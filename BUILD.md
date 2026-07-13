@@ -1,3 +1,4 @@
+> **Legacy reference only.** This document builds the retained community C++/SDL/OpenGL engine. It does not describe the Swift/Metal Revival product. See [REVIVAL.md](REVIVAL.md), [Architecture](docs/revival/architecture.md), and [Roadmap](docs/revival/roadmap.md) for current work. Use [Legacy M4 reference build](docs/revival/macos-arm64-build.md) when a focused research question requires the old executable.
 
 # Building Descent 3 Open Source 
 

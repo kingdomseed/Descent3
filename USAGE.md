@@ -1,3 +1,5 @@
+> **Legacy reference only.** These instructions run the retained community C++ engine against retail files. The Revival product will use a one-way Swift importer and will not mount retail archives at runtime. See [REVIVAL.md](REVIVAL.md) and [One-way content pipeline](docs/revival/content-pipeline.md).
+
 # Descent 3 Open source usage instructions
 
 **Important note**: This open source distribution of Descent 3 DOES NOT CONTAIN

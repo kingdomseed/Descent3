@@ -1,3 +1,5 @@
+> **Historical upstream record.** These components belong to the retained C++ reference tree. They are not selected runtime dependencies for the Swift/Metal Revival product. See [Architecture](docs/revival/architecture.md) and [Engineering principles](docs/revival/engineering-principles.md).
+
 # Third party components
 
 This file contains information about third party components that are required

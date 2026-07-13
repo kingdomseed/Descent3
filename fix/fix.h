@@ -62,10 +62,11 @@
 #define _FIX_H
 
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <type_traits>
 
-typedef std::make_signed<size_t>::type ssize_t;
+typedef std::make_signed<std::size_t>::type ssize_t;
 // the basic floating-point type
 using scalar = float;
 

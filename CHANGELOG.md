@@ -1,3 +1,5 @@
+> **Historical upstream record.** This changelog describes the retained community C++ engine. It is not the roadmap or release history of the Swift/Metal Revival product. See [REVIVAL.md](REVIVAL.md) and [Roadmap](docs/revival/roadmap.md).
+
 # Descent 3 Open Source - Changelog
 
 ## 1.6.0 - TBD
