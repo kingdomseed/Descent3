@@ -2,7 +2,7 @@
 
 # Descent 3 revival
 
-Read `REVIVAL.md`, `docs/revival/functional-completeness.md`, `docs/revival/functional-completeness-ledger.md`, `docs/revival/architecture.md`, `docs/revival/engineering-principles.md`, `docs/revival/roadmap.md`, and `docs/revival/verification.md` before making product changes. Read `docs/revival/content-pipeline.md` before changing import or asset behavior, `docs/revival/behavior-system.md` before changing gameplay behavior, `docs/revival/adaptive-music.md` before changing score import, music behavior, playback, persistence, or authoring, `docs/revival/creator-suite.md` before changing editor or publishing behavior, and `docs/revival/skills-and-agents.md` before adding or assigning an agent skill.
+Read `REVIVAL.md`, `docs/revival/functional-completeness.md`, `docs/revival/functional-completeness-ledger.md`, `docs/revival/architecture.md`, `docs/revival/engineering-principles.md`, `docs/revival/test-driven-development.md`, `docs/revival/roadmap.md`, and `docs/revival/verification.md` before making product changes. Read `docs/revival/content-pipeline.md` before changing import or asset behavior, `docs/revival/behavior-system.md` before changing gameplay behavior, `docs/revival/adaptive-music.md` before changing score import, music behavior, playback, persistence, or authoring, `docs/revival/creator-suite.md` before changing editor or publishing behavior, and `docs/revival/skills-and-agents.md` before adding or assigning an agent skill.
 
 ## Binding direction
 
@@ -39,6 +39,16 @@ Read `REVIVAL.md`, `docs/revival/functional-completeness.md`, `docs/revival/func
 - Call AppKit, Metal, MetalKit, GameController, AVFoundation, and other Apple APIs directly. Do not wrap an API merely to hide it.
 - Add a dependency only when it removes more maintained code than it introduces and its license, ownership, and update cost are documented.
 - Treat deletion and simplification as normal implementation work. Simplify mechanisms without deleting ledgered capability.
+
+## Test-driven implementation
+
+- Every new or changed production behavior starts with one focused automated test that fails for the intended reason before production implementation is written. Record the red command and salient failure, then the green command and pass.
+- Work one observable contract at a time through red, green, and refactor. Write only enough production code to turn the focused test green, then simplify while it remains green.
+- A test must protect a ledgered capability, reproduced defect, declared invariant, or reachable external boundary and must exercise the production path that actually runs.
+- Do not add tests for unreachable branches, hypothetical variants, framework behavior, or duplicate coverage. Do not add production protocols, wrappers, flags, alternate paths, or visibility solely for tests.
+- Refactoring occurs under existing green tests and cannot change behavior. Performance work starts with a failing ratified measurement. Documentation-only work uses applicable document checks rather than a fake product test.
+- Reviewers may not waive red-first evidence or demand speculative tests. A requested test must name the production entry point, reachable state, contract, and distinct regression it prevents.
+- [Test-driven development](docs/revival/test-driven-development.md) is binding. No agent, skill, reviewer, deadline, or phase may waive or weaken it. Changing it requires an explicit user-approved amendment to the accepted project documents.
 
 ## Workstream gates
 

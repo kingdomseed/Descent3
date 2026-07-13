@@ -92,7 +92,7 @@ Phase 2 adds the native editor as a read-only content inspector and level viewer
 
 One integrated application covers world and terrain editing, game-data definitions, `BehaviorGraph`, campaign and presentation authoring, asset inspection, lighting and navigation baking, dependency audits, play-in-editor, and package publishing. [Native creator suite](creator-suite.md) defines its contract.
 
-Tests live beside these targets. A separate package is not needed for test architecture.
+Tests live beside these targets and follow the binding [red-green-refactor protocol](test-driven-development.md). A separate package, test-only product path, or test architecture is not needed.
 
 ## Execution model
 

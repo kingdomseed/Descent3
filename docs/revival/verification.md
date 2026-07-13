@@ -10,6 +10,22 @@ Tests prove the contracts of the new game and creator suite. They do not require
 
 The released source and old executable may help answer a focused question about campaign, editor, behavior, multiplayer, replay, or tool intent. They are not continuous integration dependencies and do not define success for the new renderer, timing model, saves, behaviors, multiplayer, editor, or platform behavior.
 
+## Development protocol
+
+[Test-driven development](test-driven-development.md) governs every new or changed production behavior. Before implementation, write the smallest automated test for the next observable contract and run it to a failure caused by the missing behavior or reproduced defect. Then make the smallest production change that passes it, refactor while green, run the affected suite, and complete the broader evidence required below. An implementation-first test is not TDD.
+
+Each change record names:
+
+- the ledger row, reproduced defect, declared invariant, or reachable external boundary;
+- the focused red command and salient expected failure;
+- the focused green command and pass;
+- the directly affected suite and result;
+- any required image, device, performance, security, package, or end-to-end evidence.
+
+A typo, missing fixture, unavailable retail file, unrelated failure, misconfigured environment, or generally broken target is not red evidence. When a behavior-neutral refactor needs new protection for existing behavior, the test first demonstrates sensitivity through a temporary controlled mutation or reproduced defect, returns to green, and only then protects the refactor.
+
+The test-value gate is binding. Tests exercise supported production paths and protect distinct observable contracts. Coverage percentages, impossible internal states, Apple-framework behavior, duplicate assertions, speculative variants, and test-only production seams do not qualify. A reviewer requesting another test must identify the production entry point, reachable state, observable contract, plausible regression, why current tests miss it, and the lowest useful test layer.
+
 ## Evidence classes
 
 ### Import
@@ -204,4 +220,4 @@ The product is complete only when:
 
 ## Documentation gate
 
-Before implementation begins, active documents must agree on Swift 6.3, direct Metal 4, Apple Silicon, one-way import, new saves and replay, typed behavior data, the complete creator and multiplayer scope, no legacy runtime, four Phase 1 targets, and the five-target complete product. A consistency search must find no active instruction to preserve OpenGL, C++, SDL, the Osiris ABI, original saves or demos, original network interoperability, backward export, or a stock-campaign-only feature ceiling.
+Before implementation begins, active documents must agree on Swift 6.3, direct Metal 4, Apple Silicon, one-way import, new saves and replay, typed behavior data, the complete creator and multiplayer scope, no legacy runtime, four Phase 1 targets, the five-target complete product, and binding red-first TDD with the test-value gate. A consistency search must find no active instruction to preserve OpenGL, C++, SDL, the Osiris ABI, original saves or demos, original network interoperability, backward export, a stock-campaign-only feature ceiling, implementation-first testing, speculative coverage, or test-only production paths.

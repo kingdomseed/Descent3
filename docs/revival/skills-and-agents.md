@@ -8,7 +8,7 @@
 
 Skills encode methods and constraints. They do not turn an agent into the named author or reproduce the judgment of a famous engineer. Prefer official material, real authors with inspectable work, executable evidence, and narrow project-specific instructions over generic “expert” personas.
 
-No external skill is part of the product architecture. Project decisions in `AGENTS.md` and the accepted architecture document override every imported skill.
+No external skill is part of the product architecture. Project decisions in `AGENTS.md`, the accepted architecture document, and [Test-driven development](test-driven-development.md) override every imported skill.
 
 ## External sources
 
@@ -81,7 +81,7 @@ Author these skills before their workstream begins:
 
 | Skill | Purpose |
 | --- | --- |
-| `revival-constitution` | Enforce Swift/Metal-only scope, functional completeness, one-way import, non-goals, and the five-target product graph |
+| `revival-constitution` | Enforce Swift/Metal-only scope, functional completeness, one-way import, red-first TDD, non-goals, and the five-target product graph |
 | `d3-content-import` | Safe checked parsing, provenance, canonical conversion, and retail-data isolation |
 | `revival-behavior-system` | Typed visual authoring, checked compilation, deterministic Float32 execution, interval translation, adaptive-score commands, debugging, persistence, and stock translation |
 | `revival-creator-suite` | Canonical projects, AppKit editing, geometry and data tools, undo, validation, baking, play-in-editor, and publishing |
@@ -89,9 +89,11 @@ Author these skills before their workstream begins:
 | `metal4-rendering` | Direct Swift/Metal 4 resources, passes, presentation, validation, and GPU evidence |
 | `revival-multiplayer` | Authoritative simulation, transport selection, simulation and content negotiation, hostile-input and custom-media limits, hosting, modes, replay evidence, and network tests |
 | `revival-replay` | Deterministic authoritative recording and state hashes, declared observer and client evidence, desync diagnosis, persistence, and one playback architecture |
-| `revival-verification` | Numeric and revision contracts, deterministic tests, editor round trips, network matrices, images, Instruments traces, performance gates, and claim falsification |
+| `revival-verification` | Red and green evidence, reachable production paths, numeric and revision contracts, deterministic tests, editor round trips, network matrices, images, Instruments traces, performance gates, and claim falsification |
 
 Keep each skill narrow. A skill should contain enforceable rules, examples from this project, validation commands, prohibited patterns, and links to primary sources. Avoid a single large “game engine expert” prompt. Skills may share the product constitution but must not duplicate their technical playbooks.
+
+Every project-authored and imported skill inherits the binding red-green-refactor protocol and test-value gate. A skill may not permit implementation-first testing, weaken required red evidence, demand tests for unreachable or speculative paths, or introduce production seams solely for tests.
 
 The creator and behavior skills are Phase 2 and Phase 4 gates, not post-release additions. The replay skill is researched and reviewed before Phase 5. The multiplayer skill is researched and reviewed before Phase 9 design begins. Their later implementation dates do not make the capabilities optional.
 
@@ -144,6 +146,8 @@ The root agent keeps the functional-completeness ledger and assigns each phase's
 - Give each subagent one bounded output and one owner.
 - Separate verified fact, inference, recommendation, and unknown.
 - Require primary-source or local-code evidence for technical claims.
+- Require the focused red command and intended failure before production implementation, followed by focused green and affected-suite results.
+- Reject both missing red evidence and speculative tests that cannot name a reachable production path and distinct regression.
 - Project architecture is closed unless the user explicitly reopens it.
 - A content archaeologist may explain old behavior but may not solve a problem by linking old code into the product.
 - A creator-tools specialist must preserve useful capability without copying MFC dialog structure, legacy export, or the page database.
@@ -151,6 +155,6 @@ The root agent keeps the functional-completeness ledger and assigns each phase's
 - A multiplayer specialist may not inherit the original protocol merely because source exists.
 - A Metal specialist may not add an alternate renderer.
 - A systems specialist may not add a job system, ECS, or concurrency layer without a profile.
-- The verifier owns completion evidence and does not merely review code after the fact.
+- The verifier owns completion evidence and does not merely review code after the fact. The verifier cannot waive red-first evidence or convert coverage pressure into tests for paths the product never runs.
 - Every feature owner is responsible for applicable runtime, authoring, validation, playtest, and publishing evidence.
 - The root agent resolves conflicts and keeps the documents consistent.

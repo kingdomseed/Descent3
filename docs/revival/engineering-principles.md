@@ -106,7 +106,9 @@ Do not set an arbitrary lifetime line limit before the complete Training Mission
 
 Track functional ledger coverage beside line count. Falling line count while required capabilities disappear is a regression, not an improvement.
 
-## Testing without architecture theatre
+## Test-driven implementation without architecture theatre
+
+Every new or changed production behavior follows the binding [red-green-refactor protocol](test-driven-development.md). The red test is design pressure: it names the next observable contract before implementation can spread. If a behavior needs a large harness to state, narrow the slice or simplify the production boundary before adding machinery.
 
 Testability comes from explicit inputs and pure or deterministic operations, not from wrapping every type in a protocol.
 
@@ -122,6 +124,10 @@ Examples:
 - an editor command mutates, validates, undoes, redoes, saves, reopens, and plays a canonical document.
 
 Use small synthetic fixtures in Git. Parameterized tests and property tests are preferred for checked binary parsing and deterministic state transitions. GPU tests use controlled scenes and declared image tolerances.
+
+Tests are maintained code. Each test must protect reachable behavior through the real production path and add distinct regression protection. Do not optimize for test count, coverage percentage, mockability, or symmetric testing of impossible branches. When a supported path disappears, delete its obsolete tests. When a path cannot be reached after canonical validation, test the validation boundary and delete downstream dead handling instead of constructing an impossible state.
+
+The evidence chain is focused red, focused green, affected suite, then the phase-specific matrix or device evidence. A test written after implementation, a failure caused by broken setup, and a test-only production route do not satisfy that chain.
 
 ## Performance discipline
 
@@ -142,6 +148,9 @@ The 120 Hz simulation target is a product choice. The current reference display 
 Every implementation review should ask:
 
 - Does this code serve a ledgered capability in the current milestone?
+- Did the focused test first fail for the intended product reason?
+- Does each new test exercise a reachable production path and prevent a distinct regression?
+- Did test convenience add a production seam or alternate path that the product does not need?
 - Does the feature have its applicable authoring, validation, playtest, and publishing paths?
 - Can an Apple framework or standard-library feature remove it?
 - Did we add a second path where one would work?

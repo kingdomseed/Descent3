@@ -8,6 +8,8 @@ Every phase ends in a visible or objectively verifiable result. Campaign-first d
 
 Starting in Phase 2, every gameplay slice advances the matching authoring track. A feature is finished only when its applicable runtime, editor, validation, playtest, and publishing paths work.
 
+Every production slice in every phase follows the binding [red-green-refactor protocol](test-driven-development.md). Phase gates and completion matrices supplement that focused cycle; they do not replace red-first evidence or justify tests for paths the product never runs.
+
 ## Phase 0: lock the complete product definition
 
 Status: in progress
@@ -21,9 +23,10 @@ Status: in progress
 - separate intended capabilities from dead menu shells, duplicated dialogs, and historical bugs;
 - preserve verified retail hashes and the legacy M4 smoke run as non-normative evidence;
 - audit active documents for stale compatibility requirements and hidden scope deletion;
+- accept red-first TDD, the test-value gate, and the anti-dilution review rules as project law;
 - author and review `revival-constitution`, `revival-verification`, `swift-realtime-systems`, and `metal4-rendering`.
 
-Exit: every active document describes the same complete product, the ledger covers the known historical capability surface, the four Phase 1 skills are installed and pinned, and no production code has begun under conflicting instructions.
+Exit: every active document describes the same complete product, the ledger covers the known historical capability surface, the four Phase 1 skills are installed and pinned with the TDD contract intact, and no production code begins without a focused red test or under conflicting instructions.
 
 ## Phase 1: create the smallest native shell
 
@@ -36,6 +39,7 @@ Create four targets:
 
 Prove the foundations needed by the next slice:
 
+- advance each foundation one observable contract at a time through red, green, and refactor;
 - Swift 6.3 strict-concurrency build;
 - AppKit application with `MTKView`;
 - direct Metal 4 command submission and one MSL pipeline;
@@ -134,10 +138,11 @@ Bring up level 1 end to end, then proceed through the campaign graph. Implement 
 
 1. close the import dependency graph;
 2. complete its behavior translation ledger;
-3. add the smallest missing runtime capability;
-4. add the matching creator operation, inspector, validation, and playtest path;
-5. play, save, replay, reload, and complete the level;
-6. keep performance and regression evidence green.
+3. write and run the focused failing test for the next missing observable contract;
+4. add the smallest production change that turns it green;
+5. add the matching creator operation, inspector, validation, and playtest path through its own red-green slices;
+6. play, save, replay, reload, and complete the level;
+7. keep performance and regression evidence green.
 
 This phase adds outdoor terrain, reusable rooms, broader geometry tools, materials, mirrors, specular response, scorch decals, procedural textures, volumetrics, required blend semantics, more robots and AI, weapons, inventory, GuideBot, doors, triggers, paths, navigation, matcens, goals, ambient systems, weather, lighting, adaptive music, briefings, movies, TelCom-style presentation, complete cockpit and automap behavior, remaining rear and auxiliary views including guided-weapon and marker cameras, broader native haptics, effects, bosses, campaign state, and their required game-data editors as content reaches them.
 

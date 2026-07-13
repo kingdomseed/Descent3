@@ -8,6 +8,8 @@
 
 Each row names one useful capability, its current historical evidence, the native owner and planned phase, and the proof needed to close it. Phase 0 must inspect the cited source, add missing evidence, and split any row that still hides independently testable behavior. A row closes only when every applicable runtime, authoring, validation, playtest, and publishing path works. `N/A` is allowed only with a recorded reason.
 
+Implementation evidence includes the focused red and green results required by [Test-driven development](test-driven-development.md). This does not mean one test per row, branch, or line. One focused test may protect a shared contract; independently failing contracts receive separate red-green slices. Every retained test must pass the test-value gate. A ledger row does not authorize speculative coverage of a path the product never runs.
+
 States are `inventory`, `researched`, `specified`, `implemented`, or `verified`. No row is verified yet. Owners are product targets, not extra teams or modules.
 
 ## Player, simulation, and presentation

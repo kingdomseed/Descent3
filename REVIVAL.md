@@ -25,6 +25,8 @@ The revival preserves capability without preserving machinery. Every required pl
 
 A gameplay feature is complete when the runtime can execute it, the editor can author it, validation can reject broken forms, play-in-editor can test it, and the publisher can ship it. Campaign-first milestones decide implementation order; stock campaigns do not cap the behavior language or creator suite.
 
+Every production behavior is developed through a focused red-green-refactor cycle. Tests protect reachable product contracts rather than speculative branches or test-only architecture. [Test-driven development](docs/revival/test-driven-development.md) defines the binding implementation and review protocol.
+
 The binding inventory and completion rules live in [Functional completeness](docs/revival/functional-completeness.md).
 
 ## One-way conversion
@@ -112,6 +114,7 @@ The old source remains through Phase 10. It can move to an archival branch or le
 - [Functional-completeness ledger](docs/revival/functional-completeness-ledger.md) records the Phase 0 capability inventory, owners, milestones, and evidence state.
 - [Architecture](docs/revival/architecture.md) records the binding Swift/Metal decision and rejected directions.
 - [Engineering principles](docs/revival/engineering-principles.md) defines the minimal-code rules.
+- [Test-driven development](docs/revival/test-driven-development.md) defines red-first implementation, the test-value gate, and anti-dilution review rules.
 - [Content pipeline](docs/revival/content-pipeline.md) defines one-way retail conversion, native projects, and canonical packages.
 - [Behavior system](docs/revival/behavior-system.md) defines the replacement for Osiris and DALLAS.
 - [Adaptive music](docs/revival/adaptive-music.md) defines score import, logical state, native playback, persistence, and authoring.

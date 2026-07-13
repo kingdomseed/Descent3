@@ -45,6 +45,8 @@ For example, a door is incomplete if an imported door works but a creator cannot
 
 Pure runtime concerns such as controller input do not need an editor panel. Pure editor concerns such as selection history do not need a gameplay representation. The team records why a path is inapplicable instead of silently omitting it.
 
+Every new or changed production behavior used to close a completeness row follows the binding [red-green-refactor protocol](test-driven-development.md). Completion evidence records the focused test that failed for the intended reason before implementation and passed afterward. An inapplicable path receives no manufactured test; the ledger records why it is inapplicable.
+
 ## Committed product inventory
 
 The working [functional-completeness ledger](functional-completeness-ledger.md) covers these categories. Phase 0 verifies and expands it into testable rows with a source reference, native counterpart, owner, milestone, and evidence state. Umbrella names do not count as complete rows. Door rows distinguish keys, locks, automatic behavior, and blastable health. Trigger rows distinguish placement forms, activator masks, and one-shot behavior. Matcen rows distinguish production types, rates, priorities, limits, effects, sounds, and attachments. Ambient and sound rows distinguish probabilities, timing ranges, loop points, event bindings, and terrain-altitude bands.
