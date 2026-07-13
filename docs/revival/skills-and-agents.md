@@ -82,13 +82,13 @@ Author these skills before their workstream begins:
 | Skill | Purpose |
 | --- | --- |
 | `revival-constitution` | Enforce Swift/Metal-only scope, functional completeness, one-way import, red-first TDD, non-goals, and the five-target product graph |
-| `d3-content-import` | Safe checked parsing, provenance, canonical conversion, and retail-data isolation |
-| `revival-behavior-system` | Typed visual authoring, checked compilation, deterministic Float32 execution, interval translation, adaptive-score commands, debugging, persistence, and stock translation |
-| `revival-creator-suite` | Canonical projects, AppKit editing, geometry and data tools, undo, validation, baking, play-in-editor, and publishing |
-| `swift-realtime-systems` | Single-owner simulation, ownership, allocation, fixed ticks, Float32 normalization and state hashing, simulation revisions, and measured CPU optimization |
+| `d3-content-import` | Safe checked parsing, provenance, canonical conversion including selected bitmap fonts, and retail-data isolation |
+| `revival-behavior-system` | Typed visual authoring, checked compilation, deterministic Float32 execution, interval and authority translation, difficulty queries, cinematic and adaptive-score commands, debugging, persistence, and stock translation |
+| `revival-creator-suite` | Canonical projects, AppKit editing, typed room roles, difficulty playtest, cinematic and font tools, undo, validation, baking, play-in-editor, and publishing |
+| `swift-realtime-systems` | Single-owner simulation, immutable difficulty configuration, room and refueling rules, logical cinematic state, allocation, fixed ticks, Float32 normalization and state hashing, simulation revisions, and measured CPU optimization |
 | `metal4-rendering` | Direct Swift/Metal 4 resources, passes, presentation, validation, and GPU evidence |
-| `revival-multiplayer` | Authoritative simulation, transport selection, simulation and content negotiation, hostile-input and custom-media limits, hosting, modes, replay evidence, and network tests |
-| `revival-replay` | Deterministic authoritative recording and state hashes, declared observer and client evidence, desync diagnosis, persistence, and one playback architecture |
+| `revival-multiplayer` | Authoritative simulation, transport selection, simulation and content negotiation, host difficulty, chat and moderation, typed operator commands, client-presentation roles, hostile-input and custom-media limits, hosting, modes, replay evidence, and network tests |
+| `revival-replay` | Deterministic authoritative recording and state hashes, difficulty and logical cinematic persistence, game-affecting command capture, ordinary-chat exclusion, declared observer and client evidence, desync diagnosis, and one playback architecture |
 | `revival-verification` | Red and green evidence, reachable production paths, numeric and revision contracts, deterministic tests, editor round trips, network matrices, images, Instruments traces, performance gates, and claim falsification |
 
 Keep each skill narrow. A skill should contain enforceable rules, examples from this project, validation commands, prohibited patterns, and links to primary sources. Avoid a single large “game engine expert” prompt. Skills may share the product constitution but must not duplicate their technical playbooks.

@@ -70,11 +70,11 @@ RevivalMac - - explicit import - -> bundled signed D3Import
 
 This is a signed Swift command-line helper bundled inside `RevivalMac`. It reads only the original formats required by the supported owned retail content and writes a canonical directory package. It depends on canonical content types from `RevivalCore`. No gameplay library links it. The `RevivalMac` Xcode target has an explicit build dependency on the helper, copies it into `Contents/Helpers`, and includes it in nested-code signing and archive verification. During an explicit import, `RevivalMac` launches the helper as a separate process, passes selected input and destination paths, and consumes its final report and exit status.
 
-Legacy audio and movie input requires narrow project-owned Swift decoders for the exact ACM and MVE features present in the verified retail source profile. AVFoundation encodes and plays the canonical outputs; it does not decode those retail formats. The decoders exist only in `D3Import`, have bounded synthetic tests, and never enter the game process.
+Legacy bitmap fonts, audio, and movie input require narrow project-owned Swift decoders for the exact `.fnt`, ACM, and MVE features present in the verified retail source profile. `D3Import` writes canonical glyph metrics, kerning and atlases for selected production font roles; Apple media frameworks encode and play canonical audio and movie outputs. The decoders exist only in `D3Import`, have bounded synthetic tests, and never enter the game process.
 
 ### `RevivalCore`
 
-Contains canonical content and project types, world state, fixed-step simulation, collision, objects, AI, weapons, logical adaptive-score state, the behavior compiler and executor, validation, save and replay snapshots, multiplayer state, and package rules. It imports no AppKit, Metal, AVFoundation, or legacy-format code.
+Contains canonical content and project types, immutable authoritative difficulty configuration, world state, fixed-step simulation, collision, objects, AI, weapons, logical cinematic and adaptive-score state, the behavior compiler and executor, validation, save and replay snapshots, multiplayer and chat policy state, and package rules. It imports no AppKit, Metal, AVFoundation, or legacy-format code.
 
 ### `RevivalMetal`
 
@@ -82,9 +82,9 @@ Contains the concrete renderer and MSL. It consumes compact render snapshots fro
 
 ### `RevivalMac`
 
-Owns the player application, `NSWindow`, `MTKView`, display loop, input sampling, audio, adaptive-score scheduling, movies, GameController haptics, player-selected media, file locations, settings, signing, packaging, and explicit import UX. It composes `RevivalCore` and `RevivalMetal` directly and launches the bundled `D3Import` helper only when the user requests import or reimport. [Adaptive music](adaptive-music.md) fixes the boundary between deterministic score decisions and sample-clock presentation.
+Owns the player application, `NSWindow`, `MTKView`, display loop, input sampling, solo difficulty default, audio, adaptive-score scheduling, cinematic presentation, movies, GameController haptics, text-chat and operator input, player-selected media, file locations, settings, signing, packaging, and explicit import UX. It composes `RevivalCore` and `RevivalMetal` directly and launches the bundled `D3Import` helper only when the user requests import or reimport. [Adaptive music](adaptive-music.md) fixes the boundary between deterministic score decisions and sample-clock presentation.
 
-Dedicated hosting is a no-window launch mode of the same `RevivalMac` executable. That mode constructs `RevivalCore` session and network ownership, skips renderer, audio, and player UI setup, and emits structured server logs. It is not a second simulation or a separate server framework. This keeps the planned product at five targets while providing a headless host.
+Dedicated hosting is a no-window launch mode of the same `RevivalMac` executable. That mode constructs `RevivalCore` session and network ownership, skips renderer, audio, and player UI setup, and emits structured server logs. Local input and authenticated encrypted remote administration invoke the same bounded typed `HostCommand` set; no Telnet service, shell, or arbitrary process execution exists. It is not a second simulation or a separate server framework. This keeps the planned product at five targets while providing a headless host.
 
 ### `RevivalEditor`
 
@@ -102,7 +102,7 @@ Catch-up is bounded to eight simulation ticks per display callback. Excess elaps
 
 This intentionally replaces the original variable-`Frametime` loop. There is no legacy timing mode.
 
-The main owner holds mutable game state. Input is sampled into one value-type `InputFrame` per simulation tick. Held keys, buttons, and controller axes are copied into every tick while held. Press/release edges and accumulated relative mouse or scroll deltas are ordered pending impulses and are consumed exactly once by the next simulation tick, even when one display callback runs multiple ticks. Background work is limited to importing, disk I/O, media decoding, and immutable asset preparation. Completed assets are installed at a frame boundary.
+The main owner holds mutable game state. One five-case difficulty value is immutable authoritative session configuration: the profile supplies the solo default and the multiplayer host supplies the session value. Input is sampled into one value-type `InputFrame` per simulation tick. Held keys, buttons, and controller axes are copied into every tick while held. Press/release edges and accumulated relative mouse or scroll deltas are ordered pending impulses and are consumed exactly once by the next simulation tick, even when one display callback runs multiple ticks. Background work is limited to importing, disk I/O, media decoding, and immutable asset preparation. Completed assets are installed at a frame boundary.
 
 Do not add a dedicated simulation thread, actor graph, task per entity, work-stealing scheduler, or lock-free queue until Instruments shows that the single loop misses its budget because of CPU work.
 
@@ -122,7 +122,7 @@ Authoritative operations execute in declared order without fast-math transformat
 
 ## Saves and settings
 
-The game writes new versioned snapshots for saves and replay. Each binds a simulation semantic revision in addition to the content revisions it uses. Snapshots do not contain live object pointers, Swift memory layouts, renderer resources, audio-engine state, interpreter addresses, or legacy bytes. Schema changes inside the new project use explicit version handling when an existing public save, replay, or creator project requires it.
+The game writes new versioned snapshots for saves and replay. Each binds a simulation semantic revision, the authoritative difficulty value, and the content revisions it uses. Snapshots carry logical cinematic state when a sequence is active but no renderer or framework objects. They do not contain live object pointers, Swift memory layouts, renderer resources, audio-engine state, interpreter addresses, or legacy bytes. Schema changes inside the new project use explicit version handling when an existing public save, replay, or creator project requires it.
 
 The product does not import or export retail saves or demos. Settings use native Foundation storage unless a concrete need requires another format.
 

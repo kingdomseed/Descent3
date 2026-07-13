@@ -49,15 +49,15 @@ Every new or changed production behavior used to close a completeness row follow
 
 ## Committed product inventory
 
-The working [functional-completeness ledger](functional-completeness-ledger.md) covers these categories. Phase 0 verifies and expands it into testable rows with a source reference, native counterpart, owner, milestone, and evidence state. Umbrella names do not count as complete rows. Door rows distinguish keys, locks, automatic behavior, and blastable health. Trigger rows distinguish placement forms, activator masks, and one-shot behavior. Matcen rows distinguish production types, rates, priorities, limits, effects, sounds, and attachments. Ambient and sound rows distinguish probabilities, timing ranges, loop points, event bindings, and terrain-altitude bands.
+The working [functional-completeness ledger](functional-completeness-ledger.md) covers these categories. Phase 0 verifies and expands it into testable rows with a source reference, native counterpart, owner, milestone, and evidence state. Umbrella names do not count as complete rows. Door rows distinguish keys, locks, automatic behavior, and blastable health. Trigger rows distinguish placement forms, activator masks, and one-shot behavior. Matcen rows distinguish production types, rates, priorities, limits, effects, sounds, and attachments. Ambient and sound rows distinguish probabilities, timing ranges, loop points, event bindings, and terrain-altitude bands. Fonts, difficulty, cinematics, multiplayer messaging, client-presentation events, host commands, room roles, refueling, and cheat, easter-egg, or diagnostic commands each receive explicit treatment.
 
 ### Player experience
 
 - Training, base, secret, and Mercenary campaign content;
-- six-degree-of-freedom flight, collision, objects, doors, triggers, AI, weapons, inventory, GuideBot, matcens, goals, terrain, weather, effects, damage, death, and progression;
-- briefings, movies, TelCom-style presentation, HUD, animated three-dimensional cockpit, three-dimensional automap and discovery state, player markers and messages, rear view and auxiliary camera views for GuideBot, guided weapons and markers, audio, adaptive music, localization, profiles, settings, saves, accessibility, controller support, and native haptics;
+- six-degree-of-freedom flight, five named difficulty levels and their declared AI, weapon, energy-and-shield-pickup, AI energy-drop, generic-damage, profile, session, and behavior-query rules, collision, objects, doors, triggers, AI, weapons, inventory, GuideBot, matcens, goals, terrain, weather, effects, damage, death, refueling rooms, and progression;
+- briefings, movies, runtime camera-path cinematics with player-control and presentation transitions, TelCom-style presentation, HUD, animated three-dimensional cockpit, three-dimensional automap and discovery state, player markers and messages, rear view and auxiliary camera views for GuideBot, guided weapons and markers, audio, adaptive music, localization, profiles, settings, saves, accessibility, controller support, native haptics, and the intended cheat, easter-egg, and diagnostic command surface with per-command availability and consequences;
 - pilot pictures, ship logos, audio taunts, and other supported player-selected media, including local preview, network negotiation, bounds, mute and privacy controls, host policy, and safe failure;
-- stock multiplayer maps and game-mode capabilities, native multiplayer, dedicated hosting, multiplayer level and mode configuration, joining, leaving, failure recovery, and result presentation;
+- stock multiplayer maps and game-mode capabilities, native multiplayer, public, team, and private text chat with mute, block, rate, and host-policy controls, dedicated hosting with local and authenticated remote operator commands, multiplayer level and mode configuration, joining, leaving, failure recovery, and result presentation;
 - deterministic replay and recording for testing, diagnosis, desync evidence, observer or spectator behavior, and the player-facing replay experience, with each historical capability ledgered explicitly.
 
 ### World and level creation
@@ -66,7 +66,7 @@ The working [functional-completeness ledger](functional-completeness-ledger.md) 
 - outdoor terrain and reusable-room workflows;
 - UV, material, texture, procedural surface, water, fog, lighting, lightmap, volumetric, radiosity, mirror-surface, specular-response, scorch-receiver, and blend-mode capabilities, each with a ledgered native counterpart or an approved explicit exclusion;
 - sky and horizon colors, stars, satellites, rotation, halos, atmosphere, terrain environment audio, and animated-light effects such as pulses, strobes, flicker, and coronas;
-- object, player start, camera, waypoint, sound source, door, trigger, path, navigation, matcen, goal, ambient-life, and weather placement;
+- object, player start, camera, waypoint, sound source, door, trigger, path, navigation, matcen, goal, ambient-life, and weather placement, plus typed room roles for refueling, goals, secrets, special-purpose spaces, external spaces, and waypoints;
 - textured, wireframe, collision, portal, navigation, and lighting diagnostic views; focus and viewport navigation; saved views and camera bookmarks;
 - selection, grouping, reusable groups or prefabs, duplication, naming, search, undo, redo, autosave, crash recovery, inspection, statistics, repair, validation, and supported native geometry import.
 
@@ -79,7 +79,7 @@ The working [functional-completeness ledger](functional-completeness-ledger.md) 
 
 ### Behavior and campaign creation
 
-- typed event, condition, query, action, variable, timer, function, and subgraph authoring;
+- typed event, condition, query, action, variable, timer, function, and subgraph authoring, including difficulty queries, cinematic commands, bounded multiplayer command input, and explicit authoritative or client-presentation execution roles;
 - object, trigger, level, campaign, and game-mode behavior scopes;
 - behavior validation, tracing, breakpoints, deterministic replay, and persistent state;
 - campaign sequencing, branches, secrets, returns, training and multiplayer declarations, default and allowed ships, per-level ship selection, progress presentation, intros, endings, briefings, adaptive-score assignment and region control, and per-level dependencies.
@@ -89,7 +89,8 @@ The working [functional-completeness ledger](functional-completeness-ledger.md) 
 - multi-screen briefings and TelCom-style layouts;
 - text, images, movies, sound, buttons, timing, effects, fonts, colors, navigation, and conditional display;
 - cinematic sequencing, message and string management, localization, preview, and validation;
-- model, room geometry, animation, texture, font, audio, adaptive-score, movie, player-picture, ship-logo, and audio-taunt import, inspection, conversion, bounds, and rights metadata;
+- inspection and use of canonical retail bitmap fonts produced one-way by `D3Import`, with no retail font reader or conversion path in the editor;
+- model, room geometry, animation, texture, modern font, audio, adaptive-score, movie, player-picture, ship-logo, and audio-taunt import, inspection, conversion, bounds, and rights metadata;
 - font glyph coverage, atlas generation, localization preview, and animation-state and sound-event bindings.
 
 ### Build and iteration tools

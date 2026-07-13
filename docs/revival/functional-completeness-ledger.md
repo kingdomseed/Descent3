@@ -40,6 +40,10 @@ States are `inventory`, `researched`, `specified`, `implemented`, or `verified`.
 | P-022 | Adaptive score runtime and transitions | `music/`, `Descent3/d3music.cpp` | Import, Core, Mac, Editor / 5–8 | OMF conversion, logical state, musical transitions and save/replay | specified |
 | P-023 | Briefings, TelCom and movies | `Descent3/TelCom.cpp`, `editor/BriefEdit.cpp` | Mac, Editor / 5–8 | Full campaign presentation and empty-project authoring | inventory |
 | P-024 | Profiles, settings and accessibility | `Descent3/pilot.cpp`, `Descent3/config.cpp` | Mac / 4–10 | Native persistence, clean-account, control and accessibility matrix | inventory |
+| P-025 | Five-level difficulty and authoritative scaling | `Descent3/difficulty_external.h`, `Descent3/AImain.cpp`, `Descent3/WeaponFire.cpp`, `Descent3/multisafe.cpp`, `Descent3/damage.cpp`, `Descent3/pilot_class.cpp`, `Descent3/multi_ui.cpp`, `Descent3/multi_connect.cpp`, `Descent3/objinfo.h`, `editor/WorldObjectsGenericDialog.cpp`, `scripts/DallasFuncs.cpp` | Core, Mac, Editor / 4–9 | Rookie solo default, host selection and client binding, active scaling and opt-out rules, typed query, invalid-value rejection, save/replay and difficulty-selectable playtest | researched |
+| P-026 | In-game camera-path cinematics | `Descent3/gamecinematics.cpp`, `Descent3/gamecinematics_external.h`, `scripts/DallasFuncs.cpp` | Core, Metal, Mac, Editor / 5–8 | Camera and target paths, timing, text, letterbox and fades, control and AI policy, behavior commands, save/replay and authoring | researched |
+| P-027 | Refueling energy-center rooms | `Descent3/room_external.h`, `Descent3/object.cpp`, `editor/roomkeypaddialog.cpp` | Core, Mac, Editor / 4–8 | Fixed-tick recharge, cap, sound and AI notification, save/replay, authoring and validation | researched |
+| P-028 | Cheat, easter-egg and diagnostic commands | `Descent3/GameCheat.cpp` | Core, Metal, Mac / 4–10 | Per-command native effect or explicit user-approved exclusion, solo/multiplayer availability, cheated-state and progression policy, and authoritative replay treatment | researched |
 
 ## Rendering and visual effects
 
@@ -77,6 +81,7 @@ States are `inventory`, `researched`, `specified`, `implemented`, or `verified`.
 | W-012 | Selection, grouping, search and naming | `editor/` | Editor / 2–8 | Command tests, undo/redo and save/reopen | inventory |
 | W-013 | Validation, repair and statistics | `editor/` | Core, Editor / 3–8 | Broken fixtures, repair preview and refusal rules | inventory |
 | W-014 | Autosave and crash recovery | `editor/` | Editor / 3–8 | Crash simulation and explicit recovery acceptance | inventory |
+| W-015 | Typed room roles and functional metadata | `Descent3/room_external.h`, `editor/roomkeypaddialog.cpp` | Core, Editor / 2–8 | Refueling, goal, secret, special-purpose, external and waypoint roles import, author, validate, play, save and publish without a legacy bitmask API | researched |
 | D-001 | Robot and AI definitions | `manage/robotpage.h`, `editor/WorldObjectsRobotDialog.cpp` | Core, Editor / 4–8 | Full typed definition, reference and authored-play proof | inventory |
 | D-002 | Weapon and projectile definitions | `manage/weaponpage.cpp` | Core, Editor / 4–8 | Full typed definition and authored combat proof | inventory |
 | D-003 | Ship and physics definitions | `manage/shippage.cpp` | Core, Editor / 3–8 | Movement, bounds and authored ship proof | inventory |
@@ -100,6 +105,7 @@ States are `inventory`, `researched`, `specified`, `implemented`, or `verified`.
 | B-008 | Persistent behavior state and durable operations | `Descent3/gamesave.cpp` | Core, Editor / 4–8 | Save/load/replay and incompatible-revision tests | inventory |
 | B-009 | Visual debugging, traces and breakpoints | `editor/DallasMainDlg.cpp`, `editor/DallasMainDlg.h` | Core, Editor / 4–8 | Source maps, stepping, watch and error navigation | inventory |
 | B-010 | Stock behavior catalog and translation ledger | `scripts/`, `d3-osx.hog` build inputs | Import, Core / 4–9 | Complete scope manifest and approved divergence checkpoints | specified |
+| B-011 | Authoritative and client-presentation event mapping | `lib/d3events.h`, `Descent3/multi.cpp`, multiplayer modules | Import, Core, Mac, Editor / 4–9 | Every historical server/client event classified, translated or explicitly excluded; authority, replication, replay and authored-role tests | researched |
 | C-001 | Campaign order, branches, secrets and returns | `Descent3/Mission.cpp`, `Descent3/Mission.h` | Core, Editor / 5–8 | Base/Mercenary and independent campaign proof | inventory |
 | C-002 | Ship selection and campaign declarations | `Descent3/Mission.cpp`, `Descent3/Mission.h` | Core, Editor / 5–8 | Import, author, validate and replay | inventory |
 | C-003 | Briefing, intro, ending and progress presentation | `editor/BriefEdit.cpp`, `Descent3/Mission.cpp` | Mac, Editor / 5–8 | Full campaign and empty-project authoring | inventory |
@@ -124,6 +130,8 @@ States are `inventory`, `researched`, `specified`, `implemented`, or `verified`.
 | N-009 | Audio taunts | `Descent3/audiotaunts.cpp`, `Descent3/multi.cpp` | Mac / 9 | Duration/rate/cooldown bounds, mute, malformed data and playback | researched |
 | N-010 | Hostile input and media resistance | Original networking as threat evidence | Core, Mac / 9 | Fuzz, rate, storage, path and active-payload rejection | inventory |
 | N-011 | Multiplayer replay and desync evidence | `Descent3/multi.cpp`, demo capability | Core, Mac / 9 | Authoritative hashes plus declared client/observer evidence | specified |
+| N-012 | Public, team and private text chat | `Descent3/hudmessage.cpp`, `Descent3/multi.cpp` | Core, Mac / 9 | Delivery scopes, identity, bounds, rate limits, mute/block/moderation, privacy and failure tests | researched |
+| N-013 | Dedicated-host operator commands | `Descent3/dedicated_server.cpp`, `netgames/dmfc/` | Core, Mac / 9 | One typed command set through local and authenticated encrypted remote administration, authorization, audit, failure and lifecycle tests | researched |
 
 ## Import, iteration, and publishing
 
@@ -141,6 +149,7 @@ States are `inventory`, `researched`, `specified`, `implemented`, or `verified`.
 | T-010 | Atomic package publishing | Historical HOG tools as capability evidence | Core, Editor / 4–10 | Failure safety, semantic-revision checks and install proof | inventory |
 | T-011 | Rights and provenance metadata | Retail and replacement-content policy | Import, Editor / 2–10 | Required metadata and public-package refusal tests | inventory |
 | T-012 | Native mod SDK and documentation | DALLAS/editor/tool capability evidence | Core, Editor / 4–9 | Independent campaign and multiplayer package certification | inventory |
+| T-013 | Retail bitmap-font conversion | `Descent3/gamefont.cpp`, `grtext/grfont.cpp`, `grtext/grtext.h`, `cfile/cfile.cpp` | Import, Metal, Mac / 4–6 | Mixed-case source matching and collision proof; all seven entries receive a role decision; selected 4-4-4-4 production fonts decode to canonical metrics, kerning and atlases with malformed-input and image proof | researched |
 
 ## Phase 0 closure work
 
@@ -151,6 +160,6 @@ The next ledger pass must:
 3. split rows whose variants have independent state or failure behavior;
 4. record why runtime, authoring, validation, playtest, or publishing is not applicable where needed;
 5. assign a phase owner and concrete evidence artifact;
-6. confirm that no umbrella word such as “audio,” “music,” “HUD,” “TelCom,” “renderer,” or “multiplayer” hides a subsystem.
+6. confirm that no umbrella word such as “audio,” “music,” “font,” “difficulty,” “cinematic,” “HUD,” “TelCom,” “renderer,” “chat,” “room role,” “cheat,” or “multiplayer” hides a subsystem.
 
 Phase 0 does not close until that audit finds no unexplained intended capability.

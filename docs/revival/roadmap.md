@@ -19,6 +19,7 @@ Status: in progress
 - define the pinned community source as the stock behavior baseline, the historical interval-to-fixed-tick translation rule, authoritative Float32 semantics, and one `simulationSemanticRevision` policy;
 - complete the working functional-completeness ledger with one row for every required runtime, editor, behavior, campaign, multiplayer, replay, presentation, data-editing, baking, packaging, and mod-SDK capability;
 - inventory adaptive music, automap, animated cockpit, haptics, player markers, auxiliary camera views, player-selected multiplayer media, mirrors, specular response, scorch decals, procedural textures, volumetrics, and blend semantics as explicit capabilities rather than umbrella terms;
+- inventory retail bitmap-font roles, the five difficulty values and their active rules, in-game camera-path cinematics, typed room roles and refueling, per-command cheat, easter-egg, and diagnostic policy, public/team/private chat, host operator commands, and authoritative versus client-presentation behavior roles as separate capabilities;
 - record for each row its historical evidence, native counterpart, milestone, owner, acceptance evidence, and current state;
 - separate intended capabilities from dead menu shells, duplicated dialogs, and historical bugs;
 - preserve verified retail hashes and the legacy M4 smoke run as non-normative evidence;
@@ -61,7 +62,7 @@ Select a small connected cluster from the Training Mission. Implement its depend
 
 - recognized prepared-installation-directory 1.4-plus-Mercenary source profile;
 - minimal HOG and level decoding inside `D3Import`;
-- canonical room, portal, face, UV, texture, lightmap, model, object, and player-start values;
+- canonical room, typed room-role, portal, face, UV, texture, lightmap, model, object, and player-start values;
 - atomic base-package output and native package loading;
 - lightmapped opaque rendering and portal traversal through `RevivalMetal`.
 
@@ -87,7 +88,7 @@ Add runtime support for:
 Add editor support for:
 
 - deriving an imported canonical document into an editable project replacement without changing the base package;
-- creating and changing rooms, vertices, faces, portals, materials, UVs, objects, and player starts needed by the slice;
+- creating and changing rooms, typed room roles, vertices, faces, portals, materials, UVs, objects, and player starts needed by the slice;
 - transforms, snapping, duplication, naming, undo, redo, and structural validation;
 - play-in-editor with return to the same selection and document state.
 
@@ -104,7 +105,10 @@ Add runtime support for:
 - one robot with a small explicit state machine;
 - one weapon, projectile, collision, damage, and death path;
 - one pickup;
+- the five-value difficulty selection and each active difficulty-owned rule exercised by this slice;
+- the first required room-role behavior, including fixed-tick refueling if the selected cluster contains an energy center;
 - animated cockpit, HUD, instructional messaging, positional sound, and the narrow ACM import decoder if required;
+- one-way retail bitmap-font conversion when the first selected stock HUD, briefing, or TelCom consumer requires it;
 - new-format save and reload.
 
 Add editor support for:
@@ -119,7 +123,7 @@ Exit: the Training combat slice passes every Phase 4 item in `verification.md`. 
 
 Before this phase, author and review `revival-replay`.
 
-Expand import, renderer, simulation, AI, weapons, behaviors, messages, audio, adaptive music, cockpit, automap, markers, required rear or GuideBot views, and content to complete Training. Add the narrow OMF importer and canonical adaptive-score conversion when its first stock theme is required. Add the narrow MVE importer and AVFoundation transcode here if Training requires it; otherwise add it with the first level that does.
+Expand import, renderer, simulation, AI, weapons, behaviors, messages, audio, adaptive music, difficulty, typed room roles, refueling, in-game cinematics, cockpit, automap, markers, required rear or GuideBot views, selected production fonts, and content to complete Training. Add the narrow OMF importer and canonical adaptive-score conversion when its first stock theme is required. Add the narrow MVE importer and AVFoundation transcode here if Training requires it; otherwise add it with the first level that does.
 
 Complete the matching authoring surfaces for Training:
 
@@ -144,7 +148,7 @@ Bring up level 1 end to end, then proceed through the campaign graph. Implement 
 6. play, save, replay, reload, and complete the level;
 7. keep performance and regression evidence green.
 
-This phase adds outdoor terrain, reusable rooms, broader geometry tools, materials, mirrors, specular response, scorch decals, procedural textures, volumetrics, required blend semantics, more robots and AI, weapons, inventory, GuideBot, doors, triggers, paths, navigation, matcens, goals, ambient systems, weather, lighting, adaptive music, briefings, movies, TelCom-style presentation, complete cockpit and automap behavior, remaining rear and auxiliary views including guided-weapon and marker cameras, broader native haptics, effects, bosses, campaign state, and their required game-data editors as content reaches them.
+This phase adds outdoor terrain, reusable rooms, complete typed room roles and refueling behavior, broader geometry tools, materials, mirrors, specular response, scorch decals, procedural textures, volumetrics, required blend semantics, more robots and AI, weapons, inventory, GuideBot, doors, triggers, paths, navigation, matcens, goals, ambient systems, weather, lighting, adaptive music, in-game cinematics, briefings, movies, TelCom-style presentation, complete cockpit and automap behavior, remaining rear and auxiliary views including guided-weapon and marker cameras, broader native haptics, effects, bosses, campaign state, approved cheat, easter-egg, and diagnostic effects as their dependencies and per-command policies are established, and their required game-data editors as content reaches them.
 
 Exit: the complete base campaign and every stock secret level pass their player gates. Every runtime capability introduced by the base campaign can be authored and tested in `RevivalEditor`.
 
@@ -162,15 +166,15 @@ Close every remaining non-multiplayer creator row through five execution work pa
 
 ### 8A. World construction closure
 
-Complete indoor geometry operations, outdoor terrain, reusable-room workflows, native geometry import, UVs, materials, mirrors, specular response, declared blend semantics, procedural surfaces, water, fog, volumetrics, scorch behavior, sky and environment, animated lighting, diagnostic views, viewport bookmarks, and complete object placement.
+Complete indoor geometry operations, outdoor terrain, reusable-room workflows, typed room-role and functional-metadata editing, native geometry import, UVs, materials, mirrors, specular response, declared blend semantics, procedural surfaces, water, fog, volumetrics, scorch behavior, sky and environment, animated lighting, diagnostic views, viewport bookmarks, and complete object placement.
 
 ### 8B. Game definitions and player presentation closure
 
-Complete robots, powerups, buildings, clutter, ships, weapons, doors, lights, sounds, ambient patterns, physics, animation, AI, death, inventory, effects, archetype definitions, adaptive-score authoring, cockpit and HUD definitions, automap metadata, auxiliary-view layouts, marker presentation, haptic bindings, and non-multiplayer media.
+Complete robots, powerups, buildings, clutter, ships, weapons, doors, lights, sounds, ambient patterns, physics, animation, AI, death, inventory, effects, archetype definitions, difficulty-scaling opt-outs, difficulty-selectable playtest, adaptive-score authoring, cockpit and HUD definitions, automap metadata, auxiliary-view layouts, marker presentation, haptic bindings, and non-multiplayer media.
 
 ### 8C. Behavior, campaign, and presentation closure
 
-Complete typed behavior authoring, functions, subgraphs, scopes, debugging, tests, documentation, campaign graphs, secrets and returns, ship-selection rules, progress presentation, adaptive-score assignments, briefings, TelCom-style screens, cinematics, messages, fonts, localization, media import, and preview.
+Complete typed behavior authoring, functions, subgraphs, scopes, authority and presentation-role declarations, difficulty queries, debugging, tests, documentation, campaign graphs, secrets and returns, ship-selection rules, progress presentation, adaptive-score assignments, briefings, TelCom-style screens, purpose-built cinematic sequences, messages, canonical fonts, localization, media import, and preview. Phase 9 adds the multiplayer command-event declarations to this same workspace.
 
 ### 8D. Build and iteration closure
 
@@ -194,6 +198,10 @@ Implement and verify:
 - authoritative session ownership and state replication appropriate to the selected game modes;
 - joining, leaving, discovery or direct connection as selected, version and content negotiation, failure recovery, and abuse-resistant input validation;
 - exact `simulationSemanticRevision` agreement and content-revision negotiation before authoritative participation;
+- host-selected five-value difficulty as immutable authoritative session configuration;
+- bounded UTF-8 public, team, and private text chat with identity, rate limits, mute, block, moderation, privacy policy, and no raw command execution;
+- one typed host-operator command set exposed through local input and authenticated encrypted remote administration, with authorization and audit but no Telnet, shell, or arbitrary process execution;
+- classification and translation of every required historical server-side and client-presentation behavior event, with declared authority, replication, persistence, and replay treatment;
 - secure player pictures, ship logos, and audio taunts with hash identity, format and decoded-data bounds, transfer and cooldown limits, app-controlled storage, malformed and active-payload rejection, mute and disable controls, consent where required, and host policy;
 - no-window dedicated hosting through the `RevivalMac` executable, using the same `RevivalCore` simulation and network ownership as graphical sessions;
 - the original functional game-mode set or explicit modern counterparts recorded in the completeness ledger;

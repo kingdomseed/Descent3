@@ -34,6 +34,7 @@ The first supported importer input is a prepared Descent 3 1.4-plus-Mercenary in
 - canonical base-game files extracted from the original two discs;
 - canonical Mercenary files extracted from the expansion disc;
 - the official 1.4 `extra.hog` and `extra13.hog` overlays;
+- the seven recognized retail bitmap-font entries whose six historical roles receive explicit native role decisions;
 - the OMF themes, referenced score streams, and stock pilot pictures selected from the recognized retail archives;
 - Windows MVE movies from the owned discs, required for a release-complete campaign import and optional only for a partial development import.
 
@@ -52,7 +53,7 @@ Import is read-only toward the retail source and atomic toward its destination:
 3. validate container bounds, names, case collisions, duplicates, sizes, and references;
 4. select the dependency closure required by the requested partial or release-complete import scope;
 5. resolve retail patch and archive precedence once;
-6. decode and normalize the selected levels, models, textures, lightmaps, audio, adaptive-score definitions, stock pilot pictures, movies, strings, and tables;
+6. decode and normalize the selected levels, models, textures, lightmaps, production font roles, audio, adaptive-score definitions, stock pilot pictures, movies, strings, and tables;
 7. bind durable canonical content keys, resolve every reference, and assign dense package-local integer IDs;
 8. select every required entry from the bundled stock behavior catalog, validate its bindings, and attach compiled `BehaviorProgram` data for level, campaign, module-role, package-default, owner, object-archetype, game-mode, and session scopes;
 9. write a temporary package and complete import report;
@@ -91,6 +92,7 @@ Descent3Revival.content/
   definitions/
   models/
   textures/
+  fonts/
   audio/
   scores/
   movies/
@@ -112,6 +114,7 @@ Descent3Revival.content/
 - byte-integrity hashes for generated outputs;
 - normalized decoded-content hashes for transcoded images, audio, and movies;
 - imported, ignored, and rejected entries;
+- production and superseded role decisions for every recognized retail bitmap font;
 - campaign, stock-multiplayer, and optional-media completeness.
 
 Use `Codable` JSON with sorted keys for manifests, projects, and behavior data, standard Apple-readable media where practical, and a small purpose-built binary payload only where geometry or measured loading cost requires one. Do not begin with a custom archive, database, virtual filesystem, compression framework, asset graph, or plugin system.
@@ -124,6 +127,7 @@ Initial normalization favors runtime simplicity:
 | D3L rooms, portals, terrain, paths, and object placement | Typed canonical level data, using a compact binary only where JSON is clearly unsuitable |
 | Legacy texture and lightmap encodings | Standard image files or direct pixel payloads accepted by MetalKit |
 | Legacy models and animation | One small canonical mesh and animation representation |
+| Retail bitmap `.fnt` files | Checked one-way decode into canonical glyph metrics, kerning and texture atlases for production font roles; no runtime `.fnt` reader or legacy resolution switch |
 | ACM and other legacy audio | Narrow checked Swift import decode, then Apple-native PCM or compressed audio selected through AVFoundation |
 | OMF adaptive themes | Checked one-way parse into canonical regions, roles, loops, stream references, and transition rules; no runtime OMF reader |
 | MVE movies | Narrow checked Swift import decode and AVFoundation transcode to a native movie; no MVE decoder in the game |
@@ -131,7 +135,11 @@ Initial normalization favors runtime simplicity:
 | String tables and messages | UTF-8 canonical text |
 | Native Osiris mission modules | Rejected; stock behavior comes from project-supplied compiled `BehaviorProgram` data |
 
-Choose the exact standard encoding during the Training Mission import. Prefer a format that Apple frameworks read directly. `D3Import` implements only the ACM and MVE variants proven present in the verified content and rejects unknown variants. Storage efficiency does not justify a retail decoder or a general transcoding framework in the runtime.
+The source profile recognizes the logical names `lohud.fnt`, `hihud.fnt`, `briefing.fnt`, `bbriefing.fnt`, `newmenu.fnt`, `smallui.fnt`, and `largeui.fnt`; the verified HOG entries use mixed case. Legacy container matching is ASCII case-insensitive. `D3Import` forms one lowercase ASCII lookup key, rejects two entries with the same folded key, preserves exact source spelling in provenance, and assigns profile-declared canonical `ContentKey` values that do not inherit source-case variants.
+
+All seven verified fonts are proportional 4-4-4-4 color fonts; six carry kerning data and the large-UI font does not. The native product does not recreate the historical low/high-resolution font switch or use retail fonts for ordinary AppKit chrome. Each file receives a recorded production role or an explicit superseded decision. Only fonts with a real stock HUD, briefing, TelCom, or other imported-presentation consumer enter the package; unused legacy roles do not become orphan assets.
+
+Choose the exact standard media encodings during the Training Mission import. Prefer formats that Apple frameworks read directly. `D3Import` implements only the `.fnt`, ACM, and MVE variants proven present in the verified content and rejects unknown variants. Storage efficiency does not justify a retail decoder or a general transcoding framework in the runtime.
 
 ## Content identity
 
@@ -196,4 +204,4 @@ Implement legacy import coverage only as the next playable stock slice uses it:
 
 This order keeps legacy format work tied to visible game progress and prevents a general historical parser library from becoming an accidental second engine. It does not limit native project or editor functionality. Every slice adds the matching authoring surface for its canonical types, and the functional-completeness ledger drives the creator work that has no stock-import trigger.
 
-Development imports may be intentionally partial and must say so in `content.json`. A release-complete base or Mercenary import requires every campaign level, behavior program, referenced asset, required audio file, adaptive-score definition and referenced stream, briefing, and movie declared by that verified source profile. A complete stock-multiplayer import requires every committed map and its referenced assets. The release gate fails if required media is absent; only explicitly optional language or bonus content may be omitted. A future GOG or Steam profile defines and verifies its own complete required-media set rather than weakening this gate.
+Development imports may be intentionally partial and must say so in `content.json`. A release-complete base or Mercenary import requires every campaign level, behavior program, referenced asset, selected production font role, required audio file, adaptive-score definition and referenced stream, briefing, and movie declared by that verified source profile. The import report records a production or superseded decision for every recognized retail font even when the font is not packaged. A complete stock-multiplayer import requires every committed map and its referenced assets. The release gate fails if required media is absent; only explicitly optional language or bonus content may be omitted. A future GOG or Steam profile defines and verifies its own complete required-media set rather than weakening this gate.

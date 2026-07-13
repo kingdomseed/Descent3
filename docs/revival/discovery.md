@@ -80,6 +80,14 @@ OMF themes contain regions, stream selections, loops, branches, theme roles, and
 
 The declared `tMusicSeqInfo` surface is broader than the active loop: several damage, shield, kill, and mood paths are inactive or commented out. Translation records proven behavior and resolves ambiguity instead of copying dormant fields. The native design is specified in [Adaptive music](adaptive-music.md).
 
+### Retail fonts and difficulty are independent systems
+
+The stock game names seven bitmap `.fnt` files across six simultaneous runtime roles. `hihud.fnt` replaces `lohud.fnt` above the historical resolution threshold; briefing, bold briefing, menu, small UI, and large UI use the other five files. [`Descent3/gamefont.cpp`](../../Descent3/gamefont.cpp), [`Descent3/gamefont.h`](../../Descent3/gamefont.h), and [`grtext/grfont.cpp`](../../grtext/grfont.cpp) provide the loading, metrics, kerning, and glyph-pixel evidence. The native importer therefore makes a production or superseded decision for all seven files and converts only selected stock presentation consumers. It does not recreate the resolution switch or use retail fonts for ordinary AppKit chrome.
+
+Difficulty has five named values from Trainee through Insane. The active setting affects specific AI motion and aim, weapon behavior, energy and shield pickup amounts, AI energy drops, and non-scripted generic-object damage; it is not a universal damage multiplier. Solo profiles default to Rookie, multiplayer hosts select the session value, and stock behaviors query it. See [`Descent3/difficulty_external.h`](../../Descent3/difficulty_external.h), [`Descent3/difficulty.h`](../../Descent3/difficulty.h), [`Descent3/AImain.cpp`](../../Descent3/AImain.cpp), [`Descent3/WeaponFire.cpp`](../../Descent3/WeaponFire.cpp), [`Descent3/multisafe.cpp`](../../Descent3/multisafe.cpp), and [`scripts/DallasFuncs.cpp`](../../scripts/DallasFuncs.cpp).
+
+The DALLAS `aObjApplyDamage` comment says damage is difficulty-scaled, but its implementation selects scripted damage while the generic-object damage path excludes scripted damage from scaling. The native translation ledger treats that as an ambiguity to resolve. Unread historical difficulty fields do not become native state merely because they exist in the source.
+
 ### Osiris and DALLAS were separate parts of one behavior workflow
 
 Osiris was a native compiled-module runtime, not an editor or bytecode virtual machine. It loaded game, mission, and level modules; bound scripts to objects; dispatched custom, level, mission, and default object events; delivered trigger and level events; managed timers; exposed a large engine function table; and persisted script-owned state. The core contract is visible in [`Descent3/osiris_dll.h`](../../Descent3/osiris_dll.h), the module loader in [`Descent3/OsirisLoadandBind.cpp`](../../Descent3/OsirisLoadandBind.cpp), and the imported engine surface in [`scripts/osiris_import.h`](../../scripts/osiris_import.h).
@@ -90,11 +98,21 @@ The new typed [`BehaviorGraph`](behavior-system.md) and compiled `BehaviorProgra
 
 The pinned GPL community commit is the normative baseline for stock behavior because it is inspectable and supplied the 55 native reference modules used by the successful M4 smoke run. Retail 1.4 content supplies media, identifiers, and comparison evidence. Retail DLL behavior is ambiguity evidence only, and the new product never imports or executes those DLLs. Known defects are not preserved automatically; each deliberate semantic correction is recorded in the translation ledger.
 
+### In-game cinematics are behavior-driven gameplay
+
+The runtime cinematic system is separate from briefing screens and movie playback. It drives camera and target paths, level intros and endings, text, letterboxing, fades, player-control policy, AI policy, interruption, and completion. Stock behaviors invoke it through cinematic start and stop actions, so campaign translation, save and replay, rendering, application input, and creator authoring all depend on one logical sequence contract. [`Descent3/gamecinematics.cpp`](../../Descent3/gamecinematics.cpp), [`Descent3/gamecinematics_external.h`](../../Descent3/gamecinematics_external.h), and [`scripts/DallasFuncs.cpp`](../../scripts/DallasFuncs.cpp) provide the primary evidence.
+
+The native counterpart is a purpose-built typed cinematic sequence, not a general timeline engine and not a legacy canned-cinematic interpreter.
+
 ### Player presentation extends beyond HUD and TelCom
 
 The released game has a separate three-dimensional automap with discovery state, full-map effects, and marker display in [`Descent3/TelComAutoMap.cpp`](../../Descent3/TelComAutoMap.cpp). [`Descent3/cockpit.cpp`](../../Descent3/cockpit.cpp) implements an animated cockpit distinct from the HUD. [`Descent3/SmallViews.cpp`](../../Descent3/SmallViews.cpp) and [`Descent3/GameLoop.cpp`](../../Descent3/GameLoop.cpp) cover rear, GuideBot, guided-weapon, marker, and related auxiliary views.
 
 Player markers persist messages and positions. The gameplay-level force-feedback system in [`Descent3/D3ForceFeedback.cpp`](../../Descent3/D3ForceFeedback.cpp) shows intended effects even though the retained POSIX backend is a stub. Multiplayer also exchanges player-selected pictures, ship logos, and compressed audio taunts. These are functional and security requirements for native counterparts, not reasons to preserve legacy media files, codecs, or packet layouts.
+
+Rooms also carry functional roles beyond geometry. [`Descent3/room_external.h`](../../Descent3/room_external.h) declares fuel-center, goal, secret, external, waypoint, and other special-purpose flags; [`Descent3/object.cpp`](../../Descent3/object.cpp) applies refueling, capping, sound, AI notification, secret, and waypoint behavior. The native world model represents intended roles as typed data rather than preserving a legacy bitmask API.
+
+[`Descent3/GameCheat.cpp`](../../Descent3/GameCheat.cpp) implements intended cheat, easter-egg, and diagnostic effects with different policies. Several presentation and diagnostic commands remain available in multiplayer; gameplay cheats below the multiplayer guard are rejected, and only some commands mark the profile as cheated or zero score. Functional completeness therefore requires a per-command native effect or explicit user-approved exclusion, solo/multiplayer policy, cheated-state consequence, and authoritative replay decision. It does not require the old encrypted input strings or a general shell or console. A renderer-specific command receives an equivalent native diagnostic or an explicit user-approved exclusion; it does not force preservation of a dead rendering mechanism.
 
 ### Original saves expose implementation layout
 
@@ -105,6 +123,10 @@ The new engine writes a new canonical snapshot and does not import or export his
 ### Original multiplayer is a separate old architecture
 
 The source implements server and client roles, reliable and unreliable packet paths, custom reliability, game-time exchange, object updates, and native game modules. These mechanisms are evidence for functional behavior, game modes, lifecycle, presentation, and failure cases. They are not the native design.
+
+The functional surface also includes public, team, and private HUD text chat; game-mode commands entered through a bounded message path; and local and remote dedicated-host administration. [`Descent3/hudmessage.cpp`](../../Descent3/hudmessage.cpp), [`Descent3/multi.cpp`](../../Descent3/multi.cpp), and [`Descent3/dedicated_server.cpp`](../../Descent3/dedicated_server.cpp) provide that evidence. The native product separates ordinary chat from typed game-affecting commands and exposes one typed host-command set through local and authenticated encrypted administration. It does not preserve Telnet, raw chat execution, a shell, or arbitrary process execution.
+
+[`lib/d3events.h`](../../lib/d3events.h) also separates historical game-side and client-side behavior events. Translation must classify each required event as authoritative simulation, replicated presentation, local application input or UI, or an explicitly excluded obsolete mechanism. The `CLIENT` name alone does not decide authority, persistence, replay, or network safety, and the native product does not preserve the historical numeric event IDs.
 
 Multiplayer, dedicated hosting, multiplayer authoring, and replay are committed revival capabilities. Phase 9 selects a modern design against the deterministic simulation, current Apple networking APIs, security requirements, and measured behavior. It does not inherit the original protocol, packet layouts, reliability layer, module ABI, or live interoperability.
 

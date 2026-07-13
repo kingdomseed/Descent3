@@ -55,8 +55,8 @@ Stock behavior is translated into typed `BehaviorGraph` source and compiled into
 The complete revival includes:
 
 - the Training, base, secret, and Mercenary campaign content;
-- six-degree-of-freedom flight, collision, AI, weapons, objectives, HUD, animated cockpit, automap, markers, rear and auxiliary camera views, adaptive music, audio, movies, native controller haptics, modern saves, and replay;
-- native multiplayer, dedicated hosting, supported game modes, secure player pictures, ship logos and audio taunts, and multiplayer authoring;
+- six-degree-of-freedom flight, five-level difficulty and its real scaling rules, collision, AI, weapons, objectives, refueling rooms, HUD and selected one-way-converted stock fonts, animated cockpit, automap, markers, rear and auxiliary camera views, in-game camera-path cinematics, adaptive music, audio, movies, cheat, easter-egg, and diagnostic commands with explicit per-command policy, native controller haptics, modern saves, and replay;
+- native multiplayer, dedicated hosting, text chat and moderation, authenticated host operator commands, explicit authoritative and client-presentation behavior roles, supported game modes, secure player pictures, ship logos and audio taunts, and multiplayer authoring;
 - a direct Metal renderer for imported content and replacement visuals;
 - a native macOS player application with keyboard, mouse, and controller support;
 - one integrated native creator suite for world geometry, terrain, objects, game data, behaviors, campaigns, briefings, cinematics, assets, localization, lighting, navigation, validation, playtesting, and publishing;

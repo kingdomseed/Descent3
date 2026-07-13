@@ -19,6 +19,7 @@ Read `REVIVAL.md`, `docs/revival/functional-completeness.md`, `docs/revival/func
 - Campaign-first development controls order. Stock campaign requirements are not the final ceiling for behaviors, tools, multiplayer, replay, or the mod SDK.
 - Preserve intended capabilities, not old dialogs, file layouts, DLL interfaces, packet bytes, disabled shells, duplicated tools, or historical bugs.
 - Multiplayer, replay, the integrated editor, game-data tools, behavior authoring, campaign and presentation tools, baking, packaging, and the native mod SDK are committed product work. A phase may defer their implementation but may not silently remove them.
+- Retail fonts, five-level difficulty, in-game cinematic sequences, multiplayer text chat, client-presentation event roles, host operator commands, room roles and refueling, and cheat, easter-egg, and diagnostic commands with per-command policy are explicit ledgered capabilities. Do not hide or delete them under umbrella terms.
 
 ## One-way content boundary
 

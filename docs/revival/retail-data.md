@@ -41,6 +41,24 @@ Both are structurally valid `HOG2` archives: tables have sorted unique case-inse
 
 The updater ran in an isolated ignored prefix using a temporary Wine 11 bundle. Wine was never a product dependency or a runtime plan. The 1.3 staging tree was preserved, the updater touched only a cloned treatment tree, and only the two validated HOG archives were promoted. Historical Windows executables and readme files were not imported into the curated data tree.
 
+## Verified retail fonts
+
+The prepared source profile contains these seven bitmap-font entries:
+
+| Exact source spelling | Flags | Historical role |
+| --- | ---: | --- |
+| `Briefing.fnt` | `0x17` | Briefing text |
+| `bbriefing.fnt` | `0x17` | Bold briefing text |
+| `hihud.fnt` | `0x17` | High-resolution HUD variant |
+| `LARGEUI.FNT` | `0x13` | Large UI text |
+| `Lohud.fnt` | `0x17` | Standard HUD variant |
+| `Newmenu.fnt` | `0x17` | Menu text |
+| `SMALLUI.FNT` | `0x17` | Small UI text |
+
+The format flags in [`grtext/grtext.h`](../../grtext/grtext.h) and the loader in [`grtext/grfont.cpp`](../../grtext/grfont.cpp) show that all seven are proportional 4-4-4-4 color fonts. Six are kerned; `LARGEUI.FNT` is not. The mixed spelling confirms that retail HOG lookup must be ASCII case-insensitive. Import provenance retains the exact source spelling, while the one-way importer rejects case-fold collisions and emits profile-declared canonical keys.
+
+These entries are proprietary local evidence. Their pixels and converted atlases remain outside Git.
+
 ## Current ignored layout
 
 ```text
@@ -104,4 +122,4 @@ The corresponding logs and screenshots remain under ignored `runtime-data/v14-sm
 
 ## New importer contract
 
-The first importer profile must accept the prepared verified 1.4-plus-Mercenary directory above, resolve overlay order, select only the requested dependency closure, reject native code, and emit a deterministic provenance report. Development packages may be partial. Release-complete campaign packages must contain every required movie, audio file, briefing, level, and behavior program. Complete stock-multiplayer packages must contain every committed map, mode `BehaviorProgram`, referenced asset, and matching completeness metadata. Schema changes reimport from this source rather than adding legacy readers or package migrations to the runtime. Reimport is atomic and must preserve the active package, saves, replays, projects, and native packages on failure.
+The first importer profile must accept the prepared verified 1.4-plus-Mercenary directory above, resolve overlay order, select only the requested dependency closure, reject native code, and emit a deterministic provenance report. Development packages may be partial. Release-complete campaign packages must contain every required movie, audio file, selected production font, briefing, level, and behavior program, plus a production or superseded decision for every recognized font. Complete stock-multiplayer packages must contain every committed map, mode `BehaviorProgram`, referenced asset, and matching completeness metadata. Schema changes reimport from this source rather than adding legacy readers or package migrations to the runtime. Reimport is atomic and must preserve the active package, saves, replays, projects, and native packages on failure.

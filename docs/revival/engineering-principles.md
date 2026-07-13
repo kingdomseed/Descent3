@@ -84,7 +84,7 @@ Do not use actors or tasks for players, robots, projectiles, doors, AI goals, ph
 
 ## Dependencies
 
-The product aims for no third-party runtime dependencies. Apple frameworks and the Swift standard library cover the applications, renderer, input, canonical audio and movie encoding and playback, serialization, and tests. Narrow project-owned Swift decoders in `D3Import` handle the verified ACM and MVE retail inputs; Apple media frameworks do not decode those formats.
+The product aims for no third-party runtime dependencies. Apple frameworks and the Swift standard library cover the applications, renderer, input, canonical font use, audio and movie encoding and playback, serialization, and tests. Narrow project-owned Swift decoders in `D3Import` handle the verified retail bitmap-font, ACM, and MVE inputs; no legacy decoder enters a runtime target.
 
 Before adding a dependency, document:
 

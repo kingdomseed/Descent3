@@ -47,7 +47,7 @@ The behavior language supports:
 - engine queries and commands for the complete supported game domain;
 - structured errors, source locations, debug metadata, tracing, breakpoints, and inspection.
 
-Initial value families include booleans, signed integers, finite `Float32` values, vectors and orientations built from `Float32`, ticks, strings or localization keys, enums, and typed `ContentKey` or runtime-entity references. Each floating domain declares its valid range, conversions, comparison semantics, and out-of-range behavior. Import, authoring, behavior commands, saves, replays, and network inputs reject NaN and infinity. Canonical encoding and hashing normalize negative zero. An operation that produces an invalid result fails deterministically at its source node; it does not leak an exceptional value into state. The type checker rejects mismatched scopes and reference kinds before play.
+Initial value families include booleans, signed integers, finite `Float32` values, vectors and orientations built from `Float32`, ticks, strings or localization keys, enums including the fixed five-case `Difficulty`, and typed `ContentKey` or runtime-entity references. Difficulty is immutable authoritative session configuration: behavior may query it but may not mutate it. Each floating domain declares its valid range, conversions, comparison semantics, and out-of-range behavior. Import, authoring, behavior commands, saves, replays, and network inputs reject NaN and infinity. Canonical encoding and hashing normalize negative zero. An operation that produces an invalid result fails deterministically at its source node; it does not leak an exceptional value into state. The type checker rejects mismatched scopes and reference kinds before play.
 
 The language has one bounded stable-order collection value for typed query results. A runtime entity reference carries an ID and generation. A stale or destroyed reference becomes `.none`; an existence query can branch on it, and a command that requires a live entity fails with a deterministic source-linked error unless that command explicitly defines missing-target behavior. An active iteration captures its ordered membership when it begins. New entities do not join it, and destroyed entries become `.none`. Saves and replays preserve reference generations and collection order.
 
@@ -55,7 +55,7 @@ The language does not expose pointers, arbitrary memory, files, sockets, threads
 
 ## Events and ownership
 
-Events are typed data delivered through one ordered FIFO owned by `RevivalCore`. The ledger defines payloads and native counterparts for fixed-tick and AI updates; room and portal transitions; timer fire, cancellation, repetition, and owner loss; trigger, use, and collision; object creation, child death, destruction, respawn, and player death; damage; AI notifications; goals and goal items; matcens; inventory and doors; adaptive-score region, role, transition, and completion state; movie, briefing, and presentation state; level and campaign progress; multiplayer lifecycle; and custom project-defined events.
+Events are typed data delivered through one ordered FIFO owned by `RevivalCore`. The ledger defines payloads and native counterparts for fixed-tick and AI updates; room and portal transitions; timer fire, cancellation, repetition, and owner loss; trigger, use, and collision; object creation, child death, destruction, respawn, and player death; damage; AI notifications; goals and goal items; matcens; inventory and doors; refueling and room roles; adaptive-score region, role, transition, and completion state; in-game cinematic start, stop, completion and interruption; movie, briefing, and presentation state; level and campaign progress; multiplayer lifecycle and bounded game-mode command input; and custom project-defined events.
 
 Behavior can be attached at several scopes:
 
@@ -73,7 +73,7 @@ Ordinary emitted events enter the FIFO and return no value. A typed targeted req
 
 Queries read typed simulation state. Commands request validated changes through `RevivalCore`. A successful command changes logical world state immediately, so later instructions, targeted requests, and lower-priority handlers in the same dispatch observe it. Structural storage changes commit at the event boundary, but queries use the logical overlay and active collection iterations keep their captured membership. This preserves deterministic visibility without mutating a collection during traversal.
 
-The domain surface grows with completed runtime and creator capabilities and must ultimately cover the functional-completeness ledger: objects, players, rooms, terrain, doors, AI, paths, matcens, goals, inventory, weapons, effects, audio, typed adaptive-score region and role commands, player markers, presentation, camera modes, campaign flow, and multiplayer rules.
+The domain surface grows with completed runtime and creator capabilities and must ultimately cover the functional-completeness ledger: objects, players, five-level difficulty queries, rooms and typed room roles, terrain, doors, AI, paths, matcens, goals, inventory, weapons, effects, audio, typed adaptive-score region and role commands, player markers, in-game cinematics, presentation, camera modes, campaign flow, and multiplayer rules and declared command events.
 
 The public language surface is not limited to operations found in the stock campaign. Stock translation determines implementation order and provides regression cases. Creator completeness determines the final language boundary.
 
@@ -101,6 +101,8 @@ Phase 5, Phase 8, and Phase 9 stress tests measure the 4,096-operation ceiling a
 
 Solo play and the multiplayer host both own authoritative simulation. Object, trigger, level, campaign, and game-mode behaviors that can mutate game state execute only on that authority. Clients receive replicated results and may run separately declared presentation-only behavior that cannot issue authoritative commands. Any prediction uses explicit built-in simulation rules and is corrected against authority; a content graph never gains hidden client-side mutation rights.
 
+Every historical `EVT_GAME_*` and `EVT_CLIENT_*` use receives an explicit native classification: authoritative simulation event, replicated presentation event, local application input or UI event, or excluded obsolete mechanism with a recorded reason. The client prefix does not automatically make an event safe or presentation-only. The stock translation manifest records the classification and the required replication or local-input boundary. No raw historical event number enters canonical content.
+
 These rules do not select the Phase 9 transport. They fix behavior ownership so transport work cannot create a second scripting model.
 
 ## Authoring and debugging
@@ -115,6 +117,8 @@ The GPL-released DALLAS-generated and handwritten C++ sources are behavioral evi
 
 Known defects do not become requirements automatically. Every intentional community fix, retail difference, or new native correction receives one explicit ledger decision and observable checkpoint. The importer never loads retail DLLs to resolve a disagreement.
 
+Difficulty translation follows active producer-consumer paths, not comments or unused globals. In particular, the historical `aObjApplyDamage` documentation says its damage is difficulty-scaled while its implementation emits `GD_SCRIPTED`, and the generic damage path excludes scripted damage from scaling. That conflict requires an approved native decision and checkpoint before translation. `Diff_player_damage` and the stale global `Difficulty_level` path receive no production code or tests unless further source or runtime evidence establishes a reachable contract.
+
 Every translated behavior records:
 
 | Field | Purpose |
@@ -128,6 +132,7 @@ Every translated behavior records:
 | Generated DALLAS ranges | Structured behavior covered |
 | Handwritten ranges | Logic requiring direct analysis |
 | Events, values, queries, and commands | Language coverage |
+| Authority and historical event side | Authoritative, replicated presentation, local application, or explicitly excluded mapping for every server/client event used by the scope |
 | `ContentKey` bindings | Durable canonical references |
 | Observable checkpoints | Translation evidence |
 | Status | Not started, translated, playable, or verified |
@@ -138,11 +143,11 @@ Reviewed stock translations form the versioned `StockBehaviorCatalog` bundled an
 
 ## Persistence and replay
 
-Save snapshots store declared behavior variables, handler execution counts, active timers, durable operation handles, logical adaptive-score state, campaign and session state, and the simulation tick. A long-running engine operation returns a typed durable handle and later emits completion or cancellation; behavior execution never suspends an interpreter stack across ticks. Saves do not store call continuations, interpreter pointers, editor state, native memory, audio-engine or decoder state, or opaque script payloads.
+Save snapshots store declared behavior variables, handler execution counts, active timers, durable operation handles, authoritative difficulty, logical cinematic and adaptive-score state, campaign and session state, and the simulation tick. A long-running engine operation returns a typed durable handle and later emits completion or cancellation; behavior execution never suspends an interpreter stack across ticks. Saves do not store call continuations, interpreter pointers, editor state, native memory, audio-engine or decoder state, or opaque script payloads.
 
 Each behavior graph has a durable `ContentKey` and semantic revision. A save or replay binds those values and one `simulationSemanticRevision` rather than package-local IDs or incidental encoding bytes. Published creator formats receive deliberate versioning and migrations after public release.
 
-Replay records resolved tick inputs, session configuration, content identities, seeds, and nondeterministic boundary results. Authoritative simulation re-execution must reproduce the same declared canonical state hashes on the supported architecture. Multiplayer transport timing, client prediction history, and presentation traces reproduce only the session evidence declared by the Phase 9 design; they are not silently promoted into canonical state. One replay container and playback path carry both kinds of evidence.
+Replay records resolved tick inputs, authoritative difficulty and other session configuration, game-affecting player or host commands, content identities, seeds, and nondeterministic boundary results. Ordinary chat text is presentation data and is excluded from authoritative hashes and recordings by default. Authoritative simulation re-execution must reproduce the same declared canonical state hashes on the supported architecture. Multiplayer transport timing, client prediction history, and presentation traces reproduce only the session evidence declared by the Phase 9 design; they are not silently promoted into canonical state. One replay container and playback path carry both kinds of evidence.
 
 ## Extensibility
 
@@ -152,6 +157,6 @@ If a future capability cannot be expressed safely, extend the typed language or 
 
 ## Verification
 
-Tests cover parsing, type checking, graph validation, compiler output, handler disposition, command visibility, targeted requests, timer lifetime, run policies, authority, stale references, stable collections, Float32 boundaries, adaptive-score commands, historical interval translation, durable operations, operation accounting, cycles, bounded iteration, call limits, persistence, errors, debug source maps, and deterministic replay. Interval-heavy tests cover rate equivalence, timer boundaries, long-run drift, and measured operation counts. While 4,096 is the active ceiling, direct and multi-handler event cycles must fail at exactly that operation without hanging or advancing another tick.
+Tests cover parsing, type checking, graph validation, compiler output, handler disposition, command visibility, targeted requests, timer lifetime, run policies, authority and historical server/client event classification, stale references, stable collections, Float32 boundaries, focused five-level difficulty queries, in-game cinematic commands, adaptive-score commands, historical interval translation, bounded multiplayer command events, durable operations, operation accounting, cycles, bounded iteration, call limits, persistence, errors, debug source maps, and deterministic replay. Interval-heavy tests cover rate equivalence, timer boundaries, long-run drift, and measured operation counts. While 4,096 is the active ceiling, direct and multi-handler event cycles must fail at exactly that operation without hanging or advancing another tick.
 
 Every runtime operation has focused synthetic tests. Stock levels, reusable and default object behaviors, stock game modes, and independently authored projects add end-to-end checkpoints. A behavior is complete only when the editor can author it, the compiler can reject invalid forms, the runtime can execute it, the debugger can identify failure, and a package can publish it.

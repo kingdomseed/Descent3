@@ -36,11 +36,13 @@ The test-value gate is binding. Tests exercise supported production paths and pr
 - byte-deterministic structured output for the same source profile, importer version, and package schema;
 - deterministic normalized decoded pixels, PCM samples, frame timing, and project metadata for transcoded media;
 - recorded OS, SDK, codec path, and encoder settings, with media-container hashes treated as per-import integrity rather than cross-toolchain equality;
-- validated archive bounds, duplicate names, case collisions, and references;
+- validated archive bounds, duplicate names, ASCII case-fold collisions, references, exact source spelling in provenance, and profile-declared canonical keys;
 - complete source and output hashes in the import report;
 - atomic destination promotion;
 - requested-scope closure for partial imports and full closure for release-complete imports;
 - bounded synthetic ACM and MVE decode cases, including malformed and unsupported variants;
+- bounded retail `.fnt` cases for magic, flags, dimensions, glyph ranges, proportional widths, kerned and unkerned forms, bounds-derived payload lengths, and 4-4-4-4 alpha and color translation, plus canonical metrics and atlas images for every selected production role;
+- one explicit production or superseded decision for each of the seven recognized retail font files, with no packaged orphan font;
 - bounded OMF parsing into canonical regions, roles, loops, stream references and transition rules, including malformed instructions, invalid branches, missing streams, and loop failures;
 - failed reimport leaving the active package, saves, replays, projects, and native packages untouched;
 - compatible reimport preserving durable keys and semantic revisions;
@@ -56,9 +58,13 @@ Synthetic containers cover parser edge cases in repository tests. The verified o
 
 The same replay must produce the same canonical state hash in repeated release-build runs on the supported architecture. Collection iteration order may not affect that hash.
 
+Difficulty table and branch tests cover all five named values for active rules with difficulty-dependent outcomes: AI motion and aim, weapon behavior, energy and shield pickup amounts, AI energy drops, non-scripted generic damage, and the typed behavior query. When two values intentionally share an outcome, the focused owning test names that equality. Separate focused tests prove the real authorable opt-outs at one scaling-sensitive value, the Rookie solo default, selected-value persistence, host-to-client binding before the first simulation tick, and rejection of out-of-range persisted or network values. Add only stock checkpoints that branch on difficulty; do not multiply every campaign test by five. Unused historical fields and contradicted comments receive no test until a reachable native decision exists.
+
+Room-role tests cover canonical import and authoring plus the distinct runtime effects they own. Refueling tests prove fixed-tick rate, cap, sound and AI notification without frame-rate dependence. Cinematic tests prove logical timing, camera and target paths, control and AI policy, interruption, completion and state restoration. Cheat, easter-egg, and diagnostic tests cover each approved native effect, its solo/multiplayer availability, cheated-state and progression consequence where applicable, and authoritative replay treatment without reproducing the old encrypted-string implementation.
+
 ### Behaviors
 
-Each graph value, expression, event, query, command, branch, timer, function, scope, persistence rule, compiler diagnostic, and instruction family has focused synthetic tests. Type errors and invalid references fail before play. Float32 boundaries, adaptive-score region and role commands, and translated `EVT_INTERVAL` rules have focused cases. Interval-heavy fixtures verify rate equivalence, timer boundaries, long-run drift, and measured operation counts at 120 Hz. While 4,096 is the active development ceiling, direct and multi-handler cycles fail at exactly that operation without hanging or advancing another tick.
+Each graph value, expression, event, query, command, branch, timer, function, scope, persistence rule, compiler diagnostic, and instruction family has focused synthetic tests. Type errors and invalid references fail before play. Float32 boundaries, difficulty queries, cinematic commands, adaptive-score region and role commands, bounded multiplayer command events, historical server/client event classification, and translated `EVT_INTERVAL` rules have focused cases. Interval-heavy fixtures verify rate equivalence, timer boundaries, long-run drift, and measured operation counts at 120 Hz. While 4,096 is the active development ceiling, direct and multi-handler cycles fail at exactly that operation without hanging or advancing another tick.
 
 Compiler tests prove stable observable semantics, source-map accuracy, and deterministic operation accounting. Debug tests prove breakpoints, traces, watched values, and runtime errors resolve to the authoring graph.
 
@@ -66,7 +72,7 @@ Phase 5, Phase 8, and Phase 9 measure the operation ceiling against stock campai
 
 Each required stock behavior scope has local checkpoints: levels cover objectives, doors, timers, spawns, messages, set pieces, adaptive-score commands, and completion; reusable/default objects and archetypes cover lifecycle and domain behavior; campaigns cover transitions and persistent state; game modes and sessions cover lifecycle, rules, scoring, results, and failure paths. Declared community fixes, retail observations, and approved native divergences receive their own checkpoints. A scope is not translated because its content loads. It is translated when its required behavior completes in the new runtime and its ledger has no unexplained generated or handwritten source behavior.
 
-Import tests verify the signed `StockBehaviorCatalog` version and manifest hash, source-provenance entries, scope closure, graph hashes, declared bindings, compile results, and package report. Removing any required level, campaign, module-role, package-default, owner, archetype, game-mode, or session entry must make the applicable import scope fail before promotion.
+Import tests verify the signed `StockBehaviorCatalog` version and manifest hash, source-provenance entries, scope closure, graph hashes, declared bindings, authoritative or client-presentation event roles, compile results, and package report. Removing any required level, campaign, module-role, package-default, owner, archetype, game-mode, client-presentation role, or session entry must make the applicable import scope fail before promotion.
 
 ### Saves and replay
 
@@ -74,13 +80,13 @@ New saves must:
 
 - encode a version and content identity;
 - bind one `simulationSemanticRevision` and reject or explicitly migrate incompatible authoritative state;
-- round-trip canonical world, behavior, campaign, automap discovery, player-marker, and logical adaptive-score state;
+- round-trip authoritative difficulty plus canonical world, behavior, campaign, automap discovery, player-marker, logical cinematic, and logical adaptive-score state;
 - reject corrupt or incompatible data without partially mutating the live world;
 - omit renderer, framework, pointer, and transient task state;
 - bind durable campaign, level, behavior-graph, multiplayer-mode, and session-definition keys and their separate semantic revisions rather than package-local IDs or byte hashes;
 - remain deterministic for the same snapshot where the encoder guarantees stable ordering.
 
-Replays record resolved tick input, content identity, simulation revision, configuration, seeds, and controlled nondeterministic boundary results. Repeated authoritative release-build playback on the supported architecture must produce the same declared state hashes and completion result. A multiplayer recording may also carry client, observer, transport, or presentation evidence with separately declared checkpoints; it need not recreate packet timing or prediction history unless the Phase 9 contract explicitly makes one of those values authoritative. Corrupt, incompatible, truncated, and hostile replay data fails without mutating live state.
+Replays record resolved tick input, content identity, simulation revision, authoritative difficulty and other configuration, game-affecting player and host commands, seeds, and controlled nondeterministic boundary results. Ordinary chat text is excluded from authoritative hashes and replay by default. Repeated authoritative release-build playback on the supported architecture must produce the same declared state hashes and completion result. A multiplayer recording may also carry client, observer, transport, or presentation evidence with separately declared checkpoints; it need not recreate packet timing or prediction history unless the Phase 9 contract explicitly makes one of those values authoritative. Corrupt, incompatible, truncated, and hostile replay data fails without mutating live state.
 
 No test requires the original game to read a new save or replay.
 
@@ -94,6 +100,8 @@ No test requires the original game to read a new save or replay.
 - deterministic project decoding and publishing where the selected encoding promises it;
 - content-catalog resolution, declared replacement order, duplicate ownership, missing dependencies, orphan detection, and destructive-change impact reports;
 - behavior compilation, lighting and navigation bake invalidation, failure safety, and stale-product detection;
+- typed room-role editing, difficulty-selectable playtest, difficulty-scaling opt-outs, cinematic sequence authoring and declared multiplayer command and event roles;
+- canonical font metrics, kerning, atlas generation, glyph coverage and replacement-font preview without any editor `.fnt` reader;
 - adaptive-score authoring and preview, region and transition validation, logical save and replay round trips, and complete score-audio dependency closure;
 - missed semantic-revision detection, explicit compatible-change acknowledgment, encoding-only preservation, and narrowly scoped invalidation;
 - play-in-editor using the shipping simulation and return to the same document state;
@@ -104,7 +112,9 @@ Each gameplay feature's verification row names its applicable authoring operatio
 
 ### Multiplayer
 
-Multiplayer tests cover the selected transport and session contracts, authoritative state, exact simulation-revision agreement, content and version negotiation, join and leave, reconnection policy, invalid and hostile inputs, rate and size limits, dedicated-host lifecycle, game-mode rules, results, replay, and clean failure. Player pictures, ship logos, and audio taunts have format whitelists and caps for encoded bytes, decoded dimensions, sample rate, duration, transfer rate, cooldown, and aggregate session storage. Tests cover hash identity, app-controlled paths, malformed media, active-payload rejection, mute and disable controls, consent where required, host policy, and abuse-resistant failure.
+Multiplayer tests cover the selected transport and session contracts, authoritative state, host-selected difficulty bound identically on every participating client before the first simulation tick, out-of-range difficulty rejection, exact simulation-revision agreement, content and version negotiation, join and leave, reconnection policy, invalid and hostile inputs, rate and size limits, dedicated-host lifecycle, game-mode rules, results, replay, and clean failure. Player pictures, ship logos, and audio taunts have format whitelists and caps for encoded bytes, decoded dimensions, sample rate, duration, transfer rate, cooldown, and aggregate session storage. Tests cover hash identity, app-controlled paths, malformed media, active-payload rejection, mute and disable controls, consent where required, host policy, and abuse-resistant failure.
+
+Text-chat tests cover bounded UTF-8 input, sender identity, public, team and private routing, disconnected recipients, rate limiting, mute and block, host moderation, logging and privacy policy, malformed input, and abuse-resistant failure. Game-mode commands use declared typed events rather than raw chat execution. Dedicated-host tests run the same typed operator commands through local input and an authenticated encrypted remote-administration boundary, with authorization, audit, replay of game-affecting results, cancellation, invalid commands and connection loss. No shell or arbitrary process execution is exposed.
 
 Deterministic local multi-instance tests establish repeatable state and desync evidence before network variability is introduced. Network tests then exercise latency, jitter, loss, duplication, reordering where the transport permits it, disconnection, host failure, and content mismatch. No test requires an original client, packet, server, or game module.
 
@@ -112,14 +122,16 @@ Deterministic local multi-instance tests establish repeatable state and desync e
 
 Renderer tests have two layers:
 
-- CPU tests validate render-item extraction, transforms, culling, material and blend selection, lightmap bindings, mirror visibility and recursion bounds, procedural time, view ownership, ordering, and buffer bounds.
-- GPU tests render controlled synthetic scenes for opaque and lightmapped surfaces, declared alpha and additive variants, specular faces, mirrors, procedural textures, volumetrics, scorch decals, cockpit and every supported auxiliary view, then compare images with a declared tolerance.
+- CPU tests validate render-item extraction, transforms, culling, material and blend selection, lightmap bindings, mirror visibility and recursion bounds, procedural time, view ownership, cinematic camera and fade state, ordering, and buffer bounds.
+- GPU tests render controlled synthetic scenes for opaque and lightmapped surfaces, declared alpha and additive variants, specular faces, mirrors, procedural textures, volumetrics, scorch decals, selected canonical stock-font atlases, cockpit, cinematics and every supported auxiliary view, then compare images with a declared tolerance.
 
 Metal validation must be clean. Fixed images are pinned to the recorded OS, SDK, shader compiler, GPU, resolution, and settings. Cross-OS or cross-GPU comparisons use tolerances rather than a promise of bit-identical rasterization.
 
+Repository font-rendering fixtures are synthetic or independently licensed. Selected imported retail fonts receive owned local atlas and fixed-scene evidence; neither their pixels nor retail-derived reference images enter Git.
+
 ### Application
 
-Application tests cover input mapping, pause and resume, display resize, full-screen transitions, file locations, controller connect and disconnect, haptic capability detection and unsupported-device fallback, haptic enable and gain, audio and adaptive-score lifecycle, interruption and resume, movie playback, animated cockpit transitions, automap entry and discovery display, marker entry and view, rear and auxiliary camera selection, player-media selection and mute controls, project and package selection, signed-helper invocation, staging-path validation and cleanup without a report, every helper-contract exit class, cancellation before and racing with promotion, malformed or missing reports, import failure recovery, package activation, and clean player and editor termination.
+Application tests cover input mapping, difficulty selection and persistence, pause and resume, cinematic control suspension and restoration, display resize, full-screen transitions, file locations, controller connect and disconnect, haptic capability detection and unsupported-device fallback, haptic enable and gain, audio and adaptive-score lifecycle, interruption and resume, movie playback, animated cockpit transitions, automap entry and discovery display, marker entry and view, rear and auxiliary camera selection, chat entry and mute/block controls, approved cheat, easter-egg, and diagnostic input with per-command session policy, player-media selection and mute controls, project and package selection, signed-helper invocation, staging-path validation and cleanup without a report, every helper-contract exit class, cancellation before and racing with promotion, malformed or missing reports, import failure recovery, package activation, and clean player and editor termination.
 
 Every `RevivalMac` archive and combined player distribution must contain one arm64 `Contents/Helpers/D3Import` built from the expected target. `RevivalEditor` does not carry a second copy. Nested-code signature verification must pass, the helper must carry the expected signing identity and entitlements, and Gatekeeper testing must exercise an actual import launch from the notarized player app rather than merely inspect the archive.
 
@@ -175,7 +187,7 @@ The first playable milestone must use only Swift, MSL, Metal 4, and native Apple
 
 ## First complete mission
 
-The complete Training Mission milestone extends the same path to every object, behavior, briefing, adaptive-score cue, cockpit, automap, marker, auxiliary view, and completion condition used by that mission. It includes campaign and presentation authoring, behavior debugging, package publishing, install, save, and replay. It is the first complete mission, not the first moment at which the new engine is playable.
+The complete Training Mission milestone extends the same path to every object, behavior, difficulty branch, selected production font, in-game cinematic, briefing, adaptive-score cue, cockpit, automap, marker, auxiliary view, and completion condition used by that mission. It includes campaign and presentation authoring, behavior debugging, package publishing, install, save, and replay. It is the first complete mission, not the first moment at which the new engine is playable.
 
 ## Campaign gates
 
@@ -184,14 +196,14 @@ A campaign level is complete when:
 - import reports a closed and validated content graph;
 - its behavior translation ledger is complete;
 - a player can start, progress, complete, save, and reload it;
-- required controls, AI, weapons, audio, adaptive music, movies, HUD, cockpit, automap, markers, camera views, haptics, and transitions work;
+- required controls, difficulty rules, room roles and refueling, AI, weapons, fonts, audio, adaptive music, in-game cinematics, movies, HUD, cockpit, automap, markers, camera views, haptics, and transitions work;
 - relevant synthetic and local content tests pass;
 - every introduced capability has its applicable native authoring, validation, playtest, and publishing path;
 - no unexplained crash, leak, validation error, or performance regression remains.
 
 Campaign completion means every reachable mainline and secret level meets that gate, every secret entry and return transition works, and a fresh profile can reach the ending through a valid campaign path. Visiting and testing every stock secret level is mandatory for the base-campaign release gate even when a normal playthrough may skip it. A menu entry or load screen is not campaign support.
 
-A release-complete import must also report every required campaign movie, briefing, audio asset, and transition present. A deliberately partial development package cannot satisfy a campaign or release gate.
+A release-complete import must also report every required campaign movie, briefing, selected production font, audio asset, and transition present, plus an explicit superseded decision for every recognized unused retail font. A deliberately partial development package cannot satisfy a campaign or release gate.
 
 ## Campaign and content creator gate
 
