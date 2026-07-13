@@ -1,0 +1,46 @@
+docs/revival/skills-and-agents.md
+  s_38848e94e1202a::t_6935db7d73e3cf 11,84,92,96-97,149-150,158
+REVIVAL.md
+  s_38848e94e1202a::t_495c0cc53f80e2 28-29,117
+.github/pull_request_template.md
+  s_38848e94e1202a::t_3ac840adb763b9 21
+  s_38848e94e1202a::t_6b9893812dc4c8 20,22-30,38-40
+docs/revival/engineering-principles.md
+  s_38848e94e1202a::t_6935db7d73e3cf 109-111,128-131,151-153
+docs/revival/test-driven-development.md
+  s_38848e94e1202a::t_76191560e4c2ca 118
+  s_38848e94e1202a::t_6935db7d73e3cf 29-30,60-61,115-116
+  s_38848e94e1202a::t_3ac840adb763b9 13
+  s_38848e94e1202a::t_6b9893812dc4c8 15-16,94-95,99-100
+  s_38848e94e1202a::t_495c0cc53f80e2 1-12,14,17-28,31-59,62-93,96-98,101-114,117
+docs/revival/functional-completeness-ledger.md
+  s_38848e94e1202a::t_6935db7d73e3cf 11-12
+docs/revival/roadmap.md
+  s_38848e94e1202a::t_6935db7d73e3cf 11-12,26,29,42,141-145
+docs/revival/architecture.md
+  s_38848e94e1202a::t_6935db7d73e3cf 95
+docs/revival/verification.md
+  s_38848e94e1202a::t_6935db7d73e3cf 13-28,223
+docs/revival/functional-completeness.md
+  s_38848e94e1202a::t_6935db7d73e3cf 48-49
+AGENTS.md
+  s_38848e94e1202a::t_495c0cc53f80e2 5,43-50
+  s_38848e94e1202a::t_76191560e4c2ca 51
+  s_38848e94e1202a::t_893f80c0d654e2 52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "d6cad3e520aa44a04ba028374e8367f07f191b3a",
+  "prompts": {},
+  "sessions": {
+    "s_38848e94e1202a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f57d9-8914-78f1-a0ea-63ac37b35d37",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
