@@ -1,0 +1,67 @@
+docs/revival/skills-and-agents.md
+  s_38848e94e1202a::t_4cfe90f7aee7ac 85-88,90-91
+docs/revival/functional-completeness.md
+  s_38848e94e1202a::t_896867d5ae6aaa 52
+  s_38848e94e1202a::t_606f3e8d926113 60,69,82
+  s_38848e94e1202a::t_43a4fa7035d05d 57-58,92-93
+docs/revival/roadmap.md
+  s_38848e94e1202a::t_4cfe90f7aee7ac 65,91,108-109,111,126,169,173,201-204
+  s_38848e94e1202a::t_3e9ad0e657fa7c 177
+  s_38848e94e1202a::t_43a4fa7035d05d 22,151
+docs/revival/discovery.md
+  s_38848e94e1202a::t_cb0de996f1d3d1 83-86,88-90,101-106,113,116,127-129
+  s_38848e94e1202a::t_43a4fa7035d05d 87,115
+  s_38848e94e1202a::t_babfb9bdbe7ea2 114
+  s_38848e94e1202a::t_7325e33e91832a 130
+docs/revival/creator-suite.md
+  s_38848e94e1202a::t_b575de5fd35d3f 55,61,67,85,91,102,119-120
+docs/revival/engineering-principles.md
+  s_38848e94e1202a::t_2eddd8927690d6 87
+docs/revival/retail-data.md
+  s_38848e94e1202a::t_4db3ff6017b587 44-61,125
+REVIVAL.md
+  s_38848e94e1202a::t_43a4fa7035d05d 58
+  s_38848e94e1202a::t_606f3e8d926113 59
+docs/revival/functional-completeness-ledger.md
+  s_38848e94e1202a::t_606f3e8d926113 44-45,84,133-134,163
+  s_38848e94e1202a::t_43a4fa7035d05d 43,46
+  s_38848e94e1202a::t_9b668057c13fdd 152
+  s_38848e94e1202a::t_3e9ad0e657fa7c 108
+AGENTS.md
+  s_38848e94e1202a::t_43a4fa7035d05d 22
+docs/revival/verification.md
+  s_38848e94e1202a::t_896867d5ae6aaa 134
+  s_38848e94e1202a::t_472ebb85db4b87 130-131
+  s_38848e94e1202a::t_43a4fa7035d05d 39,44,63,115
+  s_38848e94e1202a::t_d7f73f0d5ca0fa 126
+  s_38848e94e1202a::t_a562efc716a2b8 45,62,64,67,75,83,89,103-104,117,125,190,199,206
+  s_38848e94e1202a::t_4db3ff6017b587 61
+  s_38848e94e1202a::t_3b8f5adee52bfc 116
+docs/revival/content-pipeline.md
+  s_38848e94e1202a::t_2eddd8927690d6 56,95,130,142,207
+  s_38848e94e1202a::t_43a4fa7035d05d 138-140
+  s_38848e94e1202a::t_9b668057c13fdd 37
+  s_38848e94e1202a::t_4cfe90f7aee7ac 117
+  s_38848e94e1202a::t_69a520b99437f3 141
+docs/revival/behavior-system.md
+  s_38848e94e1202a::t_fe59c82dff3ede 50,58,76,104-105,120-121,135,146,150,160
+docs/revival/architecture.md
+  s_38848e94e1202a::t_2eddd8927690d6 73,77,85,105,125
+  s_38848e94e1202a::t_3e9ad0e657fa7c 87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "759ebbb2908d30cbd9a1dd4e132ed77294f67e63",
+  "prompts": {},
+  "sessions": {
+    "s_38848e94e1202a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f57d9-8914-78f1-a0ea-63ac37b35d37",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
