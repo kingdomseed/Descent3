@@ -12,7 +12,7 @@ The editor starts in Phase 2 as soon as canonical world data exists. Every later
 
 ## Product shape
 
-The complete product has five production targets:
+The complete product has exactly six targets: five game-and-creator targets plus the isolated Phase 9 relay service.
 
 | Target | Responsibility |
 | --- | --- |
@@ -21,6 +21,7 @@ The complete product has five production targets:
 | `RevivalMetal` | Direct Metal rendering for game and editor viewports |
 | `RevivalMac` | Player application, input, audio, presentation, import UX, release packaging, and no-window dedicated hosting |
 | `RevivalEditor` | Native project editing, baking, validation, playtest, and publishing |
+| `RevivalRelay` | Public session discovery, expiring registration, join authorization, and opaque QUIC relay |
 
 Do not split each historical dialog or utility into a new target. Editor features are views and commands over one canonical project model. Tests live beside the owning target.
 
@@ -56,6 +57,22 @@ The world workspace covers indoor room and portal geometry, outdoor terrain, reu
 
 It provides selection, snapping, transform tools, joining and splitting, duplication, grouping, naming, search, inspection, undo and redo, validation, repair, statistics, and live Metal previews. Viewports support textured, wireframe, collision, portal, navigation, and lighting diagnostics; focus, fly, orbit, and orthographic navigation; and saved views or camera bookmarks. A modern operation may replace several historical commands if it preserves their useful results.
 
+### Geometry exchange
+
+Blender is the recommended bulk-geometry workflow. The sole planned-product DCC interchange is USD loaded through Model I/O; direct glTF, 3DS, FBX, and OBJ readers are not part of the product. A creator may convert another format in Blender, then explicitly import or reimport USD into a native project. A second DCC format requires an explicit architecture amendment.
+
+USD ingestion is one-way into canonical editable geometry. The contract fixes units, axes, transforms, winding, stable prim identity, room partitioning, portal assignment, material slots, primary and secondary UVs, collision ownership, and rejection of unsupported topology. Reimport matches stable source identities, previews every destructive change, and records source and toolchain provenance; it never live-links the runtime to a DCC file. Revival-specific roles, navigation, behavior, and gameplay metadata remain canonical editor data.
+
+This workflow changes priority, not scope. Broad room, portal, bridge, join, attach, snap, split, triangulate, terrain, repair, and diagnostic tools remain required in the native editor. USD lands before the broad construction-tool closure so creators can build large geometry in a DCC immediately, while the integrated editor remains able to construct and repair a complete level without Blender.
+
+### Navigation and lightmaps
+
+Navigation baking produces the purpose-built room, portal, outdoor-region, clearance, and sparse three-dimensional waypoint graph defined by the architecture. Hand-authored paths remain separate source data. Diagnostics show disconnected regions, insufficient clearance, blocked dynamic edges, unstable ties, unreachable goals, and stuck-recovery traces. The bake is deterministic background work in `RevivalCore` and `RevivalEditor`; there is no generic navmesh, voxel-navigation library, or runtime path bake.
+
+Lightmap coordinates use one explicit policy. Every room owns exactly one nonmipmapped 1024-by-1024 `rgba8Unorm` lightmap. Editor-built planar faces receive deterministic planar charts; the packer reserves a two-texel dilated gutter around every chart for bilinear sampling. Initial USD room geometry must provide UV2 whose normalized bounds, nonoverlap, and chart separation satisfy that same fixed atlas and gutter; import rejects invalid UV2 instead of invoking a general automatic unwrap. A room whose charts do not fit is split by the creator; the baker never adds another atlas or changes resolution.
+
+The lighting solver is one deterministic background CPU publish path over canonical geometry. For the same source, bake revision, macOS, Swift, and SDK toolchain, it emits byte-identical canonical texels. A toolchain change must pass the bake corpus; changed texels require visual review and a bake-revision bump rather than an automatic baseline update. Incremental invalidation reruns the same solver for affected rooms. There is no quality-mode fork, general charting library, cross-level atlas, mip chain, or GPU-compute baking path.
+
 ### Content-definition workspace
 
 Typed inspectors edit materials, procedural surfaces, mirrors, blend semantics, robots, powerups, buildings, clutter, ships, weapons, doors, lights, sounds, ambient patterns, physics, animation, AI, death behavior, inventory behavior, effects, cockpit and monitor bindings, haptic event mappings, and object archetypes. They expose only difficulty-scaling opt-outs backed by active runtime rules; they do not invent a generalized difficulty-tuning framework.
@@ -88,7 +105,7 @@ It uses canonical media and behavior references. Imported proprietary media rema
 
 ### Asset and build workspace
 
-The suite imports and inspects supported modern room geometry, models, animation, textures, fonts, audio, movies, player pictures, ship logos, and audio taunts; records source and license metadata; enforces media dimensions, duration, size, and decoded bounds; builds font atlases and previews glyph coverage; binds animation states, sound events, and haptic events; bakes lighting and navigation; audits dependencies and orphans; and publishes packages. Retail bitmap fonts are read-only canonical base content produced by `D3Import`; the editor never reads `.fnt` files. Native projects use supported modern font inputs and the same canonical atlas and metrics model.
+The suite imports and inspects USD room geometry, models and animation plus supported modern textures, fonts, audio, movies, player pictures, ship logos, and audio taunts; records source and license metadata; enforces media dimensions, duration, size, and decoded bounds; builds font atlases and previews glyph coverage; binds animation states, sound events, and haptic events; bakes lighting and navigation; audits dependencies and orphans; and publishes packages. Retail bitmap fonts are read-only canonical base content produced by `D3Import`; the editor never reads `.fnt` files. Native projects use supported modern font inputs and the same canonical atlas and metrics model.
 
 One publisher validates the complete dependency closure, compiles behavior graphs, produces immutable canonical content, records provenance, compares save-relevant canonical fields with the previous product, and refuses broken references or an unacknowledged semantic change without the required revision bump. It shows the affected scope, prior and current semantic fingerprints, and the author's explicit compatibility decision. It does not infer compatibility from byte hashes, emit HOG files, or write original editor formats.
 

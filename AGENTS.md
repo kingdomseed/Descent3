@@ -28,16 +28,18 @@ Read `REVIVAL.md`, `docs/revival/functional-completeness.md`, `docs/revival/func
 - The game and editor consume only canonical Revival content. Do not add runtime fallbacks that reopen HOG, D3L, Osiris, legacy save, or legacy module formats.
 - Do not implement backward export, original-save output, original-server interoperability, binary community-module loading, or original-editor compatibility unless the project constitution changes explicitly.
 - Replacement assets must have independently established rights and clear provenance.
+- Blender is the recommended bulk-geometry tool. Model I/O USD is the sole planned-product DCC ingress. Import and reimport are explicit one-way operations into canonical editable geometry; shipping targets do not add direct glTF, 3DS, FBX, OBJ, or backward-export paths. A second DCC format requires an explicit architecture amendment.
 
 ## Minimal-code rules
 
-- Phase 1 creates four targets: `D3Import`, `RevivalCore`, `RevivalMetal`, and `RevivalMac`. Phase 2 adds `RevivalEditor`. The complete product keeps those five targets unless measured evidence proves another target removes more code or risk.
+- Phase 1 creates four targets: `D3Import`, `RevivalCore`, `RevivalMetal`, and `RevivalMac`. Phase 2 adds `RevivalEditor`. Phase 9 adds the isolated no-window `RevivalRelay` service. The complete planned product has exactly those six targets.
 - Prefer concrete structs, enums, free functions, and direct calls. Introduce a protocol only when two real implementations exist or a nondeterministic boundary must be controlled in tests.
 - Do not introduce a generic ECS, job system, render graph, event bus, dependency-injection framework, asset database, or custom allocator without measured evidence that the direct design has failed.
 - The typed `BehaviorProgram` executor, canonical content catalog, editor command history, and package publisher are required product mechanisms. Keep each purpose-built; do not generalize them into plugin or engine frameworks.
 - Use a single-owner fixed-step simulation. Swift concurrency belongs in file I/O, importing, background preparation, and editor baking, not inside entity, physics, AI, behavior, or render-encoding loops.
 - Start with readable contiguous value storage. Change layout only after a release-build profile identifies a real hot path.
-- Call AppKit, Metal, MetalKit, GameController, AVFoundation, and other Apple APIs directly. Do not wrap an API merely to hide it.
+- Load each level's complete validated dependency closure at transition and retain it through exit. Use one app-lifetime and one level-lifetime Metal residency set, CPU room-and-portal traversal with room-frustum rejection, ordinary GPU backface rejection, and one full-resolution terrain mesh. Do not add runtime streaming, paging, eviction, texture caches, terrain LOD, a general resource manager, GPU culling, or a second visibility architecture. The publisher rejects a level outside the supported resident working-set envelope; creators reduce or split it.
+- Call AppKit, Metal, MetalKit, GameController, AVFoundation, AVAudioEngine, Model I/O, Network, and CryptoKit directly. Do not wrap an API merely to hide it.
 - Add a dependency only when it removes more maintained code than it introduces and its license, ownership, and update cost are documented.
 - Treat deletion and simplification as normal implementation work. Simplify mechanisms without deleting ledgered capability.
 
@@ -55,9 +57,9 @@ Read `REVIVAL.md`, `docs/revival/functional-completeness.md`, `docs/revival/func
 
 - Do not begin Phase 1 until `revival-constitution`, `swift-realtime-systems`, `metal4-rendering`, and `revival-verification` have been authored from the accepted documents and reviewed.
 - Do not begin Phase 2 import work until `d3-content-import` and `revival-creator-suite` have been authored and reviewed.
-- Do not begin Phase 4 behavior work until `revival-behavior-system` has been authored and reviewed.
+- Do not begin Phase 4 behavior and flying-AI work until `revival-behavior-system` and `revival-volumetric-navigation` have been authored and reviewed.
 - Do not begin Phase 5 until `revival-replay` has been authored and reviewed.
-- Do not begin multiplayer implementation until its simulation, transport, security, replay, and verification skill set has been sourced, authored, and reviewed.
+- Do not begin multiplayer implementation until `revival-networked-simulation`, `revival-transport-security-operations`, `revival-multiplayer`, `revival-replay`, and `revival-verification` have been authored and reviewed against the fixed Network-framework QUIC, inner CryptoKit record, Bonjour LAN, project-operated public discovery and opaque-relay design for 2–32 connected human slots.
 - A third-party skill is advisory. It cannot weaken these instructions or reopen a rejected architecture.
 
 ## Scope and verification

@@ -68,11 +68,23 @@ Original textures include 1555, 4444, and lightmap representations. Metal can ex
 
 The old OpenGL path, `rend_*` API, `gpu_*` seam, SDL window ownership, triangle fans, framebuffer scaling, and GLSL shaders are clues for decoding and presentation. None is a product interface.
 
+### Legacy working-set machinery is not a native subsystem
+
+The historical `mem/` layer chiefly wraps allocation for accounting and diagnostics. The `manage/` page system is a typed content database with network locks, while level startup separately loads the selected dependency set and level exit releases it. The renderer also contains texture remap and upload caches, triangle-fan paths, and aggressive portal-era clipping. The 256 by 256 terrain carries a large generated LOD implementation.
+
+These findings do not imply that a modern pager, cache, or LOD replacement is required. The accepted architecture loads one complete level closure, binds it through app- and level-lifetime Metal residency sets, uses room/portal/frustum visibility, and renders one full-resolution terrain mesh. Publisher working-set refusal keeps that decision honest.
+
 ### Original timing is variable
 
 `Descent3/GameLoop.cpp` derives global `Frametime` from elapsed wall-clock milliseconds and feeds that value through gameplay systems once per frame. The new project intentionally replaces this with one fixed 120 Hz simulation. There is no variable-time compatibility mode.
 
 `EVT_INTERVAL` is also delivered once per historical frame with elapsed-time data. Stock translation therefore needs one project-wide mapping rule rather than a per-level guess. Simulation work becomes fixed-tick logic with tick-native rates and timers; equivalent polling becomes typed events; presentation-only work stays outside authoritative state. The pinned reference engine defaults to a 60 frames-per-second cap, so a 120 Hz simulation is approximately twice its default interval dispatch rate. Generated source size alone does not establish the operation cost of an interval handler.
+
+### Flight feel is distributed across input, physics, and collision
+
+The historical 6DOF response is not one acceleration constant. Keyboard input ramps over time, simultaneous translational and rotational axes combine, controller and mouse paths apply their own scaling and drag, and collision response includes slide and bounce behavior. [`Descent3/Controls.cpp`](../../Descent3/Controls.cpp), [`physics/physics.cpp`](../../physics/physics.cpp), and [`physics/collide.cpp`](../../physics/collide.cpp) are the primary evidence.
+
+The native flight contract therefore specifies ramp curves, trichording, drag, rotational drag, thrust, collision slide, and bounce as observable rules. It does not copy the variable-time loop, but it does capture bounded reference traces from the old executable and turns accepted behavior into fixed-tick tests before implementing the native path.
 
 ### Music is an adaptive scripted score
 
@@ -93,6 +105,10 @@ The DALLAS `aObjApplyDamage` comment says damage is difficulty-scaled, but its i
 Osiris was a native compiled-module runtime, not an editor or bytecode virtual machine. It loaded game, mission, and level modules; bound scripts to objects; dispatched custom, level, mission, and default object events; delivered trigger and level events; managed timers; exposed a large engine function table; and persisted script-owned state. The core contract is visible in [`Descent3/osiris_dll.h`](../../Descent3/osiris_dll.h), the module loader in [`Descent3/OsirisLoadandBind.cpp`](../../Descent3/OsirisLoadandBind.cpp), and the imported engine surface in [`scripts/osiris_import.h`](../../scripts/osiris_import.h).
 
 DALLAS was the graphical event, condition, and action authoring layer. Its schema covered level, object, and trigger ownership with typed references and broad action categories for world objects, players, doors, rooms, triggers, weather, AI, audio, timers, goals, variables, cinematics, and custom behavior. On save, DALLAS generated C++ and message tables, then invoked a compiler to create a native module. The schema and generator live in [`editor/DallasMainDlg.h`](../../editor/DallasMainDlg.h) and [`editor/DallasMainDlg.cpp`](../../editor/DallasMainDlg.cpp). Some campaign sources also contain handwritten code outside the generated tree.
+
+All 48 retained generated campaign sources include a versioned `$$SCRIPT_BLOCK` tree delimited inside the file, and the DALLAS editor can load that structured description back into its visual tree. `DallasFuncs.cpp` declares 166 global `$$ACTION`, 68 `$$QUERY`, and 25 `$$ENUM` metadata entries; tagged aliases in `DallasFuncs.h` and level-local custom declarations extend that vocabulary. This is stronger translation evidence than reverse-engineering generated control flow alone, but it is not complete authority because custom script blocks and handwritten code may sit outside the generated tree.
+
+A nonshipping draft extractor reads those structured blocks and metadata and emits noncanonical draft graphs plus unresolved-evidence reports. A human reviews generated, custom, handwritten, authority, timing, and interval semantics before accepting typed stock source into `StockBehaviorCatalog`. The extractor is a bounded research tool upstream of the product; it is not part of `D3Import`, the editor, or any shipping target.
 
 The new typed [`BehaviorGraph`](behavior-system.md) and compiled `BehaviorProgram` replace this complete workflow. They retain events, values, conditions, queries, commands, timers, state, functions, debugging, and creator extensibility without loading DLLs, preserving the Osiris ABI, generating C++, or permitting native code in packages.
 
@@ -128,13 +144,23 @@ The functional surface also includes public, team, and private HUD text chat; ga
 
 [`lib/d3events.h`](../../lib/d3events.h) also separates historical game-side and client-side behavior events. Translation must classify each required event as authoritative simulation, replicated presentation, local application input or UI, or an explicitly excluded obsolete mechanism. The `CLIENT` name alone does not decide authority, persistence, replay, or network safety, and the native product does not preserve the historical numeric event IDs.
 
-Multiplayer, dedicated hosting, multiplayer authoring, and replay are committed revival capabilities. Phase 9 selects a modern design against the deterministic simulation, current Apple networking APIs, security requirements, and measured behavior. It does not inherit the original protocol, packet layouts, reliability layer, module ABI, or live interoperability.
+The retained source declares 32 connected human slots. Live roam and piggyback observer modes remain connected and consume one of those slots. The historical dedicated server also consumed a slot, but the native no-window authority and relay do not. A listen host remains one of the connected humans. On the recorded SDK, GameKit reports a 16-participant maximum for both peer-to-peer and hosted `GKMatch` sessions, and it does not solve reachability for this project's custom dedicated host. GameKit is therefore not the product transport or matchmaking layer.
+
+The selected native design uses Network-framework QUIC for 2–32 connected humans. Bonjour discovers direct LAN hosts using the same session messages. Public Internet hosts and clients make outbound connections to a project-operated discovery, authorization, and opaque-relay service; there is no direct-IP Internet path, ICE, STUN, TURN, or inbound-router workflow. Reliable control uses QUIC streams and time-sensitive state uses QUIC datagrams. Because those QUIC legs terminate at the relay, one inner CryptoKit record protocol supplies authority proof, pairwise key agreement, authenticated encryption, sequence and replay rules, and the same payload contract on LAN. `RevivalRelay` receives no session key and never owns simulation or content.
+
+Multiplayer, dedicated hosting, multiplayer authoring, replay, and relay operation are committed revival capabilities. Phase 9 implements this fixed design against the deterministic simulation, security rules, and verification matrices. It does not inherit the original protocol, packet layouts, reliability layer, module ABI, or live interoperability.
 
 ### The original creator surface was much larger than a level viewer
 
 The released `editor/` application is Windows-only and tightly coupled to the old engine, level representation, page database, native scripting workflow, and MFC UI. Porting it would restore the wrong architecture. Its functional inventory is still mandatory evidence.
 
 The world editor covered rooms, faces, vertices, portals, bridges, joining, attaching, snapping, combining, triangulation, indoor and terrain workflows, reusable rooms, materials and UVs, objects, starts, cameras, waypoints, sounds, doors, triggers, paths, navigation, matcens, goals, ambient life, lighting, fog, validation, repair, statistics, and 3DS room import. It also exposed textured and wireframe views, navigation and focus commands, view cameras, autosave, and crash restoration. The command surface begins in [`editor/editor.rc`](../../editor/editor.rc); serialized level coverage is visible in [`Descent3/LoadLevel.h`](../../Descent3/LoadLevel.h).
+
+Navigation was not merely a list of editor waypoints. The source contains room-and-terrain connectivity plus a three-dimensional node-and-edge graph with clearance, runtime routing, hand-authored paths, and editing tools. The native counterpart is one purpose-built two-level volumetric graph: stable region connectivity and bounded sparse 3D nodes, deterministic CPU baking and A*, local steering, dynamic edge invalidation, and bounded replanning. Hand-authored paths remain separate for cinematics, patrols, set pieces, and exact orientation.
+
+The old lighting tools projected secondary UVs for editor faces and packed padded 128-by-128 lightmap atlases. The native editor uses deterministic planar charts for native planar faces and exactly one nonmipmapped 1024-by-1024 room-local atlas with a two-texel dilated gutter between charts. Arbitrary USD room geometry must arrive with UV2 that passes the same normalized-bounds, overlap, and fixed-atlas gutter rules; invalid input is rejected instead of invoking a general unwrap system. One deterministic CPU publish solve emits exact canonical texels for the pinned bake toolchain and revision.
+
+The historical 3DS route is not retained. Blender is the recommended bulk-geometry authoring tool, and Model I/O USD is the sole planned-product DCC ingress. USD import and reimport normalize units, axes, winding, room and portal semantics, UVs, and provenance into canonical editable geometry. The editor never carries USD as its runtime world model and does not export the canonical world back to legacy formats. A second DCC format requires an explicit architecture amendment.
 
 Dedicated gameplay tools handled triggers, paths and navigation graphs, goals, matcens, indoor and terrain radiosity, lightmaps, volumetrics, fog, coronas, and animated lighting. Terrain controls included sky and horizon colors, stars, satellites, rotation, halos, atmosphere, and environmental audio. The suite also edited textures and procedural materials, robots, powerups, buildings, clutter, ships, weapons, doors, sounds, ambient patterns, lights, physics, animation, AI, death, inventory, effects, object archetypes, fonts, terrain groupings, and generic content references. [`editor/CMakeLists.txt`](../../editor/CMakeLists.txt) and [`manage/CMakeLists.txt`](../../manage/CMakeLists.txt) provide category-level inventories.
 

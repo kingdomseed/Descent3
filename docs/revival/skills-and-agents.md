@@ -18,7 +18,7 @@ No external skill is part of the product architecture. Project decisions in `AGE
 - License: Apache-2.0
 - Use: selective reference and future project adaptation
 
-The useful native topics are Metal 4 resources, synchronization, pipeline creation, drawable presentation, validation, capture, rendering diagnosis, macOS windows, and GameController. Exclude Windows evaluation, Direct3D translation, Metal Shader Converter, Metal-cpp lifetime guidance, and any workflow that chooses a C++ host architecture.
+The useful native topics are direct `MTL4CommandQueue`, device-owned command buffers, rotating command allocators, argument tables, app- and level-lifetime residency sets, synchronization, pipeline creation, drawable presentation, validation, capture, rendering diagnosis, macOS windows, and GameController. Exclude Windows evaluation, Direct3D translation, Metal Shader Converter, Metal-cpp lifetime guidance, and any workflow that chooses a C++ host architecture, runtime streaming, terrain LOD, a render graph, or an alternate renderer.
 
 The repository name does not make the Game Porting Toolkit a runtime dependency. Only audited Markdown guidance relevant to direct native Metal is in scope.
 
@@ -81,21 +81,24 @@ Author these skills before their workstream begins:
 
 | Skill | Purpose |
 | --- | --- |
-| `revival-constitution` | Enforce Swift/Metal-only scope, functional completeness, one-way import, red-first TDD, non-goals, and the five-target product graph |
-| `d3-content-import` | Safe checked parsing, provenance, canonical conversion including selected bitmap fonts, and retail-data isolation |
+| `revival-constitution` | Enforce Swift/Metal-only scope, functional completeness, one-way import, red-first TDD, non-goals, fixed residency and visibility, and the six-target product graph |
+| `d3-content-import` | Safe checked little-endian parsing, bounds, provenance, canonical conversion including selected bitmap fonts, behavior-extraction handoff, complete level closure, and retail-data isolation |
 | `revival-behavior-system` | Typed visual authoring, checked compilation, deterministic Float32 execution, interval and authority translation, difficulty queries, cinematic and adaptive-score commands, debugging, persistence, and stock translation |
-| `revival-creator-suite` | Canonical projects, AppKit editing, typed room roles, difficulty playtest, cinematic and font tools, undo, validation, baking, play-in-editor, and publishing |
-| `swift-realtime-systems` | Single-owner simulation, immutable difficulty configuration, room and refueling rules, logical cinematic state, allocation, fixed ticks, Float32 normalization and state hashing, simulation revisions, and measured CPU optimization |
-| `metal4-rendering` | Direct Swift/Metal 4 resources, passes, presentation, validation, and GPU evidence |
-| `revival-multiplayer` | Authoritative simulation, transport selection, simulation and content negotiation, host difficulty, chat and moderation, typed operator commands, client-presentation roles, hostile-input and custom-media limits, hosting, modes, replay evidence, and network tests |
-| `revival-replay` | Deterministic authoritative recording and state hashes, difficulty and logical cinematic persistence, game-affecting command capture, ordinary-chat exclusion, declared observer and client evidence, desync diagnosis, and one playback architecture |
-| `revival-verification` | Red and green evidence, reachable production paths, numeric and revision contracts, deterministic tests, editor round trips, network matrices, images, Instruments traces, performance gates, and claim falsification |
+| `revival-creator-suite` | Canonical projects, AppKit editing, Model I/O USD ingress, typed room roles, difficulty playtest, cinematic and font tools, navigation and room-local lightmap authoring, undo, validation, baking, play-in-editor, and publishing |
+| `swift-realtime-systems` | Single-owner simulation, exact 6DOF input and flight contracts, immutable difficulty configuration, room and refueling rules, logical cinematic state, zero warmed-step project allocations, fixed ticks, declared Float32 multiply-add and transcendental semantics, state hashing, simulation revisions, and measured CPU optimization |
+| `metal4-rendering` | Direct Swift `MTL4` queues, buffers, allocators, argument tables, app- and level-lifetime residency sets, fixed forward passes, room-and-portal visibility, full-resolution terrain, presentation, validation, and GPU evidence |
+| `revival-volumetric-navigation` | Deterministic region connectivity, bounded sparse 3D nodes and swept-volume edges, clearance, stable A*, local steering, dynamic blockage, bounded replanning, editor diagnostics, and CPU baking |
+| `revival-networked-simulation` | 2–32 connected human slots, live observer state, tick- and sequence-numbered resolved input, complete prediction state, acknowledgment and replay reconciliation, fixed history and hard resync, remote interpolation, per-weapon latency policy, replication, state hashes, desync evidence, and replay interaction |
+| `revival-transport-security-operations` | Network-framework QUIC streams and datagrams, inner X25519/Ed25519/HKDF/ChaChaPoly records, Bonjour LAN, public discovery, proof-bound registration and join authorization, replay and amplification resistance, opaque relay, hostile-input bounds, keys, metadata privacy, abuse response, deployment, monitoring, and exact control- and data-plane outage contracts |
+| `revival-multiplayer` | Coordinate the fixed simulation and transport designs with content negotiation, host difficulty, chat and moderation, typed operator commands, client-presentation roles, custom-media limits, dedicated hosting, modes, authoring, and end-to-end network matrices |
+| `revival-replay` | Deterministic authoritative recording and state hashes, difficulty and logical cinematic persistence, game-affecting command capture, ordinary-chat exclusion, save-continuation equivalence, declared observer and client evidence, desync diagnosis, and one playback architecture |
+| `revival-verification` | Red and green evidence, reachable production paths, arithmetic corpus and toolchain-upgrade conformance, warmed-step allocation proof, deterministic tests, editor round trips, baseline-image review, relay and network matrices, Instruments traces, performance gates, and claim falsification |
 
 Keep each skill narrow. A skill should contain enforceable rules, examples from this project, validation commands, prohibited patterns, and links to primary sources. Avoid a single large “game engine expert” prompt. Skills may share the product constitution but must not duplicate their technical playbooks.
 
 Every project-authored and imported skill inherits the binding red-green-refactor protocol and test-value gate. A skill may not permit implementation-first testing, weaken required red evidence, demand tests for unreachable or speculative paths, or introduce production seams solely for tests.
 
-The creator and behavior skills are Phase 2 and Phase 4 gates, not post-release additions. The replay skill is researched and reviewed before Phase 5. The multiplayer skill is researched and reviewed before Phase 9 design begins. Their later implementation dates do not make the capabilities optional.
+The creator and behavior skills are Phase 2 and Phase 4 gates, not post-release additions. The navigation skill is reviewed before Phase 4. The replay skill is researched and reviewed before Phase 5. The networked-simulation, transport-security-operations, multiplayer, replay, and verification skills are all reviewed before Phase 9 implementation begins. Their later implementation dates do not make the capabilities optional.
 
 ## Supply-chain record
 
@@ -131,9 +134,9 @@ The root agent is the integration and architecture owner. With three child slots
 
 ### Multiplayer and replay wave
 
-1. Networked-simulation specialist: authority, replication, prediction only where measured play requires it, and desync evidence.
-2. Network security and transport specialist: current Apple APIs, session lifecycle, negotiation, hostile-input bounds, and dedicated hosting.
-3. Multiplayer creator and verification specialist: modes, maps, session behaviors, local multi-instance tests, network matrices, replay, and packaging.
+1. Networked-simulation specialist: 2–32 connected human slots, live observer state, authority, replication, sequenced resolved input, full-state prediction and replay reconciliation, remote interpolation, per-weapon latency policy, and desync evidence.
+2. Network security, transport, and operations specialist: Network-framework QUIC, inner CryptoKit records, Bonjour, public discovery, authorization, replay and amplification resistance, opaque relay, hostile-input bounds, dedicated hosting, deployment, monitoring, and exact outage response.
+3. Multiplayer creator and verification specialist: multiplayer modes, maps, session behaviors, complete 32-slot and observer tests, local and relay-backed multi-instance tests, network matrices, replay, and packaging.
 
 ### Verification wave
 
@@ -154,6 +157,9 @@ The root agent keeps the functional-completeness ledger and assigns each phase's
 - A behavior specialist may extend the typed language but may not add native-code escape hatches or cap it at stock-campaign operations.
 - A multiplayer specialist may not inherit the original protocol merely because source exists.
 - A Metal specialist may not add an alternate renderer.
+- A Metal or content specialist may not add runtime streaming, eviction, terrain LOD, a general resource manager, or a second visibility architecture. An oversized level is a publishing failure.
+- A creator specialist may not add another DCC path alongside explicit Model I/O USD import and reimport. A second format requires an explicit architecture amendment.
+- A multiplayer specialist may not replace or supplement the selected QUIC, Bonjour, and project-operated discovery/opaque-relay design with GameKit, direct-IP Internet hosting, ICE, STUN, or TURN.
 - A systems specialist may not add a job system, ECS, or concurrency layer without a profile.
 - The verifier owns completion evidence and does not merely review code after the fact. The verifier cannot waive red-first evidence or convert coverage pressure into tests for paths the product never runs.
 - Every feature owner is responsible for applicable runtime, authoring, validation, playtest, and publishing evidence.

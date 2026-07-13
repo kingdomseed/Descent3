@@ -33,6 +33,7 @@ The test-value gate is binding. Tests exercise supported production paths and pr
 `D3Import` must demonstrate:
 
 - bounded reads and useful errors for malformed input;
+- explicit source-endian decoding with bounds checked before every field interpretation;
 - byte-deterministic structured output for the same source profile, importer version, and package schema;
 - deterministic normalized decoded pixels, PCM samples, frame timing, and project metadata for transcoded media;
 - recorded OS, SDK, codec path, and encoder settings, with media-container hashes treated as per-import integrity rather than cross-toolchain equality;
@@ -40,6 +41,8 @@ The test-value gate is binding. Tests exercise supported production paths and pr
 - complete source and output hashes in the import report;
 - atomic destination promotion;
 - requested-scope closure for partial imports and full closure for release-complete imports;
+- complete per-level CPU and GPU working-set accounting and refusal outside the supported resident envelope;
+- deterministic per-room repacking of legacy lightmap texels, rewritten canonical UV2, two-texel chart dilation, one nonmipmapped 1024-square `rgba8Unorm` output, fixed-atlas overflow rejection, and local imported-room image proof;
 - bounded synthetic ACM and MVE decode cases, including malformed and unsupported variants;
 - bounded retail `.fnt` cases for magic, flags, dimensions, glyph ranges, proportional widths, kerned and unkerned forms, bounds-derived payload lengths, and 4-4-4-4 alpha and color translation, plus canonical metrics and atlas images for every selected production role;
 - one explicit production or superseded decision for each of the seven recognized retail font files, with no packaged orphan font;
@@ -56,7 +59,11 @@ Synthetic containers cover parser edge cases in repository tests. The verified o
 
 `RevivalCore` tests use explicit initial state, input frames, seeds, tick counts, and `simulationSemanticRevision`. Exact equality is expected for integer state, IDs, rule order, RNG state, objectives, damage, inventory, timers, and canonical normalized Float32 bits. Boundary tests reject NaN and infinity and normalize negative zero and subnormal persisted or hashed values as declared. Tolerances apply only to approximate higher-level regression claims, never to repeated authoritative replay state under one simulation revision.
 
-The same replay must produce the same canonical state hash in repeated release-build runs on the supported architecture. Collection iteration order may not affect that hash.
+The same replay must produce the same canonical state hash in repeated release-build runs on the supported architecture. Collection iteration order may not affect that hash. The authoritative arithmetic corpus contains exact Float32 vectors for normalization, every declared fused and separately rounded multiply-add form, and every named approximation or table. The corpus and same-revision replay hashes must remain exact before adopting a new OS, Swift compiler, SDK, optimization setting, or supported Apple-Silicon generation.
+
+Flight tests cover the profile-persisted keyboard ramp-duration setting, transient held-key ramp timing and reset on focus loss, pause/resume, load and control remapping, simultaneous translation axes and trichording, mouse and controller response, mass, thrust, linear drag, rotational thrust and drag, turn roll, and buffet at 120 Hz. Replays and multiplayer consume resolved tick `InputFrame` values rather than serializing the live ramp accumulator. Collision tests cover swept contacts, wall slide, bounce and restitution, tangential motion, corners, portal crossing, and room ownership. Ratified native trajectory curves are the automated contract; old-executable captures remain non-normative local decision evidence and never become a CI dependency.
+
+Navigation tests cover deterministic room and outdoor-region connectivity, sparse 3D nodes, clearance by robot size, disconnected rooms, portal and terrain transitions, locked or blocked doors, stable A* ties, route following, bounded replan, stuck recovery, authored path round trips, and diagnostics. No fixture constructs a generic floor-navmesh path the product does not run.
 
 Difficulty table and branch tests cover all five named values for active rules with difficulty-dependent outcomes: AI motion and aim, weapon behavior, energy and shield pickup amounts, AI energy drops, non-scripted generic damage, and the typed behavior query. When two values intentionally share an outcome, the focused owning test names that equality. Separate focused tests prove the real authorable opt-outs at one scaling-sensitive value, the Rookie solo default, selected-value persistence, host-to-client binding before the first simulation tick, and rejection of out-of-range persisted or network values. Add only stock checkpoints that branch on difficulty; do not multiply every campaign test by five. Unused historical fields and contradicted comments receive no test until a reachable native decision exists.
 
@@ -74,6 +81,8 @@ Each required stock behavior scope has local checkpoints: levels cover objective
 
 Import tests verify the signed `StockBehaviorCatalog` version and manifest hash, source-provenance entries, scope closure, graph hashes, declared bindings, authoritative or client-presentation event roles, compile results, and package report. Removing any required level, campaign, module-role, package-default, owner, archetype, game-mode, client-presentation role, or session entry must make the applicable import scope fail before promotion.
 
+Nonshipping DALLAS extraction tests use synthetic and GPL source fixtures to prove versioned tree recovery, operation metadata recovery, stable draft output, custom and handwritten range accounting, and unresolved-operation and binding reports. A draft cannot satisfy catalog coverage or import closure until human review promotes it.
+
 ### Saves and replay
 
 New saves must:
@@ -86,7 +95,9 @@ New saves must:
 - bind durable campaign, level, behavior-graph, multiplayer-mode, and session-definition keys and their separate semantic revisions rather than package-local IDs or byte hashes;
 - remain deterministic for the same snapshot where the encoder guarantees stable ordering.
 
-Replays record resolved tick input, content identity, simulation revision, authoritative difficulty and other configuration, game-affecting player and host commands, seeds, and controlled nondeterministic boundary results. Ordinary chat text is excluded from authoritative hashes and replay by default. Repeated authoritative release-build playback on the supported architecture must produce the same declared state hashes and completion result. A multiplayer recording may also carry client, observer, transport, or presentation evidence with separately declared checkpoints; it need not recreate packet timing or prediction history unless the Phase 9 contract explicitly makes one of those values authoritative. Corrupt, incompatible, truncated, and hostile replay data fails without mutating live state.
+For each future-affecting state family, record world A's canonical hash at tick T, create the snapshot, and prove that snapshot creation did not mutate A. Load world B, compare A and B immediately, then drive both with identical resolved inputs and controlled boundary results for the smallest declared duration that reaches that field's next effect. Compare canonical hashes after every step. Focused fixtures cover RNG, timers, AI and navigation progress, behavior state, campaign state, and other durable fields; one phase-gate scenario crosses all state families used by the current playable slice.
+
+Replays record resolved tick input, content identity, simulation revision, authoritative difficulty and other configuration, game-affecting player and host commands, seeds, and controlled nondeterministic boundary results. Ordinary chat text is excluded from authoritative hashes and replay by default. Repeated authoritative release-build playback on the supported architecture must produce the same declared state hashes and completion result. A multiplayer recording may also carry client, observer, transport, or presentation evidence with separately declared checkpoints; replay does not recreate packet timing or prediction history because those are non-authoritative presentation and diagnosis data. Corrupt, incompatible, truncated, and hostile replay data fails without mutating live state.
 
 No test requires the original game to read a new save or replay.
 
@@ -99,7 +110,11 @@ No test requires the original game to read a new save or replay.
 - atomic autosave, crash simulation, recovery preview, acceptance or rejection, and protection of the last explicitly saved project state;
 - deterministic project decoding and publishing where the selected encoding promises it;
 - content-catalog resolution, declared replacement order, duplicate ownership, missing dependencies, orphan detection, and destructive-change impact reports;
-- behavior compilation, lighting and navigation bake invalidation, failure safety, and stale-product detection;
+- Blender-exported USD import and stable reimport through Model I/O, fixed units and axes, room and portal assignment, topology and winding rejection, primary and secondary UV validation, provenance, destructive-change preview, and canonical save/reopen;
+- deterministic planar lightmap charts for editor faces; fixed 1024-square normalized bounds; rejection of overlapping, out-of-bounds, under-guttered, or overflowing imported UV2; two-texel chart dilation; one nonmipmapped room-local `rgba8Unorm` output with no resolution or atlas-count fallback; same-toolchain exact bake hashes; bake-revision review on toolchain drift; lighting-solve invalidation; failure safety; seam diagnostics; and preview;
+- deterministic room, portal, outdoor-region, clearance and sparse 3D-node navigation baking, stable ties, invalidation, failure safety, unreachable-region diagnostics and preview;
+- complete resident-working-set accounting and publication refusal outside the supported envelope;
+- behavior compilation and stale-product detection;
 - typed room-role editing, difficulty-selectable playtest, difficulty-scaling opt-outs, cinematic sequence authoring and declared multiplayer command and event roles;
 - canonical font metrics, kerning, atlas generation, glyph coverage and replacement-font preview without any editor `.fnt` reader;
 - adaptive-score authoring and preview, region and transition validation, logical save and replay round trips, and complete score-audio dependency closure;
@@ -112,20 +127,28 @@ Each gameplay feature's verification row names its applicable authoring operatio
 
 ### Multiplayer
 
-Multiplayer tests cover the selected transport and session contracts, authoritative state, host-selected difficulty bound identically on every participating client before the first simulation tick, out-of-range difficulty rejection, exact simulation-revision agreement, content and version negotiation, join and leave, reconnection policy, invalid and hostile inputs, rate and size limits, dedicated-host lifecycle, game-mode rules, results, replay, and clean failure. Player pictures, ship logos, and audio taunts have format whitelists and caps for encoded bytes, decoded dimensions, sample rate, duration, transfer rate, cooldown, and aggregate session storage. Tests cover hash identity, app-controlled paths, malformed media, active-payload rejection, mute and disable controls, consent where required, host policy, and abuse-resistant failure.
+Multiplayer tests cover the fixed Network-framework QUIC transport and inner CryptoKit record contracts, authoritative state, and 2–32 connected human slots. Active combat and live observer modes each consume one slot; a listen host consumes one; no-window authority and relay processes consume none. A 32-slot session must join, exercise observer transitions, play, complete, and report measured authority and relay budgets. Tests also cover host-selected difficulty bound identically on every participating client before the first simulation tick, out-of-range difficulty rejection, exact simulation-revision agreement, content and version negotiation, join and leave, reconnection policy, invalid and hostile inputs, rate and size limits, dedicated-host lifecycle, game-mode rules, results, replay, and clean failure. Player pictures, ship logos, and audio taunts have format whitelists and caps for encoded bytes, decoded dimensions, sample rate, duration, transfer rate, cooldown, and aggregate session storage. Tests cover hash identity, app-controlled paths, malformed media, active-payload rejection, mute and disable controls, consent where required, host policy, and abuse-resistant failure.
 
 Text-chat tests cover bounded UTF-8 input, sender identity, public, team and private routing, disconnected recipients, rate limiting, mute and block, host moderation, logging and privacy policy, malformed input, and abuse-resistant failure. Game-mode commands use declared typed events rather than raw chat execution. Dedicated-host tests run the same typed operator commands through local input and an authenticated encrypted remote-administration boundary, with authorization, audit, replay of game-affecting results, cancellation, invalid commands and connection loss. No shell or arbitrary process execution is exposed.
 
-Deterministic local multi-instance tests establish repeatable state and desync evidence before network variability is introduced. Network tests then exercise latency, jitter, loss, duplication, reordering where the transport permits it, disconnection, host failure, and content mismatch. No test requires an original client, packet, server, or game module.
+Deterministic local multi-instance tests establish repeatable state and desync evidence before network variability is introduced. Connectivity tests cover Bonjour LAN discovery; authority proof of possession; unguessable route handles; public registration, browse and join; short lease and registration expiry; single-use client-key-, route-, session- and expiry-bound join tokens; relay-only reachability from representative NATs; outbound-only host and client connections; certificate and key rotation; pre-allocation size limits; per-source and per-session connection and byte-rate quotas; amplification bounds; and authority-owned gameplay admission. Inner-record tests cover X25519 exchange, signed transcript, HKDF context, directional ChaChaPoly keys, one global sequence per directional key across streams, datagrams and channels, unique epoch-plus-sequence nonces, associated routing headers, key-bound sender and recipient identity, allowed channel roles, duplicate and stale rejection, reconnect rekey, session-key fingerprint comparison, and proof that relay processes receive no session key.
+
+Outage tests bind the expected result: a discovery-control-plane outage blocks registration, browse and new joins while established relay data connections continue; loss of one client relay leg disconnects only that human and invokes bounded reconnect; loss of the authority leg or route-carrying relay worker ends the Internet match explicitly; LAN sessions continue; and no case falls back to direct-IP, Game Center, ICE, STUN, TURN, or automatic region migration. Privacy and retention tests cover only metadata visible to the relay. Encrypted chat and media moderation tests remain at the host and clients.
+
+Movement tests drive tick- and sequence-numbered resolved six-degree-of-freedom `InputFrame` values through local prediction. Authority snapshots acknowledge the highest processed input and carry the full future-affecting movement state. Reconciliation restores that state, replays every later unacknowledged input through the production movement path, smooths presentation only, and hard-resyncs when an acknowledgment falls outside the fixed 256-input history. The matrix covers remote interpolation and bounded extrapolation, portals, room and outdoor-region ownership, wall contacts, collision flags, corrections, listen-host and dedicated-host bias, RTT, jitter, loss, duplication, reordering, burst loss, and recovery. Each weapon family declares separately whether it predicts presentation, predicts a reversible launch, or waits for authority; pickups, damage, deaths, collision outcomes, and gameplay-affecting weapon results remain authoritative. The 120 Hz simulation rate does not imply a 120 Hz network send rate.
+
+Other network tests exercise disconnection, host failure, content mismatch, malformed envelopes, and relay capacity. No test requires an original client, packet, server, game module, or Linux service.
 
 ### Rendering
 
 Renderer tests have two layers:
 
-- CPU tests validate render-item extraction, transforms, culling, material and blend selection, lightmap bindings, mirror visibility and recursion bounds, procedural time, view ownership, cinematic camera and fade state, ordering, and buffer bounds.
+- CPU tests validate render-item extraction, transforms, room-and-portal traversal, room-frustum rejection, material and blend selection, lightmap bindings, mirror visibility and recursion bounds, procedural time, view ownership, cinematic camera and fade state, ordering, and buffer bounds.
 - GPU tests render controlled synthetic scenes for opaque and lightmapped surfaces, declared alpha and additive variants, specular faces, mirrors, procedural textures, volumetrics, scorch decals, selected canonical stock-font atlases, cockpit, cinematics and every supported auxiliary view, then compare images with a declared tolerance.
 
 Metal validation must be clean. Fixed images are pinned to the recorded OS, SDK, shader compiler, GPU, resolution, and settings. Cross-OS or cross-GPU comparisons use tolerances rather than a promise of bit-identical rasterization.
+
+Every scene records its comparison metric, threshold, environment metadata, and any narrowly justified mask. A failure retains expected, actual, and diff artifacts. Baselines never regenerate automatically: a reviewed source change, visual inspection, clean Metal validation, and recorded reviewer approval are required. Begin with simple pixel and error metrics. SSIM, perceptual masks, or another comparison dependency enters only through an explicit verification-contract amendment; ordinary OS churn does not add it silently.
 
 Repository font-rendering fixtures are synthetic or independently licensed. Selected imported retail fonts receive owned local atlas and fixed-scene evidence; neither their pixels nor retail-derived reference images enter Git.
 
@@ -153,13 +176,13 @@ Record toolchain, OS, display, content hash, build configuration, and settings b
 
 ## Performance method
 
-Measure optimized builds. Use Instruments, Metal System Trace, Metal capture, and signposts around import, simulation, render extraction, command encoding, GPU passes, audio submission, and save operations.
+Measure optimized builds. Use Instruments, Metal System Trace, Metal capture, and signposts around import, simulation, render extraction, command encoding, GPU passes, audio submission, and save operations. The allocation budget is also an automated release-build test command over the real production step and extraction path: after warm-up it exits nonzero for any project-owned allocation event inside the declared intervals. Record its failing red before the first production fix and its zero-allocation green afterward; retain an Instruments Allocations trace as supplementary attribution evidence.
 
 The initial product targets:
 
 - a fixed 120 Hz simulation without sustained backlog;
 - stable presentation at the current display refresh;
-- no avoidable steady-state allocation in measured simulation and render-extraction hot paths;
+- zero project-owned heap allocations inside warmed-up `RevivalCore.step` and render extraction for each declared production scenario;
 - no Metal validation errors;
 - bounded memory growth across repeated level loads and restarts.
 
@@ -177,7 +200,7 @@ The first playable milestone must use only Swift, MSL, Metal 4, and native Apple
 4. fly the Pyro with keyboard, mouse, and a controller through a fixed 120 Hz simulation;
 5. collide with walls and pass through connected rooms without instability;
 6. operate one animated door and one mission trigger;
-7. run one robot's minimal AI;
+7. run one robot's minimal AI through one deterministic room/portal and sparse 3D-node route with clearance and bounded replan;
 8. fire one weapon, create a projectile, apply damage, and collect one pickup;
 9. play positional sound and required instructional messaging;
 10. pause, restart, save, reload, and complete the defined slice objective;
@@ -213,7 +236,7 @@ Every applicable non-multiplayer row in the functional-completeness ledger must 
 
 ## Multiplayer gate
 
-Multiplayer completion requires every committed stock map and game mode and every dedicated-host lifecycle to pass the declared local and network matrices. Dedicated-host tests launch `RevivalMac` in its no-window host mode and prove that it does not initialize the renderer, audio, or player UI. A newly authored multiplayer package must be created, validated, published, installed, hosted, joined, completed, and replayed through native tools. Security limits and failure behavior are release criteria, not later hardening work.
+Multiplayer completion requires every committed stock map and game mode, the declared 2–32 connected-human-slot range including live observer mode, every dedicated-host lifecycle, and the public relay deployment to pass the declared local, Internet, full-load and outage matrices. Dedicated-host tests launch `RevivalMac` in its no-window host mode and prove that it does not initialize the renderer, audio, or player UI or consume a human slot. Relay tests launch `RevivalRelay` without game content or simulation and prove registration, discovery, authorization, opaque routing, expiry, recovery and operational controls without consuming a human slot. A newly authored multiplayer package must be created, validated, published, installed, hosted, joined, completed, and replayed through native tools. Security limits and failure behavior are release criteria, not later hardening work.
 
 The campaign and content creator gate plus the newly authored multiplayer package satisfy the complete creator-suite gate.
 
@@ -232,4 +255,4 @@ The product is complete only when:
 
 ## Documentation gate
 
-Before implementation begins, active documents must agree on Swift 6.3, direct Metal 4, Apple Silicon, one-way import, new saves and replay, typed behavior data, the complete creator and multiplayer scope, no legacy runtime, four Phase 1 targets, the five-target complete product, and binding red-first TDD with the test-value gate. A consistency search must find no active instruction to preserve OpenGL, C++, SDL, the Osiris ABI, original saves or demos, original network interoperability, backward export, a stock-campaign-only feature ceiling, implementation-first testing, speculative coverage, or test-only production paths.
+Before implementation begins, active documents must agree on Swift 6.3, direct Metal 4, Apple Silicon, resident level working sets, one-way import, USD creator ingress, purpose-built volumetric navigation, fixed room-local lightmaps, new saves and replay, typed behavior data, Network-framework QUIC plus inner CryptoKit records, 2–32 connected human slots with live observers consuming a slot, the project-operated relay and its fail-closed outage behavior, the complete creator and multiplayer scope, no legacy runtime, four Phase 1 targets, `RevivalEditor` as the fifth target in Phase 2, `RevivalRelay` as the sixth and final target in Phase 9, and binding red-first TDD with the test-value gate. A consistency search must find no active instruction to preserve OpenGL, C++, SDL, the Osiris ABI, original saves or demos, original network interoperability, backward export, runtime asset streaming, terrain LOD, Game Center matchmaking, direct-IP Internet hosting, a stock-campaign-only feature ceiling, implementation-first testing, speculative coverage, or test-only production paths.

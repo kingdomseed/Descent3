@@ -13,8 +13,11 @@ The shipping product uses:
 - AppKit and MetalKit for game and editor windows;
 - GameController for controller input;
 - AVFoundation and AVAudioEngine for media and sound;
+- Model I/O for one-way USD creator ingress;
+- Network and CryptoKit for QUIC sessions, authentication, and encryption;
 - Apple Silicon `arm64` and macOS 26 or later;
 - a fixed 120 Hz simulation with display-rate rendering;
+- one complete resident level working set, fixed room-and-portal visibility, and full-resolution terrain without runtime streaming or LOD;
 - one canonical content model shared by runtime, editor, behaviors, saves, replay, multiplayer, and publishing.
 
 There is one renderer, one simulation model, one behavior language, and one forward-moving content format. The project does not carry compatibility backends or export paths for the old world.
@@ -56,10 +59,10 @@ The complete revival includes:
 
 - the Training, base, secret, and Mercenary campaign content;
 - six-degree-of-freedom flight, five-level difficulty and its real scaling rules, collision, AI, weapons, objectives, refueling rooms, HUD and selected one-way-converted stock fonts, animated cockpit, automap, markers, rear and auxiliary camera views, in-game camera-path cinematics, adaptive music, audio, movies, cheat, easter-egg, and diagnostic commands with explicit per-command policy, native controller haptics, modern saves, and replay;
-- native multiplayer, dedicated hosting, text chat and moderation, authenticated host operator commands, explicit authoritative and client-presentation behavior roles, supported game modes, secure player pictures, ship logos and audio taunts, and multiplayer authoring;
-- a direct Metal renderer for imported content and replacement visuals;
+- native multiplayer for 2–32 connected human slots over Network-framework QUIC and inner CryptoKit records, dedicated hosting, public discovery and opaque relay, live observer mode, prediction and reconciliation, text chat and moderation, authenticated host operator commands, explicit authoritative and client-presentation behavior roles, supported game modes, secure player pictures, ship logos and audio taunts, and multiplayer authoring;
+- a direct Metal renderer with a resident level working set, room-and-portal visibility, and full-resolution terrain for imported content and replacement visuals;
 - a native macOS player application with keyboard, mouse, and controller support;
-- one integrated native creator suite for world geometry, terrain, objects, game data, behaviors, campaigns, briefings, cinematics, assets, localization, lighting, navigation, validation, playtesting, and publishing;
+- one integrated native creator suite for world geometry, terrain, objects, game data, behaviors, campaigns, briefings, cinematics, USD asset ingress, localization, lighting, purpose-built volumetric navigation, validation, playtesting, and publishing;
 - a native mod SDK that uses the same project and package contracts as first-party content;
 - the ability to create and publish a complete new campaign without legacy tools or hand-edited generated files.
 
@@ -74,7 +77,7 @@ The product does not include:
 
 ## Product shape
 
-Phase 1 starts with four targets. Phase 2 adds the editor, and the complete product stays at five production targets:
+Phase 1 starts with four targets. Phase 2 adds the editor. Phase 9 adds one isolated operational service, so the complete product has six targets:
 
 | Target | Responsibility |
 | --- | --- |
@@ -83,12 +86,13 @@ Phase 1 starts with four targets. Phase 2 adds the editor, and the complete prod
 | `RevivalMetal` | Direct Metal 4 rendering for the game and editor |
 | `RevivalMac` | Player application, input, audio, media, files, import UX, presentation, and no-window dedicated hosting |
 | `RevivalEditor` | Native project authoring, baking, debugging, playtest, and publishing |
+| `RevivalRelay` | Public session discovery, expiring registration, join authorization, and opaque QUIC relay; no game content or simulation |
 
-This is smaller than a general game engine. It has no generic ECS, job system, render graph, dependency-injection framework, binary plugin system, or cross-platform abstraction. Required mechanisms such as the behavior executor and content catalog stay narrow and game-specific.
+This is smaller than a general game engine. It has no generic ECS, job system, render graph, dependency-injection framework, binary plugin system, runtime streaming system, terrain LOD system, or cross-platform abstraction. Required mechanisms such as the behavior executor, content catalog, navigation graph, and relay protocol stay narrow and product-specific.
 
 ## First playable and creator slices
 
-The first playable combat slice converts a connected Training Mission room cluster and proves flight, collision, a door and trigger, one robot, one weapon, one pickup, HUD, positional audio, and new-format save and reload. The editor opens the same canonical cluster and can inspect it in Phase 2. By Phase 4 it can edit and play the geometry, door, trigger, robot, weapon, pickup, and first behavior graph used by that slice.
+The first playable combat slice converts a connected Training Mission room cluster and proves flight, collision, a door and trigger, one robot following a baked volumetric route, one weapon, one pickup, HUD, positional audio, and new-format save and reload. The editor opens the same canonical cluster and can inspect it in Phase 2. By Phase 4 it can edit and play the geometry, door, trigger, robot, navigation topology, weapon, pickup, and first behavior graph used by that slice.
 
 The next milestone completes the full Training Mission and its matching campaign, behavior, briefing, and content-authoring paths. Work then expands campaign level by level. Every runtime capability gains its authoring, validation, and playtest path in the same phase.
 

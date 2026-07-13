@@ -41,7 +41,7 @@ Add an abstraction only when at least one condition is true:
 
 Every proposal for a new subsystem must identify the current feature that needs it, the simpler direct approach that was considered, and the code or risk the subsystem removes.
 
-Do not create `Common`, `Shared`, `Engine`, `Manager`, `Service`, `Provider`, or `Factory` modules as holding areas. Name code after the game concept or Apple service it implements. The five-target product graph is a ceiling during the planned work, not a reason to pile unrelated code into one file.
+Do not create `Common`, `Shared`, `Engine`, `Manager`, `Service`, `Provider`, or `Factory` modules as holding areas. Name code after the game concept or Apple service it implements. The six-target product graph is fixed for the planned work, not a reason to pile unrelated code into one file.
 
 ## Data and ownership
 
@@ -54,6 +54,9 @@ Do not create `Common`, `Shared`, `Engine`, `Manager`, `Service`, `Provider`, or
 - Use finite `Float32` for simulation quantities that are not integral. Reject NaN and infinity at content and command boundaries, normalize negative zero before canonical encoding and hashing, and apply declared domain bounds. Keep operation order stable and do not enable fast-math transformations.
 - Install loaded assets only at defined frame boundaries.
 - Keep renderer resources out of simulation and save types.
+- Load one level's complete dependency closure at its transition and retain it through level exit. Standard Swift and Metal allocation owns that residency; do not add a transparent pager, streaming asset path, eviction policy, or runtime resource manager. A custom allocator remains subject to the measured profile and written invariant required by `AGENTS.md` and may not create a second residency path or test-only observability.
+
+Every authoritative multiply-add explicitly uses either fused `addingProduct` or separately rounded multiply and add. System and SIMD transcendental functions do not write authoritative state. A required transcendental becomes one named, versioned project operation or table with exact vectors; it does not justify a general math framework.
 
 Unsafe memory access, `Unmanaged`, `@unchecked Sendable`, `nonisolated(unsafe)`, `@inline(always)`, and `@specialize` require a measured reason, a documented invariant, and focused tests. Do not enable `-Ounchecked` for the project.
 
@@ -66,7 +69,7 @@ Use asynchronous work for operations that can block for milliseconds or more:
 - retail import;
 - disk reads and writes;
 - image, audio, and movie conversion;
-- background asset preparation;
+- level-transition asset preparation;
 - pipeline compilation or cache preparation when the Metal API supports it cleanly;
 - editor lighting, navigation, media, and package builds.
 
@@ -78,13 +81,16 @@ Do not use actors or tasks for players, robots, projectiles, doors, AI goals, ph
 - Use a small explicit pass order and a small known pipeline set.
 - Build the first correct image before adding visual systems.
 - Treat mirrors, specular response, scorch decals, procedural textures, volumetrics, and declared blend semantics as concrete content requirements. Implement each directly when its first verified scene needs it; do not hide the inventory behind a three-material summary.
-- Keep CPU render extraction predictable and allocation-light.
+- Keep CPU render extraction predictable and free of project-owned steady-state heap allocation after warm-up.
 - Use three rotating frame-resource slots where Metal synchronization requires them; do not generalize that into a resource framework.
-- Add GPU-driven culling, bindless resources, MetalFX, deferred lighting, or ray tracing only after a scene and measurement justify the code.
+- Use one app-lifetime and one level-lifetime Metal residency set. Do not add streaming, eviction, a texture cache, or a residency manager.
+- Use CPU room-and-portal traversal with room-frustum rejection and ordinary GPU backface rejection. Do not recreate legacy face-by-face portal clipping or add an occlusion subsystem.
+- Build outdoor terrain as one full-resolution canonical mesh. Do not port or replace the historical terrain LOD system.
+- Do not add GPU-driven culling, bindless scene machinery, MetalFX, deferred lighting, or ray tracing to the accepted product architecture. Reopening one requires an explicit architecture amendment.
 
 ## Dependencies
 
-The product aims for no third-party runtime dependencies. Apple frameworks and the Swift standard library cover the applications, renderer, input, canonical font use, audio and movie encoding and playback, serialization, and tests. Narrow project-owned Swift decoders in `D3Import` handle the verified retail bitmap-font, ACM, and MVE inputs; no legacy decoder enters a runtime target.
+The product has no third-party runtime dependencies. Apple frameworks and the Swift standard library cover the applications, renderer, input, Model I/O USD ingestion, Network-framework QUIC, canonical font use, audio and movie encoding and playback, serialization, and tests. Narrow project-owned Swift decoders in `D3Import` handle the verified retail bitmap-font, ACM, and MVE inputs; no legacy decoder enters a runtime target.
 
 Before adding a dependency, document:
 
@@ -102,7 +108,7 @@ Track project-owned Swift and MSL lines, target count, runtime dependency count,
 
 New code should correspond to a visible capability, required content, safety invariant, or measured improvement. When a milestone adds much more infrastructure than playable behavior, stop and simplify before continuing. Refactoring may reduce line count, target count, or concepts even when no feature changes.
 
-Do not set an arbitrary lifetime line limit before the complete Training Mission exists. Phase 5 establishes the first credible size baseline. Phase 1 has four product targets; Phase 2 adds `RevivalEditor`; the complete planned product has five. Third-party runtime dependencies remain at zero unless a documented exception removes more code and risk than it adds.
+Do not set an arbitrary lifetime line limit before the complete Training Mission exists. Phase 5 establishes the first credible size baseline. Phase 1 has four product targets; Phase 2 adds `RevivalEditor`; Phase 9 adds the isolated `RevivalRelay` operational target; the complete planned product has six. Third-party runtime dependencies remain at zero.
 
 Track functional ledger coverage beside line count. Falling line count while required capabilities disappear is a regression, not an improvement.
 
@@ -140,6 +146,8 @@ Performance work follows this order:
 5. keep the optimization only if the evidence supports it.
 
 Track frame time, simulation time, render-encoding time, GPU time, allocations, memory high-water mark, import time, and startup time. Do not infer performance from code shape alone.
+
+After warm-up, each declared production scenario performs zero project-owned heap allocations inside `RevivalCore.step` and render extraction. Initialization, level-transition installation, and Apple-framework work outside those boundaries are measured separately. Phase 1 establishes an automated release-build allocation-budget command over the real production path: it warms the scenario, measures allocation events only inside the declared step and extraction intervals, and exits nonzero on any project-owned allocation. Its first valid nonzero result is the red evidence; zero is green. Every gameplay slice extends that same command. An Instruments Allocations trace supplies attribution and corroboration but does not replace the automated red-green gate. Do not add allocator protocols, malloc hooks to shipping code, or test-only production entry points to prove the invariant.
 
 The 120 Hz simulation target is a product choice. The current reference display is 60 Hz, so a 120 frames-per-second presentation claim requires a 120 Hz test display. An offscreen test may establish at least 120 frames per second of render throughput, but not presentation pacing or latency. The first renderer gate is consistent 60 Hz presentation on the current reference display with clean Metal validation.
 

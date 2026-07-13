@@ -50,7 +50,7 @@ Import is read-only toward the retail source and atomic toward its destination:
 
 1. discover a recognized source profile;
 2. hash and fingerprint relevant files;
-3. validate container bounds, names, case collisions, duplicates, sizes, and references;
+3. validate source endianness, container and field bounds, names, case collisions, duplicates, sizes, and references before decoding values;
 4. select the dependency closure required by the requested partial or release-complete import scope;
 5. resolve retail patch and archive precedence once;
 6. decode and normalize the selected levels, models, textures, lightmaps, production font roles, audio, adaptive-score definitions, stock pilot pictures, movies, strings, and tables;
@@ -74,6 +74,8 @@ D3Import --contract 1 --source <directory> --staging <directory> --destination <
 `RevivalMac` passes each value as a separate `Process` argument. Standard output is not a machine protocol. On normal completion, the sorted-key JSON report contains the contract and report-schema versions, status, requested scope, recognized source profile and hashes, stock behavior catalog version and hash, destination manifest hash, diagnostics, and whether atomic promotion occurred.
 
 `D3Import` carries one project-owned, versioned `StockBehaviorCatalog` as a signed bundled resource. The catalog contains the reviewed `BehaviorGraph` sources and binding declarations translated from GPL-released generated, handwritten, reusable/default-object, campaign, and multiplayer modules. Its sorted manifest records baseline commit `156cba8aafd997d27deb0902ba6026bcdcc1cfaf`, every source path and hash, translation revision, graph hash, scope identity, expected `ContentKey` binding, and each approved semantic deviation. The helper selects entries by import scope, rejects an incomplete or mismatched catalog, resolves bindings against the imported content, compiles the graphs, and records the catalog manifest hash in its report and output package. No command-line behavior-source path or untrusted code-generation input exists.
+
+A required nonshipping source-analysis tool recovers draft graphs and unresolved-operation reports from the pinned GPL DALLAS sources before human review. That tool is upstream of the catalog, never runs inside `D3Import`, and cannot promote, sign, or mark a translation reviewed. `RevivalCore` and `RevivalEditor` own the reviewed graph source and translation ledger; `D3Import` only validates and consumes the signed catalog resource.
 
 Exit status `0` means a validated package was promoted. Status `2` means invalid arguments or unsupported contract version, `3` means an unrecognized or incomplete source, `4` means decode, validation, or promotion failure, and `70` means an unexpected internal failure. `RevivalMac` maps termination by `SIGTERM` to cancellation.
 
@@ -113,19 +115,21 @@ Descent3Revival.content/
 - source-to-output provenance;
 - byte-integrity hashes for generated outputs;
 - normalized decoded-content hashes for transcoded images, audio, and movies;
+- per-level CPU and GPU working-set totals and the supported-envelope result;
 - imported, ignored, and rejected entries;
 - production and superseded role decisions for every recognized retail bitmap font;
 - campaign, stock-multiplayer, and optional-media completeness.
 
-Use `Codable` JSON with sorted keys for manifests, projects, and behavior data, standard Apple-readable media where practical, and a small purpose-built binary payload only where geometry or measured loading cost requires one. Do not begin with a custom archive, database, virtual filesystem, compression framework, asset graph, or plugin system.
+Use `Codable` JSON with sorted keys for manifests, projects, and behavior data, standard Apple-readable media where practical, and one compact purpose-built geometry payload. Do not add a custom archive, database, virtual filesystem, compression framework, asset graph, or plugin system.
 
 Initial normalization favors runtime simplicity:
 
 | Retail input | Canonical output |
 | --- | --- |
 | HOG, MN3, and related containers | Removed after their selected entries are resolved into the directory package |
-| D3L rooms, portals, terrain, paths, and object placement | Typed canonical level data, using a compact binary only where JSON is clearly unsuitable |
-| Legacy texture and lightmap encodings | Standard image files or direct pixel payloads accepted by MetalKit |
+| D3L rooms, portals, terrain, paths, and object placement | Typed canonical level data with the single compact geometry payload |
+| Legacy texture encodings | Standard image files or direct pixel payloads accepted by MetalKit |
+| Legacy lightmaps and secondary UVs | Deterministically repacked per room into the canonical single nonmipmapped 1024-square `rgba8Unorm` atlas with two-texel dilated chart gutters and rewritten canonical UV2; overflow rejects the source profile |
 | Legacy models and animation | One small canonical mesh and animation representation |
 | Retail bitmap `.fnt` files | Checked one-way decode into canonical glyph metrics, kerning and texture atlases for production font roles; no runtime `.fnt` reader or legacy resolution switch |
 | ACM and other legacy audio | Narrow checked Swift import decode, then Apple-native PCM or compressed audio selected through AVFoundation |
@@ -181,7 +185,7 @@ A project may create a standalone game package or layer new content and replacem
 
 Modern player pictures, ship logos, and audio taunts enter through native profile or project media validation, never through `D3Import`. Accepted formats are an explicit whitelist. Import caps encoded bytes, decoded dimensions, sample rate, duration, and aggregate storage; strips active metadata; writes only to app-controlled paths; and identifies media by content hash. Published projects also require rights metadata. Multiplayer adds negotiated limits, cooldowns, mute and disable controls, consent where capture or playback requires it, and host policy.
 
-The publisher validates dependency closure, compiles behaviors, builds stale lighting and navigation products, copies canonical media, records provenance, and emits one immutable package. The game-team workflow and mod SDK use this same path. There is no privileged internal package format, HOG export, native plugin payload, or hand-edited generated file.
+The publisher validates dependency closure, compiles behaviors, builds stale lighting and navigation products, computes the complete per-level CPU and GPU working set, copies canonical media, records provenance, and emits one immutable package. A level outside the supported resident envelope is rejected and must be reduced or split; publication never requests a streaming fallback. The game-team workflow and mod SDK use this same path. There is no privileged internal package format, HOG export, native plugin payload, or hand-edited generated file.
 
 Every replacement asset records author, source, license, and attribution requirements. Project sources or published packages may enter Git only when their rights permit it. Publicly released creator formats receive explicit version migrations because creator-owned work cannot always be regenerated.
 

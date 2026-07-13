@@ -103,7 +103,7 @@ Solo play and the multiplayer host both own authoritative simulation. Object, tr
 
 Every historical `EVT_GAME_*` and `EVT_CLIENT_*` use receives an explicit native classification: authoritative simulation event, replicated presentation event, local application input or UI event, or excluded obsolete mechanism with a recorded reason. The client prefix does not automatically make an event safe or presentation-only. The stock translation manifest records the classification and the required replication or local-input boundary. No raw historical event number enters canonical content.
 
-These rules do not select the Phase 9 transport. They fix behavior ownership so transport work cannot create a second scripting model.
+These rules sit above the selected Phase 9 Network-framework QUIC transport. They fix behavior ownership so transport work cannot create a second scripting model.
 
 ## Authoring and debugging
 
@@ -114,6 +114,10 @@ The graph is the source of truth. Generated `BehaviorProgram` files are derived 
 ## Stock translation
 
 The GPL-released DALLAS-generated and handwritten C++ sources are behavioral evidence for Training, base, secret, Mercenary, reusable and default object behavior, and stock multiplayer game modes. The normative default is pinned community commit `156cba8aafd997d27deb0902ba6026bcdcc1cfaf`, the same source baseline that supplied the successful M4 reference modules. Retail 1.4 executable behavior is comparison evidence for ambiguous cases, not a second semantic baseline. Translation inspects complete generated and handwritten sources, including native game modules, not only the DALLAS block for a level.
+
+All 48 generated level-script sources contain a versioned `$$SCRIPT_BLOCK` tree that DALLAS itself reloaded, plus explicit custom-script ranges. `DallasFuncs.cpp` carries the global action, query, and enum metadata; `DallasFuncs.h` carries tagged aliases; level-local custom blocks add their own declarations. A nonshipping source-analysis tool parses those pinned GPL inputs into explicitly noncanonical draft `BehaviorGraph` data and an unresolved-operation, binding, message, and source-range report. Deterministic extraction is covered by synthetic fixtures and exact source hashes.
+
+The extractor makes no authority, interval, defect, error, or semantic decisions. It never runs in `D3Import`, never becomes a public legacy import format, and never adds a production target. Reviewers compare each draft with generated C++, custom blocks, handwritten modules, message and localization references, active runtime behavior, and the approved native rules. Only a reviewed graph with complete generated-node coverage, accounted custom and handwritten ranges, resolved operations and bindings, and observable checkpoints may enter `StockBehaviorCatalog`.
 
 Known defects do not become requirements automatically. Every intentional community fix, retail difference, or new native correction receives one explicit ledger decision and observable checkpoint. The importer never loads retail DLLs to resolve a disagreement.
 
@@ -157,6 +161,6 @@ If a future capability cannot be expressed safely, extend the typed language or 
 
 ## Verification
 
-Tests cover parsing, type checking, graph validation, compiler output, handler disposition, command visibility, targeted requests, timer lifetime, run policies, authority and historical server/client event classification, stale references, stable collections, Float32 boundaries, focused five-level difficulty queries, in-game cinematic commands, adaptive-score commands, historical interval translation, bounded multiplayer command events, durable operations, operation accounting, cycles, bounded iteration, call limits, persistence, errors, debug source maps, and deterministic replay. Interval-heavy tests cover rate equivalence, timer boundaries, long-run drift, and measured operation counts. While 4,096 is the active ceiling, direct and multi-handler event cycles must fail at exactly that operation without hanging or advancing another tick.
+Tests cover draft-source extraction, unresolved-operation reporting, parsing, type checking, graph validation, compiler output, handler disposition, command visibility, targeted requests, timer lifetime, run policies, authority and historical server/client event classification, stale references, stable collections, Float32 boundaries, focused five-level difficulty queries, in-game cinematic commands, adaptive-score commands, historical interval translation, bounded multiplayer command events, durable operations, operation accounting, cycles, bounded iteration, call limits, persistence, errors, debug source maps, and deterministic replay. Interval-heavy tests cover rate equivalence, timer boundaries, long-run drift, and measured operation counts. While 4,096 is the active ceiling, direct and multi-handler event cycles must fail at exactly that operation without hanging or advancing another tick.
 
 Every runtime operation has focused synthetic tests. Stock levels, reusable and default object behaviors, stock game modes, and independently authored projects add end-to-end checkpoints. A behavior is complete only when the editor can author it, the compiler can reject invalid forms, the runtime can execute it, the debugger can identify failure, and a package can publish it.

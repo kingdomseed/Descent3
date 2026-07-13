@@ -54,10 +54,10 @@ The working [functional-completeness ledger](functional-completeness-ledger.md) 
 ### Player experience
 
 - Training, base, secret, and Mercenary campaign content;
-- six-degree-of-freedom flight, five named difficulty levels and their declared AI, weapon, energy-and-shield-pickup, AI energy-drop, generic-damage, profile, session, and behavior-query rules, collision, objects, doors, triggers, AI, weapons, inventory, GuideBot, matcens, goals, terrain, weather, effects, damage, death, refueling rooms, and progression;
+- six-degree-of-freedom flight, five named difficulty levels and their declared AI, weapon, energy-and-shield-pickup, AI energy-drop, generic-damage, profile, session, and behavior-query rules, collision, objects, doors, triggers, AI, purpose-built volumetric navigation, weapons, inventory, GuideBot, matcens, goals, terrain, weather, effects, damage, death, refueling rooms, and progression;
 - briefings, movies, runtime camera-path cinematics with player-control and presentation transitions, TelCom-style presentation, HUD, animated three-dimensional cockpit, three-dimensional automap and discovery state, player markers and messages, rear view and auxiliary camera views for GuideBot, guided weapons and markers, audio, adaptive music, localization, profiles, settings, saves, accessibility, controller support, native haptics, and the intended cheat, easter-egg, and diagnostic command surface with per-command availability and consequences;
 - pilot pictures, ship logos, audio taunts, and other supported player-selected media, including local preview, network negotiation, bounds, mute and privacy controls, host policy, and safe failure;
-- stock multiplayer maps and game-mode capabilities, native multiplayer, public, team, and private text chat with mute, block, rate, and host-policy controls, dedicated hosting with local and authenticated remote operator commands, multiplayer level and mode configuration, joining, leaving, failure recovery, and result presentation;
+- stock multiplayer maps and game-mode capabilities, 2–32 connected human slots over Network-framework QUIC and inner CryptoKit records, live observer mode as a per-slot state, Bonjour LAN discovery, project-operated public discovery and opaque relay, local prediction and authoritative reconciliation, public, team, and private text chat with mute, block, rate, and host-policy controls, dedicated hosting with local and authenticated remote operator commands, multiplayer level and mode configuration, joining, leaving, fail-closed outage behavior, failure recovery, and result presentation;
 - deterministic replay and recording for testing, diagnosis, desync evidence, observer or spectator behavior, and the player-facing replay experience, with each historical capability ledgered explicitly.
 
 ### World and level creation
@@ -68,7 +68,7 @@ The working [functional-completeness ledger](functional-completeness-ledger.md) 
 - sky and horizon colors, stars, satellites, rotation, halos, atmosphere, terrain environment audio, and animated-light effects such as pulses, strobes, flicker, and coronas;
 - object, player start, camera, waypoint, sound source, door, trigger, path, navigation, matcen, goal, ambient-life, and weather placement, plus typed room roles for refueling, goals, secrets, special-purpose spaces, external spaces, and waypoints;
 - textured, wireframe, collision, portal, navigation, and lighting diagnostic views; focus and viewport navigation; saved views and camera bookmarks;
-- selection, grouping, reusable groups or prefabs, duplication, naming, search, undo, redo, autosave, crash recovery, inspection, statistics, repair, validation, and supported native geometry import.
+- selection, grouping, reusable groups or prefabs, duplication, naming, search, undo, redo, autosave, crash recovery, inspection, statistics, repair, validation, and explicit one-way Model I/O USD import and reimport into canonical editable geometry.
 
 ### Game-data creation
 
@@ -97,7 +97,8 @@ The working [functional-completeness ledger](functional-completeness-ledger.md) 
 
 - project creation from an empty native template;
 - content catalog and reference inspection;
-- lighting and navigation baking;
+- deterministic room-local lighting and purpose-built volumetric-navigation baking;
+- complete resident CPU and GPU working-set calculation with publication refusal for an oversized level;
 - dependency closure, orphan detection, validation, and diagnostics;
 - instant play-in-editor, deterministic test scenarios, and capture support;
 - package publishing, provenance, signing where required, and distribution;

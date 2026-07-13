@@ -8,7 +8,7 @@
 
 Build a complete new game and creator suite for Apple Silicon with Swift 6.3 host code and MSL shaders using the Metal 4 API directly. The product runs content converted from an owned Descent 3 installation and native creator projects, but it does not preserve the original engine architecture or executable interfaces.
 
-The product targets `arm64` Macs running macOS 26 or later. It uses AppKit, `MTKView`, GameController, AVFoundation, AVAudioEngine, Foundation, and OSLog directly. Swift Package Manager owns reusable targets. `RevivalMac` and `RevivalEditor` are thin Xcode application targets for player and creator application packaging and signing.
+The product targets `arm64` Macs running macOS 26 or later. It uses AppKit, `MTKView`, GameController, AVFoundation, AVAudioEngine, Model I/O, Network, CryptoKit, Foundation, and OSLog directly. Swift Package Manager owns reusable targets. `RevivalMac` and `RevivalEditor` are thin Xcode application targets for player and creator application packaging and signing.
 
 Shipping targets contain no C or C++ engine code, Objective-C++ bridge, Rust runtime, OpenGL renderer, SDL layer, Wine or Game Porting Toolkit runtime, Vulkan translation layer, Metal-cpp, or native legacy module.
 
@@ -34,7 +34,7 @@ Swift was not selected to translate the old source line by line. A direct transl
 
 Metal is the only renderer. There is no backend interface and no fallback renderer.
 
-The renderer uses `MTKView` so project code does not reimplement drawable and display-surface management that MetalKit already supplies. `RevivalMac` still owns the AppKit window and lifecycle. The renderer uses Metal 4 command submission, resource management, pipeline creation, validation, and capture directly from Swift. MSL shaders are compiled into a metallib for release builds.
+The renderer uses `MTKView` so project code does not reimplement drawable and display-surface management that MetalKit already supplies. `RevivalMac` still owns the AppKit window and lifecycle. The renderer uses `MTL4CommandQueue`, device-owned `MTL4CommandBuffer` values, rotating `MTL4CommandAllocator` values, `MTL4ArgumentTable`, and `MTLResidencySet` directly from Swift. MSL shaders are compiled into a metallib for release builds. Metal-cpp supplies C++ bindings to these APIs; it adds no capability to a Swift host.
 
 The initial renderer is a direct forward renderer with a small fixed pass sequence:
 
@@ -45,9 +45,17 @@ The initial renderer is a direct forward renderer with a small fixed pass sequen
 
 This initial sequence is not the final material or effect inventory. Imported and native content also require direct support for reflected room views, specular faces, scorch decals, procedural fire and water textures, volumetric surfaces and lighting, and the historical alpha-weighted additive and other declared blend semantics. Add each as the smallest explicit pass, material state, or update path that produces the required image. Their existence does not justify a render graph, deferred renderer, physically based material framework, multithreaded command encoding, MetalFX, ray tracing, or general shader system.
 
+### Resident working set and visibility
+
+The content-lifetime model is fixed. At a level transition, the game loads that level's complete validated dependency closure and keeps it resident until the level exits. Metal uses one app-lifetime residency set for global presentation resources and one level-lifetime residency set for the active level. Frame allocators rotate only for command memory. There is no runtime asset streaming, eviction, transparent paging, texture upload cache, or resource-manager layer.
+
+Indoor visibility uses one CPU room-and-portal traversal with room-frustum rejection. Metal performs ordinary triangle backface rejection. The product does not reproduce legacy face-by-face portal clipping, software occlusion, or renderer-specific survival heuristics. Outdoor terrain is one full-resolution canonical mesh for the level with no runtime terrain LOD.
+
+The publisher computes the complete CPU and GPU working set before publication and rejects a level that exceeds the supported envelope. The creator must reduce or split that level; the runtime does not open a second residency architecture. Long-form movie and audio scheduling through AVFoundation and AVAudioEngine is media playback, not a general asset-streaming path. Changing this model requires an explicit architecture amendment.
+
 ## Target graph
 
-Phase 1 creates the four runtime and import targets. Phase 2 adds `RevivalEditor`; the complete product has five production targets.
+Phase 1 creates the four runtime and import targets. Phase 2 adds `RevivalEditor`. Phase 9 adds the bounded `RevivalRelay` service required for complete Internet multiplayer; the complete product has six production and operational targets.
 
 ```text
 target dependencies
@@ -58,13 +66,14 @@ RevivalMac ─────> RevivalCore
 RevivalMac ─────> RevivalMetal
 RevivalEditor ──> RevivalCore
 RevivalEditor ──> RevivalMetal
+RevivalRelay ───> Network + CryptoKit + Foundation only
 
 process integration: Xcode package dependency, no module link
 
 RevivalMac - - explicit import - -> bundled signed D3Import
 ```
 
-`D3Import` writes canonical content. `RevivalMac` loads it through `RevivalCore` and presents it through `RevivalMetal`. `RevivalEditor` edits canonical project data and uses the same core and renderer for validation and playtest. Solid arrows are direct target dependencies; the dashed line is a small versioned command-line process contract, not a link dependency or general plugin protocol.
+`D3Import` writes canonical content. `RevivalMac` loads it through `RevivalCore` and presents it through `RevivalMetal`. `RevivalEditor` edits canonical project data and uses the same core and renderer for validation and playtest. `RevivalRelay` contains no game, content, renderer, audio, or editor code. Solid arrows are direct target dependencies; the dashed line is a small versioned command-line process contract, not a link dependency or general plugin protocol.
 
 ### `D3Import`
 
@@ -84,13 +93,27 @@ Contains the concrete renderer and MSL. It consumes compact render snapshots fro
 
 Owns the player application, `NSWindow`, `MTKView`, display loop, input sampling, solo difficulty default, audio, adaptive-score scheduling, cinematic presentation, movies, GameController haptics, text-chat and operator input, player-selected media, file locations, settings, signing, packaging, and explicit import UX. It composes `RevivalCore` and `RevivalMetal` directly and launches the bundled `D3Import` helper only when the user requests import or reimport. [Adaptive music](adaptive-music.md) fixes the boundary between deterministic score decisions and sample-clock presentation.
 
-Dedicated hosting is a no-window launch mode of the same `RevivalMac` executable. That mode constructs `RevivalCore` session and network ownership, skips renderer, audio, and player UI setup, and emits structured server logs. Local input and authenticated encrypted remote administration invoke the same bounded typed `HostCommand` set; no Telnet service, shell, or arbitrary process execution exists. It is not a second simulation or a separate server framework. This keeps the planned product at five targets while providing a headless host.
+Dedicated hosting is a no-window launch mode of the same `RevivalMac` executable. That mode constructs `RevivalCore` session and network ownership, skips renderer, audio, and player UI setup, and emits structured server logs. Local input and authenticated encrypted remote administration invoke the same bounded typed `HostCommand` set; no Telnet service, shell, or arbitrary process execution exists. It is not a second simulation or a separate server framework.
 
 ### `RevivalEditor`
 
 Phase 2 adds the native editor as a read-only content inspector and level viewer. Each later gameplay slice adds its matching creation, validation, debugging, and playtest operations. The editor owns AppKit editing views and commands while `RevivalCore` owns documents, game rules, behavior semantics, validation, and publishing rules. It has no legacy export mode.
 
 One integrated application covers world and terrain editing, game-data definitions, `BehaviorGraph`, campaign and presentation authoring, asset inspection, lighting and navigation baking, dependency audits, play-in-editor, and package publishing. [Native creator suite](creator-suite.md) defines its contract.
+
+### `RevivalRelay`
+
+Phase 9 adds one small no-window Swift service for public session discovery, expiring session registration, join authorization, and opaque packet relay. It runs on Apple Silicon and macOS 26 or later, imports no game content, renderer, audio, editor, or simulation code, and never becomes session authority. Separating this public attack surface from the signed player application removes more lifecycle and security risk than the sixth target introduces. Registration requires authority proof of possession, an unguessable route handle, a short lease, and bounded metadata. A single-use join token binds the session, client key, route, and expiry. The service enforces pre-allocation envelope limits plus per-source, per-session, connection, byte-rate, and amplification limits; the authority still makes gameplay-admission decisions.
+
+Public Internet hosts and clients make separate outbound Network-framework QUIC connections to the project-operated relay. QUIC protects each hop. Above it, every authority-client pair uses one inner CryptoKit record protocol: ephemeral X25519 key agreement, a per-session Ed25519 authority key bound into the expiring registration, a signed handshake transcript, HKDF-SHA256, and separate directional ChaChaPoly keys. Each directional key has one global monotonic sequence across every stream, datagram, and logical channel in its connection epoch. Each bounded record's visible version, route, sender, recipient, channel, epoch, sequence, and length header is authenticated as associated data; the nonce derives uniquely from epoch and that global sequence. The receiver binds the key to its expected session, route, sender, recipient, and allowed channel roles and rejects a mismatched identity or authority-only channel, wrong-session, wrong-route, oversized, duplicate, stale, or unauthenticated record. Reconnect performs a new key exchange and epoch. The relay receives no session key and sees only connection metadata, opaque routes, lengths, and timing. Host and client surface the session-key fingerprint for explicit verification.
+
+Reliable control traffic uses QUIC streams; time-sensitive input and state traffic uses QUIC datagrams. Bonjour-discovered LAN sessions use the same handshake, inner records, session messages, and authority path over a direct host QUIC listener. This is one gameplay protocol over two fixed routes, not a fallback transport. The design deliberately excludes ICE, STUN, TURN, inbound router configuration, direct-IP Internet hosting, and Game Center.
+
+Every resolved local `InputFrame` receives a monotonically increasing sequence and intended simulation tick. Authority snapshots name their authoritative tick, highest processed input sequence, and the complete future-affecting predicted ship state: pose, linear and angular velocity, room or outdoor-region ownership, collision attachment and movement flags, and physics accumulators. Reconciliation restores that state and replays every later unacknowledged `InputFrame` through the production movement path. Each client retains exactly 256 input frames; an acknowledgment older than that window triggers a hard authoritative resync. Correction smoothing affects presentation only. Remote ships interpolate authoritative snapshots and use only the bounded extrapolation declared by the networked-simulation skill.
+
+The service owns an operational budget, regional deployment, certificate and key rotation, privacy and retention rules, traffic-metadata abuse controls, health monitoring, and a tested outage contract. Encrypted chat and media moderation remain with hosts and clients. Loss of the discovery control plane blocks new registration, browse, and join while established relay data connections continue. Loss of one client-to-relay leg disconnects only that human and invokes the bounded session reconnect policy. Loss of the authority-to-relay leg or the relay worker carrying the route ends the Internet match with an explicit reason; there is no automatic regional migration or hidden transport fallback. LAN sessions are unaffected. Commodity Linux deployment is outside the platform boundary; operators use an eligible physical or cloud Mac.
+
+The capacity contract is 2–32 connected human slots. Active combat and live observer modes each consume one slot; a listen host consumes one, while a no-window dedicated authority and `RevivalRelay` consume none. Supporting 32 combatants plus additional observers is outside this scope. Game Center is not the multiplayer transport or matchmaking layer: `GKMatch` is capped at 16 participants on the recorded SDK and does not make a custom dedicated host reachable.
 
 Tests live beside these targets and follow the binding [red-green-refactor protocol](test-driven-development.md). A separate package, test-only product path, or test architecture is not needed.
 
@@ -104,6 +127,8 @@ This intentionally replaces the original variable-`Frametime` loop. There is no 
 
 The main owner holds mutable game state. One five-case difficulty value is immutable authoritative session configuration: the profile supplies the solo default and the multiplayer host supplies the session value. Input is sampled into one value-type `InputFrame` per simulation tick. Held keys, buttons, and controller axes are copied into every tick while held. Press/release edges and accumulated relative mouse or scroll deltas are ordered pending impulses and are consumed exactly once by the next simulation tick, even when one display callback runs multiple ticks. Background work is limited to importing, disk I/O, media decoding, and immutable asset preparation. Completed assets are installed at a frame boundary.
 
+The profile persists the keyboard ramp-duration setting. Live held-key ramp accumulators belong to `RevivalMac`, reset on focus loss, pause/resume, load, and control remapping, and never enter saves, authoritative hashes, or network state. Replay and multiplayer record or transmit the already resolved per-tick `InputFrame`, so the same movement path does not need a second ramp-state protocol.
+
 Do not add a dedicated simulation thread, actor graph, task per entity, work-stealing scheduler, or lock-free queue until Instruments shows that the single loop misses its budget because of CPU work.
 
 ## World and simulation model
@@ -114,11 +139,19 @@ Simulation rules are ordinary Swift functions and small state machines. The beha
 
 There is no general event bus. Behavior events use one ordered FIFO owned by `RevivalCore`; audio and presentation receive small typed command lists at frame boundaries.
 
+### Volumetric navigation
+
+Flying AI uses a purpose-built two-level graph, not a floor navmesh, voxel world, or general navigation framework. The first level is deterministic room, portal, and outdoor-region connectivity with traversability, dynamic blockage, and clearance. The second is a bounded sparse three-dimensional waypoint graph inside each region, with node clearance and swept-volume-valid edges. A stable A* order chooses a route; local steering follows its segments; blocked doors and forcefields invalidate edges; one bounded stuck-recovery path requests a replan.
+
+Hand-authored spatial paths remain a separate canonical tool for cinematics, set pieces, patrols, and exact orientation. The editor owns both path authoring and navigation diagnostics, but it does not expose the graph implementation as a generic engine subsystem.
+
 ## Numeric semantics
 
 Authoritative scalar, vector, and orientation state uses Swift `Float`, which is IEEE-754 binary32 on the supported architecture. Import, authoring, behavior, save, replay, and network boundaries reject NaN and infinity. Each domain declares its valid magnitude and clamp or failure rule. Values smaller than `Float.leastNormalMagnitude` normalize to positive zero when committed to canonical persistent or hashed state, and negative zero also normalizes to positive zero.
 
-Authoritative operations execute in declared order without fast-math transformations. A replay under the same `simulationSemanticRevision` compares canonical normalized Float32 bit patterns exactly. Transcendental or framework calculations that could vary across supported toolchains stay outside authoritative state or become a versioned, tested project operation. The project does not add fixed-point arithmetic or a general deterministic-math library without evidence that this direct contract fails.
+Authoritative operations execute in declared order without fast-math transformations. Every authoritative multiply-add site declares fused `addingProduct` semantics or separately rounded multiply-then-add semantics; exact release-build vectors protect that choice. System and SIMD transcendental functions do not feed authoritative state directly. When a required rule needs one, the project adds only the smallest versioned approximation or table for that named operation and protects it with exact bit vectors. A replay under the same `simulationSemanticRevision` compares canonical normalized Float32 bit patterns exactly. The project does not add fixed-point arithmetic or a general deterministic-math library.
+
+An OS, Swift compiler, SDK, optimization-setting, or supported Apple-Silicon change must pass the authoritative arithmetic corpus and same-revision replay hashes before adoption. A changed result is rejected or receives an explicit `simulationSemanticRevision`; it is never accepted as incidental compiler drift.
 
 ## Saves and settings
 
@@ -140,7 +173,7 @@ This is the fastest route to a conventional port, but it preserves the architect
 
 ### C++ with Metal-cpp
 
-Metal-cpp has an appropriate performance ceiling and would reuse more original code. Reuse and shortest time to parity are not the controlling goals. A C++ core would also require a second language or a nonnative UI strategy for the application and editor.
+Metal-cpp is a header-only C++ binding over Metal's Objective-C interfaces. It is appropriate for a C++ host but supplies no Metal feature that Swift lacks. Retaining it would require a C++ core, a second ownership model, and a bridge to the native application and editor solely to preserve implementation the project has rejected.
 
 ### Objective-C++ bridge
 
@@ -162,7 +195,7 @@ Translating hundreds of thousands of lines would preserve implementation detail 
 
 The planning host is a base Mac mini with a 10-core Apple M4 CPU, 10-core GPU, and 16 GB of memory. It runs macOS 26.5.2, Xcode 26.6, and Apple Swift 6.3.3. The system reports Metal 4 support.
 
-The separately downloadable Metal compiler component is not installed yet. Before the first shader build, install it through Xcode's supported component mechanism and record the resulting version. This is a future toolchain preflight, not a planning dependency.
+Xcode currently resolves the separately installed Metal toolchain, and `metal --version` reports `32023.883`. Phase 1 still begins with a minimal MSL compile, metallib link, `MTL4CommandQueue` submission, argument-table binding, residency-set use, rendered triangle, capture, and validation smoke. Tool presence alone does not close that preflight.
 
 ## Consequences
 
