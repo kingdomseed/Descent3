@@ -17,7 +17,7 @@ The shipping product uses:
 - Network and CryptoKit for QUIC sessions, authentication, and encryption;
 - Apple Silicon `arm64` and macOS 26 or later;
 - a fixed 120 Hz simulation with display-rate rendering;
-- one complete resident level working set, fixed room-and-portal visibility, and full-resolution terrain without runtime streaming or LOD;
+- one purpose-built world-cell streamer with a resident authoritative spine, orientation-independent spatial demand, and authored-resolution terrain cells without runtime LOD;
 - one canonical content model shared by runtime, editor, behaviors, saves, replay, multiplayer, and publishing.
 
 There is one renderer, one simulation model, one behavior language, and one forward-moving content format. The project does not carry compatibility backends or export paths for the old world.
@@ -60,7 +60,7 @@ The complete revival includes:
 - the Training, base, secret, and Mercenary campaign content;
 - six-degree-of-freedom flight, five-level difficulty and its real scaling rules, collision, AI, weapons, objectives, refueling rooms, HUD and selected one-way-converted stock fonts, animated cockpit, automap, markers, rear and auxiliary camera views, in-game camera-path cinematics, adaptive music, audio, movies, cheat, easter-egg, and diagnostic commands with explicit per-command policy, native controller haptics, modern saves, and replay;
 - native multiplayer for 2–32 connected human slots over Network-framework QUIC and inner CryptoKit records, dedicated hosting, public discovery and opaque relay, live observer mode, prediction and reconciliation, text chat and moderation, authenticated host operator commands, explicit authoritative and client-presentation behavior roles, supported game modes, secure player pictures, ship logos and audio taunts, and multiplayer authoring;
-- a direct Metal renderer with a resident level working set, room-and-portal visibility, and full-resolution terrain for imported content and replacement visuals;
+- a direct Metal renderer with bounded streamed presentation cells, a resident gameplay spine, room-and-portal visibility, and fixed-resolution terrain cells for imported content and replacement visuals;
 - a native macOS player application with keyboard, mouse, and controller support;
 - one integrated native creator suite for world geometry, terrain, objects, game data, behaviors, campaigns, briefings, cinematics, USD asset ingress, localization, lighting, purpose-built volumetric navigation, validation, playtesting, and publishing;
 - a native mod SDK that uses the same project and package contracts as first-party content;
@@ -88,7 +88,11 @@ Phase 1 starts with four targets. Phase 2 adds the editor. Phase 9 adds one isol
 | `RevivalEditor` | Native project authoring, baking, debugging, playtest, and publishing |
 | `RevivalRelay` | Public session discovery, expiring registration, join authorization, and opaque QUIC relay; no game content or simulation |
 
-This is smaller than a general game engine. It has no generic ECS, job system, render graph, dependency-injection framework, binary plugin system, runtime streaming system, terrain LOD system, or cross-platform abstraction. Required mechanisms such as the behavior executor, content catalog, navigation graph, and relay protocol stay narrow and product-specific.
+This is smaller than a general game engine. It has no generic ECS, job system, render graph, dependency-injection framework, binary plugin system, asset manager, sparse-resource or terrain-LOD system, or cross-platform abstraction. Required mechanisms such as the behavior executor, content catalog, navigation graph, world-cell streamer, and relay protocol stay narrow and product-specific.
+
+Every presentation-capable level uses that one streaming path; a no-window authority loads only the authoritative spine. One indoor room is one cell; outdoor terrain uses fixed 32-by-32-quad cells. Complete topology, collision, navigation, behavior, and simulation remain resident, while immutable GPU presentation payloads move through one bounded concurrent Metal I/O queue and one dynamic world residency set. Orientation-independent spatial camera envelopes and one fixed `LoadWave`-timed prefetch shell make turns and doors residency-neutral and make continuous movement certifiable. This is a finite-mission architecture, not an unbounded open world: the publisher enforces stack-global, spine, count, level-pinned, cell, simultaneous-camera, discontinuous-destination, `LoadWave`, queue, and lead-time limits. Aggregate on-disk presentation bytes alone do not make a valid level oversized. [World streaming](docs/revival/world-streaming.md) defines the complete contract.
+
+`RevivalEditor` is a human-first native AppKit document application. Each project has one document, one main-actor editing session, one primary project window, synchronized navigator, canvas, inspector, and problems/activity surfaces, named undo, revision-checked background work, and the same renderer, simulation, validator, and publisher as the game. Stable element identity, concrete typed edits, and source-linked diagnostics are required because they make human editing reliable. A future MCP or agent-authoring layer may adapt those mature operations only after Phase 10 ships the complete human creator suite; no MCP server, headless editor, training recorder, public automation schema, or agent-only path belongs to the current roadmap.
 
 ## First playable and creator slices
 
@@ -117,6 +121,7 @@ The old source remains through Phase 10. It can move to an archival branch or le
 - [Functional completeness](docs/revival/functional-completeness.md) defines the full player and creator capability contract.
 - [Functional-completeness ledger](docs/revival/functional-completeness-ledger.md) records the Phase 0 capability inventory, owners, milestones, and evidence state.
 - [Architecture](docs/revival/architecture.md) records the binding Swift/Metal decision and rejected directions.
+- [World streaming](docs/revival/world-streaming.md) defines the fixed cell model, resident gameplay spine, Metal I/O and residency lifetime, finite scale, and editor diagnostics.
 - [Engineering principles](docs/revival/engineering-principles.md) defines the minimal-code rules.
 - [Test-driven development](docs/revival/test-driven-development.md) defines red-first implementation, the test-value gate, and anti-dilution review rules.
 - [Content pipeline](docs/revival/content-pipeline.md) defines one-way retail conversion, native projects, and canonical packages.

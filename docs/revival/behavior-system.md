@@ -51,7 +51,7 @@ Initial value families include booleans, signed integers, finite `Float32` value
 
 The language has one bounded stable-order collection value for typed query results. A runtime entity reference carries an ID and generation. A stale or destroyed reference becomes `.none`; an existence query can branch on it, and a command that requires a live entity fails with a deterministic source-linked error unless that command explicitly defines missing-target behavior. An active iteration captures its ordered membership when it begins. New entities do not join it, and destroyed entries become `.none`. Saves and replays preserve reference generations and collection order.
 
-The language does not expose pointers, arbitrary memory, files, sockets, threads, process execution, dynamic library loading, Swift reflection, or unrestricted calls into Apple frameworks.
+The language does not expose pointers, arbitrary memory, files, sockets, threads, process execution, dynamic library loading, Swift reflection, unrestricted calls into Apple frameworks, or world-streaming demand, progress, residency, memory, or I/O state. Behaviors can declare typed teleports, spawns, cameras, and cinematics whose destinations become publisher-validated destination envelopes, but execution never branches on whether their presentation payload happens to be resident.
 
 ## Events and ownership
 

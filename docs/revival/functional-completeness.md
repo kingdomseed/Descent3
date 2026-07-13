@@ -45,6 +45,8 @@ For example, a door is incomplete if an imported door works but a creator cannot
 
 Pure runtime concerns such as controller input do not need an editor panel. Pure editor concerns such as selection history do not need a gameplay representation. The team records why a path is inapplicable instead of silently omitting it.
 
+Creator completeness includes the quality of the human workflow, not only the presence of data types. `RevivalEditor` must provide a native document lifecycle, predictable synchronized selection and focus, direct and numeric editing, discoverable menu and keyboard commands, named undo and redo, source-linked diagnostics, cancellable revision-safe background work, playtest state restoration, crash recovery, source-control-safe saves, Full Keyboard Access, VoiceOver coverage, and measured responsiveness on the M4. A modal dialog or hand-edited file does not close a creator row when the integrated workflow remains incomplete.
+
 Every new or changed production behavior used to close a completeness row follows the binding [red-green-refactor protocol](test-driven-development.md). Completion evidence records the focused test that failed for the intended reason before implementation and passed afterward. An inapplicable path receives no manufactured test; the ledger records why it is inapplicable.
 
 ## Committed product inventory
@@ -98,11 +100,13 @@ The working [functional-completeness ledger](functional-completeness-ledger.md) 
 - project creation from an empty native template;
 - content catalog and reference inspection;
 - deterministic room-local lighting and purpose-built volumetric-navigation baking;
-- complete resident CPU and GPU working-set calculation with publication refusal for an oversized level;
+- automatic room and fixed positive-multiple-of-32 terrain-cell partitioning, streamed-payload inspection, stack-global, level-pinned, per-cell and spatial-envelope GPU accounting, simultaneous-camera and discontinuous-destination validation, movement-lead-time proof, and publication refusal for an oversized authoritative spine, cell, envelope, `LoadWave`, or declared destination;
 - dependency closure, orphan detection, validation, and diagnostics;
 - instant play-in-editor, deterministic test scenarios, and capture support;
 - package publishing, provenance, signing where required, and distribution;
 - a native mod SDK built from the same project, package, behavior, and validation contracts used by the game team.
+
+The current completion gate is human-first. Stable element identity, concrete typed edits, structured diagnostics, and deterministic playtest operations are required for a reliable native editor. They may later support automation, but an MCP server, headless authoring mode, public command schema, training-data capture, telemetry, and agent-specific workflows are outside the current committed gate and do not justify early product machinery.
 
 ## Historical evidence policy
 

@@ -18,7 +18,7 @@ The M4 has ample CPU and GPU capacity for a late-1990s game. Spend that capacity
 - One renderer uses explicit passes, not a render graph.
 - A handful of object families use domain collections, not an ECS framework.
 - A small AI slice uses a switch, not a behavior-tree system. Expand when a ledgered capability requires it.
-- Background loading uses one task, not a job scheduler.
+- World streaming uses one coordinator and fixed cells, not a job scheduler or task per asset.
 - A directory and manifest are a package. One typed content catalog resolves project references; it is not a general asset database.
 - A measured slow loop earns optimization. A hypothetical slow loop does not.
 
@@ -54,7 +54,7 @@ Do not create `Common`, `Shared`, `Engine`, `Manager`, `Service`, `Provider`, or
 - Use finite `Float32` for simulation quantities that are not integral. Reject NaN and infinity at content and command boundaries, normalize negative zero before canonical encoding and hashing, and apply declared domain bounds. Keep operation order stable and do not enable fast-math transformations.
 - Install loaded assets only at defined frame boundaries.
 - Keep renderer resources out of simulation and save types.
-- Load one level's complete dependency closure at its transition and retain it through level exit. Standard Swift and Metal allocation owns that residency; do not add a transparent pager, streaming asset path, eviction policy, or runtime resource manager. A custom allocator remains subject to the measured profile and written invariant required by `AGENTS.md` and may not create a second residency path or test-only observability.
+- Retain the complete finite authoritative `WorldSpine` through level exit. Stream only immutable presentation records through the single fixed-cell `WorldStreamer`; simulation, behaviors, saves, replay, and multiplayer cannot observe I/O or residency. The editor's one bounded noncanonical `DraftOverlay` is the sole live-geometry exception and never enters game, save, replay, package, or multiplayer state. A custom allocator remains subject to the measured profile and written invariant required by `AGENTS.md` and may not create a second residency path or test-only observability.
 
 Every authoritative multiply-add explicitly uses either fused `addingProduct` or separately rounded multiply and add. System and SIMD transcendental functions do not write authoritative state. A required transcendental becomes one named, versioned project operation or table with exact vectors; it does not justify a general math framework.
 
@@ -69,11 +69,11 @@ Use asynchronous work for operations that can block for milliseconds or more:
 - retail import;
 - disk reads and writes;
 - image, audio, and movie conversion;
-- level-transition asset preparation;
+- world-cell Metal I/O directly into final private buffers and textures;
 - pipeline compilation or cache preparation when the Metal API supports it cleanly;
 - editor lighting, navigation, media, and package builds.
 
-Do not use actors or tasks for players, robots, projectiles, doors, AI goals, physics contacts, draw items, or individual assets already resident in memory. Do not add a job system until Instruments attributes a missed frame budget to CPU work that can be separated safely.
+Use one streaming coordinator, not a task per cell or resource. Do not use actors or tasks for players, robots, projectiles, doors, AI goals, physics contacts, draw items, or individual assets. Do not add a job system until Instruments attributes a missed frame budget to CPU work that can be separated safely.
 
 ## Rendering
 
@@ -83,10 +83,23 @@ Do not use actors or tasks for players, robots, projectiles, doors, AI goals, ph
 - Treat mirrors, specular response, scorch decals, procedural textures, volumetrics, and declared blend semantics as concrete content requirements. Implement each directly when its first verified scene needs it; do not hide the inventory behind a three-material summary.
 - Keep CPU render extraction predictable and free of project-owned steady-state heap allocation after warm-up.
 - Use three rotating frame-resource slots where Metal synchronization requires them; do not generalize that into a resource framework.
-- Use one app-lifetime and one level-lifetime Metal residency set. Do not add streaming, eviction, a texture cache, or a residency manager.
-- Use CPU room-and-portal traversal with room-frustum rejection and ordinary GPU backface rejection. Do not recreate legacy face-by-face portal clipping or add an occlusion subsystem.
-- Build outdoor terrain as one full-resolution canonical mesh. Do not port or replace the historical terrain LOD system.
+- Use one app-lifetime and one dynamic world Metal residency set. Stage whole-resource additions and removals on the render owner; install only complete batches at frame boundaries and retire only after final GPU use. Every level, content-stack, or key-document handoff cuts off old submissions, drains all committed old-generation Metal I/O and final render use, and retires its allocations and file handles before loading a successor. Only the key editor document owns live world residency; background-document viewports pause and release it through that teardown.
+- Use one orientation-independent spatial demand envelope and one lead-time-derived prefetch shell around every live camera. Use CPU room-and-portal traversal with room-frustum rejection only for drawing and ordinary GPU backface rejection. Do not let orientation or dynamic occlusion change residency, recreate legacy face-by-face portal clipping, or add an occlusion subsystem.
+- Build outdoor terrain as fixed 32-by-32-quad authored-resolution cells. Do not port or replace the historical terrain LOD system.
+- Do not add sparse resources, mip streaming, an LRU, memory-pressure quality modes, a general resource manager, a resident-only fallback, or a second cell or visibility architecture. [World streaming](world-streaming.md) is the only resource-lifetime model.
 - Do not add GPU-driven culling, bindless scene machinery, MetalFX, deferred lighting, or ray tracing to the accepted product architecture. Reopening one requires an explicit architecture amendment.
+
+## Editor discipline
+
+`RevivalEditor` uses AppKit's document architecture directly: one `NSDocument`, one `@MainActor EditorSession`, one primary project window, one canonical project value, and one `UndoManager` history per open project. Views call concrete typed edit operations on that session. Do not add a generic reactive store, command bus, editor service layer, or protocol solely to connect panes.
+
+Stable element IDs, named inverse edits, and structured source-linked diagnostics serve human selection, undo, validation, and repair. They are not a public automation protocol. Each edit, undo, redo, revert, accepted recovery, or source-changing asynchronous result advances one transient `ProjectEditGeneration` that identifies an unsaved snapshot and remains separate from persisted semantic revisions. Long editor work consumes an immutable snapshot and reports that generation. A stale or cancelled result remains diagnostic history only: it cannot enter or clear active validation, report publish success, become playable output, or replace the last good derived product. Cancellation and failure leave source and last-good derived products unchanged. Use one cancellable task per user-requested USD or native-media ingress, preview-record build, bake, validation, or publish operation rather than a scheduler.
+
+Local interface state such as open tabs, split positions, selection, and viewport cameras stays outside canonical project source. Authored camera bookmarks remain canonical content. Play-in-editor runs a snapshot through the shipping simulation, streamer, and renderer and returns to the exact document, selection, viewport, and workspace state.
+
+One logical render-owner `DraftOverlay` uses exactly three preallocated slices aligned with the three rotating frame-resource slots. Each slice holds the maximum visible dirty-geometry union across all four supported editor viewports; all three physical slices count toward high-water. Write only an available slice and retain every in-flight slice unchanged through its final render use. Pointer samples update only transient gesture state and the next available slice. Commit advances canonical source, named undo, and `ProjectEditGeneration` exactly once; cancel advances none. The matching background preview replaces the overlay records without a second renderer or per-sample build.
+
+The current product is human-first. Do not implement an MCP server, headless authoring process, public command wire format, training recorder, telemetry, or agent-only edit path before Phase 10 ships the complete human creator suite. Future automation must adapt the same mature editing session rather than introduce a second mutation, validation, playtest, or publishing path.
 
 ## Dependencies
 
@@ -150,6 +163,8 @@ Track frame time, simulation time, render-encoding time, GPU time, allocations, 
 After warm-up, each declared production scenario performs zero project-owned heap allocations inside `RevivalCore.step` and render extraction. Initialization, level-transition installation, and Apple-framework work outside those boundaries are measured separately. Phase 1 establishes an automated release-build allocation-budget command over the real production path: it warms the scenario, measures allocation events only inside the declared step and extraction intervals, and exits nonzero on any project-owned allocation. Its first valid nonzero result is the red evidence; zero is green. Every gameplay slice extends that same command. An Instruments Allocations trace supplies attribution and corroboration but does not replace the automated red-green gate. Do not add allocator protocols, malloc hooks to shipping code, or test-only production entry points to prove the invariant.
 
 The 120 Hz simulation target is a product choice. The current reference display is 60 Hz, so a 120 frames-per-second presentation claim requires a 120 Hz test display. An offscreen test may establish at least 120 frames per second of render throughput, but not presentation pacing or latency. The first renderer gate is consistent 60 Hz presentation on the current reference display with clean Metal validation.
+
+Phase 1 ratifies the safety and capacity constants required to freeze the world-streaming schema: resident spine and schema counts; stack-global, level-pinned, cell, simultaneous-camera and discontinuous-destination bytes; render radius; maximum continuous speed; maximum demand-evaluation interval; `LoadWave` and `T_wave`; prefetch shell; queue, command-buffer and submitted-stale caps; intra-level overlap; I/O latency; and active-memory high-water mark. Those are measured foundation limits, not optimization guesses. Phase 5 establishes broader gameplay and editor performance budgets from the complete Training Mission.
 
 ## Review questions
 

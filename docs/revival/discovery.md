@@ -72,7 +72,7 @@ The old OpenGL path, `rend_*` API, `gpu_*` seam, SDL window ownership, triangle 
 
 The historical `mem/` layer chiefly wraps allocation for accounting and diagnostics. The `manage/` page system is a typed content database with network locks, while level startup separately loads the selected dependency set and level exit releases it. The renderer also contains texture remap and upload caches, triangle-fan paths, and aggressive portal-era clipping. The 256 by 256 terrain carries a large generated LOD implementation.
 
-These findings do not imply that a modern pager, cache, or LOD replacement is required. The accepted architecture loads one complete level closure, binds it through app- and level-lifetime Metal residency sets, uses room/portal/frustum visibility, and renders one full-resolution terrain mesh. Publisher working-set refusal keeps that decision honest.
+These findings do not define the native resource model. The accepted architecture keeps the complete authoritative gameplay spine resident but streams immutable GPU presentation payloads through fixed cells: one indoor room or one 32-by-32-quad terrain block. It uses orientation-independent spatial camera envelopes, a fixed lead-time-derived prefetch shell, direct Metal I/O, one dynamic world residency set, and full authored-resolution terrain cells; current room/portal/frustum traversal decides drawing rather than residency. It does not preserve the legacy page database, upload cache, terrain LOD, or memory wrappers and does not replace them with a general pager or cache framework. [World streaming](world-streaming.md) records the native decision.
 
 ### Original timing is variable
 

@@ -55,9 +55,10 @@ Import is read-only toward the retail source and atomic toward its destination:
 5. resolve retail patch and archive precedence once;
 6. decode and normalize the selected levels, models, textures, lightmaps, production font roles, audio, adaptive-score definitions, stock pilot pictures, movies, strings, and tables;
 7. bind durable canonical content keys, resolve every reference, and assign dense package-local integer IDs;
-8. select every required entry from the bundled stock behavior catalog, validate its bindings, and attach compiled `BehaviorProgram` data for level, campaign, module-role, package-default, owner, object-archetype, game-mode, and session scopes;
-9. write a temporary package and complete import report;
-10. atomically promote the package only after all validation succeeds.
+8. build the bounded resident `WorldSpine`, map each indoor room and positive-multiple-of-32 terrain grid to fixed cells, prove conservative presentation-demand bounds contain every assigned static drawable, emit the aligned global and per-level presentation records with closed descriptors, and compute every ordinary simultaneous-camera and discontinuous-destination envelope plus the demand-interval-aware movement lead-time proof;
+9. select every required entry from the bundled stock behavior catalog, validate its bindings, and attach compiled `BehaviorProgram` data for level, campaign, module-role, package-default, owner, object-archetype, game-mode, and session scopes;
+10. write a temporary package and complete import report;
+11. atomically promote the package only after all validation succeeds.
 
 An unknown format feature, missing dependency, unresolved reference, or malformed payload fails the affected import with a specific diagnostic. The importer does not silently substitute a retail runtime fallback.
 
@@ -79,22 +80,34 @@ A required nonshipping source-analysis tool recovers draft graphs and unresolved
 
 Exit status `0` means a validated package was promoted. Status `2` means invalid arguments or unsupported contract version, `3` means an unrecognized or incomplete source, `4` means decode, validation, or promotion failure, and `70` means an unexpected internal failure. `RevivalMac` maps termination by `SIGTERM` to cancellation.
 
-The helper rejects a staging path that is not an empty sibling of the destination. Because `RevivalMac` chose that path, it can remove it even when termination prevents a report. Cancellation or a nonzero exit leaves the current destination package untouched and the app removes staging. If cancellation races with a completed atomic promotion, the app validates the promoted manifest and treats it as completed rather than rolling back a valid package. A missing or malformed report is failure unless a newly promoted destination independently passes full manifest validation.
+The helper rejects a staging path that is not an empty sibling of the destination. Because `RevivalMac` chose that path, it can remove it even when termination prevents a report. Cancellation or a nonzero exit leaves the current destination package untouched and the app removes staging. Before promotion, package intake verifies the structured tables and every contributed `global.stream` and `world.stream` whole-blob hash with CryptoKit. If cancellation races with a completed atomic promotion, the app validates that same intake contract and treats the promoted manifest as completed rather than rolling back a valid package. A missing or malformed report is failure unless a newly promoted destination independently passes full intake validation.
+
+Installation of any external canonical package uses the same no-TOCTOU sequence: require every declared path to remain beneath the package root and be a regular file or directory; reject symbolic links, Finder aliases, special files, escaping paths, and multiply linked staged files; materialize every accepted file as newly owned bytes in a unique app-controlled staging directory; close the external source; validate the staged structured data and whole-blob hashes; then atomically rename that exact verified directory into immutable Application Support storage. `D3Import` and `RevivalEditor` publishers write directly into equivalent controlled staging. Runtime file handles never reopen the untrusted source path.
 
 ## Package shape
 
-The initial package is an ordinary directory. APFS and Foundation provide its file behavior; ImageIO, AVFoundation, and MetalKit encode, load, and play the canonical media after import-time retail decoding.
+The initial package is an ordinary directory. APFS and Foundation provide its file behavior. ImageIO, Model I/O, and AVFoundation serve import and authoring; AVFoundation plays canonical audio and movies. `WorldStreamer` and Metal I/O exclusively load GPU presentation records from verified stream blobs.
 
 ```text
 Descent3Revival.content/
   content.json
+  global.stream
   campaigns/
   behaviors/
   levels/
+    <level-key>/
+      level.json
+      world.stream
   definitions/
-  models/
-  textures/
   fonts/
+  authoring/
+    campaigns/
+    levels/
+    behaviors/
+    definitions/
+    assets/
+    presentations/
+    localization/
   audio/
   scores/
   movies/
@@ -113,24 +126,26 @@ Descent3Revival.content/
 - OS, SDK, media-codec path, and encoder settings used for the import;
 - SHA-256 values for accepted source files;
 - source-to-output provenance;
-- byte-integrity hashes for generated outputs;
+- byte-integrity hashes for generated outputs, including each complete stream blob;
 - normalized decoded-content hashes for transcoded images, audio, and movies;
-- per-level CPU and GPU working-set totals and the supported-envelope result;
+- package-layer identity; per-level resident-spine counts and bytes; deterministic room and 32-by-32 terrain cells; conservative presentation-demand bounds; stack-global, level-pinned and cell-referenced record classes; resolved layer/blob locators; checked stream-record ranges, alignments, closed buffer or texture descriptors, and construction hashes; stack-global, level-pinned and per-cell GPU costs; fixed render-radius, maximum-demand-interval and lead-time constants; maximum game-camera and conservative four-viewport envelopes; discontinuous-destination peaks; `LoadWave`, queue, command-buffer and submitted-stale limits; and the supported-envelope results;
 - imported, ignored, and rejected entries;
 - production and superseded role decisions for every recognized retail bitmap font;
 - campaign, stock-multiplayer, and optional-media completeness.
 
-Use `Codable` JSON with sorted keys for manifests, projects, and behavior data, standard Apple-readable media where practical, and one compact purpose-built geometry payload. Do not add a custom archive, database, virtual filesystem, compression framework, asset graph, or plugin system.
+Use `Codable` JSON with sorted keys for manifests, projects, and behavior data and standard Apple-readable media where practical. Each package layer has one raw indexed `global.stream` plus one `world.stream` for each level to which it contributes presentation. The blobs contain aligned GPU-ready records addressed only by checked resolved tables; they have no filenames, runtime override order, compression, executable entries, or general archive API. A resolved locator names its package layer, global or level blob, checked range, and closed project-owned whole-buffer or two-dimensional-texture descriptor. Do not add a general archive, database, virtual filesystem, compression framework, asset graph, or plugin system.
+
+All runtime GPU presentation bytes live only in those stream blobs. Runtime `definitions/` and `fonts/` contain structured metadata; they do not create a second GPU payload or loader path. An imported base also contains a local read-only `authoring/` snapshot in the same canonical source schemas used by `.revival` projects, including derivable structured documents and ordinary decoded geometry, texture, lightmap, glyph-atlas, and other source media. `RevivalEditor` uses that snapshot for inspection and **Derive editable source**; `RevivalMac` never opens it, and the editor never reverse-engineers stream records. Modern source media remains in `.revival` projects. Blob records bind the exact authoring-source and derived-data hashes used to create them, so stale GPU output cannot coexist with newer canonical source. The imported authoring snapshot is converted retail data and remains local and outside Git.
 
 Initial normalization favors runtime simplicity:
 
 | Retail input | Canonical output |
 | --- | --- |
 | HOG, MN3, and related containers | Removed after their selected entries are resolved into the directory package |
-| D3L rooms, portals, terrain, paths, and object placement | Typed canonical level data with the single compact geometry payload |
-| Legacy texture encodings | Standard image files or direct pixel payloads accepted by MetalKit |
-| Legacy lightmaps and secondary UVs | Deterministically repacked per room into the canonical single nonmipmapped 1024-square `rgba8Unorm` atlas with two-texel dilated chart gutters and rewritten canonical UV2; overflow rejects the source profile |
-| Legacy models and animation | One small canonical mesh and animation representation |
+| D3L rooms, portals, terrain, paths, and object placement | Read-only canonical authoring documents, resident typed `WorldSpine`, one indoor cell per room, positive-multiple-of-32 terrain dimensions, fixed 32-by-32-quad outdoor cells, and raw indexed layer blobs |
+| Legacy texture encodings | Read-only canonical source pixels plus GPU-ready published texture records referenced by resolved cell tables; no runtime retail or standard-image decode in the streaming path |
+| Legacy lightmaps and secondary UVs | Deterministically repacked per room into the canonical single nonmipmapped 1024-square `rgba8Unorm` atlas with two-texel dilated chart gutters and rewritten canonical UV2, then stored with that room cell's presentation records; overflow rejects the source profile |
+| Legacy models and animation | Read-only canonical authoring geometry and animation, structured runtime definitions, and GPU-ready records referenced by demanded cells and render items |
 | Retail bitmap `.fnt` files | Checked one-way decode into canonical glyph metrics, kerning and texture atlases for production font roles; no runtime `.fnt` reader or legacy resolution switch |
 | ACM and other legacy audio | Narrow checked Swift import decode, then Apple-native PCM or compressed audio selected through AVFoundation |
 | OMF adaptive themes | Checked one-way parse into canonical regions, roles, loops, stream references, and transition rules; no runtime OMF reader |
@@ -181,11 +196,15 @@ MyProject.revival/
   localization/
 ```
 
-A project may create a standalone game package or layer new content and replacements over a read-only imported base package. It never mutates that base. Ordered layers address durable `ContentKey` values through one typed content catalog. The layer order is declared and deterministic; duplicate ownership and unresolved references are validation errors unless an explicit replacement declares them.
+A project may create a standalone game package or layer new content and replacements over a read-only imported base package. It never mutates or copies untouched base bytes. Ordered layers address durable `ContentKey` values through one typed content catalog. The layer order is declared and deterministic; duplicate ownership and unresolved references are validation errors unless an explicit replacement declares them. Resolution produces one immutable table whose presentation locators name the contributing layer and its global or per-level blob. A replacement package contains only project-owned replacement records; unchanged locators continue to reference the installed base package.
+
+Canonical source contains only authored product state. Open tabs, pane sizes, current selection, transient camera demand, viewport cameras, and other local interface state live in `RevivalEditor` restoration or recovery storage, not in the project. Saves use AppKit's document lifecycle and deterministic canonical encodings so unrelated documents are not rewritten. Recovery remains outside project sources until the creator previews and accepts it. Long-running USD or native-media ingress, preview-record generation, validation, baking, and publishing consume immutable project snapshots and may install a result only when its transient `ProjectEditGeneration` still matches. This generation is not a persisted semantic or compatibility revision.
 
 Modern player pictures, ship logos, and audio taunts enter through native profile or project media validation, never through `D3Import`. Accepted formats are an explicit whitelist. Import caps encoded bytes, decoded dimensions, sample rate, duration, and aggregate storage; strips active metadata; writes only to app-controlled paths; and identifies media by content hash. Published projects also require rights metadata. Multiplayer adds negotiated limits, cooldowns, mute and disable controls, consent where capture or playback requires it, and host policy.
 
-The publisher validates dependency closure, compiles behaviors, builds stale lighting and navigation products, computes the complete per-level CPU and GPU working set, copies canonical media, records provenance, and emits one immutable package. A level outside the supported resident envelope is rejected and must be reduced or split; publication never requests a streaming fallback. The game-team workflow and mod SDK use this same path. There is no privileged internal package format, HOG export, native plugin payload, or hand-edited generated file.
+The publisher validates dependency closure, compiles behaviors, builds stale lighting and navigation products, emits the resident `WorldSpine` and immutable presentation records, computes every cell and shared-resource closure, proves each finite presentation-demand bound contains its assigned static drawables, verifies all stream locators, ranges, alignments, closed resource descriptors, construction hashes, and whole-blob hashes, and measures each spatial camera envelope. It validates the stack-global and level-pinned caps, every supported simultaneous game-camera profile, the conservative four-viewport editor bound, every authored discontinuous destination, the maximum incoming `LoadWave`, queue and command-buffer bounds, submitted-stale cap, active high-water, and maximum-demand-interval-aware movement lead-time inequality. It copies canonical nongraphic media, records provenance, and emits one immutable package layer.
+
+Publication rejects an oversized stack-global set, resident spine or schema count, level-pinned set, indoor or terrain cell, malformed or nonfinite presentation-demand bound, uncontained static drawable, simultaneous-camera envelope, teleport, spawn, cinematic, mirror or auxiliary-view destination, `LoadWave`, queue bound, submitted-stale cap, active high-water, or movement lead-time violation. It also rejects terrain dimensions that are not positive multiples of 32 quads. Transient editor viewport positions are local state; publication validates the fixed four-viewport envelope instead of saved editor demand. It does not reject a finite level solely because aggregate streamed presentation bytes exceed active memory. A creator splits an oversized room or mission-scale authoritative world, while ordinary high-resolution presentation remains in the same continuous level. The game-team workflow and mod SDK use this same path. There is no privileged internal package format, HOG export, native plugin payload, or hand-edited generated file. [World streaming](world-streaming.md) defines the only runtime lifetime model.
 
 Every replacement asset records author, source, license, and attribution requirements. Project sources or published packages may enter Git only when their rights permit it. Publicly released creator formats receive explicit version migrations because creator-owned work cannot always be regenerated.
 
