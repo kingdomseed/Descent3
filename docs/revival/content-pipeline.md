@@ -35,7 +35,7 @@ The first supported importer input is a prepared Descent 3 1.4-plus-Mercenary in
 - canonical Mercenary files extracted from the expansion disc;
 - the official 1.4 `extra.hog` and `extra13.hog` overlays;
 - the seven recognized retail bitmap-font entries whose six historical roles receive explicit native role decisions;
-- the OMF themes, referenced score streams, and stock pilot pictures selected from the recognized retail archives;
+- the OMF themes, referenced score streams, in-level mission-voice stream archives, and stock pilot pictures selected from the recognized retail archives;
 - Windows MVE movies from the owned discs, required for a release-complete campaign import and optional only for a partial development import.
 
 Version 1 `D3Import` does not mount ISO or raw Mode 2 images, read InstallShield cabinets or OPKG installers, run the 1.4 patch, or automate Windows installation layouts. It does not invoke `unshield`, `bchunk`, Wine, Python extractors, or any other legacy preparation tool. Those completed extraction steps are provenance and source preparation. Keeping them outside the product avoids an installer framework before a second source layout exists. Reproducible owned-media preparation scripts and instructions remain in a clearly marked nonshipping support archive so original-disc owners retain a documented path to the supported input.
@@ -53,7 +53,7 @@ Import is read-only toward the retail source and atomic toward its destination:
 3. validate source endianness, container and field bounds, names, case collisions, duplicates, sizes, and references before decoding values;
 4. select the dependency closure required by the requested partial or release-complete import scope;
 5. resolve retail patch and archive precedence once;
-6. decode and normalize the selected levels, models, textures, lightmaps, production font roles, audio, adaptive-score definitions, stock pilot pictures, movies, strings, and tables;
+6. decode and normalize the selected levels, models, textures, lightmaps, production font roles, audio (OSF streams and WAV SFX), adaptive-score definitions, mission-voice streams, stock pilot pictures, movies, strings, and tables;
 7. bind durable canonical content keys, resolve every reference, and assign dense package-local integer IDs;
 8. build the bounded resident `WorldSpine`, map each indoor room and positive-multiple-of-32 terrain grid to fixed cells, prove conservative presentation-demand bounds contain every assigned static drawable, emit the aligned global and per-level presentation records with closed descriptors, and compute every ordinary simultaneous-camera and discontinuous-destination envelope plus the demand-interval-aware movement lead-time proof;
 9. select every required entry from the bundled stock behavior catalog, validate its bindings, and attach compiled `BehaviorProgram` data for level, campaign, module-role, package-default, owner, object-archetype, game-mode, and session scopes;
@@ -144,11 +144,11 @@ Initial normalization favors runtime simplicity:
 | HOG, MN3, and related containers | Removed after their selected entries are resolved into the directory package |
 | D3L rooms, portals, terrain, paths, and object placement | Read-only canonical authoring documents, resident typed `WorldSpine`, one indoor cell per room, positive-multiple-of-32 terrain dimensions, fixed 32-by-32-quad outdoor cells, and raw indexed layer blobs |
 | Legacy texture encodings | Read-only canonical source pixels plus GPU-ready published texture records referenced by resolved cell tables; no runtime retail or standard-image decode in the streaming path |
-| Legacy lightmaps and secondary UVs | Deterministically repacked per room into the canonical single nonmipmapped 1024-square `rgba8Unorm` atlas with two-texel dilated chart gutters and rewritten canonical UV2, then stored with that room cell's presentation records; overflow rejects the source profile |
+| Legacy lightmaps and secondary UVs | Deterministically repacked per room into a provisional single nonmipmapped 1024-square `rgba8Unorm` atlas with two-texel dilated chart gutters and rewritten canonical UV2, then stored with that room cell's presentation records. The historical engine packed unbounded chains of padded 128-square pages with no per-room cap; a Phase 2 whole-retail measurement of packed per-room lightmap area must ratify the atlas dimension and the import overflow rule before either becomes publisher-binding. Until that measurement, overflow is a diagnostic that blocks promotion of the affected room, not an automatic rejection of the entire source profile |
 | Legacy models and animation | Read-only canonical authoring geometry and animation, structured runtime definitions, and GPU-ready records referenced by demanded cells and render items |
 | Retail bitmap `.fnt` files | Checked one-way decode into canonical glyph metrics, kerning and texture atlases for production font roles; no runtime `.fnt` reader or legacy resolution switch |
-| ACM and other legacy audio | Narrow checked Swift import decode, then Apple-native PCM or compressed audio selected through AVFoundation |
-| OMF adaptive themes | Checked one-way parse into canonical regions, roles, loops, stream references, and transition rules; no runtime OMF reader |
+| OSF streams (ACM payload) and WAV SFX | OSF (`OSF1`) containers with ACM-compressed payloads for adaptive-score beds, in-level mission voice, and audio taunts; ordinary SFX are PCM WAV. Narrow checked Swift import decode of the OSF/ACM variants proven in the verified profile, then Apple-native PCM or compressed audio through AVFoundation. No standalone `.acm` runtime format |
+| OMF adaptive themes | Checked one-way parse into canonical regions, roles, loops, stream references, and transition rules; the active role-request surface is established from the retail themes at import rather than assumed from the library vocabulary; no runtime OMF reader |
 | MVE movies | Narrow checked Swift import decode and AVFoundation transcode to a native movie; no MVE decoder in the game |
 | Stock pilot pictures | Bounded decode into canonical static profile media; no legacy pilot-profile reader |
 | String tables and messages | UTF-8 canonical text |
@@ -158,7 +158,11 @@ The source profile recognizes the logical names `lohud.fnt`, `hihud.fnt`, `brief
 
 All seven verified fonts are proportional 4-4-4-4 color fonts; six carry kerning data and the large-UI font does not. The native product does not recreate the historical low/high-resolution font switch or use retail fonts for ordinary AppKit chrome. Each file receives a recorded production role or an explicit superseded decision. Only fonts with a real stock HUD, briefing, TelCom, or other imported-presentation consumer enter the package; unused legacy roles do not become orphan assets.
 
-Choose the exact standard media encodings during the Training Mission import. Prefer formats that Apple frameworks read directly. `D3Import` implements only the `.fnt`, ACM, and MVE variants proven present in the verified content and rejects unknown variants. Storage efficiency does not justify a retail decoder or a general transcoding framework in the runtime.
+Choose the exact standard media encodings during the Training Mission import. Prefer formats that Apple frameworks read directly. `D3Import` implements only the `.fnt`, OSF-with-ACM, WAV, and MVE variants proven present in the verified content and rejects unknown variants. Storage efficiency does not justify a retail decoder or a general transcoding framework in the runtime.
+
+### W-018 lightmap measurement gate
+
+Before Phase 2 freezes the canonical cell and lightmap tables, `D3Import` reports packed per-room lightmap area across the full verified 1.4-plus-Mercenary profile under the historical packing rules. That report either ratifies the provisional one-1024-square atlas and a concrete import overflow policy, or amends the atlas dimension with evidence. Native creator rooms that later overflow the ratified atlas still require a room split; import of owned retail content must not invent a silent second atlas or reject an otherwise valid source profile without that measured policy.
 
 ## Content identity
 

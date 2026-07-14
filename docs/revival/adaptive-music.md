@@ -27,13 +27,13 @@ Historical utilities are evidence, not the product model. `legacy/musicutils` ta
 `RevivalCore` owns deterministic logical score state:
 
 - score and region `ContentKey` values and semantic revisions;
-- requested theme role such as intro, idle, combat, transition, or death;
+- requested theme role drawn from the surface established by import of the retail OMF themes. The OMF library vocabulary includes intro, idle, combat, transition, and death roles, but the pinned game selector actively requests only idle and death; where combat switching occurs it is driven by register logic inside the theme data rather than by a five-wide C++ request surface. Import records the roles each supported theme actually uses; authoring may expose the full native set afterward;
 - pending logical transition intent;
 - gameplay-derived inputs and tick-based timers that the approved native score rules use.
 
 `RevivalMac` owns `AVAudioEngine`, decoded buffers, sample clocks, measure-boundary scheduling, fades, interruption handling, and device recovery. It consumes typed score commands from `RevivalCore` and reports bounded completion or cancellation results. Audio timing never changes authoritative gameplay state.
 
-The canonical model stays narrow. It represents regions, named theme roles, stream references, loop ranges, transition rules, and musical alignment needed by imported and newly authored scores. It is not a general digital-audio workstation, MIDI engine, or second behavior language.
+The canonical model stays narrow. It represents regions, named theme roles, stream references (historical OSF beds with ACM payloads, normalized at import), loop ranges, transition rules, and musical alignment needed by imported and newly authored scores. It is not a general digital-audio workstation, MIDI engine, or second behavior language. Saves restore only the logical region index required for coherent resume, matching the historical single-region persistence.
 
 ## Behavior contract
 

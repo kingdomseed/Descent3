@@ -18,11 +18,11 @@ Status: in progress
 - define one-way retail import, canonical projects and packages, new saves and replay, the behavior system, creator suite, multiplayer commitment, verification, and minimal-code rules;
 - define the pinned community source as the stock behavior baseline, the historical interval-to-fixed-tick translation rule, authoritative Float32 semantics, and one `simulationSemanticRevision` policy;
 - lock one purpose-built streaming path for every presentation-capable level: a resident authoritative `WorldSpine`, one room per indoor cell, positive-multiple-of-32 terrain dimensions and fixed 32-by-32-quad cells, package-layer global and level blobs, direct Metal I/O, one dynamic world residency set, orientation-independent spatial camera envelopes, one `LoadWave`-timed prefetch shell, and publication limits on stack-global resources, spine, counts, level-pinned resources, cells, simultaneous cameras, discontinuous destinations, load waves, queue depth, stale work, and movement lead time;
-- lock USD through Model I/O as the sole planned-product DCC interchange, the two-level volumetric navigation model, and the room-local lightmap policy;
+- lock USD through Model I/O as the sole planned-product DCC interchange, the two-level volumetric navigation model, and a provisional room-local lightmap policy whose atlas dimension and import overflow rule are ratified by a Phase 2 whole-retail packed-area measurement;
 - lock Network-framework QUIC, the inner CryptoKit record protocol, the project-operated public rendezvous and relay, Bonjour LAN discovery, 2–32 connected human slots, live observer slot semantics, and the complete six-degree-of-freedom prediction and reconciliation contract;
 - complete the working functional-completeness ledger with one row for every required runtime, editor, behavior, campaign, multiplayer, replay, presentation, data-editing, baking, packaging, and mod-SDK capability;
 - inventory adaptive music, automap, animated cockpit, haptics, player markers, auxiliary camera views, player-selected multiplayer media, mirrors, specular response, scorch decals, procedural textures, volumetrics, and blend semantics as explicit capabilities rather than umbrella terms;
-- inventory retail bitmap-font roles, the five difficulty values and their active rules, in-game camera-path cinematics, typed room roles and refueling, per-command cheat, easter-egg, and diagnostic policy, public/team/private chat, host operator commands, and authoritative versus client-presentation behavior roles as separate capabilities;
+- inventory afterburner, ship wiggle versus cockpit buffet, autoleveling and mouselook, in-level streamed voice, post-level results, credits/intro/loading/attract presentation, ambient-life stub versus ambient sound, campaign co-op, the full stock game-mode list, PXO-class lobby/rankings/stats and mission auto-download as adopt-or-exclude decisions, retail bitmap-font roles, the five difficulty values and their active rules, in-game camera-path cinematics, typed room roles and refueling, per-command cheat, easter-egg, and diagnostic policy, public/team/private chat, host operator commands, and authoritative versus client-presentation behavior roles as separate capabilities;
 - record for each row its historical evidence, native counterpart, milestone, owner, acceptance evidence, and current state;
 - separate intended capabilities from dead menu shells, duplicated dialogs, and historical bugs;
 - preserve verified retail hashes and the legacy M4 smoke run as non-normative evidence;
@@ -73,7 +73,8 @@ Select a small connected cluster from the Training Mission. Implement its depend
 - canonical room, typed room-role, portal, face, UV, texture, lightmap, model, object, and player-start values;
 - canonical resident `WorldSpine`, one room per indoor cell, deterministic resolved layer/blob locators, checked raw presentation ranges, complete resource descriptors and hashes, cell dependencies, spatial envelopes, and simultaneous-camera accounting;
 - atomic base-package output and native package loading;
-- lightmapped opaque rendering, portal traversal, prefetch, Metal I/O, residency installation, and retirement through `RevivalMetal`.
+- lightmapped opaque rendering, portal traversal, prefetch, Metal I/O, residency installation, and retirement through `RevivalMetal`;
+- whole-retail packed per-room lightmap-area report that ratifies or amends the provisional one-1024-square atlas policy and import overflow rule before those become publisher-binding.
 
 Add `RevivalEditor` as the fifth production target and the real human editor foundation. It provides:
 
@@ -94,8 +95,8 @@ Exit: the player and editor open the same canonical package with no retail archi
 Add runtime support for:
 
 - Pyro position, orientation, velocity, thrust, drag, and camera;
-- the profile-persisted keyboard ramp-duration setting, transient held-key ramp and reset rules, simultaneous translation axes and trichording, and mouse and controller six-degree-of-freedom mappings;
-- separately ratified mass, thrust, linear drag, rotational thrust and drag, turn roll and buffet curves at 120 Hz;
+- the profile-persisted keyboard ramp-duration setting, transient held-key ramp and the new native reset-on-focus-loss/pause/load/remap rules, simultaneous translation axes and trichording, and mouse and controller six-degree-of-freedom mappings;
+- separately ratified mass, thrust, exponential per-axis drag, rotational thrust and drag, turn roll, afterburner, `PF_WIGGLE` ship bob versus cockpit shake (with the authority decision), outdoor thrust scalar, and related impulse curves at 120 Hz;
 - swept movement against room faces with explicit wall slide, bounce, tangential and corner response;
 - portal crossing, room ownership, repeated cross-cell churn, and maximum-speed spatial-envelope readiness under the fixed lead-time inequality;
 - restart, pause, and render interpolation.
@@ -126,7 +127,7 @@ Add runtime support for:
 - one pickup;
 - the five-value difficulty selection and each active difficulty-owned rule exercised by this slice;
 - the first required room-role behavior, including fixed-tick refueling if the selected cluster contains an energy center;
-- animated cockpit, HUD, instructional messaging, positional sound, and the narrow ACM import decoder if required;
+- animated cockpit, HUD, instructional messaging, positional sound, and the narrow OSF-with-ACM import decoder if required for score streams, mission voice, or taunts;
 - one-way retail bitmap-font conversion when the first selected stock HUD, briefing, or TelCom consumer requires it;
 - new-format save and reload.
 
@@ -222,6 +223,8 @@ Add the sixth and final target, `RevivalRelay`, as a no-window Apple-Silicon/mac
 Implement and verify:
 
 - import and canonicalize the stock multiplayer maps and their required retail dependency closures;
+- the enumerated stock modes including Anarchy, Team Anarchy, Hyper-Anarchy, Robo-Anarchy, CTF, Entropy, Hoard, Monsterball, and campaign co-op with robots, GuideBot, and campaign scripts under multiplayer authority;
+- explicit adopt-or-exclude decisions for PXO-class lobby chat, rankings, and persistent pilot stats, GameSpy-style discovery coexistence, and join-time mission auto-download, each recorded in the ledger before Phase 9 closes;
 - authoritative session ownership and state replication appropriate to the selected game modes;
 - Bonjour LAN discovery plus public registration, browse, join, outbound relay connection, authority proof of possession, unguessable routes, short leases, single-use client-bound join tokens, bounded pre-allocation and traffic, registration expiry, fail-closed control-plane outage, terminal relay-data outage, version and content negotiation, failure recovery, and abuse-resistant input validation;
 - ephemeral X25519 agreement, per-session Ed25519 authority proof, HKDF-SHA256 directional ChaChaPoly keys, authenticated visible routing headers, monotonic sequence and epoch nonce rules, replay rejection, rekey, and the same inner record codec on LAN and relay routes;
@@ -234,7 +237,7 @@ Implement and verify:
 - no-window dedicated hosting through the `RevivalMac` executable, using the same `RevivalCore` simulation and network ownership as graphical sessions;
 - the declared 2–32 connected human slots without reducing the historical maximum to Game Center's 16-participant ceiling; live observers consume a human slot, listen hosts consume one, and no-window authorities and relays consume none;
 - complete local-ship prediction from tick- and sequence-numbered resolved six-degree-of-freedom inputs, authoritative snapshots with the acknowledged input and complete future-affecting movement state, replay of all remaining unacknowledged inputs, a fixed 256-input history with hard resync, presentation-only correction smoothing, remote interpolation, bounded loss extrapolation, and separate weapon-family latency policy;
-- the original functional game-mode set or explicit modern counterparts recorded in the completeness ledger;
+- the enumerated stock game-mode set including campaign co-op, or explicit modern counterparts recorded in the completeness ledger, plus recorded adopt-or-exclude decisions for lobby/rankings/stats and join-time package acquisition;
 - deterministic recording, replay, diagnosis, and desync evidence for authoritative session state, plus explicitly declared observer, client, transport, and presentation evidence without a second replay engine;
 - multiplayer maps, starts, teams, mode rules, session behaviors, validation, local multi-instance testing, package dependencies, and publishing in `RevivalEditor`;
 - multiplayer mod-SDK documentation and synthetic examples, completing the native SDK.
