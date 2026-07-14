@@ -1,10 +1,10 @@
 # Descent 3 revival
 
-This project is building a complete Apple-native revival of Descent 3: the game, its campaigns and multiplayer capabilities, and the tools needed to create entirely new levels, systems, behaviors, presentation, and campaigns. It imports legally owned retail content, but its architecture moves forward without the original runtime.
+This project is building a complete Apple-native revival of Descent 3: the game, its campaigns and multiplayer capabilities, and the tools needed to create new levels, systems, behaviors, presentation, and campaigns.
 
-The old C++ engine, OpenGL renderer, SDL platform layer, Osiris native-module ABI, Windows editor, legacy saves, original network protocol, and retail file formats are research material. They do not survive as product layers.
+The route is a source-led native translation, not a greenfield design exercise and not a shipping C++ port. We translate the pinned released source in coherent dependency order, keep every relevant file accounted for, and preserve observable game and creator semantics before deliberately modernizing them. The finished product contains no legacy runtime.
 
-## Product decision
+## Product direction
 
 The shipping product uses:
 
@@ -13,126 +13,123 @@ The shipping product uses:
 - AppKit and MetalKit for game and editor windows;
 - GameController for controller input;
 - AVFoundation and AVAudioEngine for media and sound;
-- Model I/O for one-way USD creator ingress;
-- Network and CryptoKit for QUIC sessions, authentication, and encryption;
-- Apple Silicon `arm64` and macOS 26 or later;
-- a fixed 120 Hz simulation with display-rate rendering;
-- one purpose-built world-cell streamer with a resident authoritative spine, orientation-independent spatial demand, and authored-resolution terrain cells without runtime LOD;
-- one canonical content model shared by runtime, editor, behaviors, saves, replay, multiplayer, and publishing.
+- Model I/O for the first native USD creator ingress;
+- Network and CryptoKit for native multiplayer;
+- Apple Silicon arm64 and macOS 26 or later;
+- one canonical content model shared by runtime, editor, saves, replay, multiplayer, and publishing.
 
-There is one renderer, one simulation model, one behavior language, and one forward-moving content format. The project does not carry compatibility backends or export paths for the old world.
+There is one renderer, one active simulation scheduler, one active level-lifetime path, and one shared editor/player world. OpenGL, SDL, MFC, DLL interfaces, original saves and packets, and retail runtime formats do not survive as product layers.
+
+## Translation before redesign
+
+The released C++ source is the initial specification for:
+
+- update order, elapsed-time use, input, physics, collision, AI, weapons, and objects;
+- room, portal, terrain, visibility, lighting, effects, and presentation;
+- per-level dependency discovery, eager working-set paging, reachable lazy paging, activation, and release;
+- D3Edit inspection, mutation, level I/O, rendering, and play-from-editor;
+- DALLAS, Osiris, campaign, multiplayer, replay, and utility capability.
+
+Every relevant source file receives a disposition, but native files and types follow clear Swift ownership rather than legacy file boundaries. Platform APIs, global mode switching, duplicated compilation, page-database locks, defensive branch forests, dead code, and historical workarounds are replaced or excluded with evidence.
+
+[Source translation discipline](docs/revival/source-translation.md) defines the loop: trace, capture, test, translate, run, record differences, simplify, and close the file accounting.
+
+## First implementation
+
+The first native world starts from the original game's operational baseline:
+
+- D3Import converts the complete Training D3L world plus every asset reachable by the currently translated path into checked canonical content;
+- RevivalCore constructs the complete resident level world;
+- a direct PageInAllData-style pass eagerly prepares the evidenced working set, while later source-reachable presentation assets load only from the canonical package and then remain resident;
+- the player and editor use the same world types, loader, simulation, and renderer, with separate owned document and play-session values;
+- exit waits for final GPU use and releases the level resources through one owner.
+
+The released engine did not prove a complete GPU-ready dependency closure at activation: bitmap, object, matcen, and Osiris paths could page additional assets later, and the retained GPU pre-upload hook is a no-op. The canonical-only runtime is a deliberate one-way-content strengthening. Its package contains the complete level topology and every dependency reachable through the currently translated product path, then expands when a new behavior path becomes real; eager-versus-lazy preparation still follows the source until measurement supports a change.
+
+This is the concrete current implementation. It is not “no streaming ever.” Spatial streaming is considered only after complete Training and representative large indoor, outdoor, editor, and higher-resolution workloads are measured on the M4. A later amendment must replace the resident mechanism rather than add a permanent second mode. [World loading and residency](docs/revival/world-streaming.md) defines that gate.
+
+The first scheduler preserves the historical old/new timing handoff explicitly. Frame systems and `EVT_INTERVAL` consume the previous `Frametime` and pre-update `Gametime`; after cap waiting, `CalcFrameTime` stores the new duration, then `GameFrame` advances `Gametime` before the remaining tail work. It preserves the static/`InitGame` 0.1-second initialization and nested pause/rebase behavior without retaining mutable globals. After flight, collision, interval events, and animation have native reference evidence, Phase 3 chooses and completes one final timing model. Fixed 120 Hz remains a candidate, not a Phase 1 fact, and the product will not keep variable and fixed modes in parallel.
+
+## Editor and runtime together
+
+RevivalEditor begins in Phase 1, not after an engine foundation is designed in isolation. The first integrated slice loads the complete imported Training Level in both applications, focuses one acceptance room, derives an editable complete-level project value from the read-only base, renders it through the same Metal path, performs one real mutation with undo, saves and reopens, enters the shipping simulation with a disposable play-session copy, and returns to the document.
+
+This does not claim that Descent 3 was historically built by completing its editor first. The evidence shows editor and runtime co-development around shared initialization entry points with editor branches, production world and level functions, low-level rendering, and the actual runtime loop during editor-hosted play. We are following that useful integration pattern while replacing the Windows and MFC machinery.
+
+The editor grows with the game into a human-first AppKit creator suite. MCP, headless authoring, training capture, telemetry, and agent-only workflows remain outside the current roadmap until the complete human product ships.
 
 ## Functional completeness
 
-The revival preserves capability without preserving machinery. Every required player-facing and creator-facing feature receives a modern native counterpart. KISS means fewer concepts and less code, not fewer tools or a smaller game.
+The revival preserves capability without blindly preserving machinery. Every required player-facing and creator-facing feature receives a modern native counterpart. KISS means fewer concepts and paths, not fewer tools or a smaller game.
 
-A gameplay feature is complete when the runtime can execute it, the editor can author it, validation can reject broken forms, play-in-editor can test it, and the publisher can ship it. Campaign-first milestones decide implementation order; stock campaigns do not cap the behavior language or creator suite.
-
-Every production behavior is developed through a focused red-green-refactor cycle. Tests protect reachable product contracts rather than speculative branches or test-only architecture. [Test-driven development](docs/revival/test-driven-development.md) defines the binding implementation and review protocol.
-
-The binding inventory and completion rules live in [Functional completeness](docs/revival/functional-completeness.md).
-
-## One-way conversion
-
-Owned retail files are source material for an importer:
-
-```text
-Owned Descent 3 retail data
-            |
-            v
-      Swift D3Import
-            |
-            v
- Canonical Revival package
-            |
-            v
- Swift/Metal game and editor
-```
-
-Only the shipping `D3Import` helper reads supported prepared-installation containers and legacy formats. The game never mounts retail HOG archives or loads native mission DLLs. Import and reimport are explicit, checked, repeatable, and one-way. Converted retail media remains local because conversion does not change its ownership. Separate source-preparation evidence may explain how an owner produces the supported input from original media; no product target executes it.
-
-Stock behavior is translated into typed `BehaviorGraph` source and compiled into deterministic `BehaviorProgram` data. The new system replaces Osiris and DALLAS functionality without emulating their binary ABI or generating native code.
-
-## Committed scope
+A gameplay feature is complete when the runtime can execute it, the editor can author it where applicable, validation can reject broken forms, play-in-editor can test it, and the publisher can ship it. Campaign-first milestones decide implementation order; stock campaigns do not cap the behavior or creator surface.
 
 The complete revival includes:
 
-- the Training, base, secret, and Mercenary campaign content;
-- six-degree-of-freedom flight including afterburner, ship wiggle/bob with an explicit authority decision, autoleveling and mouselook, five-level difficulty and its real scaling rules, collision, AI, weapons, objectives, refueling rooms, HUD and selected one-way-converted stock fonts, animated cockpit, automap, markers, rear and auxiliary camera views, GuideBot and its command menu, in-game camera-path cinematics, adaptive music, in-level streamed mission voice, post-level results, menu/credits/intro/loading presentation, audio, movies, cheat, easter-egg, and diagnostic commands with explicit per-command policy, native controller haptics, modern saves with thumbnails, and replay;
-- native multiplayer for 2–32 connected human slots over Network-framework QUIC and inner CryptoKit records, dedicated hosting, public discovery and opaque relay, live observer mode, prediction and reconciliation, text chat and moderation, authenticated host operator commands, explicit authoritative and client-presentation behavior roles, the enumerated stock game modes including campaign co-op, secure player pictures, ship logos and audio taunts, and multiplayer authoring; lobby chat, rankings, persistent pilot stats, and join-time mission auto-download each receive an explicit adopt-or-exclude decision;
-- a direct Metal renderer with bounded streamed presentation cells, a resident gameplay spine, room-and-portal visibility, and fixed-resolution terrain cells for imported content and replacement visuals;
-- a native macOS player application with keyboard, mouse, and controller support;
-- one integrated native creator suite for world geometry, terrain, objects, game data, behaviors, campaigns, briefings, cinematics, USD asset ingress, localization, lighting, purpose-built volumetric navigation, validation, playtesting, and publishing;
-- a native mod SDK that uses the same project and package contracts as first-party content;
-- the ability to create and publish a complete new campaign without legacy tools or hand-edited generated files.
+- Training, the base campaign and secrets, and Mercenary;
+- full six-degree-of-freedom gameplay, AI, weapons, goals, difficulty, room roles, GuideBot, cockpit, HUD, automap, markers, cameras, cinematics, adaptive music, voice, results, menus, movies, haptics, saves, replay, and ledgered presentation and command behavior;
+- native multiplayer for 2–32 connected humans, dedicated hosting, public discovery and relay, observers, prediction and reconciliation, chat, host operations, stock modes including co-op, player media, and multiplayer authoring;
+- the full native world, terrain, content-definition, behavior, campaign, briefing, cinematic, media, localization, lighting, navigation, validation, playtest, and publishing workflow;
+- a native mod SDK using the same projects and packages as first-party content;
+- the ability to create and publish a complete independent campaign and multiplayer package without legacy tools or hand-edited generated files.
 
-The product does not include:
+[Functional completeness](docs/revival/functional-completeness.md) and its [ledger](docs/revival/functional-completeness-ledger.md) are the binding inventory.
 
-- original save, demo, level, HOG, or editor-format import or export except the deliberate retail-content import boundary;
-- live interoperability with original multiplayer clients or servers;
-- binary Osiris or game-module loading;
-- original community DLL compatibility;
-- Intel Mac, Windows, Linux, iOS, or visionOS targets unless scope changes later;
-- an OpenGL, SDL GPU, Metal-cpp, or translation-layer fallback.
+## One-way conversion
+
+    Owned Descent 3 retail data
+                |
+                v
+          Swift D3Import
+                |
+                v
+     Canonical Revival content
+                |
+                v
+     Swift/Metal game and editor
+
+Only D3Import reads supported prepared-installation containers and legacy formats. The game and editor never mount retail HOG archives, open D3L at runtime, or load native mission modules. Import and reimport are explicit, checked, repeatable, and one-way. Converted retail media stays local because conversion does not change ownership.
+
+Stock behavior is translated from generated and handwritten source one actual dependency chain at a time as canonical direct typed Swift. Shipping packages contain safe native data or project-owned instructions, never native executable modules. Creator authoring grows from working generated, handwritten, timed/persistent, and presentation-oriented chains; it does not force a replacement executor before those cases prove one necessary.
 
 ## Product shape
 
-Phase 1 starts with four targets. Phase 2 adds the editor. Phase 9 adds one isolated operational service, so the complete product has six targets:
+The initial workspace has three executable products and two named code-ownership areas:
 
-| Target | Responsibility |
+| Product or ownership area | Responsibility |
 | --- | --- |
-| `D3Import` | One-way conversion from owned retail data into canonical content |
-| `RevivalCore` | Content, simulation, collision, AI, behaviors, saves, replay, multiplayer state, and validation |
-| `RevivalMetal` | Direct Metal 4 rendering for the game and editor |
-| `RevivalMac` | Player application, input, audio, media, files, import UX, presentation, and no-window dedicated hosting |
-| `RevivalEditor` | Native project authoring, baking, debugging, playtest, and publishing |
-| `RevivalRelay` | Public session discovery, expiring registration, join authorization, and opaque QUIC relay; no game content or simulation |
+| D3Import | One-way conversion of the current owned retail slice |
+| RevivalCore | Canonical world, simulation, behaviors, validation, saves, replay, and multiplayer state |
+| RevivalMetal | Direct Metal rendering for game and editor |
+| RevivalMac | Player application, input, audio, media, import UX, and later no-window hosting |
+| RevivalEditor | Native editing, validation, playtest, baking, and publishing |
 
-This is smaller than a general game engine. It has no generic ECS, job system, render graph, dependency-injection framework, binary plugin system, asset manager, sparse-resource or terrain-LOD system, or cross-platform abstraction. Required mechanisms such as the behavior executor, content catalog, navigation graph, world-cell streamer, and relay protocol stay narrow and product-specific.
+`D3Import`, `RevivalMac`, and `RevivalEditor` are executable products. `RevivalCore` and `RevivalMetal` are required ownership boundaries, but the first working code decides whether they are separate targets, source groups, or one of each. RevivalRelay is added when public multiplayer reaches implementation. Target count is not a product feature; a new target must own a real isolation boundary and remove more complexity than it introduces.
 
-Every presentation-capable level uses that one streaming path; a no-window authority loads only the authoritative spine. One indoor room is one cell; outdoor terrain uses fixed 32-by-32-quad cells. Complete topology, collision, navigation, behavior, and simulation remain resident, while immutable GPU presentation payloads move through one bounded concurrent Metal I/O queue and one dynamic world residency set. Orientation-independent spatial camera envelopes and one fixed `LoadWave`-timed prefetch shell make turns and doors residency-neutral and make continuous movement certifiable. This is a finite-mission architecture, not an unbounded open world: the publisher enforces stack-global, spine, count, level-pinned, cell, simultaneous-camera, discontinuous-destination, `LoadWave`, queue, and lead-time limits. Aggregate on-disk presentation bytes alone do not make a valid level oversized. [World streaming](docs/revival/world-streaming.md) defines the complete contract.
+The project has no generic ECS, job system, render graph, dependency-injection framework, binary plugin system, general asset manager, speculative streaming framework, or cross-platform abstraction. Required mechanisms grow from working campaign and creator slices and stay purpose-built.
 
-`RevivalEditor` is a human-first native AppKit document application. Each project has one document, one main-actor editing session, one primary project window, synchronized navigator, canvas, inspector, and problems/activity surfaces, named undo, revision-checked background work, and the same renderer, simulation, validator, and publisher as the game. Stable element identity, concrete typed edits, and source-linked diagnostics are required because they make human editing reliable. A future MCP or agent-authoring layer may adapt those mature operations only after Phase 10 ships the complete human creator suite; no MCP server, headless editor, training recorder, public automation schema, or agent-only path belongs to the current roadmap.
+## Evidence and measurements
 
-## First playable and creator slices
+The pinned source builds natively as arm64 on the local M4 after a small header correction, all 12 upstream tests pass, owned base and Mercenary data has been verified, and the reference executable reaches Training and base campaign level 1. Those results make the source and data useful translation evidence; no production target depends on the reference engine.
 
-The first playable combat slice converts a connected Training Mission room cluster and proves flight, collision, a door and trigger, one robot following a baked volumetric route, one weapon, one pickup, HUD, positional audio, and new-format save and reload. The editor opens the same canonical cluster and can inspect it in Phase 2. By Phase 4 it can edit and play the geometry, door, trigger, robot, navigation topology, weapon, pickup, and first behavior graph used by that slice.
-
-The next milestone completes the full Training Mission and its matching campaign, behavior, briefing, and content-authoring paths. Work then expands campaign level by level. Every runtime capability gains its authoring, validation, and playtest path in the same phase.
-
-Campaign completion proves the imported game. An independently authored campaign proves the depth of the campaign-creation workflow. Full creator-suite completion also requires native multiplayer maps and modes to pass their authoring and publishing gates. Multiplayer and replay prove that the new simulation and behavior contracts extend beyond the stock single-player path.
-
-## Current evidence
-
-The repository still contains the released Descent 3 C++ source and completed exploratory work. That work established that:
-
-- source commit `156cba8aafd997d27deb0902ba6026bcdcc1cfaf` builds as native `arm64` on the local M4 after a small header correction;
-- all 12 existing upstream tests pass;
-- the owned two-disc base game and Mercenary images were extracted and verified;
-- the official 1.4 update produced canonical `extra.hog` and `extra13.hog` archives;
-- the native reference executable entered the Training Mission and base campaign level 1 with the original OpenGL renderer.
-
-These results validate the source material and local retail data. The released tree also supplies behavioral and creator-tool evidence for Osiris, DALLAS, D3Edit, the Briefing Editor, multiplayer, replay, and packaging. No production target depends on it.
-
-The old source remains through Phase 10. It can move to an archival branch or leave the active checkout only after every ledger row is implemented and verified, replaced, or explicitly excluded, and no unresolved product question still depends on the active tree.
+Reference captures answer specific behavioral questions. Product tests then protect the accepted native contract. Optimized M4 profiles decide modernizations. We do not maintain permanent cross-engine parity CI or optimize hypothetical bottlenecks.
 
 ## Documentation
 
-- [Functional completeness](docs/revival/functional-completeness.md) defines the full player and creator capability contract.
-- [Functional-completeness ledger](docs/revival/functional-completeness-ledger.md) records the Phase 0 capability inventory, owners, milestones, and evidence state.
-- [Architecture](docs/revival/architecture.md) records the binding Swift/Metal decision and rejected directions.
-- [World streaming](docs/revival/world-streaming.md) defines the fixed cell model, resident gameplay spine, Metal I/O and residency lifetime, finite scale, and editor diagnostics.
+- [Architecture](docs/revival/architecture.md) records the native semantic-translation decision.
+- [Source translation discipline](docs/revival/source-translation.md) defines file accounting and modernization.
+- [Source translation ledger](docs/revival/source-translation-ledger.md) records the initial file-by-file dispositions and closure status.
+- [World loading and residency](docs/revival/world-streaming.md) defines the resident baseline and measured amendment gate.
+- [Roadmap](docs/revival/roadmap.md) gives the concrete vertical-slice sequence.
+- [Functional completeness](docs/revival/functional-completeness.md) and the [ledger](docs/revival/functional-completeness-ledger.md) define complete scope.
 - [Engineering principles](docs/revival/engineering-principles.md) defines the minimal-code rules.
-- [Test-driven development](docs/revival/test-driven-development.md) defines red-first implementation, the test-value gate, and anti-dilution review rules.
-- [Content pipeline](docs/revival/content-pipeline.md) defines one-way retail conversion, native projects, and canonical packages.
-- [Behavior system](docs/revival/behavior-system.md) defines the replacement for Osiris and DALLAS.
-- [Adaptive music](docs/revival/adaptive-music.md) defines score import, logical state, native playback, persistence, and authoring.
-- [Creator suite](docs/revival/creator-suite.md) defines the integrated native editor and publishing workflow.
-- [Verification](docs/revival/verification.md) defines tests, measurements, and product acceptance.
-- [Skills and agents](docs/revival/skills-and-agents.md) records expert sources, project skills, and team roles.
-- [Roadmap](docs/revival/roadmap.md) orders the work from planning through the complete revival and later visual upgrades.
-- [Discovery](docs/revival/discovery.md) records historical source evidence carried into the new design.
-- [Legacy M4 build](docs/revival/macos-arm64-build.md) preserves the reference-build procedure.
-- [Retail data](docs/revival/retail-data.md) records acquisition, hashes, local storage, and the importer boundary.
+- [Test-driven development](docs/revival/test-driven-development.md) defines production red-green-refactor and the test-value gate.
+- [Content pipeline](docs/revival/content-pipeline.md) defines one-way retail conversion and native packages.
+- [Behavior system](docs/revival/behavior-system.md) records the evolving safe replacement for Osiris and DALLAS.
+- [Adaptive music](docs/revival/adaptive-music.md) defines score translation and native playback.
+- [Creator suite](docs/revival/creator-suite.md) defines the human-first editor.
+- [Verification](docs/revival/verification.md) defines translation, product, and M4 evidence.
+- [Skills and agents](docs/revival/skills-and-agents.md) defines workstream playbooks and roles.
+- [Discovery](docs/revival/discovery.md) records historical source and development evidence.
 
 Command & Conquer and FreeSpace 2 remain future projects. This repository is focused on Descent 3.

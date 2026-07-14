@@ -2,72 +2,86 @@
 
 # Descent 3 revival
 
-Read `REVIVAL.md`, `docs/revival/functional-completeness.md`, `docs/revival/functional-completeness-ledger.md`, `docs/revival/architecture.md`, `docs/revival/engineering-principles.md`, `docs/revival/test-driven-development.md`, `docs/revival/roadmap.md`, and `docs/revival/verification.md` before making product changes. Read `docs/revival/world-streaming.md` before changing world partitioning, asset lifetime, loading, residency, visibility, terrain cells, or streaming diagnostics. Read `docs/revival/content-pipeline.md` before changing import or asset behavior, `docs/revival/behavior-system.md` before changing gameplay behavior, `docs/revival/adaptive-music.md` before changing score import, music behavior, playback, persistence, or authoring, `docs/revival/creator-suite.md` before changing editor or publishing behavior, and `docs/revival/skills-and-agents.md` before adding or assigning an agent skill.
+Read REVIVAL.md, docs/revival/functional-completeness.md, docs/revival/functional-completeness-ledger.md, docs/revival/architecture.md, docs/revival/source-translation.md, docs/revival/source-translation-ledger.md, docs/revival/engineering-principles.md, docs/revival/test-driven-development.md, docs/revival/roadmap.md, and docs/revival/verification.md before making product changes. Read docs/revival/world-streaming.md before changing level loading, asset lifetime, residency, visibility, terrain detail, or future streaming. Read docs/revival/content-pipeline.md before changing import or asset behavior, docs/revival/behavior-system.md before changing gameplay behavior, docs/revival/adaptive-music.md before changing score behavior, docs/revival/creator-suite.md before changing editor or publishing behavior, and docs/revival/skills-and-agents.md before adding or assigning a project skill.
 
 ## Binding direction
 
-- Build a new Apple-native game and complete creator suite. The product is neither a port of the existing engine nor a drop-in replacement for the retail executable.
-- Write project-owned host code in Swift 6.3 and shaders in MSL. Use Metal 4 directly through native Apple frameworks.
+- Build a complete Apple-native game and creator suite in Swift 6.3 and MSL, using Metal 4 and native Apple frameworks directly.
 - Target Apple Silicon and macOS 26 or later. Do not add cross-platform abstractions without an explicit product-scope change.
-- Shipping targets contain no legacy C or C++ engine code, Rust runtime, OpenGL renderer, SDL runtime, Wine or Game Porting Toolkit runtime, or native Osiris modules.
-- The existing C++ source may be inspected or temporarily executed to answer a bounded historical question. It does not define the new architecture and is never linked into a product target.
+- Shipping targets contain no legacy C or C++ engine code, Objective-C++ bridge, Rust runtime, OpenGL renderer, SDL runtime, Wine or Game Porting Toolkit runtime, or native Osiris modules.
+- Build through dependency-ordered semantic translation of the pinned C++ source. It is the default evidence for original data flow, update order, behavior, presentation, and creator workflows until the corresponding native path is verified.
+- File-by-file means every relevant legacy file receives a recorded disposition. It does not require one Swift file per C++ file, source-order implementation, or preservation of platform and ABI machinery.
+- Keep one working native implementation. A temporary research harness may answer a bounded question but never becomes a permanent compatibility backend or second production path.
 
 ## Functional completeness
 
 - Rebuild every required player-facing and creator-facing capability in a modern native form. KISS constrains implementation, not scope.
 - A feature is complete only when its applicable runtime, authoring, validation, playtest, and publishing paths work.
 - Campaign-first development controls order. Stock campaign requirements are not the final ceiling for behaviors, tools, multiplayer, replay, or the mod SDK.
-- Preserve intended capabilities, not old dialogs, file layouts, DLL interfaces, packet bytes, disabled shells, duplicated tools, or historical bugs.
-- Multiplayer, replay, the integrated editor, game-data tools, behavior authoring, campaign and presentation tools, baking, packaging, and the native mod SDK are committed product work. A phase may defer their implementation but may not silently remove them.
-- Retail fonts, five-level difficulty, in-game cinematic sequences, multiplayer text chat, client-presentation event roles, host operator commands, room roles and refueling, and cheat, easter-egg, and diagnostic commands with per-command policy are explicit ledgered capabilities. Do not hide or delete them under umbrella terms.
-- The permanent human creator product begins in Phase 2 and matures slice by slice into a top-tier complete suite. Future MCP and agent authoring are aspirations, not current deliverables: do not add an MCP server, headless editor, public automation schema, training recorder, telemetry, agent-only workflow, target, skill gate, or second mutation path before Phase 10 ships the complete human creator suite.
+- Preserve intended capabilities and observable semantics, not old dialogs, binary layouts, DLL interfaces, packet bytes, disabled shells, duplicated tools, or historical bugs.
+- Multiplayer, replay, the integrated editor, game-data tools, behavior authoring, campaign and presentation tools, baking, packaging, and the native mod SDK are committed work. A phase may defer them but may not silently remove them.
+- The permanent human creator product begins with the first native world slice. Future MCP and agent authoring remain outside the current roadmap until the complete human creator suite ships.
+
+## Source translation
+
+- Follow docs/revival/source-translation.md. Work in coherent dependency islands that end in a visible player or editor result.
+- Before closing an island, account for every legacy file and important symbol involved, including editor callers and handwritten behavior outside generated blocks.
+- Capture the original observable baseline before deliberate modernization. Record each intentional difference rather than mixing redesign into a claimed faithful transfer.
+- Preserve original ordering, formulas, eager working-set and reachable lazy-page behavior, room/portal visibility, terrain presentation, and editor-to-play semantics until a focused decision changes them.
+- Replace MFC, Win32, OpenGL, SDL, compile variants, globals, memory wrappers, page-manager locks, and editor/game handoff workarounds with direct native ownership.
+- Boundary validation happens once as untrusted data becomes canonical. Do not reproduce defensive branch forests inside trusted runtime code.
+- GPL-derived translations retain compatible licensing and source provenance.
 
 ## One-way content boundary
 
-- Original retail data remains outside Git. Converted retail media also remains outside Git unless its rights have been established independently.
-- `D3Import` is the only shipping component that understands the supported prepared-installation containers and legacy file formats. It converts owned retail data into the canonical Revival package. Nonshipping source-preparation evidence and scripts never enter a product target.
-- The game and editor consume only canonical Revival content. Do not add runtime fallbacks that reopen HOG, D3L, Osiris, legacy save, or legacy module formats.
-- Do not implement backward export, original-save output, original-server interoperability, binary community-module loading, or original-editor compatibility unless the project constitution changes explicitly.
-- Replacement assets must have independently established rights and clear provenance.
-- Blender is the recommended bulk-geometry tool. Model I/O USD is the sole planned-product DCC ingress. Import and reimport are explicit one-way operations into canonical editable geometry; shipping targets do not add direct glTF, 3DS, FBX, OBJ, or backward-export paths. A second DCC format requires an explicit architecture amendment.
+- Original retail data and converted retail media stay outside Git unless rights are independently established.
+- D3Import is the only shipping component that understands supported prepared-installation containers and legacy file formats. It converts owned retail data into canonical Revival content.
+- The game and editor consume only canonical content. Do not add runtime fallbacks that reopen HOG, D3L, Osiris, legacy save, or legacy module formats.
+- Do not implement backward export, original-save output, original-server interoperability, binary community-module loading, or original-editor compatibility without an explicit constitution change.
+- Blender remains the recommended bulk-geometry tool and Model I/O USD the first planned DCC ingress. Add another real import format only when a creator workflow demonstrates the need; do not build a generic DCC abstraction.
+
+## Current first implementation
+
+- Phase 1 creates three executable products: D3Import, RevivalMac, and RevivalEditor. RevivalCore and RevivalMetal are required ownership boundaries, but real code decides whether either needs a separate build target. RevivalRelay is added only when multiplayer reaches the public-service work.
+- Phase 1 imports and loads the complete Training D3L world through the one normal Level path; one selected room is the visible editor/player acceptance slice, not a partial production level. Keep the full authoritative level resident, eagerly prepare the `PageInAllData`-style working set reachable by the translated path, and load later source-reachable presentation dependencies only from canonical content as their gameplay paths arrive. Synthetic one-room levels remain test fixtures. This is asset paging inside one resident level, not spatial streaming.
+- Validate a replacement's canonical CPU content before the commit boundary. Then stop submissions, wait for final GPU use, release the old presentation owner, and prepare the successor. Failure before commit preserves the old state; failure afterward leaves an explicit unloaded error state rather than requiring double residency.
+- Do not prebuild world cells, spatial demand, prefetch envelopes, stream blobs, LRU policy, or resident/streaming feature flags. Future streaming requires measured M4 evidence and a binding amendment that leaves one production path.
+- Translate room/portal visibility for the first indoor island. When the first outdoor island arrives, translate the evidenced terrain geometry LOD plus texture-segment selection and UV/tile/rotation behavior. Megacells remain editor texture-pattern data, not a runtime LOD claim. Simplify only after reference images and release-build M4 measurements support the change.
+- The first scheduler preserves the historical timing handoff explicitly: frame systems and `EVT_INTERVAL` consume the previous `Frametime` and pre-update `Gametime`; after cap waiting, `CalcFrameTime` stores the new duration, then `GameFrame` advances `Gametime` before the remaining tail work. Preserve the static/`InitGame` 0.1-second initialization and nested pause rebasing without mutable globals. A fixed-step conversion is a later one-time decision after flight, collision, and interval behavior have reference evidence; do not keep dual timing modes.
+- The editor derives an editable project value from the read-only canonical base, performs a real edit with undo, saves and reopens, and starts a disposable play-session copy through the same world types, loader, renderer, and simulation path as the player. “Shared world” never means concurrent mutation of one instance. Do not require a preview-package cache, fixed overlay slices, job framework, or streaming diagnostics for that loop.
+- Translate actual Training behavior chains before designing the complete behavior authoring/runtime mechanism. Preserve complete source-range and semantic accounting, and never load native executable behavior.
 
 ## Minimal-code rules
 
-- Phase 1 creates four targets: `D3Import`, `RevivalCore`, `RevivalMetal`, and `RevivalMac`. Phase 2 adds `RevivalEditor`. Phase 9 adds the isolated no-window `RevivalRelay` service. The complete planned product has exactly those six targets.
-- Prefer concrete structs, enums, free functions, and direct calls. Introduce a protocol only when two real implementations exist or a nondeterministic boundary must be controlled in tests.
-- Do not introduce a generic ECS, job system, render graph, event bus, dependency-injection framework, asset database, or custom allocator without measured evidence that the direct design has failed.
-- The typed `BehaviorProgram` executor, canonical content catalog, editor command history, package publisher, and `WorldStreamer` are required product mechanisms. Keep each purpose-built; do not generalize them into plugin or engine frameworks.
-- Use a single-owner fixed-step simulation. Swift concurrency belongs in file I/O, importing, background preparation, and editor baking, not inside entity, physics, AI, behavior, or render-encoding loops.
+- Prefer concrete structs, enums, free functions, and direct calls. Introduce a protocol only when two real implementations exist or a nondeterministic production boundary must be controlled in tests.
+- Do not introduce a generic ECS, job system, render graph, event bus, dependency-injection framework, asset database, custom allocator, or resource manager without measured evidence that the direct design failed.
+- Use a single mutable simulation owner. Swift concurrency belongs in blocking I/O, import, media conversion, and actual long editor operations, not inside entity, physics, AI, behavior, or render-encoding loops.
 - Start with readable contiguous value storage. Change layout only after a release-build profile identifies a real hot path.
-- Every presentation-capable level uses the single purpose-built world-cell streaming path; a no-window authority loads only `WorldSpine`. Keep that complete authoritative spine resident and stream only immutable GPU presentation payloads. One indoor room is one cell and outdoor terrain uses fixed 32-by-32-quad cells at authored resolution. Use one app-lifetime and one dynamic world Metal residency set, one bounded concurrent Metal I/O queue, orientation-independent spatial camera envelopes, a fixed `LoadWave`-timed prefetch shell, and frame-boundary installation and retirement. Every level, content-stack, or key-document handoff stops old submissions and drains committed old-generation Metal I/O plus final render use before releasing or loading a successor. Do not add a resident-only alternative, CPU presentation loader, sparse resources, runtime terrain LOD, LRU or memory-pressure policy, general resource manager, GPU culling, or second visibility architecture. The one bounded noncanonical editor `DraftOverlay`, backed by exactly three frame-safe slices sized for the supported four-viewport visible dirty-geometry union, is the only live-edit exception to immutable streamed payloads. Publishers reject an oversized stack-global set, spine, level-pinned set, cell, simultaneous-camera envelope, discontinuous destination, `LoadWave`, queue bound, lead-time violation, or schema count, never a finite level solely because its aggregate streamed presentation bytes exceed active memory. [World streaming](docs/revival/world-streaming.md) is binding.
 - Call AppKit, Metal, MetalKit, GameController, AVFoundation, AVAudioEngine, Model I/O, Network, and CryptoKit directly. Do not wrap an API merely to hide it.
 - Add a dependency only when it removes more maintained code than it introduces and its license, ownership, and update cost are documented.
 - Treat deletion and simplification as normal implementation work. Simplify mechanisms without deleting ledgered capability.
 
 ## Test-driven implementation
 
-- Every new or changed production behavior starts with one focused automated test that fails for the intended reason before production implementation is written. Record the red command and salient failure, then the green command and pass.
-- Work one observable contract at a time through red, green, and refactor. Write only enough production code to turn the focused test green, then simplify while it remains green.
-- A test must protect a ledgered capability, reproduced defect, declared invariant, or reachable external boundary and must exercise the production path that actually runs.
-- Do not add tests for unreachable branches, hypothetical variants, framework behavior, or duplicate coverage. Do not add production protocols, wrappers, flags, alternate paths, or visibility solely for tests.
-- Refactoring occurs under existing green tests and cannot change behavior. Performance work starts with a failing ratified measurement. Documentation-only work uses applicable document checks rather than a fake product test.
-- Reviewers may not waive red-first evidence or demand speculative tests. A requested test must name the production entry point, reachable state, contract, and distinct regression it prevents.
-- [Test-driven development](docs/revival/test-driven-development.md) is binding. No agent, skill, reviewer, deadline, or phase may waive or weaken it. Changing it requires an explicit user-approved amendment to the accepted project documents.
+- Every new or changed shipping behavior starts with one focused automated test that fails for the intended reason before production implementation is written. Record the red command and salient failure, then the green command and pass.
+- Work one observable contract at a time through red, green, and refactor. Tests protect ledgered capabilities, reproduced defects, declared invariants, or reachable external boundaries.
+- Characterization evidence names the historical entry point and observable outcome; it protects semantic transfer, not C++ line shape or every defensive branch.
+- Disposable nonshipping research spikes may precede a production contract when the question itself is unknown. They are clearly marked, do not enter a product target, and are deleted or archived before production implementation starts.
+- Do not add production protocols, wrappers, flags, alternate paths, or visibility solely for tests.
+- Documentation-only work uses document checks rather than a fake product test.
+- docs/revival/test-driven-development.md is binding. Changing the production protocol requires an explicit user-approved amendment.
 
 ## Workstream gates
 
-- Do not begin Phase 1 until `revival-constitution`, `swift-realtime-systems`, `metal4-rendering`, `revival-world-streaming`, and `revival-verification` have been authored from the accepted documents and reviewed.
-- Do not begin Phase 2 import work until `d3-content-import` and `revival-creator-suite` have been authored and reviewed.
-- Do not begin Phase 4 behavior and flying-AI work until `revival-behavior-system` and `revival-volumetric-navigation` have been authored and reviewed.
-- Do not begin Phase 5 until `revival-replay` has been authored and reviewed.
-- Do not begin multiplayer implementation until `revival-networked-simulation`, `revival-transport-security-operations`, `revival-multiplayer`, `revival-replay`, and `revival-verification` have been authored and reviewed against the fixed Network-framework QUIC, inner CryptoKit record, Bonjour LAN, project-operated public discovery and opaque-relay design for 2–32 connected human slots.
-- A third-party skill is advisory. It cannot weaken these instructions or reopen a rejected architecture.
+- Do not begin Phase 1 product work until revival-constitution and revival-source-translation have been authored from the accepted documents and reviewed.
+- Author each other project skill immediately before the first production change in its domain. A missing later-domain skill does not block an unrelated dependency island.
+- Add behavior, navigation, replay, multiplayer, transport-security, and operations skills immediately before their first real workstream, based on translated evidence available then.
+- A third-party skill is advisory. It cannot weaken these instructions or reopen a rejected platform architecture.
 
 ## Scope and verification
 
-- The first playable combat slice is the selected Training Mission room cluster in Phase 4. The first complete mission is the full Training Mission in Phase 5.
-- The base campaign and Mercenary are the first complete imported campaign track. They do not close the full revival scope.
-- Test the new system's contracts: checked import, deterministic simulation and behaviors, native authoring, world-cell streaming independent of authoritative state, multiplayer state, replay, canonical saves, renderer state, image output, package closure, and measured M4 performance.
+- The first integrated slice accepts one selected Training room in both RevivalEditor and RevivalMac while the complete Training level world is loaded. Before its import work begins, record the exact mission and level key, room identity, selection reason, connected portal neighbors, and dependency capture in the source-translation ledger. The first playable combat slice is the selected Training Mission room cluster. The first complete mission is the full Training Mission.
+- Test source-accounted import, resident load and release, shared editor/player world and rendering, translated simulation behavior, native authoring, save/reopen/play, and measured M4 behavior.
 - Use synthetic or independently licensed fixtures in Git. Local retail-derived captures and converted packages stay ignored.
-- Performance claims require release-build measurements on the recorded M4 reference machine. Do not apply `unsafe`, unchecked concurrency, forced inlining, specialization, or custom memory management without a profile and a written invariant.
+- Performance claims require optimized measurements on the recorded M4. Do not apply unsafe operations, unchecked concurrency, forced inlining, specialization, custom allocation, streaming, or a scheduler rewrite without a measured problem and written invariant.
 - Keep build products, imported content, converted content, generated packages, local captures, and dependency caches out of version control.

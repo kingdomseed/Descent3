@@ -1,14 +1,14 @@
 # Historical discovery and retained evidence
 
 - Status: historical evidence
-- Date investigated: July 12-13, 2026
+- Date investigated: July 12-14, 2026
 - Authority: non-normative; `architecture.md` supersedes all design recommendations from the original discovery
 
 ## Purpose
 
-This document records what the source and retail-data investigation established before the project chose a complete Swift/Metal rewrite. It can answer bounded questions about source provenance, original content, formats, gameplay behavior, multiplayer, replay, editor capability, and tool intent.
+This document records what the source, retail-data, revision-history, and original-development investigation established for the Swift/Metal translation. It supports systematic mapping of source provenance, original content, formats, gameplay behavior, multiplayer, replay, editor capability, resource lifetime, and tool intent.
 
-It is not an instruction to extend the C++ engine, preserve OpenGL, extract a renderer interface, maintain SDL, keep an ABI, or seek upstream parity. Current product decisions live in [Architecture](architecture.md), [Content pipeline](content-pipeline.md), and [Roadmap](roadmap.md).
+It is not an instruction to extend or link the C++ engine, preserve OpenGL, extract a renderer interface, maintain SDL, keep an ABI, or seek byte parity. Current product decisions live in [Architecture](architecture.md), [Source translation discipline](source-translation.md), [Content pipeline](content-pipeline.md), and [Roadmap](roadmap.md).
 
 ## Source baseline
 
@@ -19,9 +19,9 @@ It is not an instruction to extend the C++ engine, preserve OpenGL, extract a re
 
 The source tree contains the game, renderer, platform code, audio, networking, editor source, DALLAS utilities, base campaign scripts, secret and Training scripts, Mercenary scripts, and multiplayer modules. Retail media is not included.
 
-The pinned tree remains available while ledgered game and creator capabilities are reconstructed and verified. It does not compile into or link with any new product target.
+The pinned tree remains available while every relevant file and ledgered game or creator capability is translated, deliberately replaced, or explicitly excluded. It does not compile into or link with any new product target.
 
-It is not a permanent product component. It may move to an archival branch or leave the active checkout only after Phase 10 has implemented and verified, replaced, or explicitly excluded every ledger row and no unresolved product question still depends on the active tree.
+It is not a permanent product component. It may move to an archival branch or leave the active checkout only after Phase 10 has closed every relevant source disposition and functional ledger row and no unresolved product question still depends on the active tree.
 
 ## Verified M4 reference build
 
@@ -54,6 +54,31 @@ These observations prove that the owned inputs are authentic and sufficient for 
 
 Full hashes, extraction provenance, and local layout are recorded in [Retail data](retail-data.md).
 
+## Historical development process evidence
+
+The available evidence supports editor/runtime co-development, not the stronger slogan that Descent 3 was completed “editor first.”
+
+The retained source history shows active editor work early, an editor-to-game bridge soon afterward, flight and collision following, and level load/save becoming shared infrastructure. The final editor target compiles almost the entire runtime and shares production mechanisms without using one identical top-level path:
+
+- `Descent3/descent.cpp`, `Descent3/init.cpp`, and `editor/MainFrm.cpp` use shared initialization entry points with explicit editor branches;
+- `editor/editorDoc.cpp`, `editor/HFile.cpp`, and `Descent3/LoadLevel.cpp` connect editor documents to the production level functions;
+- `editor/TextureGrWnd.cpp` calls the shared low-level `RenderMine` and `RenderTerrain` paths rather than the game's complete top-level presentation function;
+- `editor/gameeditor.cpp` and `Descent3/descent.cpp` enter the actual runtime `MainLoop` from the editor and return afterward.
+
+That implementation also contains historical accidents: the editor recompiles runtime files under editor conditionals, switches global modes, tears down and recreates window/input state, sleeps, and uses a temporary GameSave.D3L handoff. The native design preserves shared production world structures, level functions, low-level rendering, and play-and-return outcomes while replacing those workarounds.
+
+Original developer notes reinforce the role of representative content. [Sean Lynn described working with Matt Toschlog and Jason Leighton to build rooms that tested the new engine](https://web.archive.org/web/19990508003016/http://www.outrage.com/notes/sean.html). [Jason Leighton described rewriting terrain after designer use invalidated assumptions](https://web.archive.org/web/19990429214856/http://www.outrage.com/notes/Jason.html). [Luke Schneider described paper planning followed by room construction and the value of small tool investments](https://web.archive.org/web/19981201225823/http://www.outrage.com/notes/luke.html).
+
+The [October 1999 Descent 3 postmortem](https://media.gdcvault.com/GD_Mag_Archives/GDM_October_1999.pdf) describes major engine and renderer replacement after content tools already existed, continued D3Edit/engine/content churn, fragmented external and custom tools, and programmer-centered usability costs. The postmortem explicitly recommends stabilizing the engine before full content production. Combined with the earlier editor/runtime churn and designer-built stress content, our process inference is to prototype the shared loop first, then freeze each proven slice before scaling content.
+
+The project therefore follows this process:
+
+1. translate a coherent source dependency island;
+2. exercise it through the permanent player and editor;
+3. measure it with representative content on the M4;
+4. record one decision;
+5. stabilize the slice before expanding campaign breadth.
+
 ## Facts carried into the new design
 
 ### Legacy content is layered
@@ -68,17 +93,23 @@ Original textures include 1555, 4444, and lightmap representations. Metal can ex
 
 The old OpenGL path, `rend_*` API, `gpu_*` seam, SDL window ownership, triangle fans, framebuffer scaling, and GLSL shaders are clues for decoding and presentation. None is a product interface.
 
-### Legacy working-set machinery is not a native subsystem
+### The original level world is resident; an eager working set coexists with reachable lazy paging
 
-The historical `mem/` layer chiefly wraps allocation for accounting and diagnostics. The `manage/` page system is a typed content database with network locks, while level startup separately loads the selected dependency set and level exit releases it. The renderer also contains texture remap and upload caches, triangle-fan paths, and aggressive portal-era clipping. The 256 by 256 terrain carries a large generated LOD implementation.
+The historical `mem/` layer chiefly wraps allocation for accounting and diagnostics. The `manage/` page system is a typed content database with network locks, but level activation uses a more concrete lifecycle.
 
-These findings do not define the native resource model. The accepted architecture keeps the complete authoritative gameplay spine resident but streams immutable GPU presentation payloads through fixed cells: one indoor room or one 32-by-32-quad terrain block. It uses orientation-independent spatial camera envelopes, a fixed lead-time-derived prefetch shell, direct Metal I/O, one dynamic world residency set, and full authored-resolution terrain cells; current room/portal/frustum traversal decides drawing rather than residency. It does not preserve the legacy page database, upload cache, terrain LOD, or memory wrappers and does not replace them with a general pager or cache framework. [World streaming](world-streaming.md) records the native decision.
+`StartLevel` calls `PageInAllData()`. That path accounts for the player ship, static effects and sounds, every used room-face texture, terrain textures and sky presentation, and dependencies reached through currently placed level objects. The authoritative room, terrain, object, goal, and behavior world is already loaded for the selected level. Reachable bitmap accessors, object initialization, matcens, and Osiris operations can still page models or images later. `FreeThisLevel` and `FlushDataCache` release the level-specific set at exit. The retained GPU backend's pre-upload function is a no-op, so this path is not evidence of complete GPU readiness.
+
+This is a resident authoritative level world with an eager working-set preload plus reachable lazy asset paging. It is not spatial world streaming and does not load the entire installation. The initial native baseline preserves that observable schedule while reading only from a deliberately closed canonical package. It does not preserve page locks, memory wrappers, renderer upload caches, legacy free lists, or a general cache hierarchy.
+
+After complete Training and representative large indoor, outdoor, editor, and higher-resolution workloads run on the M4, the project measures startup, transition, memory, and viewport cost. Streaming remains a possible focused amendment if resident loading misses a ratified budget; it is neither banned forever nor prebuilt. [World loading and residency](world-streaming.md) records the current decision.
 
 ### Original timing is variable
 
-`Descent3/GameLoop.cpp` derives global `Frametime` from elapsed wall-clock milliseconds and feeds that value through gameplay systems once per frame. The new project intentionally replaces this with one fixed 120 Hz simulation. There is no variable-time compatibility mode.
+`Descent3/GameLoop.cpp` feeds gameplay systems and `EVT_INTERVAL` the previously measured global `Frametime` while `Gametime` still has its pre-update value. After simulation, rendering, normal events, and frame-cap waiting, `CalcFrameTime()` stores the newly measured duration; `GameFrame` then advances `Gametime` by that new value before later tail work such as sound-frame completion and destroyed-light processing. The static and `InitGame` initialization is 0.1 seconds; `InitFrameTime` is not a per-level 0.1 reset. Nested `StopTime`/`StartTime` calls rebase the clock around pauses. The first native scheduler preserves that handoff with explicit values rather than mutable globals.
 
-`EVT_INTERVAL` is also delivered once per historical frame with elapsed-time data. Stock translation therefore needs one project-wide mapping rule rather than a per-level guess. Simulation work becomes fixed-tick logic with tick-native rates and timers; equivalent polling becomes typed events; presentation-only work stays outside authoritative state. The pinned reference engine defaults to a 60 frames-per-second cap, so a 120 Hz simulation is approximately twice its default interval dispatch rate. Generated source size alone does not establish the operation cost of an interval handler.
+`EVT_INTERVAL` is delivered once per historical frame with elapsed-time data. Input ramps, flight, physics, collision, animation, and timers mix rate-based and frame-count behavior, so converting them before a native reference slice works would hide translation errors.
+
+Phase 3 captures those outcomes and chooses one final scheduler: retain bounded explicit variable delta, or translate all current consumers once to a selected fixed tick and delete the variable scheduler. Fixed 120 Hz remains a candidate modernization, not an original behavior or Phase 1 requirement. The product will not retain dual timing modes.
 
 ### Flight feel is distributed across input, physics, and collision
 
@@ -90,7 +121,7 @@ Additional feel-critical mechanisms that must be named in the native contract ra
 - **`PF_WIGGLE` ship bob** — sine offset along the ship up-vector that moves the authoritative object through collision checks, distinct from visual **cockpit buffet** ([`physics/physics.cpp`](../../physics/physics.cpp), [`Descent3/cockpit.cpp`](../../Descent3/cockpit.cpp));
 - **Turn roll**, **autoleveling**, **mouselook**, **slide/bank remapping**, outdoor **1.3× thrust scalar**, fusion-charge self-kick, player slide speed-preservation, wind, gravity, and damage camera shake.
 
-The native flight contract therefore specifies ramp curves, trichording, exponential drag, rotational drag, thrust, afterburner, turn roll, wiggle versus cockpit buffet with an explicit authority decision, collision slide and bounce, and the other forces above as observable rules. It does not copy the variable-time loop, but it does capture bounded reference traces from the old executable and turns accepted behavior into fixed-tick tests before implementing the native path.
+The native flight contract therefore specifies ramp curves, trichording, exponential drag, rotational drag, thrust, afterburner, turn roll, wiggle versus cockpit buffet with an explicit authority decision, collision slide and bounce, and the other forces above as observable rules. It first captures bounded reference traces through the explicit-delta translation and then converts those accepted contracts once if Phase 3 selects a fixed tick.
 
 Legacy keyboard ramps reset in `InitControls()` and on key release; they do not reset in `SuspendControls()`/`ResumeControls()`. Resetting held-key ramp state on focus loss, pause/resume, load, and control remapping is a **new native rule**, not translated historical behavior.
 
@@ -118,9 +149,9 @@ DALLAS was the graphical event, condition, and action authoring layer. Its schem
 
 All 48 retained generated campaign sources include a versioned `$$SCRIPT_BLOCK` tree delimited inside the file, and the DALLAS editor can load that structured description back into its visual tree. The scripts CMake list builds 55 modules; the seven without `$$SCRIPT_BLOCK` are reference and utility modules (`AIGame`, `aigame2`, `AIGame3`, `aigame4`, `clutter`, `generic`, `testscript`), not missing campaign levels. `DallasFuncs.cpp` declares 166 global `$$ACTION`, 68 `$$QUERY`, and 25 `$$ENUM` metadata entries (counting `$$ACTION` tags, not only distinct `void a…()` implementations); tagged aliases in `DallasFuncs.h` and level-local custom declarations extend that vocabulary. Handwritten regions use `CUSTOM_SCRIPT_BLOCK_START` / `CUSTOM_SCRIPT_BLOCK_END` markers, not a `$$CUSTOM` tag. This is stronger translation evidence than reverse-engineering generated control flow alone, but it is not complete authority because those custom blocks and other handwritten code sit outside the generated tree.
 
-A nonshipping draft extractor reads those structured blocks and metadata and emits noncanonical draft graphs plus unresolved-evidence reports. A human reviews generated, custom, handwritten, authority, timing, and interval semantics before accepting typed stock source into `StockBehaviorCatalog`. The extractor is a bounded research tool upstream of the product; it is not part of `D3Import`, the editor, or any shipping target.
+A nonshipping draft extractor may read those structured blocks and metadata and emit recovered structure plus unresolved-evidence reports. A human reviews generated, custom, handwritten, authority, timing, and interval semantics before accepting a native translation. The extractor is bounded research upstream of the product; it is not part of D3Import, the editor, or any shipping target.
 
-The new typed [`BehaviorGraph`](behavior-system.md) and compiled `BehaviorProgram` replace this complete workflow. They retain events, values, conditions, queries, commands, timers, state, functions, debugging, and creator extensibility without loading DLLs, preserving the Osiris ABI, generating C++, or permitting native code in packages.
+The native behavior replacement grows from several working direct translations. Its eventual safe source and compiled form must retain events, values, conditions, queries, commands, timers, state, functions, debugging, and creator extensibility without loading DLLs, preserving the Osiris ABI, generating C++, or permitting native code in packages. [Behavior translation and authoring](behavior-system.md) defines that ratification process.
 
 The pinned GPL community commit is the normative baseline for stock behavior because it is inspectable and supplied the 55 native reference modules used by the successful M4 smoke run. Retail 1.4 content supplies media, identifiers, and comparison evidence. Retail DLL behavior is ambiguity evidence only, and the new product never imports or executes those DLLs. Known defects are not preserved automatically; each deliberate semantic correction is recorded in the translation ledger.
 
@@ -170,15 +201,15 @@ Multiplayer, dedicated hosting, multiplayer authoring, replay, and relay operati
 
 ### The original creator surface was much larger than a level viewer
 
-The released `editor/` application is Windows-only and tightly coupled to the old engine, level representation, page database, native scripting workflow, and MFC UI. Porting it would restore the wrong architecture. Its functional inventory is still mandatory evidence.
+The released `editor/` application is Windows-only and tightly coupled to the old engine, level representation, page database, native scripting workflow, and MFC UI. A literal platform-shell port would restore the wrong ownership and APIs. Its shared production world structures, level functions, low-level renderer, actual runtime play path, and complete functional inventory are primary translation evidence.
 
 The world editor covered rooms, faces, vertices, portals, bridges, joining, attaching, snapping, combining, triangulation, indoor and terrain workflows, reusable rooms and ORF palettes, materials and UVs, objects, starts, cameras, waypoints, sounds, doorways, triggers, paths, navigation, matcens, goals, megacells, ambient life, lighting and radiosity baking, fog, validation, repair, statistics, level notes, table-file and page lock/check-in UI, DALLAS and Osiris script compile, a standalone briefing editor, HOG tools, play-from-editor, and 3DS room import. It also exposed textured and wireframe views, navigation and focus commands, view cameras, autosave, and crash restoration. The command surface begins in [`editor/editor.rc`](../../editor/editor.rc) with IDs in [`editor/resource.h`](../../editor/resource.h); serialized level coverage is visible in [`Descent3/LoadLevel.h`](../../Descent3/LoadLevel.h). No historical “scale room” or general multi-object property-edit command is required evidence; object multi-edit is limited.
 
 Navigation was not merely a list of editor waypoints. The source contains room-and-terrain connectivity plus a three-dimensional node-and-edge graph with clearance, runtime routing, hand-authored paths, and editing tools. The native counterpart is one purpose-built two-level volumetric graph: stable region connectivity and bounded sparse 3D nodes, deterministic CPU baking and A*, local steering, dynamic edge invalidation, and bounded replanning. Hand-authored paths remain separate for cinematics, patrols, set pieces, and exact orientation.
 
-The old lighting tools projected secondary UVs for editor faces and packed padded 128-by-128 lightmap atlases in an unbounded page chain with no per-room cap. The native editor uses deterministic planar charts for native planar faces and a provisional single nonmipmapped 1024-by-1024 room-local atlas with a two-texel dilated gutter between charts. That atlas dimension and the import overflow rule are ratified from the Phase 2 whole-retail packed-area measurement before they become publisher-binding; see [Content pipeline](content-pipeline.md). Arbitrary USD room geometry must arrive with UV2 that passes the same normalized-bounds, overlap, and fixed-atlas gutter rules; invalid input is rejected instead of invoking a general unwrap system. One deterministic CPU publish solve emits exact canonical texels for the pinned bake toolchain and revision.
+The old lighting tools projected secondary UVs for editor faces and `SqueezeLightmaps()` packed a sequence of padded 128-by-128 pages, with no per-room cap beyond the global 65,534 lightmap and lightmap-info handle limits. The native importer first preserves that page, UV2, and sampling meaning closely enough to reproduce reference images. A whole-retail area report and real editor bake then inform one simpler native layout. A single 1024-square room atlas is a hypothesis to measure, not an early schema constraint.
 
-The historical 3DS route is not retained. Blender is the recommended bulk-geometry authoring tool, and Model I/O USD is the sole planned-product DCC ingress. USD import and reimport normalize units, axes, winding, room and portal semantics, UVs, and provenance into canonical editable geometry. The editor never carries USD as its runtime world model and does not export the canonical world back to legacy formats. A second DCC format requires an explicit architecture amendment.
+The historical 3DS route is not retained. Blender is the recommended bulk-geometry authoring tool, and Model I/O USD is the first planned-product DCC ingress. USD import and reimport normalize units, axes, winding, room and portal semantics, UVs, and provenance into canonical editable geometry. The editor never carries USD as its runtime world model and does not export the canonical world back to legacy formats. A second real DCC input is added only for a demonstrated creator workflow and does not justify a generic interchange abstraction.
 
 Dedicated gameplay tools handled triggers, paths and navigation graphs, goals, matcens, indoor and terrain radiosity, lightmaps, volumetrics, fog, coronas, and animated lighting. Terrain controls included sky and horizon colors, stars, satellites, rotation, halos, atmosphere, and environmental audio. The suite also edited textures and procedural materials, robots, powerups, buildings, clutter, ships, weapons, doors, sounds, ambient patterns, lights, physics, animation, AI, death, inventory, effects, object archetypes, fonts, terrain groupings, and generic content references. [`editor/CMakeLists.txt`](../../editor/CMakeLists.txt) and [`manage/CMakeLists.txt`](../../manage/CMakeLists.txt) provide category-level inventories.
 
@@ -186,18 +217,18 @@ The Briefing Editor authored multi-screen layouts with text, bitmaps, movies, so
 
 The workflow also had HOG packaging, dependency and orphan checks, script compilation, and play-from-editor. The integrated HOG dialog, an empty briefing voice callback, disabled menu items, and terrain stubs show that source presence alone does not prove working capability. Intended useful functions enter the completeness ledger; historical defects and duplicated interactions do not.
 
-[`RevivalEditor`](creator-suite.md) starts in Phase 2 against canonical project data and grows with each runtime slice. One native application replaces the old dialogs and utilities with world, game-data, behavior, campaign, presentation, asset, baking, validation, playtest, and publishing workspaces. It has no original-format export or native-module compiler.
+[`RevivalEditor`](creator-suite.md) starts in Phase 1 with the first canonical room and grows with every runtime slice. One native application translates the useful world, game-data, behavior, campaign, presentation, asset, baking, validation, playtest, and publishing semantics without original-format export or a native-module compiler.
 
 ## Discarded port plan
 
 The initial plan proposed preserving the C++ gameplay core, retaining OpenGL as a reference and fallback, extracting the existing renderer seam, adding Metal behind `rend_*`, keeping SDL input and audio, and sending portable work upstream.
 
-That plan was coherent for a faithful port and has been rejected for this project. It would make legacy compatibility the permanent organizing principle and create far more maintained code than the selected native rewrite.
+That plan was coherent for a permanent C++ source port and has been rejected for this project. It would make legacy APIs and compatibility the product architecture.
 
-The useful output of the historical investigation includes verified retail data, format clues, gameplay and timing behavior, campaign and object scripts, multiplayer and replay semantics, editor and tool inventories, presentation workflows, and evidence that the reference content runs. None of those findings requires retaining the old architecture.
+That rejection does not reject semantic translation into Swift. The useful output includes verified retail data, format knowledge, gameplay and timing behavior, campaign and object scripts, multiplayer and replay semantics, editor/runtime relationships, tool inventories, presentation workflows, and evidence that the reference content runs. Those findings now drive dependency-ordered native implementation while legacy APIs and binaries remain outside the product.
 
 ## Use of historical evidence
 
-Consult the old source or executable when a current ledger row has an unanswered question. Record the answer in the importer, behavior translation ledger, functional-completeness ledger, or current design, then return to the Swift product.
+Use the old source systematically to map each current dependency island and consult the executable when an observable result remains ambiguous. Record file dispositions, answers, and deliberate differences in the source-translation ledger, importer, behavior record, functional-completeness ledger, or current design, then implement the Swift path.
 
-Do not create ongoing OpenGL comparisons, dual-engine CI, a compatibility backend, or a second maintained architecture. Local reference screenshots and logs remain ignored and may be discarded after the corresponding native feature has its own tests.
+Do not create permanent OpenGL comparisons, dual-engine CI, a compatibility backend, or a second maintained architecture. Local reference screenshots and logs remain ignored and may be archived or discarded after the corresponding native feature has accepted tests and evidence.

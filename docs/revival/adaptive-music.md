@@ -1,7 +1,7 @@
 # Adaptive music
 
-- Status: accepted
-- Date: July 13, 2026
+- Status: accepted, amended
+- Date: July 14, 2026
 - Authority: binding adaptive-score runtime, import, persistence, and authoring contract
 
 ## Historical evidence
@@ -26,10 +26,10 @@ Historical utilities are evidence, not the product model. `legacy/musicutils` ta
 
 `RevivalCore` owns deterministic logical score state:
 
-- score and region `ContentKey` values and semantic revisions;
+- score and region `ContentKey` values, plus the smallest semantic revision once public saves or packages require one;
 - requested theme role drawn from the surface established by import of the retail OMF themes. The OMF library vocabulary includes intro, idle, combat, transition, and death roles, but the pinned game selector actively requests only idle and death; where combat switching occurs it is driven by register logic inside the theme data rather than by a five-wide C++ request surface. Import records the roles each supported theme actually uses; authoring may expose the full native set afterward;
 - pending logical transition intent;
-- gameplay-derived inputs and tick-based timers that the approved native score rules use.
+- gameplay-derived inputs and explicit elapsed-time or final-scheduler timers that the approved score rules use.
 
 `RevivalMac` owns `AVAudioEngine`, decoded buffers, sample clocks, measure-boundary scheduling, fades, interruption handling, and device recovery. It consumes typed score commands from `RevivalCore` and reports bounded completion or cancellation results. Audio timing never changes authoritative gameplay state.
 
@@ -37,20 +37,20 @@ The canonical model stays narrow. It represents regions, named theme roles, stre
 
 ## Behavior contract
 
-The behavior language includes typed commands to select a score region and request a supported score state. Scope and authority are explicit. A stock translation records whether an original request targeted one player, the authoritative session, or every participant.
+The first translated behavior chains call named typed operations to select a score region and request a supported score state. The eventual canonical behavior model exposes those same operations for creators. Scope and authority are explicit where the source path requires them. A stock translation records whether an original request targeted one player, the authoritative session, or every participant.
 
 The historical region action contains an ambiguity between its “specific player” comment and the multiplayer state value it submits. The translation ledger must resolve that case explicitly. The new language does not reproduce accidental zero-value or recipient conventions.
 
-Historical `EVT_INTERVAL` score logic follows the project-wide interval translation rule: authoritative decisions use fixed simulation ticks, presentation scheduling uses the audio sample clock, and no variable-frame compatibility mode exists.
+Historical interval score logic first receives the explicit old `Frametime` and pre-update `Gametime`, preserving the source's later post-cap time update, pause ordering, and rate behavior. When Phase 3 selects the final simulation scheduler, every current score timer is converted once to that model and the superseded timing adapter is deleted. Presentation scheduling always uses the audio sample clock; it never decides gameplay state.
 
 ## Persistence and replay
 
 A save records only the logical state required to resume coherently:
 
-- adaptive-score key and semantic revision;
+- adaptive-score key and any applicable released-format semantic revision;
 - current logical region and requested role;
 - pending transition intent where it changes future logical selection;
-- deterministic tick timers or counters used by the approved score rules.
+- deterministic timers or counters expressed in the selected final simulation model.
 
 Saves do not contain audio-engine nodes, decoder state, sample buffers, device state, instruction pointers, or exact playback position. On load, `RevivalMac` starts from the declared resume policy at a valid musical boundary.
 

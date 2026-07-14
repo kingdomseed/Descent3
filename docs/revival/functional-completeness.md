@@ -1,12 +1,12 @@
 # Functional completeness
 
-- Status: accepted
-- Date: July 13, 2026
+- Status: accepted, amended
+- Date: July 14, 2026
 - Authority: binding product-scope contract
 
 ## Governing rule
 
-The revival rebuilds every required player-facing and creator-facing capability in a modern native form. Legacy ABIs, file formats, protocols, UI structures, and implementation details are not product requirements except at the one-way retail import boundary.
+The revival rebuilds every required player-facing and creator-facing capability in a modern native form. The released source is the initial semantic transfer map: reachable behavior, data flow, update order, and creator outcomes are preserved or deliberately changed with evidence. Legacy ABIs, platform APIs, file formats, protocols, UI structures, and incidental implementation details are not permanent product requirements except at the one-way retail import boundary.
 
 KISS constrains implementation, never product scope. A smaller implementation must deliver the same capability. Removing the capability is not simplification.
 
@@ -100,7 +100,7 @@ The working [functional-completeness ledger](functional-completeness-ledger.md) 
 - project creation from an empty native template;
 - content catalog and reference inspection;
 - deterministic room-local lighting and purpose-built volumetric-navigation baking;
-- automatic room and fixed positive-multiple-of-32 terrain-cell partitioning, streamed-payload inspection, stack-global, level-pinned, per-cell and spatial-envelope GPU accounting, simultaneous-camera and discontinuous-destination validation, movement-lead-time proof, and publication refusal for an oversized authoritative spine, cell, envelope, `LoadWave`, or declared destination;
+- complete level dependency inspection, resident CPU and GPU cost reporting, load and release diagnostics, and later resource-budget tools for whichever single lifetime design the measured architecture adopts;
 - dependency closure, orphan detection, validation, and diagnostics;
 - instant play-in-editor, deterministic test scenarios, and capture support;
 - package publishing, provenance, signing where required, and distribution;
@@ -110,9 +110,9 @@ The current completion gate is human-first. Stable element identity, concrete ty
 
 ## Historical evidence policy
 
-The released source is a capability inventory and behavioral reference. It is not a requirement to reproduce every menu entry or defect.
+The released source is both the capability inventory and the initial semantic translation reference. Every relevant file is accounted for, but that does not require reproducing every private decomposition, menu entry, defensive branch, or defect.
 
-Intended, functioning capabilities belong in the ledger. Partially implemented historical features belong there when the intended capability is clear and useful, even when one retained platform backend is a stub. Empty callbacks, disabled menu shells, commented-out tools, duplicated dialogs, accidental quirks, and bugs do not become requirements by existing in the tree.
+Intended, functioning capabilities and reachable behavior belong in the ledger and native baseline. Partially implemented historical features belong there when the intended capability is clear and useful, even when one retained platform backend is a stub. Empty callbacks, disabled menu shells, commented-out tools, duplicated dialogs, accidental quirks, and bugs receive an evidence-only or exclusion disposition rather than product code.
 
 When evidence is ambiguous, record the uncertainty in the ledger and make an explicit product decision. Do not resolve ambiguity by deleting the feature silently.
 

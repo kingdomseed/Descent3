@@ -1,7 +1,7 @@
 # Test-driven development
 
-- Status: accepted
-- Date: July 13, 2026
+- Status: accepted, clarified
+- Date: July 14, 2026
 - Authority: binding implementation and review protocol
 
 ## Non-negotiable rule
@@ -29,6 +29,8 @@ If the new test passes before production code changes, it does not prove a red s
 When existing reachable behavior lacks protection before a behavior-neutral refactor, prove the new test's sensitivity with a temporary controlled mutation or a reintroduced reproduction of the defect. Observe the intended failure, restore green, and only then refactor. The mutation does not enter shared history. A characterization test that has never demonstrated that it can detect the relevant mistake is not red evidence.
 
 Do not write a batch of speculative failing tests for a future subsystem. Finish the smallest red-green-refactor slice first. A table-driven test is appropriate when its cases exercise the same rule through the same production path.
+
+For source translation, the observable contract names the historical entry point, relevant data flow or order, and the result being preserved. A test protects that semantic result, not C++ line shape, private decomposition, or every legacy defensive branch. The separate source-translation ledger supplies file and range accounting; test count does not.
 
 ## What counts as red
 
@@ -93,11 +95,17 @@ Documentation-only changes do not invent a failing product test. Run available l
 
 The initial test runner and fixture bootstrap may be created to enable the first red test. Keep it smaller than the behavior it will test and prove it by observing the intended red and green results. Do not build a general harness before a concrete production contract needs it.
 
+### Disposable research
+
+A bounded nonshipping spike may precede the production cycle when the team does not yet know enough to state the contract—for example, to inspect an unknown retail field, capture reference timing, test a Metal API, or falsify a loading assumption.
+
+The spike is clearly marked as research, never enters a product target, creates no public interface, and is deleted or archived as evidence when the question is answered. Its result is a source note, fixture, capture, measurement, or proposed contract. Shipping implementation still begins with the focused red test. Research is not a loophole for implementing production code first.
+
 ### Manual evidence
 
 Manual play, device checks, Metal captures, Instruments traces, and accessibility review supplement automation where they observe something automation cannot. They do not replace the first failing automated test for project-owned behavior. When an operating-system effect cannot be automated reliably, the red test covers the nearest project-owned decision or command and the manual evidence covers the final integration.
 
-If no credible automated red can be stated at a project-owned boundary, stop implementation and clarify the contract. Difficulty testing a design is not permission to implement first.
+If no credible automated red can be stated at a known project-owned boundary, stop production implementation and clarify the contract. Use a bounded research spike only when the boundary itself is still unknown; once known, difficulty testing a design is not permission to implement it first.
 
 ## Review gate
 

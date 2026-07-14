@@ -1,187 +1,175 @@
 # Native creator suite
 
-- Status: accepted
-- Date: July 13, 2026
+- Status: accepted, amended
+- Date: July 14, 2026
 - Authority: binding creator-product contract
 
 ## Decision
 
-Build one integrated macOS application, `RevivalEditor`, for the complete creation workflow. It shares canonical content types, simulation, and Metal rendering with the game. It does not port the Windows editor, reproduce its dialog layout, or export original Descent 3 files.
+Build one integrated macOS application, RevivalEditor, for the complete creation workflow. It shares canonical world values, level I/O, simulation, and Metal rendering with the game.
 
-The editor starts in Phase 2 as soon as canonical world data exists. Every later gameplay slice adds its matching authoring and validation surface. Phase 8 completes campaign and content creation; Phase 9 completes multiplayer creation and the full suite. Neither phase is the moment when editor work begins.
+The editor translates useful D3Edit, game-data, DALLAS, briefing, baking, validation, playtest, and publishing semantics. It does not reproduce the MFC dialog layout, Win32 ownership, page-database locks, generated C++ workflow, temporary GameSave.D3L bridge, or original output formats.
 
-The editor is a top-tier human creation product before it is an automation surface. Phase 2 begins the real application shell and document lifecycle, not a disposable debug viewer. MCP, headless authoring, agent tools, training capture, telemetry, and a public command wire format are not Phase 1–10 work.
+RevivalEditor begins in Phase 1 with the first canonical resident world and Metal viewport. It grows with each gameplay slice. This is an editor/runtime co-development decision, not a claim that the historical editor was completed before the game.
 
-## Product shape
+The editor is a top-tier human creation product before it becomes an automation surface. MCP, headless authoring, agent tools, training capture, telemetry, and a public command protocol are outside the current roadmap.
 
-The complete product has exactly six targets: five game-and-creator targets plus the isolated Phase 9 relay service.
+## First integrated slice
 
-| Target | Responsibility |
-| --- | --- |
-| `D3Import` | One-way retail conversion into canonical content |
-| `RevivalCore` | Content types, simulation, behaviors, validation, saves, replay, and package rules |
-| `RevivalMetal` | Direct Metal rendering for game and editor viewports |
-| `RevivalMac` | Player application, input, audio, presentation, import UX, release packaging, and no-window dedicated hosting |
-| `RevivalEditor` | Native project editing, baking, validation, playtest, and publishing |
-| `RevivalRelay` | Public session discovery, expiring registration, join authorization, and opaque QUIC relay |
+The Phase 1 editor must:
 
-Do not split each historical dialog or utility into a new target. Editor features are views and commands over one canonical project model. Tests live beside the owning target.
+- open the same read-only complete Training Level as RevivalMac, focus the selected acceptance room, and derive one editable complete-level project value from it;
+- render it through RevivalMetal;
+- inspect and select a room, face, portal boundary, or object;
+- perform one meaningful edit on the project value without mutating the imported base;
+- name, undo, and redo that edit through UndoManager;
+- save, close, and reopen the native project;
+- enter the shipping simulation and renderer with a disposable play-session copy built through the same loader and world types;
+- return to the document with useful selection and camera state;
+- release the resident level safely on document replacement and shutdown.
+
+This is the permanent application and data path, not a disposable viewer. It intentionally omits speculative preview packages, stream-cell overlays, fixed buffer-slice rules, background-document residency protocols, a job scheduler, and a complete workspace framework.
 
 ## Native application shell
 
-Each open `.revival` directory package is one `NSDocument`, one `@MainActor EditorSession`, one canonical project value, one `UndoManager` history, and one primary project window. AppKit owns document open, save, revert, close, edited state, file coordination, window restoration, and standard menu routing. Crash recovery uses `NSDocument` autosave-elsewhere storage outside the source package, not autosave-in-place; the creator previews and accepts it before source changes. Multiple projects may remain open, but only the key project window owns the one live `WorldStreamer` and dynamic world residency set. Background-document viewports pause and release presentation residency until their window becomes key. The project does not recreate those services in a custom editor framework. Apple's [`NSDocument` documentation](https://developer.apple.com/documentation/appkit/nsdocument/) defines the platform behavior used here.
+Each open project is one NSDocument, one main-actor editing owner, one canonical project value, one UndoManager history, and one primary project window. AppKit owns document open, save, revert, close, edited state, file coordination, autosave, menu routing, and window restoration.
 
-The project window has one consistent layout:
+The shell grows toward:
 
-- a leading Project Navigator and active-level Outliner;
-- central tabbed canvases for world, definitions, behaviors, campaigns, scores, briefings, cinematics, and other authored documents;
-- a trailing contextual Inspector;
-- a bottom Problems, Activity, Playtest, and Trace pane;
-- one contextual `NSToolbar`, standard menu-bar commands, and conventional shortcuts.
+- a Project Navigator and active-level Outliner;
+- central canvases for world, definitions, behaviors, campaigns, scores, briefings, and cinematics;
+- a contextual Inspector;
+- Problems, Activity, Playtest, and Trace surfaces;
+- standard menus, shortcuts, Full Keyboard Access, and VoiceOver.
 
-The level canvas supports one-, two-, and four-viewport layouts through `RevivalMetal`. Perspective, orthographic, fly, orbit, focus, textured, wireframe, collision, portal, navigation, lighting, and streaming views are modes of the same world canvas, not separate utilities. Selection and focus remain synchronized across the Outliner, every viewport, the Inspector, reference navigation, and Problems. Opening a diagnostic or reference selects and frames the exact owning element.
+Add each surface when a real slice has content for it. Do not build empty panes merely to satisfy a final-layout diagram.
 
-Ordinary property editing is nonmodal. Spatial gestures have numeric Inspector and keyboard alternatives. Continuous drags and scrubbing coalesce into one named undo action. Standard commands live in menus and expose shortcuts; the toolbar holds only frequent contextual actions. Navigator, Inspector, Problems, forms, and commands support Full Keyboard Access and VoiceOver, and spatial manipulation always has a nonvisual Outliner or numeric path.
+Selection and focus remain synchronized across the current hierarchy, viewport, inspector, references, and diagnostics. Spatial gestures have numeric and keyboard alternatives. Continuous gestures coalesce into one named undo action.
 
-This shell stays direct. There is no generic reactive store, view model graph, command bus, editor service layer, cloud collaboration system, source-control client, marketplace, or attempt to replace Blender.
+This shell has no generic reactive store, view-model graph, command bus, editor service layer, cloud collaboration system, source-control client, marketplace, or attempt to replace Blender.
 
 ## Canonical authoring project
 
-The editor writes source projects, not imported package internals. A project is an ordinary inspectable directory:
+The editor writes ordinary inspectable source projects:
 
-```text
-MyProject.revival/
-  project.json
-  campaigns/
-  levels/
-  behaviors/
-  definitions/
-  assets/
-  presentations/
-  localization/
-```
+    MyProject.revival/
+      project.json
+      campaigns/
+      levels/
+      behaviors/
+      definitions/
+      assets/
+      presentations/
+      localization/
 
-The exact file split follows real authoring and merge needs. Structured source uses deterministic, versioned encodings. Large media remains in ordinary files. Durable `ContentKey` references connect documents; generated package-local IDs never appear in source projects.
+The file split follows real authoring and merge needs. Structured source uses deterministic versioned encodings once a format is public. Large media remains in ordinary files. Durable content keys connect values that need stable references; generated runtime indices never enter source.
 
-Imported retail content is a read-only base package. Its local `authoring/` snapshot uses the same canonical source schemas as a native project, while its GPU stream records remain generated runtime products that the editor never decodes. A project can reference or replace its canonical keys without mutating the base. New projects can also stand alone and contain no retail dependency. The editor resolves the base package plus project sources through one content catalog and one deterministic layer order.
+Imported retail content is a read-only canonical base. Derive editable source copies the selected canonical document and media needed for an edit into the project, keeps provenance, and declares the replacement without mutating the base. Unchanged content remains referenced.
 
-An explicit **Derive editable source** command copies a selected canonical document and required editable media from the base package's read-only `authoring/` snapshot into the project, preserves durable keys and provenance, and declares a project-owned replacement. Unchanged media remains a reference to the read-only base. The base bytes never change. A creator can therefore modify an owned childhood level locally without turning the imported package into an editor database or reverse-engineering GPU records. Publication checks the derived document and media rights like any other project source.
+Local tabs, pane positions, selection, active tool, and viewport cameras are not canonical source. Authored camera bookmarks are content.
 
-Publicly released project formats receive deliberate migrations because they contain creator-owned work that cannot always be regenerated. This versioning policy does not create D3L, HOG, DALLAS, or legacy-page compatibility.
+Add immutable snapshots and stale-result rejection to the first long-running USD import, media conversion, lighting bake, navigation bake, validation, or publication operation that can race with editing. Keep the mechanism local to that operation until two real operations need a common form.
 
-Local interface state is not canonical source. Open tabs, pane sizes, transient selection, active tool, current camera demand, and viewport cameras use AppKit restoration or recovery storage. Authored camera bookmarks remain project content. This separation keeps project diffs deterministic and prevents one creator's window layout from rewriting shared source.
+## Shared world and rendering
 
-Each edit, undo, redo, revert, accepted recovery, or source-changing asynchronous result advances one transient monotonic `ProjectEditGeneration` owned by the open `EditorSession`. It identifies the exact unsaved snapshot consumed by validation, USD or native-media ingress, preview-record generation, baking, playtest, and publishing. It is local authoring concurrency state, not a persisted package schema, semantic revision, `simulationSemanticRevision`, or save-compatibility decision.
+The editor and player use the same complete-Level world model, dependency rules, room/portal and terrain visibility, render extraction, Metal passes, and simulation. The editor owns an editable project value and play owns a disposable session copy; “shared world” does not mean concurrent mutation of one instance. Play-in-editor is not an editor-only game fork.
+
+Immediate edits update canonical in-memory values and the smallest affected preview resource directly. Use ordinary rotating frame resources where Metal safety requires them. Do not predefine:
+
+- one last-good and one candidate generated package layer;
+- a universal project-generation protocol;
+- exactly three DraftOverlay slices;
+- a fixed four-viewport memory envelope;
+- an editor-only loader or renderer;
+- a streaming cell and budget diagnostic workspace.
+
+If actual edit latency or GPU lifetime proves that a derived preview mechanism is required, measure the operation and specify the smallest replacement. The editor still shares the product renderer and leaves one preview path.
 
 ## Editing surfaces
 
 ### World workspace
 
-The world workspace covers indoor room and portal geometry, outdoor terrain, reusable room components and prefabs, faces and vertices, materials and UVs, mirror surfaces, specular response, scorch receivers, procedural textures, volumetric surfaces, objects and starts, triggers, paths and navigation, goals, matcens, ambient systems, lighting, animated lighting, fog, weather, sky and horizon, stars, satellites, halos, atmosphere, terrain environment audio, automap visibility and secret metadata, markers, camera points, and typed room roles for refueling, goals, secrets, special-purpose spaces, external spaces, and waypoints.
+The complete world workspace covers indoor rooms, faces, vertices, portals, bridges, joins, attachments, snapping, splitting, triangulation, outdoor terrain, reusable rooms, materials and UVs, mirrors, specular response, decals, procedural and volumetric surfaces, objects and starts, triggers, paths, navigation, goals, matcens, ambient systems, lighting, fog, weather, sky, automap metadata, markers, cameras, and typed room roles.
 
-It provides selection, snapping, transform tools, joining and splitting, duplication, grouping, naming, search, inspection, undo and redo, validation, repair, statistics, and live Metal previews. Viewports support textured, wireframe, collision, portal, navigation, and lighting diagnostics; focus, fly, orbit, and orthographic navigation; and saved views or camera bookmarks. A modern operation may replace several historical commands if it preserves their useful results.
+It provides selection, transform, duplication, grouping, naming, search, inspection, undo/redo, validation, repair, statistics, and live Metal preview. A modern operation may replace several historical commands when it preserves their useful outcomes.
 
 ### Geometry exchange
 
-Blender is the recommended bulk-geometry workflow. The sole planned-product DCC interchange is USD loaded through Model I/O; direct glTF, 3DS, FBX, and OBJ readers are not part of the product. A creator may convert another format in Blender, then explicitly import or reimport USD into a native project. A second DCC format requires an explicit architecture amendment.
+Blender is the recommended bulk-geometry workflow. USD through Model I/O is the first native DCC ingress. Import and reimport normalize units, axes, transforms, winding, stable source identity, room and portal assignment, materials, UVs, collision ownership, and provenance into canonical editable geometry.
 
-USD ingestion is one-way into canonical editable geometry. The contract fixes units, axes, transforms, winding, stable prim identity, room partitioning, portal assignment, material slots, primary and secondary UVs, collision ownership, and rejection of unsupported topology. Reimport matches stable source identities, previews every destructive change, and records source and toolchain provenance; it never live-links the runtime to a DCC file. Revival-specific roles, navigation, behavior, and gameplay metadata remain canonical editor data.
+The runtime never live-links to USD. Revival-specific gameplay, navigation, behavior, and presentation remain native project data.
 
-This workflow changes priority, not scope. Broad room, portal, bridge, join, attach, snap, split, triangulate, terrain, repair, and diagnostic tools remain required in the native editor. USD lands before the broad construction-tool closure so creators can build large geometry in a DCC immediately, while the integrated editor remains able to construct and repair a complete level without Blender.
+Another real interchange format may be added when a demonstrated creator workflow justifies its parser and maintenance cost. It does not require a generic DCC abstraction and does not authorize backward legacy export.
 
 ### Navigation and lightmaps
 
-Navigation baking produces the purpose-built room, portal, outdoor-region, clearance, and sparse three-dimensional waypoint graph defined by the architecture. Hand-authored paths remain separate source data. Diagnostics show disconnected regions, insufficient clearance, blocked dynamic edges, unstable ties, unreachable goals, and stuck-recovery traces. The bake is deterministic background work in `RevivalCore` and `RevivalEditor`; there is no generic navmesh, voxel-navigation library, or runtime path bake.
+Begin by translating the room/portal, outdoor, node, path, clearance, steering, and diagnostic semantics required by the current source slice. The native navigation model is ratified after several real AI routes work; hand-authored cinematic and patrol paths remain distinct.
 
-Lightmap coordinates use one explicit policy pending Phase 2 ratification. Every room owns exactly one nonmipmapped provisional 1024-by-1024 `rgba8Unorm` lightmap. Editor-built planar faces receive deterministic planar charts; the packer reserves a two-texel dilated gutter around every chart for bilinear sampling. Initial USD room geometry must provide UV2 whose normalized bounds, nonoverlap, and chart separation satisfy that same fixed atlas and gutter; import rejects invalid UV2 instead of invoking a general automatic unwrap. A native-authored room whose charts do not fit is split by the creator; the baker never adds another atlas or changes resolution. The atlas dimension and the retail-import overflow rule are ratified from the whole-retail packed-area measurement in [Content pipeline](content-pipeline.md) before they become publisher-binding.
+Import the released lightmap pages, UV2, and sampling meaning faithfully enough to reproduce source images. Measure the whole retail set and actual editor operations before choosing a new atlas or bake representation. A simpler room-local layout may replace it with image, capacity, and migration evidence; it is not a Phase 1 precondition.
 
-The lighting solver is one deterministic background CPU publish path over canonical geometry. For the same source, bake revision, macOS, Swift, and SDK toolchain, it emits byte-identical canonical texels. A toolchain change must pass the bake corpus; changed texels require visual review and a bake-revision bump rather than an automatic baseline update. Incremental invalidation reruns the same solver for affected rooms. There is no quality-mode fork, general charting library, cross-level atlas, mip chain, or GPU-compute baking path.
+The eventual native lighting bake is deterministic enough for reproducible creator output and incremental enough for productive editing. Do not preselect a general unwrap library, GPU compute bake, exact atlas count, or permanent toolchain-byte identity before the first real bake.
 
-### Streaming cells and budgets
+### Content definitions
 
-The level remains one continuous creative document. One indoor room is automatically one stream cell. Terrain creation and resize use positive multiples of 32 quads and automatically partition the result into fixed 32-by-32-quad cells; creators do not draw a second streaming graph. Every live world viewport and play-in-editor session uses the shipping `WorldStreamer`.
+Typed inspectors eventually edit materials, robots, powerups, buildings, clutter, ships, weapons, doors, lights, sounds, ambient patterns, physics, animation, AI, death, inventory, effects, cockpit, HUD, cameras, and haptic bindings.
 
-The world canvas can overlay cell boundaries and cross-cell edges; display desired, loading, ready, active, and retiring state; and inspect exact cell, shared-resource, spatial-envelope, prefetch-shell, simultaneous-camera, destination, and lead-time costs. Selecting a camera anchor, portal, terrain transition, teleport, spawn, cinematic, mirror, or auxiliary camera shows its resolved envelope. Problems navigate an oversized cell, seam, missing dependency, envelope, batch, or lead-time violation to the responsible room, terrain cell, asset, object, behavior command, or camera path. A saved publication report records the same values. [World streaming](world-streaming.md) defines partition and runtime semantics.
+References use the canonical content catalog and report affected owners before destructive changes. The historical network-page database, check-in/check-out workflow, and local/network overlays do not return.
 
-Preview rendering keeps exactly one last-good generated package layer and one candidate in app-controlled derived storage outside the `.revival` source package. The normal record builder repacks the active level's complete project-owned GPU records and resolved table through the shipping `world.stream` schema. It repacks the complete project-owned `global.stream` when a global input changed and otherwise copies that immutable blob byte-for-byte into the self-contained candidate. Untouched base records remain external locators. Each candidate carries its exact `ProjectEditGeneration`; only a matching successful candidate may replace the last-good layer. After final GPU use the old layer is deleted. There is no generation chain, compactor, preview cache hierarchy, editor-only stream format, loader, renderer, or generated file inside canonical source.
+### Behavior
 
-Immediate spatial feedback uses one logical fixed-capacity render-owner-owned `DraftOverlay` backed by exactly three preallocated slices aligned with the renderer's frame-resource slots. Each slice fits the conservative maximum visible dirty-geometry union across all four supported editor viewports; invisible portions of a large dirty selection consume no overlay capacity, and all three physical slices count in the fixed editor high-water. It is resident only for the key editor document in the dynamic world set. On an edit or camera change, the editor rebuilds canonical values and transient gesture state into the next available slice, never overwrites an in-flight slice, and retains that slice through its final render use. Stable IDs suppress matching last-good streamed records, and the shipping renderer draws the draft through its normal passes. It is noncanonical, unpersisted, contains no texture payload, and is not a second renderer, loader, residency path, cache, or extra frame allocation.
+Behavior authoring grows from translated source behavior. The first surface shows and edits the actual door, trigger, robot, goal, and presentation logic required by Training, with source provenance, validation, trace, and failure navigation.
 
-Pointer, drag, and scrub samples modify transient gesture state and `DraftOverlay` only. Commit performs exactly one typed project edit, named undo registration, `ProjectEditGeneration` advance, and candidate build; cancellation performs none. Dirty geometry stays overlaid until a matching-generation preview installs, while any newer dirty records remain visible. A continuous gesture therefore never launches per-sample package work.
+Direct typed Swift remains the canonical runtime while the editor exposes the smallest useful configuration and trace surface. A different visual or textual authored representation is proposed only after working evidence covers generated DALLAS, handwritten/custom, timer or persistent-state, and presentation-oriented behavior and demonstrates a concrete human-authoring limitation. Any accepted form never generates C++, invokes a native compiler, or emits executable plugins.
 
-### Content-definition workspace
+### Campaign, audio, and presentation
 
-Typed inspectors edit materials, procedural surfaces, mirrors, blend semantics, robots, powerups, buildings, clutter, ships, weapons, doors, lights, sounds, ambient patterns, physics, animation, AI, death behavior, inventory behavior, effects, cockpit and monitor bindings, haptic event mappings, and object archetypes. They expose only difficulty-scaling opt-outs backed by active runtime rules; they do not invent a generalized difficulty-tuning framework.
+The campaign workspace covers level order, branches, secrets, returns, allowed ships, progress, intros, endings, briefings, adaptive scores, and completion rules.
 
-All references use the shared content catalog. Changes report affected documents before destructive edits. The old network-page database, file locks, check-in/check-out workflow, and local-versus-network overlays do not return.
+The audio and score workspace covers supported modern audio, regions, roles, loops, transitions, gameplay bindings, preview, and validation. It never writes OMF or reopens retail archives.
 
-### Behavior workspace
+The presentation workspace covers briefings, TelCom-style screens, HUD, cockpit, automap, auxiliary views, markers, in-game cinematics, text, images, movies, sound, controls, timing, effects, fonts, colors, navigation, conditions, localization, and preview.
 
-The behavior workspace is the authoring front end for [BehaviorGraph](behavior-system.md). It supports typed nodes and ports, expressions, variables, functions and subgraphs, event ownership and authoritative or client-presentation execution roles, difficulty queries, cinematic commands, bounded game-mode command events, search, validation, execution tracing, breakpoints, inspection of persistent state, and deterministic replay of a test scenario.
+### Asset and build
 
-It never generates C++, invokes a compiler, or emits a native plugin.
+The suite imports and inspects supported geometry, models, animation, textures, fonts, audio, movies, and player media; records rights; enforces bounds at import; bakes lighting and navigation; audits dependencies and orphans; and publishes packages.
 
-### Campaign workspace
-
-The campaign workspace edits level order, branches, secret entry and return paths, training and multiplayer declarations, default and allowed ships, progress presentation, intros and endings, briefings, adaptive-score assignments and initial regions, and completion rules. Per-level ship selection may be added as a new-native improvement; it is not historical `.msn` behavior. A graph view and a direct ordered view operate on the same campaign document.
-
-This workspace is a deliberate improvement over the original hand-authored mission manifest workflow.
-
-### Audio and adaptive-score workspace
-
-The audio surface imports supported modern audio, edits positional and ambient sound definitions, and authors canonical adaptive scores. A score defines regions, intro, idle, combat, transition and death roles, stream bindings, loop ranges, transition rules, and musical alignment. Creators can preview gameplay-state and behavior-command changes, interruption and resume policy, and region transitions without starting a packaged game.
-
-Validation rejects missing streams, invalid loops, unreachable regions, transition dead ends, unsupported encodings, and incomplete rights metadata. Imported retail OMF is read-only canonical evidence; the editor neither reads nor writes OMF. [Adaptive music](adaptive-music.md) defines runtime ownership and persistence.
-
-### Presentation workspace
-
-The presentation workspace edits briefings, TelCom-style screens, HUD and animated cockpit presentation, automap presentation, bounded rear and auxiliary-view layouts, marker presentation, and purpose-built in-game cinematic sequences. Cinematics bind camera and target paths, duration, text, letterbox, fades, player-control and AI policy, completion or interruption, and behavior commands without becoming a general timeline engine. The workspace also supports text, images, movies, sounds, buttons, positions, fonts, colors, timing, effects, navigation, conditional display, localization keys, and preview.
-
-It uses canonical media and behavior references. Imported proprietary media remains local and read-only unless the user supplies replacement media with independent rights.
-
-### Asset and build workspace
-
-The suite imports and inspects USD room geometry, models and animation plus supported modern textures, fonts, audio, movies, player pictures, ship logos, and audio taunts; records source and license metadata; enforces media dimensions, duration, size, and decoded bounds; builds font atlases and previews glyph coverage; binds animation states, sound events, and haptic events; bakes lighting and navigation; audits dependencies and orphans; and publishes packages. Retail bitmap fonts are read-only canonical base content produced by `D3Import`; the editor never reads `.fnt` files. Native projects use supported modern font inputs and the same canonical atlas and metrics model.
-
-One publisher validates the complete dependency closure, compiles behavior graphs, produces immutable canonical content, records provenance, compares save-relevant canonical fields with the previous product, and refuses broken references or an unacknowledged semantic change without the required revision bump. It shows the affected scope, prior and current semantic fingerprints, and the author's explicit compatibility decision. It does not infer compatibility from byte hashes, emit HOG files, or write original editor formats.
+One publisher validates complete level topology and the dependencies reachable through the project's current behavior surface, then produces canonical native content. It does not emit HOG, D3L, original editor files, or native plugins. Security, signing, layering, and migration grow with real distribution boundaries rather than being simulated during the first local editor loop.
 
 ## Authoring loop
 
-The default loop is direct:
+The default loop is:
 
 1. edit canonical project data;
 2. validate the changed dependency closure;
-3. compile affected behaviors and bake only stale derived data;
-4. launch the current level or scenario at an explicitly selected difficulty in-process through `RevivalCore` and `RevivalMetal`;
-5. return to the exact document, selection, viewport, and workspace state with logs, traces, and failing references attached to their source documents.
+3. update only derived data that is actually stale;
+4. run the current level or scenario in-process through RevivalCore and RevivalMetal;
+5. return to the document with logs and failing references linked to their owners.
 
-Play-in-editor uses the shipping simulation. It does not maintain an editor-only gameplay fork. A packaged standalone build passes through the same validator and publisher with release checks enabled.
+Play-in-editor uses the shipping simulation and one selected timing model. A standalone package passes through the same validator and publisher with release checks enabled.
 
-Entering play-in-editor suspends every edit viewport and replaces the four-viewport demand profile with the supported game-camera profile on the same streamer. It never budgets a mixed game-plus-editor union. Exit restores the exact document selection, cameras, layout, and workspace state, waits for the restored editor envelope, then reveals the viewports.
+## Undo and testability
 
-## Undo, commands, and testability
+Editor mutations are concrete typed edits over canonical documents. Stable IDs address values whose identity must survive editing, references, or save/reopen. Names and array positions do not substitute where durable identity is required.
 
-Editor mutations use concrete typed edit families over canonical documents. Stable element IDs address rooms, portals, vertices, faces, objects, graph nodes, campaign nodes, and presentation elements; names and array positions do not identify edit targets. `EditorSession` is the only mutation owner. Each completed human action registers a named inverse with the document's `UndoManager`; continuous samples remain transient and the committed gesture is exactly one action. Do not build a generic command protocol, command bus, service layer, or public wire format.
+Each completed action registers a named inverse with UndoManager. Continuous samples stay transient and commit as one action. Do not build a generic command protocol, command bus, service layer, or public wire format.
 
-USD and native-media import or reimport, preview-record generation, validation, lighting and navigation baking, and publishing consume immutable project snapshots. Each result carries the exact `ProjectEditGeneration` it used. A stale or cancelled result remains visibly marked in Activity for diagnosis but cannot enter or clear the active Problems set, report publish success, become playable, or replace the last good derived product. Cancellation and failure leave project source and every last-good derived product unchanged. One cancellable task owns each user-requested long operation; Activity shows progress and source-linked failure while unrelated inspection remains responsive. There is no editor job scheduler.
-
-Each workspace has document-level tests, reference-integrity tests, validation fixtures, and at least one save-reopen-play round trip. Dirty projects autosave atomically to recovery storage outside the source project. After a crash, the editor offers the recovered state and does not overwrite project sources until the creator accepts it. View code does not own game rules or serialization.
+Each mature workspace gains document, reference, validation, and save-reopen-play tests for its actual production path. Recovery remains outside source until the creator accepts it. View code does not own game rules or serialization.
 
 ## Creator completeness gate
 
 The suite is complete when a creator can start with an empty project and, without hand-editing generated files or invoking a legacy tool:
 
 - build indoor and outdoor levels;
-- define the objects, combat systems, AI, audio, materials, lighting, goals, and behaviors they use;
-- assemble a branching campaign with difficulty-aware behavior, room roles, adaptive music, in-game cinematics, briefings, cockpit, automap, auxiliary views, markers, and presentation;
-- create multiplayer maps and modes with declared authoritative and client-presentation behavior, bounded game-mode commands, chat policy, and host-operator configuration supported by the game;
-- validate, debug, play, replay, package, reopen, and publish the project;
-- install the resulting package in the player application and complete its declared play paths.
+- define their objects, combat systems, AI, audio, materials, lighting, goals, and behaviors;
+- assemble a branching campaign with difficulty, room roles, music, cinematics, briefings, cockpit, automap, cameras, markers, and presentation;
+- create multiplayer maps and modes with the supported authority and communication rules;
+- validate, debug, play, replay, package, reopen, and publish;
+- install the package in RevivalMac and complete its declared play paths.
 
-Stock import is one proof case. An independently authored campaign proves the campaign and content workflow. An independently authored multiplayer package proves the multiplayer workflow. Both must pass for full creator-suite completion.
+Imported stock content, an independent campaign, and an independent multiplayer package are separate proof cases. All are required for complete creator status.
 
-## Future automation boundary
+## Future automation
 
-Stable IDs, typed edits, structured diagnostics, deterministic validation, and playtest operations exist because the human editor needs reliable selection, undo, repair, testing, and maintenance. They deliberately leave a clean future automation seam without making it a current product interface.
+Human selection, undo, diagnostics, validation, and playtest operations may later provide a clean automation seam. They are not designed as a wire protocol now.
 
-Only after Phase 10 ships the complete human creator suite, including the independently authored campaign and multiplayer package, may the project design an MCP adapter or training and evaluation system. Phase 1–10 add no MCP server, automation target, headless editor, public command-schema stability promise, agent permission model, training recorder, telemetry, or agent-only operation. Future automation must invoke the same stabilized editing session, validators, playtest, and publisher used by people. It cannot create a parallel document model or mutation path, and proprietary retail or converted media cannot enter a training corpus without independently established rights.
+Only after the complete human creator suite ships may the project design an MCP adapter or training system. It must reuse the stabilized human document, validation, playtest, and publisher paths and cannot introduce a parallel model or use proprietary media without independent rights.

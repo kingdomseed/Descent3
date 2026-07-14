@@ -1,189 +1,183 @@
 # Engineering principles
 
-- Status: accepted
-- Date: July 13, 2026
+- Status: accepted, amended
+- Date: July 14, 2026
 - Authority: binding implementation rules
 
 ## Objective
 
-Write the least project-owned code that can deliver the complete required game and creator experience with the required performance and reliability. Minimal code does not mean compressed syntax, hidden behavior, or reduced scope. It means fewer concepts, fewer paths, fewer dependencies, and fewer states a maintainer must understand.
+Write the least project-owned code that can faithfully transfer and then improve the complete required game and creator experience. Minimal code means fewer concepts, paths, dependencies, and states a maintainer must understand. It does not mean compressed syntax, hidden behavior, or reduced scope.
 
-The M4 has ample CPU and GPU capacity for a late-1990s game. Spend that capacity to keep the design direct. Optimize after release-build measurements show a missed budget.
+The M4 has ample capacity for a late-1990s game. Spend that capacity to keep the first implementation direct. Optimize and redesign only after a representative optimized build shows the problem.
+
+## Translation guardrail
+
+The source is allowed to influence semantics without dictating native structure.
+
+- Preserve reachable data flow, ordering, formulas, dependency closure, and observable results before changing them.
+- Account for every involved source file and record deliberate differences.
+- Combine or split source responsibilities when that produces clearer Swift ownership.
+- Replace platform APIs and ABI machinery directly; do not wrap them to resemble C++.
+- Do not carry dead branches, duplicated paths, defensive checks after a trusted boundary, or fixed-capacity accidents merely for fidelity.
+- Do not call a redesign a port. Baseline, change, and verification are separate records.
+
+Work one dependency island at a time and keep the real editor and player runnable. A large layer of stubs is not progress merely because many source filenames have Swift counterparts.
 
 ## Default choices
 
-- One concrete implementation is a type, not a protocol hierarchy.
-- One caller uses a direct function call, not an event bus.
-- One platform uses the platform API, not a wrapper.
+- One implementation is a concrete type, not a protocol hierarchy.
+- One caller uses a direct call, not an event bus.
+- One platform uses its framework directly, not a wrapper.
 - One renderer uses explicit passes, not a render graph.
-- A handful of object families use domain collections, not an ECS framework.
-- A small AI slice uses a switch, not a behavior-tree system. Expand when a ledgered capability requires it.
-- World streaming uses one coordinator and fixed cells, not a job scheduler or task per asset.
-- A directory and manifest are a package. One typed content catalog resolves project references; it is not a general asset database.
+- Domain object families use direct collections, not an ECS.
+- The current behavior slice uses canonical direct typed functions, not a predesigned general VM or forced future rewrite.
+- One complete resident level world and its growing presentation set use one owner, not a resource manager.
+- A directory plus a simple manifest is a package until a real distribution need proves otherwise.
 - A measured slow loop earns optimization. A hypothetical slow loop does not.
 
 ## Functional-completeness guardrail
 
-KISS changes how a capability is built. It does not decide whether the capability exists.
+KISS changes how a capability is built, never whether it exists. Each gameplay capability gains its applicable runtime, authoring, validation, playtest, and publishing paths as its roadmap slice matures.
 
-Each gameplay capability must acquire its applicable runtime, authoring, validation, playtest, and publishing paths in the same roadmap phase. Prefer one editor operation that replaces several historical dialogs, one behavior language that replaces DALLAS and Osiris, and one publisher that replaces the packaging utilities. Do not claim a code reduction by leaving out editor functions, multiplayer, replay, presentation tools, or content types listed in the [functional-completeness contract](functional-completeness.md).
+Prefer one clear editor operation over several historical dialogs, one native content representation over legacy page variants, and one eventual safe behavior workflow over DALLAS plus native modules. Do not claim simplification by omitting editor functions, multiplayer, replay, presentation tools, or content types in the [functional-completeness contract](functional-completeness.md).
 
-The historical source contains dead UI shells and partially implemented commands. Rebuild intended working capability, not the defect or obsolete interaction pattern. Ambiguous cases go into the completeness ledger for an explicit decision.
+Ambiguous source behavior goes into a ledger with evidence and one decision. It is not silently preserved or silently deleted.
 
 ## Abstraction gate
 
 Add an abstraction only when at least one condition is true:
 
 1. two current production implementations need the same contract;
-2. a nondeterministic external boundary must be controlled in tests;
+2. a nondeterministic production boundary must be controlled in tests;
 3. ownership or safety cannot be expressed clearly without the boundary;
 4. measured duplication is larger than the abstraction and likely to remain so.
 
-Every proposal for a new subsystem must identify the current feature that needs it, the simpler direct approach that was considered, and the code or risk the subsystem removes.
+Every new subsystem proposal names the current feature that needs it, the direct approach considered, and the code or risk it removes.
 
-Do not create `Common`, `Shared`, `Engine`, `Manager`, `Service`, `Provider`, or `Factory` modules as holding areas. Name code after the game concept or Apple service it implements. The six-target product graph is fixed for the planned work, not a reason to pile unrelated code into one file.
+Do not create Common, Shared, Engine, Manager, Service, Provider, or Factory modules as holding areas. Name code after the game concept or Apple service it implements. Target count is not a quality metric.
 
 ## Data and ownership
 
 - The simulation has one mutable owner.
-- Entities use stable small integer IDs. Pointers and reference cycles do not cross subsystem boundaries.
-- Start with Swift structs, enums, `ContiguousArray`, and straightforward array-of-structs storage.
-- Prefer value semantics in the simulation. Reserve classes for framework objects and genuinely shared identity.
-- Do not rely on `Dictionary` or `Set` iteration order for simulation behavior, saves, or hashes.
-- Use one explicit seeded random-number generator for game behavior.
-- Use finite `Float32` for simulation quantities that are not integral. Reject NaN and infinity at content and command boundaries, normalize negative zero before canonical encoding and hashing, and apply declared domain bounds. Keep operation order stable and do not enable fast-math transformations.
-- Install loaded assets only at defined frame boundaries.
-- Keep renderer resources out of simulation and save types.
-- Retain the complete finite authoritative `WorldSpine` through level exit. Stream only immutable presentation records through the single fixed-cell `WorldStreamer`; simulation, behaviors, saves, replay, and multiplayer cannot observe I/O or residency. The editor's one bounded noncanonical `DraftOverlay` is the sole live-geometry exception and never enters game, save, replay, package, or multiplayer state. A custom allocator remains subject to the measured profile and written invariant required by `AGENTS.md` and may not create a second residency path or test-only observability.
+- Start with Swift structs, enums, ContiguousArray, and straightforward array-of-structs storage.
+- Use stable IDs only where identity must survive collection movement, editor selection, save, or references.
+- Prefer value semantics. Reserve classes for framework objects and genuine shared identity.
+- Do not rely on Dictionary or Set iteration order for observable game behavior.
+- Keep renderer objects out of simulation, canonical project, save, replay, and network types.
+- Pass the historical prior-frame elapsed value and input explicitly; do not recreate global `Frametime` or global function-mode state.
+- Own the complete resident level world, its eager working set, and every later canonical presentation preparation through one level owner until exit.
+- Validate retail, project, package, save, and network boundaries before constructing trusted canonical values. Internal code relies on those invariants instead of rechecking impossible states.
 
-Every authoritative multiply-add explicitly uses either fused `addingProduct` or separately rounded multiply and add. System and SIMD transcendental functions do not write authoritative state. A required transcendental becomes one named, versioned project operation or table with exact vectors; it does not justify a general math framework.
+Use finite Float32 where the original semantics and Metal path require it. Reject NaN and infinity at untrusted boundaries. Preserve operation order where current behavior depends on it. Do not build a deterministic math library, fixed-point layer, fused-operation policy, or semantic-revision hierarchy before replay or multiplayer evidence requires one.
 
-Unsafe memory access, `Unmanaged`, `@unchecked Sendable`, `nonisolated(unsafe)`, `@inline(always)`, and `@specialize` require a measured reason, a documented invariant, and focused tests. Do not enable `-Ounchecked` for the project.
+Unsafe memory access, Unmanaged, unchecked concurrency, forced inlining, specialization, and custom allocation require a measured reason, a written invariant, and focused tests. Do not enable unchecked optimization for the project.
+
+## Loading and resource lifetime
+
+The first loading path is intentionally direct:
+
+1. validate the successor's canonical manifest and structural CPU content;
+2. at the commit boundary, stop old submissions, wait for final GPU use, and release the old presentation owner;
+3. build the successor's authoritative world values;
+4. prepare the source-evidenced eager working set and activate the world;
+5. prepare later source-reachable assets only from its closed canonical package and retain them until exit.
+
+Failure before commit preserves the current world; failure after commit enters an explicit unloaded error state. Loading may move one bounded operation off the main actor when measured latency warrants it. Do not add a task per asset, stream cell, spatial demand calculation, prefetch policy, LRU, memory-pressure mode, cache hierarchy, or resident/streaming switch.
+
+If the post-Training M4 gate proves the resident path inadequate, follow the amendment rule in [World loading and residency](world-streaming.md). The replacement leaves one production lifetime path.
 
 ## Concurrency
 
-The initial game loop is single-owner and main-actor isolated. This is the simplest correct architecture for the accepted runtime.
-
-Use asynchronous work for operations that can block for milliseconds or more:
+The game loop has one mutable owner. Swift concurrency is appropriate for operations that really block:
 
 - retail import;
-- disk reads and writes;
-- image, audio, and movie conversion;
-- world-cell Metal I/O directly into final private buffers and textures;
-- pipeline compilation or cache preparation when the Metal API supports it cleanly;
-- editor lighting, navigation, media, and package builds.
+- file reads and writes;
+- image, audio, font, and movie conversion;
+- Metal resource preparation when measurement shows it should leave the main actor;
+- actual editor lighting, navigation, media, validation, and publication work.
 
-Use one streaming coordinator, not a task per cell or resource. Do not use actors or tasks for players, robots, projectiles, doors, AI goals, physics contacts, draw items, or individual assets. Do not add a job system until Instruments attributes a missed frame budget to CPU work that can be separated safely.
+Do not create actors or tasks for players, robots, projectiles, doors, AI goals, physics contacts, draw items, or individual assets. Do not add a job system until Instruments attributes a missed budget to CPU work that can be separated safely.
 
 ## Rendering
 
-- `RevivalMetal` is the renderer. There is no renderer interface.
+- RevivalMetal is the renderer. There is no renderer interface.
 - Use a small explicit pass order and a small known pipeline set.
-- Build the first correct image before adding visual systems.
-- Treat mirrors, specular response, scorch decals, procedural textures, volumetrics, and declared blend semantics as concrete content requirements. Implement each directly when its first verified scene needs it; do not hide the inventory behind a three-material summary.
-- Keep CPU render extraction predictable and free of project-owned steady-state heap allocation after warm-up.
-- Use three rotating frame-resource slots where Metal synchronization requires them; do not generalize that into a resource framework.
-- Use one app-lifetime and one dynamic world Metal residency set. Stage whole-resource additions and removals on the render owner; install only complete batches at frame boundaries and retire only after final GPU use. Every level, content-stack, or key-document handoff cuts off old submissions, drains all committed old-generation Metal I/O and final render use, and retires its allocations and file handles before loading a successor. Only the key editor document owns live world residency; background-document viewports pause and release it through that teardown.
-- Use one orientation-independent spatial demand envelope and one lead-time-derived prefetch shell around every live camera. Use CPU room-and-portal traversal with room-frustum rejection only for drawing and ordinary GPU backface rejection. Do not let orientation or dynamic occlusion change residency, recreate legacy face-by-face portal clipping, or add an occlusion subsystem.
-- Build outdoor terrain as fixed 32-by-32-quad authored-resolution cells. Do not port or replace the historical terrain LOD system.
-- Do not add sparse resources, mip streaming, an LRU, memory-pressure quality modes, a general resource manager, a resident-only fallback, or a second cell or visibility architecture. [World streaming](world-streaming.md) is the only resource-lifetime model.
-- Do not add GPU-driven culling, bindless scene machinery, MetalFX, deferred lighting, or ray tracing to the accepted product architecture. Reopening one requires an explicit architecture amendment.
+- Build the first source-faithful image before adding visual improvements.
+- Translate room/portal visibility and terrain presentation before simplifying either.
+- Treat mirrors, specular response, decals, procedural textures, volume lighting, animated textures, destroyable faces, and blend semantics as concrete content requirements.
+- Keep resource creation and destruction owned by the loaded level and safe through final GPU use.
+- Use rotating frame resources only where Metal synchronization requires them; do not generalize them into a resource framework.
+- Do not add GPU-driven culling, bindless scene machinery, MetalFX, deferred lighting, ray tracing, sparse resources, or a second visibility path without a measured amendment.
 
 ## Editor discipline
 
-`RevivalEditor` uses AppKit's document architecture directly: one `NSDocument`, one `@MainActor EditorSession`, one primary project window, one canonical project value, and one `UndoManager` history per open project. Views call concrete typed edit operations on that session. Do not add a generic reactive store, command bus, editor service layer, or protocol solely to connect panes.
+RevivalEditor uses AppKit document architecture directly: one NSDocument, one main-actor editing owner, one canonical project value, one UndoManager history, and one primary window per project. Views call concrete edit operations. Do not add a reactive store, command bus, service layer, or protocol solely to connect panes.
 
-Stable element IDs, named inverse edits, and structured source-linked diagnostics serve human selection, undo, validation, and repair. They are not a public automation protocol. Each edit, undo, redo, revert, accepted recovery, or source-changing asynchronous result advances one transient `ProjectEditGeneration` that identifies an unsaved snapshot and remains separate from persisted semantic revisions. Long editor work consumes an immutable snapshot and reports that generation. A stale or cancelled result remains diagnostic history only: it cannot enter or clear active validation, report publish success, become playable output, or replace the last good derived product. Cancellation and failure leave source and last-good derived products unchanged. Use one cancellable task per user-requested USD or native-media ingress, preview-record build, bake, validation, or publish operation rather than a scheduler.
+The first editor proves the shared world:
 
-Local interface state such as open tabs, split positions, selection, and viewport cameras stays outside canonical project source. Authored camera bookmarks remain canonical content. Play-in-editor runs a snapshot through the shipping simulation, streamer, and renderer and returns to the exact document, selection, viewport, and workspace state.
+- derive, open, and render the editable project value through the canonical resident-world model;
+- select and inspect source-backed elements;
+- make one real edit with named undo and redo;
+- save, close, and reopen;
+- play a disposable session copy through the shipping simulation and renderer;
+- return to the document.
 
-One logical render-owner `DraftOverlay` uses exactly three preallocated slices aligned with the three rotating frame-resource slots. Each slice holds the maximum visible dirty-geometry union across all four supported editor viewports; all three physical slices count toward high-water. Write only an available slice and retain every in-flight slice unchanged through its final render use. Pointer samples update only transient gesture state and the next available slice. Commit advances canonical source, named undo, and `ProjectEditGeneration` exactly once; cancel advances none. The matching background preview replaces the overlay records without a second renderer or per-sample build.
+Stable identity is added to elements that actually need durable selection or references. Long operations consume immutable input and reject stale results when the first real operation can race with editing. Do not prebuild a universal generation protocol, preview package cache, fixed overlay-slice system, job scheduler, or background-document residency choreography.
 
-The current product is human-first. Do not implement an MCP server, headless authoring process, public command wire format, training recorder, telemetry, or agent-only edit path before Phase 10 ships the complete human creator suite. Future automation must adapt the same mature editing session rather than introduce a second mutation, validation, playtest, or publishing path.
+Local UI state such as tabs, split positions, selection, and viewport cameras stays outside canonical source. Authored camera bookmarks remain content.
+
+The editor is human-first. MCP, headless authoring, public command protocols, training recorders, telemetry, and agent-only paths do not enter the current roadmap.
 
 ## Dependencies
 
-The product has no third-party runtime dependencies. Apple frameworks and the Swift standard library cover the applications, renderer, input, Model I/O USD ingestion, Network-framework QUIC, canonical font use, audio and movie encoding and playback, serialization, and tests. Narrow project-owned Swift decoders in `D3Import` handle the verified retail bitmap-font, OSF-with-ACM stream, WAV, and MVE inputs; no legacy decoder enters a runtime target.
+Prefer Apple frameworks and the Swift standard library. Narrow project-owned import decoders cover only the retail variants verified in the owned source profile and never enter the runtime.
 
 Before adding a dependency, document:
 
-- the maintained project-owned code it replaces;
-- binary size and runtime cost;
+- the maintained code it replaces;
+- binary and runtime cost;
 - license and redistribution obligations;
 - update and security ownership;
-- whether a small local implementation would be clearer.
+- why a small local implementation is not clearer.
 
-Developer tools and agent skills are not runtime dependencies, but executable tools still require pinned revisions and an audit.
-
-## Code budget
-
-Track project-owned Swift and MSL lines, target count, runtime dependency count, and executable-tool count at each playable milestone. The report exists to expose growth, not reward code golf.
-
-New code should correspond to a visible capability, required content, safety invariant, or measured improvement. When a milestone adds much more infrastructure than playable behavior, stop and simplify before continuing. Refactoring may reduce line count, target count, or concepts even when no feature changes.
-
-Do not set an arbitrary lifetime line limit before the complete Training Mission exists. Phase 5 establishes the first credible size baseline. Phase 1 has four product targets; Phase 2 adds `RevivalEditor`; Phase 9 adds the isolated `RevivalRelay` operational target; the complete planned product has six. Third-party runtime dependencies remain at zero.
-
-Track functional ledger coverage beside line count. Falling line count while required capabilities disappear is a regression, not an improvement.
+Developer tools and skills are not runtime dependencies, but executable tools still need pinned revisions and audit.
 
 ## Test-driven implementation without architecture theatre
 
-Every new or changed production behavior follows the binding [red-green-refactor protocol](test-driven-development.md). The red test is design pressure: it names the next observable contract before implementation can spread. If a behavior needs a large harness to state, narrow the slice or simplify the production boundary before adding machinery.
+Every new or changed shipping behavior follows [Test-driven development](test-driven-development.md). The red test names the next observable contract before implementation spreads. Testability comes from explicit inputs and direct values, not protocol wrappers.
 
-Testability comes from explicit inputs and pure or deterministic operations, not from wrapping every type in a protocol.
+Characterization evidence protects source semantics at an observable boundary. It does not require a test for every C++ function, branch, guard, or data member. When canonical validation makes a state unreachable, test the boundary and delete downstream defensive handling.
 
-Examples:
-
-- the importer decodes a byte buffer into a canonical value;
-- the simulation steps from a world plus `InputFrame` to the next state;
-- behavior compilation turns a typed graph into a checked program;
-- behavior execution consumes an ordered event and updates typed state;
-- adaptive-score selection advances from logical state and emits typed presentation commands without depending on an audio device;
-- render extraction turns world state into a render snapshot;
-- a save snapshot encodes and decodes without live framework objects;
-- an editor command mutates, validates, undoes, redoes, saves, reopens, and plays a canonical document.
-
-Use small synthetic fixtures in Git. Parameterized tests and property tests are preferred for checked binary parsing and deterministic state transitions. GPU tests use controlled scenes and declared image tolerances.
-
-Tests are maintained code. Each test must protect reachable behavior through the real production path and add distinct regression protection. Do not optimize for test count, coverage percentage, mockability, or symmetric testing of impossible branches. When a supported path disappears, delete its obsolete tests. When a path cannot be reached after canonical validation, test the validation boundary and delete downstream dead handling instead of constructing an impossible state.
-
-The evidence chain is focused red, focused green, affected suite, then the phase-specific matrix or device evidence. A test written after implementation, a failure caused by broken setup, and a test-only production route do not satisfy that chain.
+A disposable research spike may inspect an unknown format, capture a trace, or answer an API question. It stays outside product targets and is removed or archived before shipping implementation begins. Once the product contract is known, red-first production work resumes.
 
 ## Performance discipline
 
 Performance work follows this order:
 
-1. measure a release build on the recorded M4;
-2. identify the CPU function, allocation, GPU pass, memory transfer, or wait responsible;
+1. measure an optimized build on the recorded M4;
+2. identify the responsible function, allocation, GPU pass, transfer, or wait;
 3. make the smallest change that addresses it;
 4. verify behavior and measure again;
-5. keep the optimization only if the evidence supports it.
+5. keep the complexity only when evidence supports it.
 
-Track frame time, simulation time, render-encoding time, GPU time, allocations, memory high-water mark, import time, and startup time. Do not infer performance from code shape alone.
+Track frame time, update time, render encoding, GPU time, allocations, memory high-water, import time, load time, and editor responsiveness for representative milestones.
 
-After warm-up, each declared production scenario performs zero project-owned heap allocations inside `RevivalCore.step` and render extraction. Initialization, level-transition installation, and Apple-framework work outside those boundaries are measured separately. Phase 1 establishes an automated release-build allocation-budget command over the real production path: it warms the scenario, measures allocation events only inside the declared step and extraction intervals, and exits nonzero on any project-owned allocation. Its first valid nonzero result is the red evidence; zero is green. Every gameplay slice extends that same command. An Instruments Allocations trace supplies attribution and corroboration but does not replace the automated red-green gate. Do not add allocator protocols, malloc hooks to shipping code, or test-only production entry points to prove the invariant.
-
-The 120 Hz simulation target is a product choice. The current reference display is 60 Hz, so a 120 frames-per-second presentation claim requires a 120 Hz test display. An offscreen test may establish at least 120 frames per second of render throughput, but not presentation pacing or latency. The first renderer gate is consistent 60 Hz presentation on the current reference display with clean Metal validation.
-
-Phase 1 ratifies the safety and capacity constants required to freeze the world-streaming schema: resident spine and schema counts; stack-global, level-pinned, cell, simultaneous-camera and discontinuous-destination bytes; render radius; maximum continuous speed; maximum demand-evaluation interval; `LoadWave` and `T_wave`; prefetch shell; queue, command-buffer and submitted-stale caps; intra-level overlap; I/O latency; and active-memory high-water mark. Those are measured foundation limits, not optimization guesses. Phase 5 establishes broader gameplay and editor performance budgets from the complete Training Mission.
+Zero steady-state allocations, a fixed tick rate, specialized math, direct Metal I/O, and spatial streaming are possible conclusions from measurements, not Phase 1 architecture theatre. The complete Training Mission establishes the first credible product budgets.
 
 ## Review questions
 
-Every implementation review should ask:
-
-- Does this code serve a ledgered capability in the current milestone?
-- Did the focused test first fail for the intended product reason?
-- Does each new test exercise a reachable production path and prevent a distinct regression?
-- Did test convenience add a production seam or alternate path that the product does not need?
-- Does the feature have its applicable authoring, validation, playtest, and publishing paths?
-- Can an Apple framework or standard-library feature remove it?
-- Did we add a second path where one would work?
+- Which source behavior or ledgered capability does this code serve now?
+- Is the source disposition and any deliberate difference recorded?
+- Did the focused production test fail for the intended reason?
+- Does each test exercise a reachable path and prevent a distinct regression?
+- Did test convenience add a production seam or alternate path?
+- Does the feature have the applicable editor and publishing path?
+- Did we validate once at the boundary or repeat defensive checks internally?
+- Did we add a second mode where one current implementation would work?
 - Is a generic abstraction hiding one concrete implementation?
-- Is legacy compatibility leaking into the runtime?
-- Can data replace code?
-- Can a direct switch or table replace a framework?
-- Can any new type, dependency, or layer be deleted?
-- Does a proposed deletion remove machinery or remove functionality?
-- Is the performance claim measured?
-- Are the tests checking our product contract rather than the old engine's internals?
+- Are legacy semantics being confused with prohibited legacy APIs or ABI?
+- Can direct data, a switch, a table, or an Apple framework remove code?
+- Is the performance claim measured on representative content?
+- Can any new type, target, dependency, or layer be deleted?
 
-Subtraction is valuable when the capability remains intact.
+Subtraction is valuable when fidelity and capability remain intact.

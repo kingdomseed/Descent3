@@ -1,285 +1,231 @@
 # Roadmap
 
-- Status: accepted
-- Date: July 13, 2026
-- Authority: execution sequence; cannot redefine architecture or product scope
+- Status: accepted, amended
+- Date: July 14, 2026
+- Authority: concrete execution sequence; cannot reduce product scope
 
-Every phase ends in a visible or objectively verifiable result. Campaign-first development orders the work; it does not reduce the [functional-completeness contract](functional-completeness.md).
+Every phase ends in a runnable, visible, or objectively verified product result. Campaign-first development orders the work; it does not reduce the [functional-completeness contract](functional-completeness.md).
 
-Starting in Phase 2, every gameplay slice advances the matching authoring track. A feature is finished only when its applicable runtime, editor, validation, playtest, and publishing paths work.
+The player and editor advance together from the first canonical world. A phase does not need the complete creator suite, but every new canonical type and runtime behavior gains the authoring, validation, playtest, and publishing path that is applicable at that maturity.
 
-Every production slice in every phase follows the binding [red-green-refactor protocol](test-driven-development.md). Phase gates and completion matrices supplement that focused cycle; they do not replace red-first evidence or justify tests for paths the product never runs.
+Production work follows [Test-driven development](test-driven-development.md). Bounded disposable research may answer an unknown source question before a production contract is stated; it is never shipped or retained as a second path.
 
-## Phase 0: lock the complete product definition
+## Phase 0: reconcile the product and map the source
 
 Status: in progress
 
-- accept the Swift 6.3 and direct Metal 4 architecture;
-- define one-way retail import, canonical projects and packages, new saves and replay, the behavior system, creator suite, multiplayer commitment, verification, and minimal-code rules;
-- define the pinned community source as the stock behavior baseline, the historical interval-to-fixed-tick translation rule, authoritative Float32 semantics, and one `simulationSemanticRevision` policy;
-- lock one purpose-built streaming path for every presentation-capable level: a resident authoritative `WorldSpine`, one room per indoor cell, positive-multiple-of-32 terrain dimensions and fixed 32-by-32-quad cells, package-layer global and level blobs, direct Metal I/O, one dynamic world residency set, orientation-independent spatial camera envelopes, one `LoadWave`-timed prefetch shell, and publication limits on stack-global resources, spine, counts, level-pinned resources, cells, simultaneous cameras, discontinuous destinations, load waves, queue depth, stale work, and movement lead time;
-- lock USD through Model I/O as the sole planned-product DCC interchange, the two-level volumetric navigation model, and a provisional room-local lightmap policy whose atlas dimension and import overflow rule are ratified by a Phase 2 whole-retail packed-area measurement;
-- lock Network-framework QUIC, the inner CryptoKit record protocol, the project-operated public rendezvous and relay, Bonjour LAN discovery, 2–32 connected human slots, live observer slot semantics, and the complete six-degree-of-freedom prediction and reconciliation contract;
-- complete the working functional-completeness ledger with one row for every required runtime, editor, behavior, campaign, multiplayer, replay, presentation, data-editing, baking, packaging, and mod-SDK capability;
-- inventory adaptive music, automap, animated cockpit, haptics, player markers, auxiliary camera views, player-selected multiplayer media, mirrors, specular response, scorch decals, procedural textures, volumetrics, and blend semantics as explicit capabilities rather than umbrella terms;
-- inventory afterburner, ship wiggle versus cockpit buffet, autoleveling and mouselook, in-level streamed voice, post-level results, credits/intro/loading/attract presentation, ambient-life stub versus ambient sound, campaign co-op, the full stock game-mode list, PXO-class lobby/rankings/stats and mission auto-download as adopt-or-exclude decisions, retail bitmap-font roles, the five difficulty values and their active rules, in-game camera-path cinematics, typed room roles and refueling, per-command cheat, easter-egg, and diagnostic policy, public/team/private chat, host operator commands, and authoritative versus client-presentation behavior roles as separate capabilities;
-- record for each row its historical evidence, native counterpart, milestone, owner, acceptance evidence, and current state;
-- separate intended capabilities from dead menu shells, duplicated dialogs, and historical bugs;
-- preserve verified retail hashes and the legacy M4 smoke run as non-normative evidence;
-- audit active documents for stale compatibility requirements and hidden scope deletion;
-- accept red-first TDD, the test-value gate, and the anti-dilution review rules as project law;
-- author and review `revival-constitution`, `revival-verification`, `swift-realtime-systems`, `metal4-rendering`, and `revival-world-streaming`.
+Amend the active documents so they agree on:
 
-Exit: every active document describes the same complete product, the ledger covers the known historical capability surface, the five Phase 1 skills are installed and pinned with the TDD contract intact, and no production code begins without a focused red test or under conflicting instructions.
+- Apple Silicon, macOS 26+, Swift 6.3, MSL, and direct Metal 4;
+- dependency-ordered semantic translation of the pinned source;
+- no shipping legacy engine, ABI, renderer, platform layer, or native module;
+- complete functional scope and one-way retail conversion;
+- one complete resident level world with source-faithful eager and lazy asset paging as the first loading implementation;
+- the explicit source-order old/new variable-time handoff as the first scheduler;
+- one shared editor/player world model, renderer, level I/O, and play path from Phase 1, with separately owned document and play-session values;
+- evidence-driven modernization with one surviving production path.
 
-## Phase 1: create the smallest native shell
+Seed and then expand the checked-in source-translation ledger with:
 
-Create four targets:
+- the runtime and editor files required for initialization, HOG and level loading, rooms, portals, terrain, objects, dependency paging, rendering, and editor-hosted play;
+- each file's responsibility, callers, globals, observable contracts, native owner, disposition, evidence, license, and status;
+- a dependency-island graph for the complete Training-level load and first acceptance-room result;
+- the exact mission and level key, acceptance-room identity, selection reason, connected portal neighbors, and dependency capture for that room within the complete level;
+- a register of temporary research tools or scaffolds with a deletion or archive gate.
 
-- `D3Import`;
-- `RevivalCore`;
-- `RevivalMetal`;
-- `RevivalMac`.
+Finish the functional-completeness audit without turning chosen architecture into fake historical capabilities. Author and review revival-constitution and revival-source-translation. Author each domain skill immediately before the first production change that needs it; later-domain skills do not block an unrelated island.
 
-Prove the foundations needed by the next slice:
+Exit: no active document requires fixed-cell streaming, fixed 120 Hz, exact target counts, a complete speculative behavior VM, or editor preview machinery before contact with real translated code. The complete Training Level and exact acceptance room are recorded, their initial source/dependency seed exists, and the two prerequisite skills agree with the amended documents. Exact symbols, transitive files, captures, and native owners may close alongside the working Phase 1 island, but must be complete before that island exits.
 
-- advance each foundation one observable contract at a time through red, green, and refactor;
-- Swift 6.3 strict-concurrency build;
-- AppKit application with `MTKView`;
-- installed Metal-toolchain compile and metallib-link smoke followed by direct `MTL4CommandQueue`, command-buffer, command-allocator, argument-table and app/dynamic-world residency-set submission of one MSL pipeline;
-- a synthetic branching room graph and positive-multiple-of-32 terrain grid with small capped stack-global and level-pinned sets, a cell-referenced `world.stream` portion at least three times larger than the maximum resident cell-demand portion, and total GPU bytes above the active high-water, loaded through one bounded concurrent `MTLIOCommandQueue` directly into final private buffers and textures;
-- whole-blob CryptoKit verification before package intake; full locator and buffer/texture descriptor validation; fixed orientation-independent camera envelopes and lead-time shell; simultaneous-camera and discontinuous-destination demand; bounded out-of-order and stale completion; atomic next-frame installation; last-use retirement; repeated traversal with a bounded memory plateau; intake-corruption, I/O, and late-envelope failure; clean Metal validation; and authoritative-hash independence from completion order;
-- release-build M4 calibration of the stack-global, resident-spine, schema-count, level-pinned, cell, camera-envelope, simultaneous-camera, transition-overlap, render-radius, maximum-continuous-speed, demand-evaluation interval, `LoadWave`, `T_wave`, shell, queue, command-buffer, submitted-stale, I/O-latency, and active-memory constants before Phase 2 freezes the canonical cell tables;
-- explicit streaming-stall accumulator/input reset and clock-rebase proof plus old-world teardown before new-world activation with no dual-level residency overlap;
-- explicit Xcode build and copy dependency that places `D3Import` in `RevivalMac.app/Contents/Helpers` for nested-code signing;
-- fixed 120 Hz accumulator with monotonic time, eight-tick catch-up ceiling, lifecycle reset, drop accounting, and deterministic tests;
-- canonical Float32 boundary, normalization, encoding, fused-versus-separate multiply-add, required named arithmetic, and hash conformance vectors for the initial simulation semantic revision;
-- one keyboard, mouse, and controller input snapshot;
-- held-state and exactly-once input-impulse tests across zero, one, and multiple ticks per display callback;
-- one AVAudioEngine sound;
-- an automated release-build allocation-budget command that first fails on a warmed production-path allocation, then proves zero project-owned heap-allocation events inside the warmed-up fixed-step and render-extraction boundaries; retain the supplementary Instruments trace;
-- clean shutdown, native file locations, release-build logging, and signposts.
+## Phase 1: one native room in editor and player
 
-Exit: a native player application displays a controlled streamed Metal scene, churns a presentation set larger than active residency through the one shipping lifetime path, advances a tested fixed-step world independently of completion order, accepts input, and plays sound. No legacy file is involved.
+Create three executable products:
 
-## Phase 2: canonical room cluster and editor foundation
+- D3Import;
+- RevivalMac;
+- RevivalEditor.
 
-Before this phase, author and review `d3-content-import` and `revival-creator-suite`.
+Keep `RevivalCore` and `RevivalMetal` as explicit code-ownership boundaries. Split either into a separate build target only when the first code makes that separation useful.
 
-Select a small connected cluster from the Training Mission. Implement its dependency closure:
+Implement one end-to-end source dependency island:
 
-- recognized prepared-installation-directory 1.4-plus-Mercenary source profile;
-- minimal HOG and level decoding inside `D3Import`;
-- canonical room, typed room-role, portal, face, UV, texture, lightmap, model, object, and player-start values;
-- canonical resident `WorldSpine`, one room per indoor cell, deterministic resolved layer/blob locators, checked raw presentation ranges, complete resource descriptors and hashes, cell dependencies, spatial envelopes, and simultaneous-camera accounting;
-- atomic base-package output and native package loading;
-- lightmapped opaque rendering, portal traversal, prefetch, Metal I/O, residency installation, and retirement through `RevivalMetal`;
-- whole-retail packed per-room lightmap-area report that ratifies or amends the provisional one-1024-square atlas policy and import overflow rule before those become publisher-binding.
+1. make the Swift 6.3 workspace and strict-concurrency builds green;
+2. make a minimal AppKit player window and document-based editor window;
+3. compile MSL and submit one direct Metal 4 forward pipeline through MTKView;
+4. translate the HOG and D3L structures required to read the complete Training level world into D3Import;
+5. emit one normal checked canonical Level containing all Training rooms, faces, portals, terrain, paths, goals, objects, and the assets reachable through the currently translated product path;
+6. validate the level, construct its resident authoritative world, and prepare the source-evidenced eager working set; later reachable assets load directly from canonical content added with the behavior path that needs them and remain owned by the level;
+7. render it through the translated room visibility path in RevivalMac and RevivalEditor;
+8. derive an editable complete-level project value from the read-only imported base, select the acceptance room, a face, or an object, make one real edit with named undo and redo, save, close, and reopen;
+9. create a disposable play-session copy and enter free-camera play through the same world, loader, simulation, and Metal code used by RevivalMac, then return to the document;
+10. on replacement, validate successor CPU content first, then commit by stopping submissions, waiting for final GPU use, releasing the old presentation owner, and preparing the successor; expose a clear unloaded error if post-commit preparation fails;
+11. release the world cleanly on shutdown.
 
-Add `RevivalEditor` as the fifth production target and the real human editor foundation. It provides:
+The production package contains the complete Training level world. Phase 1 accepts only one selected room's rendering and editing, but it does not create a room-scope package, synthetic portal cut, partial `Level`, or migration path that Phase 2 must remove. Tiny one-room worlds are test fixtures only.
 
-- one AppKit `NSDocument`, one `@MainActor EditorSession`, and one primary project window per project;
-- a Project Navigator and active-level Outliner, central tabbed canvas, contextual Inspector, and Problems/Activity pane;
-- a polished inspection-first Metal level canvas with selection synchronized across hierarchy, viewport, Inspector, references, and diagnostics;
-- one-, two-, and four-viewport layouts, standard menus and shortcuts, local layout restoration, keyboard access, and the first VoiceOver evidence;
-- cell boundaries and load-state overlays, camera-envelope, prefetch-shell, destination and lead-time inspection, exact byte diagnostics, and the same shipping streamer used by the player;
-- exactly one last-good and one candidate generation-bound preview layer outside project source, with the active level's complete project-owned GPU blob repacked through the shipping schema, atomic matching-generation replacement, final-GPU-use retirement, and no layer chain;
-- one logical preallocated `DraftOverlay` with exactly three frame-safe slices, each capped to the maximum visible dirty-geometry union across all four supported viewports, that suppresses matching last-good stable IDs and turns a complete drag or scrub into exactly one canonical edit, undo action, generation advance, and candidate build;
-- stable element IDs, the first concrete property edit with named undo and redo, structured source-linked diagnostics, and source-project creation, save, close, reopen, recovery, and deterministic diff behavior for canonical types already present;
-- one synthetic Blender-exported USD room import and reimport through Model I/O with coordinate, topology, UV and provenance diagnostics.
+Use a tiny synthetic fixture for focused parser and renderer tests, but the phase exit uses the owned local Training data. Record red/green evidence, the source-file dispositions, a clean Metal validation run, and optimized M4 startup, memory, and shutdown measurements. Do not add world cells, stream blobs, a job system, fixed-tick simulation, or a zero-allocation mandate.
 
-Exit: the player and editor open the same canonical package with no retail archive mounted. Both stream and render the selected rooms and objects through the shared Metal path, and the editor foundation already behaves as a native document application rather than a temporary viewer.
+Exit: the first real imported room is visible in both native applications; the editor can change and persist something meaningful; editor preview and player use the same resident-world model, loading rules, and renderer with separate owned values; a working build can be launched repeatedly without the legacy runtime.
 
-## Phase 3: flight, collision, and first world editing
+## Phase 2: connected world and real editor-to-play loop
 
-Add runtime support for:
+Extend the same complete-level path across a small connected Training cluster:
 
-- Pyro position, orientation, velocity, thrust, drag, and camera;
-- the profile-persisted keyboard ramp-duration setting, transient held-key ramp and the new native reset-on-focus-loss/pause/load/remap rules, simultaneous translation axes and trichording, and mouse and controller six-degree-of-freedom mappings;
-- separately ratified mass, thrust, exponential per-axis drag, rotational thrust and drag, turn roll, afterburner, `PF_WIGGLE` ship bob versus cockpit shake (with the authority decision), outdoor thrust scalar, and related impulse curves at 120 Hz;
-- swept movement against room faces with explicit wall slide, bounce, tangential and corner response;
-- portal crossing, room ownership, repeated cross-cell churn, and maximum-speed spatial-envelope readiness under the fixed lead-time inequality;
-- restart, pause, and render interpolation.
+- render and traverse connected room/portal topology with face materials, lightmaps, models, objects, and the player start already represented by the complete Level;
+- translate the original load ordering, eager `PageInAllData` working set, and reachable later asset paging into canonical import evidence;
+- add room/portal traversal, selection across connected rooms, and useful reference navigation;
+- add direct transforms and property editing for the canonical room, face, portal, object, and start values now present;
+- add validation for malformed topology, broken references, and incomplete dependencies;
+- extend editing of the Phase 1 complete-level project across the connected cluster;
+- save, reopen, and deterministically diff the native project;
+- launch the cluster through the shipping simulation and renderer from the editor and return to the same document, selection, and useful camera state;
+- add the first Blender-exported USD room import only if it helps this concrete cluster workflow.
 
-Add editor support for:
+Measure the released lightmap representation across the selected rooms before choosing a new atlas layout. Preserve the working imported representation until that evidence supports a simpler canonical form.
 
-- deriving an imported canonical document into an editable project replacement without changing the base package;
-- creating and changing rooms, typed room roles, vertices, faces, portals, materials, UVs, objects, and player starts needed by the slice;
-- transforms, snapping, duplication, naming, undo, redo, and structural validation;
-- synchronized selection and focus, direct and numeric edits, gesture-coalesced named undo, reference navigation, and streaming budget repair diagnostics;
-- play-in-editor with return to the same selection and document state.
+Exit: player and editor open the same connected cluster with no retail archive mounted. A creator can modify, validate, save, reopen, and play it without a temporary export or a second world path.
 
-Run a nonshipping reference-capture pass with scripted input sequences against the old executable where the evidence path is practical. Plot input, position, orientation, linear and angular velocity, and collision points. The comparison has no parity threshold: each intentional native curve is ratified once and becomes the automated contract, then the old capture leaves the active test path.
+## Phase 3: flight, collision, terrain evidence, and timing decision
 
-Exit: the player can fly through the imported cluster, and a creator can modify that cluster or build a small new connected room set, validate it, save it, reopen it, and fly it through the shipping simulation.
+Translate:
 
-## Phase 4: first playable combat and behavior slice
+- keyboard, mouse, and controller input mapping, ramps, simultaneous axes, mouselook, and autoleveling used by the selected path;
+- Pyro position, orientation, linear and angular velocity, thrust, mass, drag, turn roll, afterburner, ship wiggle, and camera behavior;
+- swept collision, wall slide, bounce, corner response, portal crossing, room ownership, and restart;
+- any outdoor terrain representation, visibility, and LOD needed by the first chosen outdoor reference scene.
 
-Before this phase, author and review `revival-behavior-system` and `revival-volumetric-navigation`.
+Pass the historical timing state explicitly through the translated order. Systems and `EVT_INTERVAL` receive the previous `Frametime` and pre-update `Gametime`; after cap waiting, `CalcFrameTime` stores the new duration, then `GameFrame` advances `Gametime` before the remaining tail work. Preserve the static/`InitGame` 0.1-second initialization and nested `StopTime`/`StartTime` rebasing. Capture scripted reference traces from the native C++ build for input, pose, velocity, collision contacts, portal ownership, interval events, animations, and this old/new time handoff. Compare native results with declared tolerances and explain each difference. Moving measurement to callback start is a modernization and must be recorded as such.
 
-Add runtime support for:
+Then make one timing amendment before behavior breadth spreads:
+
+- retain bounded variable delta and ratify its pause/cap/replay rules; or
+- select one fixed tick, translate every current elapsed-time consumer, define catch-up/interpolation/input rules, and delete the variable scheduler.
+
+Do not retain a compatibility mode. The timing decision is complete only when flight, collision, current animation, editor play, and current tests use one scheduler.
+
+Editor work adds geometry and object transforms, numeric editing, snapping, structural validation, collision diagnostics, and play-in-editor return.
+
+Exit: a player can fly the imported cluster with the intended feel, and a creator can change the spaces and immediately fly them. One measured timing model remains.
+
+## Phase 4: first combat and behavior chain
+
+Before implementation, author and review the behavior and volumetric-navigation skills from the actual translated Training dependencies.
+
+Translate one complete source call chain for:
 
 - one animated door;
-- one trigger and the first `BehaviorProgram` executor;
-- one robot with a small explicit state machine;
-- the first deterministic room/portal and sparse 3D-node route, including clearance, one dynamic blockage and bounded replan;
-- one weapon, projectile, collision, damage, and death path;
+- one trigger and its event order;
+- one robot's AI state, room/portal or node route, steering, blockage, and recovery;
+- one weapon, projectile, collision, damage, death, and effect path;
 - one pickup;
-- the five-value difficulty selection and each active difficulty-owned rule exercised by this slice;
-- the first required room-role behavior, including fixed-tick refueling if the selected cluster contains an energy center;
-- animated cockpit, HUD, instructional messaging, positional sound, and the narrow OSF-with-ACM import decoder if required for score streams, mission voice, or taunts;
-- one-way retail bitmap-font conversion when the first selected stock HUD, briefing, or TelCom consumer requires it;
-- new-format save and reload.
+- the difficulty rules, room role, sound, message, HUD, and cockpit behavior exercised by the slice;
+- new native save and reload.
 
-Add editor support for:
+Account for the generated DALLAS block and every handwritten range used by the selected interaction. Implement only the behavior operations the chain needs as canonical direct typed Swift behavior. Before proposing a different authored representation or executor, the working evidence must cover at least one generated DALLAS chain, one handwritten or custom range, one timer or persistent-state chain, and one presentation-oriented chain; one chain may cover several categories. Change the direct runtime only when concrete human-authoring cases prove it inadequate. Do not load native code or cap the eventual creator system at stock operations.
 
-- placing and configuring the door, trigger, robot, weapon, pickup, HUD message, and sound source;
-- the first typed `BehaviorGraph` event, conditions, queries, commands, variables, timer, compiler diagnostics, trace, and breakpoint;
-- validation and play-in-editor for the complete combat interaction.
+The editor can place and configure the door, trigger, robot, weapon, pickup, sound, message, route, and current behavior state; validate them; play the full interaction; and navigate a runtime failure back to its source.
 
-Exit: the Training combat slice passes every Phase 4 item in `verification.md`. A creator can rebuild the interaction in a new project without hand-editing generated files. Record the first Instruments and Metal baseline profiles.
+Exit: the selected Training combat slice is playable and can be reconstructed in a new native project without hand-editing generated files.
 
-## Phase 5: complete Training Mission
+## Phase 5: complete Training and measure the architecture
 
-Before this phase, author and review `revival-replay`.
+Complete every runtime and creator dependency of the Training Mission:
 
-Expand import, renderer, simulation, AI, weapons, behaviors, messages, audio, adaptive music, difficulty, typed room roles, refueling, in-game cinematics, cockpit, automap, markers, required rear or GuideBot views, selected production fonts, and content to complete Training. Add the narrow OMF importer and canonical adaptive-score conversion when its first stock theme is required. Add the narrow MVE importer and AVFoundation transcode here if Training requires it; otherwise add it with the first level that does.
+- behaviors, goals, failure/restart, difficulty branches, room roles, AI, weapons, GuideBot, instructional presentation, selected stock fonts, cockpit, automap, markers, cinematics, audio, adaptive music, saves, and replay;
+- matching campaign, behavior, path, navigation, presentation, score, localization, validation, playtest, and publishing operations;
+- complete source-file and behavior-range dispositions for the mission.
 
-Complete the matching authoring surfaces for Training:
+Run the resident-level evidence gate in [World loading and residency](world-streaming.md) using complete Training, the largest imported indoor and outdoor levels then available, repeated editor/player transitions, and a representative higher-resolution replacement experiment.
 
-- goals, hand-authored paths, volumetric navigation topology and diagnostics, GuideBot configuration, failure and restart rules, and mission transition;
-- behavior functions, subgraphs, persistent state, debugging, and operation-limit evidence;
-- Training campaign metadata, briefing, instructional presentation, adaptive-score regions and transitions, audio, and localization;
-- dependency closure, package publishing, install, and replay of the completed mission.
+If resident loading meets ratified startup, responsiveness, and memory budgets, ratify it for the following phases and stop speculative streaming work. A later representative workload may reopen the decision only by demonstrating a missed budget and following the amendment gate. If it misses a current budget, compare simpler encoding, duplicate-removal, and load-order fixes before proposing one narrow resource-lifetime amendment. No phase automatically creates a streamer.
 
-Ratify gameplay and editor responsiveness budgets from this finished workload and confirm or tighten the Phase 1 streaming constants against the complete mission without changing the streaming architecture.
+Also establish the first credible optimized CPU, GPU, allocation, memory, import, load, and editor responsiveness budgets. Optimize only measured hot paths.
 
-Exit: a new player can start and complete Training using canonical content. A creator can inspect, change, validate, play, package, reinstall, and complete the native Training project through the integrated tools.
+Exit: a new player can complete Training from canonical content, and a creator can inspect, change, validate, play, package, reinstall, and complete the native Training project. The resource-lifetime architecture has a recorded M4 decision.
 
-## Phase 6: base campaign and matching authoring coverage
+## Phase 6: base campaign, level by level
 
-Bring up level 1 end to end, then proceed through the campaign graph. Implement each secret branch when its entry first becomes reachable. For every level:
+Bring up level 1 end to end, then follow the campaign graph. Implement each secret when its entry becomes reachable. For every level:
 
-1. close the import dependency graph;
-2. complete its behavior translation ledger;
-3. write and run the focused failing test for the next missing observable contract;
-4. add the smallest production change that turns it green;
-5. add the matching creator operation, inspector, validation, and playtest path through its own red-green slices;
-6. play, save, replay, reload, and complete the level;
-7. keep performance and regression evidence green.
+1. close its source-file and import dependency accounting;
+2. close its generated and handwritten behavior accounting;
+3. add the next missing runtime contract through red, green, and refactor;
+4. add the matching authoring, validation, playtest, and publishing operation;
+5. play, save, replay, reload, and complete the level;
+6. record intentional differences and keep the M4 budgets green.
 
-This phase adds streamed fixed 32-by-32-quad authored-resolution outdoor terrain and seam, spatial-envelope and lead-time evidence, reusable rooms, complete typed room roles and refueling behavior, broader geometry tools, materials, mirrors, specular response, scorch decals, procedural textures, volumetrics, required blend semantics, more robots and AI, weapons, inventory, GuideBot, doors, triggers, paths, navigation, matcens, goals, ambient systems, weather, lighting, adaptive music, in-game cinematics, briefings, movies, TelCom-style presentation, complete cockpit and automap behavior, remaining rear and auxiliary views including guided-weapon and marker cameras, broader native haptics, effects, bosses, campaign state, approved cheat, easter-egg, and diagnostic effects as their dependencies and per-command policies are established, and their required game-data editors as content reaches them.
+This phase grows terrain and environment, reusable rooms, geometry tools, materials, mirrors, specular response, decals, procedural surfaces, volumetric lighting, blend semantics, robots, bosses, weapons, inventory, GuideBot, doors, triggers, paths, navigation, matcens, goals, ambient systems, weather, lighting, music, cinematics, briefings, movies, TelCom-style presentation, cockpit, automap, cameras, haptics, effects, campaign state, and approved command effects as real levels require them.
 
-Exit: the complete base campaign and every stock secret level pass their player gates. Every runtime capability introduced by the base campaign can be authored and tested in `RevivalEditor`.
+Exit: the complete base campaign and every stock secret pass player gates, and every introduced capability has its native creator path.
 
-## Phase 7: Mercenary and expansion authoring coverage
+## Phase 7: Mercenary
 
-Apply the same level-by-level process to Mercenary. Reuse base systems and add expansion-specific runtime, behavior, content, and editor capabilities only where its evidence requires them.
+Apply the same level-by-level process to Mercenary. Reuse verified native systems and add expansion-specific behavior, content, presentation, and editor work only where source and content require it.
 
-Exit: Mercenary can be played through its ending with no legacy runtime component. All expansion-specific features have matching native authoring, validation, and playtest paths.
-
-The old source remains available because editor, multiplayer, replay, and utility capabilities are not yet implemented and verified and may still require historical answers. Campaign completion alone does not trigger its retirement.
+Exit: Mercenary completes with no legacy runtime component and complete source accounting for the expansion track.
 
 ## Phase 8: complete campaign and content creation
 
-Close every remaining non-multiplayer creator row through six execution work packages. They may overlap, but each closes named ledger rows with editor save, reopen, validation, playtest, and publishing evidence. They are groupings inside the existing `RevivalEditor`, not new targets or a second workspace architecture.
+Close every remaining non-multiplayer creator row:
 
-### 8A. World construction closure
+- world and terrain construction, materials, lighting, navigation, reusable content, diagnostics, and repair;
+- game definitions for ships, robots, weapons, doors, objects, physics, AI, effects, audio, cockpit, HUD, and haptics;
+- behavior, campaign, adaptive-score, briefing, cinematic, localization, and presentation authoring;
+- deterministic builds, dependency and orphan audits, recovery, templates, validation, play-in-editor, and publishing;
+- an independently authored campaign beginning from an empty native project;
+- task-based human workflow, keyboard, VoiceOver, undo, diagnostics, recovery, and M4 responsiveness review.
 
-Land the Blender-to-USD import and stable reimport workflow first. Then complete indoor geometry operations, outdoor terrain, reusable-room workflows, typed room-role and functional-metadata editing, native room and portal construction, primary UVs, validated secondary lightmap UVs, materials, mirrors, specular response, declared blend semantics, procedural surfaces, water, fog, volumetrics, scorch behavior, sky and environment, animated lighting, diagnostic views, viewport bookmarks, and complete object placement.
+Add asynchronous snapshot/revision machinery only for operations that are now genuinely long-running, and keep it local to the smallest useful ownership boundary.
 
-### 8B. Game definitions and player presentation closure
+Exit: every non-multiplayer creator row passes and the independent campaign installs and completes in RevivalMac.
 
-Complete robots, powerups, buildings, clutter, ships, weapons, doors, lights, sounds, ambient patterns, physics, animation, AI, death, inventory, effects, archetype definitions, difficulty-scaling opt-outs, difficulty-selectable playtest, adaptive-score authoring, cockpit and HUD definitions, automap metadata, auxiliary-view layouts, marker presentation, haptic bindings, and non-multiplayer media.
+## Phase 9: multiplayer, replay, hosting, and multiplayer creation
 
-### 8C. Behavior, campaign, and presentation closure
+Author and review networked-simulation, transport-security-operations, multiplayer, replay, and verification skills against the working final simulation model.
 
-Complete typed behavior authoring, functions, subgraphs, scopes, authority and presentation-role declarations, difficulty queries, debugging, tests, documentation, campaign graphs, secrets and returns, ship-selection rules, progress presentation, adaptive-score assignments, briefings, TelCom-style screens, purpose-built cinematic sequences, messages, canonical fonts, localization, media import, and preview. Phase 9 adds the multiplayer command-event declarations to this same workspace.
+Add RevivalRelay and implement the selected native direction:
 
-### 8D. Build and iteration closure
+- Network-framework QUIC for direct Bonjour LAN and outbound public relay connections;
+- host-authoritative simulation for 2–32 connected humans, including live observers;
+- CryptoKit-protected authority/client records across relay legs;
+- public discovery, registration, join authorization, bounded opaque relay, operations, and explicit outage behavior;
+- dedicated no-window hosting through RevivalMac using RevivalCore;
+- content and simulation agreement, prediction, reconciliation, interpolation, replay, desync evidence, chat, moderation, host commands, and safe custom media;
+- the enumerated stock modes including campaign co-op;
+- multiplayer map, mode, behavior, validation, test, and publishing tools;
+- explicit adopt-or-exclude decisions for historical lobby chat, rankings, persistent pilot stats, and join-time package acquisition.
 
-Complete the deterministic CPU lighting solve, room-local lightmap products, deterministic room/portal/clearance/3D-node navigation bake, validation and repair, statistics, dependency and orphan audits, streaming-cell, spatial-envelope, lead-time and simultaneous-camera reports and refusal, autosave and crash recovery, project templates, semantic-revision comparison and release-blocking diagnostics, package publishing, play-in-editor, and the campaign and content portion of the native mod SDK using the same projects, behaviors, packages, validation, and publisher as first-party content.
+Detailed security and packet contracts are fixed immediately before their implementation and tested at the untrusted boundary. They do not create defensive branches inside trusted simulation code.
 
-### 8E. Independent campaign certification
-
-Build an independently authored campaign that starts from an empty project and uses indoor and outdoor spaces, custom content definitions, behavior, presentation, saves, and replay. Do not use hand-edited generated data or legacy tools.
-
-### 8F. Human creator experience certification
-
-Certify the complete non-multiplayer workflow as a native Mac product: predictable selection and focus across navigator, Outliner, canvases, Inspector and Problems; direct, numeric, keyboard and VoiceOver edit paths; named undo and redo; source-linked diagnostics and repair; responsive viewports and commands; cancellable revision-safe background work; source-control-safe saves; crash recovery; streaming overlays and budget repair; and exact return from play-in-editor. Run task-based reviews from empty project to playable room cluster, derived imported level to published replacement, broken reference to source repair, behavior failure to trace and fix, and interrupted edit to accepted recovery.
-
-These work packages do not include the Phase 9 multiplayer authoring closure and do not weaken the Phase 8 exit gate.
-
-Exit: every non-multiplayer creator row in the [functional-completeness ledger](functional-completeness-ledger.md) passes, every applicable imported campaign capability has an authoring counterpart, and the independent campaign installs and completes in `RevivalMac`. The full creator-completeness gate remains open until Phase 9 adds multiplayer maps and modes.
-
-## Phase 9: native multiplayer, relay service, dedicated hosting, and multiplayer creation
-
-Before this phase, author and review `revival-networked-simulation`, `revival-transport-security-operations`, `revival-multiplayer`, `revival-replay`, and `revival-verification` against the fixed transport, security, authority, replay, and operations contracts.
-
-The transport and availability design is already fixed: Network-framework QUIC, Bonjour LAN discovery, a project-operated public rendezvous and relay service, host-authoritative simulation, and no legacy packet or server compatibility. Phase 9 implements that contract; it does not reopen Game Center, direct-IP Internet hosting, ICE/STUN/TURN, the original reliability layer, native game modules, or the server ABI.
-
-Add the sixth and final target, `RevivalRelay`, as a no-window Apple-Silicon/macOS service containing only registration, discovery, join authorization, QUIC envelope routing, health and abuse controls, and operations. It never loads content or runs simulation.
-
-Implement and verify:
-
-- import and canonicalize the stock multiplayer maps and their required retail dependency closures;
-- the enumerated stock modes including Anarchy, Team Anarchy, Hyper-Anarchy, Robo-Anarchy, CTF, Entropy, Hoard, Monsterball, and campaign co-op with robots, GuideBot, and campaign scripts under multiplayer authority;
-- explicit adopt-or-exclude decisions for PXO-class lobby chat, rankings, and persistent pilot stats, GameSpy-style discovery coexistence, and join-time mission auto-download, each recorded in the ledger before Phase 9 closes;
-- authoritative session ownership and state replication appropriate to the selected game modes;
-- Bonjour LAN discovery plus public registration, browse, join, outbound relay connection, authority proof of possession, unguessable routes, short leases, single-use client-bound join tokens, bounded pre-allocation and traffic, registration expiry, fail-closed control-plane outage, terminal relay-data outage, version and content negotiation, failure recovery, and abuse-resistant input validation;
-- ephemeral X25519 agreement, per-session Ed25519 authority proof, HKDF-SHA256 directional ChaChaPoly keys, authenticated visible routing headers, monotonic sequence and epoch nonce rules, replay rejection, rekey, and the same inner record codec on LAN and relay routes;
-- exact `simulationSemanticRevision` agreement and content-revision negotiation before authoritative participation;
-- host-selected five-value difficulty as immutable authoritative session configuration;
-- bounded UTF-8 public, team, and private text chat with identity, rate limits, mute, block, moderation, privacy policy, and no raw command execution;
-- one typed host-operator command set exposed through local input and authenticated encrypted remote administration, with authorization and audit but no Telnet, shell, or arbitrary process execution;
-- classification and translation of every required historical server-side and client-presentation behavior event, with declared authority, replication, persistence, and replay treatment;
-- secure player pictures, ship logos, and audio taunts with hash identity, format and decoded-data bounds, transfer and cooldown limits, app-controlled storage, malformed and active-payload rejection, mute and disable controls, consent where required, and host policy;
-- no-window dedicated hosting through the `RevivalMac` executable, using the same `RevivalCore` simulation and network ownership as graphical sessions;
-- the declared 2–32 connected human slots without reducing the historical maximum to Game Center's 16-participant ceiling; live observers consume a human slot, listen hosts consume one, and no-window authorities and relays consume none;
-- complete local-ship prediction from tick- and sequence-numbered resolved six-degree-of-freedom inputs, authoritative snapshots with the acknowledged input and complete future-affecting movement state, replay of all remaining unacknowledged inputs, a fixed 256-input history with hard resync, presentation-only correction smoothing, remote interpolation, bounded loss extrapolation, and separate weapon-family latency policy;
-- the enumerated stock game-mode set including campaign co-op, or explicit modern counterparts recorded in the completeness ledger, plus recorded adopt-or-exclude decisions for lobby/rankings/stats and join-time package acquisition;
-- deterministic recording, replay, diagnosis, and desync evidence for authoritative session state, plus explicitly declared observer, client, transport, and presentation evidence without a second replay engine;
-- multiplayer maps, starts, teams, mode rules, session behaviors, validation, local multi-instance testing, package dependencies, and publishing in `RevivalEditor`;
-- multiplayer mod-SDK documentation and synthetic examples, completing the native SDK.
-
-Exit: supported modes complete repeatable local and network test matrices; one 32-connected-human-slot session including live observer transitions joins, plays, and completes within measured authority and relay budgets; the project-operated relay passes deployment, cryptographic-opacity and exact outage tests; dedicated hosting passes its lifecycle tests; replay reproduces declared session evidence; and a newly authored multiplayer package can be created, validated, hosted, joined, completed, and replayed using only native tools. The complete creator-suite gate now passes.
+Exit: local and relay-backed matrices pass through 32 connected human slots; dedicated hosting and outage behavior are proven; a new multiplayer package can be authored, hosted, joined, completed, and replayed through native tools.
 
 ## Phase 10: complete revival release
 
-- close every remaining functional-completeness ledger row or record an approved scope amendment;
-- finalize import, project, package, save, replay, multiplayer, and diagnostics UX;
-- prove atomic reimport and package publication failure safety;
-- verify compatible and incompatible simulation and content revision handling, explicit migrations where supported, and narrowly scoped rejection diagnostics;
-- complete settings and accessibility required by the product;
-- verify controllers, displays, audio, movies, editor lifecycle, multiplayer lifecycle, and long sessions;
-- sign, notarize, staple, and test Gatekeeper for both applications and the bundled importer;
-- run full campaign, independent-campaign, creator-suite, multiplayer, replay, memory, performance, and clean-account matrices;
-- document retail selection, local converted-content storage, project backup, package installation, hosting, and mod creation.
+- close every functional-completeness row or record a user-approved scope amendment;
+- close every relevant source file and behavior range with a final disposition;
+- delete or archive every temporary research harness, adapter, and reference-only build artifact from product paths;
+- finalize import, project, package, save, replay, multiplayer, and diagnostic UX;
+- verify compatible and incompatible public data revisions and add only the migrations real released formats require;
+- complete settings, accessibility, controller, display, audio, movie, long-session, and clean-account matrices;
+- sign, notarize, staple, and Gatekeeper-test the player, editor, and bundled importer;
+- run complete campaign, independent campaign, creator, multiplayer, replay, memory, and performance matrices.
 
-Retirement gate: remove the released C++ engine, old build workflow, and legacy launcher from the active product checkout only after every game, editor, Osiris and DALLAS, briefing, multiplayer, replay, and utility row is implemented and verified, replaced, or explicitly excluded, and no unresolved product question depends on the active tree. Move the reproducible owned-media preparation scripts and provenance documents into a clearly marked nonshipping support archive; no product target invokes them. Repository history, the pinned upstream commit, provenance, and hashes remain as evidence.
+The released C++ tree may leave the active checkout only after no ledger row, source disposition, or unresolved product question depends on it. Repository history, pinned upstream identity, provenance, and hashes remain evidence.
 
-Exit: signed and notarized native macOS player and editor applications deliver the complete ledgered revival with no legacy source or build workflow in the active product tree.
+Exit: signed and notarized native macOS player and editor applications deliver the complete revival with no legacy source or executable in a product path.
 
 ## Phase 11: visual and experiential development
 
-Continue improving the stable native product:
+Improve the stable product with higher-resolution art, models, animation, lighting, materials, effects, spatial audio, replacement music, interface work, accessibility, campaigns, multiplayer content, and creator workflows where rights permit.
 
-- higher-resolution textures and interface art;
-- higher-detail models and animation;
-- new lighting, materials, particles, fog, weapon effects, and post-processing;
-- spatial audio and replacement music where rights permit;
-- UI and accessibility improvements;
-- new campaigns, multiplayer content, and creator workflows;
-- replacement-content packages with complete provenance.
+Each engine change begins from a measured limitation in the completed product, chooses one design, and deletes the superseded path. MetalFX, spatial streaming, sparse resources, a different terrain strategy, or another DCC ingress are possible amendments; none is preinstalled as a framework or permanent alternate.
 
-Visual work stays inside the accepted direct forward renderer and fixed-cell world-streaming model. MetalFX, a render graph, sparse resources, mip streaming, runtime terrain LOD, a second resident path, an OpenGL reference mode, and legacy asset-editing paths require an explicit architecture amendment rather than entering as opportunistic upgrades.
-
-Only after Phase 10 certifies the complete human creator suite may a later product amendment design local automation, MCP tools, or agent training and evaluation. That future work must adapt the stabilized human edit, validation, playtest, and publishing operations. The current roadmap makes no MCP transport, process, schema, permission, telemetry, or training-corpus decision.
+Only after Phase 10 certifies the complete human creator suite may a later amendment design MCP or agent authoring. It must reuse the mature human operations and may not create a second document, validation, playtest, or publishing model.
 
 ## Outside the current platform boundary
 
-Intel Mac, iOS, visionOS, Windows, Linux, consoles, and web targets are outside the current roadmap. Adding one requires an explicit architecture amendment. No current code carries portability layers for a hypothetical second platform.
+Intel Mac, iOS, visionOS, Windows, Linux, consoles, and web are outside the roadmap. Adding one requires an explicit product amendment. Current code carries no portability layer for a hypothetical target.
 
 ## Immediate next step
 
-Finish the documentation consistency audit. Then complete the functional-completeness ledger and author and review the five Phase 1 project skills. Production code begins only after those gates pass.
+Finish this documentation amendment and its independent reviews. Then record the exact Training Level and acceptance room, complete that level-load/render dependency trace while building it, author the constitution/source-translation prerequisites plus each just-in-time domain skill, and ship the first resident editor/player slice.
