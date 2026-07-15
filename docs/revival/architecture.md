@@ -1,12 +1,12 @@
 # Architecture decision: native semantic translation
 
 - Status: accepted, amended
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: binding product architecture
 
 ## Decision
 
-Build a complete Apple-native Descent 3 game and creator suite in Swift 6.3 and MSL with direct Metal 4. Reach that product through dependency-ordered semantic translation of the pinned released source, keeping the native player and editor runnable together as capability moves across.
+Build a complete Apple-native Descent 3 game and creator suite with the Swift 6.4 compiler toolchain in Swift 6 language mode and with MSL and direct Metal 4. Use the current Xcode 27 beta for initial product work and move to stable Xcode 27 when released without retaining a Swift 6.3 compatibility path. Reach that product through dependency-ordered semantic translation of the pinned released source, keeping the native player and editor runnable together as capability moves across.
 
 The shipping product targets arm64 Macs running macOS 26 or later. It uses AppKit, MetalKit, GameController, AVFoundation, AVAudioEngine, Model I/O, Network, CryptoKit, Foundation, and OSLog directly.
 
@@ -22,7 +22,7 @@ Three kinds of statement must not be confused:
 2. Current implementation decisions select one concrete path for the next phase. They remain binding while implemented and change through a recorded amendment, not through parallel options.
 3. Research hypotheses identify questions to measure. They do not constrain production types, package schemas, or tests before evidence promotes them.
 
-The resident authoritative world with source-faithful asset paging, explicit source-order variable timing, and early shared editor/player loop are current implementation decisions. Spatial streaming and a fixed simulation tick are later hypotheses, not hidden Phase 1 requirements.
+The resident authoritative world with source-faithful asset paging, the explicit old/new variable-time handoff, and the early shared editor/player loop are current implementation decisions. Spatial streaming and a fixed simulation tick are later hypotheses, not hidden Phase 1 requirements.
 
 ## Product and fidelity boundary
 
@@ -45,7 +45,7 @@ Every deliberate behavior change records the source baseline, observable evidenc
 
 Swift gives the game, importer, tests, applications, and editor one language and one ownership model. Use value types and direct ownership first. Borrowing, spans, noncopyable values, explicit specialization, and small audited unsafe regions are available when release-build profiling demonstrates a need; they are not a reason to pre-optimize.
 
-Apple's TrueType interpreter migration is useful evidence for a method—clear ownership, corpus tests, and profile-guided removal of overhead—not a performance prediction or engine template.
+Apple's TrueType interpreter migration is useful evidence for a method—clear ownership, corpus tests, and profile-guided removal of overhead—not a performance prediction or engine template. [Primary technical sources](primary-source-index.md#swift-engine-code-and-performance) preserves that evidence and its limits.
 
 Call Apple frameworks directly. A single platform and implementation do not need interfaces whose only purpose is hiding AppKit, Metal, GameController, AVFoundation, or Network.
 
@@ -66,13 +66,13 @@ Indoor rendering begins with the released room-and-portal traversal and observab
 
 ## World loading and lifetime
 
-The production load unit is one complete canonical level, matching the original D3L world boundary. Phase 1 imports and loads the complete Training level; one selected room is only the first visible and editable acceptance slice. A synthetic one-room level may be a focused fixture but never becomes a second package or runtime mode.
+The production load unit is one complete canonical `Level`, matching the original D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and both applications load the resulting complete canonical `Level`; one selected room is only the first visible and editable acceptance slice. A synthetic one-room level may be a focused fixture but never becomes a second package or runtime mode.
 
-The current implementation keeps that authoritative level world resident until exit. It starts presentation preparation with the source-evidenced `PageInAllData` working set, then permits later source-reachable assets to be prepared directly from canonical content and retained for the rest of the level. The current package contains the complete level topology and every dependency reachable through translated product behavior. It expands when a later phase makes another behavior path executable, rather than analyzing all Osiris, matcen, and dynamic-spawn possibilities before their work begins. The runtime never reopens retail formats, and the design does not claim that every GPU resource existed before original level activation.
+The current implementation keeps that authoritative level world resident until exit. It starts presentation preparation with the source-evidenced `PageInAllData` working set, then permits later source-reachable assets to be prepared directly from canonical content and retained for the rest of the level. The current package contains the complete level topology and every dependency reachable through the currently translated product path. It expands when a later phase makes another path executable, rather than analyzing all Osiris, matcen, and dynamic-spawn possibilities before their work begins. The runtime never reopens retail formats, and the design does not claim that every GPU resource existed before original level activation.
 
 Player and editor use the same dependency rules and resident presentation path. For replacement, validate the successor's canonical CPU content while the current world remains active. At the commit boundary, stop new submissions, wait for final GPU use, and release the old presentation owner before preparing the successor. Failure before commit preserves the old world; failure afterward enters a clear unloaded error state. The design does not silently require two complete GPU level sets.
 
-Do not add world cells, camera-demand envelopes, prefetch shells, stream blobs, LRU policy, or a resident/streaming switch. [World loading and residency](world-streaming.md) defines the post-Training M4 evidence gate and amendment rule. Streaming remains possible only as a measured replacement that leaves one path.
+Do not add world cells, camera-demand envelopes, prefetch shells, stream blobs, LRU policy, or a resident/streaming switch. [World loading and residency](world-loading.md) defines the M4 evidence gate after the complete playable Training Mission and its amendment rule. Streaming remains possible only as a measured replacement that leaves one path.
 
 ## Initial product and ownership graph
 
@@ -88,7 +88,7 @@ D3Import is a separate signed command-line helper launched for explicit import. 
 
 D3Import is the only shipping component that reads the supported owned retail containers and formats. It translates legacy naming, precedence, HOG, level, model, texture, lightmap, font, sound, score, movie, and related semantics into canonical native content as required by the current campaign slice.
 
-It traces the original eager `PageInAllData` working set and the lazy-page paths reached by current translated behavior, including object initialization and later matcen or behavior-driven spawns when those paths enter the product. It writes ordinary checked canonical files for one complete Level and its current reachable dependency manifest; it does not mislabel the historical eager pass as complete closure, invent a room-scope production package, or require future behavior analysis early.
+It traces the original eager `PageInAllData` working set and the lazy-page paths reached by the currently translated product path, including object initialization and later matcen or behavior-driven spawns when those paths enter the product. It writes ordinary checked canonical files for one complete `Level` and its current reachable dependency manifest; it does not mislabel the historical eager pass as complete closure, invent a room-scope production package, or require future behavior analysis early.
 
 ### RevivalCore
 
@@ -139,7 +139,7 @@ Use explicit domain types such as PlayerShip, Robot, Projectile, Door, Pickup, R
 
 Behavior implementation starts with canonical direct typed Swift functions for the actual Training dependency chain, including generated DALLAS ranges and handwritten code. Preserve events, order, timers, variables, persistence, and engine operations required by the slice. A different authored representation or executor requires working evidence across generated DALLAS, handwritten/custom, timer or persistent-state, and presentation-oriented behavior plus a concrete human-authoring limitation. It is not a complete speculative VM designed before the first script runs or an inevitable rewrite.
 
-Shipping packages never contain native executable code. The eventual creator-facing behavior system must replace useful DALLAS and Osiris capability without their generated C++, compiler integration, DLL ABI, or unrestricted engine function table.
+Shipping packages never contain native executable code. Creator-facing behavior authoring must provide the useful DALLAS and Osiris capabilities without their generated C++, compiler integration, DLL ABI, or unrestricted engine function table; it does not predetermine a second runtime representation.
 
 Flying AI begins by translating the released room/portal, outdoor-region, node, path, clearance, steering, and recovery semantics used by the first robot. Simplify or replace them only after observable routes and failure cases exist.
 
@@ -173,4 +173,4 @@ The project rejects:
 
 The project accepts that the first native code may look closer to the source semantics than the final product. That traceability is deliberate. Once a working slice and measurements exist, refactoring can remove legacy-shaped complexity without guessing about what it did.
 
-The result remains one native product: Swift host code, MSL shaders, direct Apple frameworks, one renderer, one current scheduler, one current resource-lifetime path, one canonical world model, and one human-first creator application.
+The result remains one native implementation and product suite: Swift host code, MSL shaders, direct Apple frameworks, one renderer, one current scheduler, one current resource-lifetime path, one canonical world model, and one human-first creator application.

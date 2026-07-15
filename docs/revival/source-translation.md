@@ -1,7 +1,7 @@
 # Source translation discipline
 
 - Status: accepted
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: binding source-accounting and modernization protocol
 
 ## Decision
@@ -55,9 +55,11 @@ Each island is the smallest end-to-end path that can become observable in both t
 
 Temporary research code may be used to learn an unknown format or behavior. It does not enter a shipping target, does not become a second product path, and is deleted or archived as evidence when the question is answered.
 
+The project-local [revival-source-translation skill](../../.agents/skills/revival-source-translation/SKILL.md) supplies the operational trace, evidence, compiler-diagnostic, review, and closure procedure for this loop. It implements this document and cannot override it.
+
 ## Initial fidelity baseline
 
-The production load unit is one complete canonical level, matching the source D3L world boundary. Phase 1 imports and loads the complete Training level while using one selected room as its first visible and editable acceptance slice. Synthetic one-room levels are focused fixtures, not a production package or alternate world type.
+The production load unit is one complete canonical `Level`, matching the source D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and both applications load the resulting complete canonical `Level` while using one selected room as the first visible and editable acceptance slice. Synthetic one-room levels are focused fixtures, not a production package or alternate world type.
 
 The first implementation reproduces these source-supported relationships:
 
@@ -66,12 +68,12 @@ The first implementation reproduces these source-supported relationships:
 - the same canonical world model, dependency rules, and direct Metal renderer in `RevivalMac` and `RevivalEditor`, without concurrent mutation of one instance;
 - one editor-hosted open, inspect, edit, save, play, and return loop;
 - room-and-portal visibility in the first indoor island, followed by terrain geometry LOD and texture-segment selection with UV/tile/rotation behavior when the first outdoor island arrives;
-- the source timing handoff made explicit: systems and `EVT_INTERVAL` consume the old `Frametime` and `Gametime`, then after cap waiting `CalcFrameTime` stores the new duration and `GameFrame` advances `Gametime` before remaining tail work; static/`InitGame` initialization is 0.1 seconds and nested pauses rebase the clock;
+- the source timing handoff made explicit: systems and `EVT_INTERVAL` consume the old `Frametime` and pre-update `Gametime`, then after cap waiting `CalcFrameTime` stores the new duration and `GameFrame` advances `Gametime` before remaining tail work; static/`InitGame` initialization is 0.1 seconds and nested pauses rebase the clock;
 - campaign-ordered translation of the real Training dependencies rather than a speculative engine framework.
 
 The canonical package contains the complete level topology and every dependency reachable through the currently translated product path. When a later phase makes a matcen, dynamic spawn, or behavior path executable, the importer and manifest expand with that same island. This preserves the one-way content boundary without demanding Phase 4 behavior reachability analysis in Phase 1. Source inspection still shows reachable lazy paging, and the retained GPU pre-upload hook does not establish complete GPU readiness before activation.
 
-This baseline is resident per complete level. Phase 5 completes Training as a playable and editable mission; it does not introduce a second, fuller Level type. The baseline is neither a claim that streaming will never be useful nor permission to implement streaming in parallel. The current product has one resident loading path. A different resource-lifetime design requires the measured amendment described in [World loading and residency](world-streaming.md), and the replacement must leave one production path.
+This baseline is resident per complete level. Phase 5 completes Training as a playable and editable mission; it does not introduce a second, fuller Level type. The baseline is neither a claim that streaming will never be useful nor permission to implement streaming in parallel. The current product has one resident loading path. A different resource-lifetime design requires the measured amendment described in [World loading and residency](world-loading.md), and the replacement must leave one production path.
 
 ## What does not transfer
 

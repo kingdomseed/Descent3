@@ -1,7 +1,7 @@
 # Source translation ledger
 
 - Status: Phase 0 seed
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: execution record under [Source translation discipline](source-translation.md)
 
 ## Use
@@ -12,20 +12,26 @@ Seed the likely source owners before a dependency island begins. Trace its real 
 
 Allowed dispositions are translate, platform replacement, import only, superseded mechanism, evidence only, exclude, and deferred. A mixed legacy file may have more than one disposition with named ranges or symbols.
 
-States are seed, traced, translating, native-running, verified, replaced, excluded, or deferred. `Traced` requires exact relevant symbols, callers, ordering, and attached evidence; a high-level file summary remains `seed`.
+States are seed, traced, translating, native-running, verified, replaced, excluded, or deferred. `traced` requires exact relevant symbols, callers, ordering, and attached evidence; a high-level file summary remains `seed`.
+
+Record only translation hazards actually present in the current island inside the existing role or contract text: observable evaluation order and side effects; build-mode, macro, or compile-variant behavior; numeric conversion, truncation, overflow, or sentinel handling; index and capacity assumptions; and ownership, aliasing, reentrancy, or teardown order. Do not add empty checklist fields or create a project-wide lifetime inventory. When review finds a repeatable source-to-Swift error, record the concrete rule and audit previously translated rows for the same pattern.
+
+`translating` includes code that only builds, links, or reaches an entry point. `native-running` requires the row's observable contract to execute through the applicable real shipping or creator path with focused green evidence. `verified` is the terminal state for translate, import-only, and evidence-only work after its source or reference comparison, deliberate differences, and applicable island evidence close. `replaced` requires the named platform replacement or superseding native mechanism to satisfy the row's observable contract with the same applicable evidence; naming a replacement is not enough. `excluded` requires approved reachability or scope evidence. `deferred` requires a named roadmap phase or missing dependency and proof that the deferred behavior is not required by the current claimed result.
+
+Named ranges in a mixed-disposition file may share one state only while every range has reached that state. Split the row when their states diverge. A stub, stand-in constant, disabled production branch, reduced placeholder limit, or skipped test protecting the current contract cannot advance a row. Any other nonexecuted test must be inapplicable under an approved terminal disposition with replacement or removal evidence; an explanation alone is insufficient.
 
 ## Phase 1 level and acceptance-room record
 
-Complete this record before Training import production begins. It is intentionally unresolved here rather than inventing a room identity from memory. The acceptance room narrows visual and editor proof; it does not cut the imported Level.
+Complete this record before Training import production begins. Full-build source establishes the Training mission name and archive; the exact inner D3L and acceptance-room fields remain unresolved until the owned retail trace supplies evidence. The acceptance room narrows visual and editor proof; it does not cut the imported `Level`.
 
 | Field | Recorded decision |
 | --- | --- |
-| Mission and level key | Not yet recorded; blocking the Training import island |
+| Mission and level key | Full-build `Descent3/menu.cpp` identifies `Pilot Training` and loads `training.mn3`. The OEM fallback in `Descent3/Mission.cpp` corroborates `trainingmission.d3l`, but the owned retail MN3/D3L trace must confirm that inner filename. Record the confirmed source identity and project-owned canonical mission and `Level` keys before production import. |
 | Complete-level evidence | Record D3L identity, room/portal/terrain/object/path/goal counts, and proof that no topology was trimmed |
 | Acceptance-room identity | Not yet selected |
 | Selection reason | Must exercise a useful portal boundary, real lightmap/material data, at least one placed object, and a manageable first dependency island |
 | Connected portal neighbors | Record the room's actual connected edges used by traversal proof; all connected rooms remain in the complete Level |
-| Dependency capture | Attach the full-level `PageInAllData` trace plus owned local import evidence for textures, lightmaps, models, objects, effects, and sounds; add lazy behavior dependencies only when their product paths are translated |
+| Dependency capture | Attach the full-level `PageInAllData` trace plus every lazy dependency reachable through the Phase 1 product path, including object initialization, with owned local evidence for textures, lightmaps, models, objects, effects, and sounds. Add later matcen, spawn, and behavior dependencies with the islands that make those paths executable. |
 
 ## Phase 1 complete-level and acceptance-room seed
 
@@ -45,11 +51,11 @@ Complete this record before Training import production begins. It is intentional
 | Descent3/terrain.cpp | Terrain world data and update helpers | D3Import, RevivalCore, RevivalEditor | Translate source representation needed by first outdoor slice; retain historical grouping meaning without inventing stream cells | seed |
 | Descent3/terrainrender.cpp | Terrain visibility, LOD, sky and environment rendering | RevivalMetal | Translate observable terrain presentation before an M4 simplification decision; replace renderer API calls with Metal | seed |
 | Descent3/object.cpp | Placed object lifecycle, room ownership, roles and level dependency paging | D3Import, RevivalCore | Translate object values and current lifecycle; account for eager and reachable lazy dependencies in the canonical manifest | seed |
-| Descent3/render.cpp | Room/portal traversal, face rendering, lightmaps, mirrors and special paths | RevivalMetal, RevivalCore | Translate visibility and current first-room material semantics; replace rend/OpenGL API; defer unused effects to their first scene | seed |
+| Descent3/render.cpp | Room/portal traversal, face rendering, lightmaps, mirrors and special paths | RevivalMetal, RevivalCore | Translate visibility and the selected acceptance room's current material semantics; replace rend/OpenGL API; defer unused effects to their first scene | seed |
 | renderer/HardwareOpenGL.cpp | Concrete blend, texture, fog and raster behavior | RevivalMetal | Evidence only for observable render states and reference images; no API or backend translation layer | seed |
 | Descent3/gametexture.cpp | Texture animation, flags, UV sliding and definition use | D3Import, RevivalCore, RevivalMetal | Translate fields and current behavior reached by the room; defer unused families explicitly | seed |
 | Descent3/lightmap_info.cpp | Lightmap-info handles, UV metadata, and sampling relationships | D3Import, RevivalMetal, RevivalEditor | Translate source-faithful imported metadata first; do not assign atlas packing to this file | seed |
-| editor/editor_lighting.cpp | `SqueezeLightmaps`, padded 128-by-128 atlas packing, UV2 rewrite, and lighting tools | D3Import, RevivalEditor | Preserve imported page and UV2 meaning; record the global handle bound; defer native bake layout until measured | seed |
+| editor/editor_lighting.cpp | `SqueezeLightmaps`, padded 128-by-128 page packing, UV2 rewrite, and lighting tools | D3Import, RevivalEditor | Preserve imported page and UV2 meaning; record the global handle bound; defer native bake layout until measured | seed |
 | bitmap/lightmap.cpp | Lightmap allocation and global handle guards | D3Import, RevivalMetal | Translate used allocation and format semantics; replace global tables with direct ownership | seed |
 | lib/lightmap.h | `MAX_LIGHTMAPS` and lightmap data contracts | D3Import, RevivalMetal | Evidence and translated limits where the selected format requires them; do not call the page sequence unbounded | seed |
 | bitmap/bitmain.cpp | Bitmap residency accessors and reachable lazy loading | D3Import, RevivalMetal | Import bitmap semantics and translate direct canonical preparation; exclude legacy global cache mechanics | seed |
@@ -82,4 +88,4 @@ The level and acceptance-room record closes before Training import production be
 5. attach a focused reference capture, fixture, or source checkpoint to each translated contract;
 6. record the planned native file or type only after the first red test makes that ownership concrete.
 
-Phase 1 closes only when all rows reached by the complete-level load and acceptance-room result are native-running or deliberately deferred behind a named later behavior. “Seed” is not completion.
+Phase 1 closes only when every row reached by the complete-level load and acceptance-room result is `verified`, `replaced`, `excluded` with evidence, or deliberately `deferred` behind a named later behavior. `seed`, `translating`, and `native-running` are interim states.

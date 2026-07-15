@@ -1,7 +1,7 @@
 # Adaptive music
 
 - Status: accepted, amended
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: binding adaptive-score runtime, import, persistence, and authoring contract
 
 ## Historical evidence
@@ -31,30 +31,31 @@ Historical utilities are evidence, not the product model. `legacy/musicutils` ta
 - pending logical transition intent;
 - gameplay-derived inputs and explicit elapsed-time or final-scheduler timers that the approved score rules use.
 
-`RevivalMac` owns `AVAudioEngine`, decoded buffers, sample clocks, measure-boundary scheduling, fades, interruption handling, and device recovery. It consumes typed score commands from `RevivalCore` and reports bounded completion or cancellation results. Audio timing never changes authoritative gameplay state.
+`RevivalMac` and `RevivalEditor` each own an `AVAudioEngine` instance and call the same concrete project-owned score-presentation code directly. RevivalMac consumes typed gameplay score commands; RevivalEditor uses the same scheduling, fade, interruption, and recovery code for preview. Decoded buffers, sample clocks, and audio-device state remain presentation ownership and never change authoritative gameplay state.
 
-The canonical model stays narrow. It represents regions, named theme roles, stream references (historical OSF beds with ACM payloads, normalized at import), loop ranges, transition rules, and musical alignment needed by imported and newly authored scores. It is not a general digital-audio workstation, MIDI engine, or second behavior language. Saves restore only the logical region index required for coherent resume, matching the historical single-region persistence.
+The canonical model stays narrow. It represents regions, named theme roles, stream references (historical OSF beds with ACM payloads, normalized at import), loop ranges, transition rules, and musical alignment needed by imported and newly authored scores. It is not a general digital-audio workstation, MIDI engine, or second behavior language. The historical save baseline stores one logical region index. Native saves begin with that minimum and add only state proven to affect future logical selection.
 
 ## Behavior contract
 
-The first translated behavior chains call named typed operations to select a score region and request a supported score state. The eventual canonical behavior model exposes those same operations for creators. Scope and authority are explicit where the source path requires them. A stock translation records whether an original request targeted one player, the authoritative session, or every participant.
+The first translated behavior chains call named typed operations to select a score region and request a supported score state. The same operations form the creator-facing score domain surface. Scope and authority are explicit where the source path requires them. A stock translation records whether an original request targeted one player, the authoritative session, or every participant.
 
 The historical region action contains an ambiguity between its “specific player” comment and the multiplayer state value it submits. The translation ledger must resolve that case explicitly. The new language does not reproduce accidental zero-value or recipient conventions.
 
-Historical interval score logic first receives the explicit old `Frametime` and pre-update `Gametime`, preserving the source's later post-cap time update, pause ordering, and rate behavior. When Phase 3 selects the final simulation scheduler, every current score timer is converted once to that model and the superseded timing adapter is deleted. Presentation scheduling always uses the audio sample clock; it never decides gameplay state.
+Historical interval score logic is characterized with the old `Frametime` and pre-update `Gametime`, preserving the source's later post-cap time update, pause ordering, and rate behavior. Adaptive-score gameplay work arrives after Phase 3 and implements the selected final scheduler directly. Presentation scheduling always uses the audio sample clock; it never decides gameplay state.
 
 ## Persistence and replay
 
 A save records only the logical state required to resume coherently:
 
 - adaptive-score key and any applicable released-format semantic revision;
-- current logical region and requested role;
-- pending transition intent where it changes future logical selection;
-- deterministic timers or counters expressed in the selected final simulation model.
+- current logical region;
+- requested role only when it changes future logical selection;
+- pending transition intent only when it changes future logical selection;
+- timers or counters only when they affect continuation, expressed in the selected final simulation model.
 
 Saves do not contain audio-engine nodes, decoder state, sample buffers, device state, instruction pointers, or exact playback position. On load, `RevivalMac` starts from the declared resume policy at a valid musical boundary.
 
-Replay records authoritative score commands and any nondeterministic boundary result that affects their declared order. It verifies logical score state with the simulation. Exact waveform timing is presentation evidence, not part of the canonical gameplay hash.
+Replay records authoritative logical score commands in simulation order and verifies logical score state. Audio-boundary outcomes are excluded from the current replay schema; a later replay-presentation contract may add them without making them gameplay-authoritative. Exact waveform timing is not part of the canonical gameplay hash.
 
 ## Authoring
 

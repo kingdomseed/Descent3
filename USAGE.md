@@ -6,9 +6,7 @@
 GAME ASSETS. Assets must be acquired separately from an official copy of the
 game, and copied as described in the next section.
 
-This is the first release of the Descent 3 open source engine, that should be
-considered a beta version. If you find a bug that has not been reported before,
-please open a new ticket it on our [online issue tracker](https://github.com/DescentDevelopers/Descent3/issues).
+This document describes the retained community engine in this checkout. If you find a current reference-engine bug that has not been reported, open a ticket on the [upstream issue tracker](https://github.com/DescentDevelopers/Descent3/issues).
 
 1. Make sure that you have a copy of Descent 3. You can purchase a copy of
 Descent 3 from [GOG](https://www.gog.com/game/descent_3_expansion) or
@@ -46,7 +44,7 @@ context menu.
       more cutting-edge experience with the latest features, use the artifacts
       from the latest automated build. You can find the list of automated
       builds [here](https://github.com/DescentDevelopers/Descent3/actions/workflows/build.yml?query=branch%3Amain+event%3Apush).
-    - If you want to build the engine files yourself, the follow the
+    - If you want to build the engine files yourself, follow the
       instructions in [BUILD.md](BUILD.md). Once you build the engine files,
       they’ll be put in `builds/<platform>/build/<build-type>/`. For example, if
       you’re using Linux and you create a “Release” build, then the files will
@@ -73,45 +71,36 @@ conflicts.
 Descent 3 Message(Error: Couldn't find the string table.)
 ```
 
-This error means that game data could not be found. Make sure you copied all
-game files to the `D3-open-source` folder, and that you're running the game
-from this same folder.
+This error means that game data was not found in any configured base directory. Confirm that the retail data is in a recognized search root described below. Run with `-logfile` and inspect the `Base directories` entry in `Descent3.log` to see the roots the engine accepted.
 
 ## Base directories
 
 A base directory is a directory that Descent 3 expects game files to be in. When you run Descent 3, it will try to access many different files. Most of those files need to be stored in a base directory. There are two different types of files that are stored in base directories:
 
-- Read-write files are files that can change while you play Descent 3. Examples: `<you name>.plt` and files in the `savegame/` directory.
+- Read-write files are files that can change while you play Descent 3. Examples: `<your name>.plt` and files in the `savegame/` directory.
 - Read-only files are files that do not change while you play Descent 3. Examples: `d3.hog` and files in the `movies/` directory.
 
 Descent 3 has two types of base directories:
 
-- The writable base directory can contain both read-write files and read-only files. There is only one writeable base directory. By default, the writable base directory gets set to the current working directory.
-- The read-only base directories can only contain read-only files. There can be any number of read-only base directories. By default, Descent 3 uses zero read-only base directories.
+- The writable base directory can contain both read-write and read-only files. There is one writable base directory: the platform-specific SDL preference directory created for Descent 3.
+- Additional base directories supply read-only game data. They can come from build defaults, command-line options, saved configuration, the installed data location, and the executable directory.
 
-You can set the writable base directory and the list of read-only base directories using the `-setdir`, `-useexedir` and `-additionaldir` command-line options (see [the next section](#command-line-options)). Descent 3 also has a list of default read-only base directories. Normally, the list of default read-only base directories is empty, but you can change it by using the `DEFAULT_ADDITIONAL_DIRS` CMake option when compiling Descent 3 (see [BUILD.md’s Build Options section](./BUILD.md#build-options)).
+The current engine has no `-setdir` or `-useexedir` option. Add a custom read-only root with `-additionaldir <path>`; repeat the option to add more than one. Build-time roots come from the `DEFAULT_ADDITIONAL_DIRS` CMake option described in [BUILD.md’s Build Options section](./BUILD.md#build-options).
 
-When Descent 3 tries to find a read-only file, then it will look through the list of base directories in this order:
+At startup, Descent 3 adds base directories in this order:
 
-- the last read-only base directory that was specified on the command-line,
-- the second-to-last read-only base directory that was specified on the command-line,
-- the third-to-last read-only base directory that was specified on the command-line,
-- …
-- the first read-only base directory that was specified on the command-line,
-- all of the items on the `DEFAULT_ADDITIONAL_DIRS` list in reverse order, and, finally,
-- the writable base directory.
+- the writable SDL preference directory;
+- the `DEFAULT_ADDITIONAL_DIRS` build-time roots;
+- each `-additionaldir` root in command-line order;
+- the saved `GAME_base_directory`, if configured;
+- the platform data directory compiled as `D3_DATADIR`;
+- the executable directory, when it is distinct from the platform data directory.
 
-Files that are in base directories that are higher on that list will override files that are in base directories that are lower on that list. For example, lets say that the `DEFAULT_ADDITIONAL_DIRS` list is empty and that you run Descent 3 like this:
-
-```
-Descent3 -setdir /home/user/my-writable-base-directory -additionaldir /home/user/my-read-only-base-directory
-```
-
-Let’s also say that both `my-writable-base-directory` and `my-read-only-base-directory` contain a file named `d3.hog`. In this example, Descent 3 will load `/home/user/my-read-only-base-directory/d3.hog` because read-only directories have a higher precedence than the writable base directory. Descent 3 will ignore `/home/user/my-writable-base-directory/d3.hog`.
+Later entries have higher read precedence, so the engine searches that list in reverse. Among repeated `-additionaldir` options, the last path wins when two roots contain the same relative file. Nonexistent directories are ignored with a warning. Writes still go to the SDL preference directory.
 
 ## Command-Line Options
 
-The following command-line options are available in Descent 3. You can set command-line options on the Misc. tab of the Setup section of the Descent 3 launcher or by creating a shortcut to `Descent3.exe`. Case is not significant in command-line options, and `-`, `--`, and `+` are all accepted.
+The current executable parses the following user-facing command-line options. Pass them directly after the executable name. Case is not significant, and `-`, `--`, and `+` prefixes are accepted.
 
 ### Display Options
 
@@ -139,7 +128,7 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Type:** boolean
 
-    **Default:** On
+    **Default:** Saved window mode when available; otherwise On
 
     **Platform:** all
 
@@ -149,11 +138,11 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Type:** integer
 
-    **Default:** 480 unless you select a different value in the options menu
+    **Default:** Saved resolution when available; otherwise the current display height, with 720 as the fallback-list default
 
     **Platform:** all
 
-    **Description:** Sets the screen resolution to the specified height, if possible.
+    **Description:** Sets the screen resolution to the specified height, if possible. Supply `-width` and `-height` together.
 
 - `-himem`
 
@@ -199,27 +188,27 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Type:** boolean
 
-    **Default:** Off
+    **Default:** Saved setting when available; otherwise On
 
     **Platform:** all
 
-    **Description:** Turns on Vertical Sync. The flag will be enabled in the registry so it will be on when the game is run again.
+    **Description:** Turns on Vertical Sync. The current community engine stores the resulting setting in its configuration database so it remains enabled on later runs.
 
 - `-width <width>`
 
     **Type:** integer
 
-    **Default:** 640 unless you select a different value in the options menu
+    **Default:** Saved resolution when available; otherwise the current display width, with 1280 as the fallback-list default
 
     **Platform:** all
 
-    **Description:** Sets the screen resolution to the specified width, if possible.
+    **Description:** Sets the screen resolution to the specified width, if possible. Supply `-width` and `-height` together.
 
 - `-windowed` or `-w`
 
     **Type:** boolean
 
-    **Default:** Off
+    **Default:** Saved window mode when available; otherwise Off
 
     **Platform:** all
 
@@ -301,16 +290,6 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Description:** Causes a demo to play back at the highest speed your computer is capable of.
 
-- `-forcelightmaps`
-
-    **Type:** boolean
-
-    **Default:** Off
-
-    **Platform:** all
-
-    **Description:** Forces the use of lightmaps, even the Default Detail Level is set to Low in the launcher setup.
-
 - `-framecap <fps>`
 
     **Type:** integer
@@ -329,7 +308,7 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Platform:** all
 
-    **Description:** Disables motion blur on robots (Pentium III only).
+    **Description:** Disables motion blur on robots.
 
 - `-nosatomega`
 
@@ -349,7 +328,7 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Platform:** all
 
-    **Description:** Disables powerup sparkles (Pentium III only).
+    **Description:** Disables powerup sparkles.
 
 ### Multiplayer and Network Options
 
@@ -361,7 +340,7 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Platform:** all
 
-    **Description:** Sets the time in seconds the a user must wait after sending an audio taunt before he or she is able to send another. This option is only active when starting a server.
+    **Description:** Sets the number of seconds a player must wait after sending an audio taunt before sending another. This option applies only when starting a server.
 
 - `-autoexec <file>`
 
@@ -391,7 +370,7 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Platform:** all
 
-    **Description:** Specifies a port for to listen for GameSpy requests.
+    **Description:** Specifies the port on which to listen for GameSpy requests.
 
 - `-gspyfile <config file>`
 
@@ -431,7 +410,7 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Platform:** all
 
-    **Description:** Disables sending or receiving in-game custom bitmaps for ships.
+    **Description:** Disables multiplayer custom-file transfer, including the ship texture and four voice taunts.
 
 - `-nonetwork`
 
@@ -451,17 +430,17 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Platform:** all
 
-    **Description:** Disables all weapon-related HUD messages in multiplayer games.
+    **Description:** Filters the broader player-status HUD message surface in multiplayer, including pickup, weapon, shield, energy, inventory, and scripted messages that use the filtered-message path.
 
 - `-pxoport <port>`
 
     **Type:** integer
 
-    **Default:** 20142
+    **Default:** 0 (no override)
 
     **Platform:** all
 
-    **Description:** Specifies the port that PXO will tell clients to use when contacting a server. The default is 2092.
+    **Description:** Overrides the port that PXO tells clients to use when contacting a server. Zero leaves the tracker-selected port unchanged.
 
 - `-useip <IP>`
 
@@ -481,7 +460,7 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Platform:** all
 
-    **Description:** Specifies the port that TCP/IP and IPX will use.
+    **Description:** Specifies the port that TCP/IP networking will use.
 
 - `-usesmoothing`
 
@@ -503,39 +482,19 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Platform:** all
 
-    **Description:** Adds a directory to the list of read-only base directories. This options can be used multiple times to add multiple directories to the list.
-
-- `-setdir <path>`
-
-    **Type:** path
-
-    **Default:** .
-
-    **Platform:** all
-
-    **Description:** Sets the writable base directory.
-
-- `-useexedir`
-
-    **Type:** boolean
-
-    **Default:** Off
-
-    **Platform:** all
-
-    **Description:** Tells Descent 3 to use the directory in which the executable is located as the writable base directory.
+    **Description:** Adds a read-only base directory. Repeat the option to add multiple directories; later occurrences have higher read precedence.
 
 ### Other Options
 
-- `-loadlevel`
+- `-loadlevel <number>`
 
-    **Type:** int
+    **Type:** integer
 
-    **Default:** Off
+    **Default:** None
 
     **Platform:** all
 
-    **Description:** Load a specific level from the mission selected with `-mission`. Only has an effect when `-mission` is specified.
+    **Description:** Loads a specific level from the mission selected with `-mission`. It has an effect only when `-mission` is specified.
 
 - `-logfile`
 
@@ -545,7 +504,7 @@ The following command-line options are available in Descent 3. You can set comma
 
     **Platform:** all
 
-    **Description:** Generates a logfile `d3.log` if using the Debug build. All `mprintf` statements output to the logfile.
+    **Description:** Enables the rolling file logger in Release and Debug builds and writes `Descent3.log` in the process working directory. Messages at or above the selected `-loglevel` are included.
 
 - `-loglevel <LEVEL>`
 

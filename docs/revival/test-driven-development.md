@@ -1,7 +1,7 @@
 # Test-driven development
 
 - Status: accepted, clarified
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: binding implementation and review protocol
 
 ## Non-negotiable rule
@@ -10,7 +10,7 @@ Every new or changed production behavior begins with one focused automated test 
 
 This rule covers gameplay, import, validation, canonical content, behaviors, saves, replay, renderer state, shaders and images, editor commands, multiplayer, security limits, application integration, packaging, and performance contracts. A test written after the implementation is not test-driven development and does not satisfy this protocol.
 
-Red evidence does not require a separate commit. The durable Git change record records the focused command and the salient expected failure, followed by the green command and result. Put that evidence in the pull-request description or commit message body so it remains attached to the change. An agent handoff may repeat the record but may not replace it. Reviewers must be able to distinguish a real red step from an unrelated broken build.
+Red evidence does not require a separate commit. The durable change record contains the focused command and the salient expected failure, followed by the green command and result. Put that evidence in the pull-request description or commit message body so it remains attached to the change. An agent handoff may repeat the record but may not replace it. Reviewers must be able to distinguish a real red step from an unrelated broken build.
 
 Shared branches remain green. Continuous integration verifies the final state; it cannot prove the historical order and does not replace the recorded red evidence.
 

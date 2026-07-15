@@ -2,8 +2,10 @@
 
 # Third party components
 
-This file contains information about third party components that are required
-for building Descent 3.
+This file records license notices for selected vendored and externally resolved
+components used by the retained C++ reference tree. The current external build
+dependency list lives in `vcpkg.json`; this file is not the complete build
+manifest.
 
 ## libacm
 
@@ -32,20 +34,26 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ## libmve
 
-libmve - Interplay MVE implementation from D2X project. https://github.com/btb/d2x
+The MVE decoder and player core is derived from the D2X project. https://github.com/btb/d2x
 
 [@c030c453](https://github.com/btb/d2x/tree/c030c4531ad19f1658ea9635ff4ee6861e1d15e0)
 
-* libmve/decoder8.c
-* libmve/decoder16.c
+* libmve/decoder8.cpp
+* libmve/decoder16.cpp
 * libmve/decoders.h
-* libmve/mve_audio.c
+* libmve/mve_audio.cpp
 * libmve/mve_audio.h
-* libmve/mvelib.c
+* libmve/mvelib.cpp
 * libmve/mvelib.h
-* libmve/mveplay.c
+* libmve/mveplay.cpp
 
-The libmve code is licensed under GPL-3 license.
+Descent Developers integration code:
+
+* libmve/movie_sound.cpp
+* libmve/movie_sound.h
+* libmve/sound_interface.h
+
+All listed libmve files are licensed under GPL-3.0-or-later. The D2X-derived files carry this notice:
 
 ```
 Copyright (C) 2002-2024 D2X Project
@@ -68,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Portable, simple and extensible C++ logging library.
 
-* third_party/plog/*
+* Resolved externally through `vcpkg.json`; no plog source is vendored under `third_party/`.
 
 The plog code is licensed under MIT license.
 
@@ -96,11 +104,11 @@ SOFTWARE.
 
 ## stb
 
-Single-file public domain (or MIT licensed) libraries for C/C++. https://github.com/nothings/stb
+`stb_image_write.h` is the upstream single-file image writer from stb. https://github.com/nothings/stb
 
 * third_party/stb/stb_image_write.h
 
-The stb code is licensed under MIT license.
+The upstream header is offered as public domain or MIT; its MIT notice follows.
 
 ```
 Copyright (c) 2017 Sean Barrett
@@ -120,3 +128,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+Descent Developers supplies the GPL-3.0-or-later implementation wrapper that compiles the header:
+
+* third_party/stb/stb.cpp

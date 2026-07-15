@@ -1,7 +1,7 @@
 # Engineering principles
 
 - Status: accepted, amended
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: binding implementation rules
 
 ## Objective
@@ -14,7 +14,7 @@ The M4 has ample capacity for a late-1990s game. Spend that capacity to keep the
 
 The source is allowed to influence semantics without dictating native structure.
 
-- Preserve reachable data flow, ordering, formulas, dependency closure, and observable results before changing them.
+- Preserve reachable data flow, ordering, formulas, dependency discovery and lifetime, and observable results before changing them.
 - Account for every involved source file and record deliberate differences.
 - Combine or split source responsibilities when that produces clearer Swift ownership.
 - Replace platform APIs and ABI machinery directly; do not wrap them to resemble C++.
@@ -39,7 +39,7 @@ Work one dependency island at a time and keep the real editor and player runnabl
 
 KISS changes how a capability is built, never whether it exists. Each gameplay capability gains its applicable runtime, authoring, validation, playtest, and publishing paths as its roadmap slice matures.
 
-Prefer one clear editor operation over several historical dialogs, one native content representation over legacy page variants, and one eventual safe behavior workflow over DALLAS plus native modules. Do not claim simplification by omitting editor functions, multiplayer, replay, presentation tools, or content types in the [functional-completeness contract](functional-completeness.md).
+Prefer one clear editor operation over several historical dialogs, one native content representation over legacy page variants, and one safe creator behavior workflow once its real authoring requirements are known. Do not claim simplification by omitting editor functions, multiplayer, replay, presentation tools, or content types in the [functional-completeness contract](functional-completeness.md).
 
 Ambiguous source behavior goes into a ledger with evidence and one decision. It is not silently preserved or silently deleted.
 
@@ -80,11 +80,11 @@ The first loading path is intentionally direct:
 2. at the commit boundary, stop old submissions, wait for final GPU use, and release the old presentation owner;
 3. build the successor's authoritative world values;
 4. prepare the source-evidenced eager working set and activate the world;
-5. prepare later source-reachable assets only from its closed canonical package and retain them until exit.
+5. prepare later source-reachable assets only from its validated canonical package and current reachable dependency manifest, then retain them until exit.
 
 Failure before commit preserves the current world; failure after commit enters an explicit unloaded error state. Loading may move one bounded operation off the main actor when measured latency warrants it. Do not add a task per asset, stream cell, spatial demand calculation, prefetch policy, LRU, memory-pressure mode, cache hierarchy, or resident/streaming switch.
 
-If the post-Training M4 gate proves the resident path inadequate, follow the amendment rule in [World loading and residency](world-streaming.md). The replacement leaves one production lifetime path.
+If the M4 evidence gate after the complete playable Training Mission proves the resident path inadequate, follow the amendment rule in [World loading and residency](world-loading.md). The replacement leaves one production lifetime path.
 
 ## Concurrency
 
@@ -113,7 +113,7 @@ Do not create actors or tasks for players, robots, projectiles, doors, AI goals,
 
 RevivalEditor uses AppKit document architecture directly: one NSDocument, one main-actor editing owner, one canonical project value, one UndoManager history, and one primary window per project. Views call concrete edit operations. Do not add a reactive store, command bus, service layer, or protocol solely to connect panes.
 
-The first editor proves the shared world:
+The first editor proves the shared world model and production paths:
 
 - derive, open, and render the editable project value through the canonical resident-world model;
 - select and inspect source-backed elements;

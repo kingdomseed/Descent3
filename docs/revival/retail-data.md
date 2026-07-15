@@ -2,6 +2,7 @@
 
 - Status: verified evidence and active rights boundary
 - Last verified: July 13, 2026
+- Last reconciled: July 15, 2026
 - Authority: hashes and rights are binding; legacy execution instructions are non-normative
 
 ## Rights boundary
@@ -69,7 +70,7 @@ retail-data/
   revival-content/    future canonical output from D3Import
 
 runtime-data/
-  legacy smoke configuration, logs, screenshots, and disposable caches
+  legacy reference-run configuration, logs, screenshots, and disposable caches
 ```
 
 Both top-level directories are ignored by Git. The final application will place its canonical package in its own Application Support container. The repository layout is for development and provenance work.
@@ -103,7 +104,7 @@ rtk proxy tools/run-descent3-macos -windowed -width 1280 -height 720 -nointro -n
 
 This helper and the old engine's `-additionaldir` behavior are not part of the new runtime. The Swift game starts only from `retail-data/revival-content/` during development or the installed canonical package later.
 
-## Verified smoke evidence
+## Verified legacy reference-execution evidence
 
 The native arm64 reference build successfully:
 
@@ -122,4 +123,4 @@ The corresponding logs and screenshots remain under ignored `runtime-data/v14-sm
 
 ## New importer contract
 
-The first importer profile must accept the prepared verified 1.4-plus-Mercenary directory above, resolve overlay order, import each requested Level with complete topology, include its eager and currently reachable lazy dependencies, reject native code, and emit a deterministic provenance report. Development campaign packages may contain a subset of complete levels; they do not contain room-cut production levels. Release-complete campaign packages must contain every required movie, audio file, selected production font, briefing, level, reviewed translated behavior in the then-current safe canonical form, plus a production or superseded decision for every recognized font. Complete stock-multiplayer packages must contain every committed map, mode behavior, referenced asset, and matching completeness metadata. Schema changes reimport from this source rather than adding legacy readers or package migrations to the runtime. Reimport is atomic and must preserve the active package, saves, replays, projects, and native packages on failure.
+The first importer profile must accept the prepared verified 1.4-plus-Mercenary directory above, resolve overlay order, import each requested Level with complete topology, include its eager and currently reachable lazy dependencies, reject native code, and emit a deterministic provenance report. Development campaign packages may contain a subset of complete levels; they do not contain room-cut production levels. Release-complete campaign packages must contain every required movie, audio file, selected production font, briefing, level, and behavior-data record required by the one current canonical runtime, plus a production or superseded decision for every recognized font. Under the current direct typed Swift runtime, behavior data consists only of validated bindings, initial configuration and state, content references, revision, and provenance; packages contain no executable behavior. An evidence-ratified amendment may replace that form but may not retain it as a parallel path. Complete stock-multiplayer packages must contain every committed map, mode behavior, referenced asset, and matching completeness metadata. Schema changes reimport from this source rather than adding legacy readers or package migrations to the runtime. Reimport is atomic and must preserve the active package, saves, replays, projects, and native packages on failure.

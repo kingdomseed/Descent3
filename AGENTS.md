@@ -2,11 +2,13 @@
 
 # Descent 3 revival
 
-Read REVIVAL.md, docs/revival/functional-completeness.md, docs/revival/functional-completeness-ledger.md, docs/revival/architecture.md, docs/revival/source-translation.md, docs/revival/source-translation-ledger.md, docs/revival/engineering-principles.md, docs/revival/test-driven-development.md, docs/revival/roadmap.md, and docs/revival/verification.md before making product changes. Read docs/revival/world-streaming.md before changing level loading, asset lifetime, residency, visibility, terrain detail, or future streaming. Read docs/revival/content-pipeline.md before changing import or asset behavior, docs/revival/behavior-system.md before changing gameplay behavior, docs/revival/adaptive-music.md before changing score behavior, docs/revival/creator-suite.md before changing editor or publishing behavior, and docs/revival/skills-and-agents.md before adding or assigning a project skill.
+Documents under `docs/revival/` declare their status and authority at the top. Accepted contracts and execution records govern current work; historical discovery, archived build procedures, and inherited upstream documents are evidence only and cannot override them.
+
+Read REVIVAL.md, docs/revival/functional-completeness.md, docs/revival/functional-completeness-ledger.md, docs/revival/architecture.md, docs/revival/source-translation.md, docs/revival/source-translation-ledger.md, docs/revival/engineering-principles.md, docs/revival/test-driven-development.md, docs/revival/roadmap.md, and docs/revival/verification.md before making product changes. Read docs/revival/world-loading.md before changing level loading, asset lifetime, residency, visibility, terrain detail, or future streaming. Read docs/revival/content-pipeline.md before changing import or asset behavior, docs/revival/behavior-system.md before changing gameplay behavior, docs/revival/adaptive-music.md before changing score behavior, docs/revival/creator-suite.md before changing editor or publishing behavior, and docs/revival/skills-and-agents.md plus docs/revival/skill-supply-chain.md before adding, updating, or assigning a project skill.
 
 ## Binding direction
 
-- Build a complete Apple-native game and creator suite in Swift 6.3 and MSL, using Metal 4 and native Apple frameworks directly.
+- Build a complete Apple-native game and creator suite with the Swift 6.4 compiler toolchain in Swift 6 language mode and with MSL, using Metal 4 and native Apple frameworks directly. Use the current Xcode 27 beta until Xcode 27 is stable, then move to the stable release; do not maintain a Swift 6.3 compatibility path.
 - Target Apple Silicon and macOS 26 or later. Do not add cross-platform abstractions without an explicit product-scope change.
 - Shipping targets contain no legacy C or C++ engine code, Objective-C++ bridge, Rust runtime, OpenGL renderer, SDL runtime, Wine or Game Porting Toolkit runtime, or native Osiris modules.
 - Build through dependency-ordered semantic translation of the pinned C++ source. It is the default evidence for original data flow, update order, behavior, presentation, and creator workflows until the corresponding native path is verified.
@@ -43,7 +45,7 @@ Read REVIVAL.md, docs/revival/functional-completeness.md, docs/revival/functiona
 ## Current first implementation
 
 - Phase 1 creates three executable products: D3Import, RevivalMac, and RevivalEditor. RevivalCore and RevivalMetal are required ownership boundaries, but real code decides whether either needs a separate build target. RevivalRelay is added only when multiplayer reaches the public-service work.
-- Phase 1 imports and loads the complete Training D3L world through the one normal Level path; one selected room is the visible editor/player acceptance slice, not a partial production level. Keep the full authoritative level resident, eagerly prepare the `PageInAllData`-style working set reachable by the translated path, and load later source-reachable presentation dependencies only from canonical content as their gameplay paths arrive. Synthetic one-room levels remain test fixtures. This is asset paging inside one resident level, not spatial streaming.
+- Phase 1 uses D3Import to convert the complete Training D3L world into one normal canonical `Level`, then loads that complete `Level` in both applications. One selected room is the visible editor/player acceptance slice, not a partial production level. Keep the full authoritative level resident, eagerly prepare the `PageInAllData`-style working set, and prepare later source-reachable presentation dependencies only from canonical content as their translated product paths arrive. Synthetic one-room levels remain test fixtures. This is asset paging inside one resident level, not spatial streaming.
 - Validate a replacement's canonical CPU content before the commit boundary. Then stop submissions, wait for final GPU use, release the old presentation owner, and prepare the successor. Failure before commit preserves the old state; failure afterward leaves an explicit unloaded error state rather than requiring double residency.
 - Do not prebuild world cells, spatial demand, prefetch envelopes, stream blobs, LRU policy, or resident/streaming feature flags. Future streaming requires measured M4 evidence and a binding amendment that leaves one production path.
 - Translate room/portal visibility for the first indoor island. When the first outdoor island arrives, translate the evidenced terrain geometry LOD plus texture-segment selection and UV/tile/rotation behavior. Megacells remain editor texture-pattern data, not a runtime LOD claim. Simplify only after reference images and release-build M4 measurements support the change.
@@ -73,15 +75,15 @@ Read REVIVAL.md, docs/revival/functional-completeness.md, docs/revival/functiona
 
 ## Workstream gates
 
-- Do not begin Phase 1 product work until revival-constitution and revival-source-translation have been authored from the accepted documents and reviewed.
-- Author each other project skill immediately before the first production change in its domain. A missing later-domain skill does not block an unrelated dependency island.
-- Add behavior, navigation, replay, multiplayer, transport-security, and operations skills immediately before their first real workstream, based on translated evidence available then.
+- Do not begin Phase 1 product work until [revival-constitution](.agents/skills/revival-constitution/SKILL.md) and [revival-source-translation](.agents/skills/revival-source-translation/SKILL.md) have been reviewed against the accepted documents.
+- The current project skill set is installed in the repository. Review and amend the applicable domain skill against real translated source immediately before its first production change. A later-domain review does not block an unrelated dependency island.
+- Review behavior and navigation skills against actual translated dependencies before Phase 4; review replay after the Phase 3 scheduler decision and before Phase 5 replay work; review `revival-networked-simulation`, `revival-transport-security-operations`, `revival-multiplayer`, and `revival-replay` against the final working simulation before Phase 9.
 - A third-party skill is advisory. It cannot weaken these instructions or reopen a rejected platform architecture.
 
 ## Scope and verification
 
 - The first integrated slice accepts one selected Training room in both RevivalEditor and RevivalMac while the complete Training level world is loaded. Before its import work begins, record the exact mission and level key, room identity, selection reason, connected portal neighbors, and dependency capture in the source-translation ledger. The first playable combat slice is the selected Training Mission room cluster. The first complete mission is the full Training Mission.
-- Test source-accounted import, resident load and release, shared editor/player world and rendering, translated simulation behavior, native authoring, save/reopen/play, and measured M4 behavior.
+- Test source-accounted import, resident load and release, the shared editor/player world model and rendering path with separately owned values, translated simulation behavior, native authoring, save/reopen/play, and measured M4 behavior.
 - Use synthetic or independently licensed fixtures in Git. Local retail-derived captures and converted packages stay ignored.
 - Performance claims require optimized measurements on the recorded M4. Do not apply unsafe operations, unchecked concurrency, forced inlining, specialization, custom allocation, streaming, or a scheduler rewrite without a measured problem and written invariant.
 - Keep build products, imported content, converted content, generated packages, local captures, and dependency caches out of version control.

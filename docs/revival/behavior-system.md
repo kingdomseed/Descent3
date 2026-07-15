@@ -1,7 +1,7 @@
 # Behavior translation and authoring
 
 - Status: accepted, amended
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: binding current behavior-transfer and eventual creator contract
 
 ## Historical boundary
@@ -36,7 +36,7 @@ One chain may cover several categories. If that evidence exposes a real authorin
 
 An accepted replacement migrates the working chains and removes the superseded runtime path. The project does not require that rewrite in advance or keep direct and interpreted execution as permanent parallel modes.
 
-BehaviorGraph and BehaviorProgram remain possible names if the evidence eventually calls for source and compiled forms, not preapproved types, a complete VM, instruction set, scheduler, collection model, or operation budget.
+Any later source or executor types are named only when an evidence-backed amendment selects their real responsibilities. Possible future names are not current architecture.
 
 ## Translation unit
 
@@ -45,10 +45,11 @@ Translate one complete behavior dependency chain at a time:
 1. identify its module, DALLAS block, custom ranges, handwritten ranges, messages, bindings, and engine functions;
 2. trace event producers, dispatch order, conditions, state, timers, and side effects;
 3. capture observable checkpoints in the reference engine or source;
-4. implement the smallest typed Swift state and functions that reproduce the chain;
-5. expose the current configuration and diagnostics in RevivalEditor;
-6. save, reload, play, and verify it;
-7. record every deliberate difference and close the involved source ranges.
+4. write one focused automated contract and observe its intended failure;
+5. implement the smallest typed Swift state and functions that make that contract pass;
+6. expose the current configuration and diagnostics in RevivalEditor;
+7. save, reload, play, and verify it through the applicable integrated paths;
+8. refactor without changing the protected result, record every deliberate difference, and close the involved source ranges.
 
 Do not translate generated DALLAS control flow while ignoring handwritten code outside the block. Do not add an operation merely because it exists in the global function table; add it when a real translated or creator scenario needs it.
 
@@ -78,21 +79,14 @@ Add a bound when an actual untrusted creator construct or reproduced cycle needs
 
 ## Timing
 
-Historical interval handlers run once per historical frame and receive elapsed-time semantics through the surrounding engine.
+Historical interval handlers run once per historical frame and receive the old `Frametime` and pre-update `Gametime` through the surrounding engine. Phase 3 captures that ordering, rate multiplication, timer boundaries, frame-count behavior, and observable drift before selecting the one final scheduler.
 
-During the explicit-delta translation phase:
+The first Phase 4 behavior chain implements that selected scheduler directly:
 
-- pass the historical old `Frametime` and pre-update `Gametime` directly to translated interval logic, preserving the later post-cap time update and pause ordering;
-- preserve source ordering, rate multiplication, timer boundaries, and observable drift;
-- record frame-count behavior that is distinct from elapsed-time behavior;
-- keep presentation-only work outside authoritative state where that distinction already exists.
+- bounded variable delta receives the ratified explicit values and ordering; or
+- fixed-tick logic uses the accepted elapsed-time, rate, and timer equivalents.
 
-After Phase 3 selects the final timing model, translate every existing interval consumer once:
-
-- bounded variable-delta remains explicit; or
-- elapsed-time rates and timers become the chosen fixed-tick equivalents.
-
-Delete the superseded scheduler and its behavior adapters. Do not retain a legacy timing mode or claim fixed-tick parity without reference evidence.
+No production behavior path precedes that decision. Phase 3 timing characterization may use a disposable nonshipping harness, which is removed before Phase 4. Presentation-only work remains outside authoritative state where the source already supports that distinction.
 
 ## Engine queries and commands
 
@@ -124,15 +118,15 @@ Every translated chain records:
 | Observable checkpoints | Runtime and editor evidence |
 | Deliberate differences | Approved correction or modernization |
 | Native form | Direct typed functions or a later evidence-ratified representation |
-| Status | Not started, translated, playable, or verified |
+| Ledger state | Use the source-translation ledger states: seed, traced, translating, native-running, verified, replaced, excluded, or deferred |
 
 Known defects and dormant fields do not transfer automatically. Each correction records a decision and checkpoint.
 
 ## Authoring evolution
 
-The first editor behavior surface may be a direct typed inspector and trace over the translated Swift chain. It does not need a graph canvas before graph structure has real operations.
+The first editor behavior surface configures the bindings, parameters, and explicit state consumed by the translated Swift chain and provides source-linked inspection, trace, and failure navigation. Its control flow remains canonical direct typed Swift. It does not introduce a graph canvas or claim a complete authored language.
 
-As working chains establish a reusable authored behavior model, RevivalEditor provides:
+If working human-authoring cases establish the need for a reusable authored behavior model, RevivalEditor adds:
 
 - typed events, values, conditions, actions, variables, timers, functions, and composition as real needs establish them;
 - source and content reference validation;
@@ -140,7 +134,7 @@ As working chains establish a reusable authored behavior model, RevivalEditor pr
 - save, reopen, playtest, publishing, and deterministic scenario evidence;
 - explicit authoritative and presentation roles when multiplayer work reaches those chains.
 
-The authored form is the truth. If the accepted design later has compiled or generated data, that output is derived and never hand-edited; authors do not invoke a native compiler.
+When an authored form is accepted, it is the truth. If that design has compiled or generated data, the output is derived and never hand-edited; authors do not invoke a native compiler.
 
 ## Persistence, replay, and multiplayer
 
@@ -162,10 +156,10 @@ For each current chain, tests and evidence cover:
 
 - complete generated and handwritten source-range accounting;
 - event order, conditions, state changes, timers, random choices, and engine effects;
-- explicit-delta behavior followed by the selected final-timing conversion;
+- behavior under the selected final scheduler, with the historical explicit-delta result retained as characterization evidence and every deliberate timing difference recorded;
 - save/load continuation and source-linked failure;
 - editor configuration, trace, playtest, and package closure;
 - the exact checkpoint that justifies each deliberate difference;
 - migration and deletion evidence if an accepted authored executor replaces direct typed functions.
 
-Compiler, graph, budget, authority, and debug tests are added with the production mechanisms they protect, not as speculative coverage of an imagined complete language.
+Tests for any later authored representation, executor, limits, authority rules, and debugging tools arrive with the production mechanisms they protect, not as speculative coverage of an imagined complete language.

@@ -2,6 +2,7 @@
 
 - Status: historical evidence
 - Date investigated: July 12-14, 2026
+- Last reconciled: July 15, 2026
 - Authority: non-normative; `architecture.md` supersedes all design recommendations from the original discovery
 
 ## Purpose
@@ -50,7 +51,7 @@ The native reference executable:
 - entered and rendered the original Training Mission;
 - entered base campaign level 1 through its briefing and ship selection.
 
-These observations prove that the owned inputs are authentic and sufficient for the new importer. They do not make the reference executable part of the new runtime.
+These observations authenticate the owned inputs and establish tested historical comparison paths. They do not prove complete native-import coverage or make the reference executable part of the new runtime.
 
 Full hashes, extraction provenance, and local layout are recorded in [Retail data](retail-data.md).
 
@@ -79,6 +80,19 @@ The project therefore follows this process:
 4. record one decision;
 5. stabilize the slice before expanding campaign breadth.
 
+## Swift engine-code feasibility evidence
+
+The research question is whether Swift is credible for simulation, collision, AI, visibility, render extraction, and the other CPU engine code, not whether Swift wins a general language benchmark. The current evidence supports that use. Swift produces native machine code through its own ownership-aware optimizer and LLVM, and production C and C++ migrations show that low-level work can move to Swift without making the language an automatic bottleneck. Those cases establish feasibility and a method—protect outputs, use direct ownership, profile representative workloads, and optimize the measured path—not a Revival frame-rate prediction. The retained web sources and their limits are indexed in [Primary technical sources](primary-source-index.md#swift-engine-code-and-performance).
+
+The pinned Descent 3 source identifies the first representative CPU risks:
+
+- [`GameFrame`](../../Descent3/GameLoop.cpp) drives source-ordered AI, object, door, goal, player, behavior, audio, multiplayer, and presentation work, while [`ObjDoFrameAll`](../../Descent3/object.cpp) scans the live object set and its movement paths;
+- [`do_physics_sim`](../../physics/physics.cpp) permits up to nine player or five non-player response iterations and repeatedly enters [`fvi_FindIntersection`](../../physics/findintersection.cpp), making collision and spatial queries the clearest early simulation hot path;
+- room/portal traversal in [`render.cpp`](../../Descent3/render.cpp), terrain search and extraction in [`TerrainSearch.cpp`](../../Descent3/TerrainSearch.cpp) and [`terrainrender.cpp`](../../Descent3/terrainrender.cpp), and the historically marked slow paths in [`lighting.cpp`](../../Descent3/lighting.cpp) require separate CPU extraction and GPU measurements;
+- the released limits—1,500 world objects, 400 rooms, and a 256-by-256 terrain grid—bound the stock workload without becoming permanent native creator limits.
+
+The project-specific working assumption is that the original workload is tractable on the M4 with direct Swift value storage; that remains unproven until the native path is measured. The credible Swift risks are unintended copy-on-write of large world collections, ARC-heavy identity graphs, per-frame temporary allocation, runtime exclusivity checks, unspecialized generic or protocol dispatch, and large editor/play-session copies. [Verification](verification.md#performance-method) measures those costs in optimized product paths. A reproducible missed budget or regression earns the smallest local storage or ownership change that fixes it; it does not create a C++ fallback or a second engine.
+
 ## Facts carried into the new design
 
 ### Legacy content is layered
@@ -99,9 +113,9 @@ The historical `mem/` layer chiefly wraps allocation for accounting and diagnost
 
 `StartLevel` calls `PageInAllData()`. That path accounts for the player ship, static effects and sounds, every used room-face texture, terrain textures and sky presentation, and dependencies reached through currently placed level objects. The authoritative room, terrain, object, goal, and behavior world is already loaded for the selected level. Reachable bitmap accessors, object initialization, matcens, and Osiris operations can still page models or images later. `FreeThisLevel` and `FlushDataCache` release the level-specific set at exit. The retained GPU backend's pre-upload function is a no-op, so this path is not evidence of complete GPU readiness.
 
-This is a resident authoritative level world with an eager working-set preload plus reachable lazy asset paging. It is not spatial world streaming and does not load the entire installation. The initial native baseline preserves that observable schedule while reading only from a deliberately closed canonical package. It does not preserve page locks, memory wrappers, renderer upload caches, legacy free lists, or a general cache hierarchy.
+This is a resident authoritative level world with an eager working-set preload plus reachable lazy asset paging. It is not spatial world streaming and does not load the entire installation. The initial native baseline preserves that observable schedule while reading only from a validated canonical package and its current reachable dependency manifest. It does not preserve page locks, memory wrappers, renderer upload caches, legacy free lists, or a general cache hierarchy.
 
-After complete Training and representative large indoor, outdoor, editor, and higher-resolution workloads run on the M4, the project measures startup, transition, memory, and viewport cost. Streaming remains a possible focused amendment if resident loading misses a ratified budget; it is neither banned forever nor prebuilt. [World loading and residency](world-streaming.md) records the current decision.
+After the complete playable Training Mission and representative large indoor, outdoor, editor, and higher-resolution workloads run on the M4, the project measures startup, transition, memory, and viewport cost. Streaming remains a possible focused amendment if resident loading misses a ratified budget; it is neither banned forever nor prebuilt. [World loading and residency](world-loading.md) records the current decision.
 
 ### Original timing is variable
 
@@ -151,9 +165,9 @@ All 48 retained generated campaign sources include a versioned `$$SCRIPT_BLOCK` 
 
 A nonshipping draft extractor may read those structured blocks and metadata and emit recovered structure plus unresolved-evidence reports. A human reviews generated, custom, handwritten, authority, timing, and interval semantics before accepting a native translation. The extractor is bounded research upstream of the product; it is not part of D3Import, the editor, or any shipping target.
 
-The native behavior replacement grows from several working direct translations. Its eventual safe source and compiled form must retain events, values, conditions, queries, commands, timers, state, functions, debugging, and creator extensibility without loading DLLs, preserving the Osiris ABI, generating C++, or permitting native code in packages. [Behavior translation and authoring](behavior-system.md) defines that ratification process.
+The native behavior replacement begins with working canonical direct typed Swift translations. Creator authoring must eventually provide events, values, conditions, queries, commands, timers, state, functions, debugging, and extensibility without loading DLLs, preserving the Osiris ABI, generating C++, or permitting native code in packages. A different authored representation or executor is accepted only through the evidence gate in [Behavior translation and authoring](behavior-system.md).
 
-The pinned GPL community commit is the normative baseline for stock behavior because it is inspectable and supplied the 55 native reference modules used by the successful M4 smoke run. Retail 1.4 content supplies media, identifiers, and comparison evidence. Retail DLL behavior is ambiguity evidence only, and the new product never imports or executes those DLLs. Known defects are not preserved automatically; each deliberate semantic correction is recorded in the translation ledger.
+The pinned GPL community commit is the normative baseline for stock behavior because it is inspectable and supplied the 55 native reference modules used by the successful M4 reference run. Retail 1.4 content supplies media, identifiers, and comparison evidence. Retail DLL behavior is ambiguity evidence only, and the new product never imports or executes those DLLs. Known defects are not preserved automatically; each deliberate semantic correction is recorded in the translation ledger.
 
 ### In-game cinematics are behavior-driven gameplay
 
@@ -197,7 +211,7 @@ The retained source declares 32 connected human slots. Live roam and piggyback o
 
 The selected native design uses Network-framework QUIC for 2–32 connected humans. Bonjour discovers direct LAN hosts using the same session messages. Public Internet hosts and clients make outbound connections to a project-operated discovery, authorization, and opaque-relay service; there is no direct-IP Internet path, ICE, STUN, TURN, or inbound-router workflow. Reliable control uses QUIC streams and time-sensitive state uses QUIC datagrams. Because those QUIC legs terminate at the relay, one inner CryptoKit record protocol supplies authority proof, pairwise key agreement, authenticated encryption, sequence and replay rules, and the same payload contract on LAN. `RevivalRelay` receives no session key and never owns simulation or content.
 
-Multiplayer, dedicated hosting, multiplayer authoring, replay, and relay operation are committed revival capabilities. Phase 9 implements this fixed design against the deterministic simulation, security rules, and verification matrices. It does not inherit the original protocol, packet layouts, reliability layer, module ABI, or live interoperability.
+Multiplayer, dedicated hosting, multiplayer authoring, replay, and relay operation are committed revival capabilities. Phase 9 implements the selected native direction against the working final simulation, security rules, and verification matrices. Any determinism requirement is fixed from the selected scheduler, replay, and network evidence rather than assumed in advance. The native route does not inherit the original protocol, packet layouts, reliability layer, module ABI, or live interoperability.
 
 ### The original creator surface was much larger than a level viewer
 
@@ -205,7 +219,7 @@ The released `editor/` application is Windows-only and tightly coupled to the ol
 
 The world editor covered rooms, faces, vertices, portals, bridges, joining, attaching, snapping, combining, triangulation, indoor and terrain workflows, reusable rooms and ORF palettes, materials and UVs, objects, starts, cameras, waypoints, sounds, doorways, triggers, paths, navigation, matcens, goals, megacells, ambient life, lighting and radiosity baking, fog, validation, repair, statistics, level notes, table-file and page lock/check-in UI, DALLAS and Osiris script compile, a standalone briefing editor, HOG tools, play-from-editor, and 3DS room import. It also exposed textured and wireframe views, navigation and focus commands, view cameras, autosave, and crash restoration. The command surface begins in [`editor/editor.rc`](../../editor/editor.rc) with IDs in [`editor/resource.h`](../../editor/resource.h); serialized level coverage is visible in [`Descent3/LoadLevel.h`](../../Descent3/LoadLevel.h). No historical “scale room” or general multi-object property-edit command is required evidence; object multi-edit is limited.
 
-Navigation was not merely a list of editor waypoints. The source contains room-and-terrain connectivity plus a three-dimensional node-and-edge graph with clearance, runtime routing, hand-authored paths, and editing tools. The native counterpart is one purpose-built two-level volumetric graph: stable region connectivity and bounded sparse 3D nodes, deterministic CPU baking and A*, local steering, dynamic edge invalidation, and bounded replanning. Hand-authored paths remain separate for cinematics, patrols, set pieces, and exact orientation.
+Navigation was not merely a list of editor waypoints. The source contains room-and-terrain connectivity plus a three-dimensional node-and-edge graph with clearance, runtime routing, hand-authored paths, and editing tools. The first native translation preserves the region, node, clearance, routing, steering, blockage, and recovery semantics exercised by real routes. The final native structure is ratified after those routes work rather than predesigned as a generic navigation framework. Hand-authored paths remain separate for cinematics, patrols, set pieces, and exact orientation.
 
 The old lighting tools projected secondary UVs for editor faces and `SqueezeLightmaps()` packed a sequence of padded 128-by-128 pages, with no per-room cap beyond the global 65,534 lightmap and lightmap-info handle limits. The native importer first preserves that page, UV2, and sampling meaning closely enough to reproduce reference images. A whole-retail area report and real editor bake then inform one simpler native layout. A single 1024-square room atlas is a hypothesis to measure, not an early schema constraint.
 
@@ -217,7 +231,7 @@ The Briefing Editor authored multi-screen layouts with text, bitmaps, movies, so
 
 The workflow also had HOG packaging, dependency and orphan checks, script compilation, and play-from-editor. The integrated HOG dialog, an empty briefing voice callback, disabled menu items, and terrain stubs show that source presence alone does not prove working capability. Intended useful functions enter the completeness ledger; historical defects and duplicated interactions do not.
 
-[`RevivalEditor`](creator-suite.md) starts in Phase 1 with the first canonical room and grows with every runtime slice. One native application translates the useful world, game-data, behavior, campaign, presentation, asset, baking, validation, playtest, and publishing semantics without original-format export or a native-module compiler.
+[`RevivalEditor`](creator-suite.md) starts in Phase 1 with the complete canonical Training `Level` focused on one selected acceptance room and grows with every runtime slice. One native application translates the useful world, game-data, behavior, campaign, presentation, asset, baking, validation, playtest, and publishing semantics without original-format export or a native-module compiler.
 
 ## Discarded port plan
 

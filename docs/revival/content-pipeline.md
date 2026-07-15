@@ -1,7 +1,7 @@
 # One-way content pipeline
 
 - Status: accepted, amended
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: binding content and import contract
 
 ## Boundary
@@ -22,7 +22,7 @@ D3Import is the only shipping component that understands the supported prepared-
 
 The game and editor do not mount HOG archives, open MN3 or D3L files, load retail DLLs, apply retail override order, or search the original installation. RevivalEditor may import supported modern media into native projects; it never becomes a second legacy reader.
 
-The first importer favors traceability over premature normalization. It reproduces source naming, precedence, the complete Training D3L world boundary, the eager `PageInAllData` working set, and lazy-page dependencies reached by currently translated behavior in a canonical form traceable against the released loaders. Phase 1 accepts one room visually, but the production package contains the complete Level; one-room packages and synthetic portal cuts are fixtures only. The manifest expands when a later behavior, matcen, or dynamic-spawn path enters the product, so Phase 1 does not pretend to solve Phase 4 reachability. This is not evidence that the old renderer had every resource ready at activation.
+The first importer favors traceability over premature normalization. It reproduces source naming, precedence, the complete Training D3L world boundary, the eager `PageInAllData` working set, and lazy-page dependencies reached by the currently translated product path in a canonical form traceable against the released loaders. Phase 1 accepts one room visually, but the production package contains the complete `Level`; one-room packages and synthetic portal cuts are fixtures only. The manifest expands when a later behavior, matcen, or dynamic-spawn path enters the product, so Phase 1 does not pretend to solve Phase 4 reachability. This is not evidence that the old renderer had every resource ready at activation.
 
 ## Initial source profile
 
@@ -50,17 +50,17 @@ Import is read-only toward retail source and atomic toward its destination:
 1. recognize and fingerprint the source profile;
 2. validate container and field bounds, names, case collisions, duplicate entries, sizes, and references;
 3. resolve retail archive and patch precedence once;
-4. select the complete levels required by the current campaign slice and the dependencies reachable through product behavior translated so far;
+4. select the complete levels required by the current campaign slice and the dependencies reachable through the currently translated product path;
 5. decode each complete level's rooms, portals, terrain, objects, paths, and goals plus the models, textures, lightmaps, fonts, audio, score, movies, strings, and definitions the current path uses;
 6. preserve source-supported ordering and relationships in simple canonical values;
 7. record durable content keys, source provenance, hashes, complete-level identity, eager working-set evidence, and the current reachable dependency manifest;
-8. bind the reviewed translated behavior data required by the current slice;
+8. bind the validated behavior configuration required by the current slice to the compiled typed Swift behavior in RevivalCore;
 9. write and validate a temporary canonical package and import report;
 10. atomically promote the package only after every selected complete level and current reachable dependency succeeds.
 
 An unknown used format feature, missing current dependency, unresolved reference, malformed payload, or truncated level fails with a source-linked diagnostic. The importer does not substitute a retail runtime fallback or invent missing data.
 
-The first implementation covers the formats required to construct the complete Training Level and its source-evidenced eager working set, while visual/editor acceptance remains focused on one room. Each parser is the real checked production parser. Behavior-driven lazy coverage then expands with its campaign island.
+The first implementation covers the formats required to construct the complete Training `Level`, its source-evidenced eager working set, and the lazy dependencies reachable through the Phase 1 product path, while visual/editor acceptance remains focused on one selected room. Each parser is the real checked production parser. Later behavior-, matcen-, and spawn-driven coverage expands with the dependency island that makes each path executable.
 
 ## Helper boundary
 
@@ -101,7 +101,6 @@ The package is an ordinary directory using deterministic Codable JSON for struct
       behaviors/
       presentations/
       localization/
-      authoring/
 
 content.json records:
 
@@ -111,11 +110,13 @@ content.json records:
 - source-to-output provenance and byte-integrity hashes;
 - durable content keys and the current reachable dependency manifest;
 - retail format provenance and importer coverage relevant to the selected complete levels;
-- translated behavior revision and provenance for the current slice;
+- behavior binding and configuration revision plus source provenance for the current slice;
 - imported, ignored, rejected, and deferred entries;
 - rights and local-only status for converted retail media.
 
-The initial package does not contain global.stream or world.stream blobs, stream cells, spatial demand tables, Metal descriptor encodings, package-layer locators, or resource-lifetime classes. RevivalMetal prepares the source-evidenced eager working set from the canonical package, then retains any later canonical presentation resources requested by reachable source behavior until the world exits.
+Under the current direct-Swift runtime, `behaviors/` contains only validated bindings, initial configuration and state, content references, revision, and provenance consumed by RevivalCore. It contains no Swift source, bytecode, or executable instructions. An accepted behavior amendment may replace that schema, but it must also replace the superseded runtime path.
+
+The initial package does not contain global.stream or world.stream blobs, stream cells, spatial demand tables, Metal descriptor encodings, package-layer locators, or resource-lifetime classes. RevivalMetal prepares the source-evidenced eager working set from the canonical package, then retains any later canonical presentation resources requested by the currently translated product path until the world exits.
 
 Do not add a general archive, database, virtual filesystem, compression framework, asset graph, or plugin system.
 
@@ -177,7 +178,7 @@ RevivalEditor writes inspectable source projects:
       presentations/
       localization/
 
-The first project owns one simple canonical snapshot and may reference the read-only imported base content. Derive editable source copies the selected canonical document and the editable media actually required for the change, preserving provenance without mutating the base.
+The Phase 1 project owns one editable complete `Level` document value derived from the read-only imported base. It references unchanged imported assets and copies only the media that a real edit must own, preserving provenance without mutating the base.
 
 Ordered replacement-package layers and public migrations arrive with the first publishing workflow that needs them. Do not force locator tables, copy-on-write package graphs, or semantic revision machinery into the initial editor-to-play loop.
 
@@ -195,7 +196,7 @@ Retail input, generated packages, import reports containing local paths, capture
 
 Expand legacy import only as the next playable stock slice uses it:
 
-1. the complete Training Level topology and eager working set, with one room as the acceptance view;
+1. the complete Training Level topology, eager working set, and Phase 1 reachable dependency manifest, with one selected room as the acceptance view;
 2. the additional materials, models, and definitions exercised by the connected Training cluster;
 3. the remaining behavior, presentation, and mission dependencies required to complete Training;
 4. base campaign level 1 and each remaining level in campaign order, including secrets;

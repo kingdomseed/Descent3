@@ -1,7 +1,7 @@
 # Verification
 
 - Status: accepted, amended
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: binding evidence and acceptance contract
 
 ## Principle
@@ -13,7 +13,7 @@ Verify two things without confusing them:
 
 The C++ source, reference executable, retail content, revision history, and historical notes are systematic translation evidence. They do not become permanent CI dependencies or require byte, file, ABI, packet, or UI parity.
 
-Every new shipping behavior follows [Test-driven development](test-driven-development.md). Documentation-only work uses link, consistency, and evidence checks. Disposable research captures unknown behavior but does not enter product targets.
+Every new or changed shipping behavior follows [Test-driven development](test-driven-development.md). Documentation-only work uses link, consistency, and evidence checks. Disposable research captures unknown behavior but does not enter product targets.
 
 ## Evidence layers
 
@@ -45,6 +45,12 @@ Each dependency island records:
 
 A closed island has no unexplained source file, generated block, or handwritten range. This does not mean one test or Swift file per C++ file.
 
+Build, link, and entry-point success prove only those named claims; they do not prove feature behavior or composition.
+
+No island closes with a stubbed implementation, stand-in constant, disabled production path, temporary compatibility fallback, or TODO serving in place of a ledgered contract.
+
+Closure evidence names every affected suite and every skipped, disabled, quarantined, deleted, weakened, or replaced case. A test protecting the claimed current contract must execute and pass. Any other nonexecuted case must be inapplicable under an approved `deferred`, `excluded`, or `replaced` disposition with replacement or removal evidence; an explanation alone is insufficient.
+
 Reference comparisons use tolerances or structural checkpoints appropriate to the behavior. Exact values are required only where exactness is itself the accepted contract. When the native result intentionally differs, the evidence records the old result, new decision, and test that protects it.
 
 ## Import and canonical content
@@ -54,7 +60,7 @@ Import tests use the production D3Import parsers and cover:
 - recognized source profile and archive precedence;
 - checked little-endian fields, ranges, names, case collisions, duplicates, and references;
 - the source structures required by the current room, level, campaign, or media slice;
-- complete included-level topology, with the eager `PageInAllData` working set distinguished from lazy-page dependencies reached by current translated behavior;
+- complete included-level topology, with the eager `PageInAllData` working set distinguished from lazy-page dependencies reached by the currently translated product path;
 - source-faithful rooms, portals, terrain, objects, models, textures, lightmaps, paths, goals, strings, and current behavior bindings;
 - malformed input, unknown used features, missing dependencies, and destination failure;
 - atomic destination promotion and preservation of the previous valid package;
@@ -81,7 +87,7 @@ The current resource-lifetime path proves:
 - there is one loader and one renderer, with no resident/streaming switch or legacy fallback;
 - optimized M4 startup, transition, memory, and editor costs are recorded at each representative milestone.
 
-After complete Training, run the broader evidence gate in [World loading and residency](world-streaming.md). A future amendment receives tests for its real production mechanism; no hypothetical streamer tests exist now.
+After the complete playable Training Mission, run the broader evidence gate in [World loading and residency](world-loading.md). A future amendment receives tests for its real production mechanism; no hypothetical streamer tests exist now.
 
 ## Simulation and timing
 
@@ -94,7 +100,7 @@ During the translation phase, controlled-clock tests prove:
 - input ramps, flight, collision, portal ownership, timers, animation, and interval behavior against reference traces;
 - no hidden read of a global Frametime value.
 
-Phase 3 chooses one final scheduler. Its amendment adds the exact tests for bounded variable delta or fixed ticks, including input sampling, catch-up, interpolation, timers, replay, and pause behavior as applicable. It deletes tests and production adapters for the superseded scheduler.
+Phase 3 chooses one final scheduler. Its amendment adds the exact tests for bounded variable delta or fixed ticks, including input sampling, catch-up, interpolation, timers, replay, and pause behavior as applicable. If it replaces the source scheduler, the amendment deletes production adapters and product tests that require the superseded scheduler.
 
 Do not assert fixed 120 Hz, an eight-tick ceiling, exact Float32 hash semantics, fused-operation policy, or zero step allocations before the selected scheduler and replay requirements make them real contracts.
 
@@ -109,7 +115,7 @@ Focused gameplay tests protect the current source-supported rule:
 - goals, difficulty, GuideBot, campaign state, saves, and progression;
 - HUD, cockpit, automap, markers, cameras, cinematics, messages, results, and approved commands.
 
-The functional-completeness ledger determines when each family enters. Tests do not anticipate every later family during the first room.
+The functional-completeness ledger determines when each family enters. Tests do not anticipate every later family during Phase 1's selected acceptance room.
 
 ## Behavior
 
@@ -118,12 +124,12 @@ For each translated behavior chain, evidence covers:
 - generated DALLAS structure plus custom and handwritten ranges;
 - event producers, order, conditions, queries, commands, variables, timers, random choices, messages, and content bindings;
 - reference checkpoints and deliberate differences;
-- source-faithful explicit-delta behavior and later final-scheduler conversion;
+- behavior under the selected final scheduler, with source explicit-delta semantics captured as characterization evidence and every deliberate timing difference recorded;
 - save/load continuation where state persists;
 - editor configuration, trace, error navigation, playtest, and package closure;
 - migration and removal of direct typed functions only if a later evidence-ratified executor actually replaces them.
 
-Compiler, graph, operation-limit, authority, and replay tests arrive with those actual production mechanisms, not with a speculative full language.
+Tests for any later authored representation, executor, operation limits, authority rules, and replay semantics arrive with those actual production mechanisms, not with a speculative full language.
 
 ## Rendering
 
@@ -194,7 +200,7 @@ Archives prove the expected signed D3Import helper is bundled and launched succe
 
 ## Reference machine
 
-Initial optimized measurements use:
+The pre-product environment snapshot used for current archaeology and documentation checks is:
 
 - Mac mini Mac16,10;
 - Apple M4 with 10 CPU and 10 GPU cores;
@@ -204,37 +210,44 @@ Initial optimized measurements use:
 - Metal 4;
 - 1920 by 1080 at 60 Hz on the current display.
 
-Record toolchain, OS, display, content hash, build configuration, and settings beside every result. Do not record local identifiers or serial numbers.
+Phase 1 product builds and optimized measurements use Xcode 27 and the Swift 6.4 compiler in Swift 6 language mode: the current beta until the stable release, then stable Xcode 27. Xcode 26.6 and Swift 6.3.3 are not a supported product lane. Record toolchain, OS, display, content hash, build configuration, and settings beside every result. Do not record local identifiers or serial numbers.
 
 ## Performance method
 
 Measure optimized builds with Instruments, Metal System Trace, Metal capture, and focused signposts. Track:
 
 - startup and level-transition time;
-- update, render extraction, encoding, and GPU time;
+- frame-time distribution, high-percentile hitches, and the slowest frames in a recorded representative run;
+- simulation update, render extraction, Metal encoding, GPU execution, and wait time separately;
 - CPU, GPU, and unified-memory high-water;
-- allocation hot spots;
+- allocation and copy hot spots, including unexpected copy-on-write events and `memmove` weight;
+- Swift ownership and access work such as `swift_retain`, `swift_release`, `swift_beginAccess`, and `swift_endAccess` when it appears in a hot call tree;
+- unspecialized generic calls, protocol witness dispatch, and closure or task allocation in a measured frame path;
 - import and media conversion;
 - editor command and playtest latency;
 - repeated load/restart and long-session stability.
 
-The first room records a baseline, not a global budget. The connected cluster and flight slice expand it. Complete Training establishes the first credible product budgets and the resident-resource decision.
+These symbols and compiler constructs are diagnostic leads, not failures by themselves. The Swift 6.4 `PerformanceHints` diagnostics may be enabled as warnings for a focused performance investigation; they are not a project-wide error policy or a reason to ban protocols, generics, collections, or classes outside a measured path. Attribute a missed budget or regression to the responsible function, allocation, copy, pass, transfer, or wait before changing code.
+
+The first source-sensitive profiles cover the paths recorded in [Swift engine-code feasibility evidence](discovery.md#swift-engine-code-feasibility-evidence): collision and FVI, object and behavior update, room/portal and terrain extraction, dynamic lighting when reached, and the editor-to-play world-copy boundary. Compare the same accepted observable path before and after a change. Do not substitute a language headline or unrelated microbenchmark for product evidence.
+
+The selected acceptance room within the complete resident `Level` records a baseline, not a global budget. The connected cluster and flight slice expand it. The complete playable Training Mission establishes the first credible product budgets and the resident-resource decision.
 
 An optimization starts with a reproducible missed budget or regression. Keep it only when before/after measurements support it. Zero steady-state project allocations may become a targeted hot-loop contract; it is not a Phase 1 requirement.
 
 ## Milestone gates
 
-### First integrated room
+### Phase 1: complete Level with selected-room acceptance
 
 Phase 1 passes when:
 
-1. D3Import converts the complete owned Training Level topology through production parsers and includes the eager dependencies reached by the Phase 1 path;
-2. the package opens with no retail archive mounted;
-3. RevivalMac and RevivalEditor render the same lightmapped room through direct Metal;
+1. D3Import converts the complete owned Training Level topology through production parsers and emits the current reachable dependency manifest, distinguishing the eager dependencies reached by `PageInAllData` from later canonical preparations;
+2. RevivalMac and RevivalEditor each construct the complete resident canonical `Level` from the package with no retail archive mounted;
+3. both applications render the same selected lightmapped room through direct Metal;
 4. the editor derives a project value from the read-only base, changes one real value, undoes, redoes, saves, and reopens it;
 5. editor preview creates a disposable play-session copy, enters the shared shipping paths, and returns;
 6. the eager working set is ready at activation, later reachable assets resolve only from the canonical package, and replacement follows the pre-commit/post-commit failure contract before final-use release;
-7. source-file dispositions, red/green results, clean Metal validation, and first M4 measurements are recorded.
+7. every source row reached by this result satisfies the ledger's Phase 1 terminal-state rule, and red/green results, clean Metal validation, and first M4 measurements are recorded.
 
 ### First playable combat slice
 
@@ -249,9 +262,9 @@ Phase 4 passes when the selected connected Training cluster supports:
 - authoring, validation, playtest, save/reopen, and package proof for the interaction;
 - clean tests, Metal validation, and optimized M4 profile.
 
-### Complete Training
+### Complete playable Training Mission
 
-Training passes when every required runtime, behavior, presentation, save, replay, editor, validation, and publishing path works. It also closes the post-Training resident-level evidence gate with a recorded keep-or-amend decision.
+Training passes when every required runtime, behavior, presentation, save, replay, editor, validation, and publishing path works. It also closes the resident-level evidence gate after the complete playable Training Mission with a recorded keep-or-amend decision.
 
 ### Campaign and creator gates
 
@@ -279,16 +292,18 @@ The product is complete only when:
 
 Before Phase 1 production begins, active documents must agree on:
 
-- Swift 6.3, MSL, direct Metal 4, Apple Silicon, and macOS 26+;
+- the Swift 6.4 compiler toolchain in Swift 6 language mode, using Xcode 27 beta until stable Xcode 27 replaces it, plus MSL, direct Metal 4, Apple Silicon, and macOS 26+;
 - source-accounted semantic translation with recorded differences;
 - no shipping C++, OpenGL, SDL, MFC, native module, or compatibility backend;
 - one-way import and retail-data isolation;
 - one complete resident Level world, source-accounted eager working-set preparation, and canonical lazy paging added with each reachable translated path as the current implementation;
 - no speculative stream cells, stream blobs, spatial demand, or resident/streaming switch;
-- one explicit source-order old/new variable-time scheduler followed by a single Phase 3 timing decision;
+- one explicit source-faithful old/new variable-time scheduler followed by a single Phase 3 timing decision;
 - RevivalEditor in Phase 1 sharing world types, dependency rules, renderer, level I/O, and play path with RevivalMac while owning separate editor and play-session values;
 - complete human creator, campaign, replay, multiplayer, and mod-SDK scope;
 - focused red-first shipping implementation plus bounded disposable research;
 - evidence-driven modernization that deletes the superseded production path.
+
+The Phase 1 environment check must also show Xcode 27 selected, Swift 6.4 in Swift 6 language mode, the recorded SDK and macOS 26 deployment target, and no Swift 6.3 compatibility branch. During the beta window it records the exact beta build; after release it records stable Xcode 27 and deletes any beta-only workaround.
 
 A consistency search must find no active instruction that makes fixed-cell streaming, fixed 120 Hz, exact target counts, a complete speculative behavior VM, a fixed editor overlay protocol, or a provisional lightmap atlas a Phase 1 prerequisite.

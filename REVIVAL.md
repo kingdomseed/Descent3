@@ -8,7 +8,7 @@ The route is a source-led native translation, not a greenfield design exercise a
 
 The shipping product uses:
 
-- Swift 6.3 for project-owned host code;
+- the Swift 6.4 compiler toolchain in Swift 6 language mode for project-owned host code, using Xcode 27 beta until the stable Xcode 27 release;
 - MSL and direct Metal 4 for graphics;
 - AppKit and MetalKit for game and editor windows;
 - GameController for controller input;
@@ -18,7 +18,7 @@ The shipping product uses:
 - Apple Silicon arm64 and macOS 26 or later;
 - one canonical content model shared by runtime, editor, saves, replay, multiplayer, and publishing.
 
-There is one renderer, one active simulation scheduler, one active level-lifetime path, and one shared editor/player world. OpenGL, SDL, MFC, DLL interfaces, original saves and packets, and retail runtime formats do not survive as product layers.
+There is one renderer, one active simulation scheduler, one active level-lifetime path, and one canonical world model and production path. Player, editor document, and editor play session own separate values; OpenGL, SDL, MFC, DLL interfaces, original saves and packets, and retail runtime formats do not survive as product layers.
 
 ## Translation before redesign
 
@@ -44,9 +44,9 @@ The first native world starts from the original game's operational baseline:
 - the player and editor use the same world types, loader, simulation, and renderer, with separate owned document and play-session values;
 - exit waits for final GPU use and releases the level resources through one owner.
 
-The released engine did not prove a complete GPU-ready dependency closure at activation: bitmap, object, matcen, and Osiris paths could page additional assets later, and the retained GPU pre-upload hook is a no-op. The canonical-only runtime is a deliberate one-way-content strengthening. Its package contains the complete level topology and every dependency reachable through the currently translated product path, then expands when a new behavior path becomes real; eager-versus-lazy preparation still follows the source until measurement supports a change.
+The released engine did not prove a complete GPU-ready dependency closure at activation: bitmap, object, matcen, and Osiris paths could page additional assets later, and the retained GPU pre-upload hook is a no-op. The canonical-only runtime is a deliberate one-way-content strengthening. Its package contains the complete level topology and every dependency reachable through the currently translated product path, then expands when a new product path becomes real; eager-versus-lazy preparation still follows the source until measurement supports a change.
 
-This is the concrete current implementation. It is not “no streaming ever.” Spatial streaming is considered only after complete Training and representative large indoor, outdoor, editor, and higher-resolution workloads are measured on the M4. A later amendment must replace the resident mechanism rather than add a permanent second mode. [World loading and residency](docs/revival/world-streaming.md) defines that gate.
+This is the concrete current implementation. It is not “no streaming ever.” Spatial streaming is considered only after the complete playable Training Mission and representative large indoor, outdoor, editor, and higher-resolution workloads are measured on the M4. A later amendment must replace the resident mechanism rather than add a permanent second mode. [World loading and residency](docs/revival/world-loading.md) defines that gate.
 
 The first scheduler preserves the historical old/new timing handoff explicitly. Frame systems and `EVT_INTERVAL` consume the previous `Frametime` and pre-update `Gametime`; after cap waiting, `CalcFrameTime` stores the new duration, then `GameFrame` advances `Gametime` before the remaining tail work. It preserves the static/`InitGame` 0.1-second initialization and nested pause/rebase behavior without retaining mutable globals. After flight, collision, interval events, and animation have native reference evidence, Phase 3 chooses and completes one final timing model. Fixed 120 Hz remains a candidate, not a Phase 1 fact, and the product will not keep variable and fixed modes in parallel.
 
@@ -90,7 +90,7 @@ The complete revival includes:
 
 Only D3Import reads supported prepared-installation containers and legacy formats. The game and editor never mount retail HOG archives, open D3L at runtime, or load native mission modules. Import and reimport are explicit, checked, repeatable, and one-way. Converted retail media stays local because conversion does not change ownership.
 
-Stock behavior is translated from generated and handwritten source one actual dependency chain at a time as canonical direct typed Swift. Shipping packages contain safe native data or project-owned instructions, never native executable modules. Creator authoring grows from working generated, handwritten, timed/persistent, and presentation-oriented chains; it does not force a replacement executor before those cases prove one necessary.
+Stock behavior is translated from generated and handwritten source one actual dependency chain at a time as canonical direct typed Swift. Under that current runtime, packages contain validated bindings, initial configuration and state, content references, revision, and provenance—not Swift, bytecode, executable instructions, or native modules. Creator authoring grows from working generated, handwritten, timed/persistent, and presentation-oriented chains; a different authored form must pass the behavior amendment gate and replace the superseded runtime path.
 
 ## Product shape
 
@@ -119,17 +119,21 @@ Reference captures answer specific behavioral questions. Product tests then prot
 - [Architecture](docs/revival/architecture.md) records the native semantic-translation decision.
 - [Source translation discipline](docs/revival/source-translation.md) defines file accounting and modernization.
 - [Source translation ledger](docs/revival/source-translation-ledger.md) records the initial file-by-file dispositions and closure status.
-- [World loading and residency](docs/revival/world-streaming.md) defines the resident baseline and measured amendment gate.
+- [World loading and residency](docs/revival/world-loading.md) defines the resident baseline and measured amendment gate.
 - [Roadmap](docs/revival/roadmap.md) gives the concrete vertical-slice sequence.
 - [Functional completeness](docs/revival/functional-completeness.md) and the [ledger](docs/revival/functional-completeness-ledger.md) define complete scope.
 - [Engineering principles](docs/revival/engineering-principles.md) defines the minimal-code rules.
 - [Test-driven development](docs/revival/test-driven-development.md) defines production red-green-refactor and the test-value gate.
 - [Content pipeline](docs/revival/content-pipeline.md) defines one-way retail conversion and native packages.
+- [Retail data and provenance](docs/revival/retail-data.md) records verified local source profiles, hashes, and the active rights boundary.
 - [Behavior system](docs/revival/behavior-system.md) records the evolving safe replacement for Osiris and DALLAS.
 - [Adaptive music](docs/revival/adaptive-music.md) defines score translation and native playback.
 - [Creator suite](docs/revival/creator-suite.md) defines the human-first editor.
 - [Verification](docs/revival/verification.md) defines translation, product, and M4 evidence.
 - [Skills and agents](docs/revival/skills-and-agents.md) defines workstream playbooks and roles.
+- [Skill supply chain](docs/revival/skill-supply-chain.md) records external pins, licenses, allowed advice, and project overrides.
+- [Primary technical source index](docs/revival/primary-source-index.md) preserves the key web documentation, the question each source answers, and its limits.
 - [Discovery](docs/revival/discovery.md) records historical source and development evidence.
+- [Legacy M4 reference build](docs/revival/macos-arm64-build.md) preserves the archived non-product build procedure used for focused comparisons.
 
 Command & Conquer and FreeSpace 2 remain future projects. This repository is focused on Descent 3.

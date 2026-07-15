@@ -1,7 +1,7 @@
 # Native creator suite
 
 - Status: accepted, amended
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: binding creator-product contract
 
 ## Decision
@@ -64,7 +64,7 @@ The editor writes ordinary inspectable source projects:
 
 The file split follows real authoring and merge needs. Structured source uses deterministic versioned encodings once a format is public. Large media remains in ordinary files. Durable content keys connect values that need stable references; generated runtime indices never enter source.
 
-Imported retail content is a read-only canonical base. Derive editable source copies the selected canonical document and media needed for an edit into the project, keeps provenance, and declares the replacement without mutating the base. Unchanged content remains referenced.
+Imported retail content is a read-only canonical base. RevivalEditor copies the selected canonical document and only the media needed for the edit into the project, preserves provenance, and declares replacements without mutating the base. Unchanged content remains referenced.
 
 Local tabs, pane positions, selection, active tool, and viewport cameras are not canonical source. Authored camera bookmarks are content.
 
@@ -72,7 +72,7 @@ Add immutable snapshots and stale-result rejection to the first long-running USD
 
 ## Shared world and rendering
 
-The editor and player use the same complete-Level world model, dependency rules, room/portal and terrain visibility, render extraction, Metal passes, and simulation. The editor owns an editable project value and play owns a disposable session copy; “shared world” does not mean concurrent mutation of one instance. Play-in-editor is not an editor-only game fork.
+The editor and player use the same complete `Level` world model, dependency rules, room/portal and terrain visibility, render extraction, Metal passes, and simulation. The editor owns an editable project value and play owns a disposable session copy; “shared world” does not mean concurrent mutation of one instance. Play-in-editor is not an editor-only game fork.
 
 Immediate edits update canonical in-memory values and the smallest affected preview resource directly. Use ordinary rotating frame resources where Metal safety requires them. Do not predefine:
 
@@ -117,7 +117,7 @@ References use the canonical content catalog and report affected owners before d
 
 ### Behavior
 
-Behavior authoring grows from translated source behavior. The first surface shows and edits the actual door, trigger, robot, goal, and presentation logic required by Training, with source provenance, validation, trace, and failure navigation.
+Behavior authoring grows from translated source behavior. The first surface places and configures the bindings, parameters, and explicit state used by the Training door, trigger, robot, goal, and presentation chains, while inspecting and tracing their source-linked typed Swift control flow. It provides validation and failure navigation without inventing a graph or second executor.
 
 Direct typed Swift remains the canonical runtime while the editor exposes the smallest useful configuration and trace surface. A different visual or textual authored representation is proposed only after working evidence covers generated DALLAS, handwritten/custom, timer or persistent-state, and presentation-oriented behavior and demonstrates a concrete human-authoring limitation. Any accepted form never generates C++, invokes a native compiler, or emits executable plugins.
 
@@ -140,7 +140,7 @@ One publisher validates complete level topology and the dependencies reachable t
 The default loop is:
 
 1. edit canonical project data;
-2. validate the changed dependency closure;
+2. validate changed references and the dependencies reachable through the project's current behavior surface;
 3. update only derived data that is actually stale;
 4. run the current level or scenario in-process through RevivalCore and RevivalMetal;
 5. return to the document with logs and failing references linked to their owners.
@@ -153,7 +153,7 @@ Editor mutations are concrete typed edits over canonical documents. Stable IDs a
 
 Each completed action registers a named inverse with UndoManager. Continuous samples stay transient and commit as one action. Do not build a generic command protocol, command bus, service layer, or public wire format.
 
-Each mature workspace gains document, reference, validation, and save-reopen-play tests for its actual production path. Recovery remains outside source until the creator accepts it. View code does not own game rules or serialization.
+Every new or changed editor behavior starts with one focused automated test that fails for the intended reason before production implementation. As a workspace matures, it also accumulates document-composition, reference, validation, and save-reopen-play tests for its actual production path. Recovery remains outside source until the creator accepts it. View code does not own game rules or serialization.
 
 ## Creator completeness gate
 

@@ -1,6 +1,6 @@
-> **Legacy reference only.** This document builds the retained community C++/SDL/OpenGL engine. It does not describe the Swift/Metal Revival product. See [REVIVAL.md](REVIVAL.md), [Architecture](docs/revival/architecture.md), and [Roadmap](docs/revival/roadmap.md) for current work. Use [Legacy M4 reference build](docs/revival/macos-arm64-build.md) when a focused research question requires the old executable.
+> **Legacy reference only.** This document builds the retained community C++/SDL/OpenGL engine. It does not describe the Swift/Metal Revival product. See [REVIVAL.md](REVIVAL.md), [Architecture](docs/revival/architecture.md), and [Roadmap](docs/revival/roadmap.md) for current work. Use [Legacy M4 reference build](docs/revival/macos-arm64-build.md) when a focused research question requires the old executable. Any clone instructions below belong in a separate reference checkout; do not replace the pinned translation-source tree.
 
-# Building Descent 3 Open Source 
+# Building Descent 3 Open Source
 
 ## Dependencies
 The build process uses [**CMake**](https://cmake.org/) and, by default, [**Ninja**](https://ninja-build.org/). You must install these; the project cannot locate them for you. The source code also depends on third-party libraries that are not provided as part of the repository:
@@ -166,23 +166,20 @@ Once CMake finishes, the built files will be put in `builds/linux/build/Debug` o
 
 ## Cross-compilation
 
-In order to cross-compile Descent3 to another platform (for example, Linux ARM64), you'll need to build auxiliary
-tools natively which are needed to build data files. First create build-native directory and configure project in it:
+To cross-compile Descent3 to another platform, such as Linux ARM64, first build the data-file tools for the host. Run these commands from the repository root:
 
 ```shell
-mkdir build-native
-cd build-native
-cmake ..
-cmake --build . --target HogMaker
+cmake -S . -B build-native
+cmake --build build-native --target HogMaker
 ```
 
-Now, you are ready for cross-compilation. Create a new cross-compilation build directory and configure the project in it, but this time specify the location of the HogMaker native executable just built, as well as the [toolchain file](https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html#id14) location. This enables the cross-compilation environment. An example toolchain file is provided for a Linux ARM64 build at `cmake/toolchains/linux-aarch64-gcc-toolchain.cmake`. The custom toolchain system can be used in combination with VCPKG to build all dependencies for the target system.
+Then configure a separate target build with the native `HogMaker` package directory and an explicit [toolchain file](https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html#id14). The repository provides `cmake/toolchains/linux-aarch64-gcc-toolchain.cmake` for Linux ARM64. A custom toolchain can be used with vcpkg to build target dependencies.
 
 ```shell
-mkdir build-cross
-cd build-cross
-cmake -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/MyToolChain.cmake -DHogMaker_DIR=../build-native/ ..
-cmake --build .
+cmake -S . -B build-cross \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/toolchains/linux-aarch64-gcc-toolchain.cmake" \
+  -DHogMaker_DIR="$PWD/build-native"
+cmake --build build-cross
 ```
 
 ## Build Options
@@ -194,7 +191,7 @@ cmake --preset linux -DBUILD_TESTING=ON
 
 **NOTE:** CMake variables, or more technically _CMake cache entries_, will persist in their values until they are explicitly cleared. So, if you set a variable and then run another CMake command _without_ that variable specified, the variable will still be set. Variables must be explicitly unset, or the `builds/` directory cleaned, in order to be cleared.
 
-You can also use the [cmake-gui](https://cmake.org/cmake/help/latest/manual/cmake-gui.1.html) front-end to easily set and view CMake cache variable values, and generate build
+You can also use the [cmake-gui](https://cmake.org/cmake/help/latest/manual/cmake-gui.1.html) front-end to set and view CMake cache values and generate build files.
 
 | Option                    | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Default                                                                                      |
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
@@ -203,10 +200,10 @@ You can also use the [cmake-gui](https://cmake.org/cmake/help/latest/manual/cmak
 | `BUILD_TESTING`           | Enable testing. Requires GTest.                                                                                                                                                                                                                                                                                                                                                                                                                                | `OFF`                                                                                        |
 | `DEFAULT_ADDITIONAL_DIRS` | A semi-colon separated list of paths that Descent 3 will use as read-only base directories (see [USAGE.md’s Base directories section][1]). Each item in this list is placed between quotation marks in order to form a C++ expression. This will cause issues if the items in the list are not properly escaped. You can use C++ escape sequences in order to embed special characters (like `\`, `"` and `;`) in paths. Example: `C:\\Games\\Descent3\\;D:\\` | A list with one item in it. The item is an empty string.                                     |
 | `ENABLE_LOGGER`           | Enable logging to the terminal.                                                                                                                                                                                                                                                                                                                                                                                                                                | `OFF`                                                                                        |
-| `ENABLE_MEM_RTL`          | Enable Real-time library memory management functions (disable to verbose memory allocations).                                                                                                                                                                                                                                                                                                                                                                  | `ON`                                                                                         |
+| `ENABLE_MEM_RTL`          | Enable real-time library memory-management functions; disable to enable verbose memory-allocation diagnostics.                                                                                                                                                                                                                                                                                                                                                 | `ON`                                                                                         |
+| `FATAL_GL_ERRORS`         | Check OpenGL calls and raise exceptions on errors.                                                                                                                                                                                                                                                                                                                                                                                                              | `OFF`                                                                                        |
 | `FORCE_COLORED_OUTPUT`    | Always produce ANSI-colored compiler warnings/errors (GCC/Clang only; esp. useful with Ninja).                                                                                                                                                                                                                                                                                                                                                                 | `OFF`                                                                                        |
 | `FORCE_PORTABLE_INSTALL`  | Install all files into local directory defined by `CMAKE_INSTALL_PREFIX`.                                                                                                                                                                                                                                                                                                                                                                                      | `ON`                                                                                         |
-      | `OFF`                                                                                        |
 | `USE_VCPKG`               | Explicitly control whether or not to use vcpkg for dependency resolution. `ON` requires the environment variable `VCPKG_ROOT` to be set.                                                                                                                                                                                                                                                                                                                       | Determined by the existence of `VCPKG_ROOT` in the environment: If it exists, vcpkg is used. |
 | `CODESIGN_IDENTITY`       | Sets the macOS code signing identity. If set to something besides the empty string, then the dynamic libraries put into the hog files will be signed using this identity.                                                                                                                                                                                                                                                                                      | The empty string, `""`.                                                                      |
 

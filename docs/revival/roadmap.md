@@ -1,7 +1,7 @@
 # Roadmap
 
 - Status: accepted, amended
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: concrete execution sequence; cannot reduce product scope
 
 Every phase ends in a runnable, visible, or objectively verified product result. Campaign-first development orders the work; it does not reduce the [functional-completeness contract](functional-completeness.md).
@@ -16,14 +16,16 @@ Status: in progress
 
 Amend the active documents so they agree on:
 
-- Apple Silicon, macOS 26+, Swift 6.3, MSL, and direct Metal 4;
+- Apple Silicon, macOS 26+, the Swift 6.4 compiler toolchain in Swift 6 language mode, MSL, and direct Metal 4, using Xcode 27 beta until stable Xcode 27 replaces it;
 - dependency-ordered semantic translation of the pinned source;
 - no shipping legacy engine, ABI, renderer, platform layer, or native module;
 - complete functional scope and one-way retail conversion;
 - one complete resident level world with source-faithful eager and lazy asset paging as the first loading implementation;
-- the explicit source-order old/new variable-time handoff as the first scheduler;
+- the explicit source-faithful old/new variable-time handoff as the first scheduler;
 - one shared editor/player world model, renderer, level I/O, and play path from Phase 1, with separately owned document and play-session values;
 - evidence-driven modernization with one surviving production path.
+
+Before Phase 1 production code, install the current Xcode 27 beta, select it for the workspace, and record `xcodebuild -version`, `swift --version`, SDK, and deployment target. Replace the beta with stable Xcode 27 when released and remove any beta-only workaround; do not preserve Xcode 26 or Swift 6.3 as a compatibility lane.
 
 Seed and then expand the checked-in source-translation ledger with:
 
@@ -33,11 +35,11 @@ Seed and then expand the checked-in source-translation ledger with:
 - the exact mission and level key, acceptance-room identity, selection reason, connected portal neighbors, and dependency capture for that room within the complete level;
 - a register of temporary research tools or scaffolds with a deletion or archive gate.
 
-Finish the functional-completeness audit without turning chosen architecture into fake historical capabilities. Author and review revival-constitution and revival-source-translation. Author each domain skill immediately before the first production change that needs it; later-domain skills do not block an unrelated island.
+Finish the functional-completeness audit without turning chosen architecture into fake historical capabilities. `revival-constitution` and `revival-source-translation` are authored and reviewed against the accepted documents. The full current skill set is installed; review and amend each applicable domain skill against real translated source immediately before its first production change. A later-domain review does not block an unrelated island.
 
 Exit: no active document requires fixed-cell streaming, fixed 120 Hz, exact target counts, a complete speculative behavior VM, or editor preview machinery before contact with real translated code. The complete Training Level and exact acceptance room are recorded, their initial source/dependency seed exists, and the two prerequisite skills agree with the amended documents. Exact symbols, transitive files, captures, and native owners may close alongside the working Phase 1 island, but must be complete before that island exits.
 
-## Phase 1: one native room in editor and player
+## Phase 1: complete Training Level with selected-room acceptance
 
 Create three executable products:
 
@@ -49,25 +51,25 @@ Keep `RevivalCore` and `RevivalMetal` as explicit code-ownership boundaries. Spl
 
 Implement one end-to-end source dependency island:
 
-1. make the Swift 6.3 workspace and strict-concurrency builds green;
+1. make the workspace green with the Swift 6.4 compiler toolchain in Swift 6 language mode and strict concurrency, using Xcode 27 beta until the stable release replaces it without a Swift 6.3 compatibility mode;
 2. make a minimal AppKit player window and document-based editor window;
 3. compile MSL and submit one direct Metal 4 forward pipeline through MTKView;
 4. translate the HOG and D3L structures required to read the complete Training level world into D3Import;
 5. emit one normal checked canonical Level containing all Training rooms, faces, portals, terrain, paths, goals, objects, and the assets reachable through the currently translated product path;
-6. validate the level, construct its resident authoritative world, and prepare the source-evidenced eager working set; later reachable assets load directly from canonical content added with the behavior path that needs them and remain owned by the level;
+6. validate the level, construct its resident authoritative world, and prepare the source-evidenced eager working set; later reachable assets load directly from canonical content added with the translated product path that needs them and remain owned by the level;
 7. render it through the translated room visibility path in RevivalMac and RevivalEditor;
 8. derive an editable complete-level project value from the read-only imported base, select the acceptance room, a face, or an object, make one real edit with named undo and redo, save, close, and reopen;
-9. create a disposable play-session copy and enter free-camera play through the same world, loader, simulation, and Metal code used by RevivalMac, then return to the document;
+9. create a disposable play-session copy and enter free-camera play through the same world types, loader, simulation, and Metal code used by RevivalMac, then return to the document;
 10. on replacement, validate successor CPU content first, then commit by stopping submissions, waiting for final GPU use, releasing the old presentation owner, and preparing the successor; expose a clear unloaded error if post-commit preparation fails;
 11. release the world cleanly on shutdown.
 
 The production package contains the complete Training level world. Phase 1 accepts only one selected room's rendering and editing, but it does not create a room-scope package, synthetic portal cut, partial `Level`, or migration path that Phase 2 must remove. Tiny one-room worlds are test fixtures only.
 
-Use a tiny synthetic fixture for focused parser and renderer tests, but the phase exit uses the owned local Training data. Record red/green evidence, the source-file dispositions, a clean Metal validation run, and optimized M4 startup, memory, and shutdown measurements. Do not add world cells, stream blobs, a job system, fixed-tick simulation, or a zero-allocation mandate.
+Use a tiny synthetic fixture for focused parser and renderer tests, but the phase exit uses the owned local Training data. Bring every source row reached by the result to the terminal state required by the source-translation ledger, then record red/green evidence, a clean Metal validation run, and optimized M4 startup, memory, and shutdown measurements. Do not add world cells, stream blobs, a job system, fixed-tick simulation, or a zero-allocation mandate.
 
 Exit: the first real imported room is visible in both native applications; the editor can change and persist something meaningful; editor preview and player use the same resident-world model, loading rules, and renderer with separate owned values; a working build can be launched repeatedly without the legacy runtime.
 
-## Phase 2: connected world and real editor-to-play loop
+## Phase 2: connected-room acceptance in the complete Level
 
 Extend the same complete-level path across a small connected Training cluster:
 
@@ -83,7 +85,7 @@ Extend the same complete-level path across a small connected Training cluster:
 
 Measure the released lightmap representation across the selected rooms before choosing a new atlas layout. Preserve the working imported representation until that evidence supports a simpler canonical form.
 
-Exit: player and editor open the same connected cluster with no retail archive mounted. A creator can modify, validate, save, reopen, and play it without a temporary export or a second world path.
+Exit: player and editor open the complete Training `Level` with no retail archive mounted and render, traverse, edit, and play the same selected connected cluster. A creator can modify, validate, save, reopen, and play that cluster without a temporary export or a second world path.
 
 ## Phase 3: flight, collision, terrain evidence, and timing decision
 
@@ -109,7 +111,7 @@ Exit: a player can fly the imported cluster with the intended feel, and a creato
 
 ## Phase 4: first combat and behavior chain
 
-Before implementation, author and review the behavior and volumetric-navigation skills from the actual translated Training dependencies.
+Before implementation, review and amend the installed behavior and volumetric-navigation skills from the actual translated Training dependencies.
 
 Translate one complete source call chain for:
 
@@ -127,7 +129,9 @@ The editor can place and configure the door, trigger, robot, weapon, pickup, sou
 
 Exit: the selected Training combat slice is playable and can be reconstructed in a new native project without hand-editing generated files.
 
-## Phase 5: complete Training and measure the architecture
+## Phase 5: complete the playable Training Mission and measure the architecture
+
+After the Phase 3 timing decision and before replay production work, review and amend the installed replay skill against the selected scheduler and working save/simulation model.
 
 Complete every runtime and creator dependency of the Training Mission:
 
@@ -135,7 +139,7 @@ Complete every runtime and creator dependency of the Training Mission:
 - matching campaign, behavior, path, navigation, presentation, score, localization, validation, playtest, and publishing operations;
 - complete source-file and behavior-range dispositions for the mission.
 
-Run the resident-level evidence gate in [World loading and residency](world-streaming.md) using complete Training, the largest imported indoor and outdoor levels then available, repeated editor/player transitions, and a representative higher-resolution replacement experiment.
+Run the resident-level evidence gate in [World loading and residency](world-loading.md) using the complete playable Training Mission, the largest imported indoor and outdoor levels then available, repeated editor/player transitions, and a representative higher-resolution replacement experiment.
 
 If resident loading meets ratified startup, responsiveness, and memory budgets, ratify it for the following phases and stop speculative streaming work. A later representative workload may reopen the decision only by demonstrating a missed budget and following the amendment gate. If it misses a current budget, compare simpler encoding, duplicate-removal, and load-order fixes before proposing one narrow resource-lifetime amendment. No phase automatically creates a streamer.
 
@@ -181,7 +185,7 @@ Exit: every non-multiplayer creator row passes and the independent campaign inst
 
 ## Phase 9: multiplayer, replay, hosting, and multiplayer creation
 
-Author and review networked-simulation, transport-security-operations, multiplayer, replay, and verification skills against the working final simulation model.
+Review and amend the installed networked-simulation, transport-security-operations, multiplayer, and replay skills against the working final simulation model. Use the installed verification skill to falsify the declared Phase 9 evidence claims and matrices; it does not define a second test architecture.
 
 Add RevivalRelay and implement the selected native direction:
 
@@ -202,7 +206,7 @@ Exit: local and relay-backed matrices pass through 32 connected human slots; ded
 ## Phase 10: complete revival release
 
 - close every functional-completeness row or record a user-approved scope amendment;
-- close every relevant source file and behavior range with a final disposition;
+- bring every relevant source file and behavior range to `verified`, `replaced`, or `excluded` with the evidence required by its disposition; no `seed`, `traced`, `translating`, `native-running`, or `deferred` row survives complete-revival closure;
 - delete or archive every temporary research harness, adapter, and reference-only build artifact from product paths;
 - finalize import, project, package, save, replay, multiplayer, and diagnostic UX;
 - verify compatible and incompatible public data revisions and add only the migrations real released formats require;
@@ -228,4 +232,4 @@ Intel Mac, iOS, visionOS, Windows, Linux, consoles, and web are outside the road
 
 ## Immediate next step
 
-Finish this documentation amendment and its independent reviews. Then record the exact Training Level and acceptance room, complete that level-load/render dependency trace while building it, author the constitution/source-translation prerequisites plus each just-in-time domain skill, and ship the first resident editor/player slice.
+Install and select the current Xcode 27 beta, record the toolchain and macOS 26 deployment target, then record the project-owned canonical Training mission and `Level` keys plus the exact acceptance room and complete the initial level-load/render dependency trace while building the first resident editor/player slice. Review and amend each installed domain skill against the real source immediately before its first production change.

@@ -1,7 +1,7 @@
 # Functional completeness
 
 - Status: accepted, amended
-- Date: July 14, 2026
+- Date: July 15, 2026
 - Authority: binding product-scope contract
 
 ## Governing rule
@@ -45,7 +45,7 @@ For example, a door is incomplete if an imported door works but a creator cannot
 
 Pure runtime concerns such as controller input do not need an editor panel. Pure editor concerns such as selection history do not need a gameplay representation. The team records why a path is inapplicable instead of silently omitting it.
 
-Creator completeness includes the quality of the human workflow, not only the presence of data types. `RevivalEditor` must provide a native document lifecycle, predictable synchronized selection and focus, direct and numeric editing, discoverable menu and keyboard commands, named undo and redo, source-linked diagnostics, cancellable revision-safe background work, playtest state restoration, crash recovery, source-control-safe saves, Full Keyboard Access, VoiceOver coverage, and measured responsiveness on the M4. A modal dialog or hand-edited file does not close a creator row when the integrated workflow remains incomplete.
+Creator completeness includes the quality of the human workflow, not only the presence of data types. `RevivalEditor` must provide a native document lifecycle, predictable synchronized selection and focus, direct and numeric editing, discoverable menu and keyboard commands, named undo and redo, source-linked diagnostics, revision-safe background work with cancellation where supported, playtest state restoration, crash recovery, source-control-safe saves, Full Keyboard Access, VoiceOver coverage, and measured responsiveness on the M4. A modal dialog or hand-edited file does not close a creator row when the integrated workflow remains incomplete.
 
 Every new or changed production behavior used to close a completeness row follows the binding [red-green-refactor protocol](test-driven-development.md). Completion evidence records the focused test that failed for the intended reason before implementation and passed afterward. An inapplicable path receives no manufactured test; the ledger records why it is inapplicable.
 
@@ -81,7 +81,7 @@ The working [functional-completeness ledger](functional-completeness-ledger.md) 
 
 ### Behavior and campaign creation
 
-- typed event, condition, query, action, variable, timer, function, and subgraph authoring, including difficulty queries, cinematic commands, bounded multiplayer command input, and explicit authoritative or client-presentation execution roles;
+- typed event, condition, query, action, variable, timer, function, and reusable behavior composition, including difficulty queries, cinematic commands, bounded multiplayer command input, and explicit authoritative or client-presentation execution roles;
 - object, trigger, level, campaign, and game-mode behavior scopes;
 - behavior validation, tracing, breakpoints, deterministic replay, and persistent state;
 - campaign sequencing, branches, secrets, returns, training and multiplayer declarations, default and allowed ships, progress presentation, intros, endings, briefings, and adaptive-score assignment and region control. Per-level ship selection is a new-native addition: the historical `LVLFLAG_SHIPSELECT` flag was declared but never set or read, so it is a deliberate improvement, not preserved behavior. Per-level dependencies are likewise the new package dependency model, not a historical manifest field.
@@ -99,7 +99,7 @@ The working [functional-completeness ledger](functional-completeness-ledger.md) 
 
 - project creation from an empty native template;
 - content catalog and reference inspection;
-- deterministic room-local lighting and purpose-built volumetric-navigation baking;
+- deterministic native lighting and purpose-built volumetric-navigation baking;
 - complete level dependency inspection, resident CPU and GPU cost reporting, load and release diagnostics, and later resource-budget tools for whichever single lifetime design the measured architecture adopts;
 - dependency closure, orphan detection, validation, and diagnostics;
 - instant play-in-editor, deterministic test scenarios, and capture support;

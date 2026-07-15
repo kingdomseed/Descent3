@@ -1,16 +1,16 @@
 # World loading and residency
 
-- Status: accepted, superseding the July 13 fixed-cell streaming design
-- Date: July 14, 2026
+- Status: accepted, amended
+- Date: July 15, 2026
 - Authority: binding current resource-lifetime decision and modernization gate
 
 ## Current decision
 
-The production load unit is one complete canonical level, matching the source D3L world boundary. Phase 1 imports and loads the complete Training level; one selected room is the first visible and editable acceptance slice, not a partial production level. Synthetic one-room levels remain focused test fixtures.
+The production load unit is one complete canonical `Level`, matching the source D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and both applications load the resulting complete canonical `Level`; one selected room is the first visible and editable acceptance slice, not a partial production level. Synthetic one-room levels remain focused test fixtures.
 
-The initial native product keeps the authoritative level world resident until exit. Startup eagerly prepares the source-evidenced `PageInAllData` working set. If object initialization, a matcen, translated behavior, or another reachable source path later needs a canonical presentation asset, the product prepares it directly from canonical content and retains it for the rest of the level. RevivalMac and RevivalEditor use the same value model, dependency rules, renderer, and resource-loading path while owning separate document and play-session instances.
+The initial native product keeps the authoritative level world resident until exit. Startup eagerly prepares the source-evidenced `PageInAllData` working set. If object initialization, a matcen, translated behavior, or another reachable source path later needs a canonical presentation asset, the product prepares it directly from canonical content and retains it for the rest of the level. RevivalMac owns its player world. RevivalEditor owns a separate document value and creates a separate disposable play-session value; both applications use the same model, dependency rules, renderer, and resource-loading path.
 
-This reproduces the useful shape of the released engine without overstating it. `PageInAllData` walks the ship, static effects and sounds, room textures, terrain presentation, and placed-object dependencies, but bitmap access, object initialization, matcens, and Osiris paths can page more data later. The retained GPU pre-upload hook is a no-op, so the original did not prove complete GPU readiness before activation. The native package contains the complete level topology and every dependency reachable through behavior translated so far; it expands with later behavior islands rather than pretending their reachability is known in Phase 1. The preparation schedule remains source-faithful until evidence supports changing it.
+This reproduces the useful shape of the released engine without overstating it. `PageInAllData` walks the ship, static effects and sounds, room textures, terrain presentation, and placed-object dependencies, but bitmap access, object initialization, matcens, and Osiris paths can page more data later. The retained GPU pre-upload hook is a no-op, so the original did not prove complete GPU readiness before activation. The native package contains the complete level topology and every dependency reachable through the currently translated product path; it expands with later dependency islands rather than pretending future behavior reachability is known in Phase 1. The preparation schedule remains source-faithful until evidence supports changing it.
 
 Streaming is neither prohibited forever nor implemented now. The project does not add cells, prefetch envelopes, a residency graph, a streaming schema, or alternate resident and streamed modes in anticipation of a future problem.
 
