@@ -27,7 +27,7 @@ Replay records the information the selected simulation actually needs. Preserve 
 
 ## One path and clear revisions
 
-- RevivalMac, RevivalEditor, diagnostics, observers, and multiplayer consume the same canonical replay model.
+- RevivalMac, RevivalMobile, RevivalEditor, diagnostics, observers, and multiplayer consume the same canonical replay model.
 - A public replay revision is explicit and validated at intake. Add a migration only for a real released native revision.
 - An incompatible revision fails with an actionable diagnostic; it does not trigger a legacy reader or hidden fallback.
 - Checkpoints and hashes describe exactly which authoritative state they cover. They are evidence, not a claim that every platform float is magically deterministic.
@@ -39,6 +39,6 @@ Do not build a generic event-sourcing framework, dual input/state recording engi
 
 ## Verification
 
-Record focused red/green commands and affected tests for recording, playback, end conditions, corruption, revision mismatch, save/reopen, checkpoint comparison, and continuation where promised. Exercise the same record in the player and editor. Phase 9 adds authority, observer, desync, reconnect, and published multiplayer replay matrices to this path.
+Record focused red/green commands and affected tests for recording, playback, end conditions, corruption, revision mismatch, save/reopen, checkpoint comparison, and continuation where promised. Exercise the same record in RevivalMac, RevivalMobile and RevivalEditor; use the recorded physical minimum iPhone and iPad where mobile composition, lifecycle or performance is claimed. Phase 9 adds authority, observer, desync, reconnect, and published multiplayer replay matrices to this path.
 
 Close the relevant source and capability rows only when the promised runtime, creator, validation, playtest, and publishing routes pass. Material replay changes pass [`revival-review`](../revival-review/SKILL.md).

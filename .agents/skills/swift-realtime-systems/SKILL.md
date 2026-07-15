@@ -34,7 +34,7 @@ Before production code:
 4. Write one focused test through the production path and observe its intended red before implementing the contract.
 5. Make the smallest direct Swift change, observe green, then simplify without changing the protected result.
 
-Do not translate files alphabetically, create a Swift file per C++ file, or build a layer of compiling stubs. Finish a dependency island that runs in the player and editor where applicable.
+Do not translate files alphabetically, create a Swift file per C++ file, or build a layer of compiling stubs. Finish a dependency island that runs in every applicable concrete player shell and the editor where applicable.
 
 ## Current timing contract
 
@@ -66,7 +66,7 @@ Phase 3 captures flight, collision, input ramps, interval events, animation, pau
 - Keep one mutable simulation owner and direct source-ordered calls.
 - Start with structs, enums, free functions, `ContiguousArray`, and readable array-of-structs storage. Use classes only for framework objects or genuine shared identity.
 - Give stable IDs only to values whose identity must survive collection movement, editor selection, persistence, or references.
-- Keep Metal, AppKit, audio, and retail-format objects outside canonical simulation, save, replay, and network values.
+- Keep Metal, AppKit, UIKit, audio, and retail-format objects outside canonical simulation, save, replay, and network values.
 - Use Swift concurrency for real blocking I/O, import, media conversion, and measured long editor work. Pass immutable inputs and add cancellation or stale-result rejection at the first operation that can actually race.
 
 Reject an actor graph, actor or task per entity, simulation thread, lock-free queue, work stealing, job system, ECS, event bus, dependency-injection framework, generic scheduler, custom allocator, or protocol around one implementation. Strict concurrency is a correctness check, not a reason to make the simulation concurrent.
@@ -85,7 +85,7 @@ Focused controlled-clock tests cover one contract at a time:
 
 Record the exact red command and intended failure, green command and pass, affected suite, reference input, tolerances, and every deliberate difference. Tests exercise the shipping simulation step; do not test an imitation or add product visibility solely for tests.
 
-Profile only optimized builds on the recorded M4. Measure the representative update path, allocations, copies, retain/release work, collection layout, and CPU budget with Instruments. Change the smallest responsible function or storage only after a reproducible missed budget or regression, then rerun functional evidence and the same profile. Zero allocations, `Span`, `InlineArray`, noncopyable types, borrowing, and layout changes are possible measured conclusions, not starting architecture.
+Profile only optimized builds on the recorded M4 and, where the affected player path applies, the recorded physical minimum iPhone and iPad. Measure the representative update path, allocations, copies, retain/release work, collection layout, and CPU budget with Instruments. Change the smallest responsible function or storage only after a reproducible missed budget or regression, then rerun functional evidence and the same profile on every affected reference device. Zero allocations, `Span`, `InlineArray`, noncopyable types, borrowing, and layout changes are possible measured conclusions, not starting architecture.
 
 When a profile attributes time to Swift host code, inspect unexpected `memmove`, copy-on-write copies, `swift_retain`, `swift_release`, `swift_beginAccess`, `swift_endAccess`, unspecialized generic calls, protocol witness dispatch, and closure or task allocation. Their presence is a lead, not a defect. Swift 6.4 `PerformanceHints` may be enabled as warnings during the focused investigation; do not turn them into project-wide errors or abstraction bans.
 

@@ -20,9 +20,9 @@ This skill is installed now. Immediately before Phase 9 multiplayer work, review
 3. Capture source and reference evidence, including DMFC-owned presentation where it is part of the mode.
 4. Write a focused failing production test for the current rule or workflow.
 5. Implement it through the existing host-authoritative simulation and selected secure transport.
-6. Add the applicable lobby/session UI, HUD/results, chat/moderation, replay, dedicated-host, and observer behavior.
+6. Add the applicable lobby/session UI, HUD/results, chat/moderation, replay, RevivalMac and RevivalMobile listen-host, Mac-only dedicated-host, and observer behavior.
 7. Add editor authoring, validation, local test, package, host, join, completion, reopen, and publishing paths for new content.
-8. Run the relevant local, LAN, selected-Internet-topology, outage, and mode-specific slot-count matrix and close the source and capability rows.
+8. Run the relevant local, LAN, selected-Internet-topology, outage, mode-specific slot-count and mobile local-network/lifecycle matrix and close the source and capability rows.
 
 ## Committed scope
 
@@ -32,7 +32,7 @@ Lobby chat rooms, rankings, persistent pilot stats, and join-time package acquis
 
 ## One model
 
-Single-player, co-op, competitive modes, dedicated hosting, observers, replay, and editor play reuse the same canonical behavior and simulation rules. A mode owns only its actual rules and presentation. Use concrete Swift types and direct calls; validate hostile network or package input at its intake boundary.
+Single-player, co-op, competitive modes, both interactive player shells, Mac-only dedicated hosting, observers, replay, and editor play reuse the same canonical behavior and simulation rules. A mode owns only its actual rules and presentation. Use concrete Swift types and direct calls; validate hostile network or package input at its intake boundary.
 
 ## Prohibited complexity
 
@@ -40,6 +40,6 @@ Do not load binary community modules, preserve DMFC ABI shape, reproduce old pac
 
 ## Verification
 
-Record red/green commands, source and deliberate-difference evidence, runtime and creator checkpoints, published-package identity, mode results, security and outage inputs, replay results, optimized measurements for scale claims, and terminal ledger transitions. Phase 9 exits only when the accepted local, LAN, selected-Internet-topology, dedicated, observer, mode-specific-count, four-player-co-op, security, outage, authoring, publishing, replay, and 32-slot-infrastructure matrices pass.
+Record red/green commands, source and deliberate-difference evidence, runtime and creator checkpoints, published-package identity, mode results, security and outage inputs, replay results, optimized measurements for scale claims, and terminal ledger transitions. Phase 9 exits only when the accepted local, LAN, selected-Internet-topology, both-player listen-host, Mac-only dedicated, observer, mode-specific-count, four-player-co-op, security, outage, authoring, publishing, replay, mobile local-network/lifecycle and 32-slot-infrastructure matrices pass. Mobile claims run on the recorded physical minimum iPhone and iPad.
 
 Run [`revival-review`](../revival-review/SKILL.md) for every material mode or workflow slice.

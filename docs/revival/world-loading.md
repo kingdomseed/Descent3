@@ -6,9 +6,9 @@
 
 ## Current decision
 
-The production load unit is one complete canonical `Level`, matching the source D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and both applications load the resulting complete canonical `Level`; one selected room is the first visible and editable acceptance slice, not a partial production level. Synthetic one-room levels remain focused test fixtures.
+The production load unit is one complete canonical `Level`, matching the source D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and RevivalMac, RevivalMobile and RevivalEditor load the resulting complete canonical `Level`; one selected room is the first visible and editable acceptance slice, not a partial production level. Synthetic one-room levels remain focused test fixtures.
 
-The initial native product keeps the authoritative level world resident until exit. Startup eagerly prepares the source-evidenced `PageInAllData` working set. If object initialization, a matcen, translated behavior, or another reachable source path later needs a canonical presentation asset, the product prepares it directly from canonical content and retains it for the rest of the level. RevivalMac owns its player world. RevivalEditor owns a separate document value and creates a separate disposable play-session value; both applications use the same model, dependency rules, renderer, and resource-loading path.
+The initial native products keep each authoritative level world resident until exit. Startup eagerly prepares the source-evidenced `PageInAllData` working set. If object initialization, a matcen, translated behavior, or another reachable source path later needs a canonical presentation asset, the product prepares it directly from canonical content and retains it for the rest of the level. RevivalMac and RevivalMobile each own a separate player world. RevivalEditor owns a separate document value and creates a separate disposable play-session value. All three applications use the same model, dependency rules, renderer and resource-loading path.
 
 This reproduces the useful shape of the released engine without overstating it. `PageInAllData` walks the ship, static effects and sounds, room textures, terrain presentation, and placed-object dependencies, but bitmap access, object initialization, matcens, and Osiris paths can page more data later. The retained GPU pre-upload hook is a no-op, so the original did not prove complete GPU readiness before activation. The native package contains the complete level topology and every dependency reachable through the currently translated product path; it expands with later dependency islands rather than pretending future behavior reachability is known in Phase 1. The preparation schedule remains source-faithful until evidence supports changing it.
 
@@ -36,10 +36,10 @@ Loading may use one bounded background operation when measured I/O latency would
 Loading, visibility, and geometric detail are separate questions.
 
 - Indoor rendering initially translates the released room-and-portal traversal and its observable clipping behavior into direct Metal.
-- When the first outdoor dependency island arrives, outdoor rendering translates released geometry LOD plus texture-segment selection and UV/tile/rotation behavior closely enough to establish reference images and M4 measurements.
+- When the first outdoor dependency island arrives, outdoor rendering translates released geometry LOD plus texture-segment selection and UV/tile/rotation behavior closely enough to establish reference images and measurements on the recorded Mac and mobile devices.
 - Editor viewports use those same paths.
 
-The source has a 32-by-32 `Terrain_tex_seg` grid whose entries each cover an 8-by-8 terrain-cell block. Do not reinterpret that texture grouping as proof of a modern streaming partition or call editor megacells a runtime LOD system. Do not remove geometry LOD merely because the M4 is faster; first reproduce the visual and performance baseline, then record a deliberate simplification if full authored resolution is measurably safe and visually accepted.
+The source has a 32-by-32 `Terrain_tex_seg` grid whose entries each cover an 8-by-8 terrain-cell block. Do not reinterpret that texture grouping as proof of a modern streaming partition or call editor megacells a runtime LOD system. Do not remove geometry LOD merely because modern Apple devices are faster; first reproduce the visual and performance baseline, then record a deliberate simplification if full authored resolution is measurably safe and visually accepted on every affected target.
 
 ## Editor contract
 
@@ -56,18 +56,19 @@ The editor may update changed preview geometry directly while editing. It does n
 
 When a real background bake, import, or publish operation first appears, its immutable input and stale-result rule are specified for that operation. Do not build a universal job or revision framework in advance.
 
-## M4 evidence gate
+## Mac and mobile evidence gate
 
-After the complete Training Mission is playable and editable, measure optimized builds on the recorded M4 using:
+After the complete Training Mission is playable and editable, measure optimized builds on the recorded M4 Mac and selected minimum-reference iPhone and iPad using:
 
 - startup and level-transition time;
 - peak and steady CPU, GPU, and unified memory;
 - the complete Training Mission and the largest imported indoor and outdoor levels then available;
 - repeated load, restart, editor play, and return cycles;
+- repeated mobile foreground, background, interruption, memory-warning and resume cycles;
 - one representative high-resolution replacement-content experiment;
 - one-, two-, and four-viewport editor use if those layouts have shipped by the gate.
 
-Record content hashes, build settings, macOS and Xcode versions, presentation settings, and Instruments or Metal evidence. The result must distinguish aggregate level size, eager working-set size, later lazy preparations, temporary load duplication, Metal allocation cost, decoding time, and visibility cost.
+Record content hashes, build settings, OS, Xcode and exact device models, presentation settings, thermal state, and Instruments or Metal evidence. The result must distinguish aggregate level size, eager working-set size, later lazy preparations, temporary load duplication, Metal allocation cost, decoding time, visibility cost and mobile lifecycle cost.
 
 The resident design remains the implementation when it meets ratified startup, responsiveness, and memory budgets. Missing a budget does not automatically authorize a general streamer.
 
@@ -90,7 +91,7 @@ The resident path proves:
 
 - complete level topology plus every dependency reachable through the currently translated product path;
 - source-accounted eager working-set preparation plus reachable canonical lazy preparation;
-- identical player and editor resource resolution;
+- identical Mac player, mobile player and editor resource resolution;
 - room/portal and terrain visibility independent of load order;
 - pre-commit failure preserves the current world and post-commit failure enters an explicit unloaded state;
 - no partially activated authoritative world;
@@ -98,7 +99,7 @@ The resident path proves:
 - final-GPU-use safety before release;
 - no retail-format reads outside D3Import;
 - no second renderer or resource-lifetime path;
-- release-build M4 startup and memory evidence for each representative milestone.
+- release-build M4 Mac plus physical iPhone and iPad startup and memory evidence for each representative milestone that applies to those targets.
 
 These checks protect the current product. They do not add tests for a hypothetical streamer.
 
@@ -108,10 +109,12 @@ Until the evidence gate produces an accepted amendment, do not add:
 
 - world stream cells, camera-demand envelopes, prefetch shells, or LoadWave calculations;
 - global.stream / world.stream schemas or stack-global, level-pinned, and cell-referenced lifetime classes;
-- an LRU, memory-pressure policy, sparse resources, virtual texturing, or mip streaming;
+- an LRU, partial-eviction memory-pressure policy, sparse resources, virtual texturing, or mip streaming;
 - a general asset manager, cache hierarchy, or resource graph;
 - GPU-driven visibility or a second culling architecture;
 - a resident/streaming feature flag or parallel loader;
 - editor-only loading or rendering machinery.
 
 These are current exclusions against speculative complexity, not claims that no future measurement could justify a focused replacement.
+
+An iOS or iPadOS memory warning does not authorize partial eviction or an alternate mobile residency mode. If the ordinary resident world cannot remain valid, the application uses the same drain-and-release boundary and enters an explicit unloaded or recoverable error state; an evidence-backed amendment is required to introduce any narrower resource release.

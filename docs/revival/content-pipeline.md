@@ -18,9 +18,9 @@ D3Import is the only shipping component that understands the supported prepared-
 
     native project -- RevivalEditor publisher -- native package
 
-    canonical content -> RevivalCore / RevivalMetal / RevivalMac / RevivalEditor
+    canonical content -> RevivalCore / RevivalMetal / RevivalMac / RevivalMobile / RevivalEditor
 
-The game and editor do not mount HOG archives, open MN3 or D3L files, load retail DLLs, apply retail override order, or search the original installation. RevivalEditor may import supported modern media into native projects; it never becomes a second legacy reader.
+The player applications and editor do not mount HOG archives, open MN3 or D3L files, load retail DLLs, apply retail override order, or search the original installation. RevivalEditor may import supported modern media into native projects; it never becomes a second legacy reader.
 
 The first importer favors traceability over premature normalization. It reproduces source naming, precedence, the complete Training D3L world boundary, the eager `PageInAllData` working set, and lazy-page dependencies reached by the currently translated product path in a canonical form traceable against the released loaders. Phase 1 accepts one room visually, but the production package contains the complete `Level`; one-room packages and synthetic portal cuts are fixtures only. The manifest expands when a later behavior, matcen, or dynamic-spawn path enters the product, so Phase 1 does not pretend to solve Phase 4 reachability. This is not evidence that the old renderer had every resource ready at activation.
 
@@ -64,7 +64,7 @@ The first implementation covers the formats required to construct the complete T
 
 ## Helper boundary
 
-RevivalMac supplies explicit import UI and launches the bundled signed D3Import helper as a separate process. The app passes source, staging, destination, scope, and report paths as separate Process arguments.
+RevivalMac supplies explicit import UI and launches the bundled signed D3Import helper as a separate macOS process. The app passes source, staging, destination, scope, and report paths as separate Process arguments. RevivalMobile never launches D3Import or reads retail data; version 1.0 mobile use therefore requires access to a Mac that can produce the canonical package.
 
 The initial command shape is:
 
@@ -77,15 +77,17 @@ The helper writes only inside an empty destination-adjacent staging directory. E
 
 Do not add a daemon, XPC service, plugin API, in-process legacy parser, or general process protocol.
 
-Phase 1 local retail import needs checked paths, destination ownership, atomic replacement, and integrity hashes. It does not prebuild a marketplace threat model or virtual filesystem. The first native publishing workflow creates a separate external-package intake boundary described below; retail import and native package installation do not share a legacy reader or a generic package framework.
+Phase 1 local retail import needs checked paths, destination ownership, atomic replacement, and integrity hashes. It does not prebuild a marketplace threat model or virtual filesystem. The Phase 1 Mac-to-mobile handoff creates the minimum separate native-package validation, staging, promotion and base-activation boundary described below; the first publishing workflow grows that same path in place. Retail import and native package installation do not share a legacy reader or a generic package framework.
 
 ## Native package intake and local library
 
-RevivalEditor publishes immutable canonical native packages. RevivalMac owns their explicit local installation and activation; it never treats an arbitrary directory as trusted canonical content merely because the publisher normally creates valid output.
+RevivalEditor publishes immutable canonical native packages. RevivalMac and RevivalMobile each own explicit local installation and activation of those packages; neither treats an arbitrary directory as trusted canonical content merely because the publisher normally creates valid output.
+
+Phase 1 implements the shared validation, destination-adjacent staging, atomic promotion, base activation and prior-set recovery needed by the first Mac-to-mobile handoff. It applies every relevant hostile-input check below to the initial canonical schema. Later publishing grows those same validators only with real new schema and adds replacement ordering; `T-018` adds complete library actions and campaign UX. No temporary mobile installer or full speculative library precedes them.
 
 For each install, replacement, or activation:
 
-1. copy or receive the candidate into destination-adjacent staging owned by RevivalMac;
+1. copy or receive the candidate into destination-adjacent staging owned by the receiving player application;
 2. reject path escape, symlink or special-file surprises, duplicate canonical identities, unsupported revisions, missing rights metadata, invalid hashes, malformed or oversized media, and undeclared or unsatisfied dependencies;
 3. construct and validate the candidate's canonical manifest and declared campaign, level, behavior and presentation relationships through RevivalCore;
 4. compute the smallest explicit package order needed by the current base and replacement relationship and report conflicts before activation;
@@ -95,9 +97,15 @@ For each install, replacement, or activation:
 
 Package and campaign identity follows saves, profiles and multiplayer agreement where those paths require it. A released revision promise gains only the migrations or rejection rules that promise needs. The initial library does not imply a marketplace, account, cloud synchronization, background updater, generic dependency solver, public repository, or mandatory signature scheme. Signing is required only where the accepted distribution boundary requires it.
 
+### Mobile canonical-package handoff
+
+RevivalMobile acquires an already canonical package through the system document picker. A security-scoped provider URL is a temporary acquisition boundary, not an installed-content root: the app copies the candidate promptly into app-owned, destination-adjacent staging, releases provider access, and then runs the same canonical validation, atomic promotion, activation and rollback rules used by RevivalMac.
+
+Cancellation, provider revocation, insufficient storage, process suspension and copy failure leave the previous installed and active set unchanged. Durable install state is committed atomically before suspension. Because abrupt process death may provide no cleanup callback, the next launch detects and removes abandoned staging before accepting another candidate, then uses the unchanged prior active set. Reimportable retail-derived packages are marked as excluded from device backup; durable saves and profiles remain separately owned and are not deleted or excluded merely because a package can be recreated. The first implementation does not add mobile retail parsing, a provider-specific integration, cloud synchronization, background package transfer or a second package format.
+
 ## Initial canonical package
 
-The package is an ordinary directory using deterministic Codable JSON for structured values and ordinary Apple-readable files for media where practical:
+The package is an ordinary directory package using deterministic Codable JSON for structured values and ordinary Apple-readable files for media where practical. It declares one project-owned content type so the same directory package can cross the macOS and mobile system document-picker boundary; this is packaging metadata, not a second archive or schema.
 
     Descent3Revival.content/
       content.json
@@ -170,7 +178,7 @@ The whole-retail lightmap measurement still informs a later packing decision, bu
 - accepted before/after images;
 - a migration or reimport plan for current development content.
 
-Likewise, the historical 32-by-32 terrain grouping is imported as historical terrain data, not promoted into a streaming partition. Terrain rendering and editing decisions follow the roadmap's source-faithful baseline and M4 evidence.
+Likewise, the historical 32-by-32 terrain grouping is imported as historical terrain data, not promoted into a streaming partition. Terrain rendering and editing decisions follow the roadmap's source-faithful baseline and recorded Mac and mobile-device evidence.
 
 ## Content identity and versioning
 
@@ -200,13 +208,13 @@ The first publishing workflow adds only the explicit base dependency, package or
 
 Canonical source contains authored product state. Open tabs, pane sizes, selection, and viewport cameras remain local UI state. When a real long-running import, bake, validation, or publish operation appears, it consumes an immutable snapshot and may not overwrite newer source. The operation owns the smallest revision check necessary; this is not part of the content format.
 
-The publisher eventually validates dependency closure, behavior, lighting, navigation, references, provenance, rights, and current resource budgets, then emits an immutable native package. Publishing proof does not substitute for the separate RevivalMac intake, activation, rollback and removal evidence. An independently authored package certifies the creator suite but is not bundled version 1.0 replacement content and does not waive the retail requirement. The publisher does not emit HOG, D3L, native plugins, or hand-edited generated files.
+The publisher eventually validates dependency closure, behavior, lighting, navigation, references, provenance, rights, and current resource budgets, then emits an immutable native package. Publishing proof does not substitute for the separate RevivalMac and RevivalMobile intake, activation, rollback and removal evidence. An independently authored package certifies the creator suite but is not bundled version 1.0 replacement content and does not waive the retail requirement. The publisher does not emit HOG, D3L, native plugins, or hand-edited generated files.
 
 ## Rights and local storage
 
 Original and converted retail media remain proprietary and outside Git. Conversion changes representation, not ownership. Public tests use synthetic or independently licensed fixtures.
 
-Retail input, generated packages, import reports containing local paths, captures, and build products remain in ignored local directories. Public replacement assets require author, source, license, and attribution provenance.
+Retail input, generated packages, import reports containing local paths, captures, and build products remain in ignored local directories. RevivalMobile stores only its app-owned copy of canonical packages plus its own profiles and saves; it never stores or receives the prepared retail source. Public replacement assets require author, source, license, and attribution provenance.
 
 ## Incremental implementation
 
@@ -219,4 +227,4 @@ Expand legacy import only as the next playable stock slice uses it:
 5. Mercenary in campaign order;
 6. stock multiplayer maps when multiplayer begins.
 
-Each slice expands the current dependency manifest and closes the corresponding rows in the checked-in source-translation ledger, then gains its matching editor path. A development campaign import may contain a subset of campaign levels, but every included Level has complete topology and uses the one production world type. A release-complete campaign import includes every required level, behavior, font role, audio file, score, briefing, movie, and transition for the recognized profile.
+Each slice expands the current dependency manifest and closes the corresponding rows in the checked-in source-translation ledger, then gains its matching Mac player, mobile player and editor path where applicable. A development campaign import may contain a subset of campaign levels, but every included Level has complete topology and uses the one production world type. A release-complete campaign import includes every required level, behavior, font role, audio file, score, briefing, movie, and transition for the recognized profile.

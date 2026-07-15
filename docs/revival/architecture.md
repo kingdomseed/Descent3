@@ -8,11 +8,21 @@
 
 Build a complete Apple-native Descent 3 game and creator suite with the Swift 6.4 compiler toolchain in Swift 6 language mode and with MSL and direct Metal 4. Use the current Xcode 27 beta for initial product work and move to stable Xcode 27 when released without retaining a Swift 6.3 compatibility path. Reach that product through dependency-ordered semantic translation of the pinned released source, keeping the native player and editor runnable together as capability moves across.
 
-The shipping product targets arm64 Macs running macOS 26 or later. It uses AppKit, MetalKit, GameController, AVFoundation, AVAudioEngine, Model I/O, Network, CryptoKit, Foundation, and OSLog directly.
+The player targets arm64 Macs running macOS 26 or later and Metal 4-capable iPhone and iPad devices running iOS or iPadOS 26 or later. The mobile feature baseline is Apple GPU family 7 or newer. RevivalEditor, D3Import, and dedicated no-window hosting remain macOS-only. The concrete shells use AppKit or UIKit, and the product uses MetalKit, GameController, AVFoundation, AVAudioEngine, AVAudioSession, Model I/O, Network, CryptoKit, Foundation, and OSLog directly where applicable.
 
 Shipping targets contain no C or C++ engine code, Objective-C++ bridge, Rust runtime, OpenGL renderer, SDL layer, Wine or Game Porting Toolkit runtime, Vulkan translation layer, Metal-cpp host, or native legacy module.
 
 That shipping boundary does not make the source incidental. The C++ tree is the default translation specification for original data flow, ordering, formulas, resource dependency discovery and lifetime, gameplay, rendering, and editor workflows until the native counterpart is verified. [Source translation discipline](source-translation.md) defines file-level accountability and deliberate modernization.
+
+## Approved iPhone and iPad amendment
+
+The prior rule targeted only macOS and listed iOS outside the roadmap. The user approved a binding product amendment on July 15, 2026: version 1.0 now includes one universal iPhone and iPad player while preserving the native Mac player and macOS creator product.
+
+The selected replacement is a concrete UIKit `RevivalMobile` shell over the same RevivalCore, RevivalMetal, canonical package, scheduler, resident `Level`, save, replay, and multiplayer state used by RevivalMac. It is landscape-first, supports safe-area and drawable-size changes, samples touch and physical-controller input into the same explicit input value, and owns iOS/iPadOS scene, storage, audio-session, signing, and distribution behavior directly. This does not authorize a platform protocol, renderer backend, second loader, mobile scheduler, mobile package schema, or resident-Mac/streaming-mobile split.
+
+D3Import remains the sole legacy-format reader and remains a macOS signed helper. RevivalMobile imports only Mac-produced canonical packages through the system file picker, validates and atomically installs them through the same native-package rules as RevivalMac, and copies them into app-owned storage. The mobile version 1.0 product therefore requires access to a Mac that can perform retail conversion. RevivalEditor and dedicated no-window hosting also remain macOS-only; the mobile player still receives applicable campaign, replay, listen-host, join, and stock multiplayer capability.
+
+The initial mobile deployment target is iOS and iPadOS 26 or later on Apple GPU family 7 or newer. Phase 0 records actual minimum-supported iPhone and iPad reference devices before production begins. The public distribution channel remains an evidence-gated release decision because rights, GPL obligations, App Review access to functional content, signing, regional availability, and the channel's enabled device families must be resolved without redistributing proprietary retail data. If the App Store is selected, App Store Connect availability is restricted to the approved iPhone and iPad boundary; visionOS and running the iPhone/iPad app on Apple Silicon Macs remain disabled unless separately approved and tested. No native product code or released canonical package exists, so this amendment requires no code or data migration; it deletes the superseded macOS-only and three-product prose before implementation begins.
 
 ## Decision levels
 
@@ -47,11 +57,11 @@ Swift gives the game, importer, tests, applications, and editor one language and
 
 Apple's TrueType interpreter migration is useful evidence for a method—clear ownership, corpus tests, and profile-guided removal of overhead—not a performance prediction or engine template. [Primary technical sources](primary-source-index.md#swift-engine-code-and-performance) preserves that evidence and its limits.
 
-Call Apple frameworks directly. A single platform and implementation do not need interfaces whose only purpose is hiding AppKit, Metal, GameController, AVFoundation, or Network.
+Call Apple frameworks directly. RevivalMac and RevivalEditor own AppKit; RevivalMobile owns UIKit and AVAudioSession. Shared code receives canonical domain values such as the input snapshot and application transition, not a generic interface whose only purpose is hiding AppKit, UIKit, Metal, GameController, AVFoundation, or Network.
 
 ## Rendering
 
-Metal is the only renderer. There is no backend interface or fallback renderer. RevivalMac and RevivalEditor both use RevivalMetal.
+Metal is the only renderer. There is no backend interface or fallback renderer. RevivalMac, RevivalMobile, and RevivalEditor all use RevivalMetal.
 
 Start by translating the original visible result and traversal through a small explicit forward pass sequence:
 
@@ -62,27 +72,28 @@ Start by translating the original visible result and traversal through a small e
 
 Add mirrors, specular faces, scorch decals, procedural fire and water, volumetric lighting, declared blend modes, animated textures, UV sliding, destroyable surfaces, and other ledgered paths when the first source dependency and scene requires them. A complete effect inventory does not justify a render graph, generic material framework, deferred renderer, or second visibility architecture.
 
-Indoor rendering begins with the released room-and-portal traversal and observable clipping rules. When the first outdoor island arrives, outdoor rendering begins with the released terrain representation, geometry LOD, and texture-segment selection with its UV, tile, and rotation behavior. Megacells are editor texture-pattern data, not an evidenced runtime LOD mechanism. Once representative native images and M4 profiles exist, a simplification may be proposed as an explicit amendment.
+Indoor rendering begins with the released room-and-portal traversal and observable clipping rules. When the first outdoor island arrives, outdoor rendering begins with the released terrain representation, geometry LOD, and texture-segment selection with its UV, tile, and rotation behavior. Megacells are editor texture-pattern data, not an evidenced runtime LOD mechanism. Once representative native images and profiles on every affected reference device exist, a simplification may be proposed as an explicit amendment.
 
 ## World loading and lifetime
 
-The production load unit is one complete canonical `Level`, matching the original D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and both applications load the resulting complete canonical `Level`; one selected room is only the first visible and editable acceptance slice. A synthetic one-room level may be a focused fixture but never becomes a second package or runtime mode.
+The production load unit is one complete canonical `Level`, matching the original D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and RevivalMac, RevivalMobile, and RevivalEditor load the resulting complete canonical `Level`; one selected room is only the first visible and editable acceptance slice. A synthetic one-room level may be a focused fixture but never becomes a second package or runtime mode.
 
 The current implementation keeps that authoritative level world resident until exit. It starts presentation preparation with the source-evidenced `PageInAllData` working set, then permits later source-reachable assets to be prepared directly from canonical content and retained for the rest of the level. The current package contains the complete level topology and every dependency reachable through the currently translated product path. It expands when a later phase makes another path executable, rather than analyzing all Osiris, matcen, and dynamic-spawn possibilities before their work begins. The runtime never reopens retail formats, and the design does not claim that every GPU resource existed before original level activation.
 
-Player and editor use the same dependency rules and resident presentation path. For replacement, validate the successor's canonical CPU content while the current world remains active. At the commit boundary, stop new submissions, wait for final GPU use, and release the old presentation owner before preparing the successor. Failure before commit preserves the old world; failure afterward enters a clear unloaded error state. The design does not silently require two complete GPU level sets.
+Both player shells and the editor use the same dependency rules and resident presentation path. For replacement, validate the successor's canonical CPU content while the current world remains active. At the commit boundary, stop new submissions, wait for final GPU use, and release the old presentation owner before preparing the successor. Failure before commit preserves the old world; failure afterward enters a clear unloaded error state. The design does not silently require two complete GPU level sets. An iOS or iPadOS memory warning may trigger this ordinary drain-and-release path and an explicit unloaded or recoverable error; it does not create partial eviction or a second mobile lifetime mode.
 
-Do not add world cells, camera-demand envelopes, prefetch shells, stream blobs, LRU policy, or a resident/streaming switch. [World loading and residency](world-loading.md) defines the M4 evidence gate after the complete playable Training Mission and its amendment rule. Streaming remains possible only as a measured replacement that leaves one path.
+Do not add world cells, camera-demand envelopes, prefetch shells, stream blobs, LRU policy, or a resident/streaming switch. [World loading and residency](world-loading.md) defines the M4 and minimum-mobile-device evidence gate after the complete playable Training Mission and its amendment rule. Streaming remains possible only as a measured replacement that leaves one path across platforms.
 
 ## Initial product and ownership graph
 
-Phase 1 creates three executable products around two required code-ownership boundaries:
+Phase 1 creates four executable products around two required code-ownership boundaries:
 
     D3Import
-    RevivalMac    -> RevivalCore ownership + RevivalMetal ownership
-    RevivalEditor -> RevivalCore ownership + RevivalMetal ownership
+    RevivalMac     -> RevivalCore ownership + RevivalMetal ownership
+    RevivalMobile  -> RevivalCore ownership + RevivalMetal ownership
+    RevivalEditor  -> RevivalCore ownership + RevivalMetal ownership
 
-D3Import is a separate signed command-line helper launched for explicit import. `RevivalCore` and `RevivalMetal` name dependency directions and framework exclusions; the first real code decides whether either deserves a separate build target. Phase 0 researches an affordable 2026 Internet-multiplayer topology in parallel without shaping Phase 1 code. A later service target is added only if the accepted direction requires an operable public-service boundary. Target count is an execution result, not constitutional law; adding a target still requires a concrete ownership boundary that removes more complexity than it creates.
+D3Import is a separate signed macOS command-line helper launched for explicit retail import. `RevivalCore` and `RevivalMetal` name dependency directions and framework exclusions; the first real code decides whether either deserves a separate build target. Phase 0 researches an affordable 2026 Internet-multiplayer topology in parallel without shaping Phase 1 code. A later service target is added only if the accepted direction requires an operable public-service boundary. Target count is an execution result, not constitutional law; RevivalMobile exists because UIKit lifecycle, touch input, sandboxed storage, audio-session, signing, and distribution form a concrete application boundary, not to host another game implementation.
 
 Each executable shell emits its own platform diagnostics directly and presents or reports structured source-linked failures returned by RevivalCore. RevivalCore may define domain error values, but it owns no logger, retained-log store, telemetry path, or upload service.
 
@@ -94,7 +105,7 @@ It traces the original eager `PageInAllData` working set and the lazy-page paths
 
 ### RevivalCore
 
-RevivalCore contains canonical content, complete level-world values, simulation, collision, objects, AI, weapons, goals, behavior state, validation, saves, replay, multiplayer state, and package rules. It imports no AppKit, Metal, AVFoundation, or retail-format code.
+RevivalCore contains canonical content, complete level-world values, simulation, collision, objects, AI, weapons, goals, behavior state, validation, saves, replay, multiplayer state, and package rules. It imports no AppKit, UIKit, Metal, AVFoundation, or retail-format code.
 
 Start with concrete domain types and contiguous collections. The original file and global layout informs ordering and dependencies but does not dictate Swift module or type boundaries.
 
@@ -108,6 +119,14 @@ RevivalMac owns the player application and its explicit session transitions, NSW
 
 A later no-window dedicated-host mode reuses RevivalCore without initializing rendering, audio, or player UI. It is not a second simulation framework.
 
+### RevivalMobile
+
+RevivalMobile is one universal UIKit player application for iPhone and iPad. It owns `UIWindowScene` lifecycle, `MTKView`, display callbacks, safe areas and supported drawable sizes, landscape presentation, touch and physical-controller sampling, AVAudioSession configuration and interruption or route handling, mobile profile and settings UI, app-owned file locations, canonical-package selection and intake, local-library lifecycle, operational-diagnostic presentation and retention, signing, and the accepted distribution channel. It composes RevivalCore and RevivalMetal directly.
+
+The mobile shell never launches D3Import or reads a prepared retail installation. The user selects a Mac-produced canonical package through the system document picker; RevivalMobile copies it into destination-adjacent app-owned staging, applies the same hostile native-package validation and activation rules as RevivalMac, and preserves the prior active set on failure. Cancellation, revoked file-provider access, insufficient storage, background suspension, and orderly teardown have explicit outcomes. Durable install state is committed atomically before suspension; because abrupt process death may arrive without a cleanup callback, the next launch discards abandoned staging and recovers the prior active set. None of these cases creates a cloud service or second package mechanism.
+
+`GCVirtualController` is the initial touch-gameplay mechanism; ordinary UIKit touch remains responsible for interface interaction. Virtual and physical controller values feed the same explicit input snapshot. UIKit scene transitions call the same typed Core pause, resume, load, play, failure, and completion transitions as the Mac shell. Suspension clears transient input, stops presentation work, coordinates audio, and rebases time on resume without catch-up. Platform adaptations remain concrete; there is no `Platform`, `Window`, `Audio`, `FileSystem`, or `InputBackend` abstraction whose only purpose is hiding Apple frameworks.
+
 ### RevivalEditor
 
 RevivalEditor begins in Phase 1 as the permanent native AppKit document application. Its first world slice derives an editable project value from the read-only canonical base, displays it with the shared Metal path, supports selection and one real edit with named undo/redo, saves and reopens, starts a disposable play-session copy through the shipping loader and simulation types, and returns to the document. “Shared world” means shared types and production paths, not one mutable instance simultaneously owned by editor and play.
@@ -118,9 +137,9 @@ Add immutable snapshots and stale-result checks to the first real asynchronous e
 
 ### Public Internet multiplayer
 
-The required product outcome is native LAN and Internet hosting, discovery, joining, security, and explicit failure behavior without requiring the project to operate an unaffordable always-on service. Phase 0 examines current direct, player-hosted, community-operated, platform-provided, and third-party-supported approaches, including their real reachability, privacy, abuse, deployment, continuity, and recurring-cost properties. That work is a bounded research record and creates no Phase 1 transport types.
+The required product outcome is native LAN and Internet hosting, discovery, joining, security, and explicit failure behavior from both player products without requiring the project to operate an unaffordable always-on service. Phase 0 examines current direct, player-hosted, community-operated, platform-provided, and third-party-supported approaches, including their real reachability, privacy, abuse, deployment, continuity, and recurring-cost properties. That work is a bounded research record and creates no Phase 1 transport types.
 
-Phase 9 selects one operable topology through the [Internet multiplayer study](internet-multiplayer-study.md), then ratifies its transport, record protection, authority, prediction, outage, and operational contracts against the final simulation. Bonjour and Network remain the direct native starting point for LAN. The Internet path uses the native or provider boundaries selected by current evidence; CryptoKit is used only when that topology needs project-owned record protection. A service executable, relay, rendezvous system, or external integration exists only if the accepted topology needs it. The released source's 32 network/player-slot infrastructure and listen/dedicated slot accounting remain scale capabilities, while each stock mode initially preserves its source-supported player limit, including four-player campaign co-op.
+Phase 9 selects one operable topology through the [Internet multiplayer study](internet-multiplayer-study.md), then ratifies its transport, record protection, authority, prediction, outage, and operational contracts against the final simulation. Bonjour and Network remain the direct native starting point for LAN; RevivalMobile also owns the required local-network usage description, Bonjour service declarations, permission-denial recovery, and physical-device verification. The Internet path uses the native or provider boundaries selected by current evidence; CryptoKit is used only when that topology needs project-owned record protection. A service executable, relay, rendezvous system, or external integration exists only if the accepted topology needs it. The released source's 32 network/player-slot infrastructure and listen/dedicated slot accounting remain scale capabilities, while each stock mode initially preserves its source-supported player limit, including four-player campaign co-op. Dedicated no-window hosting remains a Mac-only application capability.
 
 ## Execution model
 
@@ -133,7 +152,7 @@ This explicit-delta scheduler is the one current implementation, not a permanent
 
 Do not maintain both. A fixed tick rate, catch-up policy, interpolation rule, and deterministic numeric contract become binding only in that amendment.
 
-The main owner holds mutable game state. Input becomes one explicit value passed into the translated step. Background work is limited to operations that actually block: import, file I/O, media conversion, resource preparation, and real editor bakes or publication. Do not add a simulation thread, actor graph, task per entity, work-stealing scheduler, or lock-free queue without a measured missed budget.
+The main owner holds mutable game state. Each concrete player shell samples its Apple input sources into one explicit value passed into the translated step. Background work is limited to operations that actually block: import, file I/O, media conversion, resource preparation, and real editor bakes or publication. Do not add a simulation thread, actor graph, task per entity, work-stealing scheduler, or lock-free queue without a measured missed budget.
 
 ## World and behavior model
 
@@ -147,7 +166,7 @@ Flying AI begins by translating the released room/portal, outdoor-region, node, 
 
 ## Content, saves, and compatibility
 
-The only legacy-format boundary is the one-way importer. The game and editor consume canonical native content and never reach back into the retail installation. Version 1.0 requires a user-owned supported prepared retail installation; additional source profiles, raw-media preparation, and project-owned replacement assets are later decisions.
+The only legacy-format boundary is the macOS one-way importer. The game and editor consume canonical native content and never reach back into the retail installation. RevivalMobile consumes only a transferred canonical package. Version 1.0 requires a user-owned supported prepared retail installation and a Mac for conversion; additional source profiles, raw-media preparation, mobile retail conversion, and project-owned replacement assets are later decisions.
 
 The product writes new native projects, packages, saves, and replay. It does not import or export retail saves or demos, provide original multiplayer interoperability, load binary modules, or export D3L/HOG/editor data.
 
@@ -169,7 +188,7 @@ The project rejects:
 - a greenfield engine that ignores source ordering and behavior in favor of speculative abstractions;
 - parallel legacy/modern schedulers, loaders, renderers, world models, or editor paths;
 - prebuilding spatial streaming, a general behavior VM, a job system, ECS, render graph, asset manager, or package platform before a real slice demonstrates the need;
-- cross-platform abstractions for hypothetical targets.
+- generic cross-platform abstractions or platform backends; the approved concrete AppKit and UIKit shells are product targets, not a portability framework.
 
 ## Consequences
 

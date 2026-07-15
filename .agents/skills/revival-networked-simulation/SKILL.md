@@ -11,7 +11,7 @@ Add networking to the working final simulation without forking its rules or inhe
 
 Read [`AGENTS.md`](../../../AGENTS.md), [`roadmap.md`](../../../docs/revival/roadmap.md), [`verification.md`](../../../docs/revival/verification.md), [`source-translation.md`](../../../docs/revival/source-translation.md), and the multiplayer rows in [`functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md).
 
-This skill is installed now but must be reviewed and amended against the final scheduler, behavior model, replay path, collision model, and representative M4 measurements immediately before Phase 9 simulation work. Details not fixed by accepted documents remain open until that review.
+This skill is installed now but must be reviewed and amended against the final scheduler, behavior model, replay path, collision model, and representative M4, iPhone and iPad measurements immediately before Phase 9 simulation work. Details not fixed by accepted documents remain open until that review.
 
 ## Derive the model from working behavior
 
@@ -21,13 +21,13 @@ This skill is installed now but must be reviewed and amended against the final s
 4. Write a focused failing test using the production simulation path.
 5. Implement the smallest host-authoritative command, state, prediction, reconciliation, and remote-presentation flow needed by that scenario.
 6. Add controlled latency, loss, reorder, reconnect, and desync evidence as each contract requires it.
-7. Exercise the same rules in listen-host, dedicated-host, observer, replay, and editor play paths as they become applicable.
+7. Exercise the same rules in RevivalMac and RevivalMobile listen-host paths, the Mac-only dedicated host, observer, replay, and editor play paths as they become applicable; mobile suspension or backgrounding has one explicit session outcome rather than a hidden authority mode.
 
 The host runs the same simulation owner as single-player. Local prediction and remote interpolation present that authoritative model; they do not become alternate game rules. Stable ordering, content and simulation identity, portal and collision correction, weapon-latency policy, difficulty, AI authority, and continuation behavior remain explicit.
 
 ## Scale only from evidence
 
-Start with the smallest real end-to-end session and grow through each mode's source-supported player count. Measure bandwidth, history, send rate, resimulation, interpolation, and M4 CPU cost before selecting permanent bounds or layouts. Keep the released 32 network/player-slot infrastructure and historical listen/dedicated slot accounting without claiming that every mode supports 32 players; campaign co-op begins at its source-evidenced four-player cap. Record any native slot-accounting change as a deliberate modernization.
+Start with the smallest real end-to-end session and grow through each mode's source-supported player count. Measure bandwidth, history, send rate, resimulation, interpolation, and CPU cost on every affected recorded reference device before selecting permanent bounds or layouts. Keep the released 32 network/player-slot infrastructure and historical listen/dedicated slot accounting without claiming that every mode supports 32 players; campaign co-op begins at its source-evidenced four-player cap. Record any native slot-accounting change as a deliberate modernization.
 
 Use direct data values and functions. Isolate nondeterministic transport and clocks at their real boundaries; do not protocol-wrap the whole simulation merely for tests.
 
@@ -37,6 +37,6 @@ Do not import original packet layouts, direct-IP interoperability, DMFC/native m
 
 ## Verification
 
-Record source capability evidence, focused red/green commands, authoritative checkpoints, prediction and correction traces, declared latency/loss/reorder inputs, observer and replay results, optimized measurements for performance claims, deliberate differences, and source/capability state transitions. Phase 9 closes only with the full local, LAN, selected-Internet-topology, dedicated, observer, mode-specific-count, four-player-co-op, outage, creator, replay, and 32-slot-infrastructure matrices defined by the accepted documents.
+Record source capability evidence, focused red/green commands, authoritative checkpoints, prediction and correction traces, declared latency/loss/reorder inputs, observer and replay results, optimized measurements for performance claims, deliberate differences, and source/capability state transitions. Phase 9 closes only with the full local, LAN, selected-Internet-topology, Mac and physical-mobile listen-host, Mac-only dedicated, observer, mode-specific-count, four-player-co-op, outage, creator, replay, mobile-lifecycle and 32-slot-infrastructure matrices defined by the accepted documents.
 
 Material changes pass the four independent concerns in [`revival-review`](../revival-review/SKILL.md).

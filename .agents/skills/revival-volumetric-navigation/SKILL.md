@@ -22,7 +22,7 @@ This skill is installed now but activates only after the relevant Training route
 5. Write the focused red contract.
 6. Implement direct Swift storage and calls through the existing simulation owner.
 7. Add only the editor inspection, validation, and authoring operations required by the represented data.
-8. Run the route in editor play and RevivalMac, record differences, and close the rows.
+8. Run the route in editor play, RevivalMac and RevivalMobile where the player path applies, record differences, and close the rows.
 
 Preserve source-supported selection order, cost and clearance formulas, stable identity, recovery behavior, and the point at which route state is recomputed. Navigation must agree with the translated collision and movement models rather than inventing a parallel geometric truth.
 
@@ -44,4 +44,4 @@ Do not simplify away node, clearance, steering, blockage, or recovery semantics 
 
 ## Verification
 
-Record source and reference traces, focused red/green commands, affected route tests, collision agreement, editor diagnostics, save/reopen/play evidence, optimized M4 measurements where performance is claimed, deliberate differences, and terminal source rows for the closed island. Functional rows carry the evidence and state supported by the current slice and become terminal only when complete capability or milestone closure is claimed. Material changes pass the four concerns in [`revival-review`](../revival-review/SKILL.md).
+Record source and reference traces, focused red/green commands, affected route tests, collision agreement, editor diagnostics, save/reopen/play evidence, optimized measurements on every affected recorded M4, iPhone, or iPad reference device where performance is claimed, deliberate differences, and terminal source rows for the closed island. Functional rows carry the evidence and state supported by the current slice and become terminal only when complete capability or milestone closure is claimed. Material changes pass the four concerns in [`revival-review`](../revival-review/SKILL.md).

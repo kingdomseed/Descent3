@@ -5,7 +5,7 @@ description: Trace, translate, account for, and close a Descent 3 C++ source dep
 
 # Revival source translation
 
-Translate the pinned Descent 3 source into one direct Apple-native product path without losing observable behavior or carrying obsolete machinery into Swift.
+Translate the pinned Descent 3 source into one direct Apple-native product path shared by the concrete Mac, iPhone, iPad, and editor shells without losing observable behavior or carrying obsolete machinery into Swift.
 
 ## Authority and required reading
 
@@ -27,7 +27,7 @@ If this skill conflicts with an accepted document, follow the document and repor
 ## Units of work and proof
 
 - A legacy file is a source-accounting unit. Every relevant implementation file receives a disposition.
-- A dependency island is the implementation and cutover unit. It contains the smallest complete source path that can produce a real player or editor result.
+- A dependency island is the implementation and cutover unit. It contains the smallest complete source path that can produce a real result through the applicable Mac player, mobile player, or editor entry point.
 - An observable contract is the verification unit. It states what the native product must do, not how the C++ happened to be arranged.
 - A roadmap phase is a product milestone. File count, translated line count, compiler-error count, and target count are not product progress.
 
@@ -43,7 +43,7 @@ Use the trial's failures to correct this skill, the island trace, or the shared 
 
 Before production implementation:
 
-1. Name the next observable player or editor result.
+1. Name the next observable player or editor result and every concrete shipping shell to which the current contract applies.
 2. Trace the legacy entry point, callees, data flow, editor callers, important globals, ordering, dependency discovery, and teardown.
 3. Add provisional ledger rows for every implementation file already known to participate.
 4. Capture the historical baseline with source evidence, a synthetic fixture, the reference executable, or owned local retail content.
@@ -75,9 +75,11 @@ Use native ownership immediately when the replacement is clear:
 
 - Swift values instead of manual allocation and fixed-array accidents;
 - one explicit mutable simulation owner instead of globals;
-- direct Apple frameworks instead of wrappers shaped like Win32, MFC, OpenGL, SDL, or DirectX;
+- direct Apple frameworks in the concrete AppKit or UIKit target instead of wrappers shaped like Win32, MFC, OpenGL, SDL, DirectX, or a generic platform, input, or filesystem layer;
 - canonical package values instead of a runtime legacy archive or page manager;
 - one editor document value and a separate disposable play-session value instead of global mode switching.
+
+The UIKit player shell, mobile file-picker handoff, virtual controls, safe-area and orientation policy, audio-session behavior, and scene lifecycle are deliberate native platform contracts, not source-faithful translations of a missing legacy mobile implementation. Keep source-supported simulation, world, scheduler, input-snapshot, renderer, and canonical-package semantics on the same shared path as RevivalMac, and record mobile-only observable requirements in the functional ledger rather than inventing legacy source rows for them.
 
 Defer behavioral redesign, not obvious removal of platform, ABI, allocation, and defensive baggage. Record every deliberate semantic difference. Never describe a redesign as a faithful transfer.
 
@@ -87,7 +89,7 @@ Work one focused red-green-refactor contract at a time. Compiler diagnostics may
 
 Follow [`revival-verification`](../revival-verification/SKILL.md) for evidence categories, falsification, nonexecuted tests, and milestone claims. Build, launch, focused behavior, integration, and performance checks answer different questions. Name the exact claim, command, input, configuration, and observed result; never substitute “smoke test passed.”
 
-For source translation specifically, a baseline establishes historical behavior, not native correctness; build and entry-point execution do not close semantics; a fixture does not prove the owned Training path; and an optimized measurement covers only its recorded workload. No test protecting the claimed contract may be skipped, weakened, or diverted through a nonproduction path.
+For source translation specifically, a baseline establishes historical behavior, not native correctness; build and entry-point execution do not close semantics; a fixture does not prove the owned Training path; and an optimized measurement covers only its recorded workload and device. Player performance or lifetime claims that apply to mobile require physical evidence on the recorded minimum supported iPhone and iPad as well as the applicable M4 evidence. No test protecting the claimed contract may be skipped, weakened, or diverted through a nonproduction path.
 
 ## Treat workaround comments as a stop signal
 
@@ -131,6 +133,7 @@ Reject:
 - empty bodies, default-value returns, catch-and-ignore paths, placeholder switches, reduced stand-in limits, and `fatalError("TODO")` used to make a target compile;
 - tests skipped, deleted, weakened, or feature-gated merely to reach green;
 - permanent C++ bridges, legacy runtime readers, alternate loaders, alternate renderers, or compatibility feature flags;
+- a generic cross-platform, platform-service, input, or filesystem abstraction between the concrete AppKit and UIKit shells and their shared native paths;
 - speculative protocols, managers, services, ECSs, job systems, render graphs, resource managers, custom allocators, or broad package graphs;
 - defensive checks inside trusted runtime code for states canonical construction already excludes;
 - preservation of MFC, Win32, OpenGL, SDL, native Osiris, ABI, packet, binary-layout, or editor/game handoff machinery;
@@ -152,7 +155,9 @@ Source accounting for the island closes only when:
 - every involved source row has the terminal state required by its disposition and current claim;
 - one direct native production path remains.
 
-The verification skill owns red/green, affected-suite, player/editor composition, nonexecuted-test, review-resolution evidence, and milestone closure; `revival-review` owns the review itself. At minimum, every documentation or production change also runs:
+For a player island shared by Mac and mobile, closure exercises each applicable concrete shell and records any mobile-only functional contract separately from source-parity evidence. Simulator execution does not replace required physical-device evidence.
+
+The verification skill owns red/green, affected-suite, Mac/mobile/editor composition, nonexecuted-test, review-resolution evidence, and milestone closure; `revival-review` owns the review itself. At minimum, every documentation or production change also runs:
 
 ```sh
 rtk git diff --check

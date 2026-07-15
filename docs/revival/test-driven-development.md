@@ -83,7 +83,7 @@ Deleting dead or unreachable production code and its obsolete tests is simplific
 
 ### Rendering and Apple frameworks
 
-Test project-owned render extraction, material choice, resource bounds, pass ordering, shader results, and controlled images. Do not unit-test Metal, MetalKit, AppKit, AVFoundation, or GameController themselves. Test the project's assumptions and adaptation at the real boundary.
+Test project-owned render extraction, material choice, resource bounds, pass ordering, shader results, and controlled images. Do not unit-test Metal, MetalKit, AppKit, UIKit, AVFoundation, AVAudioSession or GameController themselves. Test the project's assumptions and adaptation at the real boundary, including target-specific composition without introducing a generic platform seam.
 
 ### Performance
 
@@ -103,7 +103,7 @@ The spike is clearly marked as research, never enters a product target, creates 
 
 ### Manual evidence
 
-Manual play, device checks, Metal captures, Instruments traces, and accessibility review supplement automation where they observe something automation cannot. They do not replace the first failing automated test for project-owned behavior. When an operating-system effect cannot be automated reliably, the red test covers the nearest project-owned decision or command and the manual evidence covers the final integration.
+Manual play, physical-device checks, Metal captures, Instruments traces, and accessibility review supplement automation where they observe something automation cannot. On iPhone and iPad this includes orientation and safe areas, UIKit lifecycle, audio routes and interruptions, memory warnings, thermal behavior, virtual/physical controller handoff and local-network permission. Simulator evidence cannot replace these device effects. Manual evidence does not replace the first failing automated test for project-owned behavior. When an operating-system effect cannot be automated reliably, the red test covers the nearest project-owned decision or command and the manual evidence covers the final integration.
 
 If no credible automated red can be stated at a known project-owned boundary, stop production implementation and clarify the contract. Use a bounded research spike only when the boundary itself is still unknown; once known, difficulty testing a design is not permission to implement it first.
 

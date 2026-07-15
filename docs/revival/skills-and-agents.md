@@ -42,11 +42,13 @@ These sources support an early shared editor/player loop, representative content
 
 ### Apple Metal and application sources
 
-Use Apple's documentation for direct Metal 4 queues and command buffers, MetalKit presentation, resource lifetime, capture, validation, AppKit documents, GameController, AVFoundation, Network, and CryptoKit.
+Use Apple's documentation for direct Metal 4 queues and command buffers, MetalKit presentation, resource lifetime, capture, validation, AppKit documents, UIKit scenes and lifecycle, GameController physical and virtual controls, AVFoundation and AVAudioSession, platform file picking and app-owned storage, local-network privacy, Network, and CryptoKit.
 
 Start with the maintained [Primary technical source index](primary-source-index.md) before repeating web research. Domain skills keep narrower operational references, while the index records the key source, the question it answers, and what it cannot prove.
 
 Apple's pinned Game Porting Toolkit skill bundle is installed as audited advisory material. Its direct Metal 4 API, resource, synchronization, presentation, validation, capture, and debugging guidance is applicable, as are direct GameController API facts after applying the project's single input-snapshot ownership. Its porting workflow, Objective-C++ window scaffold, dedicated engine-thread prescription, C++, Metal-cpp, Direct3D, Vulkan, Shader Converter, compatibility-backend, and macOS 27-only baseline routes are prohibited by the project boundary. Installation is not runtime adoption.
+
+Use concrete AppKit and UIKit shells over the same RevivalCore, RevivalMetal, world, scheduler, input snapshot, and canonical-package paths. Call platform APIs directly in the shell that owns them. Do not turn shared game semantics into a generic platform, input, view, file-picker, or filesystem abstraction. RevivalMobile imports only a Mac-produced canonical package through the platform picker and copies it into app-owned storage; D3Import and all retail-format knowledge remain macOS-only.
 
 Use the smallest explicit resource-residency declarations required by the direct Metal 4 submission contract in Phase 1; this is GPU API correctness, not spatial streaming or a resource-manager architecture. Metal I/O, sparse resources, streaming samples, and speculative residency policy remain optional research sources only after resident-level measurement. API availability does not otherwise make them Phase 1 requirements.
 
@@ -62,7 +64,7 @@ The chosen product toolchain is Swift 6.4 in Swift 6 language mode from Xcode 27
 
 ### Measurement tools
 
-Use direct swift test, xcodebuild, Instruments, xctrace, Metal capture, validation, and reproducible scripts as the source of truth.
+Use direct swift test, xcodebuild, Instruments, xctrace, Metal capture, validation, physical iPhone and iPad execution, and reproducible scripts as the source of truth. Simulator evidence is useful for focused development but does not close device presentation, input, lifecycle, memory, thermal, audio-session, or package-intake claims.
 
 XcodeBuildMCP or another automation helper may be evaluated after the workspace exists. Pin and audit executable tooling, review telemetry, and keep direct commands reproducible.
 
@@ -85,26 +87,26 @@ The complete current skill set is installed in the repository so the process can
 
 | Skill | Purpose |
 | --- | --- |
-| [revival-constitution](../../.agents/skills/revival-constitution/SKILL.md) | Enforce Apple-native scope, complete capability, one-way import, human-first editor, current resident baseline, evidence-driven amendments, and one production path |
-| [revival-source-translation](../../.agents/skills/revival-source-translation/SKILL.md) | File and symbol disposition, dependency-island tracing, baseline capture, semantic translation, deliberate differences, license provenance, actual scaffold deletion, and source-led island accounting |
-| [d3-content-import](../../.agents/skills/d3-content-import/SKILL.md) | Checked parsing, source profile, archive precedence, complete Level topology, eager-working-set evidence, current reachable lazy dependencies, provenance, atomic promotion, and retail isolation |
-| [revival-creator-suite](../../.agents/skills/revival-creator-suite/SKILL.md) | Read-only base to editable project to disposable play-session flow, AppKit documents, direct edits, undo, save/reopen/play, progressive workspaces, accessibility, real background-operation safety, validation, and publishing |
-| [swift-realtime-systems](../../.agents/skills/swift-realtime-systems/SKILL.md) | Single-owner source-faithful old/new variable-time handoff, flight and collision traces, Phase 3 scheduler decision, direct data layout, and measured optimization |
-| [metal4-rendering](../../.agents/skills/metal4-rendering/SKILL.md) | Direct Swift and MSL Metal 4, source-faithful canonical resource preparation, final-use release, room/portal and terrain rendering, player/editor identity, capture, validation, and M4 profiling |
+| [revival-constitution](../../.agents/skills/revival-constitution/SKILL.md) | Enforce the accepted Mac, iPhone, and iPad player scope; Mac-only editor and importer; complete capability; one-way import; current resident baseline; evidence-driven amendments; and one production path |
+| [revival-source-translation](../../.agents/skills/revival-source-translation/SKILL.md) | File and symbol disposition, dependency-island tracing, baseline capture, shared Mac/mobile/editor semantic translation, deliberate mobile platform contracts, license provenance, actual scaffold deletion, and source-led island accounting |
+| [d3-content-import](../../.agents/skills/d3-content-import/SKILL.md) | macOS-only checked parsing, source profile, archive precedence, complete Level topology, eager-working-set evidence, current reachable lazy dependencies, provenance, atomic promotion, mobile canonical-package handoff, and retail isolation |
+| [revival-creator-suite](../../.agents/skills/revival-creator-suite/SKILL.md) | macOS-only read-only-base to editable-project to disposable-play-session flow, AppKit documents, direct edits, undo, save/reopen/play, progressive workspaces, accessibility, real background-operation safety, validation, and publishing for both player consumers |
+| [swift-realtime-systems](../../.agents/skills/swift-realtime-systems/SKILL.md) | Single-owner source-faithful old/new variable-time handoff shared by both player shells, mobile suspension and resume boundaries, flight and collision traces, Phase 3 scheduler decision, direct data layout, and measured device optimization |
+| [metal4-rendering](../../.agents/skills/metal4-rendering/SKILL.md) | One direct Swift and MSL Metal 4 path across Mac, iPhone, iPad, and editor; source-faithful canonical resource preparation; final-use release; room/portal and terrain rendering; capture; validation; and device profiling |
 | [revival-behavior-system](../../.agents/skills/revival-behavior-system/SKILL.md) | Generated and handwritten source accounting, direct typed translation, event and state fidelity, evidence-gated authoring evolution, debugging, persistence, and one executor path |
 | [revival-volumetric-navigation](../../.agents/skills/revival-volumetric-navigation/SKILL.md) | Source route and node tracing, clearance, steering, blockage, recovery, editor diagnostics, and evidence-backed native simplification |
 | [revival-replay](../../.agents/skills/revival-replay/SKILL.md) | Final-scheduler recording, authoritative checkpoints, continuation, diagnosis, observer evidence, and one playback path |
 | [revival-networked-simulation](../../.agents/skills/revival-networked-simulation/SKILL.md) | Source-supported mode counts, released 32-slot infrastructure, authority, prediction, reconciliation, interpolation, latency rules, replication, state evidence, and replay interaction |
-| [revival-transport-security-operations](../../.agents/skills/revival-transport-security-operations/SKILL.md) | Bonjour and Network LAN plus evidence-selected Internet transport and trust boundaries, affordable reachability and discovery, hostile boundaries, keys, privacy, abuse controls, deployment, cost, monitoring, and outage behavior |
-| [revival-multiplayer](../../.agents/skills/revival-multiplayer/SKILL.md) | Modes, co-op, content negotiation, host difficulty, chat, moderation, commands, media, dedicated hosting, authoring, and network matrices |
-| [revival-verification](../../.agents/skills/revival-verification/SKILL.md) | Falsify named evidence claims, verify milestone matrices and terminal states, and prevent one check from standing in for another |
+| [revival-transport-security-operations](../../.agents/skills/revival-transport-security-operations/SKILL.md) | Bonjour and Network LAN across both player products, mobile local-network privacy, evidence-selected Internet transport and trust boundaries, affordable reachability and discovery, hostile boundaries, keys, privacy, abuse controls, deployment, cost, monitoring, and outage behavior |
+| [revival-multiplayer](../../.agents/skills/revival-multiplayer/SKILL.md) | Mac and mobile modes, co-op, content negotiation, host difficulty, chat, moderation, commands, media, macOS-only dedicated hosting, authoring, and network matrices |
+| [revival-verification](../../.agents/skills/revival-verification/SKILL.md) | Falsify named evidence claims across concrete Mac, mobile, and editor paths; verify physical-device evidence, milestone matrices, and terminal states; and prevent one check from standing in for another |
 
 Three additional workflow skills stay narrow:
 
 | Skill | Purpose |
 | --- | --- |
 | [revival-wayfinding](../../.agents/skills/revival-wayfinding/SKILL.md) | Expose genuine unknowns and choose the next evidence-producing step without creating a parallel plan |
-| [revival-simplify](../../.agents/skills/revival-simplify/SKILL.md) | Prove the protected behavior surface, then delete defensive, duplicated, speculative, or indirect code without losing ledgered capability |
+| [revival-simplify](../../.agents/skills/revival-simplify/SKILL.md) | Prove the protected behavior surface across applicable Mac, mobile, and editor entry points, then delete defensive, duplicated, speculative, or indirect code without losing ledgered capability |
 | [revival-review](../../.agents/skills/revival-review/SKILL.md) | Run and consolidate the four independent concerns for a material slice: source fidelity, architecture and scope, tests and evidence, and simplicity and maintainability |
 
 Orchestration, blast-radius analysis, boundary and type discipline, PR reviewability, and optional review visualization are steps inside this workflow rather than separately triggered doctrine skills. This avoids overlapping rules and reviewer multiplication. The exact external sources, pins, licenses, and exclusions are recorded in [`skill-supply-chain.md`](skill-supply-chain.md).
@@ -117,7 +119,7 @@ Every skill inherits the production red-green-refactor protocol and test-value g
 
 The only whole-phase skill prerequisites for Phase 1 are `revival-constitution` and `revival-source-translation`. Review each other installed skill against its real source dependencies immediately before the first production change in its domain; it gates that change, not unrelated work. Review behavior and navigation against the translated Training dependencies before Phase 4. Review replay after the Phase 3 timing decision and before Phase 5 replay work, then again against multiplayer before Phase 9. Review the three network skills against the working final simulation immediately before Phase 9.
 
-Do not install or author a streaming skill unless the M4 evidence gate after the complete playable Training Mission accepts a resource-lifetime amendment. Do not install or author an MCP or agent-authoring skill before the complete human creator suite ships.
+Do not install or author a streaming skill unless optimized evidence on the recorded M4 and minimum supported iPhone and iPad after the complete playable Training Mission accepts a resource-lifetime amendment that leaves one cross-platform production path. Do not install or author an MCP or agent-authoring skill before the complete human creator suite ships.
 
 ## Supply-chain record
 
@@ -141,8 +143,8 @@ Use only the steps the current work needs:
 
 1. **Constitution check.** Confirm the requested result fits the accepted platform, product, content, ownership, and one-path boundaries.
 2. **Wayfind when genuinely foggy.** State what is known, unknown, and decision-relevant; choose the next source trace, experiment, capture, or question that can collapse uncertainty. Write accepted results back to the owning document or ledger immediately.
-3. **Trace one dependency island.** Name the observable player or editor result, legacy and editor callers, important symbols, ordering, lifetime, baseline, dispositions, and deliberate modernization boundary.
-4. **Check the real blast radius.** Prove the affected runtime and editor callers, canonical consumers, update order, resource lifetime, and current acceptance path. Record what evidence confirms, clears, or leaves a risk open; do not produce a speculative caller essay.
+3. **Trace one dependency island.** Name the observable player or editor result, each applicable concrete Mac, mobile, and editor shell, legacy and editor callers, important symbols, ordering, lifetime, baseline, dispositions, and deliberate modernization boundary.
+4. **Check the real blast radius.** Prove the affected Mac-player, mobile-player, runtime, and editor callers, canonical consumers, update order, resource lifetime, and current acceptance path. Record what evidence confirms, clears, or leaves a risk open; do not produce a speculative caller essay.
 5. **Implement one contract.** Use the current domain skill. Observe focused red, make the smallest direct green, and keep validation at the untrusted-to-canonical boundary. Concrete Swift values and exhaustive state represent real invariants; wrapper types and protocols need an actual ownership or semantic job.
 6. **Simplify the diff.** Protect the named behavior surface, then remove duplicated paths, defensive runtime branches, needless indirection, stale comments, speculative flexibility, and measured hot-path waste. Rerun the focused and affected evidence after every accepted simplification.
 7. **Review a material slice.** Run the four independent review concerns and consolidate concrete findings once. The island owner resolves them against source and product evidence; reviewers do not directly redesign the diff.
@@ -158,8 +160,8 @@ Use the following bounded evidence-producing roles rather than standing personas
 ### Translation foundation
 
 1. Source and chronology reviewer: trace the current dependency island across runtime, editor, and revision evidence; maintain dispositions.
-2. Swift and Metal implementer: translate the current world/render/simulation path directly and profile it.
-3. Content and creator implementer: import the same slice and deliver its real editor mutation, validation, save, and play loop.
+2. Swift and Metal implementer: translate the current shared world, renderer, scheduler, and simulation path directly through the concrete AppKit and UIKit shells, and profile it on the applicable devices.
+3. Content and creator implementer: import the same slice on macOS, prove canonical-package intake on both player products, and deliver its real editor mutation, validation, save, and play loop.
 
 ### Behavior and campaign
 
@@ -179,7 +181,7 @@ After every material slice, cover four concerns independently:
 
 - source fidelity and complete runtime/editor accounting;
 - architecture, constitutional scope, canonical boundaries, and one production path;
-- focused tests, evidence claims, player/editor acceptance, and terminal rows;
+- focused tests, evidence claims, Mac/mobile/editor acceptance, physical-device proof, and terminal rows;
 - simplicity, maintainability, reuse of existing direct code, and measured efficiency.
 
 Use separate reviewers when capacity allows. Run the remaining concern in the next wave when capacity is limited. For a small change one reviewer may cover multiple concerns only when the report keeps them distinct. Reviewers identify concrete paths and observable consequences; they do not demand preservation of obsolete machinery, literal source shape, defensive branches after canonical validation, or speculative future-proofing. [`revival-review`](../../.agents/skills/revival-review/SKILL.md) defines consolidation and closure.
@@ -192,7 +194,7 @@ Use separate reviewers when capacity allows. Run the remaining concern in the ne
 - Require focused red/green evidence for shipping behavior and a deletion gate for temporary scaffolds.
 - A source reviewer may drive implementation mapping but may not solve it by linking legacy code.
 - A creator reviewer preserves useful workflow, not MFC layout or backward export.
-- A Metal reviewer begins with the complete resident Level and source-faithful eager/lazy asset preparation, and may not add spatial streaming before the M4 amendment gate.
+- A Metal reviewer begins with the complete resident `Level` and source-faithful eager/lazy asset preparation across the concrete AppKit and UIKit shells, and may not add a second renderer, generic platform layer, or spatial streaming before the recorded M4 and minimum-device amendment gate.
 - A systems reviewer may not add a job system, ECS, fixed scheduler, deterministic math framework, or custom allocator without the accepted evidence gate.
 - A behavior reviewer grows the safe model from working chains, covers the evidenced shipped-game and creator-tool capability for version 1.0, and may not add native-code escape hatches or speculative post-1.0 mechanics.
 - A multiplayer reviewer implements the one affordable native route accepted from current evidence and does not inherit original packets or assume a project-operated service merely because source or an earlier plan exists.

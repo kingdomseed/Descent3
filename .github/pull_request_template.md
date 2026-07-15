@@ -6,6 +6,7 @@
 - [ ] RevivalCore simulation or behavior
 - [ ] RevivalMetal rendering or resource lifetime
 - [ ] RevivalMac application, input, audio, or media
+- [ ] RevivalMobile application, touch/controller input, audio session, storage, lifecycle, device, or distribution
 - [ ] RevivalEditor authoring, validation, playtest, or publishing
 - [ ] Multiplayer, selected network/service boundary, security, or replay
 - [ ] Retained C++ reference tree or historical tooling

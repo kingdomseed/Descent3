@@ -31,7 +31,7 @@ Historical utilities are evidence, not the product model. `legacy/musicutils` ta
 - pending logical transition intent;
 - gameplay-derived inputs and explicit elapsed-time or final-scheduler timers that the approved score rules use.
 
-`RevivalMac` and `RevivalEditor` each own an `AVAudioEngine` instance and call the same concrete project-owned score-presentation code directly. RevivalMac consumes typed gameplay score commands; RevivalEditor uses the same scheduling, fade, interruption, and recovery code for preview. Decoded buffers, sample clocks, and audio-device state remain presentation ownership and never change authoritative gameplay state.
+`RevivalMac`, `RevivalMobile` and `RevivalEditor` each own an `AVAudioEngine` instance and call the same concrete project-owned score-presentation code directly. Both player applications consume the same typed gameplay score commands; RevivalEditor uses the same scheduling, fade, interruption, route-change and recovery code for preview where applicable. RevivalMobile directly owns the AVAudioSession category, activation and route lifecycle required by `P-092`; it does not fork score logic. Decoded buffers, sample clocks, routes and audio-device state remain presentation ownership and never change authoritative gameplay state.
 
 The canonical model stays narrow. It represents regions, named theme roles, stream references (historical OSF beds with ACM payloads, normalized at import), loop ranges, transition rules, and musical alignment needed by imported and newly authored scores. It is not a general digital-audio workstation, MIDI engine, or second behavior language. The historical save baseline stores one logical region index. Native saves begin with that minimum and add only state proven to affect future logical selection.
 
@@ -53,7 +53,7 @@ A save records only the logical state required to resume coherently:
 - pending transition intent only when it changes future logical selection;
 - timers or counters only when they affect continuation, expressed in the selected final simulation model.
 
-Saves do not contain audio-engine nodes, decoder state, sample buffers, device state, instruction pointers, or exact playback position. On load, `RevivalMac` starts from the declared resume policy at a valid musical boundary.
+Saves do not contain audio-engine nodes, decoder state, sample buffers, device state, instruction pointers, or exact playback position. On load, either player application starts from the declared resume policy at a valid musical boundary.
 
 Replay records authoritative logical score commands in simulation order and verifies logical score state. Audio-boundary outcomes are excluded from the current replay schema; a later replay-presentation contract may add them without making them gameplay-authoritative. Exact waveform timing is not part of the canonical gameplay hash.
 
@@ -74,6 +74,6 @@ This is a native creator workflow. It does not write OMF, reopen retail archives
 
 ## Verification
 
-Import tests cover the exact OMF constructs present in each supported source profile plus malformed bounds, unknown instructions, missing streams, invalid branches, and loop failures. Runtime tests cover deterministic logical selection, region commands, transition intent, save and load, replay, interruption, device changes, and missing optional output devices. Audio tests verify clean scheduling within declared sample tolerances without making presentation timing authoritative.
+Import tests cover the exact OMF constructs present in each supported source profile plus malformed bounds, unknown instructions, missing streams, invalid branches, and loop failures. Runtime tests cover deterministic logical selection, region commands, transition intent, save and load, replay, interruption, device and route changes, background/foreground recovery, and missing optional output devices. Mobile tests prove AVAudioSession interruption and route recovery resumes exactly once without losing or duplicating logical commands. Audio tests verify clean scheduling within declared sample tolerances without making presentation timing authoritative.
 
 The functional-completeness ledger separates import, runtime logic, native scheduling, behavior commands, persistence, authoring, validation, playtest, and publishing. “Music works” is not a complete row.

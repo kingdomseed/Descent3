@@ -43,7 +43,7 @@ Check:
 - every involved implementation file, important symbol, editor caller, generated block, and handwritten behavior range is accounted for;
 - data flow, formulas, evaluation order, update order, dependency discovery, eager and lazy behavior, stable identity, and teardown remain source-supported;
 - ownership and final GPU-use lifetime preserve observable results;
-- the complete canonical `Level` and editor/player relationships are not reduced to a fixture or partial production model;
+- the complete canonical `Level` and RevivalMac, RevivalMobile and RevivalEditor relationships are not reduced to a fixture or partial production model;
 - every intentional difference is explicit and is not mislabeled as faithful transfer;
 - obsolete MFC, Win32, OpenGL, SDL, ABI, allocation, and defensive machinery was not preserved as semantics.
 
@@ -57,7 +57,7 @@ Check:
 
 - shipping code remains direct Swift 6.4 in Swift 6 language mode and MSL on native Apple frameworks;
 - D3Import alone understands supported legacy containers and formats;
-- game and editor consume canonical content through shared world, renderer, and simulation types;
+- RevivalMac, RevivalMobile and RevivalEditor consume canonical content through shared world, renderer, and simulation types behind their concrete shells;
 - the change leaves one loader, renderer, scheduler decision, behavior path, and resource-lifetime path;
 - no compatibility bridge, runtime legacy reader, streaming flag, speculative framework, or alternate backend appeared;
 - phase ordering deferred work without silently deleting committed capability;
@@ -77,7 +77,7 @@ Check:
 - focused green, affected suite, build, launch, integration, image, device, security, and performance claims are not substituted for one another;
 - exact commands, inputs, configurations, results, and exposed executed/failed/skipped counts are recorded;
 - no protecting test is skipped, disabled, quarantined, deleted, weakened, or diverted through a test-only path;
-- applicable player and creator composition checkpoints pass;
+- applicable Mac-player, mobile-player and creator composition checkpoints pass, including physical iPhone and iPad evidence where the accepted contract requires it;
 - every involved source row has the state required to close the claimed island, and each functional row has evidence and the state appropriate to the current slice; a functional row must be terminal only when complete capability closure is claimed;
 - research code, scaffolding, generated local content, and temporary alternate paths are deleted or archived outside product targets.
 

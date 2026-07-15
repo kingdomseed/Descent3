@@ -6,7 +6,7 @@
 
 ## Decision
 
-Build one integrated macOS application, RevivalEditor, for the complete creation workflow. It shares canonical world values, level I/O, simulation, and Metal rendering with the game.
+Build one integrated macOS application, RevivalEditor, for the complete creation workflow. It shares canonical world values, level I/O, simulation and Metal rendering with RevivalMac and RevivalMobile. The editor remains Mac-only in version 1.0.
 
 The editor translates useful D3Edit, game-data, DALLAS, briefing, baking, validation, playtest, and publishing semantics. It does not reproduce the MFC dialog layout, Win32 ownership, page-database locks, generated C++ workflow, temporary GameSave.D3L bridge, or original output formats.
 
@@ -18,7 +18,7 @@ The editor is a top-tier human creation product before it becomes an automation 
 
 The Phase 1 editor must:
 
-- open the same read-only complete Training Level as RevivalMac, focus the selected acceptance room, and derive one editable complete-level project value from it;
+- open the same read-only complete Training Level as both player applications, focus the selected acceptance room, and derive one editable complete-level project value from it;
 - render it through RevivalMetal;
 - inspect and select a room, face, portal boundary, or object;
 - after tracing the historical editor/runtime workflow, choose and perform the smallest real canonical edit that proves durable ownership without creating a disposable path or mutating the imported base;
@@ -133,7 +133,7 @@ The presentation workspace covers briefing screen creation, ordering, navigation
 
 The suite imports and inspects supported geometry, models, animation, textures, modern fonts, audio, movies, and player media; records rights; enforces bounds at import; bakes fonts, lighting and navigation; audits dependencies and orphans; and publishes packages. Retail bitmap-font conversion remains exclusive to D3Import; RevivalEditor consumes its canonical result but never becomes a second retail font reader.
 
-One publisher validates complete level topology and the dependencies reachable through the project's current behavior surface, then produces canonical native content. It does not emit HOG, D3L, original editor files, or native plugins. The publisher's output proof is distinct from RevivalMac's hostile package-intake, local-library, activation, rollback and removal proof. Security, signing, layering, and migration grow with that real distribution boundary rather than being simulated during the first local editor loop.
+One publisher validates complete level topology and the dependencies reachable through the project's current behavior surface, then produces canonical native content. It does not emit HOG, D3L, original editor files, or native plugins. The publisher's output proof is distinct from RevivalMac's and RevivalMobile's hostile package-intake, local-library, activation, rollback and removal proof. Security, signing, layering, and migration grow with those real distribution boundaries rather than being simulated during the first local editor loop.
 
 ## Authoring loop
 
@@ -164,9 +164,9 @@ The suite is complete when a creator can start with an empty project and, withou
 - assemble a branching campaign with difficulty, room roles, music, cinematics, briefings, cockpit, automap, cameras, markers, and presentation;
 - create multiplayer maps and modes with the supported authority and communication rules;
 - validate, debug, play, replay, package, reopen, and publish;
-- install the package in RevivalMac and complete its declared play paths.
+- install the package in RevivalMac and RevivalMobile and complete its declared play paths in both.
 
-Installation at this gate uses the real RevivalMac local library: validate and stage the package, resolve its explicit base and replacement relationships, activate it, enumerate its campaign, and preserve the prior active set under a failed replacement. The certification case also proves disable and removal behavior. It does not require a marketplace, account, automatic updater, or project-operated distribution service.
+Installation at this gate uses both real player libraries: validate and stage the package, resolve its explicit base and replacement relationships, activate it, enumerate its campaign, and preserve the prior active set under a failed replacement. RevivalMobile receives the canonical package through its system-picker handoff before the shared validation path; it never imports retail data. The certification case also proves disable and removal behavior. It does not require a marketplace, account, automatic updater, cloud transfer or project-operated distribution service.
 
 Imported stock content, a non-bundled independent certification campaign, and a non-bundled independent multiplayer package are separate proof cases. All are required for complete creator status. They do not supply version 1.0 replacement assets, ship as included campaigns, or remove the requirement that users own and import supported retail content.
 

@@ -62,7 +62,7 @@ Use evidence in this order where applicable:
 2. pinned released source, editor callers, revision evidence, and runnable reference behavior;
 3. current ledger entries, canonical fixtures, local captures, and project code;
 4. official Apple documentation and reproducible experiments;
-5. measured optimized behavior on the recorded M4;
+5. measured optimized behavior on every affected recorded M4, iPhone, or iPad reference device;
 6. clearly labeled inference.
 
 Historical source decides what the original did. Accepted documents decide what this product is building. An Apple API's availability proves neither a requirement nor an architecture.
@@ -104,7 +104,7 @@ Valid examples include:
 - an undocumented retail field whose meaning blocks canonical import;
 - ambiguous source ordering that changes a reachable Training behavior;
 - a Metal lifetime question that must be reproduced before ownership can be stated;
-- measured M4 evidence that activates an accepted amendment gate.
+- measured reference-device evidence that activates an accepted amendment gate.
 
 Invalid examples include:
 

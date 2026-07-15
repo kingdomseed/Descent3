@@ -29,7 +29,7 @@ Before editing, state in the working record or pull request:
 1. the exact diff, files, or dependency island in scope;
 2. the observable contracts that must remain unchanged;
 3. the source rows, deliberate differences, and accepted decisions that constrain the work;
-4. the real player, editor, importer, renderer, save, replay, network, or publishing entry points that reach it;
+4. the real RevivalMac, RevivalMobile, editor, importer, renderer, save, replay, network, or publishing entry points that reach it;
 5. the existing evidence that protects it;
 6. the concrete complexity expected to disappear.
 
@@ -55,8 +55,8 @@ Look for concrete simplifications in five areas.
 
 - Replace one-implementation protocols, managers, services, providers, registries, and factories with concrete ownership.
 - Remove mode flags, broad optionals, fallback paths, and hidden mutable state when construction can express one valid state.
-- Keep one mutable simulation owner, one resident level owner, one renderer, and distinct editor-document and play-session values.
-- Use direct AppKit, Metal, MetalKit, GameController, AVFoundation, Network, and CryptoKit calls.
+- Keep one mutable simulation owner and resident-level owner per application or play-session instance, one shared renderer implementation, and distinct editor-document and play-session values.
+- Use direct AppKit or UIKit, Metal, MetalKit, GameController, AVFoundation, AVAudioSession, Network, and CryptoKit calls in the concrete target that owns each service. Do not consolidate the two shells into a generic platform, input, or filesystem abstraction.
 - Keep canonical data free of renderer objects, framework workarounds, and legacy container knowledge.
 
 ### Control flow and defensive code
@@ -72,16 +72,16 @@ Look for concrete simplifications in five areas.
 - Remove work that is provably repeated, unused, or immediately overwritten.
 - Keep observable iteration order, Float32 operation order, update order, eager preparation, reachable lazy dependency discovery, and final GPU-use lifetime intact.
 - Do not add concurrency, caching, unsafe access, specialization, custom allocation, streaming, or a scheduler change as cleanup.
-- Performance refactoring requires the accepted optimized M4 measurement gate. Line count and theoretical speed are not evidence.
+- Performance refactoring requires the accepted optimized M4 measurement gate and, for applicable player claims, measurement on the recorded physical minimum supported iPhone and iPad. Line count and theoretical speed are not evidence.
 
 ### Blast radius
 
 Trace consequences beyond the edited function:
 
-- runtime and editor callers;
-- canonical package and save consumers;
+- Mac-player, mobile-player, runtime, and editor callers;
+- canonical package and save consumers, including mobile file-picker intake and app-owned storage;
 - complete `Level` topology and dependency preparation;
-- simulation timing, callbacks, and teardown;
+- simulation timing, AppKit and UIKit lifecycle callbacks, suspension, resumption, and teardown;
 - Metal submission and resource release;
 - undo, save/reopen, disposable play, and publishing;
 - source dispositions, deliberate differences, and applicable milestone checks.
@@ -107,7 +107,7 @@ Record:
 - the preservation claim;
 - the complexity removed and why no capability was lost;
 - the exact focused and affected-suite commands and results;
-- any integrated checkpoint or optimized M4 measurement required by the owning contract;
+- any integrated checkpoint or optimized M4 and physical mobile-device measurement required by the owning contract;
 - source-led or architecture-sensitive blast-radius facts checked;
 - any rejected suggestion and the evidence for rejecting it.
 
@@ -127,7 +127,7 @@ Reject a simplification that:
 
 - removes runtime, authoring, validation, playtest, publishing, multiplayer, replay, or mod capability;
 - replaces readable direct Swift with a framework, macro system, protocol graph, or type maze;
-- preserves a legacy API, ABI, platform layer, or defensive branch merely because it existed in C++;
+- preserves a legacy API, ABI, generic platform, input, or filesystem layer, or defensive branch merely because it existed in C++ or appears to unify the concrete AppKit and UIKit shells;
 - creates a second loader, renderer, scheduler, content reader, simulation mode, or resource-lifetime path;
 - optimizes for file size, line count, abstraction purity, or reviewer taste;
 - reports build success as proof of behavior preservation.

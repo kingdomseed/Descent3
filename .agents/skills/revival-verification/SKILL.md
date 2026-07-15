@@ -26,25 +26,25 @@ Keep these claims distinct:
 | Focused green | The named contract works through its production path |
 | Affected suite | Directly affected contracts remain green |
 | Integrated island | Applicable shipping and creator paths compose |
-| Optimized M4 measurement | The recorded representative workload meets or misses its stated budget |
+| Optimized device measurement | The recorded representative workload meets or misses its stated budget on the named M4, iPhone, or iPad |
 | Milestone matrix | The explicitly listed milestone scope passes |
 
-These are evidence categories, not new ledger states or a mandatory sequence. A source baseline does not prove native correctness; a build does not prove launch; launch does not prove behavior; a focused test does not prove integration; one M4 workload does not prove another.
+These are evidence categories, not new ledger states or a mandatory sequence. A source baseline does not prove native correctness; a build does not prove launch; launch does not prove behavior; a focused test does not prove integration; and one device, workload, shell, simulator, or M4 run does not prove another.
 
 ## Falsification workflow
 
 1. Restate one exact, observable claim and name its accepted contract, roadmap milestone, functional rows, source rows, and production entry point.
-2. Identify the cheapest evidence layer that could disprove it: source trace, focused fixture, local retail capture, controlled image, editor round trip, application composition, optimized M4 profile, or milestone matrix.
+2. Identify the cheapest evidence layer that could disprove it: source trace, focused fixture, local retail capture, controlled image, editor round trip, application composition, optimized M4 or physical mobile-device profile, or milestone matrix.
 3. For new or changed production behavior, inspect the recorded focused red command and salient intended failure. A broken environment, fixture error, or unrelated failure is not red evidence.
 4. Re-run or inspect the exact focused green and directly affected suite through the production path. Record input, configuration, result, and executed/failed/skipped counts when exposed.
-5. Exercise composition only where ownership, serialization, framework adaptation, process, GPU, application, or milestone behavior can fail independently.
+5. Exercise composition only where ownership, serialization, concrete AppKit or UIKit adaptation, process, GPU, application, physical-device lifecycle, or milestone behavior can fail independently. Do not add a generic platform, input, or filesystem abstraction to make a matrix easier to run.
 6. Compare source-supported behavior and native behavior. Record tolerances and every deliberate difference instead of blending modernization into a fidelity claim.
 7. Audit skipped, disabled, quarantined, deleted, weakened, and replaced cases. A test protecting the claimed current contract must execute and pass.
 8. Check source and functional ledger transitions against the exact scope being claimed; do not advance a row on prose or build success alone.
 9. For a material slice, require the completed [`revival-review`](../revival-review/SKILL.md) report and confirm every concrete finding changed the diff or received evidence-backed resolution.
 10. Issue a bounded verdict: supported at a named evidence rung, or unsupported with the concrete missing or contradictory evidence.
 
-Documentation-only work uses link, consistency, and evidence checks. It does not manufacture a red product test. Performance changes start from a reproducible optimized measurement that misses an accepted budget or demonstrates a regression.
+Documentation-only work uses link, consistency, and evidence checks. It does not manufacture a red product test. Performance changes start from a reproducible optimized measurement that misses an accepted budget or demonstrates a regression. Player claims that cover mobile presentation, input, package intake, lifecycle, memory, thermal, or audio behavior require the recorded physical minimum supported iPhone and iPad where applicable; simulator evidence alone cannot close them.
 
 ## Ledger discipline
 
@@ -60,7 +60,7 @@ Keep the result compact and auditable:
 
 - **Claim and authority:** observable scope, owning document, rows, and milestone.
 - **Evidence rung:** the exact category being established.
-- **Execution:** command or procedure, input or content identity, configuration, and environment.
+- **Execution:** command or procedure, input or content identity, configuration, environment, concrete target shell, and physical device when applicable.
 - **Observed result:** values, images, counts, diagnostics, timings, or failure state that bear on the claim.
 - **Nonexecuted cases:** every relevant skip, disablement, deletion, weakening, replacement, and approved disposition.
 - **Differences and provenance:** source comparison, tolerances, intentional changes, hashes, and rights boundary.
@@ -88,7 +88,7 @@ Accept a claimed island or milestone only when:
 
 - the exact claim and evidence rung are stated, with reproducible commands or procedures and observed results;
 - focused red-first history exists for every new or changed production behavior and required current tests execute and pass;
-- source comparisons, deliberate differences, provenance, and applicable integrated or M4 evidence are recorded;
+- source comparisons, deliberate differences, provenance, and applicable integrated, M4, and physical mobile-device evidence are recorded;
 - source rows satisfy the island's closure rule; functional rows carry the evidence and state supported by the current slice and satisfy their terminal rule when complete capability or milestone closure is claimed, with no unexplained file, range, capability path, or nonexecuted case;
 - temporary research and scaffolding are removed or archived outside product targets;
 - independent fidelity, architecture, evidence, and simplicity findings are resolved;

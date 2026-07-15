@@ -23,7 +23,7 @@ Before first production use for a workspace, compare this skill with the current
 - RevivalEditor is one AppKit application using one `NSDocument`, one main-actor editing owner, one canonical project value, one `UndoManager` history, and one primary window per project.
 - AppKit owns document lifecycle, edited state, file coordination, menus, restoration, keyboard behavior, and accessibility integration.
 - The imported canonical base is read-only. Editing derives a separately owned complete-Level project value and preserves provenance.
-- Play creates a disposable session copy. It uses the same world types, loader, simulation, dependency rules, and RevivalMetal path as RevivalMac.
+- Play creates a disposable session copy. It uses the same world types, loader, simulation, dependency rules, and RevivalMetal path as RevivalMac and RevivalMobile.
 - Shared world means shared code and semantics, never concurrent mutation of one instance.
 - Phase 1 opens the complete Training `Level`, focuses the selected room, performs the smallest meaningful edit selected from traced historical workflow evidence without foreclosing later creator work, undoes, redoes, saves, reopens, plays, and returns.
 
@@ -38,7 +38,7 @@ Before first production use for a workspace, compare this skill with the current
 7. Validate changed references and current reachable dependencies, update only actually stale derived data, and link diagnostics to their owners.
 8. Save, close, and reopen through the production document format. Confirm the read-only base is unchanged.
 9. Create a disposable play-session copy and execute the real shipping simulation and renderer; return to useful document, selection, and camera state.
-10. Run the affected suite and the applicable authoring, validation, playtest, publishing, accessibility, resource-release, and optimized M4 checks.
+10. Run the affected suite and the applicable authoring, validation, playtest, publishing, accessibility, resource-release, and optimized M4 checks. When publishing or cross-player certification is in scope, install and complete the package through both player applications, including the required physical mobile-device evidence.
 11. Record red and green commands, source comparison, deliberate differences, ledger transitions, and exact observable results.
 
 Add a surface only when the current slice has real content and operations for it. A modern operation may replace several historical commands when it preserves their useful capability.
@@ -81,6 +81,7 @@ A creator slice closes only when:
 - the applicable runtime, authoring, validation, playtest, and publishing paths required by the functional row work, or an inapplicable path has a recorded reason;
 - background work, when present, proves immutable input, supported cancellation, stale-result rejection, and failure preservation;
 - required keyboard, focus, VoiceOver, diagnostics, and M4 responsiveness evidence exists for the surface's milestone;
+- when publishing or certification is claimed, the package installs and completes through both RevivalMac and RevivalMobile; an editor-only slice does not manufacture that later evidence;
 - involved source rows reach allowed terminal states for the claimed island, and claimed functional rows carry their required evidence;
 - focused red, focused green, affected-suite, integration, and resource-release evidence have no required skip;
 - independent fidelity, architecture, evidence, and simplicity findings are resolved.

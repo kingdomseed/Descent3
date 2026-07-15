@@ -8,7 +8,7 @@
 
 Write the least project-owned code that can faithfully transfer and then improve the complete required game and creator experience. Minimal code means fewer concepts, paths, dependencies, and states a maintainer must understand. It does not mean compressed syntax, hidden behavior, or reduced scope.
 
-The M4 has ample capacity for a late-1990s game. Spend that capacity to keep the first implementation direct. Optimize and redesign only after a representative optimized build shows the problem.
+The recorded M4 Mac has ample capacity for a late-1990s game, while the selected minimum-reference iPhone and iPad still require measured memory, thermal and lifecycle evidence. Keep the first implementation direct on every target. Optimize and redesign only after a representative optimized build shows the problem.
 
 ## Translation guardrail
 
@@ -27,7 +27,7 @@ Work one dependency island at a time and keep the real editor and player runnabl
 
 - One implementation is a concrete type, not a protocol hierarchy.
 - One caller uses a direct call, not an event bus.
-- One platform uses its framework directly, not a wrapper.
+- Each concrete application shell uses its framework directly: AppKit for RevivalMac and RevivalEditor, UIKit for RevivalMobile. Multiple shells do not justify a generic platform, application-host, input, file-system or renderer abstraction.
 - One renderer uses explicit passes, not a render graph.
 - Domain object families use direct collections, not an ECS.
 - The current behavior slice uses canonical direct typed functions, not a predesigned general VM or forced future rewrite.
@@ -82,9 +82,9 @@ The first loading path is intentionally direct:
 4. prepare the source-evidenced eager working set and activate the world;
 5. prepare later source-reachable assets only from its validated canonical package and current reachable dependency manifest, then retain them until exit.
 
-Failure before commit preserves the current world; failure after commit enters an explicit unloaded error state. Loading may move one bounded operation off the main actor when measured latency warrants it. Do not add a task per asset, stream cell, spatial demand calculation, prefetch policy, LRU, memory-pressure mode, cache hierarchy, or resident/streaming switch.
+Failure before commit preserves the current world; failure after commit enters an explicit unloaded error state. Loading may move one bounded operation off the main actor when measured latency warrants it. An iOS or iPadOS memory warning may trigger the ordinary drain-and-release path and an explicit unloaded or recoverable error state; it does not authorize partial eviction. Do not add a task per asset, stream cell, spatial demand calculation, prefetch policy, LRU, alternate memory-pressure residency mode, cache hierarchy, or resident/streaming switch.
 
-If the M4 evidence gate after the complete playable Training Mission proves the resident path inadequate, follow the amendment rule in [World loading and residency](world-loading.md). The replacement leaves one production lifetime path.
+If the Mac and mobile evidence gate after the complete playable Training Mission proves the resident path inadequate, follow the amendment rule in [World loading and residency](world-loading.md). The replacement leaves one production lifetime path.
 
 ## Concurrency
 
@@ -154,13 +154,13 @@ A disposable research spike may inspect an unknown format, capture a trace, or a
 
 Performance work follows this order:
 
-1. measure an optimized build on the recorded M4;
+1. measure an optimized build on every recorded reference device affected by the claim;
 2. identify the responsible function, allocation, GPU pass, transfer, or wait;
 3. make the smallest change that addresses it;
 4. verify behavior and measure again;
 5. keep the complexity only when evidence supports it.
 
-Track frame time, update time, render encoding, GPU time, allocations, memory high-water, import time, load time, and editor responsiveness for representative milestones.
+Track frame time, update time, render encoding, GPU time, allocations, memory high-water, import time, load time, thermal state, lifecycle recovery and editor responsiveness for representative milestones as applicable to each target.
 
 Zero steady-state allocations, a fixed tick rate, specialized math, direct Metal I/O, and spatial streaming are possible conclusions from measurements, not Phase 1 architecture theatre. The complete Training Mission establishes the first credible product budgets.
 
@@ -177,7 +177,7 @@ Zero steady-state allocations, a fixed tick rate, specialized math, direct Metal
 - Is a generic abstraction hiding one concrete implementation?
 - Are legacy semantics being confused with prohibited legacy APIs or ABI?
 - Can direct data, a switch, a table, or an Apple framework remove code?
-- Is the performance claim measured on representative content?
+- Is the performance claim measured on representative content and every affected reference device?
 - Can any new type, target, dependency, or layer be deleted?
 
 Subtraction is valuable when fidelity and capability remain intact.

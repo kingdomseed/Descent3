@@ -15,7 +15,8 @@ This skill is installed now. Phase 0 first records current direct, player-hosted
 
 ## Native boundaries
 
-- Use Network and Bonjour directly for the LAN contract and the native boundaries selected for Internet play; do not create a cross-platform transport abstraction.
+- Use Network and Bonjour directly in RevivalMac and RevivalMobile for the LAN contract and the native boundaries selected for Internet play; do not create a cross-platform transport abstraction.
+- RevivalMobile owns its local-network usage description, Bonjour service declarations, permission-denial recovery, and explicit suspension/background session outcome. Dedicated no-window hosting remains Mac-only.
 - Use CryptoKit directly when the accepted topology has an authority, peer, rendezvous, or service trust boundary that needs project-owned record protection.
 - Do not assume a relay, always-on service, direct-IP route, or third-party provider before the accepted 2026 evidence selects one. If a relay or service exists, keep it bounded and outside simulation authority.
 - Validate, authenticate, rate-limit, bound, and canonicalize hostile input once at intake. Trusted typed commands enter the simulation without repeated wire checks.
@@ -38,7 +39,7 @@ Do not add original-server interoperability, original reliability or packet laye
 
 ## Verification
 
-Use focused red/green evidence plus declared LAN, representative Internet-reachability, reconnect, outage, key, replay-rejection, hostile-input, media, authorization, audit, capacity, privacy, deployment, recurring-cost, continuity, and monitoring matrices applicable to the accepted topology. Record skipped cases as non-passes. Verify exact public configuration and deployed revision when deployment is requested.
+Use focused red/green evidence plus declared LAN, representative Internet-reachability, reconnect, outage, key, replay-rejection, hostile-input, media, authorization, audit, capacity, privacy, deployment, recurring-cost, continuity, and monitoring matrices applicable to the accepted topology. Run mobile LAN discovery, local-network permission denial/recovery, listen hosting and lifecycle outcomes on the recorded physical minimum iPhone and iPad; a simulator does not close those claims. Record skipped cases as non-passes. Verify exact public configuration and deployed revision when deployment is requested.
 
 Architecture, evidence, simplicity, and fidelity-to-capability review remain independent under [`revival-review`](../revival-review/SKILL.md). Security findings are concrete reachable boundary failures, not requests for defensive code everywhere.
 
@@ -47,3 +48,4 @@ Architecture, evidence, simplicity, and fidelity-to-capability review remain ind
 - [Network framework](https://developer.apple.com/documentation/network)
 - [CryptoKit](https://developer.apple.com/documentation/cryptokit)
 - [Bonjour](https://developer.apple.com/bonjour/)
+- [TN3179: Understanding local network privacy](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy)

@@ -1,6 +1,6 @@
 # Source translation discipline
 
-- Status: accepted
+- Status: accepted, amended
 - Date: July 15, 2026
 - Authority: binding source-accounting and modernization protocol
 
@@ -41,7 +41,7 @@ The ledger follows the source tree, but implementation follows coherent dependen
 
 ## Dependency-island loop
 
-Each island is the smallest end-to-end path that can become observable in both the player and editor where applicable:
+Each island is the smallest end-to-end path that can become observable in every applicable shipping player shell and, where applicable, the editor:
 
 1. trace the complete legacy call and data path, including editor use;
 2. record the involved files and their provisional dispositions;
@@ -59,19 +59,21 @@ The project-local [revival-source-translation skill](../../.agents/skills/reviva
 
 ## Initial fidelity baseline
 
-The production load unit is one complete canonical `Level`, matching the source D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and both applications load the resulting complete canonical `Level` while using one selected room as the first visible and editable acceptance slice. Synthetic one-room levels are focused fixtures, not a production package or alternate world type.
+The production load unit is one complete canonical `Level`, matching the source D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and RevivalMac, RevivalMobile and RevivalEditor load the resulting complete canonical `Level` while using one selected room as the first visible and editable acceptance slice. Synthetic one-room levels are focused fixtures, not a production package or alternate world type.
 
-The first implementation reproduces these source-supported relationships:
+The first implementation preserves the source-derived world, loading, visibility, timing, and campaign relationships below. It composes them through the approved native player and editor shells without treating that shell composition as historical evidence:
 
 - one complete resident authoritative level world containing its rooms, portals, terrain, objects, paths, goals, and behavior state;
 - one eager `PageInAllData`-style working-set pass, reachable later asset paging, and one level-owned release at exit;
-- the same canonical world model, dependency rules, and direct Metal renderer in `RevivalMac` and `RevivalEditor`, without concurrent mutation of one instance;
+- the same canonical world model, dependency rules and direct Metal renderer in `RevivalMac`, `RevivalMobile` and `RevivalEditor`, without concurrent mutation of one instance;
 - one editor-hosted open, inspect, edit, save, play, and return loop;
 - room-and-portal visibility in the first indoor island, followed by terrain geometry LOD and texture-segment selection with UV/tile/rotation behavior when the first outdoor island arrives;
 - the source timing handoff made explicit: systems and `EVT_INTERVAL` consume the old `Frametime` and pre-update `Gametime`, then after cap waiting `CalcFrameTime` stores the new duration and `GameFrame` advances `Gametime` before remaining tail work; static/`InitGame` initialization is 0.1 seconds and nested pauses rebase the clock;
 - campaign-ordered translation of the real Training dependencies rather than a speculative engine framework.
 
 The canonical package contains the complete level topology and every dependency reachable through the currently translated product path. When a later phase makes a matcen, dynamic spawn, or behavior path executable, the importer and manifest expand with that same island. This preserves the one-way content boundary without demanding Phase 4 behavior reachability analysis in Phase 1. Source inspection still shows reachable lazy paging, and the retained GPU pre-upload hook does not establish complete GPU readiness before activation.
+
+UIKit scene composition, mobile document-picker intake, virtual controls, audio-session handling and mobile lifecycle recovery are deliberate platform replacements with no legacy-file fidelity claim. They attach target-specific evidence to the applicable functional contract while the underlying source-derived world, simulation, renderer, scheduler and package semantics remain one implementation. AppKit and UIKit entry points do not create separate source-disposition tracks or justify a generic platform layer.
 
 This baseline is resident per complete level. Phase 5 completes Training as a playable and editable mission; it does not introduce a second, fuller Level type. The baseline is neither a claim that streaming will never be useful nor permission to implement streaming in parallel. The current product has one resident loading path. A different resource-lifetime design requires the measured amendment described in [World loading and residency](world-loading.md), and the replacement must leave one production path.
 
@@ -94,7 +96,7 @@ Boundary validation happens once when untrusted retail, project, package, save, 
 Modernization is a separate, explicit step:
 
 1. get the translated path working;
-2. measure it in an optimized build on the recorded M4 with representative content;
+2. measure it in an optimized build on every recorded reference device affected by the change, with representative content;
 3. identify the specific missed budget, maintenance problem, or Apple-platform opportunity;
 4. record a local structural change in the translation ledger, or amend the binding documents when changing a product decision, persistent semantic contract, or cross-workstream architecture;
 5. add the focused contract or measurement that fails;

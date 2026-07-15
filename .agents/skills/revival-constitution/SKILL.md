@@ -1,6 +1,6 @@
 ---
 name: revival-constitution
-description: Guard the Descent 3 revival's Apple-native scope, complete capability, one-way import boundary, human-first creator product, resident-world baseline, evidence-driven amendments, and single production path. Use when starting a workstream or reviewing a proposal that may change product direction.
+description: Guard the Descent 3 revival's Apple-native Mac, iPhone, and iPad scope, complete capability, one-way import boundary, human-first creator product, resident-world baseline, evidence-driven amendments, and single production path. Use when starting a workstream or reviewing a proposal that may change product direction.
 ---
 
 # Revival constitution
@@ -29,16 +29,17 @@ Read the current domain document and ledger rows for the proposed work. Before t
 
 ## Constitutional invariants
 
-- Ship one Apple Silicon, macOS 26+ implementation with the Swift 6.4 compiler in Swift 6 language mode and with MSL using direct Apple frameworks and Metal 4. Use Xcode 27 beta until stable Xcode 27 replaces it; keep no Swift 6.3 compatibility path.
+- Ship the player on arm64 macOS 26+ and Metal 4-capable iPhone and iPad devices running iOS or iPadOS 26+, with Apple GPU family 7 or newer as the mobile floor. Use the Swift 6.4 compiler in Swift 6 language mode, MSL, direct Apple frameworks, and Metal 4. Use Xcode 27 beta until stable Xcode 27 replaces it; keep no Swift 6.3 compatibility path.
+- Keep RevivalEditor, D3Import, and dedicated no-window hosting macOS-only. Use concrete AppKit and UIKit shells over the same RevivalCore, RevivalMetal, canonical world, scheduler, renderer, and package paths; do not add a generic platform, input, filesystem, renderer, or simulation abstraction.
 - Ship no legacy C or C++ engine, Objective-C++ bridge, Rust runtime, OpenGL or SDL runtime, Wine or Game Porting Toolkit layer, or native Osiris module.
 - Transfer behavior through dependency-ordered source translation and record every relevant legacy file's disposition.
 - Deliver the complete player and human creator capability inventory. KISS reduces mechanisms, not scope.
 - Treat the evidenced shipped game and creator tools as the version 1.0 capability ceiling. Preserve nonworking historical ideas for later consideration without turning them into current requirements or silently losing them.
-- Keep D3Import as the sole shipping legacy-format reader. The game and editor consume canonical content only.
+- Keep macOS D3Import as the sole shipping legacy-format reader. RevivalMac and RevivalEditor consume its local canonical result. RevivalMobile accepts only a Mac-produced canonical package through the platform file picker, validates it through the same native-package boundary, and copies it into app-owned storage. Mobile never reads a retail or legacy format.
 - Require version 1.0 users to own and import the one supported prepared retail profile. Additional sources and project-owned replacement assets require later explicit decisions.
 - Start from one complete resident `Level`, source-evidenced eager preparation, and current reachable canonical lazy preparation. This is the current implementation, not “no streaming ever.”
 - Start RevivalEditor with the first world slice and share world types, loading rules, simulation, and rendering while owning separate document and play-session values.
-- Keep one renderer, one scheduler, one level-lifetime path, one canonical world model, and one production path at a time.
+- Keep one renderer, one scheduler, one level-lifetime path, one canonical world model, and one production path shared across the concrete Mac, iPhone, iPad, and editor shells.
 - Keep the product human-first. MCP, headless authoring, telemetry, training capture, and agent-only paths wait until the complete human creator suite ships.
 - Require affordable native Internet multiplayer while leaving its 2026 topology to accepted evidence. Do not assume a project-operated service, relay, or recurring cost without a viable owner and explicit approval.
 
@@ -58,7 +59,7 @@ Do not promote a hypothesis into architecture. Ordinary local structure does not
 
 1. Name the current observable result, owning accepted contract, functional rows, and source rows.
 2. Trace the pinned source and current product path before proposing redesign.
-3. Identify the concrete limitation. For performance or lifetime claims, capture an optimized representative M4 measurement.
+3. Identify the concrete limitation. For performance or lifetime claims, capture an optimized representative M4 measurement and, for player claims, measurements on the recorded minimum supported iPhone and iPad.
 4. Choose one smallest direct design that preserves complete scope. Do not average incompatible options into a permanent abstraction.
 5. State what will be deleted or superseded and how one production path remains.
 6. For new or changed production behavior, write and run one focused automated test first; confirm it fails for the intended missing contract.
@@ -71,13 +72,13 @@ Documentation-only amendments use link, consistency, and evidence checks rather 
 
 A valid amendment names the current rule, the falsifying evidence or new product decision, the selected replacement, affected capabilities, migration or reimport consequences, and deletion of the superseded path. It updates active documents together so no stale alternative remains.
 
-Future streaming, a fixed scheduler, another platform, another legacy source profile, another DCC ingress, or a post-1.0 expansion of the authored behavior representation are possible only through their accepted evidence gates. Do not install their frameworks, flags, adapters, or parallel modes in advance.
+Future streaming, a fixed scheduler, another platform beyond the accepted Mac, iPhone, and iPad targets, another legacy source profile, another DCC ingress, or a post-1.0 expansion of the authored behavior representation are possible only through their accepted evidence gates. Do not install their frameworks, flags, adapters, or parallel modes in advance.
 
 ## Prohibited complexity and scope drift
 
 Reject:
 
-- cross-platform wrappers and legacy-shaped compatibility layers;
+- generic cross-platform, input, or filesystem wrappers and legacy-shaped compatibility layers instead of the concrete AppKit and UIKit shells;
 - generic ECS, job, render-graph, event-bus, dependency-injection, asset-database, allocator, resource-manager, or service frameworks without accepted evidence;
 - resident/streaming switches, dual schedulers, alternate loaders or renderers, and “temporary” production fallbacks;
 - defensive branch forests after canonical boundary validation;
@@ -96,6 +97,8 @@ The constitutional review closes only when:
 - superseded product code, tests, flags, scaffolds, and prose are removed or receive an approved ledger disposition;
 - functional scope remains complete and source accounting remains explicit;
 - independent fidelity, architecture, evidence, and simplicity findings are resolved.
+
+Player milestone evidence that exercises presentation, input, lifecycle, memory, thermal, audio-session, or package-intake behavior must include the recorded physical minimum supported iPhone and iPad where the claim applies. A simulator can supply focused development evidence but cannot close a physical-device contract.
 
 Search active documents for superseded terminology and inspect every hit in context; a mention that rejects or archives an idea is not a conflict. Run at minimum:
 
