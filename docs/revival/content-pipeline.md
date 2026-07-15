@@ -77,7 +77,23 @@ The helper writes only inside an empty destination-adjacent staging directory. E
 
 Do not add a daemon, XPC service, plugin API, in-process legacy parser, or general process protocol.
 
-External package installation later receives security hardening proportionate to that actual public boundary. Phase 1 local import needs checked paths, destination ownership, atomic replacement, and integrity hashes; it does not prebuild a marketplace threat model or virtual filesystem.
+Phase 1 local retail import needs checked paths, destination ownership, atomic replacement, and integrity hashes. It does not prebuild a marketplace threat model or virtual filesystem. The first native publishing workflow creates a separate external-package intake boundary described below; retail import and native package installation do not share a legacy reader or a generic package framework.
+
+## Native package intake and local library
+
+RevivalEditor publishes immutable canonical native packages. RevivalMac owns their explicit local installation and activation; it never treats an arbitrary directory as trusted canonical content merely because the publisher normally creates valid output.
+
+For each install, replacement, or activation:
+
+1. copy or receive the candidate into destination-adjacent staging owned by RevivalMac;
+2. reject path escape, symlink or special-file surprises, duplicate canonical identities, unsupported revisions, missing rights metadata, invalid hashes, malformed or oversized media, and undeclared or unsatisfied dependencies;
+3. construct and validate the candidate's canonical manifest and declared campaign, level, behavior and presentation relationships through RevivalCore;
+4. compute the smallest explicit package order needed by the current base and replacement relationship and report conflicts before activation;
+5. atomically promote the validated package, then activate the selected set;
+6. if validation or promotion fails, preserve the previous installed and active set; if activation fails after promotion, leave the candidate installed but inactive with an actionable diagnostic and keep the prior active set;
+7. allow the user to enumerate campaigns and packages, enable or disable an installed package, replace it with a compatible revision, or remove it after reporting any known installed-package dependency or save/profile association and requiring explicit confirmation when one would be orphaned.
+
+Package and campaign identity follows saves, profiles and multiplayer agreement where those paths require it. A released revision promise gains only the migrations or rejection rules that promise needs. The initial library does not imply a marketplace, account, cloud synchronization, background updater, generic dependency solver, public repository, or mandatory signature scheme. Signing is required only where the accepted distribution boundary requires it.
 
 ## Initial canonical package
 
@@ -180,11 +196,11 @@ RevivalEditor writes inspectable source projects:
 
 The Phase 1 project owns one editable complete `Level` document value derived from the read-only imported base. It references unchanged imported assets and copies only the media that a real edit must own, preserving provenance without mutating the base.
 
-Ordered replacement-package layers and public migrations arrive with the first publishing workflow that needs them. Do not force locator tables, copy-on-write package graphs, or semantic revision machinery into the initial editor-to-play loop.
+The first publishing workflow adds only the explicit base dependency, package order and replacement/conflict rules required by the certification package and the first real replacement relationship. Public migrations arrive with released compatibility promises. Do not force locator tables, copy-on-write package graphs, a general dependency solver, or a complete semantic revision hierarchy into the initial editor-to-play loop.
 
 Canonical source contains authored product state. Open tabs, pane sizes, selection, and viewport cameras remain local UI state. When a real long-running import, bake, validation, or publish operation appears, it consumes an immutable snapshot and may not overwrite newer source. The operation owns the smallest revision check necessary; this is not part of the content format.
 
-The publisher eventually validates dependency closure, behavior, lighting, navigation, references, provenance, rights, and current resource budgets, then emits an immutable native package. An independently authored package certifies the creator suite but is not bundled version 1.0 replacement content and does not waive the retail requirement. The publisher does not emit HOG, D3L, native plugins, or hand-edited generated files.
+The publisher eventually validates dependency closure, behavior, lighting, navigation, references, provenance, rights, and current resource budgets, then emits an immutable native package. Publishing proof does not substitute for the separate RevivalMac intake, activation, rollback and removal evidence. An independently authored package certifies the creator suite but is not bundled version 1.0 replacement content and does not waive the retail requirement. The publisher does not emit HOG, D3L, native plugins, or hand-edited generated files.
 
 ## Rights and local storage
 

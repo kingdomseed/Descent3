@@ -84,6 +84,8 @@ Phase 1 creates three executable products around two required code-ownership bou
 
 D3Import is a separate signed command-line helper launched for explicit import. `RevivalCore` and `RevivalMetal` name dependency directions and framework exclusions; the first real code decides whether either deserves a separate build target. Phase 0 researches an affordable 2026 Internet-multiplayer topology in parallel without shaping Phase 1 code. A later service target is added only if the accepted direction requires an operable public-service boundary. Target count is an execution result, not constitutional law; adding a target still requires a concrete ownership boundary that removes more complexity than it creates.
 
+Each executable shell emits its own platform diagnostics directly and presents or reports structured source-linked failures returned by RevivalCore. RevivalCore may define domain error values, but it owns no logger, retained-log store, telemetry path, or upload service.
+
 ### D3Import
 
 D3Import is the only shipping component that reads the supported owned retail containers and formats. It translates legacy naming, precedence, HOG, level, model, texture, lightmap, font, sound, score, movie, and related semantics into canonical native content as required by the current campaign slice.
@@ -102,7 +104,7 @@ RevivalMetal contains the concrete direct Metal renderer, resource creation, lev
 
 ### RevivalMac
 
-RevivalMac owns the player application, NSWindow and MTKView, display loop, input sampling, audio and adaptive-score presentation, movies, haptics, text input, settings, file locations, signing, import UX, and level-load presentation. It composes RevivalCore and RevivalMetal directly.
+RevivalMac owns the player application and its explicit session transitions, NSWindow and MTKView, display loop, input sampling, audio and adaptive-score presentation, movies, haptics, text input, profile and settings UI, file locations, signing, import UX, native-package intake and local-library lifecycle, operational-diagnostic presentation and retention, and level-load presentation. RevivalCore validates canonical package identity, revision, dependency and content relationships; RevivalMac stages, promotes, activates, disables, replaces, or removes packages and preserves the prior active set when intake fails. It composes RevivalCore and RevivalMetal directly.
 
 A later no-window dedicated-host mode reuses RevivalCore without initializing rendering, audio, or player UI. It is not a second simulation framework.
 
@@ -149,7 +151,7 @@ The only legacy-format boundary is the one-way importer. The game and editor con
 
 The product writes new native projects, packages, saves, and replay. It does not import or export retail saves or demos, provide original multiplayer interoperability, load binary modules, or export D3L/HOG/editor data.
 
-Use the simplest current schemas. Add public migrations and semantic revision machinery when a released user-authored format or persistent state creates that obligation, not before.
+Use the simplest current schemas. Add public migrations and semantic revision machinery when a released user-authored format or persistent state creates that obligation, not before. The first public native-package workflow still has an explicit hostile boundary: validate identity, rights metadata, hashes, declared dependencies, paths and bounded media before canonical construction; stage beside the destination; and atomically promote or leave the prior installed set untouched. This is a local content-library contract, not a marketplace, cloud account, automatic updater, or mandatory package-signing platform.
 
 ## Licensing and data rights
 

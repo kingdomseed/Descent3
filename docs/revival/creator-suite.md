@@ -111,7 +111,7 @@ The eventual native lighting bake is deterministic enough for reproducible creat
 
 ### Content definitions
 
-Typed inspectors eventually edit materials, robots, powerups, buildings, clutter, ships, weapons, doors, lights, sounds, ambient patterns, physics, animation, AI, death, inventory, effects, cockpit, HUD, cameras, and haptic bindings.
+Typed inspectors eventually edit materials, robots, powerups, buildings, clutter, ships, weapons, doors, lights, sounds, ambient patterns, physics, animation, AI, death, effects, cockpit, HUD, cameras, and source-supported haptic parameters. Inventory add/remove/use and item-lifecycle bindings belong to the behavior workspace; there is no invented general inventory-definition inspector.
 
 References use the canonical content catalog and report affected owners before destructive changes. The historical network-page database, check-in/check-out workflow, and local/network overlays do not return.
 
@@ -123,17 +123,17 @@ Direct typed Swift remains the canonical runtime while early slices expose the s
 
 ### Campaign, audio, and presentation
 
-The campaign workspace covers level order, branches, secrets, returns, allowed ships, progress, intros, endings, briefings, adaptive scores, and completion rules.
+The campaign workspace covers level order, branches, secrets, returns, allowed ships, progress, intros, endings, briefing and TelCom assignment, adaptive scores, goal identity and target/completion rules, and campaign completion rules.
 
-The audio and score workspace covers supported modern audio, regions, roles, loops, transitions, gameplay bindings, preview, and validation. It never writes OMF or reopens retail archives.
+The audio and score workspace separately covers sound definitions, UI and placed/object sound sources, room and portal propagation, ambient pattern elements with probability and timing ranges, per-room reverb, terrain altitude/volume bands, and adaptive-score regions, roles, loops, transitions and gameplay bindings. Each applicable family has its own preview, validation, save/reopen/play and package proof. It never writes OMF or reopens retail archives.
 
-The presentation workspace covers briefings, TelCom-style screens, HUD, cockpit, automap, auxiliary views, markers, in-game cinematics, text, images, movies, sound, controls, timing, effects, fonts, colors, navigation, conditions, localization, and preview.
+The presentation workspace covers briefing screen creation, ordering, navigation, buttons, conditions and independently failing text/image/movie/sound effects; the working TelCom goal, ship-status and ship-selection surfaces; HUD, cockpit, automap, auxiliary views, markers, in-game cinematics, controls, timing, colors and preview. It also owns behavior-message catalog editing and reference-safe renaming, exact locale/fallback authoring, and modern-font ingress with glyph coverage, metrics, kerning, atlas generation and localization preview. Dormant historical presentation ideas remain in the future-opportunities register until contrary evidence or a later product decision makes them real scope.
 
 ### Asset and build
 
-The suite imports and inspects supported geometry, models, animation, textures, fonts, audio, movies, and player media; records rights; enforces bounds at import; bakes lighting and navigation; audits dependencies and orphans; and publishes packages.
+The suite imports and inspects supported geometry, models, animation, textures, modern fonts, audio, movies, and player media; records rights; enforces bounds at import; bakes fonts, lighting and navigation; audits dependencies and orphans; and publishes packages. Retail bitmap-font conversion remains exclusive to D3Import; RevivalEditor consumes its canonical result but never becomes a second retail font reader.
 
-One publisher validates complete level topology and the dependencies reachable through the project's current behavior surface, then produces canonical native content. It does not emit HOG, D3L, original editor files, or native plugins. Security, signing, layering, and migration grow with real distribution boundaries rather than being simulated during the first local editor loop.
+One publisher validates complete level topology and the dependencies reachable through the project's current behavior surface, then produces canonical native content. It does not emit HOG, D3L, original editor files, or native plugins. The publisher's output proof is distinct from RevivalMac's hostile package-intake, local-library, activation, rollback and removal proof. Security, signing, layering, and migration grow with that real distribution boundary rather than being simulated during the first local editor loop.
 
 ## Authoring loop
 
@@ -165,6 +165,8 @@ The suite is complete when a creator can start with an empty project and, withou
 - create multiplayer maps and modes with the supported authority and communication rules;
 - validate, debug, play, replay, package, reopen, and publish;
 - install the package in RevivalMac and complete its declared play paths.
+
+Installation at this gate uses the real RevivalMac local library: validate and stage the package, resolve its explicit base and replacement relationships, activate it, enumerate its campaign, and preserve the prior active set under a failed replacement. The certification case also proves disable and removal behavior. It does not require a marketplace, account, automatic updater, or project-operated distribution service.
 
 Imported stock content, a non-bundled independent certification campaign, and a non-bundled independent multiplayer package are separate proof cases. All are required for complete creator status. They do not supply version 1.0 replacement assets, ship as included campaigns, or remove the requirement that users own and import supported retail content.
 

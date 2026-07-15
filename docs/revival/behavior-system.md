@@ -62,7 +62,7 @@ The first translated chains use:
 - direct validated RevivalCore queries and commands;
 - explicit stable dispatch order copied from the source path;
 - one simulation owner and no task, actor, or thread inside behavior execution;
-- the simulation-owned random source when the original chain uses randomness;
+- an explicitly accounted simulation-owned random source when the original chain uses randomness; the historical process-global `ps_rand` stream, including presentation reseeds and consumption, is traced before any call site is separated, so a native authoritative/presentation split is a recorded deliberate semantic difference rather than an invisible cleanup;
 - explicit state included in new saves when that state affects continuation.
 
 Do not prebuild:
@@ -134,6 +134,8 @@ As working human-authoring cases establish the representation and responsibiliti
 - save, reopen, playtest, publishing, and deterministic scenario evidence;
 - explicit authoritative and presentation roles when multiplayer work reaches those chains.
 
+Behavior message catalogs are part of that authoring surface rather than incidental generated text. Creators can add, delete, rename and edit named messages; references update safely or fail with source-linked diagnostics; the exact supported locale and English-fallback matrix is explicit; and save/reopen, preview and package validation prove that displayed text remains attached to the intended behavior. Historical import/export buttons are workflow evidence, not a requirement to preserve the old message-file format.
+
 When an authored form is accepted, it is the truth. If that design has compiled or generated data, the output is derived and never hand-edited; authors do not invoke a native compiler.
 
 ## Persistence, replay, and multiplayer
@@ -141,6 +143,8 @@ When an authored form is accepted, it is the truth. If that design has compiled 
 Save the smallest behavior state required to continue the current translated world: relevant variables, execution counts, timers, durable operation state, and content identity. Do not store interpreter pointers, call stacks, framework objects, or opaque legacy payloads.
 
 Replay and multiplayer semantics are ratified after the final timing and behavior models exist. The host remains authoritative for game-changing behavior; clients may later execute explicitly presentation-only work. Historical game-side and client-side events are classified one by one rather than inherited from their names or numeric IDs.
+
+The historical RNG is one shared process-global stream used by gameplay, replay, multiplayer and some presentation code. Translation records seed ownership and observable consumption order for every current chain. If presentation consumption changes later authoritative choices, preserve that coupling until an approved deliberate difference supplies before/after checkpoints; if evidence supports separating presentation randomness, the final model has one authoritative stream included in save/replay/network evidence and presentation randomness excluded from authoritative hashes. Do not silently substitute a platform RNG or add a general random-service abstraction.
 
 Add compatibility revisions when a released save, replay, behavior project, or package creates a real promise. During development, reimport or republish may replace unreleased formats.
 
@@ -156,6 +160,7 @@ For each current chain, tests and evidence cover:
 
 - complete generated and handwritten source-range accounting;
 - event order, conditions, state changes, timers, random choices, and engine effects;
+- authoritative seed and consumption order, plus the recorded disposition of every presentation random call that could perturb the historical shared stream;
 - behavior under the selected final scheduler, with the historical explicit-delta result retained as characterization evidence and every deliberate timing difference recorded;
 - save/load continuation and source-linked failure;
 - editor configuration, trace, playtest, and package closure;

@@ -69,9 +69,9 @@ A gameplay feature is complete when the runtime can execute it, the editor can a
 The complete revival includes:
 
 - Training, the base campaign and secrets, and Mercenary;
-- full six-degree-of-freedom gameplay, AI, weapons, goals, difficulty, room roles, GuideBot, cockpit, HUD, automap, markers, cameras, cinematics, adaptive music, voice, results, menus, movies, haptics, saves, replay, and ledgered presentation and command behavior;
+- full six-degree-of-freedom gameplay, AI, ordinary and advanced weapons, inventory and countermeasures, environmental hazards, the Training-required headlight, goals, difficulty, room roles, GuideBot, cockpit, HUD, automap, markers, cameras, cinematics, independently ledgered audio environments, adaptive music, voice, results, application/session and pause transitions, profiles and settings, player save-slot and quicksave workflows, menus, movies, haptics, saves, replay, and ledgered presentation and command behavior;
 - native multiplayer for the source-supported player counts of each stock mode, preserving the released 32 network/player-slot infrastructure and its listen/dedicated accounting, dedicated hosting, LAN and Internet discovery and joining through one evidence-selected 2026 topology, observers, prediction and reconciliation, chat, host operations, player media, and multiplayer authoring;
-- the full native world, terrain, content-definition, behavior, campaign, briefing, cinematic, media, localization, lighting, navigation, validation, playtest, and publishing workflow;
+- the full native world, terrain, content-definition, behavior, campaign, goal, briefing, TelCom, cinematic, message-catalog, modern-font, audio, adaptive-score, media, localization, lighting, navigation, validation, playtest, publishing, and native-package install workflow;
 - a native mod SDK using the same projects and packages as first-party content;
 - certification that the creator suite can create and publish a complete independent campaign and multiplayer package without legacy tools or hand-edited generated files. These proof packages are not bundled replacement content and do not remove the version 1.0 retail-ownership requirement.
 
@@ -103,7 +103,7 @@ The initial workspace has three executable products and two named code-ownership
 | D3Import | One-way conversion of the current owned retail slice |
 | RevivalCore | Canonical world, simulation, behaviors, validation, saves, replay, and multiplayer state |
 | RevivalMetal | Direct Metal rendering for game and editor |
-| RevivalMac | Player application, input, audio, media, import UX, and later no-window hosting |
+| RevivalMac | Player application and session shell, input, profiles and settings, audio, media, import UX, native-package library and activation, operational diagnostics, and later no-window hosting |
 | RevivalEditor | Native editing, validation, playtest, baking, and publishing |
 
 `D3Import`, `RevivalMac`, and `RevivalEditor` are executable products. `RevivalCore` and `RevivalMetal` are required ownership boundaries, but the first working code decides whether they are separate targets, source groups, or one of each. Phase 0 researches an affordable 2026 Internet-multiplayer direction without shaping Phase 1 code; a later public-service executable exists only if that accepted direction needs one. Target count is not a product feature; a new target must own a real isolation boundary and remove more complexity than it introduces.

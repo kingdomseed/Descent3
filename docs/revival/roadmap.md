@@ -37,7 +37,7 @@ Seed and then expand the checked-in source-translation ledger with:
 - the exact mission and level key, acceptance-room identity, selection reason, connected portal neighbors, and dependency capture for that room within the complete level;
 - a register of temporary research tools or scaffolds with a deletion or archive gate.
 
-Finish the functional-completeness audit without turning chosen architecture into fake historical capabilities. `revival-constitution` and `revival-source-translation` are authored and reviewed against the accepted documents. The full current skill set is installed; review and amend each applicable domain skill against real translated source immediately before its first production change. A later-domain review does not block an unrelated island.
+Finish the functional-completeness audit without turning chosen architecture into fake historical capabilities. Split application/session, pause, save workflow, profile/settings, audio environment, advanced weapon and inventory families, TelCom, rendering composition, runtime attachments, creator definitions, package intake, font authoring, host configuration and operational diagnostics wherever their state or failure can vary independently. Preserve incomplete subtitle, briefing, pickup, room-metadata and HUD ideas without promoting them into version 1.0. `revival-constitution` and `revival-source-translation` are authored and reviewed against the accepted documents. The full current skill set is installed; review and amend each applicable domain skill against real translated source immediately before its first production change. A later-domain review does not block an unrelated island.
 
 Begin the bounded 2026 [Internet multiplayer study](internet-multiplayer-study.md) in parallel. Its named comparison record covers direct, player-hosted, community-operated, platform-provided, and third-party-supported approaches using current reachability, security, privacy, abuse, continuity, deployment, and recurring-cost evidence. The required outcome is affordable native Internet multiplayer, not a preselected project-operated relay. The study names an evidence owner, sources, assumptions, rejection reasons, operating owner and cost, and the decision criteria for `N-014`, `N-016`, `N-018`, and `N-019`. It does not add production networking types or block unrelated Phase 1 work, but an accepted decision record is mandatory before Phase 9 production transport work.
 
@@ -124,7 +124,7 @@ Translate one complete source call chain for:
 - one robot's AI state, room/portal or node route, steering, blockage, and recovery;
 - one weapon, projectile, collision, damage, death, and effect path;
 - one pickup;
-- the difficulty rules, room role, sound, message, HUD, and cockpit behavior exercised by the slice;
+- the difficulty rules, room role, any source-traced environmental hazard reached by the slice, the Training-required headlight, sound, message, HUD, and cockpit behavior exercised by the slice;
 - new native save and reload.
 
 Account for the generated DALLAS block and every handwritten range used by the selected interaction. Implement only the behavior operations the chain needs as canonical direct typed Swift behavior. Before selecting the reusable version 1.0 authored representation or replacing the direct executor, the working evidence must cover at least one generated DALLAS chain, one handwritten or custom range, one timer or persistent-state chain, and one presentation-oriented chain; one chain may cover several categories. Version 1.0 must let people compose the evidenced behavior and creator capability of the shipped game and tools without Swift or generated-file editing. Evidence selects the representation and one runtime path; broader mechanics remain a later decision. Never load native code.
@@ -139,8 +139,8 @@ After the Phase 3 timing decision and before replay production work, review and 
 
 Complete every runtime and creator dependency of the Training Mission:
 
-- behaviors, goals, failure/restart, difficulty branches, room roles, AI, weapons, GuideBot, instructional presentation, selected stock fonts, cockpit, automap, markers, cinematics, audio, adaptive music, saves, and replay;
-- matching campaign, behavior, path, navigation, presentation, score, localization, validation, playtest, and publishing operations;
+- behaviors, goals, failure/restart, difficulty branches, room roles, any Training-reached hazards established by the source trace, headlight, AI, Training-reached ordinary and advanced weapon and pickup-effect families, Training-reached Seeker, Betty, Chaff, Gunboy and Proximity Mine countermeasures, GuideBot, instructional presentation, selected stock fonts, cockpit, automap, markers, cinematics, independently ledgered audio environments, adaptive music, save-state and player save-slot workflows, replay and authoritative-randomness evidence;
+- matching campaign, behavior-message, path, navigation, presentation, score, localization-matrix, validation, playtest, publishing, native-package intake and activation operations;
 - complete source-file and behavior-range dispositions for the mission.
 
 Run the resident-level evidence gate in [World loading and residency](world-loading.md) using the complete playable Training Mission, the largest imported indoor and outdoor levels then available, repeated editor/player transitions, and a representative higher-resolution replacement experiment.
@@ -162,7 +162,7 @@ Bring up level 1 end to end, then follow the campaign graph. Implement each secr
 5. play, save, replay, reload, and complete the level;
 6. record intentional differences and keep the M4 budgets green.
 
-This phase grows terrain and environment, reusable rooms, geometry tools, materials, mirrors, specular response, decals, procedural surfaces, volumetric lighting, blend semantics, robots, bosses, weapons, inventory, GuideBot, doors, triggers, paths, navigation, matcens, goals, ambient sound systems and patterns, weather, lighting, music, cinematics, briefings, movies, TelCom-style presentation, cockpit, automap, cameras, haptics, effects, campaign state, and approved command effects as real levels require them.
+This phase grows terrain and environment, reusable rooms, geometry tools, materials, mirrors, specular response, decals, procedural surfaces, volumetric lighting, blend semantics, robots, bosses, weapons including player-triggered timeout/detonation, inventory and pickup families including the afterburner cooler and timed RapidFire effect, GuideBot, doors, triggers, paths, navigation, matcens, goals, ambient sound systems and patterns, weather, lighting, music, cinematics, briefings, movies, TelCom-style presentation, cockpit, automap, cameras, haptics, effects, campaign state, and approved command effects as real levels require them.
 
 Exit: the complete base campaign and every stock secret pass player gates, and every introduced capability has its native creator path.
 
@@ -177,8 +177,8 @@ Exit: Mercenary completes with no legacy runtime component and complete source a
 Close every remaining non-multiplayer creator row:
 
 - world and terrain construction, materials, lighting, navigation, reusable content, diagnostics, and repair;
-- game definitions for ships, robots, weapons, doors, objects, physics, AI, effects, audio, cockpit, HUD, and haptics;
-- behavior, campaign, adaptive-score, briefing, cinematic, localization, and presentation authoring;
+- game definitions for ships, robots, ordinary and advanced weapons, powerups, countermeasures, doors, lights, buildings, clutter, physics, animation, death, effects, sound, ambient patterns, room reverb, terrain ambience, cockpit, HUD, and source-supported haptic parameters;
+- behavior including inventory add/remove/use and item-lifecycle operations, localized message catalogs, campaign and goal rules, adaptive-score, briefing, TelCom, cinematic, modern-font, localization, and presentation authoring;
 - deterministic builds, dependency and orphan audits, recovery, templates, validation, play-in-editor, and publishing;
 - a non-bundled independently authored certification campaign beginning from an empty native project;
 - task-based human workflow, keyboard, VoiceOver, undo, diagnostics, recovery, and M4 responsiveness review.
@@ -198,7 +198,7 @@ Ratify and implement one affordable native direction from the Phase 0 Internet-m
 - the transport, trust, record-protection, reachability, discovery, join, privacy, abuse, deployment, recurring-cost, and outage contracts required by the selected Internet topology;
 - no mandatory project-operated service; add a rendezvous, relay, service executable, or external integration only when the accepted topology requires it and has a viable operator;
 - dedicated no-window hosting through RevivalMac using RevivalCore;
-- content and simulation agreement, prediction, reconciliation, interpolation, replay, desync evidence, chat, moderation, host commands, and safe custom media;
+- content and simulation agreement, prediction, reconciliation, interpolation, replay, desync evidence, chat, moderation, host commands, interactive and dedicated host presets, and safe custom media with modern local ingress and preview;
 - the enumerated stock modes including campaign co-op;
 - multiplayer map, mode, behavior, validation, test, and publishing tools;
 - evidence-backed decisions for the modern counterparts of historical lobby chat, rankings, persistent pilot stats, and join-time package acquisition, preserving unselected ideas for later rather than silently losing them.
@@ -212,7 +212,7 @@ Exit: local, LAN, and selected-Internet-topology matrices pass at the source-sup
 - close every functional-completeness row or record a user-approved scope amendment;
 - bring every relevant source file and behavior range to `verified`, `replaced`, or `excluded` with the evidence required by its disposition; no `seed`, `traced`, `translating`, `native-running`, or `deferred` row survives complete-revival closure;
 - delete or archive every temporary research harness, adapter, and reference-only build artifact from product paths;
-- finalize import, project, package, save, replay, multiplayer, and diagnostic UX;
+- finalize import, project, package publishing, local package-library intake/activation/removal, player save-slot/quicksave, replay, multiplayer, application-session, pause/resume, and privacy-bounded diagnostic UX;
 - verify compatible and incompatible public data revisions and add only the migrations real released formats require;
 - complete settings, source-supported player-accessibility and localization, controller, display, audio, movie, long-session, native-editor accessibility, and clean-account matrices, plus every deliberate improvement accepted during the preceding slices;
 - sign, notarize, staple, and Gatekeeper-test the player, editor, and bundled importer;

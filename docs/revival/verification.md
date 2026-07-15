@@ -71,6 +71,8 @@ Synthetic fixtures enter Git. Owned retail packages, converted media, and captur
 
 Do not test stream cells, stream blobs, spatial envelopes, package-layer locators, semantic revision hierarchies, or external marketplace threats before those production boundaries exist.
 
+Native-package tests begin with the first publishing workflow and use RevivalMac's production installer plus RevivalCore's canonical validator. `T-016` independently proves identity and revision, rights metadata, hashes, declared dependencies, path escape and unexpected special files, bounded media, destination failure, staging and atomic promotion; every validation, copy or promotion failure preserves the previous installed and active set. `T-017` separately proves explicit base/replacement ordering, duplicate and conflict diagnostics, activation, enable/disable, compatible replacement and removal; a post-promotion activation failure leaves the candidate inactive and the prior set active. `T-018` separately proves enumeration, actionable status, known save/profile associations, confirmation before orphaning and completion of an installed certification campaign. These tests do not create a marketplace, cloud account, automatic updater, generic dependency solver or mandatory signature scheme.
+
 ## Resident world loading
 
 The current resource-lifetime path proves:
@@ -110,10 +112,11 @@ Focused gameplay tests protect the current source-supported rule:
 
 - six-degree-of-freedom input, ramps, simultaneous axes, mouselook, autoleveling, afterburner, turn roll, ship wiggle, and cockpit shake;
 - thrust, mass, drag, forces, collision, wall slide, bounce, corners, portals, and room ownership;
-- doors, triggers, keys, room roles, refueling, objects, pickups, inventory, weapons, projectiles, damage, and death;
-- robot state, room and node routing, clearance, steering, blockage, and recovery;
+- doors, triggers, keys, room roles, refueling, damaging rooms, volatile/lava/water surfaces, the headlight and its stolen/recovery state, objects, inventory, ordinary fire, homing, player-guided, charge/release, continuous/spray, single-target electrical, zoom, child-spawn, persistent-effect and player-triggered timeout/detonation weapon mechanics, resource and weapon-grant pickups, cloak, invulnerability, immediately activated quad fire with drop bookkeeping, converter, afterburner cooler, timed RapidFire, countermeasure inventory and the Seeker, Betty, Chaff, Gunboy and Proximity Mine families, projectiles, damage, and death;
+- robot state, room and node routing, clearance, steering, blockage and recovery, plus source-supported thief and SuperThief inventory interactions;
 - goals, difficulty, GuideBot, campaign state, saves, and progression;
-- HUD, cockpit, automap, markers, cameras, cinematics, messages, results, and approved commands.
+- HUD, cockpit, automap, markers, cameras, cinematics, messages, results, and approved commands;
+- TelCom goal status, ship status and mission ship selection as separate surfaces, each covering its applicable state, navigation, localization and campaign transition behavior.
 
 The functional-completeness ledger determines when each family enters. Tests do not anticipate every later family during Phase 1's selected acceptance room.
 
@@ -142,6 +145,8 @@ GPU tests render controlled scenes for:
 - alpha, additive, saturating, fog, gamma, and vertex lighting behavior;
 - each ledgered mirror, specular, decal, procedural, volumetric-lighting, animated-texture, destroyable-surface, effect, cockpit, HUD, automap, and camera path as it arrives.
 
+Controlled overlapping scenes separately prove far-to-near composition across translucent faces, models, effects and terrain, including depth-write, fog and mirror interaction. Dynamic object-emitted lights prove the reached player, weapon, powerup, robot and building families indoors and outdoors. Runtime attachment tests cover aligned and radial nesting, transforms, mass, room reassignment, parent lifetime and save/replay/network state independently from attachment-point import.
+
 Reference images first establish source-faithful output. A deliberate visual modernization records before, after, environment, metric, threshold, and review.
 
 Metal validation must be clean. Fixed images record macOS, SDK, compiler, GPU, resolution, settings, and content identity. Baselines never regenerate automatically. Tests protect project decisions, not Metal or AppKit framework behavior.
@@ -158,7 +163,7 @@ The Phase 1 integration test opens the complete canonical Training Level in Revi
 - return to useful document, selection, and viewport state;
 - clean replacement and shutdown of complete-level world resources.
 
-Later workspace tests cover each actual operation's reference integrity, validation, undo, save/reopen, playtest, and publishing. Human evidence covers focus, discoverability, keyboard, VoiceOver, diagnostics, recovery, and M4 responsiveness at the phase where the surface exists.
+Later workspace tests cover each actual operation's reference integrity, validation, undo, save/reopen, playtest, and publishing. Independently failing creator families include goal targets and completion rules; briefing navigation, conditions and media effects; TelCom goal-status, ship-status and mission-ship-selection preview and applicable campaign authoring; behavior-message catalogs and localization; modern-font glyph/metrics/kerning/atlas work; sound, ambient/reverb and terrain-audio definitions; adaptive-score graphs; and native package publishing. Human evidence covers focus, discoverability, keyboard, VoiceOver, diagnostics, recovery, and M4 responsiveness at the phase where the surface exists.
 
 When a real background operation can race with editing, prove immutable input, cancellation where supported, stale-result rejection, source-linked failure, and preservation of newer source. Do not test a universal generation counter, preview package cache, fixed overlay slices, or streaming diagnostics unless they become accepted production mechanisms.
 
@@ -166,7 +171,9 @@ When a real background operation can race with editing, prove immutable input, c
 
 Save tests round-trip every durable state family that the current milestone owns, then step the original and loaded native worlds under the same future inputs and compare the accepted authoritative checkpoints.
 
-Replay tests begin after the final scheduler is selected. They cover current input, configuration, random seeds, behavior state, commands, content identity, and checkpoints required for repeatable playback and diagnosis.
+Player save-workflow tests separately cover named slots and thumbnails, empty and corrupt entries, restrictions, overwrite confirmation, quicksave selection and fallback, campaign/package identity, load failure and actionable recovery. A controlled interrupted or failed write must leave the prior valid save readable; canonical state round-trip does not substitute for durable-storage proof.
+
+Replay tests begin after the final scheduler is selected. They cover current input, configuration, authoritative random seeds and consumption order, behavior state, commands, content identity, and checkpoints required for repeatable playback and diagnosis. Source tracing accounts for presentation call sites that historically reseed or consume the shared RNG. Any accepted authoritative/presentation split records the coupled historical result, the new result and the test protecting the deliberate difference; presentation randomness never silently perturbs or enters authoritative hashes.
 
 Do not compare legacy save or demo bytes. Do not add a full semantic revision hierarchy until a public compatibility promise exists.
 
@@ -174,9 +181,9 @@ Do not compare legacy save or demo bytes. Do not add a full semantic revision hi
 
 Import tests cover the exact FNT, OSF-with-ACM, WAV, OMF, and MVE constructs reached by current owned content plus malformed bounds and missing dependencies.
 
-Runtime tests cover current positional sound, ambient behavior, voice queueing, adaptive-score state and transitions, font metrics and images, movie timing, interruption, device change, and missing output devices. Exact audio waveform timing is presentation evidence, not authoritative gameplay state.
+Runtime tests independently cover UI/2D sound, point and object source lifetime, room/portal propagation and door attenuation where source-supported, ambient probabilities and delay ranges, per-room reverb, terrain-altitude bands and fades, voice queueing, adaptive-score state and transitions, font metrics and images, movie timing, interruption, device change, channel priority/voice stealing and missing output devices. Exact audio waveform timing is presentation evidence, not authoritative gameplay state.
 
-Creator evidence covers the corresponding import, preview, validation, rights, save, play, and package path as each medium arrives.
+Creator evidence covers the corresponding definition/import, placement, preview, validation, rights, save/reopen/play, font-atlas build and package path as each independently failing medium arrives.
 
 ## Multiplayer and untrusted boundaries
 
@@ -187,14 +194,16 @@ Phase 9 verification uses the final simulation and behavior models plus the one 
 - prediction, reconciliation, interpolation, weapon policy, replay, and desync evidence;
 - Bonjour LAN plus the selected Internet discovery, reachability, authorization, security, privacy, abuse, operating-cost, continuity, and explicit outage results; no relay or project-operated service is assumed unless the accepted topology contains one;
 - authenticated encryption or provider-equivalent protection, sequencing, replay rejection, bounded records, rate limits, and malformed input at the selected topology's actual transport and trust boundaries, using Network or CryptoKit only where applicable;
-- chat, moderation, host commands, player media, and privacy;
+- chat, moderation, host commands, interactive and dedicated host-configuration presets, modern player-media ingress and preview, and privacy;
 - multiplayer authoring, validation, local multi-instance play, publishing, and install.
 
 Security checks concentrate at untrusted decode and authority boundaries. Trusted simulation values do not repeat packet validation defensively.
 
 ## Application and release
 
-Application tests cover current input and settings, window and display lifecycle, files, import helper invocation, level loading, audio, movies, controllers, haptics, chat and commands when present, clean termination, signing, and failure recovery.
+Application tests cover the clean-profile gate and explicit menu/new/load/replay/multiplayer/level/completion/failure transitions; solo and multiplayer pause, nested focus/suspension and resume; profile lifecycle; separate input/gameplay, display/detail and audio/voice/haptic setting families; window and display lifecycle; files; import helper invocation; native package-library intake and activation; level loading; audio; movies; controllers; haptics; chat, host presets and commands when present; clean termination; signing; and failure recovery.
+
+Operational-diagnostic evidence verifies severity and subsystem categories, OSLog public/private classification, bounded retention when durable logs exist, source-linked importer/editor/host failures and the user-visible fatal-error outcome. Fixtures containing credentials, local paths, player addresses and other private values prove they are not emitted as public log fields or automatic uploads. The product has no telemetry requirement.
 
 Archives prove the expected signed D3Import helper is bundled and launched successfully under Gatekeeper. Complete releases prove signed and notarized player and editor apps on a clean account.
 
