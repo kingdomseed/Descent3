@@ -1,0 +1,60 @@
+diff --git a/Descent3/gamesequence.cpp b/Descent3/gamesequence.cpp
+--- a/Descent3/gamesequence.cpp
++++ b/Descent3/gamesequence.cpp
+@@ -1024,3 +1024,5 @@
++#include <cstdlib>
++
+ #ifdef USE_PROFILER
+ #include <profiler.h>
+ #endif
+@@ -2574,4 +2576,50 @@ void PageInAllData() {
+     }
+   }
+   LoadLevelProgress(LOAD_PROGRESS_PREPARE, 0);
++
++  if (FindArg("-revivaldependencytrace")) {
++    int texture_count = 0;
++    int sound_count = 0;
++    int model_count = 0;
++    int lightmap_info_count = 0;
++
++    for (i = 0; i < MAX_TEXTURES; ++i) {
++      if (!Textures_to_free[i])
++        continue;
++      ++texture_count;
++      LOG_INFO.printf("REVIVAL_DEPENDENCY kind=texture id=%d", i);
++    }
++
++    for (i = 0; i < MAX_SOUNDS; ++i) {
++      if (!Sounds_to_free[i])
++        continue;
++      ++sound_count;
++      LOG_INFO.printf("REVIVAL_DEPENDENCY kind=sound id=%d", i);
++    }
++
++    for (i = 0; i < MAX_POLY_MODELS; ++i) {
++      if (!Models_to_free[i])
++        continue;
++      ++model_count;
++      LOG_INFO.printf("REVIVAL_DEPENDENCY kind=model id=%d", i);
++    }
++
++    for (i = 0; i < MAX_LIGHTMAP_INFOS; ++i) {
++      if (!LightmapInfo[i].used || LightmapInfo[i].type == LMI_DYNAMIC)
++        continue;
++      ++lightmap_info_count;
++      LOG_INFO.printf("REVIVAL_DEPENDENCY kind=lightmap_info id=%d", i);
++    }
++
++    const room &acceptance_room = Rooms[3];
++    for (i = 0; i < acceptance_room.num_faces; ++i) {
++      LOG_INFO.printf("REVIVAL_ACCEPTANCE_FACE room=3 face=%d texture=%d lightmap_info=%d", i,
++                      acceptance_room.faces[i].tmap, acceptance_room.faces[i].lmi_handle);
++    }
++
++    LOG_INFO.printf(
++        "REVIVAL_DEPENDENCY_SUMMARY ship_index=%d textures=%d sounds=%d models=%d lightmap_infos=%d",
++        Players[Player_num].ship_index, texture_count, sound_count, model_count, lightmap_info_count);
++    std::exit(EXIT_SUCCESS);
++  }
+ }

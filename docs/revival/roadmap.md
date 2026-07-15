@@ -29,6 +29,8 @@ Amend the active documents so they agree on:
 
 Before Phase 1 production code, install the current Xcode 27 beta, select it for the workspace, and record `xcodebuild -version`, `swift --version`, the macOS and iOS SDKs, the macOS deployment target, and the universal mobile target's iOS/iPadOS deployment floor. Select and record the exact minimum-reference iPhone and iPad models that satisfy the initial Metal 4 hardware floor. Replace the beta with stable Xcode 27 when released and remove any beta-only workaround; do not preserve Xcode 26 or Swift 6.3 as a compatibility lane.
 
+Current gate state on July 15, 2026: the canonical Training keys, full-level reference counts, source room 3 acceptance choice, connected portals, eager dependency baseline, and exact iPhone 12 mini and iPad Air (4th generation) minimum-device contracts are recorded. Phase 0 remains in progress because this machine still has Xcode 26.6 and Swift 6.3.3 and neither exact minimum device is attached for physical proof. Phase 1 product scaffolding has therefore not begun; the later paired iPhone's developer-image failure is non-gating audit context.
+
 Seed and then expand the checked-in source-translation ledger with:
 
 - the runtime and editor files required for initialization, HOG and level loading, rooms, portals, terrain, objects, dependency paging, rendering, and editor-hosted play;
@@ -240,4 +242,4 @@ Intel Mac, visionOS, Windows, Linux, consoles and web are outside the roadmap. R
 
 ## Immediate next step
 
-Install and select the current Xcode 27 beta; record the toolchain, macOS 26 deployment target and universal mobile target's iOS/iPadOS 26 floor; choose the exact minimum-reference iPhone and iPad; then record the project-owned canonical Training mission and `Level` keys plus the exact acceptance room. Complete the initial level-load/render dependency trace while building the first resident Mac/mobile/editor slice. In parallel, begin the bounded 2026 Internet-multiplayer study without blocking that slice or adding production transport machinery. Review and amend each installed domain skill against the real source immediately before its first production change.
+Install and select the current Xcode 27 beta, record the Swift 6.4 compiler and SDK environment, and attach the recorded iPhone 12 mini and iPad Air (4th generation) so their physical baseline can be captured. Then start the first red test for the HOG2 import boundary and create the Xcode 27-native D3Import, RevivalMac, RevivalMobile, and RevivalEditor products around the recorded complete Training/source-room-3 island. Expand the level-load and renderer trace only as that working island reaches each dependency. In parallel, begin the bounded 2026 Internet-multiplayer study without blocking the slice or adding production transport machinery. Review and amend each installed domain skill against the real source immediately before its first production change.

@@ -22,16 +22,55 @@ Named ranges in a mixed-disposition file may share one state only while every ra
 
 ## Phase 1 level and acceptance-room record
 
-Complete this record before Training import production begins. Full-build source establishes the Training mission name and archive, and the owned local retail HOG2 table confirms the inner D3L filename. The project-owned canonical keys and acceptance-room fields remain unresolved. The acceptance room narrows visual and editor proof; it does not cut the imported `Level`.
+This record was completed from full-build source plus a bounded run of the owned local retail Training data before import production began. The capture observed the complete reference `LoadLevel` result before `StartLevel`; it did not create a partial level or select a room during loading. Retail data, converted data, and the detailed capture remain local and ignored. The acceptance room narrows visual and editor proof; it does not cut the imported `Level`.
 
 | Field | Recorded decision |
 | --- | --- |
-| Mission and level key | Full-build `Descent3/menu.cpp` identifies `Pilot Training` and loads `training.mn3`. An ignored, owned local trace of that retail HOG2 table confirms `TrainingMission.d3l`, consistent with the OEM fallback in `Descent3/Mission.cpp`. The retail data and trace stay outside Git. Record project-owned canonical mission and `Level` keys before production import. |
-| Complete-level evidence | Record D3L identity, room/portal/terrain/object/path/goal counts, and proof that no topology was trimmed |
-| Acceptance-room identity | Not yet selected |
-| Selection reason | Must exercise a useful portal boundary, real lightmap/material data, at least one placed object, and a manageable first dependency island |
-| Connected portal neighbors | Record the room's actual connected edges used by traversal proof; all connected rooms remain in the complete Level |
-| Dependency capture | Attach the full-level `PageInAllData` trace plus every lazy dependency reachable through the Phase 1 product path, including object initialization, with owned local evidence for textures, lightmaps, models, objects, effects, and sounds. Add later matcen, spawn, and behavior dependencies with the islands that make those paths executable. |
+| Mission and level key | Full-build `Descent3/menu.cpp` identifies `Pilot Training` and loads `training.mn3`; `LoadMission` then exposes its sole level, `TrainingMission.d3l`, to `LoadMissionLevel` and `LoadLevel`. The project-owned canonical keys are mission `descent3.mission.pilot-training` and level `descent3.level.training-mission`. Filename spelling and case are import evidence, not canonical identity. |
+| Complete-level evidence | The owned local `training.mn3` capture is 5,059,244 bytes with SHA-256 `fc1d81921cc4b2618e441b7b9d08c4bcb5cff90731be1bfa6f3a7b054fc0cb54`; its 39-entry HOG2 table places the 1,106,008-byte `TrainingMission.d3l` at offset 3,557,737 with SHA-256 `915a561cd3bd720d88bffed72fe41b4ff711c287711f060ecd9696e2cd5f7d41`. The unfiltered reference load produced 48 used rooms across source indices 0 through 50, 112 directed portal records, 40 used objects, 65,536 terrain cells, two paths, and one goal. The reference loader reported level checksum `6db74a2eb0c563de4eb11e6d4e91e59c`. These identify this owned capture; they do not promise that every retail release has identical bytes. |
+| Acceptance-room identity | Source room index 3. The room has no authored name, so diagnostics and evidence call it `source-room-3`; the canonical model does not invent a stock-content name. |
+| Selection reason | Room 3 is a small but substantive first island: 18 faces, two real portal boundaries, 17 faces with lightmap-info records, four referenced texture handles, and one placed `OBJ_POWERUP`. Its D3L record stores generic-table index 67 (`Invisiblepowerup`) and instance name `StartCourse`; `ReadObject` maps that through `generic_xlate` to reference-runtime object-info ID 68. Import must preserve the stored identity and perform the evidenced translation rather than reading raw ID 68, which names a different GNNM entry. The room exercises topology, material/lightmap data, and object representation without making the acceptance surface large. |
+| Connected portal neighbors | Room 3 portal 0 is on face 0 and connects to room 2 (`PortalRoom1`) portal 1 with source flags 1. Room 3 portal 1 is on face 17 and connects to unnamed room 4 portal 0 with source flags 0. Room 2 also connects to room 1; room 4 also connects to room 5. All of those rooms remain in the complete resident `Level`; the first acceptance proves only room 3's two edges. |
+| Dependency capture | With reference player ship index 0, the reference `PageInAllData` pass marked 232 unique texture handles, 115 unique sound handles, and 88 unique model handles; the loaded level held 2,531 used non-dynamic lightmap-info records. Room 3 reaches texture handles 908, 793, 1332, and 985, the 17 lightmap-info handles recorded below, and the stored `StartCourse` object identity above. This is the historical eager baseline, not a claim that the canonical importer already exists or that later lazy closure is complete. Object initialization and every later matcen, spawn, behavior, effect, and media dependency are added when the translated product path can reach them. Runtime preparation will consume the resulting canonical manifest, never these retail handles directly. |
+
+### Source-room-3 face dependency baseline
+
+The handle values below are local source identities used to compare the first import; they are not proposed canonical handles. Source value 65,535 is the no-lightmap-info sentinel observed on face 0.
+
+| Face | Texture handle | Lightmap-info handle |
+| ---: | ---: | ---: |
+| 0 | 908 | 65,535 (none) |
+| 1 | 793 | 2,141 |
+| 2 | 1,332 | 926 |
+| 3 | 793 | 1,082 |
+| 4 | 1,332 | 823 |
+| 5 | 793 | 28 |
+| 6 | 1,332 | 1,211 |
+| 7 | 793 | 657 |
+| 8 | 1,332 | 1,795 |
+| 9 | 985 | 389 |
+| 10 | 1,332 | 291 |
+| 11 | 985 | 1,745 |
+| 12 | 1,332 | 2,348 |
+| 13 | 985 | 1,295 |
+| 14 | 1,332 | 1,592 |
+| 15 | 985 | 149 |
+| 16 | 1,332 | 177 |
+| 17 | 793 | 1,373 |
+
+### Bounded research record
+
+[`tools/research/training_d3l_audit.rb`](../../tools/research/training_d3l_audit.rb) is a GPL-3.0-or-later, evidence-only parser for this one owned D3LV-127 checkpoint. It mirrors only the released field order needed to audit the HOG table, chunk walk, rooms, faces, portals, stored objects, paths, and goals. The deterministic ignored output `runtime-data/revival-evidence/training-d3l-audit.txt` has SHA-256 `d20d6c34a5ac9f20eee3c500648d9a4514de668ad6af9984f7f8ce1e534e6ea4` and is reproduced from the repository root with:
+
+```sh
+rtk ruby tools/research/training_d3l_audit.rb \
+  retail-data/descent3/missions/training.mn3 \
+  | rtk tee runtime-data/revival-evidence/training-d3l-audit.txt
+```
+
+Two inert, nonshipping patches preserve the exact runtime probes: [`training_reference_runtime_trace.patch`](../../tools/research/training_reference_runtime_trace.patch) observes the complete post-`LoadLevel` state and [`training_reference_dependency_trace.patch`](../../tools/research/training_reference_dependency_trace.patch) observes the completed `PageInAllData` mark sets and room-3 faces. [The checked-in replay procedure](../../tools/research/README.md) records the full runnable commands, including the applied/reversed patch, Debug build, absolute `-additionaldir` values in their captured build-then-retail order, local pilot, private trace flag, ignored output filename, and clean-source check. Apply only one patch at a time to the recorded source commit. The dependency replay must use ship index 0, which the summary prints.
+
+The ignored `runtime-data/revival-evidence/training-room-runtime-trace.log` capture has SHA-256 `349e68ed340e8f18cd4a8b86193ea11b4b54b4dcffa38b648f154525f9b737dd`; its instrumented reference binary has SHA-256 `269cd2250124fed581938e651063db631cb1f0e5da885aded480496cc3ed4a44`. The ignored ship-index-0 `runtime-data/revival-evidence/training-dependency-trace.log` capture has SHA-256 `32aada64f1ccdbdc9f37289806ab986edb91b3c2c342b885a9ae22e09a8ac2aa`; its instrumented reference binary has SHA-256 `49be8216c866304d4d4a98c03e627cf16d0c05ed3644f8596aa5bdfb277d98b9`. Both probes build and exit only as bounded reference research. No diagnostic patch is applied, and no retail artifact, converted asset, research flag, or second runtime path enters a product target. Use these captures to author the first D3Import red assertions, then delete this parser, replay procedure, and both patches before production import implementation begins.
 
 ## Phase 1 complete-level and acceptance-room seed
 
@@ -42,7 +81,7 @@ Complete this record before Training import production begins. Full-build source
 | logger/log.cpp | Console and rolling-file logger initialization and severity routing | D3Import, RevivalMac, RevivalMobile, RevivalEditor | Platform replacement with direct OSLog categories and private fields; retain only bounded local evidence the real support workflow needs; exclude automatic upload and legacy logger machinery | seed |
 | Descent3/gamesequence.cpp | `StartLevel`, `PageInAllData`, activation, `FreeThisLevel`, and cache flush | RevivalCore, RevivalMetal, RevivalMac, RevivalMobile | Translate the eager working-set walk, activation order, and single-owner release; trace rather than assume complete closure; supersede page/cache machinery | seed |
 | Descent3/LoadLevel.cpp | D3L decode and encode, room/terrain/object/path/goal construction, editor-linked helpers | D3Import, RevivalCore, RevivalEditor | Import legacy decode semantics in D3Import; translate canonical relationships; replace legacy save with native project save; split accidental editor include dependency | seed |
-| cfile/hogfile.cpp | HOG index and entry parsing | D3Import | Import only; checked Swift parser for used variants, no runtime archive reader | seed |
+| `cfile/hogfile.{h,cpp}` | `ReadHogHeader` reads the `HOG2` tag, little-endian entry count and first-payload offset; `cf_OpenLibrary` in `cfile/cfile.cpp` then seeks to the fixed 68-byte index start, calls `ReadHogEntry` for each 48-byte record, and derives payload offsets by ordered length accumulation. `cfile/tests/TestDir/test.hog` is the tracked one-entry source checkpoint: index at 68, payload at 116 | D3Import | GPL-derived import-only Swift translation; validate the 36-byte name terminator, ASCII-folded order/collisions, integer accumulation and file extents once at the untrusted boundary instead of retaining the source assertions and unchecked `strcpy`; no runtime archive reader | traced |
 | cfile/cfile.cpp | File lookup, mounted-library precedence, case handling, reads | D3Import | Import naming and precedence semantics once; exclude runtime virtual filesystem and global library state | seed |
 | Descent3/Mission.cpp | MN3 mission metadata, HOG selection, level paths and campaign declarations | D3Import, RevivalCore | Import current Training scope; translate campaign meaning later; exclude runtime HOG mounting | seed |
 | manage/manage.cpp | Page database, lookup, network locks, paging and dependency access | D3Import, RevivalCore | Translate used definition, eager and lazy dependency meaning into direct canonical lookup; exclude network lock/check-out machinery | seed |

@@ -221,7 +221,14 @@ The pre-product environment snapshot used for current archaeology and documentat
 
 Phase 1 product builds and optimized measurements use Xcode 27 and the Swift 6.4 compiler in Swift 6 language mode: the current beta until the stable release, then stable Xcode 27. Xcode 26.6 and Swift 6.3.3 are not a supported product lane. Record toolchain, OS, display, content hash, build configuration, and settings beside every result. Do not record local identifiers or serial numbers.
 
-Before Phase 1 product code, add the exact minimum-reference iPhone and iPad model, OS version, physical memory and relevant display modes. Both must support the initial iOS/iPadOS 26 and Metal 4 Apple GPU family 7-or-later floor. Simulator build and launch may prove composition but never substitute for physical-device image, memory, thermal, lifecycle, input, audio-session and route, canonical-package intake or performance evidence.
+The July 15 Phase 0 audit selects these exact minimum-device contracts:
+
+- iPhone 12 mini on iOS 26 or later: A14 Bionic, Apple GPU family 7 and Metal 4, with a 2340-by-1080 native display;
+- iPad Air (4th generation) on iPadOS 26 or later: A14 Bionic, Apple GPU family 7 and Metal 4, with a 2360-by-1640 native display.
+
+They sit exactly at the accepted A14/Apple7 floor; the iPhone 12 mini exercises the smallest A14/Apple7 iPhone display, and the iPad Air is the earliest iPad generation at that floor. This selects the supported floor; it does not claim device proof. Neither exact reference device was available to the audit. CoreDevice could see a paired iPhone 14 Pro on iOS 26.5, but it could not mount the developer disk image and is not minimum-floor evidence; no physical iPad was detected. Physical memory, actual drawable modes and optimized behavior remain unrecorded until the two selected devices are attached and measured. Simulator build and launch may prove composition but never substitute for physical-device image, memory, thermal, lifecycle, input, audio-session and route, canonical-package intake or performance evidence.
+
+The product-start gate is therefore still open. The local machine has only Xcode 26.6 and Swift 6.3.3, while Apple's current Xcode 27 beta includes Swift 6.4 and requires macOS 26.4 or later; this macOS 26.5.2 host satisfies the host-OS requirement. Install and select Xcode 27, verify its compiler and SDKs, and attach both exact minimum devices before Phase 1 product code is created. Do not generate an interim Xcode 26 project or treat a later phone, an iPad simulator, or published specifications as the missing physical evidence. The later paired phone's developer-image failure is audit context, not a third device gate.
 
 ## Performance method
 
