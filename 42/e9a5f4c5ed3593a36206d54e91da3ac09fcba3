@@ -1,0 +1,78 @@
+docs/revival/content-pipeline.md
+  s_c503f7c0529e13::t_75af81f5e37cf7 80-93,95-96,199,203
+  s_c503f7c0529e13::t_bdff23bbb492c2 94
+docs/revival/creator-suite.md
+  s_c503f7c0529e13::t_037835edb88d30 126,128,130,134,136,169
+  s_c503f7c0529e13::t_8f947242f68c68 114
+  s_c503f7c0529e13::t_fffbd8735cae54 170
+docs/revival/architecture.md
+  s_c503f7c0529e13::t_798e1f765e5cb0 154
+  s_c503f7c0529e13::t_3be51c1001957c 87-88,107
+docs/revival/behavior-system.md
+  s_c503f7c0529e13::t_31376766ca7e9f 65,137-138,147-148,163
+docs/revival/functional-completeness.md
+  s_c503f7c0529e13::t_a0c65a077616e3 62
+  s_c503f7c0529e13::t_8f947242f68c68 79,96
+  s_c503f7c0529e13::t_43586c656db65c 59
+  s_c503f7c0529e13::t_0a679e20474964 60,63,93,106
+REVIVAL.md
+  s_c503f7c0529e13::t_d7ab5c99d35809 72,74,106
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_3be51c1001957c 60,74
+  s_c503f7c0529e13::t_552d4be4e605e3 233,249
+  s_c503f7c0529e13::t_8f947242f68c68 107,166
+  s_c503f7c0529e13::t_2fbc4f5e8d80ab 106
+  s_c503f7c0529e13::t_299ece97f4fa0c 87
+  s_c503f7c0529e13::t_978815539516f6 41-42,62,73,78,80-82
+  s_c503f7c0529e13::t_a361ea5266c4e4 43
+  s_c503f7c0529e13::t_21047dfe91efe7 201
+  s_c503f7c0529e13::t_1761d50fb2747b 105
+  s_c503f7c0529e13::t_ebdd67c040e63a 126,134-136,167-169,172,174,198,204,209
+  s_c503f7c0529e13::t_43586c656db65c 50,108
+  s_c503f7c0529e13::t_943296825c2c45 70,83,92,99
+  s_c503f7c0529e13::t_bc8dd2100dd089 25,176
+  s_c503f7c0529e13::t_4bc7afb1bf4dff 32,69,84-86,88-91,93-98,100-104,179,255-257
+  s_c503f7c0529e13::t_660e748567db9a 40,64,68,79,180
+  s_c503f7c0529e13::t_7c11fe92f93ba5 24,30-31,44,53,63,65-67,72,75-77
+  s_c503f7c0529e13::t_f860f1d01727a1 170-171,173,175,178,181,203
+  s_c503f7c0529e13::t_4ebf1dfc6d2cbb 207,223,234,254
+  s_c503f7c0529e13::t_f7ddd7a428b22b 71
+  s_c503f7c0529e13::t_7da4f487d3b892 177
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_8570fc6c9d3602 42
+docs/revival/roadmap.md
+  s_c503f7c0529e13::t_8f947242f68c68 180-181
+  s_c503f7c0529e13::t_bc8dd2100dd089 40
+  s_c503f7c0529e13::t_660e748567db9a 127
+  s_c503f7c0529e13::t_f7ddd7a428b22b 142
+  s_c503f7c0529e13::t_68cdc1a8307e89 143,201,215
+  s_c503f7c0529e13::t_43586c656db65c 165
+docs/revival/future-opportunities.md
+  s_c503f7c0529e13::t_299ece97f4fa0c 31
+  s_c503f7c0529e13::t_660e748567db9a 26-27
+  s_c503f7c0529e13::t_943296825c2c45 28
+  s_c503f7c0529e13::t_a12bfbb8685bb8 23-25
+  s_c503f7c0529e13::t_1761d50fb2747b 29-30
+docs/revival/verification.md
+  s_c503f7c0529e13::t_552d4be4e605e3 74
+  s_c503f7c0529e13::t_95d7d16e467dec 75,116,148,174-176,184,186,197,204-206
+  s_c503f7c0529e13::t_660e748567db9a 118-119,166
+  s_c503f7c0529e13::t_43586c656db65c 115
+  s_c503f7c0529e13::t_eb7993c5b4a4c5 149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "42e9a5f4c5ed3593a36206d54e91da3ac09fcba3",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
