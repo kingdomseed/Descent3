@@ -55,7 +55,7 @@ Reference comparisons use tolerances or structural checkpoints appropriate to th
 
 ## Import and canonical content
 
-Import tests use the production D3Import parsers and cover:
+Import tests use the production D3Import parsers and cover the version 1.0 user-owned prepared retail profile:
 
 - recognized source profile and archive precedence;
 - checked little-endian fields, ranges, names, case collisions, duplicates, and references;
@@ -129,7 +129,7 @@ For each translated behavior chain, evidence covers:
 - editor configuration, trace, error navigation, playtest, and package closure;
 - migration and removal of direct typed functions only if a later evidence-ratified executor actually replaces them.
 
-Tests for any later authored representation, executor, operation limits, authority rules, and replay semantics arrive with those actual production mechanisms, not with a speculative full language.
+Tests for the version 1.0 authored representation and executor arrive when working evidence selects those actual production mechanisms; later operation limits, authority rules, and replay semantics arrive with the mechanisms they protect, not with a speculative full language.
 
 ## Rendering
 
@@ -148,7 +148,7 @@ Metal validation must be clean. Fixed images record macOS, SDK, compiler, GPU, r
 
 ## Editor
 
-The Phase 1 integration test opens the complete canonical Training Level in RevivalEditor, focuses the selected acceptance room, and proves:
+The Phase 1 integration test opens the complete canonical Training Level in RevivalEditor, focuses the selected acceptance room, and proves the smallest real edit selected from the traced historical editor/runtime workflow:
 
 - read-only base to editable project to disposable play-session flow;
 - shared world types, loading rules, and renderer with RevivalMac, without shared mutable ownership;
@@ -180,13 +180,13 @@ Creator evidence covers the corresponding import, preview, validation, rights, s
 
 ## Multiplayer and untrusted boundaries
 
-Phase 9 verification uses the final simulation and behavior models. It covers:
+Phase 9 verification uses the final simulation and behavior models plus the one affordable native Internet topology accepted from the Phase 0 study. It covers:
 
-- 2–32 connected human slots, listen and dedicated hosting, live observers, join/leave/recovery, and stock modes including co-op;
+- each stock mode at its source-supported player count, the released 32 network/player-slot infrastructure, historical listen-host and dedicated-server slot accounting, four-player campaign co-op, live observers, and join/leave/recovery;
 - content and simulation agreement;
 - prediction, reconciliation, interpolation, weapon policy, replay, and desync evidence;
-- Bonjour LAN and public discovery, authorization, opaque relay, and explicit outage results;
-- authenticated encryption, sequencing, replay rejection, bounded records, rate limits, and malformed input at the real Network/CryptoKit boundary;
+- Bonjour LAN plus the selected Internet discovery, reachability, authorization, security, privacy, abuse, operating-cost, continuity, and explicit outage results; no relay or project-operated service is assumed unless the accepted topology contains one;
+- authenticated encryption or provider-equivalent protection, sequencing, replay rejection, bounded records, rate limits, and malformed input at the selected topology's actual transport and trust boundaries, using Network or CryptoKit only where applicable;
 - chat, moderation, host commands, player media, and privacy;
 - multiplayer authoring, validation, local multi-instance play, publishing, and install.
 
@@ -270,19 +270,19 @@ Training passes when every required runtime, behavior, presentation, save, repla
 
 A campaign level is complete when its source and import dependency accounting closes, a player can start/progress/complete/save/reload/replay it, every required capability works, and every introduced canonical type has its applicable creator path.
 
-The creator gate requires an independent campaign from an empty native project, covering indoor and outdoor levels, definitions, behaviors, presentation, saves, replay, validation, playtest, and publishing without a legacy tool or hand-edited generated file.
+The creator gate requires a non-bundled independent certification campaign from an empty native project, covering indoor and outdoor levels, definitions, behaviors, presentation, saves, replay, validation, playtest, and publishing without a legacy tool or hand-edited generated file. It proves the creator suite and does not provide replacement retail content.
 
 ### Multiplayer gate
 
-Multiplayer passes the declared local, LAN, relay, 32-slot, observer, dedicated-host, mode, outage, security, replay, authoring, and published-package matrices.
+Multiplayer passes the declared local, LAN, selected-Internet-topology, 32-slot-infrastructure, mode-specific-count, four-player-co-op, observer, dedicated-host, outage, security, replay, authoring, and published-package matrices.
 
 ### Complete revival
 
 The product is complete only when:
 
 - Training, the base campaign and every secret, and Mercenary pass;
-- the independent campaign and multiplayer package pass creator gates;
-- multiplayer, dedicated hosting, and relay operations pass;
+- the non-bundled independent certification campaign and multiplayer package pass creator gates;
+- multiplayer, dedicated hosting, and every service or operational boundary selected by the accepted Internet topology pass;
 - save and replay matrices pass;
 - every capability ledger row and relevant source file/range is verified, deliberately replaced, or explicitly excluded;
 - signed and notarized applications pass clean-account and Gatekeeper checks;
@@ -300,7 +300,9 @@ Before Phase 1 production begins, active documents must agree on:
 - no speculative stream cells, stream blobs, spatial demand, or resident/streaming switch;
 - one explicit source-faithful old/new variable-time scheduler followed by a single Phase 3 timing decision;
 - RevivalEditor in Phase 1 sharing world types, dependency rules, renderer, level I/O, and play path with RevivalMac while owning separate editor and play-session values;
-- complete human creator, campaign, replay, multiplayer, and mod-SDK scope;
+- complete human creator, campaign, replay, multiplayer, and mod-SDK scope through the evidenced shipped-game and creator-tool capability;
+- version 1.0 retail ownership and the one supported prepared-installation profile, with additional profiles and replacement assets left to later decisions;
+- affordable native Internet multiplayer as a required outcome, with the operational topology held as a Phase 0 research question rather than a preselected project-operated service;
 - focused red-first shipping implementation plus bounded disposable research;
 - evidence-driven modernization that deletes the superseded production path.
 

@@ -1,6 +1,6 @@
 # Descent 3 revival
 
-This repository is the working home for a complete Apple-native Descent 3 revival: a new Swift and Metal game, native multiplayer and replay, and an integrated creator suite capable of building and publishing new levels and campaigns.
+This repository is the working home for a complete Apple-native Descent 3 revival: a new Swift and Metal game, native multiplayer and replay, and an integrated creator suite capable of building and publishing new levels and campaigns. Phase 10 is the complete version 1.0 release; Phase 11 is post-1.0 visual and experiential development.
 
 The selected product is an Apple-native semantic translation and modernization:
 
@@ -26,7 +26,7 @@ Each document under `docs/revival/` declares whether it is a binding contract, a
 
 ## Retail content
 
-No retail game assets are included. Original and converted retail content stays outside Git. The verified local source profile uses owned original CDs, Mercenary, and the official 1.4 update. See [Retail data and provenance](docs/revival/retail-data.md) and [One-way content pipeline](docs/revival/content-pipeline.md).
+No retail game assets are included. Original and converted retail content stays outside Git. Version 1.0 requires each user to own and import a supported prepared retail installation; it does not promise raw-disc preparation, additional storefront profiles, or bundled replacement assets. The verified local source profile uses owned original CDs, Mercenary, and the official 1.4 update. See [Retail data and provenance](docs/revival/retail-data.md) and [One-way content pipeline](docs/revival/content-pipeline.md).
 
 ## Historical upstream documents
 

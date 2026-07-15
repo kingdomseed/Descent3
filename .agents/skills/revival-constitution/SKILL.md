@@ -16,6 +16,7 @@ This skill implements accepted documents; it cannot amend them. Read before usin
 - [`docs/revival/architecture.md`](../../../docs/revival/architecture.md)
 - [`docs/revival/functional-completeness.md`](../../../docs/revival/functional-completeness.md)
 - [`docs/revival/functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md)
+- [`docs/revival/future-opportunities.md`](../../../docs/revival/future-opportunities.md)
 - [`docs/revival/content-pipeline.md`](../../../docs/revival/content-pipeline.md)
 - [`docs/revival/world-loading.md`](../../../docs/revival/world-loading.md)
 - [`docs/revival/engineering-principles.md`](../../../docs/revival/engineering-principles.md)
@@ -32,11 +33,14 @@ Read the current domain document and ledger rows for the proposed work. Before t
 - Ship no legacy C or C++ engine, Objective-C++ bridge, Rust runtime, OpenGL or SDL runtime, Wine or Game Porting Toolkit layer, or native Osiris module.
 - Transfer behavior through dependency-ordered source translation and record every relevant legacy file's disposition.
 - Deliver the complete player and human creator capability inventory. KISS reduces mechanisms, not scope.
+- Treat the evidenced shipped game and creator tools as the version 1.0 capability ceiling. Preserve nonworking historical ideas for later consideration without turning them into current requirements or silently losing them.
 - Keep D3Import as the sole shipping legacy-format reader. The game and editor consume canonical content only.
+- Require version 1.0 users to own and import the one supported prepared retail profile. Additional sources and project-owned replacement assets require later explicit decisions.
 - Start from one complete resident `Level`, source-evidenced eager preparation, and current reachable canonical lazy preparation. This is the current implementation, not “no streaming ever.”
 - Start RevivalEditor with the first world slice and share world types, loading rules, simulation, and rendering while owning separate document and play-session values.
 - Keep one renderer, one scheduler, one level-lifetime path, one canonical world model, and one production path at a time.
 - Keep the product human-first. MCP, headless authoring, telemetry, training capture, and agent-only paths wait until the complete human creator suite ships.
+- Require affordable native Internet multiplayer while leaving its 2026 topology to accepted evidence. Do not assume a project-operated service, relay, or recurring cost without a viable owner and explicit approval.
 
 ## Classify the proposal
 
@@ -67,7 +71,7 @@ Documentation-only amendments use link, consistency, and evidence checks rather 
 
 A valid amendment names the current rule, the falsifying evidence or new product decision, the selected replacement, affected capabilities, migration or reimport consequences, and deletion of the superseded path. It updates active documents together so no stale alternative remains.
 
-Future streaming, a fixed scheduler, another platform, another legacy source profile, another DCC ingress, or a later authored behavior representation are possible only through their accepted evidence gates. Do not install their frameworks, flags, adapters, or parallel modes in advance.
+Future streaming, a fixed scheduler, another platform, another legacy source profile, another DCC ingress, or a post-1.0 expansion of the authored behavior representation are possible only through their accepted evidence gates. Do not install their frameworks, flags, adapters, or parallel modes in advance.
 
 ## Prohibited complexity and scope drift
 

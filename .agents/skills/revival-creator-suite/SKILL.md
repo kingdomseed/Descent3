@@ -25,7 +25,7 @@ Before first production use for a workspace, compare this skill with the current
 - The imported canonical base is read-only. Editing derives a separately owned complete-Level project value and preserves provenance.
 - Play creates a disposable session copy. It uses the same world types, loader, simulation, dependency rules, and RevivalMetal path as RevivalMac.
 - Shared world means shared code and semantics, never concurrent mutation of one instance.
-- Phase 1 opens the complete Training `Level`, focuses the selected room, performs one meaningful edit, undoes, redoes, saves, reopens, plays, and returns.
+- Phase 1 opens the complete Training `Level`, focuses the selected room, performs the smallest meaningful edit selected from traced historical workflow evidence without foreclosing later creator work, undoes, redoes, saves, reopens, plays, and returns.
 
 ## Slice workflow
 
@@ -84,6 +84,8 @@ A creator slice closes only when:
 - involved source rows reach allowed terminal states for the claimed island, and claimed functional rows carry their required evidence;
 - focused red, focused green, affected-suite, integration, and resource-release evidence have no required skip;
 - independent fidelity, architecture, evidence, and simplicity findings are resolved.
+
+An empty native project and independently authored campaign or multiplayer package are non-bundled creator-suite certification. They do not supply replacement retail content or waive the version 1.0 ownership and import requirement.
 
 Run exact focused and integrated commands for the real targets. At minimum:
 

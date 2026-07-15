@@ -6,6 +6,8 @@
 
 Every phase ends in a runnable, visible, or objectively verified product result. Campaign-first development orders the work; it does not reduce the [functional-completeness contract](functional-completeness.md).
 
+The phases are broad dependency groupings, not promises that every listed capability lands in one monolithic change. Phase 10 is the complete version 1.0 release. Phase 11 is post-1.0 visual and experiential development.
+
 The player and editor advance together from the first canonical world. A phase does not need the complete creator suite, but every new canonical type and runtime behavior gains the authoring, validation, playtest, and publishing path that is applicable at that maturity.
 
 Production work follows [Test-driven development](test-driven-development.md). Bounded disposable research may answer an unknown source question before a production contract is stated; it is never shipped or retained as a second path.
@@ -37,6 +39,8 @@ Seed and then expand the checked-in source-translation ledger with:
 
 Finish the functional-completeness audit without turning chosen architecture into fake historical capabilities. `revival-constitution` and `revival-source-translation` are authored and reviewed against the accepted documents. The full current skill set is installed; review and amend each applicable domain skill against real translated source immediately before its first production change. A later-domain review does not block an unrelated island.
 
+Begin the bounded 2026 [Internet multiplayer study](internet-multiplayer-study.md) in parallel. Its named comparison record covers direct, player-hosted, community-operated, platform-provided, and third-party-supported approaches using current reachability, security, privacy, abuse, continuity, deployment, and recurring-cost evidence. The required outcome is affordable native Internet multiplayer, not a preselected project-operated relay. The study names an evidence owner, sources, assumptions, rejection reasons, operating owner and cost, and the decision criteria for `N-014`, `N-016`, `N-018`, and `N-019`. It does not add production networking types or block unrelated Phase 1 work, but an accepted decision record is mandatory before Phase 9 production transport work.
+
 Exit: no active document requires fixed-cell streaming, fixed 120 Hz, exact target counts, a complete speculative behavior VM, or editor preview machinery before contact with real translated code. The complete Training Level and exact acceptance room are recorded, their initial source/dependency seed exists, and the two prerequisite skills agree with the amended documents. Exact symbols, transitive files, captures, and native owners may close alongside the working Phase 1 island, but must be complete before that island exits.
 
 ## Phase 1: complete Training Level with selected-room acceptance
@@ -58,7 +62,7 @@ Implement one end-to-end source dependency island:
 5. emit one normal checked canonical Level containing all Training rooms, faces, portals, terrain, paths, goals, objects, and the assets reachable through the currently translated product path;
 6. validate the level, construct its resident authoritative world, and prepare the source-evidenced eager working set; later reachable assets load directly from canonical content added with the translated product path that needs them and remain owned by the level;
 7. render it through the translated room visibility path in RevivalMac and RevivalEditor;
-8. derive an editable complete-level project value from the read-only imported base, select the acceptance room, a face, or an object, make one real edit with named undo and redo, save, close, and reopen;
+8. derive an editable complete-level project value from the read-only imported base, then use the traced historical editor/runtime workflow to choose the smallest real canonical edit that proves stable ownership without a disposable path; select it, perform it with named undo and redo, save, close, and reopen;
 9. create a disposable play-session copy and enter free-camera play through the same world types, loader, simulation, and Metal code used by RevivalMac, then return to the document;
 10. on replacement, validate successor CPU content first, then commit by stopping submissions, waiting for final GPU use, releasing the old presentation owner, and preparing the successor; expose a clear unloaded error if post-commit preparation fails;
 11. release the world cleanly on shutdown.
@@ -123,7 +127,7 @@ Translate one complete source call chain for:
 - the difficulty rules, room role, sound, message, HUD, and cockpit behavior exercised by the slice;
 - new native save and reload.
 
-Account for the generated DALLAS block and every handwritten range used by the selected interaction. Implement only the behavior operations the chain needs as canonical direct typed Swift behavior. Before proposing a different authored representation or executor, the working evidence must cover at least one generated DALLAS chain, one handwritten or custom range, one timer or persistent-state chain, and one presentation-oriented chain; one chain may cover several categories. Change the direct runtime only when concrete human-authoring cases prove it inadequate. Do not load native code or cap the eventual creator system at stock operations.
+Account for the generated DALLAS block and every handwritten range used by the selected interaction. Implement only the behavior operations the chain needs as canonical direct typed Swift behavior. Before selecting the reusable version 1.0 authored representation or replacing the direct executor, the working evidence must cover at least one generated DALLAS chain, one handwritten or custom range, one timer or persistent-state chain, and one presentation-oriented chain; one chain may cover several categories. Version 1.0 must let people compose the evidenced behavior and creator capability of the shipped game and tools without Swift or generated-file editing. Evidence selects the representation and one runtime path; broader mechanics remain a later decision. Never load native code.
 
 The editor can place and configure the door, trigger, robot, weapon, pickup, sound, message, route, and current behavior state; validate them; play the full interaction; and navigate a runtime failure back to its source.
 
@@ -158,7 +162,7 @@ Bring up level 1 end to end, then follow the campaign graph. Implement each secr
 5. play, save, replay, reload, and complete the level;
 6. record intentional differences and keep the M4 budgets green.
 
-This phase grows terrain and environment, reusable rooms, geometry tools, materials, mirrors, specular response, decals, procedural surfaces, volumetric lighting, blend semantics, robots, bosses, weapons, inventory, GuideBot, doors, triggers, paths, navigation, matcens, goals, ambient systems, weather, lighting, music, cinematics, briefings, movies, TelCom-style presentation, cockpit, automap, cameras, haptics, effects, campaign state, and approved command effects as real levels require them.
+This phase grows terrain and environment, reusable rooms, geometry tools, materials, mirrors, specular response, decals, procedural surfaces, volumetric lighting, blend semantics, robots, bosses, weapons, inventory, GuideBot, doors, triggers, paths, navigation, matcens, goals, ambient sound systems and patterns, weather, lighting, music, cinematics, briefings, movies, TelCom-style presentation, cockpit, automap, cameras, haptics, effects, campaign state, and approved command effects as real levels require them.
 
 Exit: the complete base campaign and every stock secret pass player gates, and every introduced capability has its native creator path.
 
@@ -176,49 +180,49 @@ Close every remaining non-multiplayer creator row:
 - game definitions for ships, robots, weapons, doors, objects, physics, AI, effects, audio, cockpit, HUD, and haptics;
 - behavior, campaign, adaptive-score, briefing, cinematic, localization, and presentation authoring;
 - deterministic builds, dependency and orphan audits, recovery, templates, validation, play-in-editor, and publishing;
-- an independently authored campaign beginning from an empty native project;
+- a non-bundled independently authored certification campaign beginning from an empty native project;
 - task-based human workflow, keyboard, VoiceOver, undo, diagnostics, recovery, and M4 responsiveness review.
 
 Add asynchronous snapshot/revision machinery only for operations that are now genuinely long-running, and keep it local to the smallest useful ownership boundary.
 
-Exit: every non-multiplayer creator row passes and the independent campaign installs and completes in RevivalMac.
+Exit: every non-multiplayer creator row passes and the non-bundled certification campaign installs and completes in RevivalMac. This proves the creator suite; it does not supply replacement retail content or remove the version 1.0 ownership requirement.
 
 ## Phase 9: multiplayer, replay, hosting, and multiplayer creation
 
 Review and amend the installed networked-simulation, transport-security-operations, multiplayer, and replay skills against the working final simulation model. Use the installed verification skill to falsify the declared Phase 9 evidence claims and matrices; it does not define a second test architecture.
 
-Add RevivalRelay and implement the selected native direction:
+Ratify and implement one affordable native direction from the Phase 0 Internet-multiplayer study against the final simulation and current Apple APIs:
 
-- Network-framework QUIC for direct Bonjour LAN and outbound public relay connections;
-- host-authoritative simulation for 2–32 connected humans, including live observers;
-- CryptoKit-protected authority/client records across relay legs;
-- public discovery, registration, join authorization, bounded opaque relay, operations, and explicit outage behavior;
+- direct Network/Bonjour LAN hosting and discovery;
+- host-authoritative simulation with the released 32 network/player-slot infrastructure and historical listen/dedicated slot accounting, each stock mode's source-supported player limit, and live observers;
+- the transport, trust, record-protection, reachability, discovery, join, privacy, abuse, deployment, recurring-cost, and outage contracts required by the selected Internet topology;
+- no mandatory project-operated service; add a rendezvous, relay, service executable, or external integration only when the accepted topology requires it and has a viable operator;
 - dedicated no-window hosting through RevivalMac using RevivalCore;
 - content and simulation agreement, prediction, reconciliation, interpolation, replay, desync evidence, chat, moderation, host commands, and safe custom media;
 - the enumerated stock modes including campaign co-op;
 - multiplayer map, mode, behavior, validation, test, and publishing tools;
-- explicit adopt-or-exclude decisions for historical lobby chat, rankings, persistent pilot stats, and join-time package acquisition.
+- evidence-backed decisions for the modern counterparts of historical lobby chat, rankings, persistent pilot stats, and join-time package acquisition, preserving unselected ideas for later rather than silently losing them.
 
 Detailed security and packet contracts are fixed immediately before their implementation and tested at the untrusted boundary. They do not create defensive branches inside trusted simulation code.
 
-Exit: local and relay-backed matrices pass through 32 connected human slots; dedicated hosting and outage behavior are proven; a new multiplayer package can be authored, hosted, joined, completed, and replayed through native tools.
+Exit: local, LAN, and selected-Internet-topology matrices pass at the source-supported count for each stock mode, the 32-slot infrastructure proof passes, four-player campaign co-op passes, dedicated hosting and outage behavior are proven, and a new multiplayer package can be authored, hosted, joined, completed, and replayed through native tools.
 
-## Phase 10: complete revival release
+## Phase 10: version 1.0 complete revival release
 
 - close every functional-completeness row or record a user-approved scope amendment;
 - bring every relevant source file and behavior range to `verified`, `replaced`, or `excluded` with the evidence required by its disposition; no `seed`, `traced`, `translating`, `native-running`, or `deferred` row survives complete-revival closure;
 - delete or archive every temporary research harness, adapter, and reference-only build artifact from product paths;
 - finalize import, project, package, save, replay, multiplayer, and diagnostic UX;
 - verify compatible and incompatible public data revisions and add only the migrations real released formats require;
-- complete settings, accessibility, controller, display, audio, movie, long-session, and clean-account matrices;
+- complete settings, source-supported player-accessibility and localization, controller, display, audio, movie, long-session, native-editor accessibility, and clean-account matrices, plus every deliberate improvement accepted during the preceding slices;
 - sign, notarize, staple, and Gatekeeper-test the player, editor, and bundled importer;
-- run complete campaign, independent campaign, creator, multiplayer, replay, memory, and performance matrices.
+- run complete campaign, non-bundled certification campaign, creator, multiplayer, replay, memory, and performance matrices.
 
 The released C++ tree may leave the active checkout only after no ledger row, source disposition, or unresolved product question depends on it. Repository history, pinned upstream identity, provenance, and hashes remain evidence.
 
 Exit: signed and notarized native macOS player and editor applications deliver the complete revival with no legacy source or executable in a product path.
 
-## Phase 11: visual and experiential development
+## Phase 11: post-1.0 visual and experiential development
 
 Improve the stable product with higher-resolution art, models, animation, lighting, materials, effects, spatial audio, replacement music, interface work, accessibility, campaigns, multiplayer content, and creator workflows where rights permit.
 
@@ -232,4 +236,4 @@ Intel Mac, iOS, visionOS, Windows, Linux, consoles, and web are outside the road
 
 ## Immediate next step
 
-Install and select the current Xcode 27 beta, record the toolchain and macOS 26 deployment target, then record the project-owned canonical Training mission and `Level` keys plus the exact acceptance room and complete the initial level-load/render dependency trace while building the first resident editor/player slice. Review and amend each installed domain skill against the real source immediately before its first production change.
+Install and select the current Xcode 27 beta, record the toolchain and macOS 26 deployment target, then record the project-owned canonical Training mission and `Level` keys plus the exact acceptance room and complete the initial level-load/render dependency trace while building the first resident editor/player slice. In parallel, begin the bounded 2026 Internet-multiplayer study without blocking that slice or adding production transport machinery. Review and amend each installed domain skill against the real source immediately before its first production change.

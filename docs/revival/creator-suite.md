@@ -21,7 +21,7 @@ The Phase 1 editor must:
 - open the same read-only complete Training Level as RevivalMac, focus the selected acceptance room, and derive one editable complete-level project value from it;
 - render it through RevivalMetal;
 - inspect and select a room, face, portal boundary, or object;
-- perform one meaningful edit on the project value without mutating the imported base;
+- after tracing the historical editor/runtime workflow, choose and perform the smallest real canonical edit that proves durable ownership without creating a disposable path or mutating the imported base;
 - name, undo, and redo that edit through UndoManager;
 - save, close, and reopen the native project;
 - enter the shipping simulation and renderer with a disposable play-session copy built through the same loader and world types;
@@ -89,7 +89,7 @@ If actual edit latency or GPU lifetime proves that a derived preview mechanism i
 
 ### World workspace
 
-The complete world workspace covers indoor rooms, faces, vertices, portals, bridges, joins, attachments, snapping, splitting, triangulation, outdoor terrain, reusable rooms, materials and UVs, mirrors, specular response, decals, procedural and volumetric surfaces, objects and starts, triggers, paths, navigation, goals, matcens, ambient systems, lighting, fog, weather, sky, automap metadata, markers, cameras, and typed room roles.
+The complete world workspace covers indoor rooms, faces, vertices, portals, bridges, joins, attachments, snapping, splitting, triangulation, outdoor terrain, reusable rooms, materials and UVs, mirrors, specular response, decals, procedural and volumetric surfaces, objects and starts, triggers, paths, navigation, goals, matcens, ambient sound systems and patterns, lighting, fog, weather, sky, automap metadata, markers, cameras, and typed room roles.
 
 It provides selection, transform, duplication, grouping, naming, search, inspection, undo/redo, validation, repair, statistics, and live Metal preview. A modern operation may replace several historical commands when it preserves their useful outcomes.
 
@@ -117,9 +117,9 @@ References use the canonical content catalog and report affected owners before d
 
 ### Behavior
 
-Behavior authoring grows from translated source behavior. The first surface places and configures the bindings, parameters, and explicit state used by the Training door, trigger, robot, goal, and presentation chains, while inspecting and tracing their source-linked typed Swift control flow. It provides validation and failure navigation without inventing a graph or second executor.
+Behavior authoring grows from translated source behavior. Version 1.0 must provide a reusable human-authored native model capable of composing the evidenced DALLAS event, condition, action, value, function and reference surface without editing Swift or generated files. That requirement does not preselect a graph, textual language, or executor. The first surface places and configures the bindings, parameters, and explicit state used by the Training door, trigger, robot, goal, and presentation chains, while inspecting and tracing their source-linked typed Swift control flow. It provides validation and failure navigation without prematurely selecting the final representation.
 
-Direct typed Swift remains the canonical runtime while the editor exposes the smallest useful configuration and trace surface. A different visual or textual authored representation is proposed only after working evidence covers generated DALLAS, handwritten/custom, timer or persistent-state, and presentation-oriented behavior and demonstrates a concrete human-authoring limitation. Any accepted form never generates C++, invokes a native compiler, or emits executable plugins.
+Direct typed Swift remains the canonical runtime while early slices expose the smallest useful configuration and trace surface. Working generated DALLAS, handwritten/custom, timer or persistent-state, and presentation-oriented evidence selects the version 1.0 authored representation and its one runtime path; it does not decide whether reusable human authoring is required. Any accepted form never generates C++, invokes a native compiler, or emits executable plugins. Mechanics beyond the shipped game and tools remain later decisions.
 
 ### Campaign, audio, and presentation
 
@@ -157,7 +157,7 @@ Every new or changed editor behavior starts with one focused automated test that
 
 ## Creator completeness gate
 
-The suite is complete when a creator can start with an empty project and, without hand-editing generated files or invoking a legacy tool:
+The suite is complete when a creator can start with an empty project and, without hand-editing generated files or invoking a legacy tool, build a non-bundled certification package that proves the toolchain:
 
 - build indoor and outdoor levels;
 - define their objects, combat systems, AI, audio, materials, lighting, goals, and behaviors;
@@ -166,7 +166,7 @@ The suite is complete when a creator can start with an empty project and, withou
 - validate, debug, play, replay, package, reopen, and publish;
 - install the package in RevivalMac and complete its declared play paths.
 
-Imported stock content, an independent campaign, and an independent multiplayer package are separate proof cases. All are required for complete creator status.
+Imported stock content, a non-bundled independent certification campaign, and a non-bundled independent multiplayer package are separate proof cases. All are required for complete creator status. They do not supply version 1.0 replacement assets, ship as included campaigns, or remove the requirement that users own and import supported retail content.
 
 ## Future automation
 

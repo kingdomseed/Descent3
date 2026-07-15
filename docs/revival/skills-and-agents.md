@@ -94,8 +94,8 @@ The complete current skill set is installed in the repository so the process can
 | [revival-behavior-system](../../.agents/skills/revival-behavior-system/SKILL.md) | Generated and handwritten source accounting, direct typed translation, event and state fidelity, evidence-gated authoring evolution, debugging, persistence, and one executor path |
 | [revival-volumetric-navigation](../../.agents/skills/revival-volumetric-navigation/SKILL.md) | Source route and node tracing, clearance, steering, blockage, recovery, editor diagnostics, and evidence-backed native simplification |
 | [revival-replay](../../.agents/skills/revival-replay/SKILL.md) | Final-scheduler recording, authoritative checkpoints, continuation, diagnosis, observer evidence, and one playback path |
-| [revival-networked-simulation](../../.agents/skills/revival-networked-simulation/SKILL.md) | 2–32 humans, authority, prediction, reconciliation, interpolation, latency rules, replication, state evidence, and replay interaction |
-| [revival-transport-security-operations](../../.agents/skills/revival-transport-security-operations/SKILL.md) | Network QUIC, CryptoKit records, Bonjour, public discovery and relay, hostile boundaries, keys, privacy, abuse controls, deployment, monitoring, and outage behavior |
+| [revival-networked-simulation](../../.agents/skills/revival-networked-simulation/SKILL.md) | Source-supported mode counts, released 32-slot infrastructure, authority, prediction, reconciliation, interpolation, latency rules, replication, state evidence, and replay interaction |
+| [revival-transport-security-operations](../../.agents/skills/revival-transport-security-operations/SKILL.md) | Bonjour and Network LAN plus evidence-selected Internet transport and trust boundaries, affordable reachability and discovery, hostile boundaries, keys, privacy, abuse controls, deployment, cost, monitoring, and outage behavior |
 | [revival-multiplayer](../../.agents/skills/revival-multiplayer/SKILL.md) | Modes, co-op, content negotiation, host difficulty, chat, moderation, commands, media, dedicated hosting, authoring, and network matrices |
 | [revival-verification](../../.agents/skills/revival-verification/SKILL.md) | Falsify named evidence claims, verify milestone matrices and terminal states, and prevent one check from standing in for another |
 
@@ -194,7 +194,7 @@ Use separate reviewers when capacity allows. Run the remaining concern in the ne
 - A creator reviewer preserves useful workflow, not MFC layout or backward export.
 - A Metal reviewer begins with the complete resident Level and source-faithful eager/lazy asset preparation, and may not add spatial streaming before the M4 amendment gate.
 - A systems reviewer may not add a job system, ECS, fixed scheduler, deterministic math framework, or custom allocator without the accepted evidence gate.
-- A behavior reviewer grows the safe model from working chains and may not add native-code escape hatches or cap the final creator surface at stock behavior.
-- A multiplayer reviewer implements the selected native route and does not inherit original packets merely because source exists.
+- A behavior reviewer grows the safe model from working chains, covers the evidenced shipped-game and creator-tool capability for version 1.0, and may not add native-code escape hatches or speculative post-1.0 mechanics.
+- A multiplayer reviewer implements the one affordable native route accepted from current evidence and does not inherit original packets or assume a project-operated service merely because source or an earlier plan exists.
 - A reviewer distinguishes legitimate semantic fidelity from prohibited API, ABI, and platform compatibility.
 - The root agent resolves conflicts, keeps the documents consistent, and ensures review findings change the actual diff when warranted.

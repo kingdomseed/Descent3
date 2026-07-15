@@ -37,9 +37,9 @@ The first supported input is the verified prepared Descent 3 1.4-plus-Mercenary 
 
 The user selects that directory explicitly. D3Import accepts it only when required files match a known source profile.
 
-Version 1 does not mount disc images, read installer cabinets, run the patch, automate Windows installation, or invoke Wine, Python extractors, or other preparation tools. Reproducible source-preparation scripts and provenance remain nonshipping support evidence.
+Version 1.0 does not mount disc images, read installer cabinets, run the patch, automate Windows installation, or invoke Wine, Python extractors, or other preparation tools. Reproducible source-preparation scripts and provenance remain nonshipping support evidence.
 
-Support for a second retail layout begins only when its exact files are verified and a real user need justifies the additional parser cases. A source profile is an exact recognized input, not a heuristic promise to accept every installation.
+Version 1.0 supports only this prepared retail profile and requires the user to own it. Support for a second retail layout, raw-disc preparation, another import source, or project-owned replacement assets is uncommitted later work that begins only after an explicit product decision, exact evidence, and a real user need justify the additional cases. A source profile is an exact recognized input, not a heuristic promise to accept every installation.
 
 The importer never executes or copies retail executables, installers, libraries, multiplayer modules, native Osiris modules, pilot profiles, legacy saves, or unrelated community missions.
 
@@ -184,7 +184,7 @@ Ordered replacement-package layers and public migrations arrive with the first p
 
 Canonical source contains authored product state. Open tabs, pane sizes, selection, and viewport cameras remain local UI state. When a real long-running import, bake, validation, or publish operation appears, it consumes an immutable snapshot and may not overwrite newer source. The operation owns the smallest revision check necessary; this is not part of the content format.
 
-The publisher eventually validates dependency closure, behavior, lighting, navigation, references, provenance, rights, and current resource budgets, then emits an immutable native package. It does not emit HOG, D3L, native plugins, or hand-edited generated files.
+The publisher eventually validates dependency closure, behavior, lighting, navigation, references, provenance, rights, and current resource budgets, then emits an immutable native package. An independently authored package certifies the creator suite but is not bundled version 1.0 replacement content and does not waive the retail requirement. The publisher does not emit HOG, D3L, native plugins, or hand-edited generated files.
 
 ## Rights and local storage
 

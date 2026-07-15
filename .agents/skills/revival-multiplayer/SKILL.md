@@ -22,13 +22,13 @@ This skill is installed now. Immediately before Phase 9 multiplayer work, review
 5. Implement it through the existing host-authoritative simulation and selected secure transport.
 6. Add the applicable lobby/session UI, HUD/results, chat/moderation, replay, dedicated-host, and observer behavior.
 7. Add editor authoring, validation, local test, package, host, join, completion, reopen, and publishing paths for new content.
-8. Run the relevant local, LAN, relay, outage, and slot-count matrix and close the source and capability rows.
+8. Run the relevant local, LAN, selected-Internet-topology, outage, and mode-specific slot-count matrix and close the source and capability rows.
 
 ## Committed scope
 
-Preserve the enumerated stock modes, campaign co-op, 2–32 connected humans, observer transitions, dedicated hosting, content and simulation agreement, host difficulty, chat scopes, moderation, typed operator commands, safe custom media, replay and desync evidence, and creator counterparts.
+Preserve the enumerated stock modes, each mode's source-supported player count, four-player campaign co-op, the released 32 network/player-slot infrastructure and historical listen/dedicated slot accounting, observer transitions, dedicated hosting, content and simulation agreement, host difficulty, chat scopes, moderation, typed operator commands, safe custom media, replay and desync evidence, and creator counterparts.
 
-Lobby chat rooms, rankings, persistent pilot stats, and join-time package acquisition receive an explicit adopt-or-exclude decision by the complete-revival gate. Exclusion requires the accepted scope-amendment process; silence is not a decision.
+Lobby chat rooms, rankings, persistent pilot stats, and join-time package acquisition remain preserved outcomes while the Phase 0 study determines which have an affordable 2026 native counterpart. Before Phase 9 production transport work, each receives either a version 1.0 owner, cost and completion proof or an explicit approved exclusion and future-preservation entry; none may silently disappear, force a project-operated service, or remain unresolved through Phase 10.
 
 ## One model
 
@@ -40,6 +40,6 @@ Do not load binary community modules, preserve DMFC ABI shape, reproduce old pac
 
 ## Verification
 
-Record red/green commands, source and deliberate-difference evidence, runtime and creator checkpoints, published-package identity, mode results, security and outage inputs, replay results, optimized measurements for scale claims, and terminal ledger transitions. Phase 9 exits only when the accepted local, LAN, relay, dedicated, observer, mode, co-op, security, outage, authoring, publishing, replay, and 32-slot matrices pass.
+Record red/green commands, source and deliberate-difference evidence, runtime and creator checkpoints, published-package identity, mode results, security and outage inputs, replay results, optimized measurements for scale claims, and terminal ledger transitions. Phase 9 exits only when the accepted local, LAN, selected-Internet-topology, dedicated, observer, mode-specific-count, four-player-co-op, security, outage, authoring, publishing, replay, and 32-slot-infrastructure matrices pass.
 
 Run [`revival-review`](../revival-review/SKILL.md) for every material mode or workflow slice.

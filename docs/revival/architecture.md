@@ -22,7 +22,7 @@ Three kinds of statement must not be confused:
 2. Current implementation decisions select one concrete path for the next phase. They remain binding while implemented and change through a recorded amendment, not through parallel options.
 3. Research hypotheses identify questions to measure. They do not constrain production types, package schemas, or tests before evidence promotes them.
 
-The resident authoritative world with source-faithful asset paging, the explicit old/new variable-time handoff, and the early shared editor/player loop are current implementation decisions. Spatial streaming and a fixed simulation tick are later hypotheses, not hidden Phase 1 requirements.
+The resident authoritative world with source-faithful asset paging, the explicit old/new variable-time handoff, and the early shared editor/player loop are current implementation decisions. Spatial streaming and a fixed simulation tick are later hypotheses, not hidden Phase 1 requirements. The public Internet multiplayer topology is also a current research hypothesis: the product requires an affordable native Internet outcome, but no project-operated relay or service executable is preselected.
 
 ## Product and fidelity boundary
 
@@ -82,7 +82,7 @@ Phase 1 creates three executable products around two required code-ownership bou
     RevivalMac    -> RevivalCore ownership + RevivalMetal ownership
     RevivalEditor -> RevivalCore ownership + RevivalMetal ownership
 
-D3Import is a separate signed command-line helper launched for explicit import. `RevivalCore` and `RevivalMetal` name dependency directions and framework exclusions; the first real code decides whether either deserves a separate build target. RevivalRelay is a committed later operational service and is added when Phase 9 begins public multiplayer implementation. Target count is an execution result, not constitutional law; adding a target still requires a concrete ownership boundary that removes more complexity than it creates.
+D3Import is a separate signed command-line helper launched for explicit import. `RevivalCore` and `RevivalMetal` name dependency directions and framework exclusions; the first real code decides whether either deserves a separate build target. Phase 0 researches an affordable 2026 Internet-multiplayer topology in parallel without shaping Phase 1 code. A later service target is added only if the accepted direction requires an operable public-service boundary. Target count is an execution result, not constitutional law; adding a target still requires a concrete ownership boundary that removes more complexity than it creates.
 
 ### D3Import
 
@@ -114,11 +114,11 @@ The editor grows slice by slice into world, terrain, game-data, behavior, campai
 
 Add immutable snapshots and stale-result checks to the first real asynchronous editor operation that needs them. Do not prescribe a universal generation counter, fixed overlay allocation, or background-document resource protocol before the product exercises those cases.
 
-### RevivalRelay
+### Public Internet multiplayer
 
-Phase 9 adds a small no-window service for public session discovery, expiring registration, join authorization, and opaque packet relay. It imports no game content or simulation and never becomes session authority.
+The required product outcome is native LAN and Internet hosting, discovery, joining, security, and explicit failure behavior without requiring the project to operate an unaffordable always-on service. Phase 0 examines current direct, player-hosted, community-operated, platform-provided, and third-party-supported approaches, including their real reachability, privacy, abuse, deployment, continuity, and recurring-cost properties. That work is a bounded research record and creates no Phase 1 transport types.
 
-The selected multiplayer direction remains Network-framework QUIC, Bonjour for LAN discovery, inner CryptoKit protection across relay legs, host-authoritative simulation, and 2–32 connected human slots. Detailed record, prediction, abuse, deployment, and outage contracts are ratified immediately before implementation against the then-working simulation rather than shaping Phase 1 code.
+Phase 9 selects one operable topology through the [Internet multiplayer study](internet-multiplayer-study.md), then ratifies its transport, record protection, authority, prediction, outage, and operational contracts against the final simulation. Bonjour and Network remain the direct native starting point for LAN. The Internet path uses the native or provider boundaries selected by current evidence; CryptoKit is used only when that topology needs project-owned record protection. A service executable, relay, rendezvous system, or external integration exists only if the accepted topology needs it. The released source's 32 network/player-slot infrastructure and listen/dedicated slot accounting remain scale capabilities, while each stock mode initially preserves its source-supported player limit, including four-player campaign co-op.
 
 ## Execution model
 
@@ -137,7 +137,7 @@ The main owner holds mutable game state. Input becomes one explicit value passed
 
 Use explicit domain types such as PlayerShip, Robot, Projectile, Door, Pickup, Room, Portal, and Terrain. This is not a generic ECS. Begin with the source-supported relationships and ordinary Swift functions; change layout only after a measured loop benefits.
 
-Behavior implementation starts with canonical direct typed Swift functions for the actual Training dependency chain, including generated DALLAS ranges and handwritten code. Preserve events, order, timers, variables, persistence, and engine operations required by the slice. A different authored representation or executor requires working evidence across generated DALLAS, handwritten/custom, timer or persistent-state, and presentation-oriented behavior plus a concrete human-authoring limitation. It is not a complete speculative VM designed before the first script runs or an inevitable rewrite.
+Behavior implementation starts with canonical direct typed Swift functions for the actual Training dependency chain, including generated DALLAS ranges and handwritten code. Preserve events, order, timers, variables, persistence, and engine operations required by the slice. Working evidence across generated DALLAS, handwritten/custom, timer or persistent-state, and presentation-oriented behavior selects the required version 1.0 reusable human-authored representation and its one runtime path. It is not a complete speculative VM designed before the first script runs. Broader mechanics or a later replacement executor require a concrete limitation and a new evidence-led decision.
 
 Shipping packages never contain native executable code. Creator-facing behavior authoring must provide the useful DALLAS and Osiris capabilities without their generated C++, compiler integration, DLL ABI, or unrestricted engine function table; it does not predetermine a second runtime representation.
 
@@ -145,7 +145,7 @@ Flying AI begins by translating the released room/portal, outdoor-region, node, 
 
 ## Content, saves, and compatibility
 
-The only legacy-format boundary is the one-way importer. The game and editor consume canonical native content and never reach back into the retail installation.
+The only legacy-format boundary is the one-way importer. The game and editor consume canonical native content and never reach back into the retail installation. Version 1.0 requires a user-owned supported prepared retail installation; additional source profiles, raw-media preparation, and project-owned replacement assets are later decisions.
 
 The product writes new native projects, packages, saves, and replay. It does not import or export retail saves or demos, provide original multiplayer interoperability, load binary modules, or export D3L/HOG/editor data.
 

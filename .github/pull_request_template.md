@@ -7,7 +7,7 @@
 - [ ] RevivalMetal rendering or resource lifetime
 - [ ] RevivalMac application, input, audio, or media
 - [ ] RevivalEditor authoring, validation, playtest, or publishing
-- [ ] RevivalRelay, multiplayer, network security, or replay
+- [ ] Multiplayer, selected network/service boundary, security, or replay
 - [ ] Retained C++ reference tree or historical tooling
 - [ ] Build, dependency, or GitHub workflow
 

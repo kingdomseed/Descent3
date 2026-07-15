@@ -7,6 +7,8 @@ description: Translate and extend Descent 3 behavior chains without inventing a 
 
 Build the behavior model from complete working chains. Preserve the intended capability while replacing generated C++, native modules, global dispatch, and ABI machinery with direct typed Swift.
 
+For version 1.0, provide a reusable human-authored native model for the behavior and creator capability evidenced by the shipped game and tools without requiring Swift or generated-file editing. Working chains select its representation and one runtime path. Broader mechanics or post-1.0 representation extensions remain later evidence-led product decisions, not speculative current scope.
+
 ## Authority and activation
 
 Read:
@@ -40,6 +42,7 @@ Use ordinary structs, enums, arrays, and exhaustive switches. Keep event order, 
 - A direct typed executor may later be replaced by a richer authoring model only after working chains prove the required responsibilities.
 - Migrate every working chain and remove the superseded path in the same accepted cutover. Never keep direct and interpreted production modes as permanent alternatives.
 - Creator tools grow with executable behavior: edit, validate, inspect state, diagnose a failure, save, reopen, play, and publish through the canonical model.
+- Do not select a visual, textual, graph, or other authored representation before working chains and creator cases establish which representation the version 1.0 capability actually needs.
 
 ## Boundaries
 

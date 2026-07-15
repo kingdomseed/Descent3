@@ -20,7 +20,7 @@ Before first production use for a new format or campaign slice, retrace the curr
 
 ## Current boundary
 
-- Version 1 accepts only the exact recognized prepared Descent 3 1.4-plus-Mercenary installation profile.
+- Version 1.0 accepts only the exact recognized prepared Descent 3 1.4-plus-Mercenary installation profile.
 - Raw discs, installers, patch execution, Wine, extraction utilities, and historical preparation scripts remain nonshipping provenance work.
 - D3Import reads supported HOG, MN3, D3L, and reached media formats. RevivalMac, RevivalCore, RevivalMetal, and RevivalEditor never do.
 - Every included production `Level` has complete topology. The selected Training room narrows acceptance evidence, not package scope.

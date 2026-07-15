@@ -25,7 +25,7 @@ The Mercenary filename is misleading: it is a raw CD image rather than a normal 
 
 The imported base and Mercenary files match hashes tracked by Debian's [game-data-packager](https://salsa.debian.org/games-team/game-data-packager/-/blob/master/data/descent3.yaml), including `d3.hog`, `ppics.hog`, `merc.hog`, campaign and expansion missions, voice archives, and MVE movies.
 
-GOG and Steam may become later source profiles after their current layouts and hashes are verified independently. They are not assumed to match the CD-derived profile.
+GOG and Steam, raw-disc preparation, other import sources, and project-owned replacement assets are not version 1.0 commitments. Any may become later work only after an explicit product decision and independent verification of the exact inputs, rights, and maintenance cost; no store layout is assumed to match the CD-derived profile.
 
 ## Official 1.4 update
 
@@ -90,7 +90,7 @@ This procedure explains how the verified source profile was assembled. It is pro
 7. apply the official 1.4 patch to a disposable staging copy;
 8. promote only the validated `extra.hog` and `extra13.hog` outputs.
 
-Version 1 `D3Import` begins with the resulting prepared 1.4-plus-Mercenary installation directory. This prepared directory is the user-selected release input, not merely a hidden developer intermediate. Version 1 is explicitly limited to users who already possess a supported prepared installation, obtained from their own installed and patched copy or the already verified local preparation. Raw images and installer media are not accepted by the version 1 product. `D3Import` does not replace or invoke ISO mounting, InstallShield or OPKG extraction, Mode 2 conversion, patch execution, `unshield`, `bchunk`, Wine, or the historical Python extractor. Those remain separately documented source-preparation provenance and move to the nonshipping support archive at the Phase 10 retirement gate. Its narrower checked import contract is specified in [One-way content pipeline](content-pipeline.md).
+Version 1.0 `D3Import` begins with the resulting prepared 1.4-plus-Mercenary installation directory. This prepared directory is the user-selected release input, not merely a hidden developer intermediate. Version 1.0 is explicitly limited to users who already possess a supported prepared installation, obtained from their own installed and patched copy or the already verified local preparation. Raw images and installer media are not accepted by the version 1.0 product. `D3Import` does not replace or invoke ISO mounting, InstallShield or OPKG extraction, Mode 2 conversion, patch execution, `unshield`, `bchunk`, Wine, or the historical Python extractor. Those remain separately documented source-preparation provenance and move to the nonshipping support archive at the Phase 10 retirement gate. Its narrower checked import contract is specified in [One-way content pipeline](content-pipeline.md).
 
 ## Legacy reference execution
 

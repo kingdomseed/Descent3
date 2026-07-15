@@ -27,7 +27,7 @@ The host runs the same simulation owner as single-player. Local prediction and r
 
 ## Scale only from evidence
 
-Start with the smallest real end-to-end session and grow through the declared 2–32-human matrices. Measure bandwidth, history, send rate, resimulation, interpolation, and M4 CPU cost before selecting permanent bounds or layouts. Keep the 32 connected-human commitment while letting measured implementation choose the mechanism.
+Start with the smallest real end-to-end session and grow through each mode's source-supported player count. Measure bandwidth, history, send rate, resimulation, interpolation, and M4 CPU cost before selecting permanent bounds or layouts. Keep the released 32 network/player-slot infrastructure and historical listen/dedicated slot accounting without claiming that every mode supports 32 players; campaign co-op begins at its source-evidenced four-player cap. Record any native slot-accounting change as a deliberate modernization.
 
 Use direct data values and functions. Isolate nondeterministic transport and clocks at their real boundaries; do not protocol-wrap the whole simulation merely for tests.
 
@@ -37,6 +37,6 @@ Do not import original packet layouts, direct-IP interoperability, DMFC/native m
 
 ## Verification
 
-Record source capability evidence, focused red/green commands, authoritative checkpoints, prediction and correction traces, declared latency/loss/reorder inputs, observer and replay results, optimized measurements for performance claims, deliberate differences, and source/capability state transitions. Phase 9 closes only with the full local, LAN, relay, dedicated, observer, mode, co-op, outage, creator, replay, and 32-slot matrices defined by the accepted documents.
+Record source capability evidence, focused red/green commands, authoritative checkpoints, prediction and correction traces, declared latency/loss/reorder inputs, observer and replay results, optimized measurements for performance claims, deliberate differences, and source/capability state transitions. Phase 9 closes only with the full local, LAN, selected-Internet-topology, dedicated, observer, mode-specific-count, four-player-co-op, outage, creator, replay, and 32-slot-infrastructure matrices defined by the accepted documents.
 
 Material changes pass the four independent concerns in [`revival-review`](../revival-review/SKILL.md).

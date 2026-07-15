@@ -14,27 +14,27 @@ The revival must preserve useful event, condition, action, timer, state, debuggi
 
 ## Current decision
 
-Do not design the complete replacement interpreter before a real stock behavior runs.
+Do not design the complete replacement interpreter before a real stock behavior runs. Version 1.0 must reproduce the evidenced behavior and creator capability of the shipped game and tools; it does not promise broader mechanics or a particular visual or textual authoring form before translated evidence makes that bridge real.
 
 Phase 4 translates the first Training door, trigger, robot, weapon, goal, message, and presentation chain into ordinary typed Swift functions and small explicit state values inside RevivalCore. This is the canonical current runtime form, not predeclared disposable scaffolding. It keeps event order, conditions, variables, timers, engine calls, and handwritten ranges visible.
 
-The direct translation is tracked in the source-translation ledger and remains valid unless concrete human-authoring cases prove it inadequate. Before proposing a different source representation or executor, working translated evidence must cover:
+The direct translation is tracked in the source-translation ledger and remains the current runtime while concrete human-authoring cases select the required version 1.0 model and its one executor. Before selecting that representation or changing the executor, working translated evidence must cover:
 
 - at least one generated DALLAS chain;
 - at least one handwritten or custom range;
 - at least one timer or persistent-state chain;
 - at least one presentation-oriented chain.
 
-One chain may cover several categories. If that evidence exposes a real authoring or safety limitation, the project may ratify the smallest replacement that can:
+One chain may cover several categories. By version 1.0, that evidence selects the smallest reusable human-authored native model and single runtime path that can:
 
 - express the verified stock chains without special cases;
 - be authored and debugged by people;
 - serialize safely in native projects and packages;
-- grow beyond stock campaign operations;
+- cover source-evidenced creator-tool operations beyond those exercised by the current stock chains;
 - execute without native code or unrestricted platform access;
 - preserve the current tests and observable checkpoints.
 
-An accepted replacement migrates the working chains and removes the superseded runtime path. The project does not require that rewrite in advance or keep direct and interpreted execution as permanent parallel modes.
+The accepted model lets people compose the evidenced DALLAS capability without editing Swift or generated files. Its representation is not preselected. If it replaces the early direct-chain runtime, it migrates the working chains and removes the superseded path; the project never keeps direct and interpreted execution as permanent parallel modes.
 
 Any later source or executor types are named only when an evidence-backed amendment selects their real responsibilities. Possible future names are not current architecture.
 
@@ -117,7 +117,7 @@ Every translated chain records:
 | Content bindings | Durable references required by the chain |
 | Observable checkpoints | Runtime and editor evidence |
 | Deliberate differences | Approved correction or modernization |
-| Native form | Direct typed functions or a later evidence-ratified representation |
+| Native form | Direct typed functions in the current slice and the evidence-ratified version 1.0 authored representation when selected |
 | Ledger state | Use the source-translation ledger states: seed, traced, translating, native-running, verified, replaced, excluded, or deferred |
 
 Known defects and dormant fields do not transfer automatically. Each correction records a decision and checkpoint.
@@ -126,7 +126,7 @@ Known defects and dormant fields do not transfer automatically. Each correction 
 
 The first editor behavior surface configures the bindings, parameters, and explicit state consumed by the translated Swift chain and provides source-linked inspection, trace, and failure navigation. Its control flow remains canonical direct typed Swift. It does not introduce a graph canvas or claim a complete authored language.
 
-If working human-authoring cases establish the need for a reusable authored behavior model, RevivalEditor adds:
+As working human-authoring cases establish the representation and responsibilities of the required version 1.0 model, RevivalEditor adds:
 
 - typed events, values, conditions, actions, variables, timers, functions, and composition as real needs establish them;
 - source and content reference validation;
@@ -146,9 +146,9 @@ Add compatibility revisions when a released save, replay, behavior project, or p
 
 ## Extensibility
 
-The complete mod SDK eventually documents the canonical behavior source, safe domain surface, validation, debugging, packages, and publishing used by first-party content.
+The version 1.0 mod SDK documents the canonical behavior source, safe domain surface, validation, debugging, packages, and publishing required by the evidenced shipped-game and creator-tool capability.
 
-If a later creator capability cannot be expressed safely, extend the typed domain model. Do not restore native modules or create a privileged project-only escape hatch.
+If a later creator capability cannot be expressed safely, extend the typed domain model when that capability becomes accepted scope. Do not speculate beyond the current game merely to advertise extensibility, restore native modules, or create a privileged project-only escape hatch.
 
 ## Verification
 
@@ -162,4 +162,4 @@ For each current chain, tests and evidence cover:
 - the exact checkpoint that justifies each deliberate difference;
 - migration and deletion evidence if an accepted authored executor replaces direct typed functions.
 
-Tests for any later authored representation, executor, limits, authority rules, and debugging tools arrive with the production mechanisms they protect, not as speculative coverage of an imagined complete language.
+Tests for the required version 1.0 authored representation and executor arrive when working evidence selects those production mechanisms. Later limits, authority rules, and debugging extensions arrive with the mechanisms they protect, not as speculative coverage of an imagined complete language.
