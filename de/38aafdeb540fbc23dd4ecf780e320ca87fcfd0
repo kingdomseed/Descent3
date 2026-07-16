@@ -1,0 +1,24 @@
+docs/revival/skill-supply-chain.md
+  s_c503f7c0529e13::t_0d672e2643eb99 52
+  s_c503f7c0529e13::t_8ac31f8cad928e 26
+  s_c503f7c0529e13::t_a6ee55a01a2d19 45-51,53-55
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_c2bd1df3cce826 31-32,66
+  s_c503f7c0529e13::t_d52c468b757868 147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "de38aafdeb540fbc23dd4ecf780e320ca87fcfd0",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
