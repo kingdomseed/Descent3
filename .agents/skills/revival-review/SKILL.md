@@ -82,6 +82,7 @@ Check:
 - no protecting test is skipped, disabled, quarantined, deleted, weakened, or diverted through a test-only path;
 - every checkpoint actually claimed by the change passes: Mac/shared evidence for a Mac/shared claim, physical iPhone and iPad evidence for a mobile composition claim, and both for overall milestone closure; unavailable support-floor hardware blocks only a public-beta or release-floor claim, which must remain open or raise the released floor;
 - every involved source row has the state required to close the claimed island, and each functional row has evidence and the state appropriate to the current slice; a functional row must be terminal only when complete capability closure is claimed;
+- the documentation-continuity handoff routes durable facts to their existing canonical owners, gives the integration owner an exact current-plan proposal or a justified no-change result, and creates no parallel plan or status diary;
 - research code, scaffolding, generated local content, and temporary alternate paths are deleted or archived outside product targets.
 
 Build success alone does not close an observable contract.

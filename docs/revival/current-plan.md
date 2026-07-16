@@ -12,6 +12,8 @@ The [roadmap](roadmap.md) remains the binding phase sequence and the accepted ar
 
 Every contributor reads this file before selecting work. The integration owner updates it in the same change that lands a completed work packet or changes the active sequence. Detailed source dispositions and proof stay in the source and functional ledgers, commit or pull-request record, and owning verification artifact; this file links or summarizes them without duplicating their full history.
 
+At the start or resumption of a material packet and at its handoff or closure, apply the project-local [`revival-documentation-steward`](../../.agents/skills/revival-documentation-steward/SKILL.md) workflow. It restores execution context from this file and the actual tree, routes durable facts to their existing owners, and prepares an exact state-change proposal. It does not create another planning file, and it does not change the rule that only the integration owner edits live state here.
+
 ## Current state
 
 | Field | State |
@@ -161,7 +163,7 @@ Two developers should parallelize independent evidence-producing paths, not crea
 
 ## Updating this file
 
-The integration owner updates this file whenever a work packet lands or a verified result changes the next sequence:
+The documentation steward supplies the evidence-backed reconciliation described below at material packet entry, resumption, handoff, or closure. `No documentation change required` is valid when the active state remains accurate. The integration owner alone updates this file whenever a work packet lands or a verified result changes the next sequence:
 
 1. update the date and the `Current state` table;
 2. record the bounded fog-of-war preflight outcome for a new packet and any resulting boundary, dependency, owner, blocker, or sequence correction; keep detailed inspected paths and evidence in the owning ledger or change record, and accept `no new gap found` when applicable;

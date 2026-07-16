@@ -1,0 +1,4 @@
+interface:
+  display_name: "Revival Documentation Steward"
+  short_description: "Keep Revival planning and evidence coherent"
+  default_prompt: "Use $revival-documentation-steward to restore the current work packet, reconcile durable facts into their canonical Revival documents, and prepare an evidence-backed handoff without creating another plan."

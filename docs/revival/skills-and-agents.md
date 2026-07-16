@@ -8,7 +8,7 @@
 
 Skills encode methods and constraints. They do not make an agent the named author or substitute a generic expert persona for source evidence.
 
-The [roadmap](roadmap.md) and accepted contracts govern scope and phase order. The [current implementation plan](current-plan.md) is the single living record of active state, near-term work, lane ownership, and blockers beneath them. Every contributor reads it before selecting work. One integration owner updates it when work lands or the active sequence changes; agents do not maintain competing plans or edit its live state concurrently.
+The [roadmap](roadmap.md) and accepted contracts govern scope and phase order. The [current implementation plan](current-plan.md) is the single living record of active state, near-term work, lane ownership, and blockers beneath them. Every contributor reads it before selecting work. One integration owner updates it when work lands or the active sequence changes; agents do not maintain competing plans or edit its live state concurrently. The project-local documentation steward restores and reconciles this record at material packet boundaries, but it routes each fact to the existing canonical owner instead of creating another plan, findings file, progress journal, or agent ledger.
 
 Prefer:
 
@@ -103,10 +103,11 @@ The complete current skill set is installed in the repository so the process can
 | [revival-multiplayer](../../.agents/skills/revival-multiplayer/SKILL.md) | Mac and mobile modes, co-op, content negotiation, host difficulty, chat, moderation, commands, media, macOS-only dedicated hosting, authoring, and network matrices |
 | [revival-verification](../../.agents/skills/revival-verification/SKILL.md) | Falsify named evidence claims across concrete Mac, mobile, and editor paths; verify physical-device evidence, milestone matrices, and terminal states; and prevent one check from standing in for another |
 
-Three additional workflow skills stay narrow:
+Four additional workflow skills stay narrow:
 
 | Skill | Purpose |
 | --- | --- |
+| [revival-documentation-steward](../../.agents/skills/revival-documentation-steward/SKILL.md) | Restore actual packet state, detect drift, route durable facts to the accepted documents and ledgers that own them, and prepare evidence-backed handoffs without creating a parallel plan |
 | [revival-wayfinding](../../.agents/skills/revival-wayfinding/SKILL.md) | Expose genuine unknowns and choose the next evidence-producing step without creating a parallel plan |
 | [revival-simplify](../../.agents/skills/revival-simplify/SKILL.md) | Prove the protected behavior surface across applicable Mac, mobile, and editor entry points, then delete defensive, duplicated, speculative, or indirect code without losing ledgered capability |
 | [revival-review](../../.agents/skills/revival-review/SKILL.md) | Run and consolidate the four independent concerns for a material slice: source fidelity, architecture and scope, tests and evidence, and simplicity and maintainability |
@@ -143,7 +144,7 @@ Do not auto-update skills. Review upstream changes before moving a pin. The curr
 
 Use only the steps the current work needs:
 
-1. **Read current state and check the constitution.** Read [`current-plan.md`](current-plan.md), select a named work packet, and confirm the requested result fits the accepted platform, product, content, ownership, and one-path boundaries.
+1. **Restore current state and check the constitution.** Apply `revival-documentation-steward` at material packet entry or resumption: read [`current-plan.md`](current-plan.md), inspect the actual tree and last landed evidence, select a named work packet, and confirm the requested result fits the accepted platform, product, content, ownership, and one-path boundaries. Resolve stale state before implementation without creating another recovery or planning file.
 2. **Uncover the fog of war.** At every new phase, milestone checkpoint, dependency island, subsystem, or material code group, test the proposed packet against the relevant source, current code, callers, state, ordering, lifetime, editor and runtime consumers, fixtures, and evidence. Record what was checked and any real correction. `No new gap found` is valid. Stop when the next observable contract and island boundary are safe to state; do not turn discovery into whole-program analysis.
 3. **Wayfind only when discovery exposes a blocker.** Use `revival-wayfinding` when several linked unknowns still prevent a concrete contract. One direct lookup or a clean preflight proceeds immediately to island tracing and implementation.
 4. **Trace one dependency island.** Name the observable player or editor result, each applicable concrete Mac, mobile, and editor shell, legacy and editor callers, important symbols, ordering, lifetime, baseline, dispositions, and deliberate modernization boundary.
@@ -152,7 +153,7 @@ Use only the steps the current work needs:
 7. **Simplify the diff.** Protect the named behavior surface, then remove duplicated paths, defensive runtime branches, needless indirection, stale comments, speculative flexibility, and measured hot-path waste. Rerun the focused and affected evidence after every accepted simplification.
 8. **Review a material slice.** Run the four independent review concerns and consolidate concrete findings once. The island owner resolves them against source and product evidence; reviewers do not directly redesign the diff.
 9. **Make the change reviewable.** Explain the observable island and source map first, core logic second, wiring and mechanical movement afterward, then risks, deliberate differences, ledger transitions, and exact evidence. Never rewrite history without explicit authority and tree-identity proof.
-10. **Close and hand off.** Require applicable player and creator checkpoints and source-row closure for the island. Advance each functional row only as far as the slice proves; require its terminal state when complete capability or milestone closure is claimed. Give the integration owner the proposed current-state and next-work change; that owner reconciles it into [`current-plan.md`](current-plan.md). Commit, push, open a PR, or generate an optional visual review only when requested.
+10. **Reconcile, close, and hand off.** Apply `revival-documentation-steward`. Require applicable player and creator checkpoints and source-row closure for the island. Advance each functional row only as far as the slice proves; require its terminal state when complete capability or milestone closure is claimed. Route durable facts to their existing accepted document, ledger, or change-record owner, then give the integration owner the exact proposed current-state and next-work change; that owner reconciles it into [`current-plan.md`](current-plan.md). `No documentation change required` is valid when the checked owners remain accurate. Commit, push, open a PR, or generate an optional visual review only when requested.
 
 Routine fog-of-war discovery is mandatory at a new boundary; formal wayfinding is conditional. Neither implies that a defect exists. The process is a feedback loop, not a waterfall. A failed test, capture, review, or real-content run may return the island to discovery, tracing, or wayfinding. Repair the narrow rule that allowed a repeated mistake; do not add a framework to prevent every imaginable one.
 
@@ -178,6 +179,12 @@ Use the following bounded evidence-producing roles rather than standing personas
 2. Transport, security, and operations owner.
 3. Multiplayer creator and independent verification owner.
 
+### Documentation continuity
+
+Assign a documentation steward as a bounded role at material packet entry or resumption and again at the review join or handoff. The role restores the packet from `current-plan.md`, the actual tree, the owning contracts, and applicable rows; detects conflicting or stale claims; and returns the smallest evidence-backed patch or a justified `no documentation change required` result.
+
+The steward may audit in parallel with implementation when it remains read-only and does not distract the packet owner. At a join, name ownership before it edits an accepted document or ledger row. Only the integration owner edits live `current-plan.md` state, accepts or rejects proposed state transitions, and resolves cross-lane conflicts. The role is not a third development lane, does not decide product scope, and does not maintain `task_plan.md`, `findings.md`, `progress.md`, `.planning/`, or another work diary.
+
 ### Independent review
 
 After every material slice, cover four concerns independently:
@@ -192,6 +199,7 @@ Use separate reviewers when capacity allows. Run the remaining concern in the ne
 ## Operating rules
 
 - Give each agent one bounded output and one owner.
+- At a material packet boundary, require a documentation-continuity handoff naming the actual base and target, packet and owners, durable facts and canonical files changed, proposed current-plan update and integration-owner disposition, row transitions, exact evidence, blockers, and next slices. Do not require a documentation edit when no durable fact changed.
 - Separate verified fact, inference, current decision, and open hypothesis.
 - Require primary-source or local-code evidence for technical claims.
 - Require focused red/green evidence for shipping behavior and a deletion gate for temporary scaffolds.
@@ -202,4 +210,4 @@ Use separate reviewers when capacity allows. Run the remaining concern in the ne
 - A behavior reviewer grows the safe model from working chains, covers the evidenced shipped-game and creator-tool capability for version 1.0, and may not add native-code escape hatches or speculative post-1.0 mechanics.
 - A multiplayer reviewer implements the one affordable native route accepted from current evidence and does not inherit original packets or assume a project-operated service merely because source or an earlier plan exists.
 - A reviewer distinguishes legitimate semantic fidelity from prohibited API, ABI, and platform compatibility.
-- The root integration agent resolves conflicts, keeps the documents consistent, owns live updates to [`current-plan.md`](current-plan.md), and ensures review findings change the actual diff when warranted.
+- The root integration agent resolves conflicts, owns live updates to [`current-plan.md`](current-plan.md), accepts or rejects the documentation steward's proposed reconciliation against evidence, keeps the documents consistent, and ensures review findings change the actual diff when warranted.

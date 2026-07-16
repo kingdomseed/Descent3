@@ -4,7 +4,7 @@ This project is building a complete Apple-native revival of Descent 3: the game,
 
 The route is a source-led native translation, not a greenfield design exercise and not a shipping C++ port. We translate the pinned released source in coherent dependency order, keep every relevant file accounted for, and preserve observable game and creator semantics before deliberately modernizing them. The finished product contains no legacy runtime.
 
-The roadmap phases are broad dependency groupings, not promises that every capability inside a phase lands at once. Phase 10 is the complete version 1.0 release. Phase 11 is explicitly post-1.0 visual and experiential development. [The current implementation plan](docs/revival/current-plan.md) is the single living record of active state, near-term work, and ownership beneath that roadmap and the accepted contracts; contributors read it and the integration owner updates it instead of maintaining another current-work plan.
+The roadmap phases are broad dependency groupings, not promises that every capability inside a phase lands at once. Phase 10 is the complete version 1.0 release. Phase 11 is explicitly post-1.0 visual and experiential development. [The current implementation plan](docs/revival/current-plan.md) is the single living record of active state, near-term work, and ownership beneath that roadmap and the accepted contracts; contributors read it and the integration owner updates it instead of maintaining another current-work plan. The project-local [documentation steward](.agents/skills/revival-documentation-steward/SKILL.md) restores that state at material packet boundaries and routes durable changes to their existing owners without creating another plan or journal.
 
 One guiding light applies whenever the work enters a new phase, milestone checkpoint, dependency island, subsystem, or material code group: **uncover the fog of war**. Before implementation, challenge the current plan against the accepted contracts, pinned source, real callers, ledgers, code, and observable evidence. Do not assume that planning has already found every dependency or nuance. Do not assume that a defect exists either. The bounded preflight may conclude that no new gap was found; deeper wayfinding begins only when it exposes linked unknowns that block a concrete contract. [Source translation discipline](docs/revival/source-translation.md#fog-of-war-preflight) defines the procedure.
 
@@ -148,7 +148,7 @@ Reference captures answer specific behavioral questions. Product tests then prot
 - [Adaptive music](docs/revival/adaptive-music.md) defines score translation and native playback.
 - [Creator suite](docs/revival/creator-suite.md) defines the human-first editor.
 - [Verification](docs/revival/verification.md) defines translation, product, Mac, and physical-mobile-device evidence.
-- [Skills and agents](docs/revival/skills-and-agents.md) defines workstream playbooks and roles.
+- [Skills and agents](docs/revival/skills-and-agents.md) defines workstream playbooks, bounded roles, and documentation continuity.
 - [Skill supply chain](docs/revival/skill-supply-chain.md) records external pins, licenses, allowed advice, and project overrides.
 - [Primary technical source index](docs/revival/primary-source-index.md) preserves the key web documentation, the question each source answers, and its limits.
 - [Discovery](docs/revival/discovery.md) records historical source and development evidence.
