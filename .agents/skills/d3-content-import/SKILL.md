@@ -14,6 +14,7 @@ This skill implements accepted documents; it cannot amend them. Read [`AGENTS.md
 - [`content-pipeline.md`](../../../docs/revival/content-pipeline.md)
 - [`retail-data.md`](../../../docs/revival/retail-data.md)
 - [`world-loading.md`](../../../docs/revival/world-loading.md)
+- [`current-plan.md`](../../../docs/revival/current-plan.md)
 - the current import rows in the source and functional ledgers
 
 Before first production use for a new format or campaign slice, retrace the current legacy reader and dependency path, compare this skill with the accepted documents, and amend the skill if the evidence changed.
@@ -31,7 +32,7 @@ Before first production use for a new format or campaign slice, retrace the curr
 
 ## Source-led import workflow
 
-1. Name the requested complete level or campaign slice, accepted source profile, owning capability rows, and expected canonical consumers across RevivalMac, RevivalMobile, and RevivalEditor.
+1. Name the `current-plan.md` import packet and checkpoint, requested complete level or campaign slice, accepted source profile, owning capability rows, and canonical consumers applicable to that checkpoint. Preserve RevivalMobile as a later consumer even when the active packet is Mac/shared.
 2. Trace the legacy entry point, container precedence, case rules, field layout, ordering, references, dependency discovery, and failure behavior.
 3. Add or deepen source-ledger rows for every parser, lookup path, definition reader, dependency expansion, and relevant editor or runtime caller.
 4. Capture a source checkpoint or owned local baseline. Separate verified fact, inference, current decision, and deferred reachability.
@@ -41,7 +42,7 @@ Before first production use for a new format or campaign slice, retrace the curr
 8. Preserve source-supported order and relationships in simple canonical values; validate once before constructing trusted values.
 9. Integrate through the real D3Import operation, not a test-only parser or in-process runtime shortcut.
 10. Write and validate an empty destination-adjacent temporary package and report, then atomically promote only after the whole request succeeds.
-11. Run the affected suite and applicable complete-Level, Mac-player, editor-isolation, failure-preservation, and local-retail evidence. When package schema, promotion, handoff, or consumer composition changes, also run the mobile-player production file-picker-to-app-storage path; a parser-only change does not duplicate unrelated `T-019` evidence and never exposes a retail source to the mobile target.
+11. Run the affected suite and applicable complete-Level, Mac-player, editor-isolation, failure-preservation, and local-retail evidence. At a claimed mobile composition checkpoint, run the production file-picker-to-app-storage path for the package schema, promotion, handoff, and consumer behavior it exercises. A parser-only or Mac/shared checkpoint leaves that later mobile evidence open, does not duplicate unrelated `T-019` evidence, and never exposes a retail source to the mobile target.
 12. Record exact red and green commands, source comparison, deliberate differences, hashes, provenance, coverage, ignored entries, and ledger states.
 
 ## Canonical and failure rules
@@ -80,7 +81,7 @@ An import slice closes only when:
 - archive precedence, naming, hashes, source identity, and deterministic provenance are recorded;
 - eager working-set evidence and currently reachable lazy dependencies are distinct and complete for the claimed path;
 - malformed and unknown-used-feature cases fail diagnostically, and destination failure preserves the previous valid package;
-- the promoted canonical package validates and the applicable RevivalMac, RevivalMobile, and RevivalEditor checks prove no retail format is opened; when package or handoff behavior changed, mobile intake proves the selected package is copied into app-owned storage before use;
+- the promoted canonical package validates and the consumers applicable to the claimed checkpoint prove no retail format is opened; a parser-only checkpoint closes through production D3Import, a Mac/shared integration checkpoint adds RevivalMac and RevivalEditor, and the separate mobile composition checkpoint proves file-picker intake, copy into app-owned storage, and shared native-package validation when package or handoff behavior is reached;
 - involved source rows reach `verified`, `replaced`, `excluded`, or justified current-claim `deferred`; claimed functional rows have the applicable evidence;
 - focused red, focused green, affected-suite, complete-Level, and applicable integrated evidence are recorded with no required skip;
 - temporary research code is removed or archived outside product targets, and proprietary outputs remain ignored;
@@ -92,4 +93,4 @@ Run exact focused and integration commands for the real targets. At minimum:
 rtk git diff --check
 ```
 
-Do not report a synthetic parser pass as Training import, a package write as atomic-promotion proof, a simulator-only picker exercise as physical mobile package-intake proof, or a build as import correctness.
+A parser-only or Mac/shared import packet does not wait on unrelated mobile hardware. It also does not claim mobile intake, overall milestone completion, or version 1.0 readiness. Do not report a synthetic parser pass as Training import, a package write as atomic-promotion proof, a simulator-only picker exercise as physical mobile package-intake proof, or a build as import correctness.

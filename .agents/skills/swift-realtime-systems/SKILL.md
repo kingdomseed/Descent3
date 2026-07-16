@@ -18,9 +18,10 @@ This skill implements, and cannot amend:
 - [`docs/revival/engineering-principles.md`](../../../docs/revival/engineering-principles.md)
 - [`docs/revival/test-driven-development.md`](../../../docs/revival/test-driven-development.md)
 - [`docs/revival/roadmap.md`](../../../docs/revival/roadmap.md)
+- [`docs/revival/current-plan.md`](../../../docs/revival/current-plan.md)
 - [`docs/revival/verification.md`](../../../docs/revival/verification.md)
 
-Use the Swift 6.4 compiler toolchain in Swift 6 language mode from Xcode 27. During the beta window, use the current Xcode 27 beta; when stable Xcode 27 ships, replace the beta toolchain and delete any beta-only workaround. Compiler version and language mode are distinct; do not call it “Swift 6.4 language mode.” Do not maintain source flags, package branches, or alternate implementations for Swift 6.3.
+Use the Swift 6.4 compiler toolchain in Swift 6 language mode from Xcode 27. During the beta window, use the current Xcode 27 beta; when stable Xcode 27 ships, replace the beta toolchain and delete any beta-only workaround. Compiler version and language mode are distinct; do not call it “Swift 6.4 language mode.” Do not maintain source flags, package branches, or alternate implementations for Swift 6.3. Use `current-plan.md` to select the active Mac/shared or mobile composition packet without forking the simulation path.
 
 Use Swift 6.4 features only when they simplify a real contract. Awaited cleanup inside an ordinary `defer` may make cleanup clearer at an actual asynchronous import, media, or editor-operation boundary; it does not make simulation asynchronous. Iteration over noncopyable `Span` or `InlineArray` is a measured hot-path option, not the starting data model. `anyAppleOS` availability syntax does not justify a portability layer, and `@diagnose` belongs only on a real project-owned API contract. Toolchain improvements do not create work by themselves.
 
@@ -34,7 +35,7 @@ Before production code:
 4. Write one focused test through the production path and observe its intended red before implementing the contract.
 5. Make the smallest direct Swift change, observe green, then simplify without changing the protected result.
 
-Do not translate files alphabetically, create a Swift file per C++ file, or build a layer of compiling stubs. Finish a dependency island that runs in every applicable concrete player shell and the editor where applicable.
+Do not translate files alphabetically, create a Swift file per C++ file, or build a layer of compiling stubs. Finish the checkpoint selected for the dependency island through every shell applicable to that checkpoint. A Mac/shared timing packet may release the next Mac/shared island before RevivalMobile composition, but both checkpoints use the same simulation implementation and overall milestone closure waits for both.
 
 ## Current timing contract
 
@@ -85,7 +86,7 @@ Focused controlled-clock tests cover one contract at a time:
 
 Record the exact red command and intended failure, green command and pass, affected suite, reference input, tolerances, and every deliberate difference. Tests exercise the shipping simulation step; do not test an imitation or add product visibility solely for tests.
 
-Profile only optimized builds on the recorded M4 and, where the affected player path applies, the recorded physical minimum iPhone and iPad. Measure the representative update path, allocations, copies, retain/release work, collection layout, and CPU budget with Instruments. Change the smallest responsible function or storage only after a reproducible missed budget or regression, then rerun functional evidence and the same profile on every affected reference device. Zero allocations, `Span`, `InlineArray`, noncopyable types, borrowing, and layout changes are possible measured conclusions, not starting architecture.
+Profile only optimized builds on the recorded M4 and, when the claim includes the affected mobile path, applicable physical iPhone and iPad development hardware. Measure the representative update path, allocations, copies, retain/release work, collection layout, and CPU budget with Instruments. Change the smallest responsible function or storage only after a reproducible missed budget or regression, then rerun functional evidence and the same profile on every affected reference device. Exact support-floor certification remains public-beta or release evidence and does not block a Mac/shared timing packet. Zero allocations, `Span`, `InlineArray`, noncopyable types, borrowing, and layout changes are possible measured conclusions, not starting architecture.
 
 When a profile attributes time to Swift host code, inspect unexpected `memmove`, copy-on-write copies, `swift_retain`, `swift_release`, `swift_beginAccess`, `swift_endAccess`, unspecialized generic calls, protocol witness dispatch, and closure or task allocation. Their presence is a lead, not a defect. Swift 6.4 `PerformanceHints` may be enabled as warnings during the focused investigation; do not turn them into project-wide errors or abstraction bans.
 

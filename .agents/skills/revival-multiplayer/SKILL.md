@@ -9,7 +9,7 @@ Rebuild the complete useful multiplayer capability on the one native simulation,
 
 ## Authority and activation
 
-Read [`AGENTS.md`](../../../AGENTS.md), [`functional-completeness.md`](../../../docs/revival/functional-completeness.md), [`functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md), [`roadmap.md`](../../../docs/revival/roadmap.md), [`verification.md`](../../../docs/revival/verification.md), and [`creator-suite.md`](../../../docs/revival/creator-suite.md).
+Read [`AGENTS.md`](../../../AGENTS.md), [`functional-completeness.md`](../../../docs/revival/functional-completeness.md), [`functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md), [`roadmap.md`](../../../docs/revival/roadmap.md), [`current-plan.md`](../../../docs/revival/current-plan.md), [`verification.md`](../../../docs/revival/verification.md), and [`creator-suite.md`](../../../docs/revival/creator-suite.md).
 
 This skill is installed now. Immediately before Phase 9 multiplayer work, review and amend it against the working final simulation, replay, behavior, transport, content, and editor models. Historical capability rows set scope; legacy packets, DLL interfaces, services, and dialogs do not set architecture.
 
@@ -40,6 +40,6 @@ Do not load binary community modules, preserve DMFC ABI shape, reproduce old pac
 
 ## Verification
 
-Record red/green commands, source and deliberate-difference evidence, runtime and creator checkpoints, published-package identity, mode results, security and outage inputs, replay results, optimized measurements for scale claims, and terminal ledger transitions. Phase 9 exits only when the accepted local, LAN, selected-Internet-topology, both-player listen-host, Mac-only dedicated, observer, mode-specific-count, four-player-co-op, security, outage, authoring, publishing, replay, mobile local-network/lifecycle and 32-slot-infrastructure matrices pass. Mobile claims run on the recorded physical minimum iPhone and iPad.
+Record red/green commands, source and deliberate-difference evidence, runtime and creator checkpoints, published-package identity, mode results, security and outage inputs, replay results, optimized measurements for scale claims, and terminal ledger transitions. Phase 9 exits only when the accepted local, LAN, selected-Internet-topology, both-player listen-host, Mac-only dedicated, observer, mode-specific-count, four-player-co-op, security, outage, authoring, publishing, replay, mobile local-network/lifecycle and 32-slot-infrastructure matrices pass. Mobile claims run on applicable physical iPhone and iPad hardware; representative support-floor certification is a public-beta or release claim rather than a blocker for independent Mac/shared multiplayer packets.
 
 Run [`revival-review`](../revival-review/SKILL.md) for every material mode or workflow slice.

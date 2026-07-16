@@ -9,9 +9,9 @@ Add networking to the working final simulation without forking its rules or inhe
 
 ## Authority and activation
 
-Read [`AGENTS.md`](../../../AGENTS.md), [`roadmap.md`](../../../docs/revival/roadmap.md), [`verification.md`](../../../docs/revival/verification.md), [`source-translation.md`](../../../docs/revival/source-translation.md), and the multiplayer rows in [`functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md).
+Read [`AGENTS.md`](../../../AGENTS.md), [`roadmap.md`](../../../docs/revival/roadmap.md), [`current-plan.md`](../../../docs/revival/current-plan.md), [`verification.md`](../../../docs/revival/verification.md), [`source-translation.md`](../../../docs/revival/source-translation.md), and the multiplayer rows in [`functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md).
 
-This skill is installed now but must be reviewed and amended against the final scheduler, behavior model, replay path, collision model, and representative M4, iPhone and iPad measurements immediately before Phase 9 simulation work. Details not fixed by accepted documents remain open until that review.
+This skill is installed now but must be reviewed and amended against the final scheduler, behavior model, replay path, collision model, and measurements applicable to the active `current-plan.md` packet immediately before Phase 9 simulation work: M4 evidence for a Mac/shared claim and physical iPhone and iPad evidence when the claim includes mobile. Representative support-floor certification remains public-beta or release evidence rather than an activation gate for Mac/shared networking. Details not fixed by accepted documents remain open until that review.
 
 ## Derive the model from working behavior
 

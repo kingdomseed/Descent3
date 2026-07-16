@@ -16,9 +16,10 @@ Read the current contract and the accepted documents that own it, especially:
 - [`docs/revival/test-driven-development.md`](../../../docs/revival/test-driven-development.md)
 - [`docs/revival/source-translation.md`](../../../docs/revival/source-translation.md)
 - [`docs/revival/source-translation-ledger.md`](../../../docs/revival/source-translation-ledger.md)
+- [`docs/revival/current-plan.md`](../../../docs/revival/current-plan.md)
 - the current domain document
 
-These documents decide scope and semantics. This skill cannot delete a ledgered capability, approve a deliberate behavior change, add a production path, or amend architecture.
+These documents decide scope and semantics. `current-plan.md` selects the active packet and checkpoint without changing those contracts. This skill cannot delete a ledgered capability, approve a deliberate behavior change, add a production path, or amend architecture.
 
 Simplification is the refactor step of a green contract. If the proposed edit changes observable behavior, stop and begin a new red-green-refactor cycle. If the relevant behavior is unknown, resolve it with the smallest direct source trace or experiment; use `revival-wayfinding` only when multiple linked unknowns meet that skill's trigger gate.
 
@@ -72,7 +73,7 @@ Look for concrete simplifications in five areas.
 - Remove work that is provably repeated, unused, or immediately overwritten.
 - Keep observable iteration order, Float32 operation order, update order, eager preparation, reachable lazy dependency discovery, and final GPU-use lifetime intact.
 - Do not add concurrency, caching, unsafe access, specialization, custom allocation, streaming, or a scheduler change as cleanup.
-- Performance refactoring requires the accepted optimized M4 measurement gate and, for applicable player claims, measurement on the recorded physical minimum supported iPhone and iPad. Line count and theoretical speed are not evidence.
+- Performance refactoring requires the accepted optimized M4 measurement gate and, when the claim includes a mobile path, applicable physical iPhone and iPad measurement. Exact support-floor certification is public-beta or release evidence and does not block an independent Mac/shared simplification. Line count and theoretical speed are not evidence.
 
 ### Blast radius
 

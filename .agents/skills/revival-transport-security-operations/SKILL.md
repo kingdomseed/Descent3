@@ -9,7 +9,7 @@ Keep hostile network handling at explicit boundaries and keep the simulation ind
 
 ## Authority and activation
 
-Read [`AGENTS.md`](../../../AGENTS.md), [`architecture.md`](../../../docs/revival/architecture.md), [`internet-multiplayer-study.md`](../../../docs/revival/internet-multiplayer-study.md), [`roadmap.md`](../../../docs/revival/roadmap.md), [`verification.md`](../../../docs/revival/verification.md), [`engineering-principles.md`](../../../docs/revival/engineering-principles.md), and the network/service rows in [`functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md).
+Read [`AGENTS.md`](../../../AGENTS.md), [`architecture.md`](../../../docs/revival/architecture.md), [`internet-multiplayer-study.md`](../../../docs/revival/internet-multiplayer-study.md), [`roadmap.md`](../../../docs/revival/roadmap.md), [`current-plan.md`](../../../docs/revival/current-plan.md), [`verification.md`](../../../docs/revival/verification.md), [`engineering-principles.md`](../../../docs/revival/engineering-principles.md), and the network/service rows in [`functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md).
 
 This skill is installed now. Phase 0 first records current direct, player-hosted, community-operated, platform-provided, and third-party-supported Internet options without adding production transport types. Review and amend the detailed contracts against the accepted topology, final simulation, current platform and selected-provider APIs, and the actual operational owner immediately before Phase 9 transport work. Network and CryptoKit are evaluated only where applicable. Exact algorithms, records, tokens, leases, bounds, costs, and outage policy are fixed then through an accepted decision and focused tests.
 
@@ -39,7 +39,7 @@ Do not add original-server interoperability, original reliability or packet laye
 
 ## Verification
 
-Use focused red/green evidence plus declared LAN, representative Internet-reachability, reconnect, outage, key, replay-rejection, hostile-input, media, authorization, audit, capacity, privacy, deployment, recurring-cost, continuity, and monitoring matrices applicable to the accepted topology. Run mobile LAN discovery, local-network permission denial/recovery, listen hosting and lifecycle outcomes on the recorded physical minimum iPhone and iPad; a simulator does not close those claims. Record skipped cases as non-passes. Verify exact public configuration and deployed revision when deployment is requested.
+Use focused red/green evidence plus declared LAN, representative Internet-reachability, reconnect, outage, key, replay-rejection, hostile-input, media, authorization, audit, capacity, privacy, deployment, recurring-cost, continuity, and monitoring matrices applicable to the accepted topology. Run mobile LAN discovery, local-network permission denial/recovery, listen hosting and lifecycle outcomes on applicable physical iPhone and iPad hardware; a simulator does not close those claims. Representative support-floor certification is required before claiming that floor for public beta or release, not before independent Mac/shared transport work. Record skipped cases as non-passes. Verify exact public configuration and deployed revision when deployment is requested.
 
 Architecture, evidence, simplicity, and fidelity-to-capability review remain independent under [`revival-review`](../revival-review/SKILL.md). Security findings are concrete reachable boundary failures, not requests for defensive code everywhere.
 

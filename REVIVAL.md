@@ -4,7 +4,9 @@ This project is building a complete Apple-native revival of Descent 3: the game,
 
 The route is a source-led native translation, not a greenfield design exercise and not a shipping C++ port. We translate the pinned released source in coherent dependency order, keep every relevant file accounted for, and preserve observable game and creator semantics before deliberately modernizing them. The finished product contains no legacy runtime.
 
-The roadmap phases are broad dependency groupings, not promises that every capability inside a phase lands at once. Phase 10 is the complete version 1.0 release. Phase 11 is explicitly post-1.0 visual and experiential development.
+The roadmap phases are broad dependency groupings, not promises that every capability inside a phase lands at once. Phase 10 is the complete version 1.0 release. Phase 11 is explicitly post-1.0 visual and experiential development. [The current implementation plan](docs/revival/current-plan.md) is the single living record of active state, near-term work, and ownership beneath that roadmap and the accepted contracts; contributors read it and the integration owner updates it instead of maintaining another current-work plan.
+
+One guiding light applies whenever the work enters a new phase, milestone checkpoint, dependency island, subsystem, or material code group: **uncover the fog of war**. Before implementation, challenge the current plan against the accepted contracts, pinned source, real callers, ledgers, code, and observable evidence. Do not assume that planning has already found every dependency or nuance. Do not assume that a defect exists either. The bounded preflight may conclude that no new gap was found; deeper wayfinding begins only when it exposes linked unknowns that block a concrete contract. [Source translation discipline](docs/revival/source-translation.md#fog-of-war-preflight) defines the procedure.
 
 ## Product direction
 
@@ -17,7 +19,7 @@ The shipping product uses:
 - AVFoundation and AVAudioEngine for media and sound;
 - Model I/O for the first native USD creator ingress;
 - Network and Bonjour for native LAN multiplayer, with the Internet transport and security boundaries selected from current evidence;
-- arm64 Macs on macOS 26 or later and Metal 4-capable iPhone and iPad devices on iOS or iPadOS 26 or later, using Apple GPU family 7 as the minimum mobile feature baseline;
+- arm64 Macs on macOS 26 or later and Metal 4-capable iPhone and iPad devices on iOS or iPadOS 26 or later, with Apple GPU family 7 as the candidate mobile feature floor pending representative release evidence;
 - one canonical content model shared by runtime, editor, saves, replay, multiplayer, and publishing.
 
 There is one renderer, one active simulation scheduler, one active level-lifetime path, and one canonical world model and production path. Player, editor document, and editor play session own separate values; OpenGL, SDL, MFC, DLL interfaces, original saves and packets, and retail runtime formats do not survive as product layers.
@@ -30,7 +32,7 @@ The replacement adds one universal UIKit executable, `RevivalMobile`. It compose
 
 RevivalEditor, D3Import, and dedicated no-window hosting remain macOS-only. D3Import remains the only legacy-format reader. RevivalMobile accepts only a Mac-produced canonical package through the system file picker, validates and atomically installs it through the same native-package contract, and copies it into app-owned storage. Version 1.0 mobile use therefore requires access to a Mac that can run D3Import. There is no existing native implementation or released canonical package to migrate; the superseded macOS-only target wording is deleted in this amendment.
 
-The first mobile deployment target is iOS and iPadOS 26 or later on Metal 4 Apple GPU family 7 or newer. Phase 0 records one actual minimum-supported iPhone and iPad before production begins. Public mobile distribution requires a separate accepted rights, GPL, review-content, signing, channel, and enabled-device-family record before release; App Store availability is not assumed merely because the player target exists. If the App Store is selected, unapproved visionOS availability and iPhone/iPad-app execution on Apple Silicon Macs remain disabled unless those targets receive their own amendment and evidence.
+The first mobile deployment target is iOS and iPadOS 26 or later, with Metal 4 Apple GPU family 7 or newer as the candidate release floor. Development proceeds on available physical hardware, and missing older floor hardware does not block the Mac-first rewrite or ordinary mobile composition. Before public beta or release claims Apple GPU family 7 support, the project verifies a representative floor-device matrix or raises the released floor to the oldest hardware it can support with evidence. Public mobile distribution also requires a separate accepted rights, GPL, review-content, signing, channel, and enabled-device-family record before release; App Store availability is not assumed merely because the player target exists. If the App Store is selected, unapproved visionOS availability and iPhone/iPad-app execution on Apple Silicon Macs remain disabled unless those targets receive their own amendment and evidence.
 
 ## Translation before redesign
 
@@ -53,18 +55,18 @@ The first native world starts from the original game's operational baseline:
 - D3Import converts the complete Training D3L world plus every asset reachable by the currently translated path into checked canonical content;
 - RevivalCore constructs the complete resident level world;
 - a direct PageInAllData-style pass eagerly prepares the evidenced working set, while later source-reachable presentation assets load only from the canonical package and then remain resident;
-- RevivalMac, RevivalMobile, and RevivalEditor use the same world types, loader, simulation, and renderer, with separately owned player, document, and play-session values;
+- RevivalMac and RevivalEditor first establish the same world types, loader, simulation, and renderer with separately owned player, document, and play-session values; RevivalMobile then composes the proven shared path without creating another implementation;
 - exit waits for final GPU use and releases the level resources through one owner.
 
 The released engine did not prove a complete GPU-ready dependency closure at activation: bitmap, object, matcen, and Osiris paths could page additional assets later, and the retained GPU pre-upload hook is a no-op. The canonical-only runtime is a deliberate one-way-content strengthening. Its package contains the complete level topology and every dependency reachable through the currently translated product path, then expands when a new product path becomes real; eager-versus-lazy preparation still follows the source until measurement supports a change.
 
-This is the concrete current implementation. It is not “no streaming ever.” Spatial streaming is considered only after the complete playable Training Mission and representative large indoor, outdoor, editor, and higher-resolution workloads are measured on the recorded M4 and minimum supported iPhone and iPad. A later amendment must replace the resident mechanism across platforms rather than add permanent Mac and mobile modes. [World loading and residency](docs/revival/world-loading.md) defines that gate.
+This is the concrete current implementation. It is not “no streaming ever.” Spatial streaming is considered only after the complete playable Training Mission and representative large indoor, outdoor, editor, and higher-resolution workloads are measured on the recorded M4 and applicable mobile development hardware. Before the supported mobile floor is claimed at public beta or release, the chosen lifetime path must also pass representative floor-device evidence or the floor must be raised. A later amendment must replace the resident mechanism across platforms rather than add permanent Mac and mobile modes. [World loading and residency](docs/revival/world-loading.md) defines that gate.
 
 The first scheduler preserves the historical old/new timing handoff explicitly. Frame systems and `EVT_INTERVAL` consume the previous `Frametime` and pre-update `Gametime`; after cap waiting, `CalcFrameTime` stores the new duration, then `GameFrame` advances `Gametime` before the remaining tail work. It preserves the static/`InitGame` 0.1-second initialization and nested pause/rebase behavior without retaining mutable globals. After flight, collision, interval events, and animation have native reference evidence, Phase 3 chooses and completes one final timing model. Fixed 120 Hz remains a candidate, not a Phase 1 fact, and the product will not keep variable and fixed modes in parallel.
 
 ## Editor and runtime together
 
-RevivalEditor begins in Phase 1, not after an engine foundation is designed in isolation. The first integrated slice loads the complete imported Training Level in RevivalMac, RevivalMobile, and RevivalEditor, focuses one acceptance room, derives an editable complete-level project value from the read-only base, renders every viewport through the same Metal path, performs one real editor mutation with undo, saves and reopens, enters the shipping simulation with a disposable play-session copy, and returns to the document.
+RevivalEditor begins in Phase 1, not after an engine foundation is designed in isolation. The first Mac/shared integrated checkpoint loads the complete imported Training Level in RevivalMac and RevivalEditor, focuses one acceptance room, derives an editable complete-level project value from the read-only base, renders both viewports through the same Metal path, performs one real editor mutation with undo, saves and reopens, enters the shipping simulation with a disposable play-session copy, and returns to the document. RevivalMobile then composes that proven canonical load and Metal result through its concrete UIKit, storage, input, audio-session, and lifecycle boundaries. The mobile checkpoint remains required for the overall milestone and version 1.0, but it does not block the next independent Mac/shared dependency island.
 
 This does not claim that Descent 3 was historically built by completing its editor first. The evidence shows editor and runtime co-development around shared initialization entry points with editor branches, production world and level functions, low-level rendering, and the actual runtime loop during editor-hosted play. We are following that useful integration pattern while replacing the Windows and MFC machinery.
 
@@ -106,7 +108,7 @@ Stock behavior is translated from generated and handwritten source one actual de
 
 ## Product shape
 
-The initial workspace has four executable products and two named code-ownership areas:
+The product has four executable products and two named code-ownership areas. Initial workspace work establishes D3Import, the shared ownership areas, RevivalMac, and RevivalEditor first; RevivalMobile joins when the first proven shared slice is ready for UIKit composition:
 
 | Product or ownership area | Responsibility |
 | --- | --- |
@@ -125,7 +127,7 @@ The project has no generic ECS, job system, render graph, dependency-injection f
 
 The pinned source builds natively as arm64 on the local M4 after a small header correction, all 12 upstream tests pass, owned base and Mercenary data has been verified, and the reference executable reaches Training and base campaign level 1. Those results make the source and data useful translation evidence; no production target depends on the reference engine.
 
-Reference captures answer specific behavioral questions. Product tests then protect the accepted native contract. Optimized M4 and minimum-supported-device profiles decide modernizations. We do not maintain permanent cross-engine parity CI or optimize hypothetical bottlenecks.
+Reference captures answer specific behavioral questions. Product tests then protect the accepted native contract. Optimized M4 and applicable development-device profiles guide implementation modernizations. Representative floor-device evidence certifies the published mobile floor at public beta or release; it is not a prerequisite for beginning the rewrite. We do not maintain permanent cross-engine parity CI or optimize hypothetical bottlenecks.
 
 ## Documentation
 
@@ -134,6 +136,7 @@ Reference captures answer specific behavioral questions. Product tests then prot
 - [Source translation ledger](docs/revival/source-translation-ledger.md) records the initial file-by-file dispositions and closure status.
 - [World loading and residency](docs/revival/world-loading.md) defines the resident baseline and measured amendment gate.
 - [Roadmap](docs/revival/roadmap.md) gives the concrete vertical-slice sequence.
+- [Current implementation plan](docs/revival/current-plan.md) is the single living record of active state, near-term work, and developer ownership beneath the roadmap and accepted contracts.
 - [Functional completeness](docs/revival/functional-completeness.md) and the [ledger](docs/revival/functional-completeness-ledger.md) define complete scope.
 - [Future opportunities](docs/revival/future-opportunities.md) preserves source-evidenced dormant or incomplete ideas without making them false 1.0 requirements.
 - [Internet multiplayer study](docs/revival/internet-multiplayer-study.md) defines the bounded Phase 0 evidence record and decision gate for an affordable 2026 topology.

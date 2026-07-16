@@ -22,17 +22,19 @@ This skill implements accepted documents; it cannot amend them. Read before usin
 - [`docs/revival/engineering-principles.md`](../../../docs/revival/engineering-principles.md)
 - [`docs/revival/test-driven-development.md`](../../../docs/revival/test-driven-development.md)
 - [`docs/revival/roadmap.md`](../../../docs/revival/roadmap.md)
+- [`docs/revival/current-plan.md`](../../../docs/revival/current-plan.md)
 - [`docs/revival/verification.md`](../../../docs/revival/verification.md)
 - [`docs/revival/skills-and-agents.md`](../../../docs/revival/skills-and-agents.md)
 
-Read the current domain document and ledger rows for the proposed work. Before this skill's first production use in a workstream, compare it with the current accepted documents and source evidence; amend the skill if it is stale. The documents still win.
+Read the current domain document and ledger rows for the proposed work. Use `current-plan.md` to select the active work packet, lane, owner, and integration checkpoint; it is an execution record under the roadmap and cannot amend an accepted contract. Before this skill's first production use in a workstream, compare it with the current accepted documents and source evidence; amend the skill if it is stale. The documents still win.
 
 ## Constitutional invariants
 
-- Ship the player on arm64 macOS 26+ and Metal 4-capable iPhone and iPad devices running iOS or iPadOS 26+, with Apple GPU family 7 or newer as the mobile floor. Use the Swift 6.4 compiler in Swift 6 language mode, MSL, direct Apple frameworks, and Metal 4. Use Xcode 27 beta until stable Xcode 27 replaces it; keep no Swift 6.3 compatibility path.
+- Ship the player on arm64 macOS 26+ and Metal 4-capable iPhone and iPad devices running iOS or iPadOS 26+, with Apple GPU family 7 or newer as the candidate mobile release floor pending representative `P-093` evidence. If that evidence is unavailable or fails, raise the released floor to the oldest hardware actually verified. Use the Swift 6.4 compiler in Swift 6 language mode, MSL, direct Apple frameworks, and Metal 4. Use Xcode 27 beta until stable Xcode 27 replaces it; keep no Swift 6.3 compatibility path.
 - Keep RevivalEditor, D3Import, and dedicated no-window hosting macOS-only. Use concrete AppKit and UIKit shells over the same RevivalCore, RevivalMetal, canonical world, scheduler, renderer, and package paths; do not add a generic platform, input, filesystem, renderer, or simulation abstraction.
 - Ship no legacy C or C++ engine, Objective-C++ bridge, Rust runtime, OpenGL or SDL runtime, Wine or Game Porting Toolkit layer, or native Osiris module.
 - Transfer behavior through dependency-ordered source translation and record every relevant legacy file's disposition.
+- At every new phase, milestone checkpoint, dependency island, subsystem, or material code group, run the bounded fog-of-war preflight before fixing the work packet. Treat the plan as a hypothesis to test, accept an evidence-backed clean result, and escalate to formal wayfinding only for several linked blocking unknowns.
 - Deliver the complete player and human creator capability inventory. KISS reduces mechanisms, not scope.
 - Treat the evidenced shipped game and creator tools as the version 1.0 capability ceiling. Preserve nonworking historical ideas for later consideration without turning them into current requirements or silently losing them.
 - Keep macOS D3Import as the sole shipping legacy-format reader. RevivalMac and RevivalEditor consume its local canonical result. RevivalMobile accepts only a Mac-produced canonical package through the platform file picker, validates it through the same native-package boundary, and copies it into app-owned storage. Mobile never reads a retail or legacy format.
@@ -40,6 +42,7 @@ Read the current domain document and ledger rows for the proposed work. Before t
 - Start from one complete resident `Level`, source-evidenced eager preparation, and current reachable canonical lazy preparation. This is the current implementation, not “no streaming ever.”
 - Start RevivalEditor with the first world slice and share world types, loading rules, simulation, and rendering while owning separate document and play-session values.
 - Keep one renderer, one scheduler, one level-lifetime path, one canonical world model, and one production path shared across the concrete Mac, iPhone, iPad, and editor shells.
+- Let the macOS/shared lane establish each source-led contract before the separate RevivalMobile composition checkpoint when `current-plan.md` selects that order. A passed Mac/shared checkpoint may release the next Mac/shared dependency island while mobile composition remains open, but it never permits a temporary Mac-only Core, renderer, package schema, scheduler, or lifetime path and never removes RevivalMobile from version 1.0.
 - Keep the product human-first. MCP, headless authoring, telemetry, training capture, and agent-only paths wait until the complete human creator suite ships.
 - Require affordable native Internet multiplayer while leaving its 2026 topology to accepted evidence. Do not assume a project-operated service, relay, or recurring cost without a viable owner and explicit approval.
 
@@ -57,14 +60,15 @@ Do not promote a hypothesis into architecture. Ordinary local structure does not
 
 ## Decision workflow
 
-1. Name the current observable result, owning accepted contract, functional rows, and source rows.
-2. Trace the pinned source and current product path before proposing redesign.
-3. Identify the concrete limitation. For performance or lifetime claims, capture an optimized representative M4 measurement and, for player claims, measurements on the recorded minimum supported iPhone and iPad.
-4. Choose one smallest direct design that preserves complete scope. Do not average incompatible options into a permanent abstraction.
-5. State what will be deleted or superseded and how one production path remains.
-6. For new or changed production behavior, write and run one focused automated test first; confirm it fails for the intended missing contract.
-7. Implement the smallest direct green change, refactor while green, then run the owning domain's integration checks.
-8. Record deliberate differences, ledger transitions, source provenance, evidence, and any temporary-harness deletion.
+1. Name the current observable result, owning accepted contract, `current-plan.md` packet and checkpoint, functional rows, and source rows.
+2. Run the bounded fog-of-war preflight against the proposed boundary and record either the evidence-backed corrections or `no new gap found`.
+3. Trace the pinned source and current product path before proposing redesign.
+4. Identify the concrete limitation. For performance or lifetime claims, capture an optimized representative M4 measurement for the affected Mac/shared path. When the claim includes mobile behavior, use the applicable physical iPhone and iPad evidence required by that checkpoint; unavailable support-floor hardware does not block unrelated Mac/shared work.
+5. Choose one smallest direct design that preserves complete scope. Do not average incompatible options into a permanent abstraction.
+6. State what will be deleted or superseded and how one production path remains.
+7. For new or changed production behavior, write and run one focused automated test first; confirm it fails for the intended missing contract.
+8. Implement the smallest direct green change, refactor while green, then run the owning domain's integration checks.
+9. Record deliberate differences, ledger transitions, source provenance, evidence, and any temporary-harness deletion.
 
 Documentation-only amendments use link, consistency, and evidence checks rather than a fake product test. Changing the red-first protocol or another binding production rule requires an explicit user-approved amendment.
 
@@ -92,13 +96,14 @@ The constitutional review closes only when:
 
 - the proposal is classified and its authority, affected rows, and current source evidence are named;
 - every affected active document expresses the same chosen direction and no historical document is treated as authority;
+- `current-plan.md` names the exact lane and checkpoint being closed without overstating a Mac/shared result as mobile or overall milestone completion;
 - any binding amendment has explicit user approval and leaves one production mechanism;
 - applicable production behavior has recorded focused red, focused green, affected-suite, and integration evidence;
 - superseded product code, tests, flags, scaffolds, and prose are removed or receive an approved ledger disposition;
 - functional scope remains complete and source accounting remains explicit;
 - independent fidelity, architecture, evidence, and simplicity findings are resolved.
 
-Player milestone evidence that exercises presentation, input, lifecycle, memory, thermal, audio-session, or package-intake behavior must include the recorded physical minimum supported iPhone and iPad where the claim applies. A simulator can supply focused development evidence but cannot close a physical-device contract.
+Mobile milestone evidence that exercises presentation, input, lifecycle, memory, thermal, audio-session, or package-intake behavior must include applicable physical iPhone and iPad execution on the available development devices recorded in `current-plan.md`. Representative support-floor certification is required before claiming that floor for public beta or release; if that evidence cannot be obtained, raise the released floor to the oldest hardware actually verified. A simulator can supply focused development evidence but cannot close a physical-device contract, and missing floor hardware never blocks a Mac/shared checkpoint.
 
 Search active documents for superseded terminology and inspect every hit in context; a mention that rejects or archives an idea is not a conflict. Run at minimum:
 

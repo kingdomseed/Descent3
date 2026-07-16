@@ -9,7 +9,7 @@ Name the claim, try to disprove it with the cheapest relevant evidence, and repo
 
 ## Authority and required reading
 
-This skill implements accepted documents; it cannot amend them. Read [`AGENTS.md`](../../../AGENTS.md) and every global prerequisite it names, then read the owning domain document, current ledger rows, and applicable project skill. Their acceptance rules define the claim; this skill does not restate or weaken them.
+This skill implements accepted documents; it cannot amend them. Read [`AGENTS.md`](../../../AGENTS.md) and every global prerequisite it names, [`current-plan.md`](../../../docs/revival/current-plan.md), then the owning domain document, current ledger rows, and applicable project skill. The plan selects the active packet and checkpoint under those contracts; their acceptance rules define the claim, and this skill does not restate or weaken them.
 
 Before first milestone use, compare this skill with the current evidence contract and amend it if stale.
 
@@ -25,7 +25,7 @@ Keep these claims distinct:
 | Entry-point execution | The executable reaches a named product boundary |
 | Focused green | The named contract works through its production path |
 | Affected suite | Directly affected contracts remain green |
-| Integrated island | Applicable shipping and creator paths compose |
+| Integrated checkpoint | The named Mac/shared, mobile composition, or overall-milestone paths compose |
 | Optimized device measurement | The recorded representative workload meets or misses its stated budget on the named M4, iPhone, or iPad |
 | Milestone matrix | The explicitly listed milestone scope passes |
 
@@ -33,7 +33,7 @@ These are evidence categories, not new ledger states or a mandatory sequence. A 
 
 ## Falsification workflow
 
-1. Restate one exact, observable claim and name its accepted contract, roadmap milestone, functional rows, source rows, and production entry point.
+1. Restate one exact, observable claim and name its accepted contract, roadmap milestone, `current-plan.md` packet and checkpoint, functional rows, source rows, and production entry point.
 2. Identify the cheapest evidence layer that could disprove it: source trace, focused fixture, local retail capture, controlled image, editor round trip, application composition, optimized M4 or physical mobile-device profile, or milestone matrix.
 3. For new or changed production behavior, inspect the recorded focused red command and salient intended failure. A broken environment, fixture error, or unrelated failure is not red evidence.
 4. Re-run or inspect the exact focused green and directly affected suite through the production path. Record input, configuration, result, and executed/failed/skipped counts when exposed.
@@ -44,13 +44,15 @@ These are evidence categories, not new ledger states or a mandatory sequence. A 
 9. For a material slice, require the completed [`revival-review`](../revival-review/SKILL.md) report and confirm every concrete finding changed the diff or received evidence-backed resolution.
 10. Issue a bounded verdict: supported at a named evidence rung, or unsupported with the concrete missing or contradictory evidence.
 
-Documentation-only work uses link, consistency, and evidence checks. It does not manufacture a red product test. Performance changes start from a reproducible optimized measurement that misses an accepted budget or demonstrates a regression. Player claims that cover mobile presentation, input, package intake, lifecycle, memory, thermal, or audio behavior require the recorded physical minimum supported iPhone and iPad where applicable; simulator evidence alone cannot close them.
+Documentation-only work uses link, consistency, and evidence checks. It does not manufacture a red product test. Performance changes start from a reproducible optimized measurement that misses an accepted budget or demonstrates a regression. Claims that cover mobile presentation, input, package intake, lifecycle, memory, thermal, or audio behavior require applicable physical iPhone and iPad evidence; simulator evidence alone cannot close them. Available development devices may close the ordinary mobile composition claims they actually exercise. Representative support-floor evidence is required for a public-beta or release-floor claim, and missing floor hardware leaves only that claim open rather than blocking Mac/shared work.
 
 ## Ledger discipline
 
 For source rows, `translating` includes build, link, and entry-point evidence. `native-running` requires focused green through the applicable real shipping or creator path. Island closure requires `verified`, `replaced`, `excluded`, or a justified current-claim `deferred` state as defined by the source ledger.
 
 Functional rows may remain intermediate when the current milestone does not claim complete capability. When a row is claimed complete, every applicable runtime, authoring, validation, playtest, and publishing path must work; an inapplicable path needs a recorded reason.
+
+Record Mac/shared, mobile composition, and overall milestone checkpoints independently. A supported Mac/shared verdict can release the next Mac/shared packet while mobile composition remains unproven, provided one shared production path remains. Do not translate that bounded verdict into mobile, milestone, or version 1.0 completion.
 
 An explanation alone never turns a skip, stub, placeholder, or named replacement into proof. Do not create a new verification state machine, duplicate either ledger, or require fields irrelevant to the claim.
 
@@ -88,7 +90,7 @@ Accept a claimed island or milestone only when:
 
 - the exact claim and evidence rung are stated, with reproducible commands or procedures and observed results;
 - focused red-first history exists for every new or changed production behavior and required current tests execute and pass;
-- source comparisons, deliberate differences, provenance, and applicable integrated, M4, and physical mobile-device evidence are recorded;
+- source comparisons, deliberate differences, provenance, and evidence applicable to the exact Mac/shared, mobile composition, or overall milestone claim are recorded;
 - source rows satisfy the island's closure rule; functional rows carry the evidence and state supported by the current slice and satisfy their terminal rule when complete capability or milestone closure is claimed, with no unexplained file, range, capability path, or nonexecuted case;
 - temporary research and scaffolding are removed or archived outside product targets;
 - independent fidelity, architecture, evidence, and simplicity findings are resolved;
@@ -100,4 +102,4 @@ Run the exact commands required by the owning domain and milestone. At minimum:
 rtk git diff --check
 ```
 
-If evidence is missing, stop the closure claim and name the missing proof. Do not invent a test, abstraction, or alternate path merely to fill a matrix cell.
+If evidence is missing, stop the affected closure claim and name the missing proof. Do not turn evidence missing from one lane into a global block, and do not invent a test, abstraction, or alternate path merely to fill a matrix cell.

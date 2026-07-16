@@ -1,14 +1,18 @@
 # Source translation ledger
 
 - Status: Phase 0 seed
-- Date: July 15, 2026
+- Date: July 16, 2026
 - Authority: execution record under [Source translation discipline](source-translation.md)
 
 ## Use
 
 This ledger accounts for source ownership and disposition. It is separate from the functional-completeness ledger, which accounts for product capabilities.
 
-Seed the likely source owners before a dependency island begins. Trace its real include, call, data, and editor paths while the island is working, and add every involved implementation file. Before it closes, replace provisional notes with exact relevant symbols, tests or captures, deliberate differences, native files, and final dispositions.
+The active packet, checkpoint, lane, owner, blocker, and next work live only in the [current implementation plan](current-plan.md). This ledger records source evidence and row state; do not turn it into a competing task queue or current-state diary.
+
+Seed likely source owners as provisional hypotheses. Before an island boundary is fixed, run the bounded [fog-of-war preflight](source-translation.md#fog-of-war-preflight), record the inspected entry points and source or code areas in the affected row text or change record, and add every dependency the pass exposes. Continue tracing real include, call, data, and editor paths while the island is working. Before it closes, replace provisional notes with exact relevant symbols, tests or captures, deliberate differences, native files, and final dispositions.
+
+No `discovery complete` column or graph identifier is added: a bounded pass cannot prove that no edge remains. A deterministic generated relationship view may support a row only with recorded source, tool, configuration, and output provenance. It does not replace a source-verified relationship, disposition, observable contract, or the manual accounting required at closure.
 
 Allowed dispositions are translate, platform replacement, import only, superseded mechanism, evidence only, exclude, and deferred. A mixed legacy file may have more than one disposition with named ranges or symbols.
 

@@ -9,7 +9,7 @@ Make replay a first-class record of the selected native simulation, not a compat
 
 ## Authority and activation
 
-Read [`AGENTS.md`](../../../AGENTS.md), [`roadmap.md`](../../../docs/revival/roadmap.md), [`verification.md`](../../../docs/revival/verification.md), [`source-translation.md`](../../../docs/revival/source-translation.md), [`test-driven-development.md`](../../../docs/revival/test-driven-development.md), and the replay rows in [`functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md).
+Read [`AGENTS.md`](../../../AGENTS.md), [`roadmap.md`](../../../docs/revival/roadmap.md), [`current-plan.md`](../../../docs/revival/current-plan.md), [`verification.md`](../../../docs/revival/verification.md), [`source-translation.md`](../../../docs/revival/source-translation.md), [`test-driven-development.md`](../../../docs/revival/test-driven-development.md), and the replay rows in [`functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md).
 
 This skill is installed now. Review and amend it after Phase 3 selects the one scheduler and before the first Phase 5 replay production change. Phase 9 reviews it again against the final networked simulation; that review does not create a second replay design.
 
@@ -39,6 +39,6 @@ Do not build a generic event-sourcing framework, dual input/state recording engi
 
 ## Verification
 
-Record focused red/green commands and affected tests for recording, playback, end conditions, corruption, revision mismatch, save/reopen, checkpoint comparison, and continuation where promised. Exercise the same record in RevivalMac, RevivalMobile and RevivalEditor; use the recorded physical minimum iPhone and iPad where mobile composition, lifecycle or performance is claimed. Phase 9 adds authority, observer, desync, reconnect, and published multiplayer replay matrices to this path.
+Record focused red/green commands and affected tests for recording, playback, end conditions, corruption, revision mismatch, save/reopen, checkpoint comparison, and continuation where promised. Record the Mac/shared and mobile composition checkpoints separately while exercising the same record in RevivalMac, RevivalMobile and RevivalEditor; use applicable physical iPhone and iPad hardware where mobile composition, lifecycle, or performance is claimed. A Mac/shared replay packet need not wait on unavailable support-floor hardware, while overall milestone and release-floor claims retain their mobile evidence requirements. Phase 9 adds authority, observer, desync, reconnect, and published multiplayer replay matrices to this path.
 
 Close the relevant source and capability rows only when the promised runtime, creator, validation, playtest, and publishing routes pass. Material replay changes pass [`revival-review`](../revival-review/SKILL.md).

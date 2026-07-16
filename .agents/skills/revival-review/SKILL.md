@@ -18,9 +18,10 @@ Read:
 - [`docs/revival/test-driven-development.md`](../../../docs/revival/test-driven-development.md)
 - [`docs/revival/verification.md`](../../../docs/revival/verification.md)
 - [`docs/revival/skills-and-agents.md`](../../../docs/revival/skills-and-agents.md)
+- [`docs/revival/current-plan.md`](../../../docs/revival/current-plan.md)
 - the owning roadmap and domain documents
 
-Resolve the exact base and review target. The target may be a commit, index, or uncommitted working tree; record its identity with the applicable commit, status, and diff rather than inventing a head revision. Gather the full changed-file contents, current observable contract, involved ledger rows, baseline, deliberate differences, and claimed evidence. Review reachable consequences outside the diff when the changed path calls or owns them.
+Resolve the exact base and review target. The target may be a commit, index, or uncommitted working tree; record its identity with the applicable commit, status, and diff rather than inventing a head revision. Gather the full changed-file contents, current observable contract, active plan packet and checkpoint, involved ledger rows, baseline, deliberate differences, and claimed evidence. Review reachable consequences outside the diff when the changed path calls or owns them.
 
 Reviewers report findings and evidence. The island owner or root integrator changes the implementation and resolves findings.
 
@@ -40,11 +41,13 @@ Give this reviewer the pinned source, native diff, relevant ledger rows, accepte
 
 Check:
 
+- the bounded fog-of-war preflight names the inspected boundary, records a disposition for each real discovery, and does not claim exhaustive knowledge from a clean result;
 - every involved implementation file, important symbol, editor caller, generated block, and handwritten behavior range is accounted for;
 - data flow, formulas, evaluation order, update order, dependency discovery, eager and lazy behavior, stable identity, and teardown remain source-supported;
 - ownership and final GPU-use lifetime preserve observable results;
 - the complete canonical `Level` and RevivalMac, RevivalMobile and RevivalEditor relationships are not reduced to a fixture or partial production model;
 - every intentional difference is explicit and is not mislabeled as faithful transfer;
+- any generated relationship evidence records its source, tool, configuration, normalized identity, and unresolved edge classes, and no generated edge is treated as proof of runtime behavior or semantic completeness;
 - obsolete MFC, Win32, OpenGL, SDL, ABI, allocation, and defensive machinery was not preserved as semantics.
 
 Literal C++ file shape and historical bugs are not fidelity requirements.
@@ -60,7 +63,7 @@ Check:
 - RevivalMac, RevivalMobile and RevivalEditor consume canonical content through shared world, renderer, and simulation types behind their concrete shells;
 - the change leaves one loader, renderer, scheduler decision, behavior path, and resource-lifetime path;
 - no compatibility bridge, runtime legacy reader, streaming flag, speculative framework, or alternate backend appeared;
-- phase ordering deferred work without silently deleting committed capability;
+- macOS-leading phase ordering may leave a separate mobile composition checkpoint open without silently deleting committed mobile capability, blocking the next independent Mac/shared island, or creating a temporary Mac-only shared path;
 - human creator workflows remain first-class where the slice requires them;
 - any binding product or cross-workstream change received the required amendment instead of entering through code.
 
@@ -77,7 +80,7 @@ Check:
 - focused green, affected suite, build, launch, integration, image, device, security, and performance claims are not substituted for one another;
 - exact commands, inputs, configurations, results, and exposed executed/failed/skipped counts are recorded;
 - no protecting test is skipped, disabled, quarantined, deleted, weakened, or diverted through a test-only path;
-- applicable Mac-player, mobile-player and creator composition checkpoints pass, including physical iPhone and iPad evidence where the accepted contract requires it;
+- every checkpoint actually claimed by the change passes: Mac/shared evidence for a Mac/shared claim, physical iPhone and iPad evidence for a mobile composition claim, and both for overall milestone closure; unavailable support-floor hardware blocks only a public-beta or release-floor claim, which must remain open or raise the released floor;
 - every involved source row has the state required to close the claimed island, and each functional row has evidence and the state appropriate to the current slice; a functional row must be terminal only when complete capability closure is claimed;
 - research code, scaffolding, generated local content, and temporary alternate paths are deleted or archived outside product targets.
 
@@ -96,6 +99,7 @@ Check:
 - duplicated paths, pass-through helpers, placeholder defaults, catch-and-ignore behavior, and workaround comments are absent;
 - test convenience did not add production seams;
 - concurrency, caching, unsafe access, specialization, allocation machinery, or optimization has measured justification;
+- a discovery aid did not become a hand-maintained knowledge graph, graph database, duplicate ledger, whole-program gate, or production dependency without accepted evidence;
 - simplification preserves ledgered capability and source-supported observable behavior.
 
 There is no line-count limit. A large file is a problem only when it causes a concrete ownership, comprehension, testing, or change-isolation failure.

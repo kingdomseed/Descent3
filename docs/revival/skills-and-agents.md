@@ -1,12 +1,14 @@
 # Skills and agents
 
 - Status: accepted, amended
-- Date: July 15, 2026
+- Date: July 16, 2026
 - Authority: skill selection and agent operating rules
 
 ## Principle
 
 Skills encode methods and constraints. They do not make an agent the named author or substitute a generic expert persona for source evidence.
+
+The [roadmap](roadmap.md) and accepted contracts govern scope and phase order. The [current implementation plan](current-plan.md) is the single living record of active state, near-term work, lane ownership, and blockers beneath them. Every contributor reads it before selecting work. One integration owner updates it when work lands or the active sequence changes; agents do not maintain competing plans or edit its live state concurrently.
 
 Prefer:
 
@@ -64,7 +66,7 @@ The chosen product toolchain is Swift 6.4 in Swift 6 language mode from Xcode 27
 
 ### Measurement tools
 
-Use direct swift test, xcodebuild, Instruments, xctrace, Metal capture, validation, physical iPhone and iPad execution, and reproducible scripts as the source of truth. Simulator evidence is useful for focused development but does not close device presentation, input, lifecycle, memory, thermal, audio-session, or package-intake claims.
+Use direct swift test, xcodebuild, Instruments, xctrace, Metal capture, validation, physical iPhone and iPad execution, and reproducible scripts as the source of truth. Available physical hardware supports ordinary mobile development; lack of an older exact floor device does not block Mac/shared implementation. Simulator evidence is useful for focused development but does not close device presentation, input, lifecycle, memory, thermal, audio-session, or package-intake claims. Before public beta or release claims Apple GPU family 7 as the support floor, verify a representative floor-device matrix or raise the released floor.
 
 XcodeBuildMCP or another automation helper may be evaluated after the workspace exists. Pin and audit executable tooling, review telemetry, and keep direct commands reproducible.
 
@@ -119,7 +121,7 @@ Every skill inherits the production red-green-refactor protocol and test-value g
 
 The only whole-phase skill prerequisites for Phase 1 are `revival-constitution` and `revival-source-translation`. Review each other installed skill against its real source dependencies immediately before the first production change in its domain; it gates that change, not unrelated work. Review behavior and navigation against the translated Training dependencies before Phase 4. Review replay after the Phase 3 timing decision and before Phase 5 replay work, then again against multiplayer before Phase 9. Review the three network skills against the working final simulation immediately before Phase 9.
 
-Do not install or author a streaming skill unless optimized evidence on the recorded M4 and minimum supported iPhone and iPad after the complete playable Training Mission accepts a resource-lifetime amendment that leaves one cross-platform production path. Do not install or author an MCP or agent-authoring skill before the complete human creator suite ships.
+Do not install or author a streaming skill unless optimized evidence on the recorded M4 and applicable mobile development hardware after the complete playable Training Mission accepts a resource-lifetime amendment that leaves one cross-platform production path. The selected lifetime must also pass representative floor evidence before the candidate Apple GPU family 7 floor is claimed at public beta or release, or that floor must be raised. Do not install or author an MCP or agent-authoring skill before the complete human creator suite ships.
 
 ## Supply-chain record
 
@@ -141,27 +143,28 @@ Do not auto-update skills. Review upstream changes before moving a pin. The curr
 
 Use only the steps the current work needs:
 
-1. **Constitution check.** Confirm the requested result fits the accepted platform, product, content, ownership, and one-path boundaries.
-2. **Wayfind when genuinely foggy.** State what is known, unknown, and decision-relevant; choose the next source trace, experiment, capture, or question that can collapse uncertainty. Write accepted results back to the owning document or ledger immediately.
-3. **Trace one dependency island.** Name the observable player or editor result, each applicable concrete Mac, mobile, and editor shell, legacy and editor callers, important symbols, ordering, lifetime, baseline, dispositions, and deliberate modernization boundary.
-4. **Check the real blast radius.** Prove the affected Mac-player, mobile-player, runtime, and editor callers, canonical consumers, update order, resource lifetime, and current acceptance path. Record what evidence confirms, clears, or leaves a risk open; do not produce a speculative caller essay.
-5. **Implement one contract.** Use the current domain skill. Observe focused red, make the smallest direct green, and keep validation at the untrusted-to-canonical boundary. Concrete Swift values and exhaustive state represent real invariants; wrapper types and protocols need an actual ownership or semantic job.
-6. **Simplify the diff.** Protect the named behavior surface, then remove duplicated paths, defensive runtime branches, needless indirection, stale comments, speculative flexibility, and measured hot-path waste. Rerun the focused and affected evidence after every accepted simplification.
-7. **Review a material slice.** Run the four independent review concerns and consolidate concrete findings once. The island owner resolves them against source and product evidence; reviewers do not directly redesign the diff.
-8. **Make the change reviewable.** Explain the observable island and source map first, core logic second, wiring and mechanical movement afterward, then risks, deliberate differences, ledger transitions, and exact evidence. Never rewrite history without explicit authority and tree-identity proof.
-9. **Close and hand off.** Require applicable player and creator checkpoints and source-row closure for the island. Advance each functional row only as far as the slice proves; require its terminal state when complete capability or milestone closure is claimed. Commit, push, open a PR, or generate an optional visual review only when requested.
+1. **Read current state and check the constitution.** Read [`current-plan.md`](current-plan.md), select a named work packet, and confirm the requested result fits the accepted platform, product, content, ownership, and one-path boundaries.
+2. **Uncover the fog of war.** At every new phase, milestone checkpoint, dependency island, subsystem, or material code group, test the proposed packet against the relevant source, current code, callers, state, ordering, lifetime, editor and runtime consumers, fixtures, and evidence. Record what was checked and any real correction. `No new gap found` is valid. Stop when the next observable contract and island boundary are safe to state; do not turn discovery into whole-program analysis.
+3. **Wayfind only when discovery exposes a blocker.** Use `revival-wayfinding` when several linked unknowns still prevent a concrete contract. One direct lookup or a clean preflight proceeds immediately to island tracing and implementation.
+4. **Trace one dependency island.** Name the observable player or editor result, each applicable concrete Mac, mobile, and editor shell, legacy and editor callers, important symbols, ordering, lifetime, baseline, dispositions, and deliberate modernization boundary.
+5. **Check the real blast radius.** Prove the affected Mac-player, mobile-player, runtime, and editor callers, canonical consumers, update order, resource lifetime, and current acceptance path. Record what evidence confirms, clears, or leaves a risk open; do not produce a speculative caller essay.
+6. **Implement one contract.** Use the current domain skill. Observe focused red, make the smallest direct green, and keep validation at the untrusted-to-canonical boundary. Concrete Swift values and exhaustive state represent real invariants; wrapper types and protocols need an actual ownership or semantic job.
+7. **Simplify the diff.** Protect the named behavior surface, then remove duplicated paths, defensive runtime branches, needless indirection, stale comments, speculative flexibility, and measured hot-path waste. Rerun the focused and affected evidence after every accepted simplification.
+8. **Review a material slice.** Run the four independent review concerns and consolidate concrete findings once. The island owner resolves them against source and product evidence; reviewers do not directly redesign the diff.
+9. **Make the change reviewable.** Explain the observable island and source map first, core logic second, wiring and mechanical movement afterward, then risks, deliberate differences, ledger transitions, and exact evidence. Never rewrite history without explicit authority and tree-identity proof.
+10. **Close and hand off.** Require applicable player and creator checkpoints and source-row closure for the island. Advance each functional row only as far as the slice proves; require its terminal state when complete capability or milestone closure is claimed. Give the integration owner the proposed current-state and next-work change; that owner reconciles it into [`current-plan.md`](current-plan.md). Commit, push, open a PR, or generate an optional visual review only when requested.
 
-The process is a feedback loop, not a waterfall. A failed test, capture, review, or real-content run may return the island to tracing or wayfinding. Repair the narrow rule that allowed a repeated mistake; do not add a framework to prevent every imaginable one.
+Routine fog-of-war discovery is mandatory at a new boundary; formal wayfinding is conditional. Neither implies that a defect exists. The process is a feedback loop, not a waterfall. A failed test, capture, review, or real-content run may return the island to discovery, tracing, or wayfinding. Repair the narrow rule that allowed a repeated mistake; do not add a framework to prevent every imaginable one.
 
 ## Agent work waves
 
-Use the following bounded evidence-producing roles rather than standing personas. Run independent roles concurrently when agent capacity allows.
+Use the following bounded evidence-producing roles rather than standing personas. Run independent roles concurrently when agent capacity allows. [`current-plan.md`](current-plan.md#two-developer-work-map) owns the current two-developer split, file ownership, merge order, and join points; this section defines reusable role boundaries rather than a second schedule.
 
 ### Translation foundation
 
 1. Source and chronology reviewer: trace the current dependency island across runtime, editor, and revision evidence; maintain dispositions.
-2. Swift and Metal implementer: translate the current shared world, renderer, scheduler, and simulation path directly through the concrete AppKit and UIKit shells, and profile it on the applicable devices.
-3. Content and creator implementer: import the same slice on macOS, prove canonical-package intake on both player products, and deliver its real editor mutation, validation, save, and play loop.
+2. Swift and Metal implementer: establish the current shared world, renderer, scheduler, and simulation path first through the concrete AppKit player and editor shells, then compose the landed shared contract through UIKit and profile it on the devices applicable to each checkpoint.
+3. Content and creator implementer: import the same slice on macOS and deliver its real editor mutation, validation, save, and play loop; after that contract lands, prove its canonical-package intake in RevivalMobile without inventing an adapter or second package path.
 
 ### Behavior and campaign
 
@@ -194,9 +197,9 @@ Use separate reviewers when capacity allows. Run the remaining concern in the ne
 - Require focused red/green evidence for shipping behavior and a deletion gate for temporary scaffolds.
 - A source reviewer may drive implementation mapping but may not solve it by linking legacy code.
 - A creator reviewer preserves useful workflow, not MFC layout or backward export.
-- A Metal reviewer begins with the complete resident `Level` and source-faithful eager/lazy asset preparation across the concrete AppKit and UIKit shells, and may not add a second renderer, generic platform layer, or spatial streaming before the recorded M4 and minimum-device amendment gate.
+- A Metal reviewer begins with the complete resident `Level` and source-faithful eager/lazy asset preparation through the concrete AppKit shells, then verifies UIKit composition of the same landed path. The reviewer may not add a second renderer, generic platform layer, or spatial streaming before the recorded M4 and applicable-mobile-development amendment gate, and may not make unavailable floor hardware a blocker for Mac/shared work.
 - A systems reviewer may not add a job system, ECS, fixed scheduler, deterministic math framework, or custom allocator without the accepted evidence gate.
 - A behavior reviewer grows the safe model from working chains, covers the evidenced shipped-game and creator-tool capability for version 1.0, and may not add native-code escape hatches or speculative post-1.0 mechanics.
 - A multiplayer reviewer implements the one affordable native route accepted from current evidence and does not inherit original packets or assume a project-operated service merely because source or an earlier plan exists.
 - A reviewer distinguishes legitimate semantic fidelity from prohibited API, ABI, and platform compatibility.
-- The root agent resolves conflicts, keeps the documents consistent, and ensures review findings change the actual diff when warranted.
+- The root integration agent resolves conflicts, keeps the documents consistent, owns live updates to [`current-plan.md`](current-plan.md), and ensures review findings change the actual diff when warranted.

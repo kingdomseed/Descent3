@@ -9,9 +9,9 @@ Reproduce the navigation behavior required by working creatures and levels befor
 
 ## Authority and activation
 
-Read [`AGENTS.md`](../../../AGENTS.md), [`behavior-system.md`](../../../docs/revival/behavior-system.md), [`source-translation.md`](../../../docs/revival/source-translation.md), [`source-translation-ledger.md`](../../../docs/revival/source-translation-ledger.md), [`test-driven-development.md`](../../../docs/revival/test-driven-development.md), and [`creator-suite.md`](../../../docs/revival/creator-suite.md).
+Read [`AGENTS.md`](../../../AGENTS.md), [`current-plan.md`](../../../docs/revival/current-plan.md), [`behavior-system.md`](../../../docs/revival/behavior-system.md), [`source-translation.md`](../../../docs/revival/source-translation.md), [`source-translation-ledger.md`](../../../docs/revival/source-translation-ledger.md), [`test-driven-development.md`](../../../docs/revival/test-driven-development.md), and [`creator-suite.md`](../../../docs/revival/creator-suite.md).
 
-This skill is installed now but activates only after the relevant Training routes, node data, AI callers, collision rules, and editor operations have been traced. Review and amend it against that evidence immediately before the first production navigation change.
+This skill is installed now but activates only after the relevant Training routes, node data, AI callers, collision rules, and editor operations have been traced. Use `current-plan.md` to select the active packet and checkpoint. Review and amend it against that evidence immediately before the first production navigation change.
 
 ## Work one observable route
 
@@ -44,4 +44,4 @@ Do not simplify away node, clearance, steering, blockage, or recovery semantics 
 
 ## Verification
 
-Record source and reference traces, focused red/green commands, affected route tests, collision agreement, editor diagnostics, save/reopen/play evidence, optimized measurements on every affected recorded M4, iPhone, or iPad reference device where performance is claimed, deliberate differences, and terminal source rows for the closed island. Functional rows carry the evidence and state supported by the current slice and become terminal only when complete capability or milestone closure is claimed. Material changes pass the four concerns in [`revival-review`](../revival-review/SKILL.md).
+Record source and reference traces, focused red/green commands, affected route tests, collision agreement, editor diagnostics, save/reopen/play evidence, optimized measurements on each M4, iPhone, or iPad device applicable to the exact performance claim and checkpoint, deliberate differences, and terminal source rows for the closed island. A Mac/shared navigation packet does not wait on unavailable support-floor hardware; mobile, overall-milestone, and public-beta or release-floor claims retain their applicable physical-device evidence. Functional rows carry the evidence and state supported by the current slice and become terminal only when complete capability or milestone closure is claimed. Material changes pass the four concerns in [`revival-review`](../revival-review/SKILL.md).

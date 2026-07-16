@@ -7,6 +7,10 @@ description: Resolve a genuinely unknown, dependency-ordered Revival decision be
 
 Use bounded investigation to turn real uncertainty into one supported project decision and the next observable contract. Wayfinding ends when implementation can proceed. It is not a second roadmap, issue hierarchy, specification system, or standing planning process.
 
+## Relationship to the fog-of-war preflight
+
+Routine bounded discovery occurs at every new phase, milestone checkpoint, dependency island, subsystem, or material code group under [`source-translation.md`](../../../docs/revival/source-translation.md#fog-of-war-preflight). That preflight is not wayfinding and may validly confirm the current packet without finding a defect. Activate this skill only when the preflight exposes several dependent unknowns that block a safe observable contract.
+
 ## Trigger gate
 
 Use this skill only when all of these are true:
@@ -22,7 +26,7 @@ These decisions are already made and are not wayfinding topics: Apple-native Swi
 
 ## Canonical authority
 
-Read [`AGENTS.md`](../../../AGENTS.md), the accepted document that owns the destination, the relevant source-translation ledger rows, and the current domain document.
+Read [`AGENTS.md`](../../../AGENTS.md), [`current-plan.md`](../../../docs/revival/current-plan.md), the accepted document that owns the destination, the relevant source-translation ledger rows, and the current domain document. A named packet, lane, owner, or checkpoint in `current-plan.md` is already selected work rather than a wayfinding topic unless new evidence makes the plan conflict with an accepted contract.
 
 Wayfinding working notes are temporary. They may live in the active task, a bounded research note, or an explicitly requested issue, but they never become a parallel source of truth. Do not create a wayfinding map, shadow roadmap, decision-ticket tree, duplicate backlog, or permanent status ledger.
 
@@ -32,6 +36,7 @@ As soon as a decision is supported and authorized, update its canonical owner:
 - a domain workflow or contract goes in its accepted domain document;
 - a product, persistent semantic, or cross-workstream architecture change uses the binding amendment process;
 - a repeated implementation failure updates the narrow owning skill or rule;
+- active packet, lane, ownership, or near-term sequencing updates go in `current-plan.md` after the owning contract is resolved;
 - test evidence stays with the test, commit, or pull request record that owns the change.
 
 If approval is required, present one explicit proposed amendment and stop. Do not record it as accepted before the user approves it.
@@ -62,7 +67,7 @@ Use evidence in this order where applicable:
 2. pinned released source, editor callers, revision evidence, and runnable reference behavior;
 3. current ledger entries, canonical fixtures, local captures, and project code;
 4. official Apple documentation and reproducible experiments;
-5. measured optimized behavior on every affected recorded M4, iPhone, or iPad reference device;
+5. measured optimized behavior on every M4, iPhone, or iPad device applicable to the exact claim and checkpoint; support-floor evidence is required only when the public-beta or release floor is the decision being investigated;
 6. clearly labeled inference.
 
 Historical source decides what the original did. Accepted documents decide what this product is building. An Apple API's availability proves neither a requirement nor an architecture.

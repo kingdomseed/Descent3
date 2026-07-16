@@ -17,10 +17,11 @@ This skill implements the repository's accepted rules. It cannot amend them. Rea
 - [`docs/revival/test-driven-development.md`](../../../docs/revival/test-driven-development.md)
 - [`docs/revival/engineering-principles.md`](../../../docs/revival/engineering-principles.md)
 - [`docs/revival/roadmap.md`](../../../docs/revival/roadmap.md)
+- [`docs/revival/current-plan.md`](../../../docs/revival/current-plan.md)
 - [`docs/revival/verification.md`](../../../docs/revival/verification.md)
 - [`docs/revival/skills-and-agents.md`](../../../docs/revival/skills-and-agents.md)
 
-Read the current domain document before touching its behavior. Loading and residency work also requires [`world-loading.md`](../../../docs/revival/world-loading.md); import work requires [`content-pipeline.md`](../../../docs/revival/content-pipeline.md); editor work requires [`creator-suite.md`](../../../docs/revival/creator-suite.md); gameplay behavior requires [`behavior-system.md`](../../../docs/revival/behavior-system.md); music requires [`adaptive-music.md`](../../../docs/revival/adaptive-music.md).
+Read the current domain document before touching its behavior, and use `current-plan.md` to select the active packet, owner, lane, and checkpoint inside the roadmap. Loading and residency work also requires [`world-loading.md`](../../../docs/revival/world-loading.md); import work requires [`content-pipeline.md`](../../../docs/revival/content-pipeline.md); editor work requires [`creator-suite.md`](../../../docs/revival/creator-suite.md); gameplay behavior requires [`behavior-system.md`](../../../docs/revival/behavior-system.md); music requires [`adaptive-music.md`](../../../docs/revival/adaptive-music.md).
 
 If this skill conflicts with an accepted document, follow the document and report the conflict. Do not silently reinterpret it.
 
@@ -30,8 +31,17 @@ If this skill conflicts with an accepted document, follow the document and repor
 - A dependency island is the implementation and cutover unit. It contains the smallest complete source path that can produce a real result through the applicable Mac player, mobile player, or editor entry point.
 - An observable contract is the verification unit. It states what the native product must do, not how the C++ happened to be arranged.
 - A roadmap phase is a product milestone. File count, translated line count, compiler-error count, and target count are not product progress.
+- A `current-plan.md` work packet is the near-term ownership and integration unit. It may close a Mac/shared checkpoint before its mobile composition checkpoint without closing the overall roadmap milestone.
 
 Do not translate files alphabetically or require one Swift file per C++ file. Do not translate the whole repository before running the product. Complete one observable island at a time and leave one production path.
+
+## Uncover the fog before fixing the island
+
+At every new phase, milestone checkpoint, dependency island, subsystem, or material code group, perform the bounded [fog-of-war preflight](../../../docs/revival/source-translation.md#fog-of-war-preflight). Treat the selected packet and seeded ledger rows as a proposed boundary. Inspect enough pinned source, current native code, callers, state, ordering, ownership, lifetime, editor and runtime paths, fixtures, and evidence to validate or correct that boundary.
+
+Record the inspected roots, newly exposed dependencies or unknowns, and any canonical plan or ledger correction. A clean pass is valid and does not imply that a defect should have existed. Stop when the next observable contract is safe to state. One direct question stays in ordinary tracing; several linked unknowns that block the contract hand off to [`revival-wayfinding`](../revival-wayfinding/SKILL.md).
+
+A deterministic relationship view may direct this pass only under the provenance and uncertainty rules in the accepted document. Treat its compiler-derived edges, manually evidenced edges, and inferences as different categories. Never turn generated output into a second ledger, infer missing calls with a model, or require a whole-program graph before implementation.
 
 ## Prove a repeated mapping before parallelizing it
 
@@ -43,7 +53,7 @@ Use the trial's failures to correct this skill, the island trace, or the shared 
 
 Before production implementation:
 
-1. Name the next observable player or editor result and every concrete shipping shell to which the current contract applies.
+1. Name the next observable player or editor result, its `current-plan.md` packet and checkpoint, the refined preflight boundary and result, and every concrete shipping shell applicable to that checkpoint.
 2. Trace the legacy entry point, callees, data flow, editor callers, important globals, ordering, dependency discovery, and teardown.
 3. Add provisional ledger rows for every implementation file already known to participate.
 4. Capture the historical baseline with source evidence, a synthetic fixture, the reference executable, or owned local retail content.
@@ -89,7 +99,7 @@ Work one focused red-green-refactor contract at a time. Compiler diagnostics may
 
 Follow [`revival-verification`](../revival-verification/SKILL.md) for evidence categories, falsification, nonexecuted tests, and milestone claims. Build, launch, focused behavior, integration, and performance checks answer different questions. Name the exact claim, command, input, configuration, and observed result; never substitute “smoke test passed.”
 
-For source translation specifically, a baseline establishes historical behavior, not native correctness; build and entry-point execution do not close semantics; a fixture does not prove the owned Training path; and an optimized measurement covers only its recorded workload and device. Player performance or lifetime claims that apply to mobile require physical evidence on the recorded minimum supported iPhone and iPad as well as the applicable M4 evidence. No test protecting the claimed contract may be skipped, weakened, or diverted through a nonproduction path.
+For source translation specifically, a baseline establishes historical behavior, not native correctness; build and entry-point execution do not close semantics; a fixture does not prove the owned Training path; and an optimized measurement covers only its recorded workload and device. Mobile performance or lifetime claims require applicable physical iPhone and iPad evidence as well as the Mac/shared M4 evidence where that path is also claimed. Exact support-floor certification belongs to public-beta or release evidence; its absence leaves that release claim open without blocking the next Mac/shared dependency island. No test protecting the claimed contract may be skipped, weakened, or diverted through a nonproduction path.
 
 ## Treat workaround comments as a stop signal
 
@@ -155,7 +165,7 @@ Source accounting for the island closes only when:
 - every involved source row has the terminal state required by its disposition and current claim;
 - one direct native production path remains.
 
-For a player island shared by Mac and mobile, closure exercises each applicable concrete shell and records any mobile-only functional contract separately from source-parity evidence. Simulator execution does not replace required physical-device evidence.
+For a player island shared by Mac and mobile, record the Mac/shared and mobile composition checkpoints separately. A Mac/shared packet may close and release the next Mac/shared dependency island after its applicable D3Import, RevivalMac, RevivalEditor, source, and evidence contracts pass, provided it leaves the one shared Core, Metal, package, scheduler, and lifetime path intact. RevivalMobile then composes that landed contract through its concrete shell and records mobile-only functional requirements separately from source-parity evidence. An open mobile checkpoint prevents mobile, overall-milestone, and version 1.0 closure; it does not retroactively invalidate the Mac/shared checkpoint. Simulator execution does not replace physical-device evidence required by a mobile claim.
 
 The verification skill owns red/green, affected-suite, Mac/mobile/editor composition, nonexecuted-test, review-resolution evidence, and milestone closure; `revival-review` owns the review itself. At minimum, every documentation or production change also runs:
 
@@ -170,7 +180,8 @@ Use direct `rtk swift test` and `rtk xcodebuild` commands once their real target
 The pinned Descent 3 source and accepted revival documents remain the authority. These external sources inform the operating method only:
 
 - Jarred Sumner, [“Rewriting Bun in Rust”](https://bun.com/blog/bun-in-rust), especially the preparation, representative trial, compiler-error queue, evidence progression, adversarial review, workflow correction, and post-port regression sections.
+- Bun's reviewed [`PORTING.md`](https://github.com/oven-sh/bun/blob/3157cb14b5970b69532a47800504a28ef5963e22/docs/PORTING.md), [`LIFETIMES.tsv`](https://github.com/oven-sh/bun/blob/eeb4d9fdf6e9a7bdd45388d7f3a03dcf570839ad/docs/LIFETIMES.tsv), and [verified-claims record](https://github.com/oven-sh/bun/blob/eeb4d9fdf6e9a7bdd45388d7f3a03dcf570839ad/docs/.rust-rewrite-verified-claims.md), as examples of source-cited mapping and structured review evidence rather than an authoritative knowledge graph.
 - Bun commit [`46d3bc29f270fa881dd5730ef1549e88407701a5`](https://github.com/oven-sh/bun/commit/46d3bc29f270fa881dd5730ef1549e88407701a5), containing the concrete Phase-A porting guide and batch-selection script.
 - Bun PR [#30224](https://github.com/oven-sh/bun/pull/30224), useful evidence for separating source reorganization from behavior changes and for treating proposed module boundaries as hypotheses.
 
-Do not copy Bun's whole-repository batch size, agent count, platform matrix, noncompiling Phase-A draft, `TODO(port)` placeholders, unsafe allowance, or performance conclusions. This project changes the platform, renderer, editor, and content boundary and therefore requires observable dependency islands rather than a whole-program draft.
+Do not copy Bun's whole-repository batch size, agent count, platform matrix, noncompiling Phase-A draft, `TODO(port)` placeholders, unsafe allowance, or performance conclusions. The documented Bun method did not use a knowledge graph as its control mechanism. This project changes the platform, renderer, editor, and content boundary and therefore requires observable dependency islands rather than a whole-program draft.

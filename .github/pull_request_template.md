@@ -23,9 +23,11 @@
 
 - Functional-completeness row, defect, invariant, or reachable boundary:
 - Functional-row state transitions and whether capability or milestone closure is claimed:
+- Current-plan packet, lane, checkpoint, packet owner, and integration owner:
 - Legacy source files, symbols, and source-translation dispositions:
 - Source-row state transitions and whether island or milestone closure is claimed:
 - Observable dependency island and source map:
+- Bounded fog-of-war preflight: inspected entry points or areas, newly exposed dependencies or unknowns, and plan or ledger corrections, or `no new gap found`:
 - Core logic versus wiring or mechanical movement:
 - Historical observable baseline:
 - Deliberate native differences:
@@ -36,6 +38,7 @@
 - Applicable build, launch, integration, or other evidence claims not recorded above, with exact command, input, configuration, and result:
 - Nonexecuted, deleted, weakened, or replaced tests with approved disposition and replacement or removal evidence:
 - Source-fidelity, architecture-and-scope, tests-and-evidence, and simplicity-and-maintainability findings and resolution:
+- Proposed current-plan state or next-packet update, and integration-owner disposition:
 - Image, device, package, security, or performance evidence:
 - N/A reason, if permitted:
 
@@ -50,6 +53,7 @@
 - [ ] Each retained test protects a reachable production path and a distinct observable contract.
 - [ ] I did not add speculative tests or production architecture solely for tests.
 - [ ] I updated every affected source disposition and recorded deliberate differences.
+- [ ] I named the current-plan packet and checkpoint and gave the integration owner the proposed landed-state and next-packet update without creating a competing plan.
 - [ ] Every source row required by a claimed island has reached its required closure state; each functional row has the evidence and state appropriate to this slice, and is terminal when complete capability or milestone closure is claimed.
 - [ ] I did not present build, launch, or a synthetic fixture as proof of behavior it did not exercise.
 - [ ] No stub, stand-in constant, disabled production path, required-test skip, or workaround comment is serving in place of the claimed contract.

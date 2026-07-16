@@ -1,12 +1,14 @@
 # World loading and residency
 
 - Status: accepted, amended
-- Date: July 15, 2026
+- Date: July 16, 2026
 - Authority: binding current resource-lifetime decision and modernization gate
 
 ## Current decision
 
-The production load unit is one complete canonical `Level`, matching the source D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and RevivalMac, RevivalMobile and RevivalEditor load the resulting complete canonical `Level`; one selected room is the first visible and editable acceptance slice, not a partial production level. Synthetic one-room levels remain focused test fixtures.
+The production load unit is one complete canonical `Level`, matching the source D3L world boundary. In Phase 1, D3Import converts the complete Training D3L; RevivalMac and RevivalEditor first load the resulting complete canonical `Level`, and RevivalMobile then composes that same proven load path. One selected room is the first visible and editable acceptance slice, not a partial production level. Synthetic one-room levels remain focused test fixtures.
+
+This document owns the lifetime contract. The active slice, checkpoint state and developer ownership live in the [current implementation plan](current-plan.md) and are updated there. Mac/shared loading and editor work leads; an open mobile composition checkpoint does not block the next Mac/shared dependency island, but it does block the applicable overall milestone and version 1.0. The shared canonical, renderer and lifetime contracts must remain mobile-composable while that checkpoint is open.
 
 The initial native products keep each authoritative level world resident until exit. Startup eagerly prepares the source-evidenced `PageInAllData` working set. If object initialization, a matcen, translated behavior, or another reachable source path later needs a canonical presentation asset, the product prepares it directly from canonical content and retains it for the rest of the level. RevivalMac and RevivalMobile each own a separate player world. RevivalEditor owns a separate document value and creates a separate disposable play-session value. All three applications use the same model, dependency rules, renderer and resource-loading path.
 
@@ -56,9 +58,11 @@ The editor may update changed preview geometry directly while editing. It does n
 
 When a real background bake, import, or publish operation first appears, its immutable input and stale-result rule are specified for that operation. Do not build a universal job or revision framework in advance.
 
-## Mac and mobile evidence gate
+## Mac, mobile-development and release-floor evidence gate
 
-After the complete Training Mission is playable and editable, measure optimized builds on the recorded M4 Mac and selected minimum-reference iPhone and iPad using:
+After the complete Training Mission is playable and editable, measure the Mac/shared path in an optimized build on the recorded M4 Mac. When the corresponding mobile composition exists, run the applicable development matrix on the physical iPhone and iPad recorded in the [current implementation plan](current-plan.md). Before a public beta or release claims the candidate Apple GPU family 7 floor, repeat the applicable matrix on selected representative floor iPhone and iPad devices; if those devices are unavailable or fail, raise the released floor to the oldest hardware actually verified. The absence of exact floor devices does not hold later Mac/shared islands open.
+
+Use:
 
 - startup and level-transition time;
 - peak and steady CPU, GPU, and unified memory;
@@ -99,7 +103,7 @@ The resident path proves:
 - final-GPU-use safety before release;
 - no retail-format reads outside D3Import;
 - no second renderer or resource-lifetime path;
-- release-build M4 Mac plus physical iPhone and iPad startup and memory evidence for each representative milestone that applies to those targets.
+- release-build M4 Mac evidence for each applicable Mac/shared checkpoint, recorded available physical-device evidence for mobile development checkpoints, and selected floor-device startup and memory evidence before a public beta or release claims that floor.
 
 These checks protect the current product. They do not add tests for a hypothetical streamer.
 

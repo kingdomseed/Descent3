@@ -19,12 +19,13 @@ Read:
 - [`source-translation-ledger.md`](../../../docs/revival/source-translation-ledger.md)
 - [`test-driven-development.md`](../../../docs/revival/test-driven-development.md)
 - [`functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md)
+- [`current-plan.md`](../../../docs/revival/current-plan.md)
 
-This skill is installed before implementation so the workflow is visible. Immediately before its first production use, review it against the actual translated Training chains and amend any assumption that the source disproves. An amendment cannot silently reduce ledgered behavior or creator scope.
+This skill is installed before implementation so the workflow is visible. Use `current-plan.md` to select the active behavior packet, lane, owner, and checkpoint. Immediately before its first production use, review it against the actual translated Training chains and amend any assumption that the source disproves. An amendment cannot silently reduce ledgered behavior or creator scope.
 
 ## Translate one complete chain
 
-1. Name the observable gameplay and creator result.
+1. Name the observable gameplay and creator result and its `current-plan.md` packet and checkpoint.
 2. Trace the module, generated block, handwritten ranges, messages, bindings, event producers, conditions, state, timers, engine calls, ordering, and teardown.
 3. Seed source-ledger rows for every involved file and range.
 4. Capture the historical checkpoints and deliberate native differences.

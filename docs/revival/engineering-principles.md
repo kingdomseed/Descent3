@@ -1,14 +1,16 @@
 # Engineering principles
 
 - Status: accepted, amended
-- Date: July 15, 2026
+- Date: July 16, 2026
 - Authority: binding implementation rules
 
 ## Objective
 
 Write the least project-owned code that can faithfully transfer and then improve the complete required game and creator experience. Minimal code means fewer concepts, paths, dependencies, and states a maintainer must understand. It does not mean compressed syntax, hidden behavior, or reduced scope.
 
-The recorded M4 Mac has ample capacity for a late-1990s game, while the selected minimum-reference iPhone and iPad still require measured memory, thermal and lifecycle evidence. Keep the first implementation direct on every target. Optimize and redesign only after a representative optimized build shows the problem.
+The recorded M4 Mac has ample capacity for a late-1990s game, so Mac/shared implementation leads. The available physical devices recorded in the current plan provide mobile-development evidence when mobile composition begins; exact release-floor hardware is a later public-beta or release certification concern, not a rewrite-start gate. Keep the first implementation direct on every target. Optimize and redesign only after a representative optimized build shows the problem.
+
+These are enduring implementation rules. The active slice, separate Mac/shared and mobile checkpoints, and two-developer ownership live in the [current implementation plan](current-plan.md); update that file rather than duplicating a live task queue here.
 
 ## Translation guardrail
 
@@ -20,6 +22,8 @@ The source is allowed to influence semantics without dictating native structure.
 - Replace platform APIs and ABI machinery directly; do not wrap them to resemble C++.
 - Do not carry dead branches, duplicated paths, defensive checks after a trusted boundary, or fixed-capacity accidents merely for fidelity.
 - Do not call a redesign a port. Baseline, change, and verification are separate records.
+
+Before fixing a new phase, island, subsystem, or material code-group boundary, run the bounded [fog-of-war preflight](source-translation.md#fog-of-war-preflight). Treat the existing plan and seeded source rows as hypotheses to check against the relevant source and current native path. The goal is enough evidence for the next direct contract, not exhaustive program analysis. Finding no correction is a normal result.
 
 Work one dependency island at a time and keep the real editor and player runnable. A large layer of stubs is not progress merely because many source filenames have Swift counterparts.
 
@@ -84,7 +88,7 @@ The first loading path is intentionally direct:
 
 Failure before commit preserves the current world; failure after commit enters an explicit unloaded error state. Loading may move one bounded operation off the main actor when measured latency warrants it. An iOS or iPadOS memory warning may trigger the ordinary drain-and-release path and an explicit unloaded or recoverable error state; it does not authorize partial eviction. Do not add a task per asset, stream cell, spatial demand calculation, prefetch policy, LRU, alternate memory-pressure residency mode, cache hierarchy, or resident/streaming switch.
 
-If the Mac and mobile evidence gate after the complete playable Training Mission proves the resident path inadequate, follow the amendment rule in [World loading and residency](world-loading.md). The replacement leaves one production lifetime path.
+If applicable optimized evidence after the complete playable Training Mission proves the resident path inadequate, follow the amendment rule in [World loading and residency](world-loading.md). Mac/shared evidence may trigger that investigation without waiting for release-floor certification; the replacement still leaves one production lifetime path that is verified through mobile composition before the affected overall milestone closes.
 
 ## Concurrency
 
@@ -154,7 +158,7 @@ A disposable research spike may inspect an unknown format, capture a trace, or a
 
 Performance work follows this order:
 
-1. measure an optimized build on every recorded reference device affected by the claim;
+1. measure an optimized build on every recorded development device affected by the implementation claim, and on selected floor devices before making a public support-floor claim;
 2. identify the responsible function, allocation, GPU pass, transfer, or wait;
 3. make the smallest change that addresses it;
 4. verify behavior and measure again;
@@ -166,6 +170,7 @@ Zero steady-state allocations, a fixed tick rate, specialized math, direct Metal
 
 ## Review questions
 
+- Did the bounded fog-of-war preflight test the proposed boundary, record real corrections, and stop when the next contract was stable, including a valid clean result when no gap appeared?
 - Which source behavior or ledgered capability does this code serve now?
 - Is the source disposition and any deliberate difference recorded?
 - Did the focused production test fail for the intended reason?
@@ -177,7 +182,7 @@ Zero steady-state allocations, a fixed tick rate, specialized math, direct Metal
 - Is a generic abstraction hiding one concrete implementation?
 - Are legacy semantics being confused with prohibited legacy APIs or ABI?
 - Can direct data, a switch, a table, or an Apple framework remove code?
-- Is the performance claim measured on representative content and every affected reference device?
+- Is the performance claim measured on representative content and every device needed for that claim, without turning later release-floor certification into a Mac/shared implementation gate?
 - Can any new type, target, dependency, or layer be deleted?
 
 Subtraction is valuable when fidelity and capability remain intact.

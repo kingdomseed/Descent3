@@ -1,18 +1,20 @@
 # Architecture decision: native semantic translation
 
 - Status: accepted, amended
-- Date: July 15, 2026
+- Date: July 16, 2026
 - Authority: binding product architecture
 
 ## Decision
 
 Build a complete Apple-native Descent 3 game and creator suite with the Swift 6.4 compiler toolchain in Swift 6 language mode and with MSL and direct Metal 4. Use the current Xcode 27 beta for initial product work and move to stable Xcode 27 when released without retaining a Swift 6.3 compatibility path. Reach that product through dependency-ordered semantic translation of the pinned released source, keeping the native player and editor runnable together as capability moves across.
 
-The player targets arm64 Macs running macOS 26 or later and Metal 4-capable iPhone and iPad devices running iOS or iPadOS 26 or later. The mobile feature baseline is Apple GPU family 7 or newer. RevivalEditor, D3Import, and dedicated no-window hosting remain macOS-only. The concrete shells use AppKit or UIKit, and the product uses MetalKit, GameController, AVFoundation, AVAudioEngine, AVAudioSession, Model I/O, Network, CryptoKit, Foundation, and OSLog directly where applicable.
+The player targets arm64 Macs running macOS 26 or later and Metal 4-capable iPhone and iPad devices running iOS or iPadOS 26 or later. Apple GPU family 7 or newer is the candidate mobile release floor pending representative floor evidence. RevivalEditor, D3Import, and dedicated no-window hosting remain macOS-only. The concrete shells use AppKit or UIKit, and the product uses MetalKit, GameController, AVFoundation, AVAudioEngine, AVAudioSession, Model I/O, Network, CryptoKit, Foundation, and OSLog directly where applicable.
 
 Shipping targets contain no C or C++ engine code, Objective-C++ bridge, Rust runtime, OpenGL renderer, SDL layer, Wine or Game Porting Toolkit runtime, Vulkan translation layer, Metal-cpp host, or native legacy module.
 
 That shipping boundary does not make the source incidental. The C++ tree is the default translation specification for original data flow, ordering, formulas, resource dependency discovery and lifetime, gameplay, rendering, and editor workflows until the native counterpart is verified. [Source translation discipline](source-translation.md) defines file-level accountability and deliberate modernization.
+
+The [roadmap](roadmap.md) and accepted contracts govern scope and phase order. The [current implementation plan](current-plan.md) is the single living execution-state record beneath them: it names the active slice, current blockers, next work, and developer ownership. The integration owner updates it as work lands or the active sequence changes; it cannot amend this architecture or become a competing source of product scope.
 
 ## Approved iPhone and iPad amendment
 
@@ -22,7 +24,7 @@ The selected replacement is a concrete UIKit `RevivalMobile` shell over the same
 
 D3Import remains the sole legacy-format reader and remains a macOS signed helper. RevivalMobile imports only Mac-produced canonical packages through the system file picker, validates and atomically installs them through the same native-package rules as RevivalMac, and copies them into app-owned storage. The mobile version 1.0 product therefore requires access to a Mac that can perform retail conversion. RevivalEditor and dedicated no-window hosting also remain macOS-only; the mobile player still receives applicable campaign, replay, listen-host, join, and stock multiplayer capability.
 
-The initial mobile deployment target is iOS and iPadOS 26 or later on Apple GPU family 7 or newer. Phase 0 records actual minimum-supported iPhone and iPad reference devices before production begins. The public distribution channel remains an evidence-gated release decision because rights, GPL obligations, App Review access to functional content, signing, regional availability, and the channel's enabled device families must be resolved without redistributing proprietary retail data. If the App Store is selected, App Store Connect availability is restricted to the approved iPhone and iPad boundary; visionOS and running the iPhone/iPad app on Apple Silicon Macs remain disabled unless separately approved and tested. No native product code or released canonical package exists, so this amendment requires no code or data migration; it deletes the superseded macOS-only and three-product prose before implementation begins.
+The initial mobile deployment target is iOS and iPadOS 26 or later, with Apple GPU family 7 or newer as the candidate release floor. Development may use available physical hardware, and missing older floor hardware does not block D3Import, shared Core and Metal work, RevivalMac, RevivalEditor, later Mac dependency islands, or ordinary mobile composition. Before public beta or release claims Apple GPU family 7 support, the project verifies a representative floor-device matrix or raises the released floor to the oldest hardware it can support with evidence. The public distribution channel remains an evidence-gated release decision because rights, GPL obligations, App Review access to functional content, signing, regional availability, and the channel's enabled device families must be resolved without redistributing proprietary retail data. If the App Store is selected, App Store Connect availability is restricted to the approved iPhone and iPad boundary; visionOS and running the iPhone/iPad app on Apple Silicon Macs remain disabled unless separately approved and tested. No native product code or released canonical package exists, so this amendment requires no code or data migration; it deletes the superseded macOS-only and three-product prose before implementation begins.
 
 ## Decision levels
 
@@ -76,17 +78,17 @@ Indoor rendering begins with the released room-and-portal traversal and observab
 
 ## World loading and lifetime
 
-The production load unit is one complete canonical `Level`, matching the original D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and RevivalMac, RevivalMobile, and RevivalEditor load the resulting complete canonical `Level`; one selected room is only the first visible and editable acceptance slice. A synthetic one-room level may be a focused fixture but never becomes a second package or runtime mode.
+The production load unit is one complete canonical `Level`, matching the original D3L world boundary. In Phase 1, D3Import converts the complete Training D3L, RevivalMac and RevivalEditor first load the resulting complete canonical `Level`, and RevivalMobile subsequently composes that same proven load path; one selected room is only the first visible and editable acceptance slice. A synthetic one-room level may be a focused fixture but never becomes a second package or runtime mode.
 
 The current implementation keeps that authoritative level world resident until exit. It starts presentation preparation with the source-evidenced `PageInAllData` working set, then permits later source-reachable assets to be prepared directly from canonical content and retained for the rest of the level. The current package contains the complete level topology and every dependency reachable through the currently translated product path. It expands when a later phase makes another path executable, rather than analyzing all Osiris, matcen, and dynamic-spawn possibilities before their work begins. The runtime never reopens retail formats, and the design does not claim that every GPU resource existed before original level activation.
 
 Both player shells and the editor use the same dependency rules and resident presentation path. For replacement, validate the successor's canonical CPU content while the current world remains active. At the commit boundary, stop new submissions, wait for final GPU use, and release the old presentation owner before preparing the successor. Failure before commit preserves the old world; failure afterward enters a clear unloaded error state. The design does not silently require two complete GPU level sets. An iOS or iPadOS memory warning may trigger this ordinary drain-and-release path and an explicit unloaded or recoverable error; it does not create partial eviction or a second mobile lifetime mode.
 
-Do not add world cells, camera-demand envelopes, prefetch shells, stream blobs, LRU policy, or a resident/streaming switch. [World loading and residency](world-loading.md) defines the M4 and minimum-mobile-device evidence gate after the complete playable Training Mission and its amendment rule. Streaming remains possible only as a measured replacement that leaves one path across platforms.
+Do not add world cells, camera-demand envelopes, prefetch shells, stream blobs, LRU policy, or a resident/streaming switch. [World loading and residency](world-loading.md) defines the M4 and applicable mobile-development evidence gate after the complete playable Training Mission and its amendment rule. Before public beta or release claims the candidate Apple GPU family 7 floor, the selected lifetime path must pass representative floor evidence or the released floor must be raised. Streaming remains possible only as a measured replacement that leaves one path across platforms.
 
 ## Initial product and ownership graph
 
-Phase 1 creates four executable products around two required code-ownership boundaries:
+Phase 1 delivers four executable products around two required code-ownership boundaries. Work begins with D3Import, the shared ownership areas, RevivalMac, and RevivalEditor; RevivalMobile composes each proven shared slice afterward and remains required for version 1.0:
 
     D3Import
     RevivalMac     -> RevivalCore ownership + RevivalMetal ownership
