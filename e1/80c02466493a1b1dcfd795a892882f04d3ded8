@@ -1,0 +1,99 @@
+Revival/Sources/RevivalEditor/RevivalEditorApplication.swift
+  s_cda1bc56a74f89::t_713254d5d03101 1-39
+Revival.xcodeproj/xcshareddata/xcschemes/D3Import.xcscheme
+  s_cda1bc56a74f89::t_713254d5d03101 1-104
+Revival.xcodeproj/xcshareddata/xcschemes/RevivalEditor.xcscheme
+  s_cda1bc56a74f89::t_713254d5d03101 1-79
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_00c8f783124003 21-22,24-27,31,34-36,149
+  s_cda1bc56a74f89::t_a544f0266e892c 88
+  s_cda1bc56a74f89::t_fb84349d20e3fb 30
+  s_cda1bc56a74f89::t_43d6cc6954496b 23,40,89
+  s_cda1bc56a74f89::t_aa5bd6438b9099 29,85,87,148
+  s_cda1bc56a74f89::t_91b5dd35839e13 32,64,68
+  s_c503f7c0529e13::t_cbd81cdd9c0392 33,147,151,153,155-160
+Revival.xcworkspace/contents.xcworkspacedata
+  s_cda1bc56a74f89::t_713254d5d03101 1-7
+.gitignore
+  s_cda1bc56a74f89::t_aa5bd6438b9099 414-416
+Revival.xcodeproj/project.pbxproj
+  s_cda1bc56a74f89::t_dc6159138f805d 15-16,29,108,324,349
+  s_cda1bc56a74f89::t_713254d5d03101 1-14,17-28,30-107,109-323,325-348,350-554
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_cbd81cdd9c0392 249,267
+Revival/Sources/D3Import/main.swift
+  s_cda1bc56a74f89::t_713254d5d03101 1-7
+Revival/Tests/D3ImportTests/HOG2ArchiveTests.swift
+  s_cda1bc56a74f89::t_713254d5d03101 1-4,168-182,238-239
+  s_cda1bc56a74f89::t_0eb56765c84be5 5-10
+  s_cda1bc56a74f89::t_a5554097f292af 28-35
+  s_cda1bc56a74f89::t_adbc576a17cfbe 45-52
+  s_cda1bc56a74f89::t_3d6aafe8ef8efd 64-72
+  s_cda1bc56a74f89::t_67719ff2df78b2 87-102
+  s_cda1bc56a74f89::t_9da373788a1ba4 20-27,183-190,223,230-237
+  s_cda1bc56a74f89::t_798d118c1a1254 36-44
+  s_cda1bc56a74f89::t_41c5363ffdab63 11-19
+  s_cda1bc56a74f89::t_84ef217a9368e4 53-54,56-63,191-222,224-229
+  s_cda1bc56a74f89::t_ef660962cc6a3b 115-126
+  s_cda1bc56a74f89::t_48e37b9968a394 55
+  s_cda1bc56a74f89::t_62ac32b0f7243d 73-86
+  s_cda1bc56a74f89::t_0c5948a222b686 103-114
+  s_cda1bc56a74f89::t_b3554b6976c3de 127-138
+  s_cda1bc56a74f89::t_2994d039d40658 139-167
+docs/revival/skills-and-agents.md
+  s_c503f7c0529e13::t_4477f52b5e20f7 162
+docs/revival/engineering-principles.md
+  s_c503f7c0529e13::t_4477f52b5e20f7 13
+Revival/Sources/RevivalMac/RevivalMacApplication.swift
+  s_cda1bc56a74f89::t_713254d5d03101 1-39
+docs/revival/source-translation-ledger.md
+  s_cda1bc56a74f89::t_a38fdf4761941c 82,84,86,94
+  s_cda1bc56a74f89::t_43d6cc6954496b 97
+  s_cda1bc56a74f89::t_aa5bd6438b9099 65,67,69,71,75-79,95-96,98-99
+  s_c503f7c0529e13::t_e0586ce66064fc 81,83,85
+  s_c503f7c0529e13::t_1f8fb8061a6cfc 80
+Revival/Sources/D3Import/HOG2Archive.swift
+  s_cda1bc56a74f89::t_a1185864214abf 70,104,106-108,112-113
+  s_cda1bc56a74f89::t_ebca0b2fe071d5 85-97
+  s_cda1bc56a74f89::t_63c654ea952c96 109-111,127-129
+  s_cda1bc56a74f89::t_100dacdf4a1d1e 53-56,58-61
+  s_cda1bc56a74f89::t_a34aafa714a6e8 80-81,83
+  s_cda1bc56a74f89::t_b76c9d8fe9d380 130-133
+  s_cda1bc56a74f89::t_d17e964e9d35af 77
+  s_cda1bc56a74f89::t_dc6159138f805d 1-44,46-47,49-52,57,63,67-69,72-76,78-79,82,100-103,105,114-126,134-141,146
+  s_cda1bc56a74f89::t_235c6c62f0f46d 62
+  s_cda1bc56a74f89::t_b17af2b9e73ed0 48
+  s_cda1bc56a74f89::t_7f8f8078946046 45
+  s_cda1bc56a74f89::t_ad7db7c7ec963d 64-66
+  s_cda1bc56a74f89::t_508b68a6e40838 71,84,98-99,142-145
+docs/revival/creator-suite.md
+  s_c503f7c0529e13::t_4477f52b5e20f7 15
+docs/revival/roadmap.md
+  s_c503f7c0529e13::t_cbd81cdd9c0392 11,255
+Revival.xcodeproj/xcshareddata/xcschemes/RevivalMac.xcscheme
+  s_cda1bc56a74f89::t_713254d5d03101 1-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e180c02466493a1b1dcfd795a892882f04d3ded8",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_cda1bc56a74f89": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6ad9-5966-7f43-98f6-f5b8965a8f9d",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
