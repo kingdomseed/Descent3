@@ -159,7 +159,7 @@ Routine fog-of-war discovery is mandatory at a new boundary; formal wayfinding i
 
 ## Agent work waves
 
-Use the following bounded evidence-producing roles rather than standing personas. Run independent roles concurrently when agent capacity allows. [`current-plan.md`](current-plan.md#two-developer-work-map) owns the current two-developer split, file ownership, merge order, and join points; this section defines reusable role boundaries rather than a second schedule.
+Use the following bounded evidence-producing roles rather than standing personas. Run independent roles concurrently when agent capacity allows. [`current-plan.md`](current-plan.md#one-or-two-developer-capacity-and-integration-ownership) owns current lane assignment, file ownership, merge order, and join points; this section defines reusable role boundaries rather than a second schedule.
 
 ### Translation foundation
 

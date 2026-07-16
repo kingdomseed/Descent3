@@ -8,7 +8,7 @@ Every phase ends in a runnable, visible, or objectively verified product result.
 
 The phases are broad dependency groupings, not promises that every listed capability lands in one monolithic change. Phase 10 is the complete version 1.0 release. Phase 11 is post-1.0 visual and experiential development.
 
-This roadmap defines the durable phase sequence. The living current state, active integration slice, lane-specific blockers, next work packets, and two-developer ownership map are maintained only in [Current implementation plan](current-plan.md). The integration owner updates that execution record when work lands; other active documents link to it instead of carrying independent “next step” lists.
+This roadmap defines the durable phase sequence. The living current state, active integration slice, lane-specific blockers, next work packets, and one-or-two-developer capacity and ownership map are maintained only in [Current implementation plan](current-plan.md). The integration owner updates that execution record when work lands; other active documents link to it instead of carrying independent “next step” lists.
 
 macOS is the leading implementation lane. D3Import, the shared canonical/Core and Metal paths, RevivalMac, and RevivalEditor establish each source-led slice before RevivalMobile composes the proven path through UIKit and its mobile-only boundaries. Mobile remains required for version 1.0. An open mobile-composition checkpoint does not block the next Mac/shared dependency island, but it does block claims that the slice works on mobile, that the overall milestone is closed, or that version 1.0 is complete. The Mac-leading order may not create a temporary Mac-only Core, renderer, scheduler, package schema, or resource-lifetime path.
 
@@ -252,4 +252,4 @@ Intel Mac, visionOS, Windows, Linux, consoles and web are outside the roadmap. R
 
 ## Current execution record
 
-Find and update the authoritative live state, exact next slices, lane-specific blockers, and two-developer assignments only in [Current implementation plan](current-plan.md). This roadmap does not duplicate that moving state. Review and amend each installed domain skill against the real source immediately before its first production change.
+Find and update the authoritative live state, exact next slices, lane-specific blockers, and current one-or-two-developer assignments only in [Current implementation plan](current-plan.md). Capacity for a second developer is not a requirement to keep two implementation lanes active. This roadmap does not duplicate that moving state. Review and amend each installed domain skill against the real source immediately before its first production change.

@@ -12,7 +12,7 @@ The editor translates useful D3Edit, game-data, DALLAS, briefing, baking, valida
 
 RevivalEditor begins in Phase 1 with the first canonical resident world and Metal viewport. It grows with each gameplay slice. This is an editor/runtime co-development decision, not a claim that the historical editor was completed before the game.
 
-The [current implementation plan](current-plan.md) is the sole live record of the active editor/player slice, separate Mac/shared and mobile checkpoints, and two-developer ownership. Update it as work moves; this contract defines the required creator result rather than duplicating its task queue.
+The [current implementation plan](current-plan.md) is the sole live record of the active editor/player slice, separate Mac/shared and mobile checkpoints, and current one-or-two-developer capacity and ownership. Update it as work moves; this contract defines the required creator result rather than duplicating its task queue.
 
 The editor is a top-tier human creation product before it becomes an automation surface. MCP, headless authoring, agent tools, training capture, telemetry, and a public command protocol are outside the current roadmap.
 

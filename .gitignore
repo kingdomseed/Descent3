@@ -411,3 +411,6 @@ git-hash.txt
 
 # Local agent/editor state
 /.cursor/
+
+# Xcode per-user state
+xcuserdata/

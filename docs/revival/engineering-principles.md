@@ -10,7 +10,7 @@ Write the least project-owned code that can faithfully transfer and then improve
 
 The recorded M4 Mac has ample capacity for a late-1990s game, so Mac/shared implementation leads. The available physical devices recorded in the current plan provide mobile-development evidence when mobile composition begins; exact release-floor hardware is a later public-beta or release certification concern, not a rewrite-start gate. Keep the first implementation direct on every target. Optimize and redesign only after a representative optimized build shows the problem.
 
-These are enduring implementation rules. The active slice, separate Mac/shared and mobile checkpoints, and two-developer ownership live in the [current implementation plan](current-plan.md); update that file rather than duplicating a live task queue here.
+These are enduring implementation rules. The active slice, separate Mac/shared and mobile checkpoints, and current one-or-two-developer capacity and ownership live in the [current implementation plan](current-plan.md); update that file rather than duplicating a live task queue here.
 
 ## Translation guardrail
 
