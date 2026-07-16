@@ -1,0 +1,39 @@
+.github/pull_request_template.md
+  s_c503f7c0529e13::t_8a29b8c0fa0b86 57
+  s_c503f7c0529e13::t_b07c4d87be8e6f 41
+.agents/skills/revival-documentation-steward/agents/openai.yaml
+  s_c503f7c0529e13::t_afec83a754cc5e 1-4
+docs/revival/skill-supply-chain.md
+  s_c503f7c0529e13::t_8a29b8c0fa0b86 39
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_8a29b8c0fa0b86 15-16,166
+REVIVAL.md
+  s_c503f7c0529e13::t_8a29b8c0fa0b86 7,151
+.agents/skills/revival-documentation-steward/SKILL.md
+  s_c503f7c0529e13::t_8a29b8c0fa0b86 1-2,4-30,32,34-49,52-140
+  s_c503f7c0529e13::t_699eed6540f5e3 3,50-51
+  s_c503f7c0529e13::t_0845b52f37816f 141
+  s_c503f7c0529e13::t_50fe29498c9f95 31,33
+docs/revival/skills-and-agents.md
+  s_c503f7c0529e13::t_8a29b8c0fa0b86 11,106,110,147,156,182-187,202,213
+.agents/skills/revival-review/SKILL.md
+  s_c503f7c0529e13::t_8a29b8c0fa0b86 85
+AGENTS.md
+  s_c503f7c0529e13::t_8a29b8c0fa0b86 7,81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "80ba189fbe4ac2c9ca4886345fc9e157c7c4c013",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
