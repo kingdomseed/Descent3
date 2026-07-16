@@ -1,0 +1,152 @@
+.agents/skills/d3-content-import/SKILL.md
+  s_c503f7c0529e13::t_95ba7e156bd3a3 45
+  s_c503f7c0529e13::t_e1b644cc3121db 17,35,96
+  s_c503f7c0529e13::t_c5acdaa0aeb233 84
+.agents/skills/revival-simplify/SKILL.md
+  s_c503f7c0529e13::t_ab7c85da9f66e5 19,22,76
+docs/revival/skill-supply-chain.md
+  s_c503f7c0529e13::t_20e24a600b9c4b 4
+  s_c503f7c0529e13::t_954038e06614f5 42
+.agents/skills/revival-constitution/SKILL.md
+  s_c503f7c0529e13::t_701e79feff68de 106
+  s_c503f7c0529e13::t_1df7ed5afae649 37,64-71
+  s_c503f7c0529e13::t_f6df50a9012256 25,29,45,63,99
+  s_c503f7c0529e13::t_ab3e5af0015a1b 33
+docs/revival/verification.md
+  s_c503f7c0529e13::t_be0d8527f8abf2 325
+  s_c503f7c0529e13::t_701e79feff68de 230
+  s_c503f7c0529e13::t_c8a82386780833 4,27,78,214,228,262-264,267-268,271-280,332,339-341
+  s_c503f7c0529e13::t_59c266f54e4f6d 34-35,50
+  s_c503f7c0529e13::t_02eb5cfb0a8d17 232
+  s_c503f7c0529e13::t_5d27c3348ee3db 51
+docs/revival/engineering-principles.md
+  s_c503f7c0529e13::t_95e33034b1e317 11
+  s_c503f7c0529e13::t_59c266f54e4f6d 26-27,173
+  s_c503f7c0529e13::t_6840ac1303e267 4,13,91,161,185
+  s_66fe1b6590951c::t_3b4760d49d05a3 12
+docs/revival/content-pipeline.md
+  s_c503f7c0529e13::t_6840ac1303e267 4,27-28,88,232
+AGENTS.md
+  s_c503f7c0529e13::t_6c6af118aeee2f 12
+  s_c503f7c0529e13::t_e61605d162e5b3 30
+  s_c503f7c0529e13::t_9e97cdeee1436b 7,49-50,52,87-88
+  s_c503f7c0529e13::t_a7d0d0f1338388 90
+.agents/skills/revival-transport-security-operations/SKILL.md
+  s_c503f7c0529e13::t_e1b644cc3121db 12,42
+.agents/skills/revival-verification/SKILL.md
+  s_c503f7c0529e13::t_e1b644cc3121db 12,28,36,47,55-56,93,105
+docs/revival/creator-suite.md
+  s_c503f7c0529e13::t_6840ac1303e267 4,15-16,23
+.agents/skills/swift-realtime-systems/SKILL.md
+  s_c503f7c0529e13::t_e1b644cc3121db 21,24,38,89
+docs/revival/primary-source-index.md
+  s_c503f7c0529e13::t_954038e06614f5 79
+  s_c503f7c0529e13::t_1df7ed5afae649 80-81
+  s_c503f7c0529e13::t_6840ac1303e267 4,20
+  s_c503f7c0529e13::t_95e33034b1e317 41
+REVIVAL.md
+  s_c503f7c0529e13::t_a7d0d0f1338388 22,35
+  s_c503f7c0529e13::t_e61605d162e5b3 9
+  s_c503f7c0529e13::t_9e97cdeee1436b 58,63,69,111,130,139
+  s_c503f7c0529e13::t_c47c38e766a703 7
+  s_c503f7c0529e13::t_784d1c8b963e24 8
+.agents/skills/revival-review/SKILL.md
+  s_c503f7c0529e13::t_e1b644cc3121db 21,24,66,83
+  s_c503f7c0529e13::t_1df7ed5afae649 50,102
+  s_c503f7c0529e13::t_4efb30460a9be4 44
+docs/revival/world-loading.md
+  s_c503f7c0529e13::t_6840ac1303e267 4,11,61,65
+  s_c503f7c0529e13::t_230a27920699e3 9
+  s_c503f7c0529e13::t_95e33034b1e317 63,106
+  s_66fe1b6590951c::t_fe2f2e689ecbd6 10,62
+.agents/skills/revival-volumetric-navigation/SKILL.md
+  s_c503f7c0529e13::t_4ebf8ae2010970 12,14,47
+.agents/skills/revival-multiplayer/SKILL.md
+  s_c503f7c0529e13::t_e1b644cc3121db 12,43
+docs/revival/architecture.md
+  s_c503f7c0529e13::t_9e97cdeee1436b 4,11,17-18,81,87,91
+  s_c503f7c0529e13::t_a7d0d0f1338388 27
+.agents/skills/revival-behavior-system/SKILL.md
+  s_c503f7c0529e13::t_4ebf8ae2010970 22,24,28
+.agents/skills/revival-source-translation/SKILL.md
+  s_c503f7c0529e13::t_e1b644cc3121db 20,24,34,102,168
+  s_c503f7c0529e13::t_1df7ed5afae649 38-45,56,183
+  s_c503f7c0529e13::t_954038e06614f5 187
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_936aee804e3b18 32
+  s_c503f7c0529e13::t_8a622e5ada3f42 126
+  s_c503f7c0529e13::t_be0d8527f8abf2 20-22,25,58-62
+  s_c503f7c0529e13::t_b7e8a9a59c8d15 28
+  s_c503f7c0529e13::t_16e2f538eb987b 116,149
+  s_c503f7c0529e13::t_3db1c62434f0c6 56-57
+  s_c503f7c0529e13::t_701e79feff68de 23-24,154
+  s_c503f7c0529e13::t_2f8420f889ba77 127,129
+  s_c503f7c0529e13::t_e61605d162e5b3 34-53,119-123,125,128,130-145,168-173
+  s_c503f7c0529e13::t_59c266f54e4f6d 124,167
+  s_66fe1b6590951c::t_8137982cf6e964 1-19,26-27,29-31,33,54-55,63-115,117-118,146-148,150-153,155-166,174-175
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_59c266f54e4f6d 4,13-15
+  s_c503f7c0529e13::t_7ddfe2f43d4907 11-12
+.github/pull_request_template.md
+  s_c503f7c0529e13::t_59c266f54e4f6d 30
+  s_c503f7c0529e13::t_be0d8527f8abf2 26,41,56
+.agents/skills/revival-replay/SKILL.md
+  s_c503f7c0529e13::t_e1b644cc3121db 12,42
+.agents/skills/metal4-rendering/SKILL.md
+  s_c503f7c0529e13::t_e1b644cc3121db 22,37,87-88
+  s_c503f7c0529e13::t_be0d8527f8abf2 25
+  s_c503f7c0529e13::t_701e79feff68de 86
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_6840ac1303e267 4,11-12,17,268,270,279
+  s_c503f7c0529e13::t_95e33034b1e317 114-115,266
+docs/revival/roadmap.md
+  s_c503f7c0529e13::t_7ddfe2f43d4907 23
+  s_c503f7c0529e13::t_59c266f54e4f6d 19-20,44,52
+  s_c503f7c0529e13::t_6c6af118aeee2f 38,253,255
+  s_c503f7c0529e13::t_be0d8527f8abf2 27
+  s_c503f7c0529e13::t_fe0a36e1869de7 4,11-14,33,36,56,63,68-77,82-86,88,160
+docs/revival/skills-and-agents.md
+  s_c503f7c0529e13::t_59c266f54e4f6d 147-155,157
+  s_c503f7c0529e13::t_9e97cdeee1436b 4,11-12,124,146,161,166-167,200,205
+  s_c503f7c0529e13::t_a7d0d0f1338388 69
+.agents/skills/revival-wayfinding/SKILL.md
+  s_c503f7c0529e13::t_1df7ed5afae649 10-13
+  s_c503f7c0529e13::t_ab7c85da9f66e5 29,39,70
+.agents/skills/revival-networked-simulation/SKILL.md
+  s_c503f7c0529e13::t_e1b644cc3121db 12
+  s_c503f7c0529e13::t_95ba7e156bd3a3 14
+.agents/skills/revival-creator-suite/SKILL.md
+  s_c503f7c0529e13::t_e1b644cc3121db 17,33,42,85
+docs/revival/source-translation.md
+  s_c503f7c0529e13::t_59c266f54e4f6d 68-77
+  s_c503f7c0529e13::t_6840ac1303e267 4,83-86,126
+  s_c503f7c0529e13::t_230a27920699e3 89
+  s_c503f7c0529e13::t_2f8420f889ba77 58
+  s_c503f7c0529e13::t_e61605d162e5b3 42-57,59-63
+README.md
+  s_c503f7c0529e13::t_45ddf40730e073 9,15-17,25,27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "40eba1dd1250987f8e8891285105d018b2fc1b2b",
+  "prompts": {},
+  "sessions": {
+    "s_66fe1b6590951c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f665b-7e3b-7a20-806a-f76bb3891df0",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
