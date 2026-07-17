@@ -70,11 +70,13 @@ Do not create Common, Shared, Engine, Manager, Service, Provider, or Factory mod
 - Keep renderer objects out of simulation, canonical project, save, replay, and network types.
 - Pass the historical prior-frame elapsed value and input explicitly; do not recreate global `Frametime` or global function-mode state.
 - Own the complete resident level world, its eager working set, and every later canonical presentation preparation through one level owner until exit.
-- Validate retail, project, package, save, and network boundaries before constructing trusted canonical values. Internal code relies on those invariants instead of rechecking impossible states.
+- Validate retail, project, package, save, and network boundaries once, before constructing trusted canonical values. A branch that returns or throws a recoverable error must represent input, a lifecycle event, or an operating-system failure plausibly reachable through a supported production path. Internal code relies on established invariants instead of rechecking impossible states; an impossible trusted state is a programming error and may terminate through a precondition or ordinary crash.
 
 Use finite Float32 where the original semantics and Metal path require it. Reject NaN and infinity at untrusted boundaries. Preserve operation order where current behavior depends on it. Do not build a deterministic math library, fixed-point layer, fused-operation policy, or semantic-revision hierarchy before replay or multiplayer evidence requires one.
 
 Unsafe memory access, Unmanaged, unchecked concurrency, forced inlining, specialization, and custom allocation require a measured reason, a written invariant, and focused tests. Do not enable unchecked optimization for the project.
+
+Catch an error only to perform recovery required by an accepted outcome or to attach a diagnostic that the owning executable presents to the user. Otherwise let the original error propagate. Do not copy C++ defensive branches or add fallbacks, rollback machinery, or catch-and-continue paths for arbitrary failure of trusted state.
 
 ## Loading and resource lifetime
 
@@ -178,6 +180,8 @@ Zero steady-state allocations, a fixed tick rate, specialized math, direct Metal
 - Did test convenience add a production seam or alternate path?
 - Does the feature have the applicable editor and publishing path?
 - Did we validate once at the boundary or repeat defensive checks internally?
+- Which supported production event reaches each recoverable failure branch? If none does, delete the branch instead of defending it.
+- Does each catch perform required recovery or improve a user-facing diagnostic? If neither is true, remove it.
 - Did we add a second mode where one current implementation would work?
 - Is a generic abstraction hiding one concrete implementation?
 - Are legacy semantics being confused with prohibited legacy APIs or ABI?

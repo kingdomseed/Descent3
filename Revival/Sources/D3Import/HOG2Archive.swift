@@ -12,6 +12,13 @@ import Foundation
 
 struct HOG2Archive: Equatable {
     let entries: [HOG2Entry]
+
+    func uniqueEntry(named name: String) -> HOG2Entry {
+        let folded = [UInt8](name.utf8).map(asciiLowercased)
+        return entries.first { entry in
+            [UInt8](entry.sourceName.utf8).map(asciiLowercased) == folded
+        }!
+    }
 }
 
 struct HOG2Entry: Equatable {
@@ -24,7 +31,6 @@ struct HOG2Entry: Equatable {
 enum HOG2ParseError: Error, Equatable {
     case truncatedHeader
     case invalidTag
-    case entryTableOffsetOverflow
     case truncatedEntryTable
     case payloadOverlapsEntryTable
     case payloadOffsetOutOfBounds
@@ -32,7 +38,6 @@ enum HOG2ParseError: Error, Equatable {
     case nonASCIIName(index: Int)
     case entriesOutOfOrder(previous: String, current: String)
     case nameCollision(first: String, second: String)
-    case payloadOffsetOverflow(index: Int)
     case truncatedPayload(index: Int)
     case trailingBytes
 }
@@ -48,17 +53,11 @@ func parseHOG2(_ data: Data) throws -> HOG2Archive {
         throw HOG2ParseError.invalidTag
     }
 
-    let entryCount = readLittleEndianUInt32(data, at: 4)
-    let firstPayloadOffset = readLittleEndianUInt32(data, at: 8)
-    let (tableByteCount, tableSizeOverflow) = entryCount.multipliedReportingOverflow(
-        by: UInt32(entrySize)
-    )
-    let (tableEnd, tableOffsetOverflow) = UInt32(headerSize).addingReportingOverflow(tableByteCount)
+    let entryCount = Int(readLittleEndianUInt32(data, at: 4))
+    let firstPayloadOffset = Int(readLittleEndianUInt32(data, at: 8))
+    let tableEnd = headerSize + entryCount * entrySize
 
-    guard !tableSizeOverflow, !tableOffsetOverflow else {
-        throw HOG2ParseError.entryTableOffsetOverflow
-    }
-    guard UInt64(tableEnd) <= UInt64(data.count) else {
+    guard tableEnd <= data.count else {
         throw HOG2ParseError.truncatedEntryTable
     }
     guard firstPayloadOffset >= tableEnd else {
@@ -66,11 +65,11 @@ func parseHOG2(_ data: Data) throws -> HOG2Archive {
     }
 
     var entries: [HOG2Entry] = []
-    entries.reserveCapacity(Int(entryCount))
+    entries.reserveCapacity(entryCount)
     var payloadOffset = firstPayloadOffset
     var previousName: (source: String, folded: [UInt8])?
 
-    for index in 0..<Int(entryCount) {
+    for index in 0..<entryCount {
         let recordOffset = headerSize + index * entrySize
         let nameField = data[recordOffset..<(recordOffset + 36)]
         guard let terminator = nameField.firstIndex(of: 0) else {
@@ -99,35 +98,32 @@ func parseHOG2(_ data: Data) throws -> HOG2Archive {
         previousName = (sourceName, foldedName)
 
         let flags = readLittleEndianUInt32(data, at: recordOffset + 36)
-        let length = readLittleEndianUInt32(data, at: recordOffset + 40)
+        let length = Int(readLittleEndianUInt32(data, at: recordOffset + 40))
         let timestamp = readLittleEndianUInt32(data, at: recordOffset + 44)
-        let (payloadEnd, payloadOffsetOverflow) = payloadOffset.addingReportingOverflow(length)
 
-        guard !payloadOffsetOverflow else {
-            throw HOG2ParseError.payloadOffsetOverflow(index: index)
-        }
-        guard UInt64(payloadOffset) <= UInt64(data.count) else {
+        guard payloadOffset <= data.count else {
             throw HOG2ParseError.payloadOffsetOutOfBounds
         }
-        guard UInt64(payloadEnd) <= UInt64(data.count) else {
+        guard length <= data.count - payloadOffset else {
             throw HOG2ParseError.truncatedPayload(index: index)
         }
+        let payloadEnd = payloadOffset + length
 
         entries.append(
             HOG2Entry(
                 sourceName: sourceName,
                 flags: flags,
                 timestamp: timestamp,
-                payloadRange: Int(payloadOffset)..<Int(payloadEnd)
+                payloadRange: payloadOffset..<payloadEnd
             )
         )
         payloadOffset = payloadEnd
     }
 
-    guard UInt64(payloadOffset) <= UInt64(data.count) else {
+    guard payloadOffset <= data.count else {
         throw HOG2ParseError.payloadOffsetOutOfBounds
     }
-    guard UInt64(payloadOffset) == UInt64(data.count) else {
+    guard payloadOffset == data.count else {
         throw HOG2ParseError.trailingBytes
     }
 

@@ -38,7 +38,7 @@ These are the facts to establish, not a form quota. For a genuinely local cleanu
 
 Do not create another ledger or refactor-artifact system. Put durable evidence in the existing source ledger, test record, commit, or pull request that already owns the change.
 
-If a reachable contract lacks a sensitive test, follow the controlled-mutation procedure in the TDD document before refactoring. Dead or unreachable code instead requires proof that no supported production entry point reaches it. Do not invent a test route to keep dead code alive.
+If a reachable contract lacks a sensitive test, follow the controlled-mutation procedure in the TDD document before refactoring. A nondeterministic seam may schedule a real supported event only; it may not fabricate arbitrary permissions, flags, ownership, or trusted-state corruption. Dead or unreachable code instead requires proof that no supported production entry point reaches it. Do not invent a test route to keep dead code alive.
 
 ## Inspect the change
 
@@ -65,7 +65,10 @@ Look for concrete simplifications in five areas.
 - Validate untrusted input once as it becomes canonical, then trust the canonical value.
 - Remove repeated internal guards for states canonical construction excludes.
 - Prefer a direct call, early return, exhaustive `switch`, small concrete value, or local function over callbacks and indirection.
-- Delete catch-and-ignore behavior, placeholder defaults, speculative recovery branches, and comments that rationalize them.
+- Retain recovery only for a named supported event with an accepted outcome. Catch only to perform required recovery or produce a user-visible diagnostic.
+- Honor the accepted commit point: preserve prior state for supported precommit failure, keep postcommit cleanup best effort, and do not build recursive rollback.
+- Delete catch-and-ignore behavior, placeholder defaults, speculative recovery branches, tests for fabricated failure states, and comments that rationalize them.
+- Let impossible states behind a trusted boundary terminate through direct invariants, preconditions, or ordinary traps.
 - Preserve assertions that state a real trusted invariant and are backed by construction and evidence.
 
 ### Efficiency
@@ -110,6 +113,7 @@ Record:
 - the exact focused and affected-suite commands and results;
 - any integrated checkpoint or optimized M4 and physical mobile-device measurement required by the owning contract;
 - source-led or architecture-sensitive blast-radius facts checked;
+- the supported event and accepted outcome for every retained recovery branch or `catch`;
 - any rejected suggestion and the evidence for rejecting it.
 
 Keep the record proportional. A small cleanup may combine these into the compact preservation note above; a material refactor keeps the evidence separate enough to audit.

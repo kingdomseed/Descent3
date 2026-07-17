@@ -41,7 +41,7 @@ Before first production use for a new format or campaign slice, retrace the curr
 7. Implement checked little-endian reads, bounds, names, folded-key collision handling, duplicates, sizes, variants, and references directly.
 8. Preserve source-supported order and relationships in simple canonical values; validate once before constructing trusted values.
 9. Integrate through the real D3Import operation, not a test-only parser or in-process runtime shortcut.
-10. Write and validate an empty destination-adjacent temporary package and report, then atomically promote only after the whole request succeeds.
+10. Fully write and validate the destination-adjacent staging package and a destination-adjacent report candidate. Under the destination-parent lock, require the destination to be absent or to load as a valid Revival package, promote the report first, perform the last supported cancellation check, and rename the staging package as the final commit. Restore the prior report only when supported cancellation or package-rename failure occurs before that commit; propagate a report-restoration syscall error directly. After commit, removal of replaced artifacts is best-effort cleanup.
 11. Run the affected suite and applicable complete-Level, Mac-player, editor-isolation, failure-preservation, and local-retail evidence. At a claimed mobile composition checkpoint, run the production file-picker-to-app-storage path for the package schema, promotion, handoff, and consumer behavior it exercises. A parser-only or Mac/shared checkpoint leaves that later mobile evidence open, does not duplicate unrelated `T-019` evidence, and never exposes a retail source to the mobile target.
 12. Record exact red and green commands, source comparison, deliberate differences, hashes, provenance, coverage, ignored entries, and ledger states.
 
@@ -49,7 +49,9 @@ Before first production use for a new format or campaign slice, retrace the curr
 
 Use deterministic Codable JSON and ordinary Apple-readable files until a real consumer proves a narrower change. Durable content keys exist only where identity crosses project, package, save, behavior, or runtime ownership.
 
-An unknown used feature, missing current dependency, malformed payload, truncated level, unresolved reference, case collision, or destination failure produces a source-linked diagnostic and a nonzero result. Failure or cancellation leaves the active package untouched. Never invent missing values or fall back to the retail installation.
+An unknown used feature, missing current dependency, malformed payload, truncated level, unresolved reference, case collision, or destination failure produces a source-linked diagnostic and a nonzero result. Before the package commit, supported failure or cancellation leaves the active package untouched; after commit, cleanup failure is reported without pretending the completed publication rolled back. Never invent missing values or fall back to the retail installation.
+
+Once exact profile fingerprints establish the accepted bytes, an impossible contradiction in the trusted exact-profile lookup or parse path is a programming error. Do not add recovery branches or user diagnostics for it.
 
 The helper's current product boundary is the explicit `D3Import --contract 1` process contract documented in the content pipeline. Pass source, staging, destination, scope, and report as separate arguments. A scope selects complete levels or campaign slices, never a production room cut.
 
@@ -57,7 +59,7 @@ The helper's current product boundary is the explicit `D3Import --contract 1` pr
 
 Every new or changed parser, validator, normalization rule, manifest rule, promotion behavior, or helper contract starts with a focused automated red through the production path. A missing fixture, unavailable retail file, broken target, or unrelated failure is not red evidence.
 
-Synthetic and independently licensed fixtures may enter Git. Owned retail evidence stays local and ignored. Do not add a protocol, virtual filesystem, mock importer, public setter, alternate initializer, or process wrapper only for tests.
+Synthetic and independently licensed fixtures may enter Git. Owned retail evidence stays local and ignored. A failure seam may schedule only a supported production event and must prove the exact accepted error or preservation outcome. It may not use callbacks to fabricate arbitrary permission, flag, ownership, or trusted-state corruption. Do not add a protocol, virtual filesystem, mock importer, public setter, alternate initializer, or process wrapper only for tests.
 
 ## Prohibited complexity
 
@@ -80,7 +82,7 @@ An import slice closes only when:
 - every requested `Level` has complete rooms, portals, terrain, objects, paths, goals, and current bindings, with no topology trimmed;
 - archive precedence, naming, hashes, source identity, and deterministic provenance are recorded;
 - eager working-set evidence and currently reachable lazy dependencies are distinct and complete for the claimed path;
-- malformed and unknown-used-feature cases fail diagnostically, and destination failure preserves the previous valid package;
+- malformed and unknown-used-feature cases fail diagnostically; an unrelated destination occupant is preserved and rejected; and supported precommit cancellation or destination failure preserves the previous valid package;
 - the promoted canonical package validates and the consumers applicable to the claimed checkpoint prove no retail format is opened; a parser-only checkpoint closes through production D3Import, a Mac/shared integration checkpoint adds RevivalMac and RevivalEditor, and the separate mobile composition checkpoint proves file-picker intake, copy into app-owned storage, and shared native-package validation when package or handoff behavior is reached;
 - involved source rows reach `verified`, `replaced`, `excluded`, or justified current-claim `deferred`; claimed functional rows have the applicable evidence;
 - focused red, focused green, affected-suite, complete-Level, and applicable integrated evidence are recorded with no required skip;

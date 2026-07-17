@@ -1,7 +1,7 @@
 # Test-driven development
 
 - Status: accepted, clarified
-- Date: July 15, 2026
+- Date: July 16, 2026
 - Authority: binding implementation and review protocol
 
 ## Non-negotiable rule
@@ -63,6 +63,10 @@ Code coverage is a diagnostic, never a target or merge gate. An uncovered path t
 
 Malformed files, hostile packets, corrupted saves, device loss, cancellation races, and similar boundary states are reachable because supported production boundaries can receive them. They deserve tests even when an honest user interface would not generate them.
 
+Failure injection constructs only a state that the supported production entry point can receive. A seam may choose when a real cancellation, clock, filesystem, process, device, or network event occurs; its callback may not mutate permissions, flags, ownership, or trusted internal state that the production callback never changes merely to force a recovery branch. “Arbitrary failure” is not itself a product contract.
+
+A malformed or hostile fixture remains otherwise valid through the target boundary and asserts the exact intended error and relevant context. Removing the target check must make that test fail for the claimed reason; an earlier or broader rejection does not prove the contract.
+
 ## No test-only architecture
 
 Tests do not justify production pathways that the product never runs. Do not add a protocol, dependency-injection container, wrapper, public setter, alternate initializer, mock mode, test flag, subclass seam, virtual filesystem, renderer backend, or service layer solely to make a test convenient.
@@ -120,6 +124,8 @@ A production-behavior change is not reviewable without:
 Reviewers reject implementation-first tests, tests that passed before the change, wrong-reason failures, flaky tests, tests coupled only to private implementation shape, and production seams with no production purpose.
 
 Reviewers also reject demands for speculative tests. A requested test must name the supported production entry point, reachable state, observable contract, and distinct regression it prevents. “Coverage,” “defensive,” “best practice,” and “we may need it later” are insufficient.
+
+A request based on arbitrary failure is not a finding unless it identifies the supported production event that reaches the state and the accepted outcome it violates.
 
 For existing behavior, a blocking request for new coverage must also identify a plausible defect or mutation the test will detect and why the current suite would miss it. The new test must demonstrate that sensitivity before it is retained.
 

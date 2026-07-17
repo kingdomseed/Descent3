@@ -1,7 +1,7 @@
 # One-way content pipeline
 
 - Status: accepted, amended
-- Date: July 16, 2026
+- Date: July 17, 2026
 - Authority: binding content and import contract
 
 ## Boundary
@@ -75,7 +75,7 @@ The initial command shape is:
 
 `--scope` selects one or more complete levels or a campaign slice. It never selects a room-cut production world.
 
-The helper writes only inside an empty destination-adjacent staging directory. Exit zero means a validated package was promoted; a nonzero exit or cancellation leaves the active package untouched. The report records the recognized source profile, accepted hashes, requested and completed level or campaign selection, source-to-content provenance, eager and currently reachable dependency evidence, diagnostics, destination manifest hash, and whether promotion occurred. Source-file dispositions live only in the checked-in source-translation ledger.
+The staging path, destination package, and report are distinct siblings in one existing output directory. The staging path is absent at entry; the helper creates and writes package content only there. Its report candidate and final report live beside that package and destination, never inside either package. Publication locks that shared parent, then requires the destination to be absent or to pass the shared canonical package loader as a Revival-owned package. An unrelated file or directory at the requested output name is rejected and preserved before the report is touched. Publication prepares the report first and uses the package rename as the final commit. If supported cancellation or package-rename failure occurs after report promotion but before that commit, the helper restores the prior report; a restoration syscall failure surfaces its real OS error rather than starting recursive rollback. After commit, replaced-artifact removal is best-effort cleanup. Exit zero means a validated package was promoted; a nonzero exit or cancellation before that commit leaves the active package untouched. The report records the recognized source profile, accepted hashes, requested and completed level or campaign selection, source-to-content provenance, eager and currently reachable dependency evidence, diagnostics, destination manifest hash, and whether promotion occurred. Source-file dispositions live only in the checked-in source-translation ledger.
 
 Do not add a daemon, XPC service, plugin API, in-process legacy parser, or general process protocol.
 

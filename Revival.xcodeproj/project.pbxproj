@@ -14,6 +14,28 @@
 		A10000000000000000000005 /* test.hog in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* test.hog */; };
 		A10000000000000000000006 /* HOG2Archive.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* HOG2Archive.swift */; };
 		A10000000000000000000007 /* HOG2Archive.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* HOG2Archive.swift */; };
+		B10000000000000000000001 /* PreparedRetailProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* PreparedRetailProfileTests.swift */; };
+		B10000000000000000000002 /* PreparedRetailProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* PreparedRetailProfile.swift */; };
+		B10000000000000000000003 /* PreparedRetailProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* PreparedRetailProfile.swift */; };
+		B10000000000000000000004 /* TrainingMission.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* TrainingMission.swift */; };
+		B10000000000000000000005 /* TrainingMission.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* TrainingMission.swift */; };
+		B10000000000000000000006 /* D3LV127Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000004 /* D3LV127Tests.swift */; };
+		B10000000000000000000007 /* D3LV127.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* D3LV127.swift */; };
+		B10000000000000000000008 /* D3LV127.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* D3LV127.swift */; };
+		B10000000000000000000009 /* CanonicalLevelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000006 /* CanonicalLevelTests.swift */; };
+		B1000000000000000000000A /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
+		B1000000000000000000000B /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
+		B1000000000000000000000C /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
+		B1000000000000000000000D /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
+		B1000000000000000000000E /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
+		B1000000000000000000000F /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
+		B10000000000000000000010 /* CanonicalPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* CanonicalPackage.swift */; };
+		B10000000000000000000011 /* CanonicalPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* CanonicalPackage.swift */; };
+		B10000000000000000000012 /* CanonicalPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* CanonicalPackage.swift */; };
+		B10000000000000000000013 /* CanonicalPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* CanonicalPackage.swift */; };
+		B10000000000000000000014 /* D3ImportOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000A /* D3ImportOperationTests.swift */; };
+		B10000000000000000000015 /* D3ImportOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000B /* D3ImportOperation.swift */; };
+		B10000000000000000000016 /* D3ImportOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000B /* D3ImportOperation.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +49,17 @@
 		A20000000000000000000008 /* D3ImportTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = D3ImportTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000009 /* test.hog */ = {isa = PBXFileReference; lastKnownFileType = file; path = test.hog; sourceTree = "<group>"; };
 		A2000000000000000000000A /* HOG2Archive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HOG2Archive.swift; sourceTree = "<group>"; };
+		B20000000000000000000001 /* PreparedRetailProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreparedRetailProfileTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000002 /* PreparedRetailProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreparedRetailProfile.swift; sourceTree = "<group>"; };
+		B20000000000000000000003 /* TrainingMission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingMission.swift; sourceTree = "<group>"; };
+		B20000000000000000000004 /* D3LV127Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127Tests.swift; sourceTree = "<group>"; };
+		B20000000000000000000005 /* D3LV127.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127.swift; sourceTree = "<group>"; };
+		B20000000000000000000006 /* CanonicalLevelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalLevelTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000007 /* Level.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Level.swift; sourceTree = "<group>"; };
+		B20000000000000000000008 /* D3LV127Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127Decoder.swift; sourceTree = "<group>"; };
+		B20000000000000000000009 /* CanonicalPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalPackage.swift; sourceTree = "<group>"; };
+		B2000000000000000000000A /* D3ImportOperationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3ImportOperationTests.swift; sourceTree = "<group>"; };
+		B2000000000000000000000B /* D3ImportOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3ImportOperation.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -105,7 +138,12 @@
 		A30000000000000000000005 /* D3Import */ = {
 			isa = PBXGroup;
 			children = (
+				B2000000000000000000000B /* D3ImportOperation.swift */,
+				B20000000000000000000005 /* D3LV127.swift */,
+				B20000000000000000000008 /* D3LV127Decoder.swift */,
 				A2000000000000000000000A /* HOG2Archive.swift */,
+				B20000000000000000000002 /* PreparedRetailProfile.swift */,
+				B20000000000000000000003 /* TrainingMission.swift */,
 				A20000000000000000000001 /* main.swift */,
 			);
 			path = D3Import;
@@ -130,6 +168,8 @@
 		A30000000000000000000008 /* RevivalCore */ = {
 			isa = PBXGroup;
 			children = (
+				B20000000000000000000009 /* CanonicalPackage.swift */,
+				B20000000000000000000007 /* Level.swift */,
 			);
 			path = RevivalCore;
 			sourceTree = "<group>";
@@ -152,7 +192,11 @@
 		A3000000000000000000000B /* D3ImportTests */ = {
 			isa = PBXGroup;
 			children = (
+				B20000000000000000000006 /* CanonicalLevelTests.swift */,
+				B2000000000000000000000A /* D3ImportOperationTests.swift */,
 				A20000000000000000000004 /* HOG2ArchiveTests.swift */,
+				B20000000000000000000004 /* D3LV127Tests.swift */,
+				B20000000000000000000001 /* PreparedRetailProfileTests.swift */,
 			);
 			path = D3ImportTests;
 			sourceTree = "<group>";
@@ -321,7 +365,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B10000000000000000000015 /* D3ImportOperation.swift in Sources */,
+				B10000000000000000000010 /* CanonicalPackage.swift in Sources */,
+				B1000000000000000000000A /* Level.swift in Sources */,
+				B10000000000000000000007 /* D3LV127.swift in Sources */,
+				B1000000000000000000000E /* D3LV127Decoder.swift in Sources */,
 				A10000000000000000000006 /* HOG2Archive.swift in Sources */,
+				B10000000000000000000002 /* PreparedRetailProfile.swift in Sources */,
+				B10000000000000000000004 /* TrainingMission.swift in Sources */,
 				A10000000000000000000001 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -330,6 +381,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B10000000000000000000011 /* CanonicalPackage.swift in Sources */,
+				B1000000000000000000000B /* Level.swift in Sources */,
 				A10000000000000000000002 /* RevivalMacApplication.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -338,6 +391,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B10000000000000000000012 /* CanonicalPackage.swift in Sources */,
+				B1000000000000000000000C /* Level.swift in Sources */,
 				A10000000000000000000003 /* RevivalEditorApplication.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -346,8 +401,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B10000000000000000000016 /* D3ImportOperation.swift in Sources */,
+				B10000000000000000000013 /* CanonicalPackage.swift in Sources */,
+				B1000000000000000000000D /* Level.swift in Sources */,
+				B10000000000000000000008 /* D3LV127.swift in Sources */,
+				B1000000000000000000000F /* D3LV127Decoder.swift in Sources */,
 				A10000000000000000000007 /* HOG2Archive.swift in Sources */,
+				B10000000000000000000003 /* PreparedRetailProfile.swift in Sources */,
+				B10000000000000000000005 /* TrainingMission.swift in Sources */,
+				B10000000000000000000009 /* CanonicalLevelTests.swift in Sources */,
+				B10000000000000000000014 /* D3ImportOperationTests.swift in Sources */,
 				A10000000000000000000004 /* HOG2ArchiveTests.swift in Sources */,
+				B10000000000000000000006 /* D3LV127Tests.swift in Sources */,
+				B10000000000000000000001 /* PreparedRetailProfileTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

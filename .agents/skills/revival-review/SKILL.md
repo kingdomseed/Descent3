@@ -77,6 +77,7 @@ Check:
 
 - new or changed behavior began with a focused test that failed for the intended project-owned reason;
 - a behavior-neutral refactor had existing sensitive protection or the required controlled mutation;
+- hostile and failure fixtures enter through the production-reachable boundary, remain otherwise valid, and assert the exact intended error rather than a convenient earlier failure;
 - focused green, affected suite, build, launch, integration, image, device, security, and performance claims are not substituted for one another;
 - exact commands, inputs, configurations, results, and exposed executed/failed/skipped counts are recorded;
 - no protecting test is skipped, disabled, quarantined, deleted, weakened, or diverted through a test-only path;
@@ -98,6 +99,9 @@ Check:
 - flags, broad optionals, fallback modes, callbacks, and hidden state do not obscure one valid ownership model;
 - direct structs, enums, functions, collections, and Apple APIs can replace indirection;
 - duplicated paths, pass-through helpers, placeholder defaults, catch-and-ignore behavior, and workaround comments are absent;
+- every retained recovery branch names a supported event and accepted outcome, and every `catch` performs required recovery or produces a user-visible diagnostic;
+- the implementation honors its accepted commit point: supported precommit failure preserves the prior state, while postcommit cleanup is best effort and does not recursively attempt rollback;
+- impossible states behind a trusted boundary terminate through ordinary Swift invariants, preconditions, or traps instead of speculative guards and recovery;
 - test convenience did not add production seams;
 - concurrency, caching, unsafe access, specialization, allocation machinery, or optimization has measured justification;
 - a discovery aid did not become a hand-maintained knowledge graph, graph database, duplicate ledger, whole-program gate, or production dependency without accepted evidence;
@@ -112,11 +116,13 @@ Every actionable finding states:
 - priority: `P1` blocking, `P2` important, or `P3` non-blocking;
 - concern;
 - exact file and tight line range, or named missing ledger/evidence item;
-- reachable input, state, or caller;
+- supported production entry point and practically plausible event, state, or caller;
+- whether the event occurs before or after the accepted commit point, when one exists;
 - violated source fact, accepted decision, observable contract, or maintenance consequence;
+- the accepted user-visible, preservation, or termination outcome that is violated;
 - the smallest credible correction or proof needed.
 
-Do not report style preference, hypothetical future need, unsupported performance concern, literal source-shape mismatch, or generic best practice as a defect.
+Do not report style preference, hypothetical future need, unsupported performance concern, literal source-shape mismatch, generic best practice, arbitrary failure, coverage in the abstract, or absence of a mathematical rollback guarantee as a defect. A recovery syscall failure is actionable only through its truthful propagated outcome unless an accepted supported event requires another layer of recovery.
 
 ## Deterministic consolidation
 

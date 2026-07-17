@@ -17,11 +17,11 @@ final class HOG2ArchiveTests: XCTestCase {
         }
     }
 
-    func testRejectsEntryTableOffsetOverflow() {
+    func testRejectsEntryTableBeyondFile() {
         let data = makeHeader(entryCount: .max, firstPayloadOffset: 68)
 
         XCTAssertThrowsError(try parseHOG2(data)) { error in
-            XCTAssertEqual(error as? HOG2ParseError, .entryTableOffsetOverflow)
+            XCTAssertEqual(error as? HOG2ParseError, .truncatedEntryTable)
         }
     }
 
@@ -112,15 +112,15 @@ final class HOG2ArchiveTests: XCTestCase {
         }
     }
 
-    func testRejectsPayloadOffsetOverflow() {
+    func testRejectsPayloadOffsetPastEndBeforeReadingEntry() {
         var data = makeHeader(entryCount: 1, firstPayloadOffset: .max)
-        data.append(contentsOf: nameField("overflow.bin"))
+        data.append(contentsOf: nameField("past-end.bin"))
         data.appendLittleEndian(0)
         data.appendLittleEndian(1)
         data.appendLittleEndian(0)
 
         XCTAssertThrowsError(try parseHOG2(data)) { error in
-            XCTAssertEqual(error as? HOG2ParseError, .payloadOffsetOverflow(index: 0))
+            XCTAssertEqual(error as? HOG2ParseError, .payloadOffsetOutOfBounds)
         }
     }
 
