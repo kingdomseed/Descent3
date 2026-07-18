@@ -42,7 +42,9 @@ Give this reviewer the pinned source, native diff, relevant ledger rows, accepte
 Check:
 
 - the bounded fog-of-war preflight names the inspected boundary, records a disposition for each real discovery, and does not claim exhaustive knowledge from a clean result;
-- every involved implementation file, important symbol, editor caller, generated block, and handwritten behavior range is accounted for;
+- the reviewer independently reconstructs the bounded source census from the declared pinned revision, runtime and editor roots, and applicable build variants by tracing forward semantic dependencies and searching backward for callers and registrations of entries and owned or mutated state; unrelated reverse callers of shared helpers are classified at the boundary rather than recursively expanded, and reviewing only the implementer's supplied rows is insufficient;
+- every reconstructed census file, important symbol, editor caller, generated block, handwritten behavior range, and outward edge is accounted for, with mixed completed and deferred ranges split and every current-slice range in a terminal state;
+- the source ledger contains the compact census block with its revision, claim, roots, variants, sorted row anchors, deferred outward edges, and this independent-review result;
 - data flow, formulas, evaluation order, update order, dependency discovery, eager and lazy behavior, stable identity, and teardown remain source-supported;
 - ownership and final GPU-use lifetime preserve observable results;
 - the complete canonical `Level` and RevivalMac, RevivalMobile and RevivalEditor relationships are not reduced to a fixture or partial production model;

@@ -120,6 +120,8 @@ The released source is both the capability inventory and the initial semantic tr
 
 Intended, functioning capabilities and reachable behavior belong in the ledger and native baseline. A partially implemented historical feature belongs there only when source or retail evidence proves a useful working product capability. Empty callbacks, disabled menu shells, commented-out tools, and dead backend concepts are excluded from the version 1.0 baseline while their intent and provenance remain in [Future opportunities](future-opportunities.md). Duplicated dialogs, accidental quirks, and bugs receive an evidence-only or exclusion disposition rather than product code.
 
+A maintained community fork may expose a missed working capability, a community-discovered defect correction, or a useful modernization. Its presence alone does not change the version 1.0 inventory or prove original semantics. Corroborate a claimed historical capability against the released source, retail behavior, or another applicable baseline; otherwise adopt it only as an explicit deliberate modernization with its own product decision and evidence. Fork-specific platform and backend machinery is not a product capability.
+
 When evidence is ambiguous, record the uncertainty in the ledger and make an explicit product decision. Do not resolve ambiguity by deleting the feature silently.
 
 ## Sequencing and scope control

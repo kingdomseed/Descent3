@@ -2,6 +2,77 @@ import AppKit
 import XCTest
 
 final class EditorProjectTests: XCTestCase {
+    func testEditorSelectionValidatesRoomFaceAndPortalAgainstCanonicalLevel() throws {
+        let level = makeConnectedRoomProjectLevel()
+
+        XCTAssertEqual(
+            try RevivalRoomSelection(sourceIndex: 3, in: level).sourceIndex,
+            3
+        )
+        let face = try RevivalFaceSelection(
+            roomSourceIndex: 3,
+            faceIndex: 0,
+            in: level
+        )
+        XCTAssertEqual(face.roomSourceIndex, 3)
+        XCTAssertEqual(face.faceIndex, 0)
+        let portal = try RevivalPortalSelection(
+            roomSourceIndex: 3,
+            portalIndex: 0,
+            in: level
+        )
+        XCTAssertEqual(portal.roomSourceIndex, 3)
+        XCTAssertEqual(portal.portalIndex, 0)
+
+        XCTAssertThrowsError(try RevivalRoomSelection(sourceIndex: 99, in: level)) {
+            XCTAssertEqual($0 as? RevivalEditorSelectionError, .roomMissing(99))
+        }
+        XCTAssertThrowsError(
+            try RevivalFaceSelection(roomSourceIndex: 3, faceIndex: 99, in: level)
+        ) {
+            XCTAssertEqual(
+                $0 as? RevivalEditorSelectionError,
+                .faceMissing(roomSourceIndex: 3, faceIndex: 99)
+            )
+        }
+        XCTAssertThrowsError(
+            try RevivalPortalSelection(roomSourceIndex: 3, portalIndex: 99, in: level)
+        ) {
+            XCTAssertEqual(
+                $0 as? RevivalEditorSelectionError,
+                .portalMissing(roomSourceIndex: 3, portalIndex: 99)
+            )
+        }
+    }
+
+    func testEditorSelectionFollowsReciprocalPortalReferences() throws {
+        let level = makeConnectedRoomProjectLevel()
+        var selection = try RevivalEditorSelection(
+            roomSourceIndex: 3,
+            in: level
+        )
+
+        try selection.selectPortal(0, in: level)
+        selection.followSelectedPortal(in: level)
+        XCTAssertEqual(selection.room.sourceIndex, 2)
+        XCTAssertEqual(selection.face.faceIndex, 1)
+        XCTAssertEqual(selection.portal?.portalIndex, 1)
+
+        try selection.selectPortal(0, in: level)
+        selection.followSelectedPortal(in: level)
+        XCTAssertEqual(selection.room.sourceIndex, 1)
+        XCTAssertEqual(selection.face.faceIndex, 0)
+        XCTAssertEqual(selection.portal?.portalIndex, 0)
+
+        selection.followSelectedPortal(in: level)
+        XCTAssertEqual(selection.room.sourceIndex, 2)
+        XCTAssertEqual(selection.portal?.portalIndex, 0)
+        try selection.selectPortal(1, in: level)
+        selection.followSelectedPortal(in: level)
+        XCTAssertEqual(selection.room.sourceIndex, 3)
+        XCTAssertEqual(selection.portal?.portalIndex, 0)
+    }
+
     @MainActor
     func testProjectPersistsOnlyAnInstalledBaseReferenceAndRoomNameDelta() throws {
         let root = FileManager.default.temporaryDirectory
@@ -231,6 +302,66 @@ final class EditorProjectTests: XCTestCase {
 
         document.undoManager?.redo()
         XCTAssertEqual(document.project.level.rooms.first { $0.sourceIndex == 3 }?.name, "Course Start")
+    }
+
+    @MainActor
+    func testNonRoomThreeRenameUndoAndProjectReopenPreserveImmutableBase() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        let importedBase = makeConnectedRoomProjectLevel()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        try writeCanonicalPackage(importedBase, to: candidate)
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+
+        try document.selectRoom(sourceIndex: 1)
+        try document.renameSelectedRoom(to: "Generator Annex")
+        XCTAssertEqual(document.editorSelection.room.sourceIndex, 1)
+        XCTAssertEqual(
+            document.project.level.rooms.first { $0.sourceIndex == 1 }?.name,
+            "Generator Annex"
+        )
+        XCTAssertEqual(document.undoManager?.undoActionName, "Rename Room")
+        document.undoManager?.undo()
+        XCTAssertNil(document.project.level.rooms.first { $0.sourceIndex == 1 }?.name)
+        XCTAssertEqual(document.undoManager?.redoActionName, "Rename Room")
+        document.undoManager?.redo()
+
+        let wrapper = try document.fileWrapper(ofType: RevivalProjectDocument.projectType)
+        let json = try XCTUnwrap(
+            wrapper.fileWrappers?["project.json"]?.regularFileContents
+        )
+        let source = try JSONDecoder().decode(RevivalProjectSource.self, from: json)
+        XCTAssertEqual(
+            source.roomNameEdits,
+            [.init(sourceIndex: 1, name: "Generator Annex")]
+        )
+
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(from: wrapper, ofType: RevivalProjectDocument.projectType)
+        XCTAssertEqual(reopened.editorSelection.room.sourceIndex, 3)
+        XCTAssertEqual(
+            reopened.project.level.rooms.first { $0.sourceIndex == 1 }?.name,
+            "Generator Annex"
+        )
+        XCTAssertNil(importedBase.rooms.first { $0.sourceIndex == 1 }?.name)
+        XCTAssertNil(
+            try library.load(activation.reference).rooms.first {
+                $0.sourceIndex == 1
+            }?.name
+        )
     }
 
     @MainActor
@@ -497,11 +628,51 @@ final class EditorProjectTests: XCTestCase {
         document.returnToEditor()
         XCTAssertNil(document.playSession)
         XCTAssertEqual(document.selectedRoomSourceIndex, 3)
-        XCTAssertEqual(document.camera, .trainingRoom3)
+        XCTAssertEqual(document.camera, movedCamera)
         XCTAssertEqual(
             document.project.level.rooms.first { $0.sourceIndex == 3 }?.name,
             "Course Revised"
         )
+    }
+
+    @MainActor
+    func testPlayReturnPreservesEditorSelectionAndFixedCameraIdentity() throws {
+        let document = RevivalProjectDocument(
+            project: try makeProject(importedBase: makeConnectedRoomProjectLevel())
+        )
+        try document.selectPortal(0)
+        document.followSelectedPortal()
+        try document.selectPortal(0)
+        document.followSelectedPortal()
+        let selectionBeforePlay = document.editorSelection
+
+        let staged = try document.makePlaySession()
+        XCTAssertEqual(staged.camera, .trainingRoom3)
+        document.commitPlaySession(staged)
+        XCTAssertEqual(document.editorSelection, selectionBeforePlay)
+
+        let movedCamera = RoomCamera(
+            position: .init(
+                x: staged.camera.position.x + 0.25,
+                y: staged.camera.position.y,
+                z: staged.camera.position.z
+            ),
+            target: .init(
+                x: staged.camera.target.x + 0.25,
+                y: staged.camera.target.y,
+                z: staged.camera.target.z
+            ),
+            up: staged.camera.up,
+            projection: staged.camera.projection
+        )
+        document.commitPlaySession(
+            try document.makePlaySession(movingCameraTo: movedCamera)
+        )
+
+        document.returnToEditor()
+        XCTAssertEqual(document.editorSelection, selectionBeforePlay)
+        XCTAssertEqual(document.cameraContainingRoomSourceIndex, 3)
+        XCTAssertEqual(document.camera, movedCamera)
     }
 
     @MainActor
@@ -558,6 +729,84 @@ private func makeClosedRoomProjectLevel() -> Level {
     level.rooms[roomIndex] = makeSourceContainmentRoom(
         center: RoomCamera.trainingRoom3.position,
         texture: level.presentationMaterials[0].texture
+    )
+    return level
+}
+
+private func makeConnectedRoomProjectLevel() -> Level {
+    var level = makeClosedRoomProjectLevel()
+    let texture = level.presentationMaterials[0].texture
+    let corners = [
+        FaceCorner(vertexIndex: 0, u: 0, v: 0, alpha: 255),
+        FaceCorner(vertexIndex: 1, u: 1, v: 0, alpha: 255),
+        FaceCorner(vertexIndex: 2, u: 0, v: 1, alpha: 255),
+    ]
+    let vertices = [
+        Vector3.zero,
+        Vector3(x: 1, y: 0, z: 0),
+        Vector3(x: 0, y: 1, z: 0),
+    ]
+    let portalFace: (Int?) -> LevelFace = { portalIndex in
+        LevelFace(
+            corners: corners,
+            flags: 0,
+            portalIndex: portalIndex,
+            texture: texture
+        )
+    }
+
+    let room3Index = level.rooms.firstIndex { $0.sourceIndex == 3 }!
+    let room3 = level.rooms[room3Index]
+    level.rooms[room3Index] = LevelRoom(
+        sourceIndex: room3.sourceIndex,
+        name: room3.name,
+        pathPoint: room3.pathPoint,
+        vertices: room3.vertices,
+        faces: room3.faces.enumerated().map { index, face in
+            guard index == 0 else { return face }
+            return LevelFace(
+                corners: face.corners,
+                flags: face.flags,
+                portalIndex: 0,
+                texture: face.texture,
+                lightmapInfoIndex: face.lightmapInfoIndex,
+                allowsLightCorona: face.allowsLightCorona,
+                lightMultiple: face.lightMultiple,
+                special: face.special
+            )
+        },
+        portals: [.init(faceIndex: 0, connectedRoom: 2, connectedPortal: 1)],
+        flags: room3.flags,
+        pulseTime: room3.pulseTime,
+        pulseOffset: room3.pulseOffset,
+        mirrorFaceIndex: room3.mirrorFaceIndex,
+        door: room3.door,
+        volumeLights: room3.volumeLights,
+        fog: room3.fog,
+        ambientSoundPattern: room3.ambientSoundPattern,
+        reverb: room3.reverb,
+        damage: room3.damage,
+        damageType: room3.damageType
+    )
+    level.rooms.removeAll { $0.sourceIndex == 2 || $0.sourceIndex == 4 }
+    level.rooms.append(
+        LevelRoom(
+            sourceIndex: 2,
+            vertices: vertices,
+            faces: [portalFace(0), portalFace(1)],
+            portals: [
+                .init(faceIndex: 0, connectedRoom: 1, connectedPortal: 0),
+                .init(faceIndex: 1, connectedRoom: 3, connectedPortal: 0),
+            ]
+        )
+    )
+    level.rooms.append(
+        LevelRoom(
+            sourceIndex: 1,
+            vertices: vertices,
+            faces: [portalFace(0)],
+            portals: [.init(faceIndex: 0, connectedRoom: 2, connectedPortal: 0)]
+        )
     )
     return level
 }

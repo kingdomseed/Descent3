@@ -53,9 +53,9 @@ Use the trial's failures to correct this skill, the island trace, or the shared 
 
 Before production implementation:
 
-1. Name the next observable player or editor result, its `current-plan.md` packet and checkpoint, the refined preflight boundary and result, and every concrete shipping shell applicable to that checkpoint.
-2. Trace the legacy entry point, callees, data flow, editor callers, important globals, ordering, dependency discovery, and teardown.
-3. Add provisional ledger rows for every implementation file already known to participate.
+1. Name the next observable player or editor result, its `current-plan.md` packet and checkpoint, pinned source revision, runtime and editor entry symbols, applicable build variants, refined preflight boundary, native owners, and every concrete shipping shell applicable to that checkpoint.
+2. Build a sorted bounded source census: trace forward through definitions, calls, data flow, important globals, ordering, dependency discovery, initialization, teardown, and editor consumers; search backward across the pinned tree for callers and registrations of the island entry symbols and state or types the island defines, mutates, or owns; and inspect callbacks, virtual dispatch, function pointers, macros, generated blocks, and handwritten behavior when actually present. Classify and stop at an outside caller that cannot reach the named contract instead of recursively reverse-tracing every shared helper.
+3. Continue until every discovered semantic dependency and outward edge is included, evidenced as irrelevant, excluded, or deferred to a named roadmap phase and missing dependency. Add or split ledger rows for every census file and relevant symbol or range; do not treat the original row list as proof that discovery is complete. Persist one compact census block in the source ledger with the revision, claim, roots, variants, native owners, sorted row anchors, deferred outward edges, and later independent-review result.
 4. Capture the historical baseline with source evidence, a synthetic fixture, the reference executable, or owned local retail content.
 5. Record the difficult native ownership boundary. Do not design a project-wide lifetime framework.
 6. Identify only the semantic hazards present in this island.
@@ -160,12 +160,16 @@ Use [`revival-verification`](../revival-verification/SKILL.md) to falsify the cl
 
 Source accounting for the island closes only when:
 
-- every involved implementation file, important symbol, editor caller, generated block, and handwritten range has a final disposition;
+- the bounded source census has reached a classified fixed point from its declared runtime and editor roots, and an independent source-fidelity reviewer has reconstructed it rather than merely reading the implementer's row list;
+- every census implementation file, important symbol, editor caller, generated block, handwritten range, and outward edge has a final disposition or a named justified deferral;
 - the source or reference comparison and every deliberate difference are recorded;
 - temporary research and scaffolding are deleted or archived outside product targets;
 - license and provenance are complete;
-- every involved source row has the terminal state required by its disposition and current claim;
+- every current-census range is `verified`, `replaced`, or `excluded`, while any separately split `deferred` range names its roadmap phase and missing dependency and is not required by the current observable contract;
+- every relevant native-owner empty body, placeholder return or switch, disabled production branch, catch-and-ignore path, reduced stand-in limit, `fatalError("TODO")`, or equivalent compilation-stub hit is classified as implemented, a source-evidenced no-op, excluded, deferred, or an unresolved placeholder; no unresolved placeholder remains for the claimed contract;
 - one direct native production path remains.
+
+Stop at that bounded island claim. Do not require a whole-repository graph, folder-completion percentage, generic TODO purge, one test per function, or unlimited negative proof. Phase 10 performs the whole-project terminal ledger check.
 
 For a player island shared by Mac and mobile, close its Phase 1–7 packet after the applicable D3Import, RevivalMac, RevivalEditor, source, and evidence contracts pass, provided it leaves one mobile-composable Core, Metal, package, scheduler, input, and lifetime path. RevivalMobile may compile or compose that landed contract early through its concrete UIKit shell, but this is compatibility evidence rather than a separate closure checkpoint. Unavailable devices, signing, or development-team setup cannot block the packet or next Mac/shared island. Phase 8 then exercises the accumulated mobile-only functional requirements on physical devices; simulator execution does not replace evidence required by that Phase 8+ claim.
 

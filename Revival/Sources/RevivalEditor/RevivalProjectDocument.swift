@@ -49,7 +49,8 @@ final class RevivalProjectDocument: NSDocument {
 
     private nonisolated let projectStorage = Mutex<RevivalProject?>(nil)
     private nonisolated let library: CanonicalPackageLibrary
-    private(set) var selectedRoomSourceIndex = 3
+    private var selection: RevivalEditorSelection?
+    let cameraContainingRoomSourceIndex = 3
     private(set) var camera = RoomCamera.trainingRoom3
     private(set) var playSession: RevivalPlaySession?
 
@@ -176,21 +177,70 @@ final class RevivalProjectDocument: NSDocument {
         return project
     }
 
+    var editorSelection: RevivalEditorSelection {
+        if let selection {
+            return selection
+        }
+        do {
+            let initialSelection = try RevivalEditorSelection(
+                roomSourceIndex: 3,
+                in: project.level
+            )
+            selection = initialSelection
+            return initialSelection
+        } catch {
+            preconditionFailure("The canonical Training level must contain source room 3 face 0: \(error)")
+        }
+    }
+
+    var selectedRoomSourceIndex: Int {
+        editorSelection.room.sourceIndex
+    }
+
+    func selectRoom(sourceIndex: Int) throws {
+        var candidate = editorSelection
+        try candidate.selectRoom(sourceIndex: sourceIndex, in: project.level)
+        selection = candidate
+        refreshWindowControllers()
+    }
+
+    func selectFace(_ faceIndex: Int) throws {
+        var candidate = editorSelection
+        try candidate.selectFace(faceIndex, in: project.level)
+        selection = candidate
+        refreshWindowControllers()
+    }
+
+    func selectPortal(_ portalIndex: Int) throws {
+        var candidate = editorSelection
+        try candidate.selectPortal(portalIndex, in: project.level)
+        selection = candidate
+        refreshWindowControllers()
+    }
+
+    func followSelectedPortal() {
+        var candidate = editorSelection
+        candidate.followSelectedPortal(in: project.level)
+        selection = candidate
+        refreshWindowControllers()
+    }
+
     func renameSelectedRoom(to proposedName: String) throws {
+        let sourceIndex = editorSelection.room.sourceIndex
         var previousName: String?
         try projectStorage.withLock { storedProject in
             guard var project = storedProject else {
                 throw RevivalProjectDocumentError.projectNotLoaded
             }
             previousName = try project.renameRoom(
-                sourceIndex: selectedRoomSourceIndex,
+                sourceIndex: sourceIndex,
                 to: proposedName
             )
             storedProject = project
         }
 
         registerRoomNameUndo(
-            sourceIndex: selectedRoomSourceIndex,
+            sourceIndex: sourceIndex,
             name: previousName
         )
         undoManager?.setActionName("Rename Room")
@@ -198,10 +248,7 @@ final class RevivalProjectDocument: NSDocument {
     }
 
     func makePlaySession() throws -> RevivalPlaySession {
-        let session = try project.makePlaySession(
-            selectedRoomSourceIndex: selectedRoomSourceIndex,
-            camera: camera
-        )
+        let session = project.makePlaySession(camera: camera)
         try validateCameraRoom(session.camera, session: session)
         return session
     }
@@ -218,10 +265,6 @@ final class RevivalProjectDocument: NSDocument {
     }
 
     func commitPlaySession(_ session: RevivalPlaySession) {
-        precondition(
-            session.selectedRoomSourceIndex == selectedRoomSourceIndex,
-            "A staged play session must match the document selection"
-        )
         playSession = session
         refreshWindowControllers()
     }
@@ -230,19 +273,21 @@ final class RevivalProjectDocument: NSDocument {
         _ proposedCamera: RoomCamera,
         session: RevivalPlaySession
     ) throws {
-        guard let room = session.level.rooms.first(where: {
-            $0.sourceIndex == session.selectedRoomSourceIndex
-        }) else {
-            throw RevivalProjectError.roomMissing(session.selectedRoomSourceIndex)
-        }
+        let room = session.level.rooms.first {
+            $0.sourceIndex == cameraContainingRoomSourceIndex
+        }!
         guard sourceRoomThreeContains(proposedCamera.position, in: room) else {
             throw RevivalProjectDocumentError.cameraOutsideRoom(
-                session.selectedRoomSourceIndex
+                cameraContainingRoomSourceIndex
             )
         }
     }
 
     func returnToEditor() {
+        guard let session = playSession else {
+            preconditionFailure("A play session must be active before returning to the editor")
+        }
+        camera = session.camera
         playSession = nil
         refreshWindowControllers()
     }

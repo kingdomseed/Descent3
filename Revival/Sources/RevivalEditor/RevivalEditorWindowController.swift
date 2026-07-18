@@ -16,6 +16,11 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
 
     private unowned let projectDocument: RevivalProjectDocument
     private let renderer: MetalWorldRenderer?
+    private let selectedRoomHeading: NSTextField
+    private let roomPopup: NSPopUpButton
+    private let facePopup: NSPopUpButton
+    private let portalPopup: NSPopUpButton
+    private let followPortalButton: NSButton
     private let roomNameField: NSTextField
     private let renameButton: NSButton
     private let playButton: NSButton
@@ -30,7 +35,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.translatesAutoresizingMaskIntoConstraints = false
         metalView.setAccessibilityLabel("Training level viewport")
         metalView.setAccessibilityHelp(
-            "Shows source room 3 and its source-visible portal closure using the shared Metal renderer."
+            "Shows the fixed source room 3 portal closure. Editor selection can move independently without recentering this camera."
         )
         do {
             renderer = try MetalWorldRenderer(view: metalView)
@@ -39,11 +44,34 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             rendererError = error.localizedDescription
         }
 
+        selectedRoomHeading = NSTextField(labelWithString: "Selected Source Room 3")
+        selectedRoomHeading.font = .preferredFont(forTextStyle: .headline)
+
+        roomPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        roomPopup.setAccessibilityLabel("Selected source room")
+        roomPopup.setAccessibilityHelp("Selects a room in the complete canonical Training level.")
+
+        facePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        facePopup.setAccessibilityLabel("Selected face")
+        facePopup.setAccessibilityHelp("Selects a face in the current source room.")
+
+        portalPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        portalPopup.setAccessibilityLabel("Selected portal")
+        portalPopup.setAccessibilityHelp(
+            "Selects a portal and its owning face in the current source room."
+        )
+
+        followPortalButton = NSButton(title: "Follow Portal", target: nil, action: nil)
+        followPortalButton.setAccessibilityLabel("Follow selected portal")
+        followPortalButton.setAccessibilityHelp(
+            "Navigates to the connected room and reciprocal portal reference."
+        )
+
         let roomNameField = NSTextField(string: "")
         roomNameField.placeholderString = "Room name"
         roomNameField.setAccessibilityLabel("Selected room name")
         roomNameField.setAccessibilityHelp(
-            "Enter a user-authored name for source room 3 and press Return."
+            "Enter a user-authored name for the selected source room and press Return."
         )
         self.roomNameField = roomNameField
 
@@ -88,9 +116,14 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         sidebar.spacing = 10
         sidebar.edgeInsets = NSEdgeInsets(top: 18, left: 18, bottom: 18, right: 18)
 
-        let selectedRoomHeading = NSTextField(labelWithString: "Selected Source Room 3")
-        selectedRoomHeading.font = .preferredFont(forTextStyle: .headline)
         sidebar.addArrangedSubview(selectedRoomHeading)
+        sidebar.addArrangedSubview(NSTextField(labelWithString: "Room"))
+        sidebar.addArrangedSubview(roomPopup)
+        sidebar.addArrangedSubview(NSTextField(labelWithString: "Face"))
+        sidebar.addArrangedSubview(facePopup)
+        sidebar.addArrangedSubview(NSTextField(labelWithString: "Portal"))
+        sidebar.addArrangedSubview(portalPopup)
+        sidebar.addArrangedSubview(followPortalButton)
         sidebar.addArrangedSubview(roomNameField)
         sidebar.addArrangedSubview(renameButton)
         let editSeparator = NSBox()
@@ -116,6 +149,9 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             sidebar.topAnchor.constraint(equalTo: root.topAnchor),
             sidebar.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             sidebar.widthAnchor.constraint(equalToConstant: 270),
+            roomPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
+            facePopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
+            portalPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
             roomNameField.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
             statusLabel.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
 
@@ -144,6 +180,14 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         roomNameField.action = #selector(commitRoomName(_:))
         renameButton.target = self
         renameButton.action = #selector(commitRoomName(_:))
+        roomPopup.target = self
+        roomPopup.action = #selector(selectRoom(_:))
+        facePopup.target = self
+        facePopup.action = #selector(selectFace(_:))
+        portalPopup.target = self
+        portalPopup.action = #selector(selectPortal(_:))
+        followPortalButton.target = self
+        followPortalButton.action = #selector(followPortal(_:))
         playButton.target = self
         playButton.action = #selector(togglePlay(_:))
         for button in cameraButtons {
@@ -161,12 +205,20 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     }
 
     func refreshFromDocument() {
+        let selection = projectDocument.editorSelection
+        let level = projectDocument.project.level
         let room = projectDocument.project.level.rooms.first {
-            $0.sourceIndex == projectDocument.selectedRoomSourceIndex
+            $0.sourceIndex == selection.room.sourceIndex
         }
+        selectedRoomHeading.stringValue = "Selected Source Room \(selection.room.sourceIndex)"
+        populateSelectionControls(level: level, selection: selection)
         roomNameField.stringValue = room?.name ?? ""
 
         let isPlaying = projectDocument.playSession != nil
+        roomPopup.isEnabled = !isPlaying
+        facePopup.isEnabled = !isPlaying
+        portalPopup.isEnabled = !isPlaying && !(room?.portals.isEmpty ?? true)
+        followPortalButton.isEnabled = !isPlaying && selection.portal != nil
         roomNameField.isEnabled = !isPlaying
         renameButton.isEnabled = !isPlaying
         playButton.title = isPlaying ? "Return to Editor" : "Play Disposable Copy"
@@ -183,9 +235,8 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                 isError: false
             )
         } else {
-            let level = projectDocument.project.level
             setStatus(
-                "Editing \(level.metadata.name) — \(level.rooms.count) complete resident rooms — source room 3 selected.",
+                "Editing \(level.metadata.name) — \(level.rooms.count) complete resident rooms — source room \(selection.room.sourceIndex), face \(selection.face.faceIndex) selected.",
                 isError: false
             )
         }
@@ -202,11 +253,47 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             roomNameField.stringValue = projectDocument.project.level.rooms.first {
                 $0.sourceIndex == projectDocument.selectedRoomSourceIndex
             }?.name ?? ""
-            setStatus("Renamed source room 3. Undo action: Rename Room.", isError: false)
+            setStatus(
+                "Renamed source room \(projectDocument.selectedRoomSourceIndex). Undo action: Rename Room.",
+                isError: false
+            )
         } catch {
             refreshFromDocument()
             setStatus(error.localizedDescription, isError: true)
             NSSound.beep()
+        }
+    }
+
+    @objc private func selectRoom(_ sender: NSPopUpButton) {
+        performSelectionChange {
+            guard let sourceIndex = sender.selectedItem?.representedObject as? Int else {
+                return
+            }
+            try projectDocument.selectRoom(sourceIndex: sourceIndex)
+        }
+    }
+
+    @objc private func selectFace(_ sender: NSPopUpButton) {
+        performSelectionChange {
+            guard let faceIndex = sender.selectedItem?.representedObject as? Int else {
+                return
+            }
+            try projectDocument.selectFace(faceIndex)
+        }
+    }
+
+    @objc private func selectPortal(_ sender: NSPopUpButton) {
+        performSelectionChange {
+            guard let portalIndex = sender.selectedItem?.representedObject as? Int else {
+                return
+            }
+            try projectDocument.selectPortal(portalIndex)
+        }
+    }
+
+    @objc private func followPortal(_ sender: Any?) {
+        performSelectionChange {
+            projectDocument.followSelectedPortal()
         }
     }
 
@@ -220,10 +307,10 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                 )
                 projectDocument.commitPlaySession(candidate)
                 setStatus("Playing a disposable complete-level copy.", isError: false)
-            } else {
+            } else if let playSession = projectDocument.playSession {
                 try replaceRenderedWorld(
                     level: projectDocument.project.level,
-                    camera: projectDocument.camera
+                    camera: playSession.camera
                 )
                 projectDocument.returnToEditor()
                 window?.makeFirstResponder(roomNameField)
@@ -294,10 +381,51 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         try renderer.replace(
             level: level,
             camera: camera,
-            startRoomSourceIndex: projectDocument.selectedRoomSourceIndex
+            startRoomSourceIndex: projectDocument.cameraContainingRoomSourceIndex
         )
         renderer.drawNow()
         rendererError = nil
+    }
+
+    private func populateSelectionControls(
+        level: Level,
+        selection: RevivalEditorSelection
+    ) {
+        roomPopup.removeAllItems()
+        for room in level.rooms.sorted(by: { $0.sourceIndex < $1.sourceIndex }) {
+            roomPopup.addItem(withTitle: "Source Room \(room.sourceIndex)")
+            roomPopup.lastItem?.representedObject = room.sourceIndex
+        }
+        roomPopup.selectItem(withTitle: "Source Room \(selection.room.sourceIndex)")
+
+        let room = level.rooms.first { $0.sourceIndex == selection.room.sourceIndex }!
+        facePopup.removeAllItems()
+        for faceIndex in room.faces.indices {
+            facePopup.addItem(withTitle: "Face \(faceIndex)")
+            facePopup.lastItem?.representedObject = faceIndex
+        }
+        facePopup.selectItem(withTitle: "Face \(selection.face.faceIndex)")
+
+        portalPopup.removeAllItems()
+        for portalIndex in room.portals.indices {
+            portalPopup.addItem(withTitle: "Portal \(portalIndex)")
+            portalPopup.lastItem?.representedObject = portalIndex
+        }
+        if let portal = selection.portal {
+            portalPopup.selectItem(withTitle: "Portal \(portal.portalIndex)")
+        } else {
+            portalPopup.select(nil)
+        }
+    }
+
+    private func performSelectionChange(_ change: () throws -> Void) {
+        do {
+            try change()
+        } catch {
+            refreshFromDocument()
+            setStatus(error.localizedDescription, isError: true)
+            NSSound.beep()
+        }
     }
 
     private func setStatus(_ message: String, isError: Bool) {

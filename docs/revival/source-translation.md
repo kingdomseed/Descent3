@@ -51,6 +51,14 @@ At the start of every roadmap phase, milestone checkpoint, dependency island, su
 
 The preflight repeats when new evidence changes the known boundary, not after every file edit. One direct trace is handled in the island. Several dependent unknowns that prevent a safe contract trigger the bounded [`revival-wayfinding`](../../.agents/skills/revival-wayfinding/SKILL.md) process. A large or unfamiliar task does not trigger indefinite research by itself.
 
+### Maintained-fork differential evidence
+
+The pinned released Descent 3 source remains the default evidence for original behavior. A maintained community fork may supply secondary differential evidence for a defect correction, restored behavior, quality-of-life semantics, or a source area that deserves closer inspection; it does not become a second baseline.
+
+Run one bounded broad inventory that pins the fork revisions it compares and maps material changed areas to existing source rows, functional rows, and roadmap owners. After that, an island checks only the pinned fork changes whose paths or symbols intersect its declared roots and dependencies. Classify each exact delta as an original-behavior clarification, defect correction, deliberate-modernization candidate, platform-only mechanism, experimental or unfinished work, or irrelevant to the named contract. Record an adopted finding and its GPL provenance in the existing source-ledger row or deliberate-difference record.
+
+Keep stable released behavior distinct from later branch work. A fork is not another census root, does not require fork-wide parity, does not justify copying its platform or backend architecture, and does not expand or reopen an island without a concrete affected product contract.
+
 ### Deterministic relationship evidence
 
 A machine-derived relationship map may support this preflight, but it is an evidence view rather than a product subsystem, source of truth, or proof of behavioral completeness. The pinned source, accepted documents, current native code, observable evidence, and ledgers remain authoritative.
@@ -61,20 +69,34 @@ Legacy-to-native edges come only from explicit ledger dispositions and named nat
 
 Phase 0 runs one non-blocking trial on the HOG2 and Training-load island. Compare its actionable unique findings, false or unresolved edges, reproducibility, review value, run time, and maintenance cost with the existing manual trace and ledger. Keep the smallest useful normalized artifact only if it materially improves discovery or review. Otherwise record the rejection and continue with direct source tracing. Do not add a graph database, hand-maintained knowledge graph, project-wide graph-completion gate, production dependency, or requirement to map the whole legacy tree before product work.
 
+### Bounded source census and closure
+
+“Every involved file” must be a separately challenged finite set, not whatever the implementer happened to notice. A legacy folder is not a system boundary: one observable result may cross runtime, renderer, physics, bitmap, model, page-definition, editor, generated-behavior, and platform directories.
+
+Before production edits, the island records its pinned source revision, observable contract, runtime and editor entry symbols, applicable build variants, and named native owners. Starting from those roots, build a sorted bounded census by tracing definitions, statically resolvable calls, data and global-state access, initialization, teardown, and editor consumers. Search backward across the pinned tree for callers and registrations of the island entry symbols and of state or types the island defines, mutates, or owns. Do not recursively reverse-trace every shared helper into unrelated systems: when an outside caller cannot reach the named observable contract, classify that edge and stop. Inspect callbacks, virtual dispatch, function pointers, macros, generated blocks, and handwritten behavior when they actually occur. Continue until every discovered semantic dependency and outward edge has one classification: included, irrelevant to the named result with evidence, excluded with approval, or deferred to a named roadmap phase and missing dependency. Several linked unknowns that prevent this classification invoke bounded wayfinding; a known unresolved edge that is not required by the current observable contract is recorded as deferred rather than silently dropped.
+
+Map every census file and relevant symbol or range into the existing source ledger. Split a mixed row when completed and deferred ranges have different states. A range claimed complete by the island must end in `verified`, `replaced`, or `excluded`; a justified `deferred` range remains explicitly open. `seed`, `traced`, `translating`, and `native-running` are evidence-bearing interim states and cannot support a terminal claim for that range.
+
+Persist the finite set as a compact census-and-closure block in the existing source ledger, or in a named checked-in change record when the ledger links to it. The block records the revision, observable claim, roots, applicable variants, native owners, sorted file/range row anchors, deferred outward edges, and the independent source-fidelity result. It is an index into the existing dispositions, not a new ledger or generated graph.
+
+Inspect the named native owner files for concrete empty bodies, placeholder returns or switches, disabled production branches, catch-and-ignore paths, reduced stand-in limits, `fatalError("TODO")`, and equivalent compilation stubs. Every relevant hit is classified as implemented, a source-evidenced no-op, excluded, deferred, or an unresolved placeholder that blocks the current claim. Resolve only that last category in supported paths; do not demand a repository-wide zero-hit scan, generic coverage, or one test per function.
+
+The independent source-fidelity reviewer reconstructs the census from the declared roots and compares it with the implementer's accounting. Reviewing only the rows supplied by the implementer is insufficient. Closure means the named dependency island reached from those entry points is fully classified and works through the real product path. It does not mean an entire directory, broad umbrella system, or unknown future caller has been translated. Phase 10 supplies the whole-project terminal check by requiring every relevant ledger range to be verified, replaced, or excluded.
+
 ## Dependency-island loop
 
 Each island is the smallest end-to-end path that can become observable in every applicable shipping player shell and, where applicable, the editor:
 
 1. perform the bounded fog-of-war preflight and refine the proposed island boundary;
-2. trace the complete legacy call and data path, including editor use;
-3. record the involved files and their provisional dispositions;
+2. construct the bounded source census from declared runtime and editor roots, including forward semantic dependencies and bounded reverse callers for entries and owned or mutated state;
+3. record every census file, relevant symbol or range, outward-edge classification, and provisional disposition;
 4. capture the observable baseline with source, fixtures, the reference executable, or a local retail level;
 5. write one focused failing test for the next native contract when production behavior is about to be added;
 6. translate the smallest coherent path into Swift and MSL;
 7. render, play, save, or inspect it through the real product path;
 8. record every intentional difference;
 9. simplify the native implementation while the behavior remains protected;
-10. update every involved file disposition before the island closes;
+10. split mixed rows as needed and drive every current-census range to its terminal disposition before the island closes;
 11. consolidate ordinary review, then apply the independent [`revival-completion-gate`](../../.agents/skills/revival-completion-gate/SKILL.md) once before closure, `HOLD`, additional terminal evidence, or expensive profiling.
 
 Temporary research code may be used to learn an unknown format or behavior. It does not enter a shipping target, does not become a second product path, and is deleted or archived as evidence when the question is answered.

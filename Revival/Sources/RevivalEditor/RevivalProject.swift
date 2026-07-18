@@ -34,9 +34,171 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
     }
 }
 
+enum RevivalEditorSelectionError: Error, Equatable, LocalizedError {
+    case roomMissing(Int)
+    case faceMissing(roomSourceIndex: Int, faceIndex: Int)
+    case portalMissing(roomSourceIndex: Int, portalIndex: Int)
+
+    var errorDescription: String? {
+        switch self {
+        case let .roomMissing(sourceIndex):
+            "Source room \(sourceIndex) is not present in the complete level."
+        case let .faceMissing(roomSourceIndex, faceIndex):
+            "Source room \(roomSourceIndex) has no face \(faceIndex)."
+        case let .portalMissing(roomSourceIndex, portalIndex):
+            "Source room \(roomSourceIndex) has no portal \(portalIndex)."
+        }
+    }
+}
+
+struct RevivalRoomSelection: Equatable, Sendable {
+    let sourceIndex: Int
+
+    init(sourceIndex: Int, in level: Level) throws {
+        guard level.rooms.contains(where: { $0.sourceIndex == sourceIndex }) else {
+            throw RevivalEditorSelectionError.roomMissing(sourceIndex)
+        }
+        self.sourceIndex = sourceIndex
+    }
+
+    fileprivate init(trustedSourceIndex: Int) {
+        sourceIndex = trustedSourceIndex
+    }
+}
+
+struct RevivalFaceSelection: Equatable, Sendable {
+    let roomSourceIndex: Int
+    let faceIndex: Int
+
+    init(roomSourceIndex: Int, faceIndex: Int, in level: Level) throws {
+        guard let room = level.rooms.first(where: {
+            $0.sourceIndex == roomSourceIndex
+        }) else {
+            throw RevivalEditorSelectionError.roomMissing(roomSourceIndex)
+        }
+        guard room.faces.indices.contains(faceIndex) else {
+            throw RevivalEditorSelectionError.faceMissing(
+                roomSourceIndex: roomSourceIndex,
+                faceIndex: faceIndex
+            )
+        }
+        self.roomSourceIndex = roomSourceIndex
+        self.faceIndex = faceIndex
+    }
+
+    fileprivate init(trustedRoomSourceIndex: Int, faceIndex: Int) {
+        roomSourceIndex = trustedRoomSourceIndex
+        self.faceIndex = faceIndex
+    }
+}
+
+struct RevivalPortalSelection: Equatable, Sendable {
+    let roomSourceIndex: Int
+    let portalIndex: Int
+
+    init(roomSourceIndex: Int, portalIndex: Int, in level: Level) throws {
+        guard let room = level.rooms.first(where: {
+            $0.sourceIndex == roomSourceIndex
+        }) else {
+            throw RevivalEditorSelectionError.roomMissing(roomSourceIndex)
+        }
+        guard room.portals.indices.contains(portalIndex) else {
+            throw RevivalEditorSelectionError.portalMissing(
+                roomSourceIndex: roomSourceIndex,
+                portalIndex: portalIndex
+            )
+        }
+        self.roomSourceIndex = roomSourceIndex
+        self.portalIndex = portalIndex
+    }
+
+    fileprivate init(trustedRoomSourceIndex: Int, portalIndex: Int) {
+        roomSourceIndex = trustedRoomSourceIndex
+        self.portalIndex = portalIndex
+    }
+}
+
+struct RevivalEditorSelection: Equatable, Sendable {
+    private(set) var room: RevivalRoomSelection
+    private(set) var face: RevivalFaceSelection
+    private(set) var portal: RevivalPortalSelection?
+
+    init(roomSourceIndex: Int, in level: Level) throws {
+        room = try RevivalRoomSelection(sourceIndex: roomSourceIndex, in: level)
+        face = try RevivalFaceSelection(
+            roomSourceIndex: roomSourceIndex,
+            faceIndex: 0,
+            in: level
+        )
+        portal = nil
+    }
+
+    mutating func selectRoom(sourceIndex: Int, in level: Level) throws {
+        let selectedRoom = try RevivalRoomSelection(sourceIndex: sourceIndex, in: level)
+        let selectedFace = try RevivalFaceSelection(
+            roomSourceIndex: sourceIndex,
+            faceIndex: 0,
+            in: level
+        )
+        room = selectedRoom
+        face = selectedFace
+        portal = nil
+    }
+
+    mutating func selectFace(_ faceIndex: Int, in level: Level) throws {
+        face = try RevivalFaceSelection(
+            roomSourceIndex: room.sourceIndex,
+            faceIndex: faceIndex,
+            in: level
+        )
+        portal = nil
+    }
+
+    mutating func selectPortal(_ portalIndex: Int, in level: Level) throws {
+        let selectedPortal = try RevivalPortalSelection(
+            roomSourceIndex: room.sourceIndex,
+            portalIndex: portalIndex,
+            in: level
+        )
+        let currentRoom = level.rooms.first {
+            $0.sourceIndex == room.sourceIndex
+        }!
+        let selectedFace = RevivalFaceSelection(
+            trustedRoomSourceIndex: room.sourceIndex,
+            faceIndex: currentRoom.portals[portalIndex].faceIndex
+        )
+        face = selectedFace
+        portal = selectedPortal
+    }
+
+    mutating func followSelectedPortal(in level: Level) {
+        let portal = portal!
+        let sourceRoom = level.rooms.first {
+            $0.sourceIndex == portal.roomSourceIndex
+        }!
+        let sourcePortal = sourceRoom.portals[portal.portalIndex]
+        let destinationRoom = RevivalRoomSelection(
+            trustedSourceIndex: sourcePortal.connectedRoom
+        )
+        let destinationPortal = RevivalPortalSelection(
+            trustedRoomSourceIndex: sourcePortal.connectedRoom,
+            portalIndex: sourcePortal.connectedPortal
+        )
+        let destination = level.rooms.first {
+            $0.sourceIndex == sourcePortal.connectedRoom
+        }!
+        let destinationFace = RevivalFaceSelection(
+            trustedRoomSourceIndex: sourcePortal.connectedRoom,
+            faceIndex: destination.portals[sourcePortal.connectedPortal].faceIndex
+        )
+        room = destinationRoom
+        face = destinationFace
+        self.portal = destinationPortal
+    }
+}
+
 struct RevivalPlaySession: Equatable, Sendable {
     let level: Level
-    let selectedRoomSourceIndex: Int
     var camera: RoomCamera
 }
 
@@ -197,21 +359,8 @@ struct RevivalProject: Equatable, Sendable {
         return previousName
     }
 
-    func makePlaySession(
-        selectedRoomSourceIndex: Int,
-        camera: RoomCamera
-    ) throws -> RevivalPlaySession {
-        guard level.rooms.contains(where: {
-            $0.sourceIndex == selectedRoomSourceIndex
-        }) else {
-            throw RevivalProjectError.roomMissing(selectedRoomSourceIndex)
-        }
-
-        return RevivalPlaySession(
-            level: level,
-            selectedRoomSourceIndex: selectedRoomSourceIndex,
-            camera: camera
-        )
+    func makePlaySession(camera: RoomCamera) -> RevivalPlaySession {
+        RevivalPlaySession(level: level, camera: camera)
     }
 
     private mutating func updateRoomNameEdit(sourceIndex: Int) {
