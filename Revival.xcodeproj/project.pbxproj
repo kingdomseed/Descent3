@@ -36,6 +36,29 @@
 		B10000000000000000000014 /* D3ImportOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000A /* D3ImportOperationTests.swift */; };
 		B10000000000000000000015 /* D3ImportOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000B /* D3ImportOperation.swift */; };
 		B10000000000000000000016 /* D3ImportOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000B /* D3ImportOperation.swift */; };
+		C10000000000000000000001 /* PresentationImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* PresentationImport.swift */; };
+		C10000000000000000000002 /* PresentationImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* PresentationImport.swift */; };
+		C10000000000000000000003 /* WorldRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000002 /* WorldRenderingTests.swift */; };
+		C10000000000000000000004 /* WorldRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WorldRendering.swift */; };
+		C10000000000000000000005 /* WorldRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WorldRendering.swift */; };
+		C10000000000000000000006 /* WorldRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WorldRendering.swift */; };
+		C10000000000000000000007 /* WorldRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WorldRendering.swift */; };
+		C10000000000000000000008 /* EditorProjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000004 /* EditorProjectTests.swift */; };
+		C10000000000000000000009 /* RevivalProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000005 /* RevivalProject.swift */; };
+		C1000000000000000000000A /* RevivalProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000005 /* RevivalProject.swift */; };
+		D10000000000000000000001 /* MetalWorldPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* MetalWorldPlanTests.swift */; };
+		D10000000000000000000002 /* MetalWorldPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* MetalWorldPlan.swift */; };
+		D10000000000000000000003 /* MetalWorldPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* MetalWorldPlan.swift */; };
+		D10000000000000000000004 /* MetalWorldPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* MetalWorldPlan.swift */; };
+		D10000000000000000000005 /* MetalWorldRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* MetalWorldRenderer.swift */; };
+		D10000000000000000000006 /* MetalWorldRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* MetalWorldRenderer.swift */; };
+		D10000000000000000000007 /* WorldShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000004 /* WorldShaders.metal */; };
+		D10000000000000000000008 /* WorldShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000004 /* WorldShaders.metal */; };
+		E10000000000000000000001 /* RevivalProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* RevivalProjectDocument.swift */; };
+		E10000000000000000000002 /* RevivalProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* RevivalProjectDocument.swift */; };
+		E10000000000000000000003 /* RevivalEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* RevivalEditorWindowController.swift */; };
+		E10000000000000000000004 /* RevivalEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* RevivalEditorWindowController.swift */; };
+		E10000000000000000000005 /* MetalWorldRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* MetalWorldRenderer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -60,6 +83,17 @@
 		B20000000000000000000009 /* CanonicalPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalPackage.swift; sourceTree = "<group>"; };
 		B2000000000000000000000A /* D3ImportOperationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3ImportOperationTests.swift; sourceTree = "<group>"; };
 		B2000000000000000000000B /* D3ImportOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3ImportOperation.swift; sourceTree = "<group>"; };
+		C20000000000000000000001 /* PresentationImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationImport.swift; sourceTree = "<group>"; };
+		C20000000000000000000002 /* WorldRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderingTests.swift; sourceTree = "<group>"; };
+		C20000000000000000000003 /* WorldRendering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRendering.swift; sourceTree = "<group>"; };
+		C20000000000000000000004 /* EditorProjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorProjectTests.swift; sourceTree = "<group>"; };
+		C20000000000000000000005 /* RevivalProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalProject.swift; sourceTree = "<group>"; };
+		D20000000000000000000001 /* MetalWorldPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalWorldPlanTests.swift; sourceTree = "<group>"; };
+		D20000000000000000000002 /* MetalWorldPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalWorldPlan.swift; sourceTree = "<group>"; };
+		D20000000000000000000003 /* MetalWorldRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalWorldRenderer.swift; sourceTree = "<group>"; };
+		D20000000000000000000004 /* WorldShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = WorldShaders.metal; sourceTree = "<group>"; };
+		E20000000000000000000001 /* RevivalProjectDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalProjectDocument.swift; sourceTree = "<group>"; };
+		E20000000000000000000002 /* RevivalEditorWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalEditorWindowController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -139,6 +173,7 @@
 			isa = PBXGroup;
 			children = (
 				B2000000000000000000000B /* D3ImportOperation.swift */,
+				C20000000000000000000001 /* PresentationImport.swift */,
 				B20000000000000000000005 /* D3LV127.swift */,
 				B20000000000000000000008 /* D3LV127Decoder.swift */,
 				A2000000000000000000000A /* HOG2Archive.swift */,
@@ -160,6 +195,9 @@
 		A30000000000000000000007 /* RevivalEditor */ = {
 			isa = PBXGroup;
 			children = (
+				E20000000000000000000002 /* RevivalEditorWindowController.swift */,
+				E20000000000000000000001 /* RevivalProjectDocument.swift */,
+				C20000000000000000000005 /* RevivalProject.swift */,
 				A20000000000000000000003 /* RevivalEditorApplication.swift */,
 			);
 			path = RevivalEditor;
@@ -168,6 +206,7 @@
 		A30000000000000000000008 /* RevivalCore */ = {
 			isa = PBXGroup;
 			children = (
+				C20000000000000000000003 /* WorldRendering.swift */,
 				B20000000000000000000009 /* CanonicalPackage.swift */,
 				B20000000000000000000007 /* Level.swift */,
 			);
@@ -177,6 +216,9 @@
 		A30000000000000000000009 /* RevivalMetal */ = {
 			isa = PBXGroup;
 			children = (
+				D20000000000000000000004 /* WorldShaders.metal */,
+				D20000000000000000000003 /* MetalWorldRenderer.swift */,
+				D20000000000000000000002 /* MetalWorldPlan.swift */,
 			);
 			path = RevivalMetal;
 			sourceTree = "<group>";
@@ -192,6 +234,9 @@
 		A3000000000000000000000B /* D3ImportTests */ = {
 			isa = PBXGroup;
 			children = (
+				D20000000000000000000001 /* MetalWorldPlanTests.swift */,
+				C20000000000000000000004 /* EditorProjectTests.swift */,
+				C20000000000000000000002 /* WorldRenderingTests.swift */,
 				B20000000000000000000006 /* CanonicalLevelTests.swift */,
 				B2000000000000000000000A /* D3ImportOperationTests.swift */,
 				A20000000000000000000004 /* HOG2ArchiveTests.swift */,
@@ -365,6 +410,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C10000000000000000000004 /* WorldRendering.swift in Sources */,
+				C10000000000000000000001 /* PresentationImport.swift in Sources */,
 				B10000000000000000000015 /* D3ImportOperation.swift in Sources */,
 				B10000000000000000000010 /* CanonicalPackage.swift in Sources */,
 				B1000000000000000000000A /* Level.swift in Sources */,
@@ -381,6 +428,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D10000000000000000000007 /* WorldShaders.metal in Sources */,
+				D10000000000000000000005 /* MetalWorldRenderer.swift in Sources */,
+				D10000000000000000000002 /* MetalWorldPlan.swift in Sources */,
+				C10000000000000000000005 /* WorldRendering.swift in Sources */,
 				B10000000000000000000011 /* CanonicalPackage.swift in Sources */,
 				B1000000000000000000000B /* Level.swift in Sources */,
 				A10000000000000000000002 /* RevivalMacApplication.swift in Sources */,
@@ -391,6 +442,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E10000000000000000000003 /* RevivalEditorWindowController.swift in Sources */,
+				E10000000000000000000001 /* RevivalProjectDocument.swift in Sources */,
+				D10000000000000000000008 /* WorldShaders.metal in Sources */,
+				D10000000000000000000006 /* MetalWorldRenderer.swift in Sources */,
+				D10000000000000000000003 /* MetalWorldPlan.swift in Sources */,
+				C10000000000000000000009 /* RevivalProject.swift in Sources */,
+				C10000000000000000000006 /* WorldRendering.swift in Sources */,
 				B10000000000000000000012 /* CanonicalPackage.swift in Sources */,
 				B1000000000000000000000C /* Level.swift in Sources */,
 				A10000000000000000000003 /* RevivalEditorApplication.swift in Sources */,
@@ -401,6 +459,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E10000000000000000000005 /* MetalWorldRenderer.swift in Sources */,
+				E10000000000000000000004 /* RevivalEditorWindowController.swift in Sources */,
+				E10000000000000000000002 /* RevivalProjectDocument.swift in Sources */,
+				D10000000000000000000004 /* MetalWorldPlan.swift in Sources */,
+				D10000000000000000000001 /* MetalWorldPlanTests.swift in Sources */,
+				C1000000000000000000000A /* RevivalProject.swift in Sources */,
+				C10000000000000000000008 /* EditorProjectTests.swift in Sources */,
+				C10000000000000000000007 /* WorldRendering.swift in Sources */,
+				C10000000000000000000003 /* WorldRenderingTests.swift in Sources */,
+				C10000000000000000000002 /* PresentationImport.swift in Sources */,
 				B10000000000000000000016 /* D3ImportOperation.swift in Sources */,
 				B10000000000000000000013 /* CanonicalPackage.swift in Sources */,
 				B1000000000000000000000D /* Level.swift in Sources */,
@@ -484,9 +552,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = RevivalMac;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Revival/Sources/RevivalMac/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -500,9 +567,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = RevivalMac;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Revival/Sources/RevivalMac/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -516,9 +582,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = RevivalEditor;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Revival/Sources/RevivalEditor/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -532,9 +597,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = RevivalEditor;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Revival/Sources/RevivalEditor/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

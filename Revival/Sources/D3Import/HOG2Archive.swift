@@ -13,11 +13,15 @@ import Foundation
 struct HOG2Archive: Equatable {
     let entries: [HOG2Entry]
 
-    func uniqueEntry(named name: String) -> HOG2Entry {
+    func entry(named name: String) -> HOG2Entry? {
         let folded = [UInt8](name.utf8).map(asciiLowercased)
         return entries.first { entry in
             [UInt8](entry.sourceName.utf8).map(asciiLowercased) == folded
-        }!
+        }
+    }
+
+    func uniqueEntry(named name: String) -> HOG2Entry {
+        entry(named: name)!
     }
 }
 

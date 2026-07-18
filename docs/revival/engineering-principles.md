@@ -1,7 +1,7 @@
 # Engineering principles
 
 - Status: accepted, amended
-- Date: July 16, 2026
+- Date: July 18, 2026
 - Authority: binding implementation rules
 
 ## Objective
@@ -156,6 +156,14 @@ Characterization evidence protects source semantics at an observable boundary. I
 
 A disposable research spike may inspect an unknown format, capture a trace, or answer an API question. It stays outside product targets and is removed or archived before shipping implementation begins. Once the product contract is known, red-first production work resumes.
 
+## Completion proportionality
+
+Before a material packet is declared `READY` or `HOLD`, handed off, or sent into additional terminal evidence, apply the independent [Revival completion gate](../../.agents/skills/revival-completion-gate/SKILL.md) once after ordinary review consolidation. Continued work carries the burden of proof: name the current accepted requirement, practically reachable supported event, observable outcome, distinct defect, smallest bounded check, stopping condition, and decision the result can change.
+
+This gate does not lower fidelity, correctness, security, creator, player, lifetime, accessibility, or performance standards. It stops a prompt, review, or current-plan entry from turning later-milestone work, unsupported failure, repeated passing evidence, or an unlimited negative such as `no growth forever` into a present blocker. A real reachable defect remains a defect. A legitimate later concern stays in its accepted owner without blocking the narrower current claim.
+
+Every nontrivial trace or profile begins with a hypothesis, representative content and build, bounded duration or cycle count, comparison or threshold, and predeclared decision. If the result cannot change code, scope, support, or the next evidence step, do not collect it.
+
 ## Performance discipline
 
 Performance work follows this order:
@@ -172,6 +180,8 @@ Zero steady-state allocations, a fixed tick rate, specialized math, direct Metal
 
 ## Review questions
 
+- Which accepted current-checkpoint sentence requires each proposed remaining action, and what decision changes when it passes or fails?
+- Is a requested trace, rerun, or proof bounded, or is it ceremonial reassurance or an attempt to prove an unlimited negative?
 - Did the bounded fog-of-war preflight test the proposed boundary, record real corrections, and stop when the next contract was stable, including a valid clean result when no gap appeared?
 - Which source behavior or ledgered capability does this code serve now?
 - Is the source disposition and any deliberate difference recorded?

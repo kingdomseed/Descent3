@@ -1,4 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import AppKit
+import MetalKit
 
 @main
 @MainActor
@@ -17,23 +20,275 @@ enum RevivalMacApplication {
 }
 
 @MainActor
-private final class RevivalMacApplicationDelegate: NSObject, NSApplicationDelegate {
+private final class RevivalMacApplicationDelegate: NSObject,
+    NSApplicationDelegate,
+    NSWindowDelegate
+{
+    private enum ContentRequest: Sendable {
+        case loadActive
+        case install(URL)
+    }
+
+    private let library = CanonicalPackageLibrary.revivalMac
     private var window: NSWindow?
+    private var renderer: MetalWorldRenderer?
+    private var statusLabel: NSTextField?
+    private var contentRequests = CanonicalPackageRequestQueue<ContentRequest>()
+    private var libraryPreparationError: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installMenu()
+
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            showWindow(rendererView: nil, message: "No Metal device is available.")
+            return
+        }
+        let metalView = MTKView(frame: .zero, device: device)
+        do {
+            renderer = try MetalWorldRenderer(view: metalView)
+            showWindow(
+                rendererView: metalView,
+                message: "Open a canonical Revival package to begin."
+            )
+        } catch {
+            showWindow(rendererView: nil, message: error.localizedDescription)
+        }
+
+        do {
+            try library.prepareForUse()
+        } catch {
+            libraryPreparationError = error.localizedDescription
+            setStatus(
+                "Could not prepare installed content: \(error.localizedDescription)",
+                isError: true
+            )
+        }
+
+        if contentRequests.isEmpty {
+            enqueue(.loadActive)
+        } else if libraryPreparationError == nil {
+            processNextContentRequest()
+        } else {
+            contentRequests.removeAllPending()
+        }
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        if window == nil {
+            for url in urls {
+                contentRequests.append(.install(url))
+            }
+        } else {
+            for url in urls {
+                enqueueInstall(url)
+            }
+        }
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(
+        _ sender: NSApplication
+    ) -> Bool {
+        true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        renderer?.shutdown()
+        renderer = nil
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        renderer?.shutdown()
+        renderer = nil
+    }
+
+    @objc private func chooseCanonicalPackage(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.title = "Open Canonical Revival Content"
+        panel.message = "Choose a package produced by D3Import."
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        enqueueInstall(url)
+    }
+
+    private func enqueueInstall(_ packageURL: URL) {
+        guard libraryPreparationError == nil else {
+            setStatus(
+                "New installs are blocked until abandoned staging is recovered. Relaunch Revival to retry preparation.",
+                isError: true
+            )
+            return
+        }
+        enqueue(.install(packageURL))
+    }
+
+    private func enqueue(_ request: ContentRequest) {
+        contentRequests.append(request)
+        processNextContentRequest()
+    }
+
+    private func processNextContentRequest() {
+        guard let renderer else {
+            if !contentRequests.isEmpty {
+                contentRequests.removeAllPending()
+                setStatus("The Metal renderer is unavailable.", isError: true)
+            }
+            return
+        }
+        guard let request = contentRequests.startNextIfIdle() else { return }
+        switch request {
+        case .loadActive:
+            setStatus("Loading the active canonical base…", isError: false)
+        case let .install(packageURL):
+            setStatus("Installing \(packageURL.lastPathComponent)…", isError: false)
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                self.contentRequests.finishCurrent()
+                self.processNextContentRequest()
+            }
+            do {
+                let library = self.library
+                let activation = try await Task.detached(priority: .userInitiated) {
+                    switch request {
+                    case .loadActive:
+                        try library.loadActive()
+                    case let .install(candidateURL):
+                        try library.installAndActivate(from: candidateURL)
+                    }
+                }.value
+                guard self.renderer === renderer else { return }
+                guard let activation else {
+                    if let preparationError = self.libraryPreparationError {
+                        self.setStatus(
+                            "Could not recover abandoned staging: \(preparationError)",
+                            isError: true
+                        )
+                    } else {
+                        self.setStatus(
+                            "Open a canonical Revival package to begin.",
+                            isError: false
+                        )
+                    }
+                    return
+                }
+                try self.present(activation, with: renderer)
+            } catch {
+                let operation: String
+                switch request {
+                case .loadActive:
+                    operation = "load the active base"
+                case let .install(packageURL):
+                    operation = "open \(packageURL.lastPathComponent)"
+                }
+                self.setStatus(
+                    "Could not \(operation): \(error.localizedDescription)",
+                    isError: true
+                )
+            }
+        }
+    }
+
+    private func present(
+        _ activation: ActivatedCanonicalPackage,
+        with renderer: MetalWorldRenderer
+    ) throws {
+        try renderer.replace(
+            level: activation.level,
+            camera: .trainingRoom3,
+            startRoomSourceIndex: 3
+        )
+        let contentSummary = "\(activation.level.metadata.name) — \(activation.level.rooms.count) rooms — source room 3"
+        if let preparationError = libraryPreparationError {
+            setStatus(
+                "\(contentSummary) — new installs blocked: \(preparationError)",
+                isError: true
+            )
+        } else {
+            setStatus(contentSummary, isError: false)
+        }
+        renderer.drawNow()
+    }
+
+    private func showWindow(rendererView: MTKView?, message: String) {
+        let content = NSView()
+        content.wantsLayer = true
+        content.layer?.backgroundColor = NSColor.black.cgColor
+
+        if let rendererView {
+            rendererView.translatesAutoresizingMaskIntoConstraints = false
+            content.addSubview(rendererView)
+            NSLayoutConstraint.activate([
+                rendererView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+                rendererView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+                rendererView.topAnchor.constraint(equalTo: content.topAnchor),
+                rendererView.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            ])
+        }
+
+        let label = NSTextField(labelWithString: message)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.textColor = .white
+        label.backgroundColor = NSColor.black.withAlphaComponent(0.72)
+        label.drawsBackground = true
+        label.alignment = .center
+        label.lineBreakMode = .byTruncatingMiddle
+        label.setAccessibilityLabel("Revival content status")
+        content.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 16),
+            label.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
+            label.topAnchor.constraint(equalTo: content.topAnchor, constant: 16),
+            label.heightAnchor.constraint(greaterThanOrEqualToConstant: 28),
+        ])
+        statusLabel = label
+
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 960, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 900),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Descent 3 Revival"
+        window.contentMinSize = NSSize(width: 480, height: 480)
+        window.contentView = content
+        window.delegate = self
         window.center()
         window.makeKeyAndOrderFront(nil)
         self.window = window
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+    private func setStatus(_ message: String, isError: Bool) {
+        statusLabel?.stringValue = message
+        statusLabel?.textColor = isError ? .systemRed : .white
+    }
+
+    private func installMenu() {
+        let mainMenu = NSMenu()
+        let appItem = NSMenuItem()
+        mainMenu.addItem(appItem)
+        let appMenu = NSMenu()
+        appMenu.addItem(
+            withTitle: "Quit Descent 3 Revival",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+        appItem.submenu = appMenu
+
+        let fileItem = NSMenuItem()
+        mainMenu.addItem(fileItem)
+        let fileMenu = NSMenu(title: "File")
+        let openItem = fileMenu.addItem(
+            withTitle: "Open Canonical Content…",
+            action: #selector(chooseCanonicalPackage(_:)),
+            keyEquivalent: "o"
+        )
+        openItem.target = self
+        fileItem.submenu = fileMenu
+        NSApplication.shared.mainMenu = mainMenu
     }
 }

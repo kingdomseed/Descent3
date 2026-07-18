@@ -23,6 +23,7 @@ Then read the smallest applicable authority set:
 - [`docs/revival/source-translation.md`](../../../docs/revival/source-translation.md) and [`docs/revival/source-translation-ledger.md`](../../../docs/revival/source-translation-ledger.md) for source paths, symbols, dispositions, provenance, and island state;
 - [`docs/revival/functional-completeness.md`](../../../docs/revival/functional-completeness.md) and [`docs/revival/functional-completeness-ledger.md`](../../../docs/revival/functional-completeness-ledger.md) for capability scope, owners, evidence, and row state;
 - [`docs/revival/verification.md`](../../../docs/revival/verification.md) and [`docs/revival/test-driven-development.md`](../../../docs/revival/test-driven-development.md) for evidence and closure claims;
+- [`revival-completion-gate`](../revival-completion-gate/SKILL.md) and its one accepted verdict when reconciling a material `READY`, `HOLD`, terminal-evidence, or handoff decision;
 - [`docs/revival/skill-supply-chain.md`](../../../docs/revival/skill-supply-chain.md) when a skill, external method, executable tool, pin, license, or audit boundary changes;
 - [the pull-request template](../../../.github/pull_request_template.md) when preparing a reviewable handoff.
 
@@ -47,6 +48,7 @@ Route each durable fact once:
 | External technical source and its evidentiary limit | [`primary-source-index.md`](../../../docs/revival/primary-source-index.md) |
 | External skill or tool pin, license, audit, allowed use, and exclusion | [`skill-supply-chain.md`](../../../docs/revival/skill-supply-chain.md) |
 | Exact red, green, suite, build, launch, capture, device, performance, and review run for one change | Commit, pull-request, or named verification artifact |
+| Completion-gate verdict, classifications, and stop instruction | Commit, pull-request, or named verification artifact; [`current-plan.md`](../../../docs/revival/current-plan.md) retains only the resulting active blocker or next state |
 | Detailed reusable operating method | The narrow project skill |
 | Skill selection, role boundaries, and orchestration | [`skills-and-agents.md`](../../../docs/revival/skills-and-agents.md) |
 
@@ -78,7 +80,7 @@ If one answer is missing, label it unproven or assign the existing owner that mu
 2. **Compare claims with evidence.** Inspect the full changed-file contents and reachable consequences. Separate verified fact, accepted decision, inference, proposed update, and unresolved question.
 3. **Run a bounded drift scan.** Check active documents for conflicting platform floors, toolchains, target counts, phase state, ownership, blockers, next-step prose, superseded mechanisms, duplicate queues, broken links, and claims that exceed the recorded checkpoint.
 4. **Route the smallest durable update.** Change only the canonical owners whose facts changed. Preserve each document's status and authority header. Remove superseded active prose in the same change rather than leaving both directions.
-5. **Reconcile the handoff.** Give the integration owner an exact `current-plan.md` proposal, affected ledger transitions, accepted-document changes, verification, open uncertainty, and next two or three slices. The integration owner accepts, adjusts, or rejects the proposal against the evidence.
+5. **Reconcile the handoff.** Give the integration owner the one completion-gate verdict and dispositions, an exact `current-plan.md` proposal, affected ledger transitions, accepted-document changes, verification, open uncertainty, and next two or three slices. The integration owner accepts, adjusts, or rejects the proposal against the evidence.
 
 The documentation steward does not replace the fog-of-war preflight, source translator, domain owner, reviewer, or integration owner. It ensures their durable results reach the right files.
 
@@ -103,6 +105,7 @@ Return a concise documentation-continuity record containing:
 - proposed `current-plan.md` change and the integration owner's disposition;
 - source and functional row transitions without overstating closure;
 - exact document, test, build, launch, capture, or device verification relevant to the claims;
+- the one completion-gate verdict, required-now items, deferred items, rejected ceremony, and stop instruction for a material closure;
 - remaining uncertainty and lane-labeled blockers;
 - the next two or three concrete slices when the active result changed them.
 
@@ -113,7 +116,7 @@ Put detailed command transcripts and ephemeral troubleshooting in the change rec
 Do not create or maintain:
 
 - `task_plan.md`, `findings.md`, `progress.md`, `.planning/`, per-agent journals, or another current-work backlog;
-- automated prompt-injection, plan-recitation, attestation, loop, stop-gate, or completion-gate hooks;
+- automated prompt-injection, plan-recitation, attestation, loop, or recursive stop/completion hooks; the bounded read-only `revival-completion-gate` review is the accepted exception and creates no automation or parallel plan;
 - a second decision log or evidence ledger beside the accepted documents and existing ledgers;
 - an error quota, forced update after a fixed number of reads, or mandatory documentation touch when no durable fact changed;
 - a hand-maintained knowledge graph or generated relationship artifact presented as project state.
@@ -138,4 +141,4 @@ Run any additional project document checker that actually exists and record its 
 
 ## Method provenance
 
-This skill is original Revival-specific prose implementing the accepted documentation authority and integration-owner rules. Its context-restoration, read-before-decision, phase-boundary writeback, and resumable-handoff ideas were informed by the MIT-licensed OthmanAdi `planning-with-files` skill at commit `f90780c92f0506d21c5f6c4865ce95517a8b1964`, audited July 16, 2026. No text, templates, hooks, scripts, commands, assets, or planning files from that source were copied into the repository, and none of its scripts or hooks were executed. The project's existing documents and ledgers replace the upstream `task_plan.md`, `findings.md`, `progress.md`, `.planning/`, hook, attestation, recitation, error-log, loop, ledger, and stop-gate mechanisms.
+This skill is original Revival-specific prose implementing the accepted documentation authority and integration-owner rules. Its context-restoration, read-before-decision, phase-boundary writeback, and resumable-handoff ideas were informed by the MIT-licensed OthmanAdi `planning-with-files` skill at commit `f90780c92f0506d21c5f6c4865ce95517a8b1964`, audited July 16, 2026. No text, templates, hooks, scripts, commands, assets, or planning files from that source were copied into the repository, and none of its scripts or hooks were executed. The project's existing documents and ledgers replace the upstream `task_plan.md`, `findings.md`, `progress.md`, `.planning/`, hook, attestation, recitation, error-log, loop, ledger, and automated stop-gate mechanisms. The independent project-authored completion review is a single human-readable decision, not an upstream hook or planning system.

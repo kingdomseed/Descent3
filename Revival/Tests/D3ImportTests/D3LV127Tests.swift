@@ -2,6 +2,291 @@ import Foundation
 import XCTest
 
 final class D3LV127Tests: XCTestCase {
+    func testDecodesReachedOutrage1555FirstMip() throws {
+        var ogf = Data([0, 0, 122])
+        ogf.appendCString("slice3.ogf")
+        ogf.append(1)
+        ogf.append(Data(repeating: 0, count: 9))
+        ogf.appendLittleEndian(UInt16(2))
+        ogf.appendLittleEndian(UInt16(1))
+        ogf.append(32)
+        ogf.append(40)
+        ogf.append(0)
+        ogf.appendLittleEndian(UInt16(0xfc00))
+        ogf.append(0)
+        ogf.appendLittleEndian(UInt16(0x83e0))
+
+        let image = try decodeReachedOutrage16OGF(ogf)
+
+        XCTAssertEqual(image.width, 2)
+        XCTAssertEqual(image.height, 1)
+        XCTAssertEqual(
+            image.rgba8,
+            Data([255, 0, 0, 255, 0, 255, 0, 255])
+        )
+    }
+
+    func testDecodesReachedOutrage4444FirstMip() throws {
+        var ogf = Data([0, 0, 121])
+        ogf.appendCString("slice3-4444.ogf")
+        ogf.append(1)
+        ogf.append(Data(repeating: 0, count: 9))
+        ogf.appendLittleEndian(UInt16(1))
+        ogf.appendLittleEndian(UInt16(1))
+        ogf.append(32)
+        ogf.append(40)
+        ogf.append(0)
+        ogf.appendLittleEndian(UInt16(0xf0f0))
+
+        let image = try decodeReachedOutrage16OGF(ogf)
+
+        XCTAssertEqual(image.rgba8, Data([0, 255, 0, 255]))
+    }
+
+    func testTranslatesV7TextureFlagsIntoTypedWaterAndCoronaDefinitions() throws {
+        let table = makeTextureTablePage(
+            name: "Alien Force Field_1",
+            bitmapSourceName: "ForceField.ogf",
+            red: 0.25,
+            green: 0.5,
+            blue: 0.75,
+            alpha: 0.7,
+            coronaType: 0,
+            flags: 0x0368_0020,
+            proceduralLighting: 8,
+            proceduralThickness: 6,
+            evaluationIntervalSeconds: 0,
+            elements: [
+                (type: 1, frequency: 20, speed: 40, size: 100, x1: 127, y1: 58, x2: 186, y2: 13),
+                (type: 1, frequency: 20, speed: 40, size: 100, x1: 0, y1: 59, x2: 13, y2: 240),
+                (type: 1, frequency: 20, speed: 40, size: 100, x1: 0, y1: 58, x2: 240, y2: 173),
+                (type: 1, frequency: 20, speed: 40, size: 100, x1: 62, y1: 1, x2: 173, y2: 186),
+                (type: 1, frequency: 20, speed: 40, size: 100, x1: 62, y1: 126, x2: 186, y2: 13),
+                (type: 1, frequency: 20, speed: 40, size: 100, x1: 62, y1: 3, x2: 13, y2: 240),
+                (type: 0, frequency: 0, speed: 1, size: 1, x1: 91, y1: 38, x2: 240, y2: 173),
+            ]
+        )
+
+        let definition = try XCTUnwrap(
+            resolveRetailTextureDefinitions(
+                table: table,
+                overlay: Data(),
+                names: ["alien force field_1"]
+            ).first
+        )
+
+        XCTAssertEqual(definition.blend, .additiveSourceAlpha(opacity: 178))
+        XCTAssertEqual(definition.lightmapBlend, .none)
+        XCTAssertEqual(
+            definition.waterProcedural,
+            .init(
+                evaluationIntervalSeconds: 0,
+                lightingShift: 7,
+                dampingShift: 6,
+                elements: [
+                    .init(
+                        kind: .heightBlob,
+                        frequency: 20,
+                        speed: 40,
+                        size: 100,
+                        x1: 127,
+                        y1: 58,
+                        x2: 186,
+                        y2: 13
+                    ),
+                    .init(
+                        kind: .heightBlob,
+                        frequency: 20,
+                        speed: 40,
+                        size: 100,
+                        x1: 0,
+                        y1: 59,
+                        x2: 13,
+                        y2: 240
+                    ),
+                    .init(
+                        kind: .heightBlob,
+                        frequency: 20,
+                        speed: 40,
+                        size: 100,
+                        x1: 0,
+                        y1: 58,
+                        x2: 240,
+                        y2: 173
+                    ),
+                    .init(
+                        kind: .heightBlob,
+                        frequency: 20,
+                        speed: 40,
+                        size: 100,
+                        x1: 62,
+                        y1: 1,
+                        x2: 173,
+                        y2: 186
+                    ),
+                    .init(
+                        kind: .heightBlob,
+                        frequency: 20,
+                        speed: 40,
+                        size: 100,
+                        x1: 62,
+                        y1: 126,
+                        x2: 186,
+                        y2: 13
+                    ),
+                    .init(
+                        kind: .heightBlob,
+                        frequency: 20,
+                        speed: 40,
+                        size: 100,
+                        x1: 62,
+                        y1: 3,
+                        x2: 13,
+                        y2: 240
+                    ),
+                    .init(
+                        kind: .noOp,
+                        frequency: 0,
+                        speed: 1,
+                        size: 1,
+                        x1: 91,
+                        y1: 38,
+                        x2: 240,
+                        y2: 173
+                    ),
+                ]
+            )
+        )
+        XCTAssertEqual(definition.lightCorona?.bitmapSourceName, "StarFlare6.ogf")
+        XCTAssertEqual(definition.lightCorona?.tint, .init(x: 0.25, y: 0.5, z: 0.75))
+        XCTAssertEqual(
+            definition.lightCorona?.blend,
+            .additiveSourceAlpha(opacity: 102)
+        )
+    }
+
+    func testRejectsWaterWithoutSaturateBeforeCanonicalization() {
+        let table = makeTextureTablePage(
+            name: "unsupported-water-blend",
+            bitmapSourceName: "water.ogf",
+            red: 0,
+            green: 0,
+            blue: 0,
+            alpha: 0.7,
+            coronaType: 0,
+            flags: 0x0348_0020,
+            proceduralLighting: 8,
+            proceduralThickness: 6,
+            evaluationIntervalSeconds: 0,
+            elements: [
+                (type: 0, frequency: 0, speed: 1, size: 1, x1: 1, y1: 1, x2: 1, y2: 1),
+            ]
+        )
+
+        XCTAssertThrowsError(
+            try resolveRetailTextureDefinitions(
+                table: table,
+                overlay: Data(),
+                names: ["unsupported-water-blend"]
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? RetailTextureTableError,
+                .unsupportedPresentation("unsupported-water-blend")
+            )
+        }
+    }
+
+    func testRejectsOscillatingWaterBeforeCanonicalization() {
+        let table = makeTextureTablePage(
+            name: "unsupported-water-oscillation",
+            bitmapSourceName: "water.ogf",
+            red: 0,
+            green: 0,
+            blue: 0,
+            alpha: 0.7,
+            coronaType: 0,
+            flags: 0x0368_0020,
+            proceduralLighting: 8,
+            proceduralThickness: 6,
+            evaluationIntervalSeconds: 0,
+            oscillationTimeSeconds: 1,
+            elements: [
+                (type: 0, frequency: 0, speed: 1, size: 1, x1: 1, y1: 1, x2: 1, y2: 1),
+            ]
+        )
+
+        XCTAssertThrowsError(
+            try resolveRetailTextureDefinitions(
+                table: table,
+                overlay: Data(),
+                names: ["unsupported-water-oscillation"]
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? RetailTextureTableError,
+                .unsupportedPresentation("unsupported-water-oscillation")
+            )
+        }
+    }
+
+    func testRejectsUnsupportedV7WaterElementBeforeCanonicalization() {
+        let table = makeTextureTablePage(
+            name: "unsupported-water",
+            bitmapSourceName: "water.ogf",
+            red: 0,
+            green: 0,
+            blue: 0,
+            alpha: 0.7,
+            coronaType: 0,
+            flags: 0x0368_0020,
+            proceduralLighting: 8,
+            proceduralThickness: 6,
+            evaluationIntervalSeconds: 0,
+            elements: [
+                (type: 2, frequency: 1, speed: 1, size: 1, x1: 1, y1: 1, x2: 1, y2: 1),
+            ]
+        )
+
+        XCTAssertThrowsError(
+            try resolveRetailTextureDefinitions(
+                table: table,
+                overlay: Data(),
+                names: ["unsupported-water"]
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? RetailTextureTableError,
+                .unsupportedPresentation("unsupported-water")
+            )
+        }
+    }
+
+    func testConvertsNLMPPixelsToCanonicalRGBAInD3Import() throws {
+        let level = try parseD3LV127(
+            makeSyntheticD3LV127(
+                lightmapPayload: makeLightmapPayload(
+                    width: 2,
+                    height: 1,
+                    pixels: [0xfc00, 0x83e0]
+                )
+            ),
+            source: syntheticSource
+        )
+
+        XCTAssertEqual(
+            level.lightmaps.pages.first?.rgba8,
+            Data([255, 0, 0, 255, 0, 255, 0, 255])
+        )
+        XCTAssertNoThrow(try level.validateForImportStaging())
+        XCTAssertThrowsError(try level.validate()) { error in
+            XCTAssertEqual(
+                error as? LevelValidationError,
+                .invalidDependency("orphan presentation payload")
+            )
+        }
+    }
+
     func testRejectsEveryVersionExcept127() {
         for version in [126, 128] {
             var data = Data("D3LV".utf8)
@@ -375,7 +660,7 @@ final class D3LV127Tests: XCTestCase {
         let dispositions = Dictionary(uniqueKeysWithValues: level.sourceChunks.map { ($0.name, $0.disposition) })
         XCTAssertEqual(
             dispositions["NLMP"],
-            "canonical-metadata-deferred-phase-1-slice-3-selected-room-presentation-payload"
+            "canonical-metadata"
         )
         XCTAssertEqual(dispositions["NODE"], "deferred-phase-4-training-navigation-ai-reimport")
         XCTAssertEqual(dispositions["LIFE"], "evidence-only-future-opportunity-f-001")
@@ -620,14 +905,17 @@ private func makeLightmapPayload(
     width: UInt16,
     height: UInt16,
     infoWidth: UInt16? = nil,
-    infoHeight: UInt16? = nil
+    infoHeight: UInt16? = nil,
+    pixels: [UInt16]? = nil
 ) -> Data {
     var data = Data()
     data.appendLittleEndian(UInt32(1))
     data.appendLittleEndian(width)
     data.appendLittleEndian(height)
     data.append(UInt8(0))
-    data.append(Data(repeating: 0, count: Int(width) * Int(height) * 2))
+    let pixels = pixels ?? [UInt16](repeating: 0, count: Int(width) * Int(height))
+    precondition(pixels.count == Int(width) * Int(height))
+    for pixel in pixels { data.appendLittleEndian(pixel) }
     if let infoWidth, let infoHeight {
         data.appendLittleEndian(UInt32(1))
         data.appendLittleEndian(UInt16(0))
@@ -643,6 +931,77 @@ private func makeLightmapPayload(
         data.appendLittleEndian(UInt32(0))
     }
     return data
+}
+
+private func makeTextureTablePage(
+    name: String,
+    bitmapSourceName: String,
+    red: Float,
+    green: Float,
+    blue: Float,
+    alpha: Float,
+    coronaType: UInt8,
+    flags: UInt32,
+    proceduralLighting: UInt8,
+    proceduralThickness: UInt8,
+    evaluationIntervalSeconds: Float,
+    proceduralHeat: UInt8 = 128,
+    oscillationTimeSeconds: Float = 0,
+    oscillationValue: UInt8 = 8,
+    elements: [(
+        type: UInt8,
+        frequency: UInt8,
+        speed: UInt8,
+        size: UInt8,
+        x1: UInt8,
+        y1: UInt8,
+        x2: UInt8,
+        y2: UInt8
+    )]
+) -> Data {
+    var body = Data()
+    body.appendLittleEndian(UInt16(7))
+    body.appendCString(name)
+    body.appendCString(bitmapSourceName)
+    body.appendCString("")
+    body.appendFloat(red)
+    body.appendFloat(green)
+    body.appendFloat(blue)
+    body.appendFloat(alpha)
+    body.appendFloat(1)
+    body.appendFloat(0)
+    body.appendFloat(0)
+    body.appendFloat(0.5)
+    body.append(coronaType)
+    body.appendLittleEndian(UInt32(0))
+    body.appendLittleEndian(flags)
+    body.append(Data(repeating: 0, count: 255 * 2))
+    body.append(proceduralHeat)
+    body.append(proceduralLighting)
+    body.append(proceduralThickness)
+    body.appendFloat(evaluationIntervalSeconds)
+    body.appendFloat(oscillationTimeSeconds)
+    body.append(oscillationValue)
+    body.appendLittleEndian(UInt16(elements.count))
+    for element in elements {
+        body.append(contentsOf: [
+            element.type,
+            element.frequency,
+            element.speed,
+            element.size,
+            element.x1,
+            element.y1,
+            element.x2,
+            element.y2,
+        ])
+    }
+    body.appendCString("")
+    body.appendFloat(1)
+
+    var page = Data([1])
+    page.appendLittleEndian(UInt32(body.count + 4))
+    page.append(body)
+    return page
 }
 
 private func makeSyntheticObjects(

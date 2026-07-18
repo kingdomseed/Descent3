@@ -122,6 +122,8 @@ A comment cannot legitimize a stub, placeholder constant, broad optional state, 
 
 Use [`revival-review`](../revival-review/SKILL.md) before closing a material island. The translator supplies the pinned source, native diff, accepted documents, ledger rows, baseline, deliberate differences, and claimed evidence but does not review their own work. The four review concerns and deterministic consolidation live in that skill, not here.
 
+After that review is consolidated, use [`revival-completion-gate`](../revival-completion-gate/SKILL.md) once before holding or closing the island, collecting more terminal evidence, or authorizing expensive profiling. The gate cannot waive source accounting or observable fidelity. It prevents a translation packet from expanding into later-milestone proof, unsupported failure engineering, repeated verification, or an unlimited negative after its current checkpoint is satisfied.
+
 A source-specific finding must name observable drift, missing file or range accounting, a false deliberate-difference claim, or an obsolete mechanism mistaken for semantics. Literal C++ shape, personal style, and hypothetical future needs are not defects.
 
 ## Repair the process when the pattern is wrong

@@ -1,7 +1,7 @@
 # Verification
 
 - Status: accepted, amended
-- Date: July 16, 2026
+- Date: July 18, 2026
 - Authority: binding evidence and acceptance contract
 
 ## Principle
@@ -14,6 +14,8 @@ Verify two things without confusing them:
 The C++ source, reference executable, retail content, revision history, and historical notes are systematic translation evidence. They do not become permanent CI dependencies or require byte, file, ABI, packet, or UI parity.
 
 Every new or changed shipping behavior follows [Test-driven development](test-driven-development.md). Documentation-only work uses link, consistency, and evidence checks. Disposable research captures unknown behavior but does not enter product targets.
+
+After ordinary review is consolidated and before a material packet is declared `READY` or `HOLD`, handed off, or sent into additional terminal evidence, apply the independent [Revival completion gate](../../.agents/skills/revival-completion-gate/SKILL.md) once. Evidence is required only for the exact claim being made. Missing evidence for a later, broader, mobile, complete-mission, soak, support-floor, or release claim leaves that claim open; it does not automatically block a narrower current checkpoint.
 
 ## Evidence layers
 
@@ -232,6 +234,10 @@ Use the available physical development devices recorded in the [current implemen
 The [current implementation plan](current-plan.md) alone records whether the product-toolchain gate is still open and which packet is next. Before Phase 1 production code, select Xcode 27, verify its Swift 6.4 compiler and SDKs, and record that evidence there. Mobile hardware availability does not block D3Import, shared Core/Metal, RevivalMac, RevivalEditor, or later Mac/shared dependency islands.
 
 ## Performance method
+
+Before starting a nontrivial trace, profile, repeated lifecycle campaign, soak, or terminal-evidence run, state the hypothesis, current accepted claim, production path, content and optimized build, bounded duration or cycle count, comparison or threshold, and code, product, support, or next-evidence decision that the result will change. If those facts are absent, use the completion gate to classify the work as later or unnecessary instead of collecting evidence because a tool or broad checklist exists.
+
+One bounded lifecycle exercise may falsify new ownership and release behavior. It does not prove indefinite absence of leaks or growth. A clean bounded result ends that check unless a reproducible signal, ratified budget, or later accepted milestone requires more.
 
 Measure optimized builds with Instruments, Metal System Trace, Metal capture, and focused signposts. Track:
 

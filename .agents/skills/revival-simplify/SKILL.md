@@ -118,6 +118,8 @@ Record:
 
 Keep the record proportional. A small cleanup may combine these into the compact preservation note above; a material refactor keeps the evidence separate enough to audit.
 
+After a material simplification and its ordinary review are complete, pass every proposed remaining rerun, profile, proof, and blocker to [`revival-completion-gate`](../revival-completion-gate/SKILL.md). Do not collect additional evidence merely because this section names a possible category; the current accepted checkpoint decides applicability, and the gate must order work to stop once the protected behavior is sufficiently proven.
+
 No protecting test may be skipped, weakened, deleted, or replaced with a mock path. Run at minimum:
 
 ```sh

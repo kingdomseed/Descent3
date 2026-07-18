@@ -1,14 +1,14 @@
 # Skills and agents
 
 - Status: accepted, amended
-- Date: July 16, 2026
+- Date: July 18, 2026
 - Authority: skill selection and agent operating rules
 
 ## Principle
 
 Skills encode methods and constraints. They do not make an agent the named author or substitute a generic expert persona for source evidence.
 
-The [roadmap](roadmap.md) and accepted contracts govern scope and phase order. The [current implementation plan](current-plan.md) is the single living record of active state, near-term work, lane ownership, and blockers beneath them. Every contributor reads it before selecting work. One integration owner updates it when work lands or the active sequence changes; agents do not maintain competing plans or edit its live state concurrently. The project-local documentation steward restores and reconciles this record at material packet boundaries, but it routes each fact to the existing canonical owner instead of creating another plan, findings file, progress journal, or agent ledger.
+The [roadmap](roadmap.md) and accepted contracts govern scope and phase order. The [current implementation plan](current-plan.md) is the single living record of active state, near-term work, lane ownership, and blockers beneath them. Every contributor reads it before selecting work. One integration owner updates it when work lands or the active sequence changes; agents do not maintain competing plans or edit its live state concurrently. The project-local documentation steward restores and reconciles this record at material packet boundaries, but it routes each fact to the existing canonical owner instead of creating another plan, findings file, progress journal, or agent ledger. After ordinary review consolidation, the independent completion gate decides once whether remaining work is required now, one bounded correction, later work, or ceremony; it is not another implementation lane or recursive reviewer.
 
 Prefer:
 
@@ -103,7 +103,7 @@ The complete current skill set is installed in the repository so the process can
 | [revival-multiplayer](../../.agents/skills/revival-multiplayer/SKILL.md) | Mac and mobile modes, co-op, content negotiation, host difficulty, chat, moderation, commands, media, macOS-only dedicated hosting, authoring, and network matrices |
 | [revival-verification](../../.agents/skills/revival-verification/SKILL.md) | Falsify named evidence claims across concrete Mac, mobile, and editor paths; verify physical-device evidence, milestone matrices, and terminal states; and prevent one check from standing in for another |
 
-Four additional workflow skills stay narrow:
+Five additional workflow skills stay narrow:
 
 | Skill | Purpose |
 | --- | --- |
@@ -111,6 +111,7 @@ Four additional workflow skills stay narrow:
 | [revival-wayfinding](../../.agents/skills/revival-wayfinding/SKILL.md) | Expose genuine unknowns and choose the next evidence-producing step without creating a parallel plan |
 | [revival-simplify](../../.agents/skills/revival-simplify/SKILL.md) | Prove the protected behavior surface across applicable Mac, mobile, and editor entry points, then delete defensive, duplicated, speculative, or indirect code without losing ledgered capability |
 | [revival-review](../../.agents/skills/revival-review/SKILL.md) | Run and consolidate the four independent concerns for a material slice: source fidelity, architecture and scope, tests and evidence, and simplicity and maintainability |
+| [revival-completion-gate](../../.agents/skills/revival-completion-gate/SKILL.md) | Challenge the need for every remaining correction, guard, test, rerun, profile, and blocker; preserve real current-checkpoint obligations while rejecting ceremony, unsupported failure, unlimited proof, and later-milestone work |
 
 Orchestration, blast-radius analysis, boundary and type discipline, PR reviewability, and optional review visualization are steps inside this workflow rather than separately triggered doctrine skills. This avoids overlapping rules and reviewer multiplication. The exact external sources, pins, licenses, and exclusions are recorded in [`skill-supply-chain.md`](skill-supply-chain.md).
 
@@ -152,8 +153,9 @@ Use only the steps the current work needs:
 6. **Implement one contract.** Use the current domain skill. Observe focused red, make the smallest direct green, and keep validation at the untrusted-to-canonical boundary. Concrete Swift values and exhaustive state represent real invariants; wrapper types and protocols need an actual ownership or semantic job.
 7. **Simplify the diff.** Protect the named behavior surface, then remove duplicated paths, defensive runtime branches, needless indirection, stale comments, speculative flexibility, and measured hot-path waste. Rerun the focused and affected evidence after every accepted simplification.
 8. **Review a material slice.** Run the four independent review concerns and consolidate concrete findings once. The island owner resolves them against source and product evidence; reviewers do not directly redesign the diff.
-9. **Make the change reviewable.** Explain the observable island and source map first, core logic second, wiring and mechanical movement afterward, then risks, deliberate differences, ledger transitions, and exact evidence. Never rewrite history without explicit authority and tree-identity proof.
-10. **Reconcile, close, and hand off.** Apply `revival-documentation-steward`. Require applicable player and creator checkpoints and source-row closure for the island. Advance each functional row only as far as the slice proves; require its terminal state when complete capability or milestone closure is claimed. Route durable facts to their existing accepted document, ledger, or change-record owner, then give the integration owner the exact proposed current-state and next-work change; that owner reconciles it into [`current-plan.md`](current-plan.md). `No documentation change required` is valid when the checked owners remain accurate. Commit, push, open a PR, or generate an optional visual review only when requested.
+9. **Apply the completion gate once.** Give one independent `revival-completion-gate` reviewer the consolidated findings, actual diff, exact current checkpoint, proposed remaining work, and existing evidence. It classifies each item as required now, defer, or delete and returns one packet verdict and stop instruction. It does not repeat the four concerns, implement fixes, spawn reviewers, or turn uncertainty into a blocker. A `FIX THEN READY` verdict receives only its bounded corrections, smallest exact-final-tree verification, and one recheck of the affected ordinary concern; do not rerun the other concerns or the completion gate. Invoke the gate before further terminal evidence or expensive profiling, not afterward as a ceremonial signature.
+10. **Make the change reviewable.** Explain the observable island and source map first, core logic second, wiring and mechanical movement afterward, then risks, deliberate differences, ledger transitions, completion-gate verdict, and exact evidence. Never rewrite history without explicit authority and tree-identity proof.
+11. **Reconcile, close, and hand off.** Apply `revival-documentation-steward`. Require applicable player and creator checkpoints and source-row closure for the island. Advance each functional row only as far as the slice proves; require its terminal state when complete capability or milestone closure is claimed. Route durable facts and the accepted completion-gate disposition to their existing accepted document, ledger, or change-record owner, then give the integration owner the exact proposed current-state and next-work change; that owner reconciles it into [`current-plan.md`](current-plan.md). `No documentation change required` is valid when the checked owners remain accurate. Commit, push, open a PR, or generate an optional visual review only when requested.
 
 Routine fog-of-war discovery is mandatory at a new boundary; formal wayfinding is conditional. Neither implies that a defect exists. The process is a feedback loop, not a waterfall. A failed test, capture, review, or real-content run may return the island to discovery, tracing, or wayfinding. Repair the narrow rule that allowed a repeated mistake; do not add a framework to prevent every imaginable one.
 
@@ -196,9 +198,12 @@ After every material slice, cover four concerns independently:
 
 Use separate reviewers when capacity allows. Run the remaining concern in the next wave when capacity is limited. For a small change one reviewer may cover multiple concerns only when the report keeps them distinct. Reviewers identify concrete paths and observable consequences; they do not demand preservation of obsolete machinery, literal source shape, defensive branches after canonical validation, or speculative future-proofing. [`revival-review`](../../.agents/skills/revival-review/SKILL.md) defines consolidation and closure.
 
+After those concerns are consolidated and corrected, one independent [`revival-completion-gate`](../../.agents/skills/revival-completion-gate/SKILL.md) reviewer decides whether any proposed remainder belongs to the current checkpoint. This reviewer consumes the existing review rather than repeating it. `HOLD` requires a concrete reachable defect or exact current-checkpoint evidence gap; later work, unsupported failure, unlimited negative proof, and reassuring-but-decisionless evidence are deferred or rejected. A `STOP - READY` verdict explicitly ends implementation.
+
 ## Operating rules
 
 - Give each agent one bounded output and one owner.
+- A material handoff records the one completion-gate verdict and stop condition. Do not invoke the gate recursively or add a reviewer to review its style; resolve only a named contract conflict or concrete contrary evidence.
 - At a material packet boundary, require a documentation-continuity handoff naming the actual base and target, packet and owners, durable facts and canonical files changed, proposed current-plan update and integration-owner disposition, row transitions, exact evidence, blockers, and next slices. Do not require a documentation edit when no durable fact changed.
 - Separate verified fact, inference, current decision, and open hypothesis.
 - Require primary-source or local-code evidence for technical claims.

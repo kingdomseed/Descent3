@@ -200,23 +200,9 @@ func runD3Import(
     }!
     let training = try readValidatedPreparedRetailFile(trainingFile, at: arguments.source)
     let trainingArchive = try! parseHOG2(training.data)
-    let inventories = try profile.files.map { file in
-        let validated: ValidatedPreparedRetailFile
-        let archive: HOG2Archive
-        if file.relativePath == trainingFile.relativePath {
-            validated = training
-            archive = trainingArchive
-        } else {
-            validated = try readValidatedPreparedRetailFile(file, at: arguments.source)
-            archive = try! parseHOG2(validated.data)
-        }
-        return PreparedArchiveInventory(
-            relativePath: validated.file.relativePath,
-            byteCount: validated.file.byteCount,
-            sha256: validated.file.sha256,
-            entryCount: archive.entries.count
-        )
-    }
+    var inventoryByPath = [
+        trainingFile.relativePath: archiveInventory(training, trainingArchive),
+    ]
     let trainingData = training.data
 
     let descriptorEntry = trainingArchive.uniqueEntry(named: "training.msn")
@@ -242,7 +228,171 @@ func runD3Import(
         referenceChecksum: "6db74a2eb0c563de4eb11e6d4e91e59c",
         referenceChecksumBasis: "pinned-source-provenance-implied-by-exact-level-sha256"
     )
-    let level = try! parseD3LV127(levelData, source: source)
+    let topologyLevel = try! parseD3LV127(levelData, source: source)
+
+    let mercFile = profile.files.first { $0.relativePath == "merc.hog" }!
+    let merc = try readValidatedPreparedRetailFile(mercFile, at: arguments.source)
+    let mercArchive = try! parseHOG2(merc.data)
+    inventoryByPath[mercFile.relativePath] = archiveInventory(merc, mercArchive)
+    let tableData = merc.data.subdata(in: mercArchive.uniqueEntry(named: "Table.gam").payloadRange)
+
+    let extra13File = profile.files.first { $0.relativePath == "extra13.hog" }!
+    let extra13 = try readValidatedPreparedRetailFile(extra13File, at: arguments.source)
+    let extra13Archive = try! parseHOG2(extra13.data)
+    inventoryByPath[extra13File.relativePath] = archiveInventory(extra13, extra13Archive)
+    let overlayData = extra13.data.subdata(
+        in: extra13Archive.uniqueEntry(named: "extra.gam").payloadRange
+    )
+
+    let extraFile = profile.files.first { $0.relativePath == "extra.hog" }!
+    let extra = try readValidatedPreparedRetailFile(extraFile, at: arguments.source)
+    let extraArchive = try! parseHOG2(extra.data)
+    inventoryByPath[extraFile.relativePath] = archiveInventory(extra, extraArchive)
+    let d3File = profile.files.first { $0.relativePath == "d3.hog" }!
+    let d3 = try readValidatedPreparedRetailFile(d3File, at: arguments.source)
+    let d3Archive = try! parseHOG2(d3.data)
+    inventoryByPath[d3File.relativePath] = archiveInventory(d3, d3Archive)
+
+    let presentationArchives = [
+        IndexedPreparedArchive(validated: extra13, archive: extra13Archive),
+        IndexedPreparedArchive(validated: merc, archive: mercArchive),
+        IndexedPreparedArchive(validated: extra, archive: extraArchive),
+        IndexedPreparedArchive(validated: d3, archive: d3Archive),
+    ]
+    let sourceTextureByName = topologyLevel.rooms.reduce(
+        into: [String: SourceResource]()
+    ) { result, room in
+        for face in room.faces {
+            result[face.texture.sourceName.lowercased()] = face.texture
+        }
+    }
+    var portalBlends: [SourceResource: PresentationBlend] = [:]
+    var discoveredVisibility: SourceVisibleWorld?
+    while discoveredVisibility == nil {
+        do {
+            discoveredVisibility = try extractSourceVisibleWorld(
+                topologyLevel,
+                camera: .trainingRoom3,
+                startRoomSourceIndex: 3,
+                portalBlends: portalBlends
+            )
+        } catch RoomRenderExtractionError.missingMaterial(let sourceName) {
+            let key = sourceName.lowercased()
+            let definition = try! resolveRetailTextureDefinitions(
+                table: tableData,
+                overlay: overlayData,
+                names: [key]
+            )
+            portalBlends[sourceTextureByName[key]!] = definition[0].blend
+        }
+    }
+    let visibility = discoveredVisibility!
+    precondition(visibility.visibleRoomSourceIndices == [3, 2, 1])
+    precondition(visibility.faces.count == 125)
+
+    let roomBySourceIndex = Dictionary(
+        uniqueKeysWithValues: topologyLevel.rooms.map { ($0.sourceIndex, $0) }
+    )
+    let sortedVisibleFaces = visibility.faces.sorted {
+        ($0.roomSourceIndex, $0.faceIndex) < ($1.roomSourceIndex, $1.faceIndex)
+    }
+    let visibleFaceEvidence = sortedVisibleFaces.map {
+        "\($0.roomSourceIndex):\($0.faceIndex)\n"
+    }.joined()
+    precondition(
+        canonicalSHA256(Data(visibleFaceEvidence.utf8))
+            == "564a9fd0b1264cbf19b124e55e36bd2ca1275dc86926093db538df1c97001002"
+    )
+    precondition(
+        sortedVisibleFaces.filter {
+            let face = roomBySourceIndex[$0.roomSourceIndex]!.faces[$0.faceIndex]
+            return face.allowsLightCorona && [1_205, 1_332].contains(face.texture.storedIndex)
+        }.map { "\($0.roomSourceIndex):\($0.faceIndex)" } == [
+            "1:332", "1:336", "1:340", "1:344",
+            "3:2", "3:4", "3:6", "3:8", "3:10", "3:12", "3:14", "3:16",
+        ]
+    )
+    var lightmapPageByInfo: [Int: Int] = [:]
+    let perFaceLightmapEvidence = sortedVisibleFaces.compactMap { reference -> String? in
+        let face = roomBySourceIndex[reference.roomSourceIndex]!.faces[reference.faceIndex]
+        guard let infoIndex = face.lightmapInfoIndex else { return nil }
+        let pageIndex = topologyLevel.lightmaps.infos[infoIndex].pageIndex
+        lightmapPageByInfo[infoIndex] = pageIndex
+        return "\(reference.roomSourceIndex):\(reference.faceIndex):\(infoIndex):\(pageIndex)\n"
+    }.joined()
+    precondition(
+        perFaceLightmapEvidence.utf8.count > 0
+            && perFaceLightmapEvidence.filter({ $0 == "\n" }).count == 123
+            && canonicalSHA256(Data(perFaceLightmapEvidence.utf8))
+                == "e3e01bf4d0619be753ac4361f3829e780811497866b69bcb6de9da2deefd4456"
+    )
+    let uniqueLightmapEvidence = lightmapPageByInfo.keys.sorted().map {
+        "\($0):\(lightmapPageByInfo[$0]!)\n"
+    }.joined()
+    precondition(
+        lightmapPageByInfo.count == 98
+            && canonicalSHA256(Data(uniqueLightmapEvidence.utf8))
+                == "022c80403ef6d37064b74f11b38e441cbdbc9fef29c13c6ea0a68dfc53cfac76"
+    )
+    let textureByName = visibility.faces.reduce(
+        into: [String: SourceResource]()
+    ) { result, reference in
+        let texture = roomBySourceIndex[reference.roomSourceIndex]!
+            .faces[reference.faceIndex].texture
+        result[texture.sourceName.lowercased()] = texture
+    }
+    precondition(Set(textureByName.values.map(\.storedIndex)) == [
+        698, 793, 797, 908, 985, 1_205, 1_331, 1_332,
+    ])
+    let definitions = try! resolveRetailTextureDefinitions(
+        table: tableData,
+        overlay: overlayData,
+        names: Set(textureByName.keys)
+    )
+    let coronaAssets = makePresentationCoronaAssets(
+        definitions,
+        archives: presentationArchives
+    )
+    precondition(
+        coronaAssets.map(\.source.sourceName) == ["StarFlare6.ogf"]
+            && coronaAssets[0].sourceSHA256
+                == "fa5d633a1af6fe1c07632ac40da19eeb30e21f08cb84dc6be83a0626709710c2"
+            && canonicalSHA256(coronaAssets[0].image.rgba8)
+                == "2649897647d5b3b3584b5c6c474f53a95ab5f397bb3ecb76bb92cef66c1c5e3f"
+    )
+    let materials = makePresentationMaterials(
+        definitions,
+        textureByName: textureByName,
+        archives: presentationArchives
+    )
+    let coronaByTexture = Dictionary(
+        uniqueKeysWithValues: materials.compactMap { material in
+            material.lightCorona.map { (material.texture.storedIndex, $0) }
+        }
+    )
+    precondition(
+        Set(coronaByTexture.keys) == [908, 1_205, 1_332]
+            && coronaByTexture[1_205]?.tint
+                == .init(x: Float(16) / 18, y: 1, z: 1)
+            && coronaByTexture[1_332]?.tint
+                == .init(x: 0.2, y: 0.2, z: 0.2)
+    )
+    let reachedLightmapPages = Set(visibility.faces.compactMap { reference -> Int? in
+        let face = roomBySourceIndex[reference.roomSourceIndex]!.faces[reference.faceIndex]
+        return face.lightmapInfoIndex.map { topologyLevel.lightmaps.infos[$0].pageIndex }
+    })
+    precondition(reachedLightmapPages == [8, 13, 19])
+    let level = topologyLevel.addingPresentationMaterials(
+        materials,
+        retainingLightmapPages: reachedLightmapPages,
+        coronaAssets: coronaAssets
+    )
+
+    let ppicsFile = profile.files.first { $0.relativePath == "ppics.hog" }!
+    let ppics = try readValidatedPreparedRetailFile(ppicsFile, at: arguments.source)
+    let ppicsArchive = try! parseHOG2(ppics.data)
+    inventoryByPath[ppicsFile.relativePath] = archiveInventory(ppics, ppicsArchive)
+    let inventories = profile.files.map { inventoryByPath[$0.relativePath]! }
 
     try writeCanonicalPackage(level, to: arguments.staging)
     let stagedLevel = try loadCanonicalLevel(from: arguments.staging)
@@ -274,6 +424,84 @@ func runD3Import(
         cancellationCheck: cancellationCheck
     )
     return report
+}
+
+private struct IndexedPreparedArchive {
+    let validated: ValidatedPreparedRetailFile
+    let archive: HOG2Archive
+}
+
+private func makePresentationMaterials(
+    _ definitions: [RetailTextureDefinition],
+    textureByName: [String: SourceResource],
+    archives: [IndexedPreparedArchive]
+) -> [PresentationMaterial] {
+    let coronaNames = Set(definitions.compactMap { $0.lightCorona?.bitmapSourceName }).sorted()
+    let coronaIndexByName = Dictionary(
+        uniqueKeysWithValues: coronaNames.enumerated().map { ($0.element, $0.offset) }
+    )
+    return definitions.map { definition in
+        let indexed = archives.first { archive in
+            archive.archive.entry(named: definition.bitmapSourceName) != nil
+        }!
+        let entry = indexed.archive.uniqueEntry(named: definition.bitmapSourceName)
+        let payload = indexed.validated.data.subdata(in: entry.payloadRange)
+        let image = try! decodeReachedOutrage16OGF(payload)
+        precondition(
+            !definition.requiresARGB4444ForOpaqueTMap2 || image.sourceWasARGB4444
+        )
+        return PresentationMaterial(
+            texture: textureByName[definition.name.lowercased()]!,
+            bitmapSourceName: definition.bitmapSourceName,
+            image: .init(width: image.width, height: image.height, rgba8: image.rgba8),
+            blend: definition.blend,
+            lightmapBlend: definition.lightmapBlend,
+            waterProcedural: definition.waterProcedural,
+            lightCorona: definition.lightCorona.map {
+                PresentationLightCorona(
+                    assetIndex: coronaIndexByName[$0.bitmapSourceName]!,
+                    tint: $0.tint,
+                    blend: $0.blend
+                )
+            },
+            sourceArchive: indexed.validated.file.relativePath,
+            sourceSHA256: canonicalSHA256(payload)
+        )
+    }
+}
+
+private func makePresentationCoronaAssets(
+    _ definitions: [RetailTextureDefinition],
+    archives: [IndexedPreparedArchive]
+) -> [PresentationCoronaAsset] {
+    let names = Set(definitions.compactMap { $0.lightCorona?.bitmapSourceName }).sorted()
+    return names.enumerated().map { index, name in
+        let indexed = archives.first { archive in
+            archive.archive.entry(named: name) != nil
+        }!
+        let entry = indexed.archive.uniqueEntry(named: name)
+        let payload = indexed.validated.data.subdata(in: entry.payloadRange)
+        let image = try! decodeReachedOutrage16OGF(payload)
+        return PresentationCoronaAsset(
+            source: .init(storedIndex: index, sourceName: name),
+            bitmapSourceName: name,
+            image: .init(width: image.width, height: image.height, rgba8: image.rgba8),
+            sourceArchive: indexed.validated.file.relativePath,
+            sourceSHA256: canonicalSHA256(payload)
+        )
+    }
+}
+
+private func archiveInventory(
+    _ validated: ValidatedPreparedRetailFile,
+    _ archive: HOG2Archive
+) -> PreparedArchiveInventory {
+    PreparedArchiveInventory(
+        relativePath: validated.file.relativePath,
+        byteCount: validated.file.byteCount,
+        sha256: validated.file.sha256,
+        entryCount: archive.entries.count
+    )
 }
 
 func validateD3ImportPaths(_ arguments: D3ImportArguments) throws {

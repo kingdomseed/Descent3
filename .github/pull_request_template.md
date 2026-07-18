@@ -38,6 +38,7 @@
 - Applicable build, launch, integration, or other evidence claims not recorded above, with exact command, input, configuration, and result:
 - Nonexecuted, deleted, weakened, or replaced tests with approved disposition and replacement or removal evidence:
 - Source-fidelity, architecture-and-scope, tests-and-evidence, and simplicity-and-maintainability findings and resolution:
+- Completion-gate verdict: required-now corrections, stopped/deleted ceremony, deferred later work, and exact stop instruction:
 - Documentation continuity: canonical files and rows reconciled, or `no documentation change required` with checked owners; proposed current-plan state or next-packet update and integration-owner disposition:
 - Image, device, package, security, or performance evidence:
 - N/A reason, if permitted:
@@ -52,6 +53,7 @@
 - [ ] Each production behavior started with a focused test that failed for the intended reason before implementation, or the TDD evidence section documents why this change qualifies for N/A.
 - [ ] Each retained test protects a reachable production path and a distinct observable contract.
 - [ ] I did not add speculative tests or production architecture solely for tests.
+- [ ] After consolidated material review, I applied the completion gate once; every retained blocker or additional evidence request names the accepted current requirement, practically reachable supported event, bounded check, and decision it can change.
 - [ ] I updated every affected source disposition and recorded deliberate differences.
 - [ ] I named the current-plan packet and checkpoint and gave the integration owner the proposed landed-state and next-packet update without creating a competing plan.
 - [ ] I applied the documentation-continuity check at this material boundary, routed each durable fact to its existing canonical owner, and did not add a parallel plan, findings file, progress journal, or agent ledger.

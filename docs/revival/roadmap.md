@@ -1,7 +1,7 @@
 # Roadmap
 
 - Status: accepted, amended
-- Date: July 16, 2026
+- Date: July 18, 2026
 - Authority: concrete execution sequence; cannot reduce product scope
 
 Every phase ends in a runnable, visible, or objectively verified product result. Campaign-first development orders the work; it does not reduce the [functional-completeness contract](functional-completeness.md).
@@ -17,6 +17,8 @@ The player and editor advance together from the first canonical world. A phase d
 Production work follows [Test-driven development](test-driven-development.md). Bounded disposable research may answer an unknown source question before a production contract is stated; it is never shipped or retained as a second path.
 
 At entry to each phase and each material dependency island within it, apply the bounded [fog-of-war preflight](source-translation.md#fog-of-war-preflight) before finalizing the work packet. Phase bullets are intended outcomes, not proof that every dependency or nuance is already known. The pass may confirm the packet unchanged; it neither presumes a defect nor delays known work. Several linked unknowns that still prevent a concrete contract invoke bounded wayfinding.
+
+After ordinary review of a material packet is consolidated and before the packet is held, closed, handed off, or sent into more terminal evidence, apply the [Revival completion gate](../../.agents/skills/revival-completion-gate/SKILL.md) once. It cannot waive a phase or checkpoint outcome in this roadmap. It decides whether remaining work is required now, one bounded correction, later-milestone work, or ceremony, and prevents a slice prompt or living plan from silently enlarging the durable exit.
 
 ## Phase 0: reconcile the product and map the source
 

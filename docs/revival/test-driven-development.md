@@ -1,7 +1,7 @@
 # Test-driven development
 
 - Status: accepted, clarified
-- Date: July 16, 2026
+- Date: July 18, 2026
 - Authority: binding implementation and review protocol
 
 ## Non-negotiable rule
@@ -126,6 +126,8 @@ Reviewers reject implementation-first tests, tests that passed before the change
 Reviewers also reject demands for speculative tests. A requested test must name the supported production entry point, reachable state, observable contract, and distinct regression it prevents. “Coverage,” “defensive,” “best practice,” and “we may need it later” are insufficient.
 
 A request based on arbitrary failure is not a finding unless it identifies the supported production event that reaches the state and the accepted outcome it violates.
+
+After ordinary material review is consolidated, [`revival-completion-gate`](../../.agents/skills/revival-completion-gate/SKILL.md) decides once whether any proposed additional test, rerun, failure proof, or evidence belongs to the current checkpoint. It cannot waive this protocol or a real reachable defect. It must reject tests and verification requested only for ceremony, unlimited negative proof, unsupported failure, or a later claim.
 
 For existing behavior, a blocking request for new coverage must also identify a plausible defect or mutation the test will detect and why the current suite would miss it. The new test must demonstrate that sensitivity before it is retained.
 

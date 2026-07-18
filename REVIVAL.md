@@ -8,6 +8,8 @@ The roadmap phases are broad dependency groupings, not promises that every capab
 
 One guiding light applies whenever the work enters a new phase, milestone checkpoint, dependency island, subsystem, or material code group: **uncover the fog of war**. Before implementation, challenge the current plan against the accepted contracts, pinned source, real callers, ledgers, code, and observable evidence. Do not assume that planning has already found every dependency or nuance. Do not assume that a defect exists either. The bounded preflight may conclude that no new gap was found; deeper wayfinding begins only when it exposes linked unknowns that block a concrete contract. [Source translation discipline](docs/revival/source-translation.md#fog-of-war-preflight) defines the procedure.
 
+A paired guiding light applies at closure: **prove the need to continue**. After ordinary review is consolidated, the independent [Revival completion gate](.agents/skills/revival-completion-gate/SKILL.md) challenges every remaining guard, test, profile, rerun, and blocker against the current accepted checkpoint, a practically reachable shipping event, and a bounded decision it can change. It preserves real fidelity, boundary, lifetime, security, creator, player, and performance obligations while rejecting ceremonial proof, unsupported failure engineering, later-milestone work, and unlimited negatives. Once the checkpoint is satisfied and no reachable P1/P2 defect remains, it orders the implementer to stop.
+
 ## Product direction
 
 The shipping product uses:

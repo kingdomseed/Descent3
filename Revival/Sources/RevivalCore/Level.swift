@@ -34,6 +34,7 @@ enum D3SourceIdentity {
         case "object-definition": return 910
         case "door-definition": return 60
         case "lightmap-page", "lightmap-info": return 65_534
+        case "presentation-effect": return 256
         default: return nil
         }
     }
@@ -170,6 +171,7 @@ struct LevelFace: Codable, Equatable, Sendable {
     let portalIndex: Int?
     let texture: SourceResource
     let lightmapInfoIndex: Int?
+    let allowsLightCorona: Bool
     let lightMultiple: UInt8
     let special: SpecialFace?
 
@@ -179,6 +181,7 @@ struct LevelFace: Codable, Equatable, Sendable {
         portalIndex: Int?,
         texture: SourceResource,
         lightmapInfoIndex: Int? = nil,
+        allowsLightCorona: Bool = false,
         lightMultiple: UInt8 = 4,
         special: SpecialFace? = nil
     ) {
@@ -187,6 +190,7 @@ struct LevelFace: Codable, Equatable, Sendable {
         self.portalIndex = portalIndex
         self.texture = texture
         self.lightmapInfoIndex = lightmapInfoIndex
+        self.allowsLightCorona = allowsLightCorona
         self.lightMultiple = lightMultiple
         self.special = special
     }
@@ -243,7 +247,7 @@ struct RoomFog: Codable, Equatable, Sendable {
 
 struct LevelRoom: Codable, Equatable, Sendable {
     let sourceIndex: Int
-    let name: String?
+    var name: String?
     let pathPoint: Vector3
     let vertices: [Vector3]
     let faces: [LevelFace]
@@ -434,6 +438,13 @@ struct LevelTrigger: Codable, Equatable, Sendable {
 struct LightmapPageMetadata: Codable, Equatable, Sendable {
     let width: Int
     let height: Int
+    let rgba8: Data?
+
+    init(width: Int, height: Int, rgba8: Data? = nil) {
+        self.width = width
+        self.height = height
+        self.rgba8 = rgba8
+    }
 }
 
 struct LightmapInfoRecord: Codable, Equatable, Sendable {
@@ -452,6 +463,93 @@ struct LightmapInfoRecord: Codable, Equatable, Sendable {
 struct LightmapCatalog: Codable, Equatable, Sendable {
     let pages: [LightmapPageMetadata]
     let infos: [LightmapInfoRecord]
+}
+
+struct CanonicalRGBA8Image: Codable, Equatable, Sendable {
+    let width: Int
+    let height: Int
+    let rgba8: Data
+}
+
+enum PresentationBlend: Codable, Equatable, Sendable {
+    case opaque
+    case additiveSourceAlpha(opacity: UInt8)
+}
+
+enum PresentationLightmapBlend: String, Codable, Equatable, Sendable {
+    case multiply
+    case none
+}
+
+enum WaterProceduralElementKind: String, Codable, Equatable, Sendable {
+    case noOp
+    case heightBlob
+}
+
+struct WaterProceduralElement: Codable, Equatable, Sendable {
+    let kind: WaterProceduralElementKind
+    let frequency: UInt8
+    let speed: UInt8
+    let size: UInt8
+    let x1: UInt8
+    let y1: UInt8
+    let x2: UInt8
+    let y2: UInt8
+}
+
+struct WaterProceduralDefinition: Codable, Equatable, Sendable {
+    let evaluationIntervalSeconds: Float
+    let lightingShift: UInt8
+    let dampingShift: UInt8
+    let elements: [WaterProceduralElement]
+}
+
+struct PresentationLightCorona: Codable, Equatable, Sendable {
+    let assetIndex: Int
+    let tint: Vector3
+    let blend: PresentationBlend
+}
+
+struct PresentationCoronaAsset: Codable, Equatable, Sendable {
+    let source: SourceResource
+    let bitmapSourceName: String
+    let image: CanonicalRGBA8Image
+    let sourceArchive: String
+    let sourceSHA256: String
+}
+
+struct PresentationMaterial: Codable, Equatable, Sendable {
+    let texture: SourceResource
+    let bitmapSourceName: String
+    let image: CanonicalRGBA8Image
+    let blend: PresentationBlend
+    let lightmapBlend: PresentationLightmapBlend
+    let waterProcedural: WaterProceduralDefinition?
+    let lightCorona: PresentationLightCorona?
+    let sourceArchive: String
+    let sourceSHA256: String
+
+    init(
+        texture: SourceResource,
+        bitmapSourceName: String,
+        image: CanonicalRGBA8Image,
+        blend: PresentationBlend,
+        lightmapBlend: PresentationLightmapBlend,
+        waterProcedural: WaterProceduralDefinition?,
+        lightCorona: PresentationLightCorona? = nil,
+        sourceArchive: String,
+        sourceSHA256: String
+    ) {
+        self.texture = texture
+        self.bitmapSourceName = bitmapSourceName
+        self.image = image
+        self.blend = blend
+        self.lightmapBlend = lightmapBlend
+        self.waterProcedural = waterProcedural
+        self.lightCorona = lightCorona
+        self.sourceArchive = sourceArchive
+        self.sourceSHA256 = sourceSHA256
+    }
 }
 
 struct DependencyRecord: Codable, Equatable, Hashable, Sendable {
@@ -486,7 +584,7 @@ struct Level: Codable, Equatable, Sendable {
     let levelKey: String
     let source: LevelSource
     let metadata: LevelMetadata
-    let rooms: [LevelRoom]
+    var rooms: [LevelRoom]
     let terrain: LevelTerrain
     let objects: [PlacedObject]
     let retiredObjectHandles: [UInt32]
@@ -496,11 +594,13 @@ struct Level: Codable, Equatable, Sendable {
     let triggers: [LevelTrigger]
     let playerStartFlags: [UInt32]
     let lightmaps: LightmapCatalog
+    let presentationMaterials: [PresentationMaterial]
+    let presentationCoronaAssets: [PresentationCoronaAsset]
     let dependencyManifest: DependencyManifest
     let sourceChunks: [SourceChunkRecord]
 
     init(
-        schemaVersion: Int = 1,
+        schemaVersion: Int = 2,
         missionKey: String,
         levelKey: String,
         source: LevelSource,
@@ -515,6 +615,8 @@ struct Level: Codable, Equatable, Sendable {
         triggers: [LevelTrigger],
         playerStartFlags: [UInt32],
         lightmaps: LightmapCatalog,
+        presentationMaterials: [PresentationMaterial] = [],
+        presentationCoronaAssets: [PresentationCoronaAsset] = [],
         dependencyManifest: DependencyManifest,
         sourceChunks: [SourceChunkRecord]
     ) {
@@ -533,17 +635,32 @@ struct Level: Codable, Equatable, Sendable {
         self.triggers = triggers
         self.playerStartFlags = playerStartFlags
         self.lightmaps = lightmaps
+        self.presentationMaterials = presentationMaterials
+        self.presentationCoronaAssets = presentationCoronaAssets
         self.dependencyManifest = dependencyManifest
         self.sourceChunks = sourceChunks
     }
 
     func validate() throws {
-        guard schemaVersion == 1, source.d3lvVersion == 127,
+        try validate(allowImportStagingPresentation: false)
+    }
+
+    func validateForImportStaging() throws {
+        try validate(allowImportStagingPresentation: true)
+    }
+
+    private func validate(allowImportStagingPresentation: Bool) throws {
+        guard schemaVersion == 2, source.d3lvVersion == 127,
               !missionKey.isEmpty, !levelKey.isEmpty else {
             throw LevelValidationError.invalidIdentity
         }
         try validateSource(source)
         try validateLightmaps(lightmaps)
+        try validatePresentation(
+            materials: presentationMaterials,
+            coronaAssets: presentationCoronaAssets,
+            source: source
+        )
 
         guard rooms.count <= 400,
               rooms.allSatisfy({ (0..<400).contains($0.sourceIndex) }) else {
@@ -588,6 +705,9 @@ struct Level: Codable, Equatable, Sendable {
             for (faceIndex, face) in room.faces.enumerated() {
                 guard (3...64).contains(face.corners.count),
                       face.corners.allSatisfy({ room.vertices.indices.contains($0.vertexIndex) }) else {
+                    throw LevelValidationError.invalidFace(room: room.sourceIndex, face: faceIndex)
+                }
+                guard canonicalFaceNormal(room: room, face: face) != nil else {
                     throw LevelValidationError.invalidFace(room: room.sourceIndex, face: faceIndex)
                 }
                 let hasLightmap = face.flags & 0x0001 != 0
@@ -796,6 +916,9 @@ struct Level: Codable, Equatable, Sendable {
             }
         }
         try validateDependencyClosure(availableDependencies)
+        try validateSelectedRoomPresentationClosure(
+            allowIncomplete: allowImportStagingPresentation
+        )
 
         guard !sourceChunks.isEmpty else {
             throw LevelValidationError.invalidSourceChunk("missing")
@@ -812,6 +935,225 @@ struct Level: Codable, Equatable, Sendable {
             }
         }
     }
+
+    func addingPresentationMaterials(
+        _ materials: [PresentationMaterial],
+        retainingLightmapPages retainedPageIndices: Set<Int>,
+        coronaAssets: [PresentationCoronaAsset] = []
+    ) -> Level {
+        let retainedLightmaps = LightmapCatalog(
+            pages: lightmaps.pages.enumerated().map { index, page in
+                LightmapPageMetadata(
+                    width: page.width,
+                    height: page.height,
+                    rgba8: retainedPageIndices.contains(index) ? page.rgba8 : nil
+                )
+            },
+            infos: lightmaps.infos
+        )
+        let materialSources = Set(materials.map(\.texture))
+        let coronaSources = Set(coronaAssets.map(\.source))
+        var dependencies = dependencyManifest.current.map { dependency in
+            let preparedTexture = dependency.category == "texture"
+                && materialSources.contains(dependency.source)
+            let preparedLightmapPage = dependency.category == "lightmap-page"
+                && retainedPageIndices.contains(dependency.source.storedIndex)
+            let preparedCorona = dependency.category == "presentation-effect"
+                && coronaSources.contains(dependency.source)
+            guard preparedTexture || preparedLightmapPage || preparedCorona else {
+                if dependency.state == "presentation-payload-imported" {
+                    return DependencyRecord(
+                        category: dependency.category,
+                        source: dependency.source,
+                        state: "payload-validated-preparation-deferred",
+                        provenance: dependency.provenance
+                    )
+                }
+                return dependency
+            }
+            return DependencyRecord(
+                category: dependency.category,
+                source: dependency.source,
+                state: "presentation-payload-imported",
+                provenance: dependency.provenance
+            )
+        }
+        let existingDependencies = Set(dependencies.map {
+            DependencyIdentity(category: $0.category, source: $0.source)
+        })
+        for asset in coronaAssets where !existingDependencies.contains(
+            DependencyIdentity(category: "presentation-effect", source: asset.source)
+        ) {
+            dependencies.append(
+                DependencyRecord(
+                    category: "presentation-effect",
+                    source: asset.source,
+                    state: "presentation-payload-imported",
+                    provenance: "D3Import-resolved face-light corona"
+                )
+            )
+        }
+        return Level(
+            schemaVersion: schemaVersion,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            lightmaps: retainedLightmaps,
+            presentationMaterials: materials,
+            presentationCoronaAssets: coronaAssets,
+            dependencyManifest: .init(
+                current: dependencies,
+                historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
+            ),
+            sourceChunks: sourceChunks
+        )
+    }
+
+    var hasSelectedRoomPresentation: Bool {
+        rooms.contains(where: { $0.sourceIndex == 3 }) && !presentationMaterials.isEmpty
+    }
+
+    private func validateSelectedRoomPresentationClosure(allowIncomplete: Bool) throws {
+        if allowIncomplete && presentationMaterials.isEmpty && presentationCoronaAssets.isEmpty {
+            return
+        }
+
+        guard let room = rooms.first(where: { $0.sourceIndex == 3 }) else {
+            guard presentationMaterials.isEmpty,
+                  presentationCoronaAssets.isEmpty,
+                  lightmaps.pages.allSatisfy({ $0.rgba8 == nil }),
+                  dependencyManifest.current.allSatisfy({
+                      $0.state != "presentation-payload-imported"
+                  }) else {
+                throw LevelValidationError.invalidDependency("orphan presentation payload")
+            }
+            return
+        }
+
+        let visibility: SourceVisibleWorld
+        do {
+            visibility = try extractSourceVisibleWorld(
+                self,
+                camera: .trainingRoom3,
+                startRoomSourceIndex: room.sourceIndex,
+                portalBlends: Dictionary(
+                    uniqueKeysWithValues: presentationMaterials.map {
+                        ($0.texture, $0.blend)
+                    }
+                )
+            )
+        } catch {
+            throw LevelValidationError.invalidDependency("fixed-camera portal traversal")
+        }
+        let roomBySourceIndex = Dictionary(
+            uniqueKeysWithValues: rooms.map { ($0.sourceIndex, $0) }
+        )
+        let requiredTextures = Set(visibility.faces.map {
+            roomBySourceIndex[$0.roomSourceIndex]!.faces[$0.faceIndex].texture
+        })
+        guard Set(presentationMaterials.map(\.texture)) == requiredTextures else {
+            throw LevelValidationError.invalidDependency("selected-room textures")
+        }
+        let materialByTexture = Dictionary(
+            uniqueKeysWithValues: presentationMaterials.map { ($0.texture, $0) }
+        )
+        var requiredCoronaAssetIndices: Set<Int> = []
+        for reference in visibility.faces {
+            let face = roomBySourceIndex[reference.roomSourceIndex]!.faces[reference.faceIndex]
+            guard face.allowsLightCorona,
+                  let corona = materialByTexture[face.texture]?.lightCorona else { continue }
+            requiredCoronaAssetIndices.insert(corona.assetIndex)
+        }
+        guard requiredCoronaAssetIndices == Set(presentationCoronaAssets.indices) else {
+            throw LevelValidationError.invalidDependency("selected-room corona assets")
+        }
+
+        let requiredLightmapPages = Set(visibility.faces.compactMap { reference -> Int? in
+            let face = roomBySourceIndex[reference.roomSourceIndex]!.faces[reference.faceIndex]
+            return face.lightmapInfoIndex.map { lightmaps.infos[$0].pageIndex }
+        })
+        let importedLightmapPages = Set(lightmaps.pages.indices.filter { index in
+            lightmaps.pages[index].rgba8 != nil
+        })
+        guard importedLightmapPages == requiredLightmapPages else {
+            throw LevelValidationError.invalidDependency("selected-room lightmaps")
+        }
+
+        let importedDependencies = Set(dependencyManifest.current.compactMap {
+            $0.state == "presentation-payload-imported"
+                ? DependencyIdentity(category: $0.category, source: $0.source)
+                : nil
+        })
+        let requiredDependencies = Set(requiredTextures.map {
+            DependencyIdentity(category: "texture", source: $0)
+        }).union(requiredLightmapPages.map {
+            DependencyIdentity(
+                category: "lightmap-page",
+                source: .init(storedIndex: $0, sourceName: "lightmap-page-\($0)")
+            )
+        }).union(requiredCoronaAssetIndices.map {
+            DependencyIdentity(
+                category: "presentation-effect",
+                source: presentationCoronaAssets[$0].source
+            )
+        })
+        guard importedDependencies == requiredDependencies else {
+            throw LevelValidationError.invalidDependency("selected-room presentation state")
+        }
+
+        let fixedCameraCoronas: [WorldLightCorona]
+        do {
+            fixedCameraCoronas = try extractSourceLightCoronas(
+                self,
+                camera: .trainingRoom3,
+                visibility: visibility
+            )
+        } catch {
+            throw LevelValidationError.invalidDependency("fixed-camera light coronas")
+        }
+        guard fixedCameraCoronas.isEmpty else {
+            throw LevelValidationError.invalidDependency("fixed-camera light coronas")
+        }
+    }
+}
+
+func canonicalFaceNormal(room: LevelRoom, face: LevelFace) -> Vector3? {
+    var best = Vector3.zero
+    var bestMagnitudeSquared: Float = 0
+    for index in face.corners.indices {
+        let a = room.vertices[face.corners[index].vertexIndex]
+        let b = room.vertices[face.corners[(index + 1) % face.corners.count].vertexIndex]
+        let c = room.vertices[face.corners[(index + 2) % face.corners.count].vertexIndex]
+        let candidate = cross(
+            .init(x: b.x - a.x, y: b.y - a.y, z: b.z - a.z),
+            .init(x: c.x - b.x, y: c.y - b.y, z: c.z - b.z)
+        )
+        let magnitudeSquared = dot(candidate, candidate)
+        guard magnitudeSquared.isFinite else { return nil }
+        if magnitudeSquared > bestMagnitudeSquared {
+            best = candidate
+            bestMagnitudeSquared = magnitudeSquared
+        }
+    }
+    guard bestMagnitudeSquared > 0 else { return nil }
+    let magnitude = sqrt(bestMagnitudeSquared)
+    let normal = Vector3(
+        x: best.x / magnitude,
+        y: best.y / magnitude,
+        z: best.z / magnitude
+    )
+    guard normal.x.isFinite, normal.y.isFinite, normal.z.isFinite else { return nil }
+    return normal
 }
 
 enum LevelValidationError: Error, Equatable {
@@ -951,7 +1293,9 @@ private func validateLightmaps(_ lightmaps: LightmapCatalog) throws {
         throw LevelValidationError.invalidCount("lightmap infos")
     }
     for (pageIndex, page) in lightmaps.pages.enumerated() {
-        guard (1...128).contains(page.width), (1...128).contains(page.height) else {
+        guard (1...128).contains(page.width),
+              (1...128).contains(page.height),
+              page.rgba8 == nil || page.rgba8?.count == page.width * page.height * 4 else {
             throw LevelValidationError.invalidLightmapPage(pageIndex)
         }
     }
@@ -969,6 +1313,77 @@ private func validateLightmaps(_ lightmaps: LightmapCatalog) throws {
               info.width <= page.width - info.x,
               info.height <= page.height - info.y else {
             throw LevelValidationError.invalidLightmapInfo(infoIndex)
+        }
+    }
+}
+
+private func validatePresentation(
+    materials: [PresentationMaterial],
+    coronaAssets: [PresentationCoronaAsset],
+    source: LevelSource
+) throws {
+    let acceptedSourcePaths = Set(source.profileFiles.map(\.relativePath))
+    guard Set(materials.map(\.texture)).count == materials.count,
+          Set(coronaAssets.map(\.source)).count == coronaAssets.count else {
+        throw LevelValidationError.invalidCount("presentation materials")
+    }
+    for (index, asset) in coronaAssets.enumerated() {
+        guard asset.source.storedIndex == index,
+              D3SourceIdentity.isValidSourceResource(
+                asset.source,
+                category: "presentation-effect"
+              ),
+              asset.source.sourceName == asset.bitmapSourceName,
+              !asset.bitmapSourceName.isEmpty,
+              asset.bitmapSourceName.utf8.allSatisfy({ $0 < 0x80 }),
+              (1...256).contains(asset.image.width),
+              (1...256).contains(asset.image.height),
+              asset.image.rgba8.count == asset.image.width * asset.image.height * 4,
+              isSafeRelativePath(asset.sourceArchive),
+              acceptedSourcePaths.contains(asset.sourceArchive),
+              isSHA256(asset.sourceSHA256) else {
+            throw LevelValidationError.invalidCount("presentation corona asset")
+        }
+    }
+    for material in materials {
+        guard D3SourceIdentity.isValidSourceResource(material.texture, category: "texture"),
+              !material.bitmapSourceName.isEmpty,
+              material.bitmapSourceName.utf8.allSatisfy({ $0 < 0x80 }),
+              (1...256).contains(material.image.width),
+              (1...256).contains(material.image.height),
+              material.image.rgba8.count == material.image.width * material.image.height * 4,
+              isSafeRelativePath(material.sourceArchive),
+              acceptedSourcePaths.contains(material.sourceArchive),
+              isSHA256(material.sourceSHA256) else {
+            throw LevelValidationError.invalidCount("presentation material")
+        }
+        if case .additiveSourceAlpha = material.blend {
+            guard material.lightmapBlend == .none else {
+                throw LevelValidationError.invalidCount("presentation material")
+            }
+        }
+        if let water = material.waterProcedural {
+            guard material.image.width == 128,
+                  material.image.height == 128,
+                  water.lightingShift < 16,
+                  water.dampingShift < 16,
+                  water.elements.count <= 64,
+                  water.evaluationIntervalSeconds.isFinite,
+                  water.evaluationIntervalSeconds >= 0 else {
+                throw LevelValidationError.invalidCount("water procedural")
+            }
+        }
+        if let corona = material.lightCorona {
+            guard coronaAssets.indices.contains(corona.assetIndex),
+                  corona.tint.x.isFinite,
+                  corona.tint.y.isFinite,
+                  corona.tint.z.isFinite,
+                  corona.tint.x >= 0,
+                  corona.tint.y >= 0,
+                  corona.tint.z >= 0,
+                  corona.blend == .additiveSourceAlpha(opacity: 102) else {
+                throw LevelValidationError.invalidCount("presentation light corona")
+            }
         }
     }
 }

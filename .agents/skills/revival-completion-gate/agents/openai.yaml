@@ -1,0 +1,4 @@
+interface:
+  display_name: "Revival Completion Gate"
+  short_description: "Reject ceremony and decide when Revival work is done"
+  default_prompt: "Use $revival-completion-gate to classify every remaining action as required now, defer, or delete, issue one packet verdict, and give a bounded stop instruction without adding implementation or another review round."

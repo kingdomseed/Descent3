@@ -92,7 +92,10 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
             name: chunk.name,
             byteCount: payload.count,
             sha256: SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined(),
-            disposition: chunkDisposition(chunk.name)
+            disposition: chunkDisposition(
+                chunk.name,
+                includesCanonicalPresentationPixels: !lightmaps.pages.isEmpty
+            )
         )
     }
     let manifest = makeDependencyManifest(
@@ -120,7 +123,7 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
         dependencyManifest: manifest,
         sourceChunks: sourceChunks
     )
-    try level.validate()
+    try level.validateForImportStaging()
     return level
 }
 
@@ -241,9 +244,15 @@ private func parseLightmaps(_ data: Data) throws -> LightmapCatalog {
               (1...128).contains(height) else {
             throw D3LV127DecodeError.invalidCount(section: "NLMP pages")
         }
-        let pixels = width * height
-        _ = try readCompressedUInt16(&cursor, count: pixels)
-        pages.append(.init(width: width, height: height))
+        let pixelCount = width * height
+        let pixels = try readCompressedUInt16(&cursor, count: pixelCount)
+        pages.append(
+            .init(
+                width: width,
+                height: height,
+                rgba8: canonicalRGBA8From1555(pixels)
+            )
+        )
     }
 
     let infoCount = Int(try cursor.readUInt32())
@@ -402,6 +411,7 @@ private func parseRooms(
                     portalIndex: rawPortal == 0xff ? nil : Int(rawPortal),
                     texture: texture,
                     lightmapInfoIndex: lightmapIndex,
+                    allowsLightCorona: flags & 0x0005 == 0x0005,
                     lightMultiple: lightMultiple,
                     special: special
                 )
@@ -1090,12 +1100,17 @@ private func makeDependencyManifest(
     )
 }
 
-private func chunkDisposition(_ name: String) -> String {
+private func chunkDisposition(
+    _ name: String,
+    includesCanonicalPresentationPixels: Bool
+) -> String {
     switch name {
     case "PATH", "PSTR", "TXNM", "GNNM", "DRNM", "ROOM", "TERR", "OBJS", "TRIG", "LVLG", "INFO":
         return "canonical"
     case "NLMP":
-        return "canonical-metadata-deferred-phase-1-slice-3-selected-room-presentation-payload"
+        return includesCanonicalPresentationPixels
+            ? "canonical-metadata-and-importer-staging-rgba-pixels"
+            : "canonical-metadata"
     case "TSND", "MTCN":
         return "validated-empty"
     case "CNBS", "CBOA", "AABB":

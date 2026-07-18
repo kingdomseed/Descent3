@@ -1,7 +1,7 @@
 # Source translation discipline
 
 - Status: accepted, amended
-- Date: July 16, 2026
+- Date: July 18, 2026
 - Authority: binding source-accounting and modernization protocol
 
 ## Decision
@@ -74,7 +74,8 @@ Each island is the smallest end-to-end path that can become observable in every 
 7. render, play, save, or inspect it through the real product path;
 8. record every intentional difference;
 9. simplify the native implementation while the behavior remains protected;
-10. update every involved file disposition before the island closes.
+10. update every involved file disposition before the island closes;
+11. consolidate ordinary review, then apply the independent [`revival-completion-gate`](../../.agents/skills/revival-completion-gate/SKILL.md) once before closure, `HOLD`, additional terminal evidence, or expensive profiling.
 
 Temporary research code may be used to learn an unknown format or behavior. It does not enter a shipping target, does not become a second product path, and is deleted or archived as evidence when the question is answered.
 

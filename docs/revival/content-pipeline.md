@@ -83,13 +83,15 @@ Phase 1 local retail import needs checked paths, destination ownership, atomic r
 
 ## Native package intake and local library
 
-RevivalEditor publishes immutable canonical native packages. RevivalMac and RevivalMobile each own explicit local installation and activation of those packages; neither treats an arbitrary directory as trusted canonical content merely because the publisher normally creates valid output.
+RevivalEditor publishes immutable canonical native packages. RevivalMac and RevivalMobile each own explicit local installation and activation of those packages. RevivalEditor also owns a separate local base library so an authoring project can retain an immutable canonical package reference and reopen after the external import candidate is gone; this Phase 1 base role does not absorb the player library's later enable, disable, replacement, removal, or campaign UX. None of the three applications treats an arbitrary directory as trusted canonical content merely because the importer or publisher normally creates valid output.
 
-Phase 1 implements the shared validation, destination-adjacent staging, atomic promotion, base activation and prior-set recovery needed by both player products. Establish that contract through the Mac/shared path first, then compose the system-picker and app-owned-storage handoff through RevivalMobile as its own checkpoint. An open mobile intake checkpoint does not block the next Mac/shared content island, but it does block the applicable overall milestone and version 1.0. Later publishing grows those same validators only with real new schema and adds replacement ordering; `T-018` adds complete library actions and campaign UX. No temporary mobile installer or full speculative library precedes them.
+Phase 1 implements the shared validation, destination-adjacent staging, atomic promotion, base activation and prior-set recovery needed by the Mac player and editor-base paths. RevivalMobile then composes the system-picker and app-owned-storage handoff through the same Core contract as its own checkpoint. An open mobile intake checkpoint does not block the next Mac/shared content island, but it does block the applicable overall milestone and version 1.0. Later publishing grows those same validators only with real new schema and adds replacement ordering; `T-018` adds complete player-library actions and campaign UX. No temporary mobile installer or full speculative library precedes them.
+
+Each application serializes accepted package requests through one bounded install-and-activate operation so the presented world and durable active-base reference cannot be reordered by overlapping file-open events. Launch recovery removes abandoned destination-adjacent staging before new intake; if recovery fails, the application blocks new candidates while leaving the unchanged prior active-base record available for loading.
 
 For each install, replacement, or activation:
 
-1. copy or receive the candidate into destination-adjacent staging owned by the receiving player application;
+1. copy or receive the candidate into destination-adjacent staging owned by the receiving application;
 2. reject path escape, symlink or special-file surprises, duplicate canonical identities, unsupported revisions, missing rights metadata, invalid hashes, malformed or oversized media, and undeclared or unsatisfied dependencies;
 3. construct and validate the candidate's canonical manifest and declared campaign, level, behavior and presentation relationships through RevivalCore;
 4. compute the smallest explicit package order needed by the current base and replacement relationship and report conflicts before activation;
@@ -107,7 +109,7 @@ Cancellation, provider revocation, insufficient storage, process suspension and 
 
 ## Initial canonical package
 
-The package is an ordinary directory package using deterministic Codable JSON for structured values and ordinary Apple-readable files for media where practical. It declares one project-owned content type so the same directory package can cross the macOS and mobile system document-picker boundary; this is packaging metadata, not a second archive or schema.
+The package is an ordinary directory package using deterministic Codable JSON for structured values and ordinary Apple-readable files for media where practical. It declares one project-owned content type so the same directory package can cross the macOS and mobile system document-picker boundary; this is packaging metadata, not a second archive or schema. Schema 2 is presentation-usable: the shared validator rejects a topology-only package that lacks the canonical selected-view RGBA, typed material/procedural, and reached lightmap payloads rather than accepting a package no current player or editor viewport can render.
 
     Descent3Revival.content/
       content.json
@@ -194,7 +196,7 @@ Package hashes prove byte integrity. During development, reimport is the migrati
 
 RevivalEditor writes inspectable source projects:
 
-    MyProject.revival/
+    MyProject.revivalproject/
       project.json
       campaigns/
       levels/
@@ -204,7 +206,7 @@ RevivalEditor writes inspectable source projects:
       presentations/
       localization/
 
-The Phase 1 project owns one editable complete `Level` document value derived from the read-only imported base. It references unchanged imported assets and copies only the media that a real edit must own, preserving provenance without mutating the base.
+The Phase 1 project source stores the immutable installed-base reference and the sorted delta for its reached room-name edit. On open, the editor resolves and validates the base through its local canonical library and derives one separately owned editable complete `Level` value. Unchanged topology and imported media remain referenced by the base and do not enter `project.json`; only media that a later real edit must own is copied into project source, with provenance preserved and without mutating the base.
 
 The first publishing workflow adds only the explicit base dependency, package order and replacement/conflict rules required by the certification package and the first real replacement relationship. Public migrations arrive with released compatibility promises. Do not force locator tables, copy-on-write package graphs, a general dependency solver, or a complete semantic revision hierarchy into the initial editor-to-play loop.
 

@@ -1,6 +1,6 @@
 ---
 name: revival-review
-description: Run and consolidate independent source-fidelity, architecture, evidence-closure, and maintainability reviews for a Revival change. Use before closing a material dependency island or when a small change needs a scoped independent review.
+description: Run and consolidate independent source-fidelity, architecture, evidence-closure, and maintainability reviews for a Revival change, then hand the consolidated result to the completion gate. Use before closing a material dependency island or when a small change needs a scoped independent review.
 ---
 
 # Revival review
@@ -137,6 +137,20 @@ The root integrator consolidates reports as follows:
 
 No majority vote or averaged compromise decides a finding. If two reviewers disagree, inspect the evidence and choose the one direction the authority supports.
 
+## Completion-gate handoff
+
+`CLEAN` means the four ordinary review concerns have no actionable finding. It does not authorize an implementer to invent additional proof, and it does not make every broader evidence category a current blocker.
+
+After corrections and deterministic consolidation, give one independent [`revival-completion-gate`](../revival-completion-gate/SKILL.md) reviewer:
+
+- the actual base and target;
+- the exact accepted current checkpoint;
+- this consolidated report and dispositions;
+- existing verification already applicable to the final tree;
+- every proposed remaining correction, test, rerun, trace, profile, review, blocker, and deferred item.
+
+The completion gate evaluates whether continuing work is proportional and applicable. It does not rerun these four concerns or commission another reviewer. The root integrator resolves only a concrete contrary fact or `CONTRACT CONFLICT`; do not recursively review the gate.
+
 ## Completion report
 
 Return:
@@ -146,6 +160,7 @@ Return:
 - the consolidated findings and dispositions;
 - exact verification rerun after corrections;
 - remaining uncertainty marked as unproven;
+- proposed remaining actions in a form the completion gate can classify;
 - `CLEAN` only when no actionable finding remains.
 
 Run at minimum:

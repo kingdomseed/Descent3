@@ -42,9 +42,15 @@ These are evidence categories, not new ledger states or a mandatory sequence. A 
 7. Audit skipped, disabled, quarantined, deleted, weakened, and replaced cases. A test protecting the claimed current contract must execute and pass.
 8. Check source and functional ledger transitions against the exact scope being claimed; do not advance a row on prose or build success alone.
 9. For a material slice, require the completed [`revival-review`](../revival-review/SKILL.md) report and confirm every concrete finding changed the diff or received evidence-backed resolution.
-10. Issue a bounded verdict: supported at a named evidence rung, or unsupported with the concrete missing or contradictory evidence.
+10. Issue a bounded evidence verdict: supported at a named evidence rung, or unsupported with the concrete missing or contradictory evidence. For material closure, pass that result to [`revival-completion-gate`](../revival-completion-gate/SKILL.md) rather than deciding that every unexecuted broader evidence category blocks the packet.
 
 Documentation-only work uses link, consistency, and evidence checks. It does not manufacture a red product test. Performance changes start from a reproducible optimized measurement that misses an accepted budget or demonstrates a regression. Claims that cover mobile presentation, input, package intake, lifecycle, memory, thermal, or audio behavior require applicable physical iPhone and iPad evidence; simulator evidence alone cannot close them. Available development devices may close the ordinary mobile composition claims they actually exercise. Representative support-floor evidence is required for a public-beta or release-floor claim, and missing floor hardware leaves only that claim open rather than blocking Mac/shared work.
+
+## Proportional evidence authorization
+
+Before requesting a nontrivial terminal trace, profile, repeated lifecycle campaign, soak, additional full-suite rerun, or evidence-only `HOLD`, invoke the completion gate once on the consolidated review and current claim. Name the hypothesis, supported production path, content and configuration, bounded duration or cycle count, comparison or threshold, and product or implementation decision the result can change.
+
+Do not authorize evidence merely because it appears in a broad verification catalog. A selected-room baseline does not require complete-mission budgets; a Mac/shared checkpoint does not require mobile or release-floor certification; a bounded lifecycle exercise does not prove indefinite absence of growth. Existing evidence remains applicable when a later change cannot affect its path.
 
 ## Ledger discipline
 
@@ -82,6 +88,7 @@ Reject:
 - preserving obsolete APIs, defensive branches, literal file shape, or historical bugs in the name of fidelity;
 - deleting ledgered capability in the name of maintainability;
 - invented performance budgets, unrecorded environments, or optimization conclusions from debug builds;
+- unlimited negative proof, repeated passing commands, recursive review, or profiling without a predeclared decision;
 - domain checklists copied into this skill instead of following the owning accepted document.
 
 ## Milestone or terminal closure
@@ -94,6 +101,7 @@ Accept a claimed island or milestone only when:
 - source rows satisfy the island's closure rule; functional rows carry the evidence and state supported by the current slice and satisfy their terminal rule when complete capability or milestone closure is claimed, with no unexplained file, range, capability path, or nonexecuted case;
 - temporary research and scaffolding are removed or archived outside product targets;
 - independent fidelity, architecture, evidence, and simplicity findings are resolved;
+- one independent completion-gate verdict classifies every proposed remainder and provides the bounded stop condition;
 - the verdict names what remains unproven and never expands beyond the executed evidence.
 
 Run the exact commands required by the owning domain and milestone. At minimum:

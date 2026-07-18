@@ -127,8 +127,8 @@ final class D3ImportOperationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
 
-        let prior = makeMinimalCanonicalLevel(levelKey: "test.level.prior")
-        let successor = makeMinimalCanonicalLevel(levelKey: "test.level.successor")
+        let prior = makeMinimalCanonicalPackageLevel(levelKey: "test.level.prior")
+        let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         try writeCanonicalPackage(prior, to: destination)
         try writeCanonicalPackage(successor, to: staging)
         let reportData = Data("{\"result\":\"ok\"}".utf8)
@@ -160,7 +160,7 @@ final class D3ImportOperationTests: XCTestCase {
         )
         let unrelatedData = try Data(contentsOf: fixtureURL)
         let priorReport = Data("{\"result\":\"prior\"}".utf8)
-        let successor = makeMinimalCanonicalLevel(levelKey: "test.level.successor")
+        let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         try unrelatedData.write(to: destination)
         try priorReport.write(to: report)
         try writeCanonicalPackage(successor, to: staging)
@@ -190,7 +190,7 @@ final class D3ImportOperationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalLevel(), to: destination)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: destination)
 
         XCTAssertThrowsError(
             try validateD3ImportPaths(
@@ -244,8 +244,8 @@ final class D3ImportOperationTests: XCTestCase {
         let report = root.appending(path: "report.json")
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        let prior = makeMinimalCanonicalLevel(levelKey: "test.level.prior")
-        let successor = makeMinimalCanonicalLevel(levelKey: "test.level.successor")
+        let prior = makeMinimalCanonicalPackageLevel(levelKey: "test.level.prior")
+        let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         let priorReport = Data("{\"result\":\"prior\"}".utf8)
         try writeCanonicalPackage(prior, to: destination)
         try writeCanonicalPackage(successor, to: staging)
@@ -283,8 +283,8 @@ final class D3ImportOperationTests: XCTestCase {
         let report = root.appending(path: "report.json")
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        let prior = makeMinimalCanonicalLevel(levelKey: "test.level.prior")
-        let successor = makeMinimalCanonicalLevel(levelKey: "test.level.successor")
+        let prior = makeMinimalCanonicalPackageLevel(levelKey: "test.level.prior")
+        let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         let priorReport = Data("{\"result\":\"prior\"}".utf8)
         try writeCanonicalPackage(prior, to: destination)
         try writeCanonicalPackage(successor, to: staging)
@@ -320,7 +320,7 @@ final class D3ImportOperationTests: XCTestCase {
         let report = root.appending(path: "report.json")
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        let successor = makeMinimalCanonicalLevel(levelKey: "test.level.successor")
+        let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         try writeCanonicalPackage(successor, to: staging)
         var cancellationChecks = 0
 
@@ -354,8 +354,8 @@ final class D3ImportOperationTests: XCTestCase {
         let destination = root.appending(path: "training.revival", directoryHint: .isDirectory)
         let report = root.appending(path: "report.json")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        let prior = makeMinimalCanonicalLevel(levelKey: "test.level.prior")
-        let successor = makeMinimalCanonicalLevel(levelKey: "test.level.successor")
+        let prior = makeMinimalCanonicalPackageLevel(levelKey: "test.level.prior")
+        let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         let priorReport = Data("{\"result\":\"prior\"}".utf8)
         try writeCanonicalPackage(prior, to: destination)
         try writeCanonicalPackage(successor, to: staging)
@@ -389,8 +389,8 @@ final class D3ImportOperationTests: XCTestCase {
         let destination = root.appending(path: "training.revival", directoryHint: .isDirectory)
         let report = root.appending(path: "report.json")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        let prior = makeMinimalCanonicalLevel(levelKey: "test.level.prior")
-        let successor = makeMinimalCanonicalLevel(levelKey: "test.level.successor")
+        let prior = makeMinimalCanonicalPackageLevel(levelKey: "test.level.prior")
+        let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         let priorReport = Data("{\"result\":\"prior\"}".utf8)
         let successorReport = Data("{\"result\":\"successor\"}".utf8)
         try writeCanonicalPackage(prior, to: destination)
@@ -427,9 +427,9 @@ final class D3ImportOperationTests: XCTestCase {
         let report = root.appending(path: "report.json")
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        let prior = makeMinimalCanonicalLevel(levelKey: "test.level.prior")
-        let levelA = makeMinimalCanonicalLevel(levelKey: "test.level.writer-a")
-        let levelB = makeMinimalCanonicalLevel(levelKey: "test.level.writer-b")
+        let prior = makeMinimalCanonicalPackageLevel(levelKey: "test.level.prior")
+        let levelA = makeMinimalCanonicalPackageLevel(levelKey: "test.level.writer-a")
+        let levelB = makeMinimalCanonicalPackageLevel(levelKey: "test.level.writer-b")
         let reportA = Data("{\"levelKey\":\"test.level.writer-a\"}".utf8)
         let reportB = Data("{\"levelKey\":\"test.level.writer-b\"}".utf8)
         try writeCanonicalPackage(prior, to: destination)

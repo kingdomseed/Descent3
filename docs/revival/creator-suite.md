@@ -1,7 +1,7 @@
 # Native creator suite
 
 - Status: accepted, amended
-- Date: July 16, 2026
+- Date: July 17, 2026
 - Authority: binding creator-product contract
 
 ## Decision
@@ -52,9 +52,9 @@ This shell has no generic reactive store, view-model graph, command bus, editor 
 
 ## Canonical authoring project
 
-The editor writes ordinary inspectable source projects:
+The editor writes ordinary inspectable source projects. The Phase 1 package contains only `project.json`; the named subdirectories appear when a reached authoring operation owns content for them:
 
-    MyProject.revival/
+    MyProject.revivalproject/
       project.json
       campaigns/
       levels/
@@ -66,7 +66,7 @@ The editor writes ordinary inspectable source projects:
 
 The file split follows real authoring and merge needs. Structured source uses deterministic versioned encodings once a format is public. Large media remains in ordinary files. Durable content keys connect values that need stable references; generated runtime indices never enter source.
 
-Imported retail content is a read-only canonical base. RevivalEditor copies the selected canonical document and only the media needed for the edit into the project, preserves provenance, and declares replacements without mutating the base. Unchanged content remains referenced.
+Imported retail content is a read-only canonical base installed in RevivalEditor's own local base library. The Phase 1 `project.json` stores its immutable canonical package reference plus a deterministic, source-index-sorted room-name edit delta. On open, RevivalEditor validates and resolves that reference and derives a separately owned complete editable `Level`; unchanged topology and presentation media are neither copied into the project nor mutable through the base. When a later real media edit requires project ownership, copy only that media, preserve its provenance, and declare the replacement without mutating the base.
 
 Local tabs, pane positions, selection, active tool, and viewport cameras are not canonical source. Authored camera bookmarks are content.
 
