@@ -1,0 +1,107 @@
+Revival/Tests/D3ImportTests/EditorProjectTests.swift
+  s_4e9f989c14b690::t_8af5192d66e93d 639-643,645,647-653,672-674,676-677
+  s_4e9f989c14b690::t_74f108ad25a3ec 308-366
+  s_4e9f989c14b690::t_eb19f3c711dceb 48-55,57-61,63-66,68-70,72-75
+  s_c503f7c0529e13::t_32a881cdeb4b1d 56,62,67,71,644,646
+  s_4e9f989c14b690::t_e89c3e43182c43 654-671,675
+  s_4e9f989c14b690::t_3d5c4ffd54a983 5-11,16,23,26-47,735-810
+  s_4e9f989c14b690::t_45a459b65bad70 12-15,17-22,24-25
+  s_4e9f989c14b690::t_667e4c82d87b8d 631
+  s_4e9f989c14b690::t_045dec1bbd8723 307
+  s_4e9f989c14b690::t_dd5861f158ae30 638
+  s_4e9f989c14b690::t_07d2d8a31d673c 811-812
+docs/revival/source-translation.md
+  s_c503f7c0529e13::t_54e29962dc3350 72-75,77-79,81,84-85,92,99
+  s_c503f7c0529e13::t_8bda40c33c5339 76,80,82-83,91
+  s_c503f7c0529e13::t_320e53a1bb232c 54-61
+AGENTS.md
+  s_c503f7c0529e13::t_8bda40c33c5339 32
+docs/revival/functional-completeness.md
+  s_c503f7c0529e13::t_320e53a1bb232c 123-124
+docs/revival/primary-source-index.md
+  s_c503f7c0529e13::t_29a9ca797e6c0c 78
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_fdefa12d824cae 207
+  s_4e9f989c14b690::t_ca642a0cc1215a 217-222,225-226,229,231-233,237
+  s_c503f7c0529e13::t_54d7447aed0ac8 131-134,165-166,209,212-213
+  s_c503f7c0529e13::t_8bda40c33c5339 15,17-18,29
+  s_4e9f989c14b690::t_fbf30dd47069ea 228
+  s_4e9f989c14b690::t_6ff13115ef22e5 235
+  s_c503f7c0529e13::t_54e29962dc3350 16,30-31
+  s_c503f7c0529e13::t_0cdc1652e131d7 223,236
+  s_4e9f989c14b690::t_10a730b6b52ff6 240-242
+  s_4e9f989c14b690::t_ed841836e9ebed 234
+  s_c503f7c0529e13::t_eedfeabf180d18 135,149-150,167-170,176-179,181-182
+  s_c503f7c0529e13::t_1b16b5cfde26e8 230
+  s_c503f7c0529e13::t_f1cabfa066d02e 198-199
+  s_c503f7c0529e13::t_1ba91fd5a81f59 216,224,227,238-239
+  s_c503f7c0529e13::t_9715403266c618 201-206,208,210-211,214-215,246,255
+  s_c503f7c0529e13::t_685a66a5bd0847 200
+.agents/skills/revival-source-translation/SKILL.md
+  s_c503f7c0529e13::t_8bda40c33c5339 57-58,169
+  s_c503f7c0529e13::t_54e29962dc3350 56,163-164,168,172
+  s_1b171c8d379963::t_0699a939c1ea49 173
+.agents/skills/revival-review/SKILL.md
+  s_c503f7c0529e13::t_8bda40c33c5339 45,47
+  s_c503f7c0529e13::t_54e29962dc3350 46
+Revival/Sources/RevivalEditor/RevivalProjectDocument.swift
+  s_c503f7c0529e13::t_0cdc1652e131d7 251,276-278,281
+  s_4e9f989c14b690::t_2d09b6b5ab285d 287,290
+  s_4e9f989c14b690::t_667e4c82d87b8d 288-289
+  s_c503f7c0529e13::t_32a881cdeb4b1d 221,223
+  s_4e9f989c14b690::t_50ca42f5bea8d4 53
+  s_4e9f989c14b690::t_8510d57436df61 52,180-220,222,224-227,229,236,243
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_1ba91fd5a81f59 161,168,253
+  s_c503f7c0529e13::t_0cdc1652e131d7 256
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_1b16b5cfde26e8 23-25,28-29,37-38
+  s_c503f7c0529e13::t_320e53a1bb232c 154-157,159-160,162-165,167
+  s_c503f7c0529e13::t_27af7ae42ce3a9 158,161
+  s_c503f7c0529e13::t_90b2ef404b15dd 174
+  s_c503f7c0529e13::t_23dbf50fd234ab 21-22,31,39-40,44,166,170,183
+  s_c503f7c0529e13::t_aeb3f65cb898cb 26
+Revival/Sources/RevivalEditor/RevivalProject.swift
+  s_c503f7c0529e13::t_32a881cdeb4b1d 174-175
+  s_4e9f989c14b690::t_40bafc29d639e7 118-165,169-173,176-179,182,186-189,193-196
+  s_c503f7c0529e13::t_0cdc1652e131d7 63-66,86-90,112-116,166-168,180-181,183-185,190-192,362-363
+  s_4e9f989c14b690::t_45a459b65bad70 37-62,67-85,91-111,117,197-199
+Revival/Sources/RevivalEditor/RevivalEditorWindowController.swift
+  s_c503f7c0529e13::t_32a881cdeb4b1d 296
+  s_4e9f989c14b690::t_667e4c82d87b8d 310,313
+  s_4e9f989c14b690::t_2d61e57b9440ae 19-23,38,47-69,74,120-126,152-154,183-190,208-209,211,213-214,218-221,239,256-259,267-295,297-298,384,390-429
+  s_4e9f989c14b690::t_3cdd7fb9beab81 299
+  s_4e9f989c14b690::t_c6a4b4e7d059b0 430
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "8a1acc63c2853bf590ffcfea0da0122eeed5a12e",
+  "prompts": {},
+  "sessions": {
+    "s_1b171c8d379963": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3638441f-5955-45ac-8421-f728260a8f4d",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_4e9f989c14b690": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f7618-7f20-7171-9146-879b1909b1a8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
