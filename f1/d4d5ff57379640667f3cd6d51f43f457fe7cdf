@@ -1,0 +1,171 @@
+docs/revival/verification.md
+  s_c503f7c0529e13::t_fc070ac37b07a3 268,279,281
+  s_c503f7c0529e13::t_187868e1c28bc1 210
+  s_c503f7c0529e13::t_b6352538eef55d 29,80,96,232,270,283-293,306,310,345,352
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_43774d83ad436f 47,49,52-53,55,122,131,133
+  s_c503f7c0529e13::t_8667f2468b2154 27,38,120
+  s_c503f7c0529e13::t_c8a9d55215ed29 36-37
+  s_c503f7c0529e13::t_230cb8e420806b 40
+  s_c503f7c0529e13::t_a36c5bcb2e89ef 21-22,26,31,39,135,154,158,167
+  s_c503f7c0529e13::t_a317101bd20bc6 23-25,28-29
+  s_1b171c8d379963::t_016776a573919c 134
+.agents/skills/metal4-rendering/SKILL.md
+  s_c503f7c0529e13::t_5be0ede8185052 25,37,43,86-88
+AGENTS.md
+  s_c503f7c0529e13::t_b86fd7a9f0a4fd 12,64,89-90
+  s_c503f7c0529e13::t_fc070ac37b07a3 49,52-53
+  s_c503f7c0529e13::t_f47196c65f7838 92
+docs/revival/roadmap.md
+  s_c503f7c0529e13::t_cb8869ea2da3fd 13,35,78-80,84,88,110,116,132,164,170,181,195-201,213
+  s_c503f7c0529e13::t_fc070ac37b07a3 90-92
+.agents/skills/revival-constitution/SKILL.md
+  s_c503f7c0529e13::t_33ff8ca06838a0 34,45,66,106
+docs/revival/content-pipeline.md
+  s_c503f7c0529e13::t_fc070ac37b07a3 4
+  s_c503f7c0529e13::t_428a57fdc5e0ea 185
+  s_c503f7c0529e13::t_8c33583455472c 27,88,234
+.agents/skills/d3-content-import/SKILL.md
+  s_c503f7c0529e13::t_5be0ede8185052 45,86,98
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_ccf872c23817f2 125,163
+Revival/Sources/RevivalMobile/Info.plist
+  s_f5d8e0de298fa1::t_c65899851de15d 1-41,44-61,64-86
+  s_f5d8e0de298fa1::t_cb8fc273f12c94 42-43
+  s_f5d8e0de298fa1::t_cb0cfb9717fabe 62-63
+.agents/skills/revival-replay/SKILL.md
+  s_c503f7c0529e13::t_5be0ede8185052 42
+docs/revival/functional-completeness.md
+  s_c503f7c0529e13::t_b86fd7a9f0a4fd 4,19
+Revival/Sources/RevivalCore/CanonicalPackage.swift
+  s_f5d8e0de298fa1::t_798ca4e3d08e7d 130-134,149-154
+  s_f5d8e0de298fa1::t_c65899851de15d 291
+  s_f5d8e0de298fa1::t_ebc195a8eed71f 121-122
+  s_1b171c8d379963::t_ffbbdee4e4d3a3 155
+.agents/skills/revival-simplify/SKILL.md
+  s_c503f7c0529e13::t_62be2d8cbfb064 60,79
+Revival/Tests/D3ImportTests/CanonicalLevelTests.swift
+  s_f5d8e0de298fa1::t_712d317ebc60df 4-18
+Revival.xcodeproj/project.pbxproj
+  s_f5d8e0de298fa1::t_2614fe11b1240a 62-68,107-108,142-148,167,189,249-251,253-255,257,362-378,401-403,425,460-466,551-554,556-565,711-760,809-814,817
+  s_f5d8e0de298fa1::t_7ed5e1e5ca9419 70-71,110,252,523,555
+  s_f5d8e0de298fa1::t_50c768d1fba5ad 69,109,269,524
+  s_0e74156b4b0f93::t_25a8e4b0a12daf 256,815-816
+Revival/Tests/D3ImportTests/RevivalMobilePresentationStateTests.swift
+  s_f5d8e0de298fa1::t_3f86d565fbe9a4 58-78
+  s_f5d8e0de298fa1::t_50c768d1fba5ad 1-5,79-90,101-122
+  s_f5d8e0de298fa1::t_7ed5e1e5ca9419 91-100
+  s_c503f7c0529e13::t_7fe35f3d81f5f8 37
+  s_c503f7c0529e13::t_1da3cf02085e8e 6-36,38-57
+Revival/Sources/RevivalMobile/RevivalMobilePresentationState.swift
+  s_c503f7c0529e13::t_2cbe417357c1e8 3-99
+  s_f5d8e0de298fa1::t_7ed5e1e5ca9419 1-2,100,102-112,114-164,168-175,177-203,205-207
+  s_f5d8e0de298fa1::t_26105cf5446880 101,113,165-167,176,204
+.agents/skills/swift-realtime-systems/SKILL.md
+  s_c503f7c0529e13::t_5be0ede8185052 24,38,89
+.agents/skills/revival-verification/SKILL.md
+  s_c503f7c0529e13::t_33ff8ca06838a0 28,47,61
+  s_c503f7c0529e13::t_fc070ac37b07a3 100
+.agents/skills/revival-completion-gate/SKILL.md
+  s_c503f7c0529e13::t_33ff8ca06838a0 85-86,99
+docs/revival/engineering-principles.md
+  s_c503f7c0529e13::t_b86fd7a9f0a4fd 11,13,34,93,171
+docs/revival/test-driven-development.md
+  s_c503f7c0529e13::t_84411b42932570 110
+.agents/skills/revival-volumetric-navigation/SKILL.md
+  s_c503f7c0529e13::t_62be2d8cbfb064 47
+  s_c503f7c0529e13::t_428a57fdc5e0ea 25
+docs/revival/creator-suite.md
+  s_c503f7c0529e13::t_699be37bfc3884 15
+  s_c503f7c0529e13::t_c3ca74c3034b17 23
+  s_c503f7c0529e13::t_fc070ac37b07a3 4
+.agents/skills/revival-documentation-steward/SKILL.md
+  s_c503f7c0529e13::t_62be2d8cbfb064 81,112
+  s_c503f7c0529e13::t_f257b4a99949ce 113
+.agents/skills/revival-source-translation/SKILL.md
+  s_c503f7c0529e13::t_62be2d8cbfb064 34,92,102,170
+docs/revival/skills-and-agents.md
+  s_c503f7c0529e13::t_7dd3c4fcf12115 53,69,169-170,196,213
+  s_c503f7c0529e13::t_6b9449fec03d5f 47
+docs/revival/source-translation.md
+  s_c503f7c0529e13::t_4e8cbc0b5b2e9a 86,104
+  s_c503f7c0529e13::t_fc070ac37b07a3 127
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_c4113874e7ebb9 116
+  s_c503f7c0529e13::t_9d15778b813299 112-113,263-264,266
+  s_c503f7c0529e13::t_699be37bfc3884 11,111
+  s_c503f7c0529e13::t_4e8cbc0b5b2e9a 17,114
+  s_c503f7c0529e13::t_fc070ac37b07a3 4
+Revival.xcodeproj/xcshareddata/xcschemes/RevivalMobile.xcscheme
+  s_f5d8e0de298fa1::t_c65899851de15d 1-76
+.agents/skills/revival-wayfinding/SKILL.md
+  s_c503f7c0529e13::t_62be2d8cbfb064 31-32,72
+.github/pull_request_template.md
+  s_c503f7c0529e13::t_c3ca74c3034b17 44-45,66-67
+.agents/skills/revival-review/SKILL.md
+  s_c503f7c0529e13::t_33ff8ca06838a0 66-67,85
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_f5d8e0de298fa1::t_d2fb3c21538616 4-23
+Revival/Sources/RevivalMobile/RevivalMobileApplication.swift
+  s_f5d8e0de298fa1::t_cb8fc273f12c94 3,5,7-9,15,26,28-29,47-51,65,69-70,76,79-101,107,109-121,125-127,130-138,156-260,262-266,269,273-274,276-288,291-295,297-298,301-315,317,319-337,339,341-342,344,347-359,362-476
+  s_f5d8e0de298fa1::t_c65899851de15d 1-2,4,6,30-46,52-60,75,77-78,108,122-124,154-155,261,267-268,270-272,275,289-290,296,299-300,316,318,477-478
+  s_f5d8e0de298fa1::t_43fb89bb1c553b 153
+  s_c503f7c0529e13::t_d120281459fa81 10-14,16-25,27,61-64,66-68,71-74,102-106,128-129,139-152,338,340,343,345-346,360-361
+docs/revival/world-loading.md
+  s_c503f7c0529e13::t_8c33583455472c 9,11,41,63,71,106
+  s_c503f7c0529e13::t_fc070ac37b07a3 4
+.agents/skills/revival-creator-suite/SKILL.md
+  s_c503f7c0529e13::t_62be2d8cbfb064 42,85
+Revival/Sources/RevivalMetal/MetalWorldRenderer.swift
+  s_f5d8e0de298fa1::t_4b79dac8f75e5e 30-44,253-255
+  s_f5d8e0de298fa1::t_c65899851de15d 9,738
+  s_f5d8e0de298fa1::t_cb8fc273f12c94 67-70
+docs/revival/architecture.md
+  s_c503f7c0529e13::t_fc070ac37b07a3 77
+  s_c503f7c0529e13::t_4e8cbc0b5b2e9a 4,11,23,27,62,81,91,130
+docs/revival/primary-source-index.md
+  s_c503f7c0529e13::t_6b9449fec03d5f 4,39
+REVIVAL.md
+  s_c503f7c0529e13::t_c4113874e7ebb9 20
+  s_c503f7c0529e13::t_b86fd7a9f0a4fd 19,35-36,39,73,134
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f1d4d5ff57379640667f3cd6d51f43f457fe7cdf",
+  "prompts": {},
+  "sessions": {
+    "s_0e74156b4b0f93": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "737d8bbb-3dfe-446f-a856-e002d6317237",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_1b171c8d379963": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3638441f-5955-45ac-8421-f728260a8f4d",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_f5d8e0de298fa1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f753a-244a-7b50-81d6-2b1aa28b4d25",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
