@@ -82,7 +82,8 @@ Do not turn a `DEFER` item into an active backlog in another file. Route durable
 
 - An unproven item blocks only the claim to which it actually applies.
 - Apply general complete-product, accessibility, performance, mobile, soak, and release evidence only when the specific current checkpoint or row makes that evidence current. Do not infer timing merely because the eventual capability now has an early scaffold.
-- Missing mobile evidence does not block the next independent Mac/shared island; missing release-floor evidence does not block ordinary development.
+- Through Phase 7, unavailable mobile hardware, signing, development-team setup, or unexecuted physical-device evidence is always `DEFER`, never `REQUIRED NOW` or `HOLD`. Early target, unsigned generic-device, and focused simulator evidence proves only the wiring it executes. Phase 8 owns required physical mobile integration; Phases 9 and 10 own applicable multiplayer and release evidence.
+- Missing release-floor evidence does not block ordinary development.
 - Uncertainty alone is not a blocker. Use bounded fog-of-war discovery for the next island and `revival-wayfinding` only for several linked unknowns that prevent a concrete contract.
 - Continued work can be riskier and less valuable than landing a satisfied slice. Account for that cost explicitly.
 
@@ -95,7 +96,7 @@ Return one verdict:
 - `HOLD - REAL BLOCKER`: the current checkpoint has a concrete reachable defect, required evidence gap, external dependency, or missing authority that cannot be resolved by a known bounded correction inside the authorized packet. Name the exact blocker and the next evidence, authority, or packet needed.
 - `CONTRACT CONFLICT`: identify the contradictory, unsupported, or unlimited accepted requirement that the integration owner must route to its owning authority or, when required, the user.
 
-Never return `HOLD` for generalized risk, arbitrary failure, later-phase work, an unlimited negative, reviewer discomfort, or missing evidence that cannot change the current product decision.
+Never return `HOLD` for generalized risk, arbitrary failure, later-phase work, an unlimited negative, reviewer discomfort, or missing evidence that cannot change the current product decision. In particular, do not return `HOLD` during Phase 1–7 because an iPhone or iPad is unavailable, untrusted, unsigned, absent from Xcode, or lacks a selected development team.
 
 ## Output contract
 

@@ -1,6 +1,21 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testRevivalMobileBackupExclusionIsScopedToReimportableContent() {
+        let library = CanonicalPackageLibrary.revivalMobile
+
+        XCTAssertEqual(library.rootURL.lastPathComponent, "Content")
+        XCTAssertEqual(
+            library.rootURL.deletingLastPathComponent().lastPathComponent,
+            "RevivalMobile"
+        )
+        XCTAssertEqual(library.reimportableContentBackupExclusionURL, library.rootURL)
+        XCTAssertNotEqual(
+            library.reimportableContentBackupExclusionURL,
+            library.rootURL.deletingLastPathComponent()
+        )
+    }
+
     func testCanonicalPackageRequestsStartOneAtATimeInFIFOOrder() {
         let first = URL(fileURLWithPath: "/tmp/first.revival")
         let second = URL(fileURLWithPath: "/tmp/second.revival")

@@ -39,7 +39,7 @@ Before first production use for a workspace, compare this skill with the current
 7. Validate changed references and current reachable dependencies, update only actually stale derived data, and link diagnostics to their owners.
 8. Save, close, and reopen through the production document format. Confirm the read-only base is unchanged.
 9. Create a disposable play-session copy and execute the real shipping simulation and renderer; return to useful document, selection, and camera state.
-10. Run the affected suite and the applicable authoring, validation, playtest, publishing, accessibility, resource-release, and optimized M4 checks. An editor packet does not wait on unrelated mobile composition. When publishing or cross-player certification is in scope, install and complete the package through both player applications, including the physical mobile-device evidence applicable to that claim.
+10. Run the affected suite and the applicable authoring, validation, playtest, publishing, accessibility, resource-release, and optimized M4 checks. Through Phase 7, an editor packet never waits on mobile hardware, signing, development-team setup, or physical-device evidence. Phase 8 owns accumulated cross-player physical mobile integration; later publishing or certification claims add the applicable player and device evidence at their owning phase.
 11. Record red and green commands, source comparison, deliberate differences, ledger transitions, and exact observable results.
 
 Add a surface only when the current slice has real content and operations for it. A modern operation may replace several historical commands when it preserves their useful capability.
@@ -82,7 +82,7 @@ A creator slice closes only when:
 - the applicable runtime, authoring, validation, playtest, and publishing paths required by the functional row work, or an inapplicable path has a recorded reason;
 - background work, when present, proves immutable input, supported cancellation, stale-result rejection, and failure preservation;
 - required keyboard, focus, VoiceOver, diagnostics, and M4 responsiveness evidence exists for the surface's milestone;
-- when publishing or certification is claimed, the package installs and completes through both RevivalMac and RevivalMobile with applicable physical-device evidence; an editor-only Mac/shared slice may close without manufacturing or waiting on that later mobile evidence and does not claim cross-player completion;
+- when Phase 8 cross-player integration or later publishing or certification is claimed, the package installs and completes through both RevivalMac and RevivalMobile with the applicable physical-device evidence; a Phase 1–7 editor slice closes without manufacturing or waiting on that later mobile evidence and does not claim cross-player completion;
 - involved source rows reach allowed terminal states for the claimed island, and claimed functional rows carry their required evidence;
 - focused red, focused green, affected-suite, integration, and resource-release evidence have no required skip;
 - independent fidelity, architecture, evidence, and simplicity findings are resolved.

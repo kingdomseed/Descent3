@@ -10,7 +10,7 @@ The phases are broad dependency groupings, not promises that every listed capabi
 
 This roadmap defines the durable phase sequence. The living current state, active integration slice, lane-specific blockers, next work packets, and one-or-two-developer capacity and ownership map are maintained only in [Current implementation plan](current-plan.md). The integration owner updates that execution record when work lands; other active documents link to it instead of carrying independent “next step” lists.
 
-macOS is the leading implementation lane. D3Import, the shared canonical/Core and Metal paths, RevivalMac, and RevivalEditor establish each source-led slice before RevivalMobile composes the proven path through UIKit and its mobile-only boundaries. Mobile remains required for version 1.0. An open mobile-composition checkpoint does not block the next Mac/shared dependency island, but it does block claims that the slice works on mobile, that the overall milestone is closed, or that version 1.0 is complete. The Mac-leading order may not create a temporary Mac-only Core, renderer, scheduler, package schema, or resource-lifetime path.
+macOS is the leading implementation lane. D3Import, the shared canonical/Core and Metal paths, RevivalMac, and RevivalEditor establish the Phase 1–7 source-led slices. RevivalMobile may compile and compose landed shared work early through its UIKit target, but those phases have no separate physical-mobile closure checkpoint: unavailable iPhone or iPad hardware, signing, or development-team setup cannot block a slice or phase. Phase 8 performs the required direct mobile integration of the accumulated player; Phases 9 and 10 close their applicable mobile multiplayer and release matrices. Mobile and touch remain required for version 1.0, and the Mac-leading order may not create a temporary Mac-only Core, renderer, scheduler, input model, package schema, or resource-lifetime path.
 
 The player and editor advance together from the first canonical world. A phase does not need the complete creator suite, but every new canonical type and runtime behavior gains the authoring, validation, playtest, and publishing path that is applicable at that maturity.
 
@@ -32,7 +32,7 @@ Amend the active documents so they agree on:
 - complete functional scope and one-way retail conversion;
 - one complete resident level world with source-faithful eager and lazy asset paging as the first loading implementation;
 - the explicit source-faithful old/new variable-time handoff as the first scheduler;
-- one shared Mac player, mobile player and editor world model, renderer, level I/O and play path from Phase 1, introduced Mac/editor first and then composed through mobile, with separately owned worlds, document and play-session values behind concrete AppKit and UIKit shells;
+- one shared Mac player, mobile player and editor world model, renderer, level I/O and play path from Phase 1, introduced through Mac/editor slices, kept mobile-composable, and directly integrated through mobile in Phase 8, with separately owned worlds, document and play-session values behind concrete AppKit and UIKit shells; UIKit remains the mobile default, with SwiftUI allowed only for a bounded current advantage inside that shell;
 - evidence-driven modernization with one surviving production path.
 
 Before Phase 1 production code, install the current Xcode 27 beta, select it for the workspace, and record `xcodebuild -version`, `swift --version`, the macOS and iOS SDKs, the macOS deployment target, and the universal mobile target's iOS/iPadOS deployment floor. Record Apple GPU family 7 as the candidate mobile feature floor; exact floor-device certification is a public-beta/release claim, not a product-start prerequisite. Replace the beta with stable Xcode 27 when released and remove any beta-only workaround; do not preserve Xcode 26 or Swift 6.3 as a compatibility lane.
@@ -75,19 +75,21 @@ Implement one end-to-end source dependency island:
 7. derive an editable complete-level project value from the read-only imported base, then use the traced historical editor/runtime workflow to choose the smallest real canonical edit that proves stable ownership without a disposable path; select it, perform it with named undo and redo, save, close, and reopen;
 8. create a disposable play-session copy and enter free-camera play through the same world types, loader, simulation, and Metal code used by the Mac player, then return to the document;
 9. on replacement, validate successor CPU content first, then commit by stopping submissions, waiting for final GPU use, releasing the old presentation owner, and preparing the successor; expose a clear unloaded error if post-commit preparation fails;
-10. compose the proven canonical load and direct Metal room path through the concrete landscape-first RevivalMobile UIKit scene, proving drawable resize, supported orientation, and safe-area composition without changing shared ownership;
-11. let RevivalMobile receive the Mac-produced canonical package through the system document picker, copy it into app-owned staging, and run the shared validation, promotion, and activation slice without reading retail data; exclude the reimportable package from backup while keeping saves and profiles under their separate durable policy;
-12. map UIKit inactive/background/foreground transitions into the same explicit unloaded or paused ownership rules; release each world during delivered orderly teardown, and prove that abrupt process death needs no cleanup callback because relaunch removes abandoned staging and recovers the prior durable state.
+10. establish the universal RevivalMobile UIKit target and, when useful, wire the proven canonical load and direct Metal room path through its landscape-first scene without changing shared ownership;
+11. wire RevivalMobile's system-picker acquisition and app-owned staging to the shared validation, promotion, and activation code without reading retail data; exclude only reimportable package content from backup while keeping saves and profiles under their separate durable policy;
+12. encode the reached UIKit lifecycle ownership directly. Early focused automation, target builds, unsigned generic-device builds, and simulator checks may protect this scaffold; required physical picker, drawable, lifecycle, touch, audio, memory, thermal, and abrupt-death evidence belongs to Phase 8.
 
 The production package contains the complete Training level world. Phase 1 accepts only one selected room's rendering and editing, but it does not create a room-scope package, synthetic portal cut, partial `Level`, or migration path that Phase 2 must remove. Tiny one-room worlds are test fixtures only.
 
-Use a tiny synthetic fixture for focused parser and renderer tests, but each applicable checkpoint uses the owned local Training data. Bring every source row reached by that result to the state required by the source-translation ledger, then record red/green evidence, clean Metal validation, and optimized evidence on the recorded M4 Mac. The mobile composition checkpoint adds recorded physical development-device presentation, package, lifecycle, memory, and thermal evidence on the available iPhone and iPad; simulator launch is not device-effect proof. Exact candidate-floor certification remains a public-beta/release gate. Do not add world cells, stream blobs, a job system, fixed-tick simulation, a mobile-only residency path, or a zero-allocation mandate.
+Use a tiny synthetic fixture for focused parser and renderer tests, but the Mac/shared checkpoint uses the owned local Training data. Bring every source row reached by that result to the state required by the source-translation ledger, then record red/green evidence, clean Metal validation, and optimized evidence on the recorded M4 Mac. An early mobile scaffold records only the target, build, and focused composition evidence it actually proves; simulator execution is not device-effect proof, and the missing proof is deferred rather than promoted into a Phase 1 `HOLD`. Phase 8 adds recorded physical development-device presentation, package, lifecycle, memory, thermal, touch, controller, and audio evidence. Exact candidate-floor certification remains a public-beta/release gate. Do not add world cells, stream blobs, a job system, fixed-tick simulation, a mobile-only residency path, or a zero-allocation mandate.
 
 Mac/shared checkpoint: the first real imported room is visible in RevivalMac and RevivalEditor; the editor can change and persist something meaningful; editor preview and the Mac player use the same resident-world model, loading rules, and renderer with separate owned values; working builds launch repeatedly without the legacy runtime. Reaching this checkpoint authorizes the next Mac/shared dependency island.
 
-Mobile composition checkpoint: RevivalMobile renders the same room through the same Core/Metal and package paths; the package handoff and lifecycle cycle pass on the recorded available physical development iPhone and iPad without a second implementation.
+Early mobile compatibility packet: RevivalMobile's universal UIKit target builds and directly wires the accepted Core, Metal, and package paths without a second implementation. Focused simulator or unsigned generic-device evidence may close this bounded packet. Physical device availability, signing, and development-team setup are explicitly outside its exit.
 
-Overall exit: both checkpoints pass, every reached source and functional row has the state its evidence supports, and no overall Phase 1 or version 1.0 claim depends on missing mobile composition. Candidate floor-device certification may remain open until public beta or release.
+Mac/shared Phase 1 checkpoint: the Mac/shared result passes and every reached source and functional row has the state its evidence supports. This authorizes Phase 2 even if the early mobile packet remains open.
+
+Phase 1 product-establishment closure: the Mac/shared checkpoint and the early mobile compatibility packet both pass. The latter requires the universal UIKit target, an unsigned generic-device or simulator build, and focused shared-path wiring evidence, but no physical device, trust, signing, or development-team setup. Phase 8 owns required direct mobile integration before version 1.0; candidate floor-device certification remains a public-beta or release concern.
 
 ## Phase 2: connected-room acceptance in the complete Level
 
@@ -105,13 +107,13 @@ Extend the same complete-level path across a small connected Training cluster:
 
 Measure the released lightmap representation across the selected rooms before choosing a new atlas layout. Preserve the working imported representation until that evidence supports a simpler canonical form.
 
-Exit: both player applications and the editor open the complete Training `Level` with no retail archive mounted and render, traverse, edit, and play the same selected connected cluster. A creator can modify, validate, save, reopen, and play that cluster without a temporary export or a second world path.
+Exit: RevivalMac and RevivalEditor open the complete Training `Level` with no retail archive mounted and render, traverse, edit, and play the same selected connected cluster. A creator can modify, validate, save, reopen, and play that cluster without a temporary export or a second world path. The shared Core, Metal, package, and lifetime path remains directly consumable by RevivalMobile; physical mobile proof is Phase 8 work.
 
 ## Phase 3: flight, collision, terrain evidence, and timing decision
 
 Translate:
 
-- keyboard, mouse and physical-controller input mapping plus `GCVirtualController` as the initial mobile touch-gameplay mechanism, all delivered through the same explicit input snapshot; ordinary UIKit touch remains interface input, and the selected path preserves ramps, simultaneous axes, mouselook and autoleveling;
+- keyboard, mouse and physical-controller input mapping delivered through one explicit input snapshot whose action and axis semantics can also accept mobile touch without a touch-only simulation path; Phase 8 selects and proves one direct native touch-control mechanism against the working UIKit, GameController, Metal 4, and input paths;
 - Pyro position, orientation, linear and angular velocity, thrust, mass, drag, turn roll, afterburner, ship wiggle, and camera behavior;
 - swept collision, wall slide, bounce, corner response, portal crossing, room ownership, and restart;
 - any outdoor terrain representation, visibility, and LOD needed by the first chosen outdoor reference scene.
@@ -127,7 +129,7 @@ Do not retain a compatibility mode. The timing decision is complete only when fl
 
 Editor work adds geometry and object transforms, numeric editing, snapping, structural validation, collision diagnostics, and play-in-editor return.
 
-Exit: a player can fly the imported cluster with the intended feel on Mac, iPhone and iPad using each applicable input surface, and a creator can change the spaces and immediately fly them. One measured timing model remains.
+Exit: a player can fly the imported cluster with the intended feel in RevivalMac using keyboard, mouse, and physical-controller paths, and a creator can change the spaces and immediately fly them. One measured timing model remains, its input contract does not assume a Mac-only device, and Phase 8 later proves mobile touch and controller delivery through that same path.
 
 ## Phase 4: first combat and behavior chain
 
@@ -159,13 +161,13 @@ Complete every runtime and creator dependency of the Training Mission:
 - matching campaign, behavior-message, path, navigation, presentation, score, localization-matrix, validation, playtest, publishing, native-package intake and activation operations;
 - complete source-file and behavior-range dispositions for the mission.
 
-Run the resident-level evidence gate in [World loading and residency](world-loading.md) on the recorded M4 Mac and recorded available physical development iPhone and iPad, using the complete playable Training Mission, the largest imported indoor and outdoor levels then available, repeated editor/player and mobile lifecycle transitions, and a representative higher-resolution replacement experiment. Before ratifying the same budgets for the candidate Apple GPU family 7 public floor, add representative floor-device evidence or raise the released floor to the oldest verified hardware. Missing floor certification leaves that mobile release claim open; it does not stop subsequent Mac/shared campaign islands.
+Run the resident-level evidence gate in [World loading and residency](world-loading.md) on the recorded M4 Mac, using the complete playable Training Mission, the largest imported indoor and outdoor levels then available, repeated editor/player transitions, and a representative higher-resolution replacement experiment. Record the exact mobile lifetime and performance questions Phase 8 must repeat; do not delay this decision for an unavailable device. Phase 8 supplies the applicable physical development-device matrix. Before ratifying the same budgets for the candidate Apple GPU family 7 public floor, add representative floor-device evidence or raise the released floor to the oldest verified hardware.
 
 If resident loading meets ratified startup, responsiveness, and memory budgets, ratify it for the following phases and stop speculative streaming work. A later representative workload may reopen the decision only by demonstrating a missed budget and following the amendment gate. If it misses a current budget, compare simpler encoding, duplicate-removal, and load-order fixes before proposing one narrow resource-lifetime amendment. No phase automatically creates a streamer.
 
 Also establish the first credible optimized CPU, GPU, allocation, memory, import, load, and editor responsiveness budgets. Optimize only measured hot paths.
 
-Exit: a new player can complete Training from canonical content on Mac, iPhone and iPad, and a creator can inspect, change, validate, play, package, reinstall in both players, and complete the native Training project. The resource-lifetime architecture has a recorded cross-device decision.
+Exit: a new player can complete Training from canonical content in RevivalMac, and a creator can inspect, change, validate, play, package, reinstall in the Mac player, and complete the native Training project. The resource-lifetime architecture has a recorded M4 decision and an explicit Phase 8 mobile validation obligation; no separate lifetime path is introduced while that evidence is pending.
 
 ## Phase 6: base campaign, level by level
 
@@ -176,7 +178,7 @@ Bring up level 1 end to end, then follow the campaign graph. Implement each secr
 3. add the next missing runtime contract through red, green, and refactor;
 4. add the matching authoring, validation, playtest, and publishing operation;
 5. play, save, replay, reload, and complete the level;
-6. record intentional differences and keep the applicable Mac and mobile-device budgets green.
+6. record intentional differences and keep the applicable M4 Mac budgets green; preserve the exact accumulated mobile scenarios for the Phase 8 integration matrix rather than running a per-level device gate.
 
 This phase grows terrain and environment, reusable rooms, geometry tools, materials, mirrors, specular response, decals, procedural surfaces, volumetric lighting, blend semantics, robots, bosses, weapons including player-triggered timeout/detonation, inventory and pickup families including the afterburner cooler and timed RapidFire effect, GuideBot, doors, triggers, paths, navigation, matcens, goals, ambient sound systems and patterns, weather, lighting, music, cinematics, briefings, movies, TelCom-style presentation, cockpit, automap, cameras, haptics, effects, campaign state, and approved command effects as real levels require them.
 
@@ -190,6 +192,13 @@ Exit: Mercenary completes with no legacy runtime component and complete source a
 
 ## Phase 8: complete campaign and content creation
 
+Begin by closing the accumulated mobile player integration through the one universal UIKit application:
+
+- compose the complete shared campaign, save, replay, renderer, scheduler, package, and resident-level paths without a second implementation;
+- select and implement one direct native touch-control mechanism, prove coexistence and handoff with physical controllers through the same input snapshot, and provide touch access to every reachable gameplay action;
+- close system-picker package intake, app-owned storage, activation, lifecycle and abrupt-death recovery, landscape/safe-area/drawable behavior, AVAudioSession routes and interruptions, application transitions, settings, HUD and interface composition;
+- run the bounded physical development matrix on the available iPhone and iPad, including the applicable M4-to-mobile lifetime and performance comparisons. Device connection, trust, signing, and development-team setup become real Phase 8 lane requirements here, not retroactive Phase 1–7 blockers.
+
 Close every remaining non-multiplayer creator row:
 
 - world and terrain construction, materials, lighting, navigation, reusable content, diagnostics, and repair;
@@ -201,7 +210,7 @@ Close every remaining non-multiplayer creator row:
 
 Add asynchronous snapshot/revision machinery only for operations that are now genuinely long-running, and keep it local to the smallest useful ownership boundary.
 
-Exit: every non-multiplayer creator row passes and the non-bundled certification campaign installs and completes in RevivalMac and RevivalMobile. This proves the creator suite; it does not supply replacement retail content or remove the version 1.0 ownership requirement.
+Exit: every non-multiplayer creator row passes; the accumulated mobile integration matrix passes on the recorded available physical iPhone and iPad; and the non-bundled certification campaign installs and completes in RevivalMac and RevivalMobile. This proves the creator suite and mobile player integration, but not the candidate release floor, public distribution, or replacement retail content.
 
 ## Phase 9: multiplayer, replay, hosting, and multiplayer creation
 

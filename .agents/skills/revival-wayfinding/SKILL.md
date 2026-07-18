@@ -28,6 +28,8 @@ These decisions are already made and are not wayfinding topics: Apple-native Swi
 
 Read [`AGENTS.md`](../../../AGENTS.md), [`current-plan.md`](../../../docs/revival/current-plan.md), the accepted document that owns the destination, the relevant source-translation ledger rows, and the current domain document. A named packet, lane, owner, or checkpoint in `current-plan.md` is already selected work rather than a wayfinding topic unless new evidence makes the plan conflict with an accepted contract.
 
+Do not activate wayfinding to reconsider settled mobile lane policy. UIKit is the default RevivalMobile lifecycle and UI toolkit, SwiftUI is allowed only for a bounded current advantage, early mobile target/build/simulator work is nonblocking compatibility evidence, and Phase 8 owns required physical mobile integration. Through Phase 7, unavailable devices, signing, or development-team setup is a deferred integration fact rather than a linked unknown or blocker.
+
 Wayfinding working notes are temporary. They may live in the active task, a bounded research note, or an explicitly requested issue, but they never become a parallel source of truth. Do not create a wayfinding map, shadow roadmap, decision-ticket tree, duplicate backlog, or permanent status ledger.
 
 As soon as a decision is supported and authorized, update its canonical owner:
@@ -67,7 +69,7 @@ Use evidence in this order where applicable:
 2. pinned released source, editor callers, revision evidence, and runnable reference behavior;
 3. current ledger entries, canonical fixtures, local captures, and project code;
 4. official Apple documentation and reproducible experiments;
-5. measured optimized behavior on every M4, iPhone, or iPad device applicable to the exact claim and checkpoint; support-floor evidence is required only when the public-beta or release floor is the decision being investigated;
+5. measured optimized behavior on the M4 for applicable Phase 1–7 claims and, beginning with Phase 8, on every iPhone or iPad device applicable to the exact mobile claim; support-floor evidence is required only when the public-beta or release floor is the decision being investigated;
 6. clearly labeled inference.
 
 Historical source decides what the original did. Accepted documents decide what this product is building. An Apple API's availability proves neither a requirement nor an architecture.

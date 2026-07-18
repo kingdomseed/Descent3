@@ -1,14 +1,14 @@
 # World loading and residency
 
 - Status: accepted, amended
-- Date: July 16, 2026
+- Date: July 18, 2026
 - Authority: binding current resource-lifetime decision and modernization gate
 
 ## Current decision
 
-The production load unit is one complete canonical `Level`, matching the source D3L world boundary. In Phase 1, D3Import converts the complete Training D3L; RevivalMac and RevivalEditor first load the resulting complete canonical `Level`, and RevivalMobile then composes that same proven load path. One selected room is the first visible and editable acceptance slice, not a partial production level. Synthetic one-room levels remain focused test fixtures.
+The production load unit is one complete canonical `Level`, matching the source D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and RevivalMac and RevivalEditor first load the resulting complete canonical `Level`. RevivalMobile may compile and wire that same path early; Phase 8 supplies the required direct mobile lifetime and device evidence. One selected room is the first visible and editable acceptance slice, not a partial production level. Synthetic one-room levels remain focused test fixtures.
 
-This document owns the lifetime contract. The active slice, checkpoint state and developer ownership live in the [current implementation plan](current-plan.md) and are updated there. Mac/shared loading and editor work leads; an open mobile composition checkpoint does not block the next Mac/shared dependency island, but it does block the applicable overall milestone and version 1.0. The shared canonical, renderer and lifetime contracts must remain mobile-composable while that checkpoint is open.
+This document owns the lifetime contract. The active slice, checkpoint state and developer ownership live in the [current implementation plan](current-plan.md) and are updated there. Mac/shared loading and editor work leads. Through Phase 7, unavailable mobile hardware, signing, development-team setup, or open mobile lifetime evidence cannot block a slice or phase. The shared canonical, renderer and lifetime contracts must remain mobile-composable; Phase 8 closes the accumulated mobile lifetime path before version 1.0.
 
 The initial native products keep each authoritative level world resident until exit. Startup eagerly prepares the source-evidenced `PageInAllData` working set. If object initialization, a matcen, translated behavior, or another reachable source path later needs a canonical presentation asset, the product prepares it directly from canonical content and retains it for the rest of the level. RevivalMac and RevivalMobile each own a separate player world. RevivalEditor owns a separate document value and creates a separate disposable play-session value. All three applications use the same model, dependency rules, renderer and resource-loading path.
 
@@ -38,7 +38,7 @@ Loading may use one bounded background operation when measured I/O latency would
 Loading, visibility, and geometric detail are separate questions.
 
 - Indoor rendering initially translates the released room-and-portal traversal and its observable clipping behavior into direct Metal.
-- When the first outdoor dependency island arrives, outdoor rendering translates released geometry LOD plus texture-segment selection and UV/tile/rotation behavior closely enough to establish reference images and measurements on the recorded Mac and mobile devices.
+- When the first outdoor dependency island arrives, outdoor rendering translates released geometry LOD plus texture-segment selection and UV/tile/rotation behavior closely enough to establish reference images and M4 measurements. Record the equivalent mobile scene and questions for the Phase 8 physical-device matrix rather than holding the outdoor island open.
 - Editor viewports use those same paths.
 
 The source has a 32-by-32 `Terrain_tex_seg` grid whose entries each cover an 8-by-8 terrain-cell block. Do not reinterpret that texture grouping as proof of a modern streaming partition or call editor megacells a runtime LOD system. Do not remove geometry LOD merely because modern Apple devices are faster; first reproduce the visual and performance baseline, then record a deliberate simplification if full authored resolution is measurably safe and visually accepted on every affected target.
@@ -60,7 +60,7 @@ When a real background bake, import, or publish operation first appears, its imm
 
 ## Mac, mobile-development and release-floor evidence gate
 
-After the complete Training Mission is playable and editable, measure the Mac/shared path in an optimized build on the recorded M4 Mac. When the corresponding mobile composition exists, run the applicable development matrix on the physical iPhone and iPad recorded in the [current implementation plan](current-plan.md). Before a public beta or release claims the candidate Apple GPU family 7 floor, repeat the applicable matrix on selected representative floor iPhone and iPad devices; if those devices are unavailable or fail, raise the released floor to the oldest hardware actually verified. The absence of exact floor devices does not hold later Mac/shared islands open.
+After the complete Training Mission is playable and editable, measure the Mac/shared path in an optimized build on the recorded M4 Mac and make the resident keep-or-amend decision without waiting for mobile hardware. Phase 8 runs the applicable accumulated lifetime matrix on the physical iPhone and iPad recorded in the [current implementation plan](current-plan.md). Before a public beta or release claims the candidate Apple GPU family 7 floor, repeat the applicable matrix on selected representative floor iPhone and iPad devices; if those devices are unavailable or fail, raise the released floor to the oldest hardware actually verified. Missing mobile devices, signing, or development-team setup cannot hold Phase 1–7 open.
 
 Use:
 
@@ -68,7 +68,7 @@ Use:
 - peak and steady CPU, GPU, and unified memory;
 - the complete Training Mission and the largest imported indoor and outdoor levels then available;
 - repeated load, restart, editor play, and return cycles;
-- repeated mobile foreground, background, interruption, memory-warning and resume cycles;
+- in Phase 8, repeated mobile foreground, background, interruption, memory-warning and resume cycles;
 - one representative high-resolution replacement-content experiment;
 - one-, two-, and four-viewport editor use if those layouts have shipped by the gate.
 
@@ -103,7 +103,7 @@ The resident path proves:
 - final-GPU-use safety before release;
 - no retail-format reads outside D3Import;
 - no second renderer or resource-lifetime path;
-- release-build M4 Mac evidence for each applicable Mac/shared checkpoint, recorded available physical-device evidence for mobile development checkpoints, and selected floor-device startup and memory evidence before a public beta or release claims that floor.
+- release-build M4 Mac evidence for applicable Phase 1–7 checkpoints, recorded available physical-device evidence at the Phase 8 mobile integration gate and later applicable mobile matrices, and selected floor-device startup and memory evidence before a public beta or release claims that floor.
 
 These checks protect the current product. They do not add tests for a hypothetical streamer.
 

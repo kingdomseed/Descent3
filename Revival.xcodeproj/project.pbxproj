@@ -59,6 +59,16 @@
 		E10000000000000000000003 /* RevivalEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* RevivalEditorWindowController.swift */; };
 		E10000000000000000000004 /* RevivalEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* RevivalEditorWindowController.swift */; };
 		E10000000000000000000005 /* MetalWorldRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* MetalWorldRenderer.swift */; };
+		F10000000000000000000001 /* RevivalMobileApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* RevivalMobileApplication.swift */; };
+		F10000000000000000000002 /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
+		F10000000000000000000003 /* CanonicalPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* CanonicalPackage.swift */; };
+		F10000000000000000000004 /* WorldRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WorldRendering.swift */; };
+		F10000000000000000000005 /* MetalWorldPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* MetalWorldPlan.swift */; };
+		F10000000000000000000006 /* MetalWorldRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* MetalWorldRenderer.swift */; };
+		F10000000000000000000007 /* WorldShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000004 /* WorldShaders.metal */; };
+		F10000000000000000000008 /* RevivalMobilePresentationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* RevivalMobilePresentationStateTests.swift */; };
+		F10000000000000000000009 /* RevivalMobilePresentationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000004 /* RevivalMobilePresentationState.swift */; };
+		F1000000000000000000000A /* RevivalMobilePresentationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000004 /* RevivalMobilePresentationState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -94,6 +104,10 @@
 		D20000000000000000000004 /* WorldShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = WorldShaders.metal; sourceTree = "<group>"; };
 		E20000000000000000000001 /* RevivalProjectDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalProjectDocument.swift; sourceTree = "<group>"; };
 		E20000000000000000000002 /* RevivalEditorWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalEditorWindowController.swift; sourceTree = "<group>"; };
+		F20000000000000000000001 /* RevivalMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RevivalMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F20000000000000000000002 /* RevivalMobileApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalMobileApplication.swift; sourceTree = "<group>"; };
+		F20000000000000000000003 /* RevivalMobilePresentationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalMobilePresentationStateTests.swift; sourceTree = "<group>"; };
+		F20000000000000000000004 /* RevivalMobilePresentationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalMobilePresentationState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,6 +139,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F40000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -143,6 +164,7 @@
 				A20000000000000000000005 /* D3Import */,
 				A20000000000000000000006 /* RevivalMac.app */,
 				A20000000000000000000007 /* RevivalEditor.app */,
+				F20000000000000000000001 /* RevivalMobile.app */,
 				A20000000000000000000008 /* D3ImportTests.xctest */,
 			);
 			name = Products;
@@ -164,6 +186,7 @@
 				A30000000000000000000008 /* RevivalCore */,
 				A30000000000000000000009 /* RevivalMetal */,
 				A30000000000000000000006 /* RevivalMac */,
+				F30000000000000000000001 /* RevivalMobile */,
 				A30000000000000000000007 /* RevivalEditor */,
 			);
 			path = Sources;
@@ -223,6 +246,15 @@
 			path = RevivalMetal;
 			sourceTree = "<group>";
 		};
+		F30000000000000000000001 /* RevivalMobile */ = {
+			isa = PBXGroup;
+			children = (
+				F20000000000000000000004 /* RevivalMobilePresentationState.swift */,
+				F20000000000000000000002 /* RevivalMobileApplication.swift */,
+			);
+			path = RevivalMobile;
+			sourceTree = "<group>";
+		};
 		A3000000000000000000000A /* Tests */ = {
 			isa = PBXGroup;
 			children = (
@@ -234,6 +266,7 @@
 		A3000000000000000000000B /* D3ImportTests */ = {
 			isa = PBXGroup;
 			children = (
+				F20000000000000000000003 /* RevivalMobilePresentationStateTests.swift */,
 				D20000000000000000000001 /* MetalWorldPlanTests.swift */,
 				C20000000000000000000004 /* EditorProjectTests.swift */,
 				C20000000000000000000002 /* WorldRenderingTests.swift */,
@@ -326,6 +359,23 @@
 			productReference = A20000000000000000000008 /* D3ImportTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		F50000000000000000000001 /* RevivalMobile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F80000000000000000000001 /* Build configuration list for PBXNativeTarget "RevivalMobile" */;
+			buildPhases = (
+				F40000000000000000000001 /* Sources */,
+				F40000000000000000000002 /* Frameworks */,
+				F40000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RevivalMobile;
+			productName = RevivalMobile;
+			productReference = F20000000000000000000001 /* RevivalMobile.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -346,6 +396,9 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					A50000000000000000000004 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					F50000000000000000000001 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -369,6 +422,7 @@
 				A50000000000000000000002 /* RevivalMac */,
 				A50000000000000000000003 /* RevivalEditor */,
 				A50000000000000000000004 /* D3ImportTests */,
+				F50000000000000000000001 /* RevivalMobile */,
 			);
 		};
 /* End PBXProject section */
@@ -400,6 +454,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000005 /* test.hog in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F40000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -459,6 +520,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F1000000000000000000000A /* RevivalMobilePresentationState.swift in Sources */,
+				F10000000000000000000008 /* RevivalMobilePresentationStateTests.swift in Sources */,
 				E10000000000000000000005 /* MetalWorldRenderer.swift in Sources */,
 				E10000000000000000000004 /* RevivalEditorWindowController.swift in Sources */,
 				E10000000000000000000002 /* RevivalProjectDocument.swift in Sources */,
@@ -482,6 +545,21 @@
 				A10000000000000000000004 /* HOG2ArchiveTests.swift in Sources */,
 				B10000000000000000000006 /* D3LV127Tests.swift in Sources */,
 				B10000000000000000000001 /* PreparedRetailProfileTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F40000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F10000000000000000000009 /* RevivalMobilePresentationState.swift in Sources */,
+				F10000000000000000000007 /* WorldShaders.metal in Sources */,
+				F10000000000000000000006 /* MetalWorldRenderer.swift in Sources */,
+				F10000000000000000000005 /* MetalWorldPlan.swift in Sources */,
+				F10000000000000000000004 /* WorldRendering.swift in Sources */,
+				F10000000000000000000003 /* CanonicalPackage.swift in Sources */,
+				F10000000000000000000002 /* Level.swift in Sources */,
+				F10000000000000000000001 /* RevivalMobileApplication.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -630,6 +708,56 @@
 			};
 			name = Release;
 		};
+		F70000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				"EXCLUDED_SOURCE_FILE_NAMES[sdk=iphonesimulator*]" = WorldShaders.metal;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Revival/Sources/RevivalMobile/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.descent3.revival.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F70000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				"EXCLUDED_SOURCE_FILE_NAMES[sdk=iphonesimulator*]" = WorldShaders.metal;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Revival/Sources/RevivalMobile/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.descent3.revival.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -674,6 +802,15 @@
 			buildConfigurations = (
 				A70000000000000000000009 /* Debug */,
 				A7000000000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F80000000000000000000001 /* Build configuration list for PBXNativeTarget "RevivalMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F70000000000000000000001 /* Debug */,
+				F70000000000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

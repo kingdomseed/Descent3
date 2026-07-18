@@ -44,13 +44,13 @@ These sources support an early shared editor/player loop, representative content
 
 ### Apple Metal and application sources
 
-Use Apple's documentation for direct Metal 4 queues and command buffers, MetalKit presentation, resource lifetime, capture, validation, AppKit documents, UIKit scenes and lifecycle, GameController physical and virtual controls, AVFoundation and AVAudioSession, platform file picking and app-owned storage, local-network privacy, Network, and CryptoKit.
+Use Apple's documentation for direct Metal 4 queues and command buffers, MetalKit presentation, resource lifetime, capture, validation, AppKit documents, UIKit scenes and lifecycle, GameController physical-controller input and candidate touch-control APIs, AVFoundation and AVAudioSession, platform file picking and app-owned storage, local-network privacy, Network, and CryptoKit. Phase 8 selects the touch-gameplay mechanism against the working product; an available API does not preselect it.
 
 Start with the maintained [Primary technical source index](primary-source-index.md) before repeating web research. Domain skills keep narrower operational references, while the index records the key source, the question it answers, and what it cannot prove.
 
 Apple's pinned Game Porting Toolkit skill bundle is installed as audited advisory material. Its direct Metal 4 API, resource, synchronization, presentation, validation, capture, and debugging guidance is applicable, as are direct GameController API facts after applying the project's single input-snapshot ownership. Its porting workflow, Objective-C++ window scaffold, dedicated engine-thread prescription, C++, Metal-cpp, Direct3D, Vulkan, Shader Converter, compatibility-backend, and macOS 27-only baseline routes are prohibited by the project boundary. Installation is not runtime adoption.
 
-Use concrete AppKit and UIKit shells over the same RevivalCore, RevivalMetal, world, scheduler, input snapshot, and canonical-package paths. Call platform APIs directly in the shell that owns them. Do not turn shared game semantics into a generic platform, input, view, file-picker, or filesystem abstraction. RevivalMobile imports only a Mac-produced canonical package through the platform picker and copies it into app-owned storage; D3Import and all retail-format knowledge remain macOS-only.
+Use concrete AppKit and UIKit shells over the same RevivalCore, RevivalMetal, world, scheduler, input snapshot, and canonical-package paths. UIKit owns RevivalMobile's lifecycle and is its default UI toolkit. A bounded SwiftUI view is allowed only when a current component has a concrete technical or product advantage and remains hosted inside the UIKit lifecycle, navigation, state, and Metal-view path. Call platform APIs directly in the shell that owns them. Do not turn shared game semantics into a generic platform, input, view, file-picker, or filesystem abstraction. RevivalMobile imports only a Mac-produced canonical package through the platform picker and copies it into app-owned storage; D3Import and all retail-format knowledge remain macOS-only.
 
 Use the smallest explicit resource-residency declarations required by the direct Metal 4 submission contract in Phase 1; this is GPU API correctness, not spatial streaming or a resource-manager architecture. Metal I/O, sparse resources, streaming samples, and speculative residency policy remain optional research sources only after resident-level measurement. API availability does not otherwise make them Phase 1 requirements.
 
@@ -66,7 +66,7 @@ The chosen product toolchain is Swift 6.4 in Swift 6 language mode from Xcode 27
 
 ### Measurement tools
 
-Use direct swift test, xcodebuild, Instruments, xctrace, Metal capture, validation, physical iPhone and iPad execution, and reproducible scripts as the source of truth. Available physical hardware supports ordinary mobile development; lack of an older exact floor device does not block Mac/shared implementation. Simulator evidence is useful for focused development but does not close device presentation, input, lifecycle, memory, thermal, audio-session, or package-intake claims. Before public beta or release claims Apple GPU family 7 as the support floor, verify a representative floor-device matrix or raise the released floor.
+Use direct swift test, xcodebuild, Instruments, xctrace, Metal capture, validation, and reproducible scripts as the source of truth. Through Phase 7, RevivalMobile target builds, unsigned generic-device builds, and focused simulator runs are useful compatibility evidence only; unavailable physical devices, signing, or development-team setup cannot return `HOLD`. Phase 8 begins required physical iPhone and iPad execution for accumulated presentation, input, lifecycle, memory, thermal, audio-session, and package-intake claims. Before public beta or release claims Apple GPU family 7 as the support floor, verify a representative floor-device matrix or raise the released floor.
 
 XcodeBuildMCP or another automation helper may be evaluated after the workspace exists. Pin and audit executable tooling, review telemetry, and keep direct commands reproducible.
 
@@ -166,8 +166,8 @@ Use the following bounded evidence-producing roles rather than standing personas
 ### Translation foundation
 
 1. Source and chronology reviewer: trace the current dependency island across runtime, editor, and revision evidence; maintain dispositions.
-2. Swift and Metal implementer: establish the current shared world, renderer, scheduler, and simulation path first through the concrete AppKit player and editor shells, then compose the landed shared contract through UIKit and profile it on the devices applicable to each checkpoint.
-3. Content and creator implementer: import the same slice on macOS and deliver its real editor mutation, validation, save, and play loop; after that contract lands, prove its canonical-package intake in RevivalMobile without inventing an adapter or second package path.
+2. Swift and Metal implementer: establish the current shared world, renderer, scheduler, and simulation path through the concrete AppKit player and editor shells; early UIKit target/build work is optional compatibility evidence, and Phase 8 composes and profiles the accumulated shared contract on physical mobile devices.
+3. Content and creator implementer: import each Phase 1–7 slice on macOS and deliver its real editor mutation, validation, save, and play loop; early mobile package wiring may proceed without device closure, while Phase 8 proves the accumulated canonical-package intake without inventing an adapter or second package path.
 
 ### Behavior and campaign
 
@@ -193,7 +193,7 @@ After every material slice, cover four concerns independently:
 
 - source fidelity and complete runtime/editor accounting;
 - architecture, constitutional scope, canonical boundaries, and one production path;
-- focused tests, evidence claims, Mac/mobile/editor acceptance, physical-device proof, and terminal rows;
+- focused tests, evidence claims, Mac/editor acceptance, early mobile compatibility where present, Phase 8+ physical-device proof where current, and terminal rows;
 - simplicity, maintainability, reuse of existing direct code, and measured efficiency.
 
 Use separate reviewers when capacity allows. Run the remaining concern in the next wave when capacity is limited. For a small change one reviewer may cover multiple concerns only when the report keeps them distinct. Reviewers identify concrete paths and observable consequences; they do not demand preservation of obsolete machinery, literal source shape, defensive branches after canonical validation, or speculative future-proofing. [`revival-review`](../../.agents/skills/revival-review/SKILL.md) defines consolidation and closure.
@@ -210,7 +210,7 @@ After those concerns are consolidated and corrected, one independent [`revival-c
 - Require focused red/green evidence for shipping behavior and a deletion gate for temporary scaffolds.
 - A source reviewer may drive implementation mapping but may not solve it by linking legacy code.
 - A creator reviewer preserves useful workflow, not MFC layout or backward export.
-- A Metal reviewer begins with the complete resident `Level` and source-faithful eager/lazy asset preparation through the concrete AppKit shells, then verifies UIKit composition of the same landed path. The reviewer may not add a second renderer, generic platform layer, or spatial streaming before the recorded M4 and applicable-mobile-development amendment gate, and may not make unavailable floor hardware a blocker for Mac/shared work.
+- A Metal reviewer begins with the complete resident `Level` and source-faithful eager/lazy asset preparation through the concrete AppKit shells. Early UIKit build or simulator composition is nonblocking compatibility work; Phase 8 verifies the accumulated landed path on physical mobile devices. The reviewer may not add a second renderer, generic platform layer, or spatial streaming before the recorded M4 and applicable-mobile-development amendment gate, and may not make unavailable devices, signing, development-team setup, or floor hardware a Phase 1–7 blocker.
 - A systems reviewer may not add a job system, ECS, fixed scheduler, deterministic math framework, or custom allocator without the accepted evidence gate.
 - A behavior reviewer grows the safe model from working chains, covers the evidenced shipped-game and creator-tool capability for version 1.0, and may not add native-code escape hatches or speculative post-1.0 mechanics.
 - A multiplayer reviewer implements the one affordable native route accepted from current evidence and does not inherit original packets or assume a project-operated service merely because source or an earlier plan exists.

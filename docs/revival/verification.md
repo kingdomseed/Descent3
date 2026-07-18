@@ -26,7 +26,7 @@ Use the cheapest layer that can falsify the claim:
 - local retail-derived fixtures and captures for owned campaign translation;
 - controlled renderer scenes and image comparisons;
 - editor save, reopen, undo, play, and return workflows;
-- optimized profiling on the recorded M4 Mac and recorded physical development iPhone and iPad for current mobile integration claims, plus representative floor-device evidence before a public beta or release claims the candidate mobile support floor;
+- optimized profiling on the recorded M4 Mac for Phase 1–7 claims, on recorded physical development iPhone and iPad devices beginning with Phase 8 mobile integration claims, and on representative floor devices before a public beta or release claims the candidate mobile support floor;
 - end-to-end application, campaign, multiplayer, signing, and clean-account tests.
 
 Do not duplicate the same assertion at every layer. Add an integration test only when composition can fail independently.
@@ -77,7 +77,7 @@ Synthetic fixtures enter Git. Owned retail packages, converted media, and captur
 
 Do not test stream cells, stream blobs, spatial envelopes, package-layer locators, semantic revision hierarchies, or external marketplace threats before those production boundaries exist.
 
-Native-package tests begin with the shared `T-016` validator, destination-adjacent staging, atomic promotion and failure-preservation path plus the minimum `T-017` base activation and prior-set recovery path required by the first Mac-to-mobile handoff. Mac/shared work may establish and grow those canonical boundaries before mobile composition consumes them. `T-016` proves every field and hostile case reachable in the initial canonical schema, including identity and revision, rights metadata, hashes, declared dependencies, path escape and unexpected special files, bounded media and destination failure; the same validator grows only when later packages add real schema. With the first publishing workflow, `T-017` expands to explicit base/replacement ordering, duplicate and conflict diagnostics, enable/disable, compatible replacement and removal. A post-promotion activation failure leaves the candidate inactive and the prior set active. `T-018` separately proves enumeration, actionable status, known save/profile associations, confirmation before orphaning and completion of an installed certification campaign. Focused production-boundary automation covers `T-019` cancellation, hostile paths, low storage, interrupted copy, duplicate and replacement behavior once through those shared paths. Physical runs on the recorded available development iPhone and iPad prove the initial OS-specific picker/provider grant and loss, representative install and activation, suspension and abrupt-death/relaunch recovery, abandoned-staging removal, prior-set preservation, backup-exclusion metadata for reimportable packages, and the separate durable policy for saves and profiles. Representative floor-device runs are added before public beta or release claims the candidate floor. These tests do not create a temporary mobile-only installer, mobile legacy reader, marketplace, cloud account, automatic updater, generic dependency solver or mandatory signature scheme.
+Native-package tests begin with the shared `T-016` validator, destination-adjacent staging, atomic promotion and failure-preservation path plus the minimum `T-017` base activation and prior-set recovery path required by the later Mac-to-mobile handoff. Mac/shared work establishes and grows those canonical boundaries before required mobile integration. `T-016` proves every field and hostile case reachable in the initial canonical schema, including identity and revision, rights metadata, hashes, declared dependencies, path escape and unexpected special files, bounded media and destination failure; the same validator grows only when later packages add real schema. With the first publishing workflow, `T-017` expands to explicit base/replacement ordering, duplicate and conflict diagnostics, enable/disable, compatible replacement and removal. A post-promotion activation failure leaves the candidate inactive and the prior set active. `T-018` separately proves enumeration, actionable status, known save/profile associations, confirmation before orphaning and completion of an installed certification campaign. Focused production-boundary automation may cover `T-019` cancellation, hostile paths, low storage, interrupted copy, duplicate and replacement behavior early through those shared paths. Phase 8 physical runs on the recorded available development iPhone and iPad prove the OS-specific picker/provider grant and loss, representative install and activation, suspension and abrupt-death/relaunch recovery, abandoned-staging removal, prior-set preservation, backup-exclusion metadata for reimportable packages, and the separate durable policy for saves and profiles. Representative floor-device runs are added before public beta or release claims the candidate floor. Missing devices, signing, or development-team setup cannot turn Phase 1–7 package work into `HOLD`. These tests do not create a temporary mobile-only installer, mobile legacy reader, marketplace, cloud account, automatic updater, generic dependency solver or mandatory signature scheme.
 
 ## Resident world loading
 
@@ -93,7 +93,7 @@ The current resource-lifetime path proves:
 - repeated load, restart, editor play, return, document replacement, and shutdown do not produce unbounded CPU or GPU memory growth;
 - new submissions stop and final GPU use completes before the level owner releases resources and file handles;
 - there is one loader and one renderer, with no resident/streaming switch or legacy fallback;
-- optimized startup, transition, memory, thermal, lifecycle and editor costs are recorded on each applicable reference device at every representative milestone.
+- optimized startup, transition, memory, lifecycle and editor costs are recorded on the M4 at representative Phase 1–7 milestones; the applicable physical mobile, thermal and lifecycle costs are added at Phase 8 and later mobile gates.
 
 After the complete playable Training Mission, run the broader evidence gate in [World loading and residency](world-loading.md). A future amendment receives tests for its real production mechanism; no hypothetical streamer tests exist now.
 
@@ -207,7 +207,7 @@ Security checks concentrate at untrusted decode and authority boundaries. Truste
 
 ## Application and release
 
-Application tests use separate Mac and mobile composition matrices over the same Core contracts. They cover the clean-profile gate and explicit menu/new/load/replay/multiplayer/level/completion/failure transitions; solo and multiplayer pause, nested focus/suspension and resume; profile lifecycle; separate input/gameplay, display/detail and audio/voice/haptic setting families; AppKit window and UIKit scene/orientation/safe-area/drawable lifecycle; files and app-owned storage; Mac import-helper invocation; both native package libraries; level loading; audio routes; movies; physical and virtual controllers; haptics; chat, host presets and commands when present; delivered orderly teardown; abrupt mobile process death and relaunch recovery; signing; and failure recovery.
+Application tests use the Phase 1–7 Mac/shared matrix and the accumulated Phase 8+ physical mobile matrices over the same Core contracts. They cover the clean-profile gate and explicit menu/new/load/replay/multiplayer/level/completion/failure transitions; solo and multiplayer pause, nested focus/suspension and resume; profile lifecycle; separate input/gameplay, display/detail and audio/voice/haptic setting families; AppKit window and UIKit scene/orientation/safe-area/drawable lifecycle; files and app-owned storage; Mac import-helper invocation; both native package libraries; level loading; audio routes; movies; physical and touch controllers; haptics; chat, host presets and commands when present; delivered orderly teardown; abrupt mobile process death and relaunch recovery; signing; and failure recovery. Each category applies only at the phase that owns its product claim.
 
 Operational-diagnostic evidence verifies severity and subsystem categories, OSLog public/private classification, bounded retention when durable logs exist, source-linked importer/editor/host failures and the user-visible fatal-error outcome. Fixtures containing credentials, local paths, player addresses and other private values prove they are not emitted as public log fields or automatic uploads. The product has no telemetry requirement.
 
@@ -229,7 +229,7 @@ Phase 1 product builds and optimized measurements use Xcode 27 and the Swift 6.4
 
 Apple GPU family 7 is the candidate mobile feature floor. The earlier audit identified A14-generation examples at that floor, but published specifications and an arbitrarily selected old model do not prove the product's physical memory, drawable, lifecycle, thermal, audio, input, package-intake, or performance behavior. No exact old device is a prerequisite for starting or continuing the rewrite.
 
-Use the available physical development devices recorded in the [current implementation plan](current-plan.md) when the mobile composition lane begins. Record their exact model, OS, toolchain, drawable, content, and settings with the resulting evidence; do not infer those details from a chip family or planning label. Simulator build and launch may prove compilation and focused composition, but never substitutes for physical-device effects. Before public beta or release claims Apple GPU family 7 as the support floor, run the accepted representative floor-device matrix. If suitable floor hardware is unavailable or fails the matrix, raise the released floor to the oldest hardware actually verified and update every deployment, distribution, and support record together.
+Use the available physical development devices recorded in the [current implementation plan](current-plan.md) when the required Phase 8 mobile integration lane begins. Record their exact model, OS, toolchain, drawable, content, and settings with the resulting evidence; do not infer those details from a chip family or planning label. Before then, simulator launch, target builds, and unsigned generic-device builds may prove compilation and focused composition but cannot prove device effects—and the missing device proof is deferred, not a Phase 1–7 blocker. Before public beta or release claims Apple GPU family 7 as the support floor, run the accepted representative floor-device matrix. If suitable floor hardware is unavailable or fails the matrix, raise the released floor to the oldest hardware actually verified and update every deployment, distribution, and support record together.
 
 The [current implementation plan](current-plan.md) alone records whether the product-toolchain gate is still open and which packet is next. Before Phase 1 production code, select Xcode 27, verify its Swift 6.4 compiler and SDKs, and record that evidence there. Mobile hardware availability does not block D3Import, shared Core/Metal, RevivalMac, RevivalEditor, or later Mac/shared dependency islands.
 
@@ -265,9 +265,9 @@ An optimization starts with a reproducible missed budget or regression. Keep it 
 
 ### Phase 1: complete Level with selected-room acceptance
 
-Phase 1 has separately closable Mac/shared and mobile-composition checkpoints. An open mobile checkpoint does not block the next Mac/shared dependency island, but it prevents an overall Phase 1 or mobile-complete claim.
+The Mac/shared Phase 1 checkpoint below authorizes Phase 2. Full Phase 1 product establishment additionally requires the bounded Slice 4 universal UIKit target, an unsigned generic-device or simulator build, and focused shared-path wiring evidence. Neither checkpoint requires physical-device visibility, trust, signing, or development-team setup, and an open Slice 4 does not block the next Mac/shared island.
 
-The Mac/shared checkpoint passes when:
+The checkpoint passes when:
 
 1. D3Import converts the complete owned Training Level topology through production parsers and emits the current reachable dependency manifest, distinguishing the eager dependencies reached by `PageInAllData` from later canonical preparations;
 2. RevivalMac and RevivalEditor each construct separately owned complete resident canonical `Level` values from the package with no retail archive mounted;
@@ -276,14 +276,21 @@ The Mac/shared checkpoint passes when:
 5. editor preview creates a disposable play-session copy, enters the shared shipping paths, and returns;
 6. the eager working set is ready at activation, later reachable assets resolve only from the canonical package, replacement follows the pre-commit/post-commit failure contract before final-use release, every reached source and functional row records the state its evidence supports, and focused red/green, affected-suite, clean Metal validation, and optimized M4 evidence are recorded.
 
-The mobile composition checkpoint passes when:
+The early mobile packet must prove that the universal UIKit target builds and wires the accepted Core, Metal, and package paths without another implementation. It advances mobile rows only as far as its focused automation, simulator, or unsigned generic-device evidence supports. It does not require or claim physical picker, presentation, lifecycle, touch, audio, memory, or thermal behavior.
 
-1. RevivalMobile constructs its own complete resident canonical `Level` and renders the same selected room through the already accepted Core/Metal and package paths;
-2. it acquires the Mac-produced canonical package through the system picker and shared `T-016`/`T-017` validation, staging, promotion, and activation path;
-3. recorded available physical development iPhone and iPad runs prove the current landscape/drawable, failed acquisition, suspension, abrupt-death/relaunch, abandoned-staging cleanup, prior-content preservation, backup-exclusion, and separate save/profile policy contracts;
-4. the reached mobile rows, including `P-090`, `P-091`, `T-016`, `T-017`, and `T-019`, advance only as far as their evidence supports, with mobile-focused red/green, affected-suite, clean Metal validation, and physical-device evidence recorded.
+The Mac/shared Phase 1 checkpoint passes when the requirements above close through one production path and releases Phase 2. The Phase 1 product-establishment record closes when the early mobile target/build packet also passes. `P-090`, `P-091`, `T-019`, and other physical mobile rows may remain open for Phase 8; `P-093` support-floor certification remains a Phase 10/public-release concern.
 
-Overall Phase 1 passes when both checkpoints pass through one production path and the source-accounting requirements for the milestone close. `P-093` support-floor certification may remain open until public beta or release; it cannot be used to block the Mac/shared checkpoint or ordinary mobile development.
+### Phase 8: accumulated mobile integration
+
+The first required physical mobile gate passes when:
+
+1. RevivalMobile constructs its own complete resident canonical `Level`, presents the accumulated campaign through the accepted Core/Metal path, and introduces no second loader, renderer, scheduler, input model, package schema, or lifetime path;
+2. it acquires a Mac-produced canonical package through the system picker and shared `T-016`/`T-017` validation, staging, promotion, and activation path;
+3. one selected direct native touch-control mechanism and physical controllers deliver every reachable action through the shared input snapshot without stuck state or a touch-only simulation path;
+4. recorded available physical development iPhone and iPad runs prove applicable landscape/drawable/safe-area, package failure, suspension, audio interruption, abrupt-death/relaunch, abandoned-staging cleanup, prior-content preservation, backup, save/profile, memory, thermal, and lifecycle contracts;
+5. affected mobile rows advance only as far as their focused red/green, affected-suite, clean Metal validation, application, and physical-device evidence supports.
+
+Candidate-floor certification remains a Phase 10/public-beta or release claim and is not part of this development-device gate.
 
 ### First playable combat slice
 
@@ -296,11 +303,11 @@ Phase 4 passes when the selected connected Training cluster supports:
 - required HUD, cockpit, sound, messaging, difficulty, save, and reload;
 - complete generated and handwritten behavior accounting;
 - authoring, validation, playtest, save/reopen, and package proof for the interaction;
-- clean tests, Metal validation and optimized profiles on the applicable Mac, iPhone and iPad reference devices.
+- clean tests, Metal validation and optimized M4 profiles; the accumulated physical mobile combat and performance proof joins at Phase 8.
 
 ### Complete playable Training Mission
 
-Training passes when every required runtime, behavior, presentation, save, replay, editor, validation, and publishing path works. It also closes the resident-level evidence gate after the complete playable Training Mission with a recorded keep-or-amend decision.
+Training passes on the Mac/shared lane when every required runtime, behavior, presentation, save, replay, editor, validation, and publishing path works. It also closes the M4 resident-level evidence gate with a recorded keep-or-amend decision. Phase 8 repeats the applicable player, lifetime, input, and presentation outcomes on physical mobile development devices.
 
 ### Campaign and creator gates
 
@@ -335,14 +342,14 @@ Before Phase 1 production begins, active documents must agree on:
 - one complete resident Level world, source-accounted eager working-set preparation, and canonical lazy paging added with each reachable translated path as the current implementation;
 - no speculative stream cells, stream blobs, spatial demand, or resident/streaming switch;
 - one explicit source-faithful old/new variable-time scheduler followed by a single Phase 3 timing decision;
-- macOS-leading Phase 1 implementation in which D3Import, shared Core/Metal, RevivalMac and RevivalEditor establish each slice before RevivalMobile composes it, while all products share world types, dependency rules, renderer, level I/O and play paths and own separate world, editor and play-session values behind direct AppKit and UIKit shells;
+- macOS-leading Phase 1–7 implementation in which D3Import, shared Core/Metal, RevivalMac and RevivalEditor establish each slice while the shared contracts remain directly mobile-composable; early RevivalMobile target/build work is nonblocking, and Phase 8 performs the required direct mobile integration behind the one UIKit shell;
 - complete human creator, campaign, replay, multiplayer, and mod-SDK scope through the evidenced shipped-game and creator-tool capability;
 - version 1.0 retail ownership and the one supported prepared-installation profile, with additional profiles and replacement assets left to later decisions;
 - affordable native Internet multiplayer as a required outcome, with the operational topology held as a Phase 0 research question rather than a preselected project-operated service;
 - focused red-first shipping implementation plus bounded disposable research;
 - evidence-driven modernization that deletes the superseded production path.
 
-The Phase 1 environment check must also show Xcode 27 selected, Swift 6.4 in Swift 6 language mode, the recorded macOS and iOS SDKs, the macOS deployment target, the universal mobile target's iOS/iPadOS floor, the candidate Apple GPU family 7 feature floor, and no Swift 6.3 compatibility branch. During the beta window it records the exact beta build; after release it records stable Xcode 27 and deletes any beta-only workaround. Exact physical mobile development environments are recorded when that lane begins; representative floor-device evidence is required only before the public beta or release claims that floor.
+The Phase 1 environment check must also show Xcode 27 selected, Swift 6.4 in Swift 6 language mode, the recorded macOS and iOS SDKs, the macOS deployment target, the universal mobile target's iOS/iPadOS floor, the candidate Apple GPU family 7 feature floor, and no Swift 6.3 compatibility branch. During the beta window it records the exact beta build; after release it records stable Xcode 27 and deletes any beta-only workaround. Exact physical mobile development environments are recorded at Phase 8; representative floor-device evidence is required only before the public beta or release claims that floor. Neither requirement can be used as an earlier blocker.
 
 The roadmap and accepted contracts point to [Current implementation plan](current-plan.md) as the single living record for current state, active slice, lane ownership, and real blockers. No active document maintains a competing current-work queue.
 

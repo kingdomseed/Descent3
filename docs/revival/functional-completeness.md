@@ -1,7 +1,7 @@
 # Functional completeness
 
 - Status: accepted, amended
-- Date: July 15, 2026
+- Date: July 18, 2026
 - Authority: binding product-scope contract
 
 ## Governing rule
@@ -16,7 +16,7 @@ Campaign-first development controls sequence. The evidenced shipped game and cre
 
 Version 1.0 has two player products: RevivalMac and the universal iPhone/iPad RevivalMobile. A shared gameplay, campaign, save, replay, presentation, or multiplayer capability applies to both unless its ledger row records a concrete platform reason otherwise. The ledger uses `Player` for that shared obligation, `Mac` only for macOS-specific application work, and `Mobile` only for iOS/iPadOS-specific application work. This avoids duplicating every gameplay row while still requiring composition and release evidence in each player product.
 
-RevivalEditor, D3Import, and dedicated no-window hosting are intentionally macOS-only. Mobile retail conversion is not part of version 1.0: RevivalMobile accepts only a Mac-produced canonical package through the system file picker and the same hostile native-package validation and activation boundary. The mobile player supports applicable campaign play, saves, replay, listen hosting, joining, and stock multiplayer. Its additional required contracts are `GCVirtualController` touch-gameplay input plus ordinary UIKit interface touch, UIKit scene lifecycle, safe-area and drawable-size behavior, AVAudioSession interruption and route handling, canonical-package intake and app-owned storage, physical-device memory and thermal evidence, signing, and an accepted lawful distribution route.
+RevivalEditor, D3Import, and dedicated no-window hosting are intentionally macOS-only. Mobile retail conversion is not part of version 1.0: RevivalMobile accepts only a Mac-produced canonical package through the system file picker and the same hostile native-package validation and activation boundary. The mobile player supports applicable campaign play, saves, replay, listen hosting, joining, and stock multiplayer. Its additional required contracts are one direct native touch-gameplay mechanism plus ordinary UIKit interface touch, UIKit scene lifecycle, safe-area and drawable-size behavior, AVAudioSession interruption and route handling, canonical-package intake and app-owned storage, physical-device memory and thermal evidence, signing, and an accepted lawful distribution route. UIKit is the default shell and UI framework; a bounded SwiftUI view is allowed only for a concrete current advantage and does not create a second player architecture. These mobile contracts remain version 1.0 requirements, but unavailable devices, signing, or development-team setup cannot block Phase 1–7 slices. Direct mobile integration begins in Phase 8 and continues through the applicable Phase 9 and Phase 10 gates.
 
 ## What compatibility means here
 

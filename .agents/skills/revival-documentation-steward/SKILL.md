@@ -78,7 +78,7 @@ If one answer is missing, label it unproven or assign the existing owner that mu
 
 1. **Name the maintenance boundary.** Record the base and target, active packet and checkpoint, integration owner, affected contracts and rows, and whether the task is entry, resumption, evidence change, amendment, handoff, or closure.
 2. **Compare claims with evidence.** Inspect the full changed-file contents and reachable consequences. Separate verified fact, accepted decision, inference, proposed update, and unresolved question.
-3. **Run a bounded drift scan.** Check active documents for conflicting platform floors, toolchains, target counts, phase state, ownership, blockers, next-step prose, superseded mechanisms, duplicate queues, broken links, and claims that exceed the recorded checkpoint.
+3. **Run a bounded drift scan.** Check active documents for conflicting platform floors, toolchains, target counts, phase state, ownership, blockers, next-step prose, superseded mechanisms, duplicate queues, broken links, and claims that exceed the recorded checkpoint. Reject any Phase 1–7 state or handoff that turns unavailable mobile hardware, signing, development-team setup, or physical-device evidence into `HOLD`; route those facts to the Phase 8 mobile gate. Confirm UIKit remains the default mobile lifecycle and UI toolkit and that any SwiftUI use has a bounded current justification.
 4. **Route the smallest durable update.** Change only the canonical owners whose facts changed. Preserve each document's status and authority header. Remove superseded active prose in the same change rather than leaving both directions.
 5. **Reconcile the handoff.** Give the integration owner the one completion-gate verdict and dispositions, an exact `current-plan.md` proposal, affected ledger transitions, accepted-document changes, verification, open uncertainty, and next two or three slices. The integration owner accepts, adjusts, or rejects the proposal against the evidence.
 
@@ -108,6 +108,8 @@ Return a concise documentation-continuity record containing:
 - the one completion-gate verdict, required-now items, deferred items, rejected ceremony, and stop instruction for a material closure;
 - remaining uncertainty and lane-labeled blockers;
 - the next two or three concrete slices when the active result changed them.
+
+Through Phase 7, label unavailable iPhone/iPad access, trust, signing, development-team selection, and unexecuted physical mobile evidence as deferred Phase 8 integration facts, not current blockers. Early mobile target, unsigned generic-device, and simulator evidence may be recorded only for the compatibility behavior it actually executed.
 
 Put detailed command transcripts and ephemeral troubleshooting in the change record, not in accepted documents or a new progress journal.
 

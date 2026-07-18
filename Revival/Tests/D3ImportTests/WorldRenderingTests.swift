@@ -1,6 +1,26 @@
 import XCTest
 
 final class WorldRenderingTests: XCTestCase {
+    func testCentersSquareWorldViewportInsideAnyDrawableShape() {
+        let portrait = centeredSquareMetalViewport(
+            drawableWidth: 1_170,
+            drawableHeight: 2_532
+        )
+        XCTAssertEqual(portrait.originX, 0)
+        XCTAssertEqual(portrait.originY, 681)
+        XCTAssertEqual(portrait.width, 1_170)
+        XCTAssertEqual(portrait.height, 1_170)
+
+        let landscape = centeredSquareMetalViewport(
+            drawableWidth: 2_360,
+            drawableHeight: 1_640
+        )
+        XCTAssertEqual(landscape.originX, 360)
+        XCTAssertEqual(landscape.originY, 0)
+        XCTAssertEqual(landscape.width, 1_640)
+        XCTAssertEqual(landscape.height, 1_640)
+    }
+
     func testRoomThreeConvexShellContainmentAcceptsItsBoundaryAndRejectsPastIt() {
         let center = RoomCamera.trainingRoom3.position
         let room = makeSourceContainmentRoom(

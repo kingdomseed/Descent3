@@ -31,7 +31,7 @@ If this skill conflicts with an accepted document, follow the document and repor
 - A dependency island is the implementation and cutover unit. It contains the smallest complete source path that can produce a real result through the applicable Mac player, mobile player, or editor entry point.
 - An observable contract is the verification unit. It states what the native product must do, not how the C++ happened to be arranged.
 - A roadmap phase is a product milestone. File count, translated line count, compiler-error count, and target count are not product progress.
-- A `current-plan.md` work packet is the near-term ownership and integration unit. It may close a Mac/shared checkpoint before its mobile composition checkpoint without closing the overall roadmap milestone.
+- A `current-plan.md` work packet is the near-term ownership and integration unit. Through Phase 7, it closes on its applicable Mac/shared contract; early mobile build and simulator composition is compatibility evidence rather than a second closure checkpoint. Phase 8 owns required physical mobile integration.
 
 Do not translate files alphabetically or require one Swift file per C++ file. Do not translate the whole repository before running the product. Complete one observable island at a time and leave one production path.
 
@@ -89,7 +89,7 @@ Use native ownership immediately when the replacement is clear:
 - canonical package values instead of a runtime legacy archive or page manager;
 - one editor document value and a separate disposable play-session value instead of global mode switching.
 
-The UIKit player shell, mobile file-picker handoff, virtual controls, safe-area and orientation policy, audio-session behavior, and scene lifecycle are deliberate native platform contracts, not source-faithful translations of a missing legacy mobile implementation. Keep source-supported simulation, world, scheduler, input-snapshot, renderer, and canonical-package semantics on the same shared path as RevivalMac, and record mobile-only observable requirements in the functional ledger rather than inventing legacy source rows for them.
+The UIKit player shell, mobile file-picker handoff, touch gameplay, safe-area and orientation policy, audio-session behavior, and scene lifecycle are deliberate native platform contracts, not source-faithful translations of a missing legacy mobile implementation. UIKit remains the default lifecycle and UI toolkit; use a bounded SwiftUI component only for a recorded current advantage and keep it inside the same UIKit lifecycle, navigation, state, and game-view path. Preserve source-supported simulation, world, scheduler, input-snapshot, renderer, and canonical-package semantics on the same shared path as RevivalMac, and record mobile-only observable requirements in the functional ledger rather than inventing legacy source rows for them.
 
 Defer behavioral redesign, not obvious removal of platform, ABI, allocation, and defensive baggage. Record every deliberate semantic difference. Never describe a redesign as a faithful transfer.
 
@@ -99,7 +99,7 @@ Work one focused red-green-refactor contract at a time. Compiler diagnostics may
 
 Follow [`revival-verification`](../revival-verification/SKILL.md) for evidence categories, falsification, nonexecuted tests, and milestone claims. Build, launch, focused behavior, integration, and performance checks answer different questions. Name the exact claim, command, input, configuration, and observed result; never substitute “smoke test passed.”
 
-For source translation specifically, a baseline establishes historical behavior, not native correctness; build and entry-point execution do not close semantics; a fixture does not prove the owned Training path; and an optimized measurement covers only its recorded workload and device. Mobile performance or lifetime claims require applicable physical iPhone and iPad evidence as well as the Mac/shared M4 evidence where that path is also claimed. Exact support-floor certification belongs to public-beta or release evidence; its absence leaves that release claim open without blocking the next Mac/shared dependency island. No test protecting the claimed contract may be skipped, weakened, or diverted through a nonproduction path.
+For source translation specifically, a baseline establishes historical behavior, not native correctness; build and entry-point execution do not close semantics; a fixture does not prove the owned Training path; and an optimized measurement covers only its recorded workload and device. Through Phase 7, early mobile target, generic-device, and simulator checks prove only their compatibility wiring; unavailable devices, signing, or development-team setup cannot block the island. Beginning with Phase 8, mobile performance or lifetime claims require applicable physical iPhone and iPad evidence as well as Mac/shared M4 evidence where that path is also claimed. Exact support-floor certification belongs to public-beta or release evidence. No test protecting the claimed contract may be skipped, weakened, or diverted through a nonproduction path.
 
 ## Treat workaround comments as a stop signal
 
@@ -167,7 +167,7 @@ Source accounting for the island closes only when:
 - every involved source row has the terminal state required by its disposition and current claim;
 - one direct native production path remains.
 
-For a player island shared by Mac and mobile, record the Mac/shared and mobile composition checkpoints separately. A Mac/shared packet may close and release the next Mac/shared dependency island after its applicable D3Import, RevivalMac, RevivalEditor, source, and evidence contracts pass, provided it leaves the one shared Core, Metal, package, scheduler, and lifetime path intact. RevivalMobile then composes that landed contract through its concrete shell and records mobile-only functional requirements separately from source-parity evidence. An open mobile checkpoint prevents mobile, overall-milestone, and version 1.0 closure; it does not retroactively invalidate the Mac/shared checkpoint. Simulator execution does not replace physical-device evidence required by a mobile claim.
+For a player island shared by Mac and mobile, close its Phase 1–7 packet after the applicable D3Import, RevivalMac, RevivalEditor, source, and evidence contracts pass, provided it leaves one mobile-composable Core, Metal, package, scheduler, input, and lifetime path. RevivalMobile may compile or compose that landed contract early through its concrete UIKit shell, but this is compatibility evidence rather than a separate closure checkpoint. Unavailable devices, signing, or development-team setup cannot block the packet or next Mac/shared island. Phase 8 then exercises the accumulated mobile-only functional requirements on physical devices; simulator execution does not replace evidence required by that Phase 8+ claim.
 
 The verification skill owns red/green, affected-suite, Mac/mobile/editor composition, nonexecuted-test, review-resolution evidence, and milestone closure; `revival-review` owns the review itself. At minimum, every documentation or production change also runs:
 

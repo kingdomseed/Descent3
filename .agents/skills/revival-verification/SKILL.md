@@ -25,7 +25,7 @@ Keep these claims distinct:
 | Entry-point execution | The executable reaches a named product boundary |
 | Focused green | The named contract works through its production path |
 | Affected suite | Directly affected contracts remain green |
-| Integrated checkpoint | The named Mac/shared, mobile composition, or overall-milestone paths compose |
+| Integrated checkpoint | The named Mac/shared path or the Phase 8+ mobile, multiplayer, or release path composes |
 | Optimized device measurement | The recorded representative workload meets or misses its stated budget on the named M4, iPhone, or iPad |
 | Milestone matrix | The explicitly listed milestone scope passes |
 
@@ -44,7 +44,7 @@ These are evidence categories, not new ledger states or a mandatory sequence. A 
 9. For a material slice, require the completed [`revival-review`](../revival-review/SKILL.md) report and confirm every concrete finding changed the diff or received evidence-backed resolution.
 10. Issue a bounded evidence verdict: supported at a named evidence rung, or unsupported with the concrete missing or contradictory evidence. For material closure, pass that result to [`revival-completion-gate`](../revival-completion-gate/SKILL.md) rather than deciding that every unexecuted broader evidence category blocks the packet.
 
-Documentation-only work uses link, consistency, and evidence checks. It does not manufacture a red product test. Performance changes start from a reproducible optimized measurement that misses an accepted budget or demonstrates a regression. Claims that cover mobile presentation, input, package intake, lifecycle, memory, thermal, or audio behavior require applicable physical iPhone and iPad evidence; simulator evidence alone cannot close them. Available development devices may close the ordinary mobile composition claims they actually exercise. Representative support-floor evidence is required for a public-beta or release-floor claim, and missing floor hardware leaves only that claim open rather than blocking Mac/shared work.
+Documentation-only work uses link, consistency, and evidence checks. It does not manufacture a red product test. Performance changes start from a reproducible optimized measurement that misses an accepted budget or demonstrates a regression. Through Phase 7, RevivalMobile target builds and focused simulator or unsigned generic-device checks are compatibility evidence only; unavailable hardware, signing, or development-team setup cannot return `HOLD` or block the next Mac/shared packet. Beginning with Phase 8, claims that cover mobile presentation, input, package intake, lifecycle, memory, thermal, or audio behavior require applicable physical iPhone and iPad evidence; simulator evidence alone cannot close them. Representative support-floor evidence is required for a public-beta or release-floor claim, and missing floor hardware leaves only that claim open.
 
 ## Proportional evidence authorization
 
@@ -58,7 +58,7 @@ For source rows, `translating` includes build, link, and entry-point evidence. `
 
 Functional rows may remain intermediate when the current milestone does not claim complete capability. When a row is claimed complete, every applicable runtime, authoring, validation, playtest, and publishing path must work; an inapplicable path needs a recorded reason.
 
-Record Mac/shared, mobile composition, and overall milestone checkpoints independently. A supported Mac/shared verdict can release the next Mac/shared packet while mobile composition remains unproven, provided one shared production path remains. Do not translate that bounded verdict into mobile, milestone, or version 1.0 completion.
+Record the Phase 1–7 Mac/shared result and early mobile compatibility evidence without inventing a second closure checkpoint. A supported Mac/shared verdict releases the next Mac/shared packet while accumulated physical mobile integration remains owned by Phase 8, provided one mobile-composable production path remains. Do not translate an early target build or simulator result into physical mobile, milestone, or version 1.0 completion.
 
 An explanation alone never turns a skip, stub, placeholder, or named replacement into proof. Do not create a new verification state machine, duplicate either ledger, or require fields irrelevant to the claim.
 
@@ -97,7 +97,7 @@ Accept a claimed island or milestone only when:
 
 - the exact claim and evidence rung are stated, with reproducible commands or procedures and observed results;
 - focused red-first history exists for every new or changed production behavior and required current tests execute and pass;
-- source comparisons, deliberate differences, provenance, and evidence applicable to the exact Mac/shared, mobile composition, or overall milestone claim are recorded;
+- source comparisons, deliberate differences, provenance, and evidence applicable to the exact Phase 1–7 Mac/shared, early mobile target/build, Phase 8+ mobile, or overall milestone claim are recorded;
 - source rows satisfy the island's closure rule; functional rows carry the evidence and state supported by the current slice and satisfy their terminal rule when complete capability or milestone closure is claimed, with no unexplained file, range, capability path, or nonexecuted case;
 - temporary research and scaffolding are removed or archived outside product targets;
 - independent fidelity, architecture, evidence, and simplicity findings are resolved;

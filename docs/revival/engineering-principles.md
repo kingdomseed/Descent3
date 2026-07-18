@@ -8,9 +8,9 @@
 
 Write the least project-owned code that can faithfully transfer and then improve the complete required game and creator experience. Minimal code means fewer concepts, paths, dependencies, and states a maintainer must understand. It does not mean compressed syntax, hidden behavior, or reduced scope.
 
-The recorded M4 Mac has ample capacity for a late-1990s game, so Mac/shared implementation leads. The available physical devices recorded in the current plan provide mobile-development evidence when mobile composition begins; exact release-floor hardware is a later public-beta or release certification concern, not a rewrite-start gate. Keep the first implementation direct on every target. Optimize and redesign only after a representative optimized build shows the problem.
+The recorded M4 Mac has ample capacity for a late-1990s game, so Mac/shared implementation leads. Early mobile target, build, and simulator work may proceed when useful, but unavailable devices, signing, or development-team setup cannot block Phase 1–7. The available physical devices recorded in the current plan become required development evidence at the Phase 8 mobile integration gate; exact release-floor hardware remains a later public-beta or release certification concern. Keep the first implementation direct on every target. Optimize and redesign only after a representative optimized build shows the problem.
 
-These are enduring implementation rules. The active slice, separate Mac/shared and mobile checkpoints, and current one-or-two-developer capacity and ownership live in the [current implementation plan](current-plan.md); update that file rather than duplicating a live task queue here.
+These are enduring implementation rules. The active slice, Mac/shared phase progress, early mobile compatibility work, late mobile integration gate, and current one-or-two-developer capacity and ownership live in the [current implementation plan](current-plan.md); update that file rather than duplicating a live task queue here.
 
 ## Translation guardrail
 
@@ -31,7 +31,7 @@ Work one dependency island at a time and keep the real editor and player runnabl
 
 - One implementation is a concrete type, not a protocol hierarchy.
 - One caller uses a direct call, not an event bus.
-- Each concrete application shell uses its framework directly: AppKit for RevivalMac and RevivalEditor, UIKit for RevivalMobile. Multiple shells do not justify a generic platform, application-host, input, file-system or renderer abstraction.
+- Each concrete application shell uses its framework directly: AppKit for RevivalMac and RevivalEditor, UIKit for RevivalMobile. UIKit is the mobile default. A bounded SwiftUI view is justified only by a concrete current technical or product advantage and may not create another lifecycle, navigation model, state owner, renderer path, or unnecessary `MTKView` bridge. Multiple shells or UI frameworks do not justify a generic platform, application-host, input, file-system or renderer abstraction.
 - One renderer uses explicit passes, not a render graph.
 - Domain object families use direct collections, not an ECS.
 - The current behavior slice uses canonical direct typed functions, not a predesigned general VM or forced future rewrite.
@@ -90,7 +90,7 @@ The first loading path is intentionally direct:
 
 Failure before commit preserves the current world; failure after commit enters an explicit unloaded error state. Loading may move one bounded operation off the main actor when measured latency warrants it. An iOS or iPadOS memory warning may trigger the ordinary drain-and-release path and an explicit unloaded or recoverable error state; it does not authorize partial eviction. Do not add a task per asset, stream cell, spatial demand calculation, prefetch policy, LRU, alternate memory-pressure residency mode, cache hierarchy, or resident/streaming switch.
 
-If applicable optimized evidence after the complete playable Training Mission proves the resident path inadequate, follow the amendment rule in [World loading and residency](world-loading.md). Mac/shared evidence may trigger that investigation without waiting for release-floor certification; the replacement still leaves one production lifetime path that is verified through mobile composition before the affected overall milestone closes.
+If applicable optimized evidence after the complete playable Training Mission proves the resident path inadequate, follow the amendment rule in [World loading and residency](world-loading.md). Mac/shared evidence may trigger that investigation without waiting for mobile integration or release-floor certification; the replacement still leaves one production lifetime path that is verified through the Phase 8 mobile integration gate before version 1.0 closes.
 
 ## Concurrency
 
@@ -168,7 +168,7 @@ Every nontrivial trace or profile begins with a hypothesis, representative conte
 
 Performance work follows this order:
 
-1. measure an optimized build on every recorded development device affected by the implementation claim, and on selected floor devices before making a public support-floor claim;
+1. measure an optimized build on every recorded development device required by the current implementation claim—M4 for Phase 1–7 Mac/shared claims, applicable physical mobile devices from Phase 8 onward—and on selected floor devices before making a public support-floor claim;
 2. identify the responsible function, allocation, GPU pass, transfer, or wait;
 3. make the smallest change that addresses it;
 4. verify behavior and measure again;

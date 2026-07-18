@@ -63,7 +63,8 @@ Check:
 - RevivalMac, RevivalMobile and RevivalEditor consume canonical content through shared world, renderer, and simulation types behind their concrete shells;
 - the change leaves one loader, renderer, scheduler decision, behavior path, and resource-lifetime path;
 - no compatibility bridge, runtime legacy reader, streaming flag, speculative framework, or alternate backend appeared;
-- macOS-leading phase ordering may leave a separate mobile composition checkpoint open without silently deleting committed mobile capability, blocking the next independent Mac/shared island, or creating a temporary Mac-only shared path;
+- macOS-leading Phase 1–7 ordering may include early mobile build and simulator composition without creating a separate closure gate; unavailable hardware, signing, or development-team setup cannot block the packet, phase, or next Mac/shared island, and the shared path may not become temporarily Mac-only;
+- UIKit owns the RevivalMobile application lifecycle and remains the default UI toolkit; any SwiftUI use has one bounded current advantage and stays inside the existing UIKit lifecycle, navigation, state, renderer, and game-view path;
 - human creator workflows remain first-class where the slice requires them;
 - any binding product or cross-workstream change received the required amendment instead of entering through code.
 
@@ -81,7 +82,7 @@ Check:
 - focused green, affected suite, build, launch, integration, image, device, security, and performance claims are not substituted for one another;
 - exact commands, inputs, configurations, results, and exposed executed/failed/skipped counts are recorded;
 - no protecting test is skipped, disabled, quarantined, deleted, weakened, or diverted through a test-only path;
-- every checkpoint actually claimed by the change passes: Mac/shared evidence for a Mac/shared claim, physical iPhone and iPad evidence for a mobile composition claim, and both for overall milestone closure; unavailable support-floor hardware blocks only a public-beta or release-floor claim, which must remain open or raise the released floor;
+- every checkpoint actually claimed by the change passes: Phase 1–7 Mac/shared claims use their applicable Mac/shared evidence, while early mobile target, generic-device, or simulator checks prove only the compatibility behavior they execute and cannot become a separate closure gate; Phase 8 mobile integration and applicable Phase 9–10 claims require their named physical iPhone and iPad evidence; unavailable support-floor hardware blocks only a public-beta or release-floor claim, which must remain open or raise the released floor;
 - every involved source row has the state required to close the claimed island, and each functional row has evidence and the state appropriate to the current slice; a functional row must be terminal only when complete capability closure is claimed;
 - the documentation-continuity handoff routes durable facts to their existing canonical owners, gives the integration owner an exact current-plan proposal or a justified no-change result, and creates no parallel plan or status diary;
 - research code, scaffolding, generated local content, and temporary alternate paths are deleted or archived outside product targets.

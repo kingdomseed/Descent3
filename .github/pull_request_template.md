@@ -41,6 +41,8 @@
 - Completion-gate verdict: required-now corrections, stopped/deleted ceremony, deferred later work, and exact stop instruction:
 - Documentation continuity: canonical files and rows reconciled, or `no documentation change required` with checked owners; proposed current-plan state or next-packet update and integration-owner disposition:
 - Image, device, package, security, or performance evidence:
+- Mobile evidence applicability: for Phase 1–7, record target, unsigned generic-device, or simulator checks only when run and classify unavailable hardware, signing, and development-team setup as deferred Phase 8 facts rather than blockers; for Phase 8+, record the applicable physical-device evidence:
+- RevivalMobile UI choice, if affected: UIKit default, or the bounded current advantage that justifies a SwiftUI component inside the existing UIKit lifecycle and state path:
 - N/A reason, if permitted:
 
 ### Screenshots (if applicable)
@@ -61,6 +63,8 @@
 - [ ] I did not present build, launch, or a synthetic fixture as proof of behavior it did not exercise.
 - [ ] No stub, stand-in constant, disabled production path, required-test skip, or workaround comment is serving in place of the claimed contract.
 - [ ] I kept one production path and did not add speculative abstraction.
+- [ ] I did not return `HOLD` during Phase 1–7 for unavailable mobile hardware, trust, signing, development-team setup, or physical-device evidence; Phase 8 owns required physical mobile integration.
+- [ ] RevivalMobile remains UIKit-first. Any SwiftUI component has a concrete current advantage and does not create a second lifecycle, navigation model, state owner, renderer, or game-view path.
 - [ ] Where applicable, I validate untrusted input once at its boundary rather than duplicating impossible-state checks inside trusted code.
 - [ ] I have documented any new or modified functionality.
 - [ ] I have reviewed the changes to ensure they do not introduce any unnecessary complexity or duplicate code.

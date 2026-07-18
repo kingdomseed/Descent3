@@ -6,6 +6,7 @@ import MetalKit
 import QuartzCore
 import simd
 
+#if !targetEnvironment(simulator)
 enum MetalWorldRendererError: Error, LocalizedError {
     case metalUnavailable
     case metal4Unavailable
@@ -24,6 +25,21 @@ enum MetalWorldRendererError: Error, LocalizedError {
             "Metal could not prepare \(name)."
         }
     }
+}
+
+func centeredSquareMetalViewport(
+    drawableWidth: Double,
+    drawableHeight: Double
+) -> MTLViewport {
+    let side = min(drawableWidth, drawableHeight)
+    return MTLViewport(
+        originX: (drawableWidth - side) / 2,
+        originY: (drawableHeight - side) / 2,
+        width: side,
+        height: side,
+        znear: 0,
+        zfar: 1
+    )
 }
 
 @MainActor
@@ -47,6 +63,10 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
     private var submittedValue: UInt64 = 0
     private var submittedFrameCount = 0
     private var firstFrameTime = CACurrentMediaTime()
+
+    var hasPresentation: Bool {
+        presentation != nil
+    }
 
     init(view: MTKView) throws {
         guard let device = view.device ?? MTLCreateSystemDefaultDevice() else {
@@ -229,15 +249,10 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             return
         }
 
-        let square = min(view.drawableSize.width, view.drawableSize.height)
         encoder.setViewport(
-            MTLViewport(
-                originX: (view.drawableSize.width - square) / 2,
-                originY: (view.drawableSize.height - square) / 2,
-                width: square,
-                height: square,
-                znear: 0,
-                zfar: 1
+            centeredSquareMetalViewport(
+                drawableWidth: Double(view.drawableSize.width),
+                drawableHeight: Double(view.drawableSize.height)
             )
         )
         encoder.setCullMode(.none)
@@ -720,3 +735,4 @@ private func worldToClip(_ camera: RoomCamera) -> simd_float4x4 {
     ))
     return projection * view
 }
+#endif

@@ -118,8 +118,8 @@ struct CanonicalPackageRequestQueue<Request> {
     }
 }
 
-/// The concrete native-package boundary shared by the Mac player and later
-/// platform shells. It owns one directory of immutable package generations and
+/// The concrete native-package boundary shared by the player shells and editor.
+/// It owns one directory of immutable package generations and
 /// one atomically replaced active-base reference; package publication remains
 /// D3Import's separate responsibility.
 struct CanonicalPackageLibrary: Sendable {
@@ -127,6 +127,11 @@ struct CanonicalPackageLibrary: Sendable {
 
     static let revivalMac = applicationSupportLibrary(component: "RevivalMac")
     static let revivalEditor = applicationSupportLibrary(component: "RevivalEditor")
+    static let revivalMobile = applicationSupportLibrary(component: "RevivalMobile")
+
+    var reimportableContentBackupExclusionURL: URL {
+        rootURL
+    }
 
     init(rootURL: URL) {
         self.rootURL = rootURL.standardizedFileURL
@@ -139,6 +144,13 @@ struct CanonicalPackageLibrary: Sendable {
                 at: packagesDirectoryURL.appending(path: name)
             )
         }
+    }
+
+    func excludeReimportableContentFromBackup() throws {
+        var contentURL = reimportableContentBackupExclusionURL
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try contentURL.setResourceValues(values)
     }
 
     func installAndActivate(from candidateURL: URL) throws -> ActivatedCanonicalPackage {
@@ -275,13 +287,8 @@ struct CanonicalPackageLibrary: Sendable {
     }
 
     private static func applicationSupportLibrary(component: String) -> Self {
-        let supportURL = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first ?? FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Library/Application Support", directoryHint: .isDirectory)
         return Self(
-            rootURL: supportURL
+            rootURL: URL.applicationSupportDirectory
                 .appending(path: "Descent3Revival", directoryHint: .isDirectory)
                 .appending(path: component, directoryHint: .isDirectory)
                 .appending(path: "Content", directoryHint: .isDirectory)

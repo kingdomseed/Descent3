@@ -1,7 +1,7 @@
 # One-way content pipeline
 
 - Status: accepted, amended
-- Date: July 17, 2026
+- Date: July 18, 2026
 - Authority: binding content and import contract
 
 ## Boundary
@@ -24,7 +24,7 @@ The player applications and editor do not mount HOG archives, open MN3 or D3L fi
 
 The first importer favors traceability over premature normalization. It reproduces source naming, precedence, the complete Training D3L world boundary, the eager `PageInAllData` working set, and lazy-page dependencies reached by the currently translated product path in a canonical form traceable against the released loaders. Phase 1 accepts one room visually, but the production package contains the complete `Level`; one-room packages and synthetic portal cuts are fixtures only. The manifest expands when a later behavior, matcen, or dynamic-spawn path enters the product, so Phase 1 does not pretend to solve Phase 4 reachability. This is not evidence that the old renderer had every resource ready at activation.
 
-This document owns the content contracts. The active import slice, separate Mac/shared and mobile checkpoints, and developer ownership live in the [current implementation plan](current-plan.md); update that file when execution state changes rather than adding a second queue here.
+This document owns the content contracts. The active import slice, Mac/shared progress, early mobile compatibility work, Phase 8 mobile integration gate, and developer ownership live in the [current implementation plan](current-plan.md); update that file when execution state changes rather than adding a second queue here.
 
 ## Initial source profile
 
@@ -85,7 +85,7 @@ Phase 1 local retail import needs checked paths, destination ownership, atomic r
 
 RevivalEditor publishes immutable canonical native packages. RevivalMac and RevivalMobile each own explicit local installation and activation of those packages. RevivalEditor also owns a separate local base library so an authoring project can retain an immutable canonical package reference and reopen after the external import candidate is gone; this Phase 1 base role does not absorb the player library's later enable, disable, replacement, removal, or campaign UX. None of the three applications treats an arbitrary directory as trusted canonical content merely because the importer or publisher normally creates valid output.
 
-Phase 1 implements the shared validation, destination-adjacent staging, atomic promotion, base activation and prior-set recovery needed by the Mac player and editor-base paths. RevivalMobile then composes the system-picker and app-owned-storage handoff through the same Core contract as its own checkpoint. An open mobile intake checkpoint does not block the next Mac/shared content island, but it does block the applicable overall milestone and version 1.0. Later publishing grows those same validators only with real new schema and adds replacement ordering; `T-018` adds complete player-library actions and campaign UX. No temporary mobile installer or full speculative library precedes them.
+Phase 1 implements the shared validation, destination-adjacent staging, atomic promotion, base activation and prior-set recovery needed by the Mac player and editor-base paths. RevivalMobile may wire the system-picker and app-owned-storage handoff to the same Core contract early, but target, simulator, or automated work does not create a physical mobile closure gate. Phase 8 proves the accumulated picker, storage, activation, lifecycle, and recovery path on available physical devices. An open mobile intake state cannot block a Phase 1–7 slice or phase, but it must close in Phase 8 and for version 1.0. Later publishing grows those same validators only with real new schema and adds replacement ordering; `T-018` adds complete player-library actions and campaign UX. No temporary mobile installer or full speculative library precedes them.
 
 Each application serializes accepted package requests through one bounded install-and-activate operation so the presented world and durable active-base reference cannot be reordered by overlapping file-open events. Launch recovery removes abandoned destination-adjacent staging before new intake; if recovery fails, the application blocks new candidates while leaving the unchanged prior active-base record available for loading.
 
@@ -182,7 +182,7 @@ The whole-retail lightmap measurement still informs a later packing decision, bu
 - accepted before/after images;
 - a migration or reimport plan for current development content.
 
-Likewise, the historical 32-by-32 terrain grouping is imported as historical terrain data, not promoted into a streaming partition. Terrain rendering and editing decisions follow the roadmap's source-faithful baseline and recorded Mac and mobile-device evidence.
+Likewise, the historical 32-by-32 terrain grouping is imported as historical terrain data, not promoted into a streaming partition. Terrain rendering and editing decisions follow the roadmap's source-faithful baseline, applicable M4 evidence, and the Phase 8+ mobile-device evidence for an affected mobile claim.
 
 ## Content identity and versioning
 
@@ -231,4 +231,4 @@ Expand legacy import only as the next playable stock slice uses it:
 5. Mercenary in campaign order;
 6. stock multiplayer maps when multiplayer begins.
 
-Each slice expands the current dependency manifest and advances the corresponding rows in the checked-in source-translation ledger. Its Mac/shared checkpoint covers D3Import, shared Core and Metal, RevivalMac, and RevivalEditor where applicable; its mobile checkpoint composes that landed contract through RevivalMobile. The next Mac/shared content island may begin while mobile composition remains open, but no applicable overall milestone or version 1.0 closes until both checkpoints do. A development campaign import may contain a subset of campaign levels, but every included Level has complete topology and uses the one production world type. A release-complete campaign import includes every required level, behavior, font role, audio file, score, briefing, movie, and transition for the recognized profile.
+Each slice expands the current dependency manifest and advances the corresponding rows in the checked-in source-translation ledger. Through Phase 7, its closure covers D3Import, shared Core and Metal, RevivalMac, and RevivalEditor where applicable. RevivalMobile may consume landed contracts early through target builds and focused automation, but there is no per-slice physical mobile gate. Phase 8 integrates the accumulated package and player paths on available physical devices before version 1.0. A development campaign import may contain a subset of campaign levels, but every included Level has complete topology and uses the one production world type. A release-complete campaign import includes every required level, behavior, font role, audio file, score, briefing, movie, and transition for the recognized profile.

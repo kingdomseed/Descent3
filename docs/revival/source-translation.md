@@ -83,7 +83,7 @@ The project-local [revival-source-translation skill](../../.agents/skills/reviva
 
 The [current implementation plan](current-plan.md) is the sole live record of the active island, checkpoint state and developer ownership. Update it as work advances; do not turn this source-accounting contract or its ledger into a competing task queue.
 
-An island may reach its Mac/shared checkpoint through D3Import, shared Core and Metal, RevivalMac, and RevivalEditor where applicable before its RevivalMobile composition checkpoint closes. That open mobile checkpoint does not block starting the next Mac/shared dependency island. It does prevent any claim that the island is complete on mobile, that its overall roadmap milestone is closed, or that version 1.0 is complete. The lead work may not create a temporary Mac-only canonical model, renderer, scheduler, package schema, or lifetime path.
+Through Phase 7, an island closes on its applicable Mac/shared result through D3Import, shared Core and Metal, RevivalMac, and RevivalEditor. RevivalMobile may compile or compose landed shared work early, but physical-device availability, signing, development-team setup, or an open mobile integration state cannot block the island, phase, or next Mac/shared packet. The required direct mobile integration gate begins in Phase 8 and continues through the applicable Phase 9 and Phase 10 work. This timing never permits a temporary Mac-only canonical model, renderer, scheduler, input model, package schema, or lifetime path, and it never removes mobile or touch from version 1.0.
 
 ## Initial fidelity baseline
 
@@ -101,7 +101,7 @@ The first implementation preserves the source-derived world, loading, visibility
 
 The canonical package contains the complete level topology and every dependency reachable through the currently translated product path. When a later phase makes a matcen, dynamic spawn, or behavior path executable, the importer and manifest expand with that same island. This preserves the one-way content boundary without demanding Phase 4 behavior reachability analysis in Phase 1. Source inspection still shows reachable lazy paging, and the retained GPU pre-upload hook does not establish complete GPU readiness before activation.
 
-UIKit scene composition, mobile document-picker intake, virtual controls, audio-session handling and mobile lifecycle recovery are deliberate platform replacements with no legacy-file fidelity claim. They attach target-specific evidence to the applicable functional contract while the underlying source-derived world, simulation, renderer, scheduler and package semantics remain one implementation. AppKit and UIKit entry points do not create separate source-disposition tracks or justify a generic platform layer.
+UIKit scene composition, mobile document-picker intake, touch controls, audio-session handling and mobile lifecycle recovery are deliberate platform replacements with no legacy-file fidelity claim. UIKit is the default mobile UI framework. A bounded SwiftUI component may be used only for a concrete current advantage and remains inside the UIKit lifecycle and state path. These platform contracts attach target-specific evidence to the applicable functional row while the underlying source-derived world, simulation, renderer, scheduler and package semantics remain one implementation. AppKit, UIKit, and any bounded SwiftUI view do not create separate source-disposition tracks or justify a generic platform layer.
 
 This baseline is resident per complete level. Phase 5 completes Training as a playable and editable mission; it does not introduce a second, fuller Level type. The baseline is neither a claim that streaming will never be useful nor permission to implement streaming in parallel. The current product has one resident loading path. A different resource-lifetime design requires the measured amendment described in [World loading and residency](world-loading.md), and the replacement must leave one production path.
 
@@ -124,7 +124,7 @@ Boundary validation happens once when untrusted retail, project, package, save, 
 Modernization is a separate, explicit step:
 
 1. get the translated path working;
-2. measure it in an optimized build on every recorded development device affected by the change, with representative content, and add selected release-floor devices only when the change supports a public floor claim;
+2. measure it in an optimized build with representative content on the devices required by the current claim: the recorded M4 for Phase 1–7 Mac/shared work, applicable physical mobile development devices beginning with Phase 8, and selected floor devices only for a public support-floor claim;
 3. identify the specific missed budget, maintenance problem, or Apple-platform opportunity;
 4. record a local structural change in the translation ledger, or amend the binding documents when changing a product decision, persistent semantic contract, or cross-workstream architecture;
 5. add the focused contract or measurement that fails;

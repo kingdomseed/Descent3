@@ -57,7 +57,7 @@ Look for concrete simplifications in five areas.
 - Replace one-implementation protocols, managers, services, providers, registries, and factories with concrete ownership.
 - Remove mode flags, broad optionals, fallback paths, and hidden mutable state when construction can express one valid state.
 - Keep one mutable simulation owner and resident-level owner per application or play-session instance, one shared renderer implementation, and distinct editor-document and play-session values.
-- Use direct AppKit or UIKit, Metal, MetalKit, GameController, AVFoundation, AVAudioSession, Network, and CryptoKit calls in the concrete target that owns each service. Do not consolidate the two shells into a generic platform, input, or filesystem abstraction.
+- Use direct AppKit or UIKit, Metal, MetalKit, GameController, AVFoundation, AVAudioSession, Network, and CryptoKit calls in the concrete target that owns each service. UIKit remains RevivalMobile's default lifecycle and UI toolkit. Retain a SwiftUI component only when it has a documented current advantage and stays inside the same UIKit lifecycle, navigation, state, and game-view path. Do not consolidate the shells into a generic platform, input, or filesystem abstraction.
 - Keep canonical data free of renderer objects, framework workarounds, and legacy container knowledge.
 
 ### Control flow and defensive code
@@ -76,7 +76,7 @@ Look for concrete simplifications in five areas.
 - Remove work that is provably repeated, unused, or immediately overwritten.
 - Keep observable iteration order, Float32 operation order, update order, eager preparation, reachable lazy dependency discovery, and final GPU-use lifetime intact.
 - Do not add concurrency, caching, unsafe access, specialization, custom allocation, streaming, or a scheduler change as cleanup.
-- Performance refactoring requires the accepted optimized M4 measurement gate and, when the claim includes a mobile path, applicable physical iPhone and iPad measurement. Exact support-floor certification is public-beta or release evidence and does not block an independent Mac/shared simplification. Line count and theoretical speed are not evidence.
+- Performance refactoring requires the accepted optimized M4 measurement gate for an applicable Mac/shared claim and, beginning with Phase 8, applicable physical iPhone and iPad measurement for a mobile claim. Unavailable mobile hardware, signing, or development-team setup cannot make a Phase 1–7 simplification `HOLD`. Exact support-floor certification is public-beta or release evidence. Line count and theoretical speed are not evidence.
 
 ### Blast radius
 
