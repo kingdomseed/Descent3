@@ -74,7 +74,7 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
-    func testProjectPersistsOnlyAnInstalledBaseReferenceAndRoomNameDelta() throws {
+    func testProjectPersistsOnlyAnInstalledBaseReferenceAndSelectedValueDeltas() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
@@ -101,7 +101,18 @@ final class EditorProjectTests: XCTestCase {
         let object = try XCTUnwrap(
             JSONSerialization.jsonObject(with: json) as? [String: Any]
         )
-        XCTAssertEqual(Set(object.keys), ["base", "roomNameEdits", "schemaVersion"])
+        XCTAssertEqual(
+            Set(object.keys),
+            [
+                "base",
+                "faceMaterialEdits",
+                "objectTransformEdits",
+                "playerStartTransformEdits",
+                "portalRenderingEdits",
+                "roomNameEdits",
+                "schemaVersion",
+            ]
+        )
         XCTAssertNil(object["level"])
         XCTAssertFalse(String(decoding: json, as: UTF8.self).contains("presentationMaterials"))
 
@@ -302,6 +313,442 @@ final class EditorProjectTests: XCTestCase {
 
         document.undoManager?.redo()
         XCTAssertEqual(document.project.level.rooms.first { $0.sourceIndex == 3 }?.name, "Course Start")
+    }
+
+    @MainActor
+    func testFaceMaterialAndPortalRenderingEditsRegisterNamedUndo() throws {
+        let document = RevivalProjectDocument(
+            project: try makeProject(importedBase: makeEditableProjectLevel())
+        )
+        let alternateTexture = document.project.level.presentationMaterials[0].texture
+
+        try document.selectFace(1)
+        try document.setSelectedFaceMaterial(to: alternateTexture)
+        XCTAssertEqual(
+            document.project.level.rooms.first { $0.sourceIndex == 3 }?.faces[1].texture,
+            alternateTexture
+        )
+        XCTAssertEqual(document.undoManager?.undoActionName, "Set Face Material")
+        document.undoManager?.undo()
+        XCTAssertNotEqual(
+            document.project.level.rooms.first { $0.sourceIndex == 3 }?.faces[1].texture,
+            alternateTexture
+        )
+        document.undoManager?.redo()
+
+        try document.selectPortal(0)
+        try document.setSelectedPortalRendersFaces(false)
+        XCTAssertEqual(
+            try XCTUnwrap(document.project.level.rooms.first { $0.sourceIndex == 3 }).portals[0].flags & 1,
+            UInt32(0)
+        )
+        XCTAssertEqual(document.undoManager?.undoActionName, "Set Portal Rendering")
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            try XCTUnwrap(document.project.level.rooms.first { $0.sourceIndex == 3 }).portals[0].flags & 1,
+            UInt32(1)
+        )
+    }
+
+    @MainActor
+    func testObjectAndPlayerStartTransformsUseStableIdentitiesAndNamedUndo() throws {
+        let document = RevivalProjectDocument(
+            project: try makeProject(importedBase: makeEditableProjectLevel())
+        )
+        let quarterTurn = Matrix3(
+            right: .init(x: 0, y: 1, z: 0),
+            up: .init(x: -1, y: 0, z: 0),
+            forward: .init(x: 0, y: 0, z: 1)
+        )
+
+        let objectBefore = try XCTUnwrap(
+            document.project.level.objects.first { $0.handle == 6_147 }
+        )
+        XCTAssertThrowsError(
+            try document.setObjectTransform(
+                handle: 6_147,
+                to: .init(
+                    position: .init(
+                        x: objectBefore.position.x + 0.25,
+                        y: objectBefore.position.y,
+                        z: objectBefore.position.z
+                    ),
+                    orientation: objectBefore.orientation
+                )
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? RevivalProjectError,
+                .objectPositionEditDeferred(6_147)
+            )
+        }
+        XCTAssertEqual(
+            document.project.level.objects.first { $0.handle == 6_147 },
+            objectBefore
+        )
+        try document.rotateObjectQuarterTurn(handle: 6_147)
+        XCTAssertEqual(
+            document.project.level.objects.first { $0.handle == 6_147 }?.orientation,
+            quarterTurn
+        )
+        XCTAssertEqual(document.undoManager?.undoActionName, "Transform Object")
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first { $0.handle == 6_147 }?.orientation,
+            objectBefore.orientation
+        )
+
+        let playerBefore = try XCTUnwrap(
+            document.project.level.objects.first { $0.handle == 2_048 }
+        )
+        XCTAssertThrowsError(
+            try document.setPlayerStartTransform(
+                playerID: 0,
+                handle: 2_048,
+                to: .init(
+                    position: .init(
+                        x: playerBefore.position.x + 0.25,
+                        y: playerBefore.position.y,
+                        z: playerBefore.position.z
+                    ),
+                    orientation: playerBefore.orientation
+                )
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? RevivalProjectError,
+                .playerStartPositionEditDeferred(playerID: 0, handle: 2_048)
+            )
+        }
+        try document.rotatePlayerStartQuarterTurn(handle: 2_048)
+        XCTAssertEqual(
+            document.project.level.objects.first { $0.handle == 2_048 }?.orientation,
+            quarterTurn
+        )
+        XCTAssertEqual(document.undoManager?.undoActionName, "Transform Player Start")
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first { $0.handle == 2_048 }?.orientation,
+            playerBefore.orientation
+        )
+    }
+
+    @MainActor
+    func testSelectedValueDeltasRoundTripDeterministicallyWithSemanticDiff() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        let importedBase = makeEditableProjectLevel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        try writeCanonicalPackage(importedBase, to: candidate)
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        let quarterTurn = Matrix3(
+            right: .init(x: 0, y: 1, z: 0),
+            up: .init(x: -1, y: 0, z: 0),
+            forward: .init(x: 0, y: 0, z: 1)
+        )
+
+        try document.selectRoom(sourceIndex: 1)
+        try document.renameSelectedRoom(to: "Generator Annex")
+        try document.selectRoom(sourceIndex: 3)
+        try document.selectFace(1)
+        try document.setSelectedFaceMaterial(to: importedBase.presentationMaterials[0].texture)
+        try document.selectPortal(0)
+        try document.setSelectedPortalRendersFaces(false)
+        let object = try XCTUnwrap(importedBase.objects.first { $0.handle == 6_147 })
+        try document.setObjectTransform(
+            handle: object.handle,
+            to: .init(position: object.position, orientation: quarterTurn)
+        )
+        let player = try XCTUnwrap(importedBase.objects.first { $0.handle == 2_048 })
+        try document.setPlayerStartTransform(
+            playerID: player.storedID,
+            handle: player.handle,
+            to: .init(position: player.position, orientation: quarterTurn)
+        )
+
+        let first = try document.fileWrapper(ofType: RevivalProjectDocument.projectType)
+        let second = try document.fileWrapper(ofType: RevivalProjectDocument.projectType)
+        let firstJSON = try XCTUnwrap(first.fileWrappers?["project.json"]?.regularFileContents)
+        XCTAssertEqual(
+            firstJSON,
+            try XCTUnwrap(second.fileWrappers?["project.json"]?.regularFileContents)
+        )
+        XCTAssertEqual(document.project.semanticDiff.count, 5)
+
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(from: first, ofType: RevivalProjectDocument.projectType)
+        XCTAssertEqual(reopened.project, document.project)
+        XCTAssertEqual(reopened.project.semanticDiff, document.project.semanticDiff)
+        XCTAssertEqual(try library.load(activation.reference), importedBase)
+    }
+
+    func testCanonicalBoundaryRejectsMismatchedReciprocalPortalGeometry() throws {
+        var level = makeConnectedRoomProjectLevel()
+        let roomIndex = try XCTUnwrap(level.rooms.firstIndex { $0.sourceIndex == 2 })
+        let room = level.rooms[roomIndex]
+        var faces = room.faces
+        let portalFaceIndex = room.portals[1].faceIndex
+        let portalFace = faces[portalFaceIndex]
+        faces[portalFaceIndex] = LevelFace(
+            corners: Array(portalFace.corners.reversed()),
+            flags: portalFace.flags,
+            portalIndex: portalFace.portalIndex,
+            texture: portalFace.texture,
+            lightmapInfoIndex: portalFace.lightmapInfoIndex,
+            allowsLightCorona: portalFace.allowsLightCorona,
+            lightMultiple: portalFace.lightMultiple,
+            special: portalFace.special
+        )
+        level.rooms[roomIndex] = LevelRoom(
+            sourceIndex: room.sourceIndex,
+            name: room.name,
+            pathPoint: room.pathPoint,
+            vertices: room.vertices,
+            faces: faces,
+            portals: room.portals,
+            flags: room.flags,
+            pulseTime: room.pulseTime,
+            pulseOffset: room.pulseOffset,
+            mirrorFaceIndex: room.mirrorFaceIndex,
+            door: room.door,
+            volumeLights: room.volumeLights,
+            fog: room.fog,
+            ambientSoundPattern: room.ambientSoundPattern,
+            reverb: room.reverb,
+            damage: room.damage,
+            damageType: room.damageType
+        )
+
+        XCTAssertThrowsError(try level.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .mismatchedPortalGeometry(room: 3, portal: 0)
+            )
+        }
+    }
+
+    func testCanonicalBoundaryValidatesConnectedFaceBeforeMatchingGeometry() throws {
+        var level = makeConnectedRoomProjectLevel()
+        let roomIndex = try XCTUnwrap(level.rooms.firstIndex { $0.sourceIndex == 2 })
+        let portal = level.rooms[roomIndex].portals[1]
+        level.rooms[roomIndex].portals[1] = LevelPortal(
+            flags: portal.flags,
+            faceIndex: level.rooms[roomIndex].faces.count,
+            connectedRoom: portal.connectedRoom,
+            connectedPortal: portal.connectedPortal,
+            boundaryNodeIndex: portal.boundaryNodeIndex,
+            pathPoint: portal.pathPoint,
+            combineMaster: portal.combineMaster
+        )
+
+        XCTAssertThrowsError(try level.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidFacePortal(room: 2, face: 1)
+            )
+        }
+    }
+
+    func testCanonicalBoundaryRejectsReachedMalformedFaceStructure() throws {
+        let texture = makeMinimalCanonicalPackageLevel().presentationMaterials[0].texture
+        func levelWithFace(vertices: [Vector3], indices: [Int]) -> Level {
+            var level = makeMinimalCanonicalPackageLevel()
+            level.rooms.append(
+                LevelRoom(
+                    sourceIndex: 10,
+                    vertices: vertices,
+                    faces: [
+                        .init(
+                            corners: indices.map {
+                                .init(vertexIndex: $0, u: 0, v: 0, alpha: 255)
+                            },
+                            flags: 0,
+                            portalIndex: nil,
+                            texture: texture
+                        ),
+                    ],
+                    portals: []
+                )
+            )
+            return level
+        }
+
+        let degenerate = levelWithFace(
+            vertices: [.zero, .init(x: 1, y: 0, z: 0), .init(x: 0, y: 1, z: 0)],
+            indices: [0, 1, 0]
+        )
+        XCTAssertThrowsError(try degenerate.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .degenerateFace(room: 10, face: 0)
+            )
+        }
+
+        let lowPrecisionNormal = levelWithFace(
+            vertices: [
+                .zero,
+                .init(x: 0.01, y: 0, z: 0),
+                .init(x: 0, y: 0.01, z: 0),
+            ],
+            indices: [0, 1, 2]
+        )
+        XCTAssertThrowsError(try lowPrecisionNormal.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidFace(room: 10, face: 0)
+            )
+        }
+
+        let nonplanar = levelWithFace(
+            vertices: [
+                .zero,
+                .init(x: 1, y: 0, z: 0),
+                .init(x: 1, y: 1, z: 0.5),
+                .init(x: 0, y: 1, z: 0),
+            ],
+            indices: [0, 1, 2, 3]
+        )
+        XCTAssertThrowsError(try nonplanar.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .nonplanarFace(room: 10, face: 0)
+            )
+        }
+
+        let concave = levelWithFace(
+            vertices: [
+                .zero,
+                .init(x: 2, y: 0, z: 0),
+                .init(x: 1, y: 0.5, z: 0),
+                .init(x: 2, y: 2, z: 0),
+                .init(x: 0, y: 2, z: 0),
+            ],
+            indices: [0, 1, 2, 3, 4]
+        )
+        XCTAssertThrowsError(try concave.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .concaveFace(room: 10, face: 0)
+            )
+        }
+
+        let sourceToleranceConcave = levelWithFace(
+            vertices: [
+                .zero,
+                .init(x: 1.2037811, y: 1.5971571, z: 0),
+                .init(x: 1.7434071, y: 1.1602463, z: -0.70276165),
+                .init(x: 2.3259587, y: 0.75136924, z: -1.4231515),
+                .init(x: 1.1221776, y: -0.8457879, z: -1.4231515),
+            ],
+            indices: [0, 1, 2, 3, 4]
+        )
+        XCTAssertThrowsError(try sourceToleranceConcave.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .concaveFace(room: 10, face: 0)
+            )
+        }
+    }
+
+    func testEditorQuarterTurnPreservesRigidOrientation() throws {
+        let identity = Matrix3(
+            right: .init(x: 1, y: 0, z: 0),
+            up: .init(x: 0, y: 1, z: 0),
+            forward: .init(x: 0, y: 0, z: 1)
+        )
+
+        XCTAssertEqual(
+            quarterTurnedProjectOrientation(identity),
+            Matrix3(
+                right: .init(x: 0, y: 1, z: 0),
+                up: .init(x: -1, y: 0, z: 0),
+                forward: .init(x: 0, y: 0, z: 1)
+            )
+        )
+        let sourceObjectOrientation = Matrix3(
+            right: .init(x: -1, y: 0, z: 0),
+            up: .init(x: 0, y: 1, z: 0),
+            forward: .init(x: 0, y: 0, z: -1)
+        )
+        XCTAssertEqual(
+            quarterTurnedProjectOrientation(sourceObjectOrientation),
+            Matrix3(
+                right: .init(x: 0, y: 1, z: 0),
+                up: .init(x: 1, y: 0, z: 0),
+                forward: .init(x: 0, y: 0, z: -1)
+            )
+        )
+    }
+
+
+    func testCombinedPortalRenderingEditIsRefusedWithoutChangingProject() throws {
+        var level = makeEditableProjectLevel()
+        for (roomSourceIndex, portalIndex) in [(3, 0), (2, 1)] {
+            let roomIndex = try XCTUnwrap(
+                level.rooms.firstIndex { $0.sourceIndex == roomSourceIndex }
+            )
+            let portal = level.rooms[roomIndex].portals[portalIndex]
+            level.rooms[roomIndex].portals[portalIndex] = LevelPortal(
+                flags: portal.flags | 0x0000_0008,
+                faceIndex: portal.faceIndex,
+                connectedRoom: portal.connectedRoom,
+                connectedPortal: portal.connectedPortal,
+                boundaryNodeIndex: portal.boundaryNodeIndex,
+                pathPoint: portal.pathPoint,
+                combineMaster: portalIndex
+            )
+        }
+        var project = try makeProject(importedBase: level)
+        let before = project
+
+        XCTAssertThrowsError(
+            try project.setPortalRendersFace(
+                roomSourceIndex: 3,
+                portalIndex: 0,
+                to: false
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? RevivalProjectError,
+                .combinedPortalRenderingEditDeferred(
+                    roomSourceIndex: 3,
+                    portalIndex: 0
+                )
+            )
+        }
+        XCTAssertEqual(project, before)
+    }
+
+    func testSemanticChangesSummaryStaysBoundedForTheEditorSidebar() {
+        XCTAssertEqual(
+            boundedSemanticChangesText([]),
+            "No authored changes"
+        )
+        XCTAssertEqual(
+            boundedSemanticChangesText(["Room 3 face 9 material changed"]),
+            "Room 3 face 9 material changed"
+        )
+        XCTAssertEqual(
+            boundedSemanticChangesText([
+                "Room 3 face 9 material changed",
+                "Room 3 portal 0 rendering changed",
+                "Object 6147 transform changed",
+                "Player 0 start 2048 transform changed",
+            ]),
+            "Room 3 face 9 material changed (+3 more)"
+        )
     }
 
     @MainActor
@@ -565,7 +1012,7 @@ final class EditorProjectTests: XCTestCase {
                 with: canonicalJSONData(original.persistedSource)
             ) as? [String: Any]
         )
-        object["schemaVersion"] = 2
+        object["schemaVersion"] = 3
         var base = try XCTUnwrap(object["base"] as? [String: Any])
         base["identitySHA256"] = String(repeating: "b", count: 64)
         object["base"] = base
@@ -584,7 +1031,7 @@ final class EditorProjectTests: XCTestCase {
                 ofType: RevivalProjectDocument.projectType
             )
         ) {
-            XCTAssertEqual($0 as? RevivalProjectError, .unsupportedSchema(2))
+            XCTAssertEqual($0 as? RevivalProjectError, .unsupportedSchema(3))
         }
         XCTAssertEqual(document.project, original)
     }
@@ -676,6 +1123,40 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testEditedValuesPlayThroughSeparateCopyAndReturnToSameDocumentState() throws {
+        let document = RevivalProjectDocument(
+            project: try makeProject(importedBase: makeEditableProjectLevel())
+        )
+        try document.selectFace(1)
+        let selectionBeforePlay = document.editorSelection
+        let editedTexture = document.project.level.presentationMaterials[0].texture
+        try document.setSelectedFaceMaterial(to: editedTexture)
+        let object = try XCTUnwrap(
+            document.project.level.objects.first { $0.handle == 6_147 }
+        )
+        let editedOrientation = quarterTurnedProjectOrientation(object.orientation)
+        try document.setObjectTransform(
+            handle: object.handle,
+            to: .init(position: object.position, orientation: editedOrientation)
+        )
+        let diffBeforePlay = document.project.semanticDiff
+
+        let staged = try document.makePlaySession()
+        XCTAssertEqual(staged.level.rooms.first { $0.sourceIndex == 3 }?.faces[1].texture, editedTexture)
+        XCTAssertEqual(
+            staged.level.objects.first { $0.handle == object.handle }?.orientation,
+            editedOrientation
+        )
+        document.commitPlaySession(staged)
+        document.returnToEditor()
+
+        XCTAssertEqual(document.editorSelection, selectionBeforePlay)
+        XCTAssertEqual(document.camera, .trainingRoom3)
+        XCTAssertEqual(document.project.semanticDiff, diffBeforePlay)
+        XCTAssertEqual(document.project.level, staged.level)
+    }
+
+    @MainActor
     func testPlayCameraRejectsAnOutsideEndpointWithoutChangingTheSession() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeClosedRoomProjectLevel())
@@ -736,19 +1217,16 @@ private func makeClosedRoomProjectLevel() -> Level {
 private func makeConnectedRoomProjectLevel() -> Level {
     var level = makeClosedRoomProjectLevel()
     let texture = level.presentationMaterials[0].texture
-    let corners = [
-        FaceCorner(vertexIndex: 0, u: 0, v: 0, alpha: 255),
-        FaceCorner(vertexIndex: 1, u: 1, v: 0, alpha: 255),
-        FaceCorner(vertexIndex: 2, u: 0, v: 1, alpha: 255),
-    ]
-    let vertices = [
-        Vector3.zero,
-        Vector3(x: 1, y: 0, z: 0),
-        Vector3(x: 0, y: 1, z: 0),
-    ]
-    let portalFace: (Int?) -> LevelFace = { portalIndex in
+    let portalFace: ([Int], Int?) -> LevelFace = { indices, portalIndex in
         LevelFace(
-            corners: corners,
+            corners: indices.enumerated().map { offset, vertexIndex in
+                FaceCorner(
+                    vertexIndex: vertexIndex,
+                    u: offset == 1 || offset == 2 ? 1 : 0,
+                    v: offset >= 2 ? 1 : 0,
+                    alpha: 255
+                )
+            },
             flags: 0,
             portalIndex: portalIndex,
             texture: texture
@@ -788,12 +1266,22 @@ private func makeConnectedRoomProjectLevel() -> Level {
         damage: room3.damage,
         damageType: room3.damageType
     )
+    let room3PortalPoints = level.rooms[room3Index].faces[0].corners.map {
+        level.rooms[room3Index].vertices[$0.vertexIndex]
+    }
+    let room1PortalPoints = room3PortalPoints.map {
+        Vector3(x: $0.x - 2, y: $0.y, z: $0.z)
+    }
+    let room2Vertices = room3PortalPoints + room1PortalPoints
     level.rooms.removeAll { $0.sourceIndex == 2 || $0.sourceIndex == 4 }
     level.rooms.append(
         LevelRoom(
             sourceIndex: 2,
-            vertices: vertices,
-            faces: [portalFace(0), portalFace(1)],
+            vertices: room2Vertices,
+            faces: [
+                portalFace([4, 5, 6, 7], 0),
+                portalFace([0, 3, 2, 1], 1),
+            ],
             portals: [
                 .init(faceIndex: 0, connectedRoom: 1, connectedPortal: 0),
                 .init(faceIndex: 1, connectedRoom: 3, connectedPortal: 0),
@@ -803,10 +1291,150 @@ private func makeConnectedRoomProjectLevel() -> Level {
     level.rooms.append(
         LevelRoom(
             sourceIndex: 1,
-            vertices: vertices,
-            faces: [portalFace(0)],
+            vertices: room1PortalPoints,
+            faces: [portalFace([0, 3, 2, 1], 0)],
             portals: [.init(faceIndex: 0, connectedRoom: 2, connectedPortal: 0)]
         )
     )
     return level
+}
+
+private func makeEditableProjectLevel() -> Level {
+    let base = makeConnectedRoomProjectLevel()
+    let alternateTexture = SourceResource(storedIndex: 1, sourceName: "alternate-wall")
+    let alternateMaterial = PresentationMaterial(
+        texture: alternateTexture,
+        bitmapSourceName: "alternate-wall.ogf",
+        image: .init(width: 1, height: 1, rgba8: Data([128, 128, 128, 255])),
+        blend: .opaque,
+        lightmapBlend: .multiply,
+        waterProcedural: nil,
+        sourceArchive: base.source.profileFiles[0].relativePath,
+        sourceSHA256: String(repeating: "e", count: 64)
+    )
+    var rooms = base.rooms
+    let roomIndex = rooms.firstIndex { $0.sourceIndex == 3 }!
+    let room = rooms[roomIndex]
+    let faces = room.faces.enumerated().map { index, face in
+        LevelFace(
+            corners: face.corners,
+            flags: face.flags,
+            portalIndex: face.portalIndex,
+            texture: index == 1 || index == 2 ? alternateTexture : face.texture,
+            lightmapInfoIndex: face.lightmapInfoIndex,
+            allowsLightCorona: face.allowsLightCorona,
+            lightMultiple: face.lightMultiple,
+            special: face.special
+        )
+    }
+    rooms[roomIndex] = LevelRoom(
+        sourceIndex: room.sourceIndex,
+        name: room.name,
+        pathPoint: room.pathPoint,
+        vertices: room.vertices,
+        faces: faces,
+        portals: room.portals.map {
+            LevelPortal(
+                flags: $0.flags | 1,
+                faceIndex: $0.faceIndex,
+                connectedRoom: $0.connectedRoom,
+                connectedPortal: $0.connectedPortal,
+                boundaryNodeIndex: $0.boundaryNodeIndex,
+                pathPoint: $0.pathPoint,
+                combineMaster: $0.combineMaster
+            )
+        },
+        flags: room.flags,
+        pulseTime: room.pulseTime,
+        pulseOffset: room.pulseOffset,
+        mirrorFaceIndex: room.mirrorFaceIndex,
+        door: room.door,
+        volumeLights: room.volumeLights,
+        fog: room.fog,
+        ambientSoundPattern: room.ambientSoundPattern,
+        reverb: room.reverb,
+        damage: room.damage,
+        damageType: room.damageType
+    )
+    let identity = Matrix3(
+        right: .init(x: 1, y: 0, z: 0),
+        up: .init(x: 0, y: 1, z: 0),
+        forward: .init(x: 0, y: 0, z: 1)
+    )
+    func object(
+        handle: UInt32,
+        type: UInt8,
+        storedID: Int,
+        room: Int,
+        position: Vector3
+    ) -> PlacedObject {
+        PlacedObject(
+            handle: handle,
+            type: type,
+            storedID: storedID,
+            definition: nil,
+            instanceName: nil,
+            flags: 0,
+            doorShields: nil,
+            location: .room(room),
+            position: position,
+            orientation: identity,
+            containsType: 0,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        )
+    }
+    return Level(
+        schemaVersion: base.schemaVersion,
+        missionKey: base.missionKey,
+        levelKey: base.levelKey,
+        source: base.source,
+        metadata: base.metadata,
+        rooms: rooms,
+        terrain: base.terrain,
+        objects: [
+            object(
+                handle: 2_048,
+                type: D3SourceIdentity.playerObjectType,
+                storedID: 0,
+                room: 1,
+                position: .init(x: 0.25, y: 0.25, z: 0)
+            ),
+            object(
+                handle: 6_147,
+                type: 6,
+                storedID: 0,
+                room: 3,
+                position: RoomCamera.trainingRoom3.target
+            ),
+        ],
+        retiredObjectHandles: base.retiredObjectHandles,
+        paths: base.paths,
+        goals: base.goals,
+        goalFlags: base.goalFlags,
+        triggers: base.triggers,
+        playerStartFlags: base.playerStartFlags,
+        lightmaps: base.lightmaps,
+        presentationMaterials: base.presentationMaterials + [alternateMaterial],
+        presentationCoronaAssets: base.presentationCoronaAssets,
+        models: base.models,
+        objectPresentations: base.objectPresentations,
+        dependencyManifest: .init(
+            current: base.dependencyManifest.current + [
+                .init(
+                    category: "texture",
+                    source: alternateTexture,
+                    state: "presentation-payload-imported",
+                    provenance: "synthetic editable project fixture"
+                ),
+            ],
+            historicalEagerBaseline: base.dependencyManifest.historicalEagerBaseline
+        ),
+        sourceChunks: base.sourceChunks
+    )
 }

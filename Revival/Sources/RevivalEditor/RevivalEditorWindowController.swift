@@ -19,14 +19,23 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     private let selectedRoomHeading: NSTextField
     private let roomPopup: NSPopUpButton
     private let facePopup: NSPopUpButton
+    private let faceMaterialPopup: NSPopUpButton
     private let portalPopup: NSPopUpButton
+    private let portalRenderingCheckbox: NSButton
     private let followPortalButton: NSButton
     private let roomNameField: NSTextField
     private let renameButton: NSButton
+    private let objectPopup: NSPopUpButton
+    private let rotateObjectButton: NSButton
+    private let playerStartPopup: NSPopUpButton
+    private let rotatePlayerStartButton: NSButton
+    private let changesLabel: NSTextField
     private let playButton: NSButton
     private let cameraButtons: [NSButton]
     private let statusLabel: NSTextField
     private var rendererError: String?
+    private var selectedObjectHandle: UInt32?
+    private var selectedPlayerStartHandle: UInt32?
 
     init(document: RevivalProjectDocument) {
         projectDocument = document
@@ -55,10 +64,25 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         facePopup.setAccessibilityLabel("Selected face")
         facePopup.setAccessibilityHelp("Selects a face in the current source room.")
 
+        faceMaterialPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        faceMaterialPopup.setAccessibilityLabel("Selected face material")
+        faceMaterialPopup.setAccessibilityHelp(
+            "Applies one of the complete level's prepared canonical materials to the selected face."
+        )
+
         portalPopup = NSPopUpButton(frame: .zero, pullsDown: false)
         portalPopup.setAccessibilityLabel("Selected portal")
         portalPopup.setAccessibilityHelp(
             "Selects a portal and its owning face in the current source room."
+        )
+
+        portalRenderingCheckbox = NSButton(
+            checkboxWithTitle: "Render portal face",
+            target: nil,
+            action: nil
+        )
+        portalRenderingCheckbox.setAccessibilityHelp(
+            "Changes the selected portal's source-backed render-faces property without changing topology."
         )
 
         followPortalButton = NSButton(title: "Follow Portal", target: nil, action: nil)
@@ -77,6 +101,31 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
 
         renameButton = NSButton(title: "Rename Room", target: nil, action: nil)
         renameButton.setAccessibilityLabel("Rename selected room")
+
+        objectPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        objectPopup.setAccessibilityLabel("Reached object")
+        objectPopup.setAccessibilityHelp("Selects a reached non-player object by stable handle.")
+        rotateObjectButton = NSButton(title: "Rotate Object 90°", target: nil, action: nil)
+        rotateObjectButton.setAccessibilityHelp(
+            "Applies a direct rigid quarter-turn without collision or room-membership changes."
+        )
+
+        playerStartPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        playerStartPopup.setAccessibilityLabel("Player start")
+        playerStartPopup.setAccessibilityHelp("Selects a player start by player ID and stable handle.")
+        rotatePlayerStartButton = NSButton(
+            title: "Rotate Player Start 90°",
+            target: nil,
+            action: nil
+        )
+        rotatePlayerStartButton.setAccessibilityHelp(
+            "Applies a direct rigid quarter-turn to the authoritative player-start object."
+        )
+
+        changesLabel = NSTextField(wrappingLabelWithString: "No authored changes")
+        changesLabel.setAccessibilityLabel("Semantic project changes")
+        changesLabel.textColor = .secondaryLabelColor
+        changesLabel.maximumNumberOfLines = 1
 
         playButton = NSButton(title: "Play Disposable Copy", target: nil, action: nil)
         playButton.bezelStyle = .rounded
@@ -121,14 +170,30 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         sidebar.addArrangedSubview(roomPopup)
         sidebar.addArrangedSubview(NSTextField(labelWithString: "Face"))
         sidebar.addArrangedSubview(facePopup)
+        sidebar.addArrangedSubview(NSTextField(labelWithString: "Face Material"))
+        sidebar.addArrangedSubview(faceMaterialPopup)
         sidebar.addArrangedSubview(NSTextField(labelWithString: "Portal"))
         sidebar.addArrangedSubview(portalPopup)
+        sidebar.addArrangedSubview(portalRenderingCheckbox)
         sidebar.addArrangedSubview(followPortalButton)
         sidebar.addArrangedSubview(roomNameField)
         sidebar.addArrangedSubview(renameButton)
         let editSeparator = NSBox()
         editSeparator.boxType = .separator
         sidebar.addArrangedSubview(editSeparator)
+        sidebar.addArrangedSubview(NSTextField(labelWithString: "Reached Object"))
+        sidebar.addArrangedSubview(objectPopup)
+        sidebar.addArrangedSubview(rotateObjectButton)
+        sidebar.addArrangedSubview(NSTextField(labelWithString: "Player Start"))
+        sidebar.addArrangedSubview(playerStartPopup)
+        sidebar.addArrangedSubview(rotatePlayerStartButton)
+        let changesHeading = NSTextField(labelWithString: "Changes")
+        changesHeading.font = .preferredFont(forTextStyle: .headline)
+        sidebar.addArrangedSubview(changesHeading)
+        sidebar.addArrangedSubview(changesLabel)
+        let playSeparator = NSBox()
+        playSeparator.boxType = .separator
+        sidebar.addArrangedSubview(playSeparator)
         sidebar.addArrangedSubview(playButton)
 
         let cameraHeading = NSTextField(labelWithString: "Play Camera")
@@ -148,11 +213,15 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             sidebar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             sidebar.topAnchor.constraint(equalTo: root.topAnchor),
             sidebar.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-            sidebar.widthAnchor.constraint(equalToConstant: 270),
+            sidebar.widthAnchor.constraint(equalToConstant: 300),
             roomPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
             facePopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
+            faceMaterialPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
             portalPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
             roomNameField.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
+            objectPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
+            playerStartPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
+            changesLabel.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
             statusLabel.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
 
             metalView.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
@@ -163,13 +232,13 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         ])
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1_070, height: 800),
+            contentRect: NSRect(x: 0, y: 0, width: 1_100, height: 980),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "RevivalEditor"
-        window.contentMinSize = NSSize(width: 750, height: 520)
+        window.contentMinSize = NSSize(width: 780, height: 720)
         window.contentView = root
 
         super.init(window: window)
@@ -184,10 +253,22 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         roomPopup.action = #selector(selectRoom(_:))
         facePopup.target = self
         facePopup.action = #selector(selectFace(_:))
+        faceMaterialPopup.target = self
+        faceMaterialPopup.action = #selector(setFaceMaterial(_:))
         portalPopup.target = self
         portalPopup.action = #selector(selectPortal(_:))
+        portalRenderingCheckbox.target = self
+        portalRenderingCheckbox.action = #selector(setPortalRendering(_:))
         followPortalButton.target = self
         followPortalButton.action = #selector(followPortal(_:))
+        objectPopup.target = self
+        objectPopup.action = #selector(selectObject(_:))
+        rotateObjectButton.target = self
+        rotateObjectButton.action = #selector(rotateObject(_:))
+        playerStartPopup.target = self
+        playerStartPopup.action = #selector(selectPlayerStart(_:))
+        rotatePlayerStartButton.target = self
+        rotatePlayerStartButton.action = #selector(rotatePlayerStart(_:))
         playButton.target = self
         playButton.action = #selector(togglePlay(_:))
         for button in cameraButtons {
@@ -196,7 +277,6 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         }
 
         refreshFromDocument()
-        renderCurrentWorld()
     }
 
     @available(*, unavailable)
@@ -212,15 +292,26 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         }
         selectedRoomHeading.stringValue = "Selected Source Room \(selection.room.sourceIndex)"
         populateSelectionControls(level: level, selection: selection)
+        populateObjectControls(level: level)
+        let differences = projectDocument.project.semanticDiff
+        changesLabel.stringValue = boundedSemanticChangesText(
+            differences.map(\.summary)
+        )
         roomNameField.stringValue = room?.name ?? ""
 
         let isPlaying = projectDocument.playSession != nil
         roomPopup.isEnabled = !isPlaying
         facePopup.isEnabled = !isPlaying
+        faceMaterialPopup.isEnabled = !isPlaying
         portalPopup.isEnabled = !isPlaying && !(room?.portals.isEmpty ?? true)
+        portalRenderingCheckbox.isEnabled = !isPlaying && selection.portal != nil
         followPortalButton.isEnabled = !isPlaying && selection.portal != nil
         roomNameField.isEnabled = !isPlaying
         renameButton.isEnabled = !isPlaying
+        objectPopup.isEnabled = !isPlaying && objectPopup.numberOfItems > 0
+        rotateObjectButton.isEnabled = objectPopup.isEnabled
+        playerStartPopup.isEnabled = !isPlaying && playerStartPopup.numberOfItems > 0
+        rotatePlayerStartButton.isEnabled = playerStartPopup.isEnabled
         playButton.title = isPlaying ? "Return to Editor" : "Play Disposable Copy"
         playButton.setAccessibilityLabel(playButton.title)
         for button in cameraButtons {
@@ -236,10 +327,11 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             )
         } else {
             setStatus(
-                "Editing \(level.metadata.name) — \(level.rooms.count) complete resident rooms — source room \(selection.room.sourceIndex), face \(selection.face.faceIndex) selected.",
+                "Editing \(level.metadata.name) — \(level.rooms.count) complete resident rooms — source room \(selection.room.sourceIndex), face \(selection.face.faceIndex) selected — \(projectDocument.project.semanticDiff.count) authored changes.",
                 isError: false
             )
         }
+        renderCurrentWorld()
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -253,9 +345,8 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             roomNameField.stringValue = projectDocument.project.level.rooms.first {
                 $0.sourceIndex == projectDocument.selectedRoomSourceIndex
             }?.name ?? ""
-            setStatus(
-                "Renamed source room \(projectDocument.selectedRoomSourceIndex). Undo action: Rename Room.",
-                isError: false
+            setSuccessStatus(
+                "Renamed source room \(projectDocument.selectedRoomSourceIndex). Undo action: Rename Room."
             )
         } catch {
             refreshFromDocument()
@@ -291,6 +382,66 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         }
     }
 
+    @objc private func setFaceMaterial(_ sender: NSPopUpButton) {
+        do {
+            guard sender.indexOfSelectedItem >= 0 else { return }
+            let texture = projectDocument.project.level.presentationMaterials[
+                sender.indexOfSelectedItem
+            ].texture
+            try projectDocument.setSelectedFaceMaterial(to: texture)
+            setSuccessStatus("Set the selected face material. Undo action: Set Face Material.")
+        } catch {
+            refreshFromDocument()
+            setStatus(error.localizedDescription, isError: true)
+            NSSound.beep()
+        }
+    }
+
+    @objc private func setPortalRendering(_ sender: NSButton) {
+        do {
+            try projectDocument.setSelectedPortalRendersFaces(sender.state == .on)
+            setSuccessStatus("Set the selected portal rendering property. Undo action: Set Portal Rendering.")
+        } catch {
+            refreshFromDocument()
+            setStatus(error.localizedDescription, isError: true)
+            NSSound.beep()
+        }
+    }
+
+    @objc private func selectObject(_ sender: NSPopUpButton) {
+        selectedObjectHandle = sender.selectedItem?.representedObject as? UInt32
+    }
+
+    @objc private func rotateObject(_ sender: Any?) {
+        do {
+            let handle = selectedObjectHandle!
+            try projectDocument.rotateObjectQuarterTurn(handle: handle)
+            setSuccessStatus("Rotated object handle \(handle). Undo action: Transform Object.")
+        } catch {
+            refreshFromDocument()
+            setStatus(error.localizedDescription, isError: true)
+            NSSound.beep()
+        }
+    }
+
+    @objc private func selectPlayerStart(_ sender: NSPopUpButton) {
+        selectedPlayerStartHandle = sender.selectedItem?.representedObject as? UInt32
+    }
+
+    @objc private func rotatePlayerStart(_ sender: Any?) {
+        do {
+            let handle = selectedPlayerStartHandle!
+            try projectDocument.rotatePlayerStartQuarterTurn(handle: handle)
+            setSuccessStatus(
+                "Rotated player start handle \(handle). Undo action: Transform Player Start."
+            )
+        } catch {
+            refreshFromDocument()
+            setStatus(error.localizedDescription, isError: true)
+            NSSound.beep()
+        }
+    }
+
     @objc private func followPortal(_ sender: Any?) {
         performSelectionChange {
             projectDocument.followSelectedPortal()
@@ -306,7 +457,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                     camera: candidate.camera
                 )
                 projectDocument.commitPlaySession(candidate)
-                setStatus("Playing a disposable complete-level copy.", isError: false)
+                setSuccessStatus("Playing a disposable complete-level copy.")
             } else if let playSession = projectDocument.playSession {
                 try replaceRenderedWorld(
                     level: projectDocument.project.level,
@@ -314,7 +465,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                 )
                 projectDocument.returnToEditor()
                 window?.makeFirstResponder(roomNameField)
-                setStatus("Returned to the unchanged editor document state.", isError: false)
+                setSuccessStatus("Returned to the unchanged editor document state.")
             }
         } catch {
             setStatus(error.localizedDescription, isError: true)
@@ -338,7 +489,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                 camera: candidate.camera
             )
             projectDocument.commitPlaySession(candidate)
-            setStatus("Moved the disposable play camera through the shared render path.", isError: false)
+            setSuccessStatus("Moved the disposable play camera through the shared render path.")
         } catch {
             setStatus(
                 "That camera move left the imported presentation closure: \(error.localizedDescription)",
@@ -405,6 +556,16 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             facePopup.lastItem?.representedObject = faceIndex
         }
         facePopup.selectItem(withTitle: "Face \(selection.face.faceIndex)")
+        faceMaterialPopup.removeAllItems()
+        for material in level.presentationMaterials {
+            faceMaterialPopup.addItem(withTitle: material.texture.sourceName)
+        }
+        let selectedTexture = room.faces[selection.face.faceIndex].texture
+        if let materialIndex = level.presentationMaterials.firstIndex(where: {
+            $0.texture == selectedTexture
+        }) {
+            faceMaterialPopup.selectItem(at: materialIndex)
+        }
 
         portalPopup.removeAllItems()
         for portalIndex in room.portals.indices {
@@ -413,8 +574,52 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         }
         if let portal = selection.portal {
             portalPopup.selectItem(withTitle: "Portal \(portal.portalIndex)")
+            portalRenderingCheckbox.state = room.portals[portal.portalIndex].flags & 1 != 0
+                ? .on
+                : .off
         } else {
             portalPopup.select(nil)
+            portalRenderingCheckbox.state = .off
+        }
+    }
+
+    private func populateObjectControls(level: Level) {
+        let presentedHandles = Set(level.objectPresentations.map(\.objectHandle))
+        let objects = level.objects.filter {
+            $0.type != D3SourceIdentity.playerObjectType
+                && (presentedHandles.isEmpty || presentedHandles.contains($0.handle))
+        }.sorted { $0.handle < $1.handle }
+        if !objects.contains(where: { $0.handle == selectedObjectHandle }) {
+            selectedObjectHandle = objects.first?.handle
+        }
+        objectPopup.removeAllItems()
+        for object in objects {
+            let label = object.instanceName.map { "\($0) — \(object.handle)" }
+                ?? "Object \(object.handle)"
+            objectPopup.addItem(withTitle: label)
+            objectPopup.lastItem?.representedObject = object.handle
+        }
+        if let handle = selectedObjectHandle,
+           let index = objects.firstIndex(where: { $0.handle == handle }) {
+            objectPopup.selectItem(at: index)
+        }
+
+        let players = level.objects.filter {
+            $0.type == D3SourceIdentity.playerObjectType
+        }.sorted { ($0.storedID, $0.handle) < ($1.storedID, $1.handle) }
+        if !players.contains(where: { $0.handle == selectedPlayerStartHandle }) {
+            selectedPlayerStartHandle = players.first?.handle
+        }
+        playerStartPopup.removeAllItems()
+        for player in players {
+            playerStartPopup.addItem(
+                withTitle: "Player \(player.storedID) — \(player.handle)"
+            )
+            playerStartPopup.lastItem?.representedObject = player.handle
+        }
+        if let handle = selectedPlayerStartHandle,
+           let index = players.firstIndex(where: { $0.handle == handle }) {
+            playerStartPopup.selectItem(at: index)
         }
     }
 
@@ -431,6 +636,11 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     private func setStatus(_ message: String, isError: Bool) {
         statusLabel.stringValue = message
         statusLabel.textColor = isError ? .systemRed : .secondaryLabelColor
+    }
+
+    private func setSuccessStatus(_ message: String) {
+        guard rendererError == nil else { return }
+        setStatus(message, isError: false)
     }
 
     private func movedCamera(
@@ -470,4 +680,10 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             projection: camera.projection
         )
     }
+}
+
+func boundedSemanticChangesText(_ summaries: [String]) -> String {
+    guard let first = summaries.first else { return "No authored changes" }
+    guard summaries.count > 1 else { return first }
+    return "\(first) (+\(summaries.count - 1) more)"
 }

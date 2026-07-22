@@ -170,7 +170,7 @@ struct LevelFace: Codable, Equatable, Sendable {
     let corners: [FaceCorner]
     let flags: UInt16
     let portalIndex: Int?
-    let texture: SourceResource
+    var texture: SourceResource
     let lightmapInfoIndex: Int?
     let allowsLightCorona: Bool
     let lightMultiple: UInt8
@@ -198,7 +198,7 @@ struct LevelFace: Codable, Equatable, Sendable {
 }
 
 struct LevelPortal: Codable, Equatable, Sendable {
-    let flags: UInt32
+    var flags: UInt32
     let faceIndex: Int
     let connectedRoom: Int
     let connectedPortal: Int
@@ -251,8 +251,8 @@ struct LevelRoom: Codable, Equatable, Sendable {
     var name: String?
     let pathPoint: Vector3
     let vertices: [Vector3]
-    let faces: [LevelFace]
-    let portals: [LevelPortal]
+    var faces: [LevelFace]
+    var portals: [LevelPortal]
     let flags: UInt32
     let pulseTime: UInt8
     let pulseOffset: UInt8
@@ -384,8 +384,8 @@ struct PlacedObject: Codable, Equatable, Sendable {
     let flags: UInt32
     let doorShields: Int16?
     let location: SpatialLocation
-    let position: Vector3
-    let orientation: Matrix3
+    var position: Vector3
+    var orientation: Matrix3
     let containsType: UInt8
     let containsID: UInt8
     let containsCount: UInt8
@@ -648,7 +648,7 @@ struct Level: Codable, Equatable, Sendable {
     let metadata: LevelMetadata
     var rooms: [LevelRoom]
     let terrain: LevelTerrain
-    let objects: [PlacedObject]
+    var objects: [PlacedObject]
     let retiredObjectHandles: [UInt32]
     let paths: [GamePath]
     let goals: [LevelGoal]
@@ -782,8 +782,27 @@ struct Level: Codable, Equatable, Sendable {
                       face.corners.allSatisfy({ room.vertices.indices.contains($0.vertexIndex) }) else {
                     throw LevelValidationError.invalidFace(room: room.sourceIndex, face: faceIndex)
                 }
-                guard canonicalFaceNormal(room: room, face: face) != nil else {
+                let cornerIndices = face.corners.map(\.vertexIndex)
+                guard Set(cornerIndices).count == cornerIndices.count else {
+                    throw LevelValidationError.degenerateFace(
+                        room: room.sourceIndex,
+                        face: faceIndex
+                    )
+                }
+                guard let normal = canonicalFaceNormal(room: room, face: face) else {
                     throw LevelValidationError.invalidFace(room: room.sourceIndex, face: faceIndex)
+                }
+                guard faceIsPlanar(room: room, face: face, normal: normal) else {
+                    throw LevelValidationError.nonplanarFace(
+                        room: room.sourceIndex,
+                        face: faceIndex
+                    )
+                }
+                guard !faceIsConcave(room: room, face: face, normal: normal) else {
+                    throw LevelValidationError.concaveFace(
+                        room: room.sourceIndex,
+                        face: faceIndex
+                    )
                 }
                 let hasLightmap = face.flags & 0x0001 != 0
                 let hasAnyLightmapUV = face.corners.contains {
@@ -850,6 +869,24 @@ struct Level: Codable, Equatable, Sendable {
             }
         }
 
+        for room in rooms {
+            for (portalIndex, portal) in room.portals.enumerated() {
+                let connected = roomMap[portal.connectedRoom]!
+                let inverse = connected.portals[portal.connectedPortal]
+                guard reciprocalPortalGeometryMatches(
+                    room: room,
+                    portal: portal,
+                    connectedRoom: connected,
+                    connectedPortal: inverse
+                ) else {
+                    throw LevelValidationError.mismatchedPortalGeometry(
+                        room: room.sourceIndex,
+                        portal: portalIndex
+                    )
+                }
+            }
+        }
+
         guard terrain.heights.count == 65_536,
               terrain.textureCells.count == 1_024,
               terrain.flags.count == 65_536,
@@ -909,6 +946,9 @@ struct Level: Codable, Equatable, Sendable {
                 }
             }
             try validateObjectLocation(object.location, rooms: roomMap)
+            guard isFinite(object.position) else {
+                throw LevelValidationError.invalidObjectPosition(object.handle)
+            }
             guard isOrthonormal(object.orientation) else {
                 throw LevelValidationError.invalidObjectOrientation(object.handle)
             }
@@ -1304,8 +1344,8 @@ func canonicalFaceNormal(room: LevelRoom, face: LevelFace) -> Vector3? {
             bestMagnitudeSquared = magnitudeSquared
         }
     }
-    guard bestMagnitudeSquared > 0 else { return nil }
     let magnitude = sqrt(bestMagnitudeSquared)
+    guard magnitude >= 0.035 else { return nil }
     let normal = Vector3(
         x: best.x / magnitude,
         y: best.y / magnitude,
@@ -1319,12 +1359,16 @@ enum LevelValidationError: Error, Equatable {
     case invalidIdentity
     case duplicateRoom
     case invalidFace(room: Int, face: Int)
+    case degenerateFace(room: Int, face: Int)
+    case nonplanarFace(room: Int, face: Int)
+    case concaveFace(room: Int, face: Int)
     case invalidFacePortal(room: Int, face: Int)
     case invalidMirrorFace(room: Int)
     case invalidSpecialFace(room: Int, face: Int)
     case invalidPortal(room: Int, portal: Int)
     case invalidCombinedPortal(room: Int, portal: Int)
     case nonreciprocalPortal(room: Int, portal: Int)
+    case mismatchedPortalGeometry(room: Int, portal: Int)
     case invalidLightmapReference(Int)
     case invalidLightmapPage(Int)
     case invalidLightmapInfo(Int)
@@ -1336,6 +1380,7 @@ enum LevelValidationError: Error, Equatable {
     case invalidPlayerID(handle: UInt32, playerID: Int)
     case duplicatePlayerID(handle: UInt32, playerID: Int)
     case invalidObjectDefinition(UInt32)
+    case invalidObjectPosition(UInt32)
     case invalidObjectOrientation(UInt32)
     case invalidObjectPresentation(UInt32)
     case invalidModel(String)
@@ -1352,6 +1397,103 @@ enum LevelValidationError: Error, Equatable {
 private struct DependencyIdentity: Hashable {
     let category: String
     let source: SourceResource
+}
+
+private func reciprocalPortalGeometryMatches(
+    room: LevelRoom,
+    portal: LevelPortal,
+    connectedRoom: LevelRoom,
+    connectedPortal: LevelPortal
+) -> Bool {
+    let face = room.faces[portal.faceIndex]
+    let connectedFace = connectedRoom.faces[connectedPortal.faceIndex]
+    guard face.corners.count == connectedFace.corners.count else { return false }
+    let points = face.corners.map { room.vertices[$0.vertexIndex] }
+    let connectedPoints = connectedFace.corners.map {
+        connectedRoom.vertices[$0.vertexIndex]
+    }
+    for start in connectedPoints.indices where pointsMatch(points[0], connectedPoints[start]) {
+        if points.indices.dropFirst().allSatisfy({ offset in
+            pointsMatch(
+                points[offset],
+                connectedPoints[(start - offset + connectedPoints.count) % connectedPoints.count]
+            )
+        }) {
+            return true
+        }
+    }
+    return false
+}
+
+private func pointsMatch(_ lhs: Vector3, _ rhs: Vector3) -> Bool {
+    let x = lhs.x - rhs.x
+    let y = lhs.y - rhs.y
+    let z = lhs.z - rhs.z
+    return x * x + y * y + z * z < 0.01
+}
+
+private func faceIsPlanar(
+    room: LevelRoom,
+    face: LevelFace,
+    normal: Vector3
+) -> Bool {
+    guard face.corners.count > 3 else { return true }
+    let distances = face.corners.map {
+        dot(room.vertices[$0.vertexIndex], normal)
+    }
+    let average = distances.reduce(0, +) / Float(distances.count)
+    return distances.allSatisfy { abs($0 - average) <= 0.1 }
+}
+
+private func faceIsConcave(
+    room: LevelRoom,
+    face: LevelFace,
+    normal: Vector3
+) -> Bool {
+    let points = face.corners.map { room.vertices[$0.vertexIndex] }
+    let (i, j) = faceProjectionAxes(normal)
+    var previousEdge = subtract(points[0], points[points.count - 1])
+    for index in points.indices {
+        let current = points[index]
+        let next = points[(index + 1) % points.count]
+        let nextEdge = subtract(next, current)
+        let previousI = component(previousEdge, at: i)
+        let previousJ = component(previousEdge, at: j)
+        let nextI = component(nextEdge, at: i)
+        let nextJ = component(nextEdge, at: j)
+        let denominator = sqrt(previousI * previousI + previousJ * previousJ)
+            * sqrt(nextI * nextI + nextJ * nextJ)
+        guard denominator > 0 else { return true }
+        let turn = (-previousJ * nextI + previousI * nextJ) / denominator
+        if turn > 0.05 { return true }
+        previousEdge = nextEdge
+    }
+    return false
+}
+
+private func faceProjectionAxes(_ normal: Vector3) -> (Int, Int) {
+    if abs(normal.x) > abs(normal.y) {
+        if abs(normal.x) > abs(normal.z) {
+            return normal.x > 0 ? (2, 1) : (1, 2)
+        }
+        return normal.z > 0 ? (1, 0) : (0, 1)
+    }
+    if abs(normal.y) > abs(normal.z) {
+        return normal.y > 0 ? (0, 2) : (2, 0)
+    }
+    return normal.z > 0 ? (1, 0) : (0, 1)
+}
+
+private func component(_ vector: Vector3, at index: Int) -> Float {
+    switch index {
+    case 0: vector.x
+    case 1: vector.y
+    default: vector.z
+    }
+}
+
+private func subtract(_ lhs: Vector3, _ rhs: Vector3) -> Vector3 {
+    .init(x: lhs.x - rhs.x, y: lhs.y - rhs.y, z: lhs.z - rhs.z)
 }
 
 private func validateSourceResource(_ source: SourceResource, category: String) throws {
@@ -1766,6 +1908,13 @@ private func isOrthonormal(_ matrix: Matrix3) -> Bool {
     return abs(expectedRight.x - right.x) <= tolerance
         && abs(expectedRight.y - right.y) <= tolerance
         && abs(expectedRight.z - right.z) <= tolerance
+}
+
+func isCanonicalRigidTransform(
+    position: Vector3,
+    orientation: Matrix3
+) -> Bool {
+    isFinite(position) && isOrthonormal(orientation)
 }
 
 private func dot(_ a: Vector3, _ b: Vector3) -> Float {

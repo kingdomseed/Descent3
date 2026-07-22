@@ -2264,7 +2264,7 @@ func makeMinimalCanonicalLevel(levelKey: String = "descent3.level.training-missi
     let room4 = LevelRoom(
         sourceIndex: 4,
         vertices: [.zero, .init(x: 1, y: 0, z: 0), .init(x: 0, y: 1, z: 0)],
-        faces: [.init(corners: corners, flags: 0, portalIndex: 0, texture: texture)],
+        faces: [.init(corners: Array(corners.reversed()), flags: 0, portalIndex: 0, texture: texture)],
         portals: [.init(faceIndex: 0, connectedRoom: 2, connectedPortal: 0)]
     )
     return Level(

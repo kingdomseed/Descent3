@@ -247,6 +247,131 @@ final class RevivalProjectDocument: NSDocument {
         refreshWindowControllers()
     }
 
+    func setSelectedFaceMaterial(to texture: SourceResource) throws {
+        let selection = editorSelection.face
+        var previous: SourceResource?
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            previous = try project.setFaceMaterial(
+                roomSourceIndex: selection.roomSourceIndex,
+                faceIndex: selection.faceIndex,
+                to: texture
+            )
+            storedProject = project
+        }
+        registerFaceMaterialUndo(selection: selection, texture: previous!)
+        undoManager?.setActionName("Set Face Material")
+        refreshWindowControllers()
+    }
+
+    func setSelectedPortalRendersFaces(_ rendersFace: Bool) throws {
+        guard let selection = editorSelection.portal else {
+            preconditionFailure("A portal must be selected before editing its rendering state")
+        }
+        var previous = false
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            previous = try project.setPortalRendersFace(
+                roomSourceIndex: selection.roomSourceIndex,
+                portalIndex: selection.portalIndex,
+                to: rendersFace
+            )
+            storedProject = project
+        }
+        registerPortalRenderingUndo(selection: selection, rendersFace: previous)
+        undoManager?.setActionName("Set Portal Rendering")
+        refreshWindowControllers()
+    }
+
+    func setObjectTransform(
+        handle: UInt32,
+        to transform: RevivalRigidTransform
+    ) throws {
+        var previous: RevivalRigidTransform?
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            previous = try project.setObjectTransform(handle: handle, to: transform)
+            storedProject = project
+        }
+        registerObjectTransformUndo(handle: handle, transform: previous!)
+        undoManager?.setActionName("Transform Object")
+        refreshWindowControllers()
+    }
+
+    func rotateObjectQuarterTurn(handle: UInt32) throws {
+        var previous: RevivalRigidTransform?
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            previous = try project.rotateObjectQuarterTurn(handle: handle)
+            storedProject = project
+        }
+        registerObjectTransformUndo(handle: handle, transform: previous!)
+        undoManager?.setActionName("Transform Object")
+        refreshWindowControllers()
+    }
+
+    func setPlayerStartTransform(
+        playerID: Int,
+        handle: UInt32,
+        to transform: RevivalRigidTransform
+    ) throws {
+        var previous: RevivalRigidTransform?
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            previous = try project.setPlayerStartTransform(
+                playerID: playerID,
+                handle: handle,
+                to: transform
+            )
+            storedProject = project
+        }
+        registerPlayerStartTransformUndo(
+            playerID: playerID,
+            handle: handle,
+            transform: previous!
+        )
+        undoManager?.setActionName("Transform Player Start")
+        refreshWindowControllers()
+    }
+
+    func rotatePlayerStartQuarterTurn(handle: UInt32) throws {
+        var playerID: Int?
+        var previous: RevivalRigidTransform?
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            guard let playerStart = project.level.objects.first(where: {
+                $0.handle == handle && $0.type == D3SourceIdentity.playerObjectType
+            }) else {
+                throw RevivalProjectError.objectMissing(handle)
+            }
+            playerID = playerStart.storedID
+            previous = try project.rotatePlayerStartQuarterTurn(
+                playerID: playerStart.storedID,
+                handle: handle
+            )
+            storedProject = project
+        }
+        registerPlayerStartTransformUndo(
+            playerID: playerID!,
+            handle: handle,
+            transform: previous!
+        )
+        undoManager?.setActionName("Transform Player Start")
+        refreshWindowControllers()
+    }
+
     func makePlaySession() throws -> RevivalPlaySession {
         let session = project.makePlaySession(camera: camera)
         try validateCameraRoom(session.camera, session: session)
@@ -319,6 +444,67 @@ final class RevivalProjectDocument: NSDocument {
                 try document.restoreRoomName(sourceIndex: sourceIndex, to: name)
             } catch {
                 preconditionFailure("Room-name undo invariant failed: \(error)")
+            }
+        }
+    }
+
+    private func registerFaceMaterialUndo(
+        selection: RevivalFaceSelection,
+        texture: SourceResource
+    ) {
+        undoManager?.registerUndo(withTarget: self) { document in
+            do {
+                try document.selectRoom(sourceIndex: selection.roomSourceIndex)
+                try document.selectFace(selection.faceIndex)
+                try document.setSelectedFaceMaterial(to: texture)
+            } catch {
+                preconditionFailure("Face-material undo invariant failed: \(error)")
+            }
+        }
+    }
+
+    private func registerPortalRenderingUndo(
+        selection: RevivalPortalSelection,
+        rendersFace: Bool
+    ) {
+        undoManager?.registerUndo(withTarget: self) { document in
+            do {
+                try document.selectRoom(sourceIndex: selection.roomSourceIndex)
+                try document.selectPortal(selection.portalIndex)
+                try document.setSelectedPortalRendersFaces(rendersFace)
+            } catch {
+                preconditionFailure("Portal-rendering undo invariant failed: \(error)")
+            }
+        }
+    }
+
+    private func registerObjectTransformUndo(
+        handle: UInt32,
+        transform: RevivalRigidTransform
+    ) {
+        undoManager?.registerUndo(withTarget: self) { document in
+            do {
+                try document.setObjectTransform(handle: handle, to: transform)
+            } catch {
+                preconditionFailure("Object-transform undo invariant failed: \(error)")
+            }
+        }
+    }
+
+    private func registerPlayerStartTransformUndo(
+        playerID: Int,
+        handle: UInt32,
+        transform: RevivalRigidTransform
+    ) {
+        undoManager?.registerUndo(withTarget: self) { document in
+            do {
+                try document.setPlayerStartTransform(
+                    playerID: playerID,
+                    handle: handle,
+                    to: transform
+                )
+            } catch {
+                preconditionFailure("Player-start transform undo invariant failed: \(error)")
             }
         }
     }
