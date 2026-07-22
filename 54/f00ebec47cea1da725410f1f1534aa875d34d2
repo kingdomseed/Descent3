@@ -1,0 +1,53 @@
+.agents/skills/revival-source-translation/SKILL.md
+  s_c503f7c0529e13::t_075f9b9934ceb9 23,47-60,71,97,142,167
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_832936011fabd6 4,244-285
+  s_c503f7c0529e13::t_ae9c46569538fa 286
+docs/revival/skills-and-agents.md
+  s_c503f7c0529e13::t_0a6e7924b1ae94 200,205
+  s_c503f7c0529e13::t_075f9b9934ceb9 4,33-38,155,157,174
+.agents/skills/revival-review/SKILL.md
+  s_c503f7c0529e13::t_0a6e7924b1ae94 24,48-49,75
+docs/revival/primary-source-index.md
+  s_c503f7c0529e13::t_075f9b9934ceb9 78-79
+  s_c503f7c0529e13::t_f5a4e9d4ca2510 4
+REVIVAL.md
+  s_c503f7c0529e13::t_075f9b9934ceb9 51-52
+docs/revival/source-translation.md
+  s_c503f7c0529e13::t_075f9b9934ceb9 4,54,56,58,60-70,103-111,157
+  s_78df32ccc9759b::t_a848bf62f40560 158
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_27c58111528a70 21-22,24-25,38-39
+  s_c503f7c0529e13::t_0a6e7924b1ae94 28,170
+  s_c503f7c0529e13::t_f5a4e9d4ca2510 4,154,160,163,165-166,168
+  s_c503f7c0529e13::t_644eab3dfcdf2e 158,174,178
+  s_c503f7c0529e13::t_ece4e668356bac 23,29,31,40,44,156,161
+  s_c503f7c0529e13::t_58f4c2ed7deca3 169
+AGENTS.md
+  s_c503f7c0529e13::t_0a6e7924b1ae94 34
+  s_c503f7c0529e13::t_075f9b9934ceb9 31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "54f00ebec47cea1da725410f1f1534aa875d34d2",
+  "prompts": {},
+  "sessions": {
+    "s_78df32ccc9759b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a46a49f8-b538-4d87-a72a-c5a711be23cc",
+        "model": "cursor-grok-4.5-high-fast"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
