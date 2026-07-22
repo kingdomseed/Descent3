@@ -48,6 +48,8 @@ The released C++ source is the initial specification for:
 - D3Edit inspection, mutation, level I/O, rendering, and play-from-editor;
 - DALLAS, Osiris, campaign, multiplayer, replay, and utility capability.
 
+Pinned maintained descendants are an interpretation and correction layer over that baseline. Their exact commits often contain work the Revival team should not repeat: a diagnosed defect, a clarified ordering or lifetime invariant, a restored result, a quality-of-life improvement, and a compact before/after diff that makes the older path easier to understand. When one of those changes maps to the current dependency island, read it before implementing the corresponding released-source path, extract the corrected behavior and regression case, and express that result directly through native Swift, MSL, canonical data, and Apple-framework ownership. Do not implement a known historical defect first merely to rediscover and repair it later. The descendant's platform mechanism is neither the product design nor a reason to discard the semantic work it reveals.
+
 Every relevant source file receives a disposition, but native files and types follow clear Swift ownership rather than legacy file boundaries. Platform APIs, global mode switching, duplicated compilation, page-database locks, defensive branch forests, dead code, and historical workarounds are replaced or excluded with evidence.
 
 [Source translation discipline](docs/revival/source-translation.md) defines the loop: trace, capture, test, translate, run, record differences, simplify, and close the file accounting.

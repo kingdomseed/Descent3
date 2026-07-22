@@ -1,7 +1,7 @@
 # Source translation discipline
 
 - Status: accepted, amended
-- Date: July 18, 2026
+- Date: July 22, 2026
 - Authority: binding source-accounting and modernization protocol
 
 ## Decision
@@ -51,13 +51,23 @@ At the start of every roadmap phase, milestone checkpoint, dependency island, su
 
 The preflight repeats when new evidence changes the known boundary, not after every file edit. One direct trace is handled in the island. Several dependent unknowns that prevent a safe contract trigger the bounded [`revival-wayfinding`](../../.agents/skills/revival-wayfinding/SKILL.md) process. A large or unfamiliar task does not trigger indefinite research by itself.
 
-### Maintained-fork differential evidence
+### Maintained-source differential evidence
 
-The pinned released Descent 3 source remains the default evidence for original behavior. A maintained community fork may supply secondary differential evidence for a defect correction, restored behavior, quality-of-life semantics, or a source area that deserves closer inspection; it does not become a second baseline.
+The pinned released Descent 3 source remains the default evidence for shipped behavior. Pinned PiccuEngine and DESCENT 3MASTERED revisions are a semantic patch history over that baseline: their exact commits may already diagnose a defect, clarify original intent or ordering, restore missing behavior, demonstrate a quality-of-life improvement, expose a dependency or lifetime requirement, and supply a useful regression scenario. They do not replace the baseline, but they can save Revival from rediscovering the same issue in older, harder-to-read code.
 
-Run one bounded broad inventory that pins the fork revisions it compares and maps material changed areas to existing source rows, functional rows, and roadmap owners. After that, an island checks only the pinned fork changes whose paths or symbols intersect its declared roots and dependencies. Classify each exact delta as an original-behavior clarification, defect correction, deliberate-modernization candidate, platform-only mechanism, experimental or unfinished work, or irrelevant to the named contract. Record an adopted finding and its GPL provenance in the existing source-ledger row or deliberate-difference record.
+Run one bounded broad inventory that pins the maintained revisions it compares and maps material changed areas to existing source rows, functional rows, and roadmap owners. After that, an island begins by reading every mapped exact change whose paths or symbols intersect its declared roots and dependencies. Before translating the corresponding older path, extract:
 
-Keep stable released behavior distinct from later branch work. A fork is not another census root, does not require fork-wide parity, does not justify copying its platform or backend architecture, and does not expand or reopen an island without a concrete affected product contract.
+- the concrete historical defect, limitation, ambiguity, or improvement;
+- the before/after observable result and corrected invariant, ordering, formula, dependency, ownership, or lifetime rule;
+- the smallest regression input or comparison that distinguishes the correction;
+- the direct Swift, MSL, canonical-data, or Apple-framework expression of that result; and
+- the exact revision, stability classification, license provenance, and current product owner.
+
+A clear defect correction, restored intended behavior, or source clarification becomes part of the current native contract when the island reaches that path; do not deliberately reproduce the known bad behavior first. A quality-of-life or deliberate-modernization candidate is routed to its existing owner and accepted evidence rule rather than silently discarded or automatically adopted. If a mapped change does not apply, record the concrete reason. Classify stable milestone behavior separately from later experimental branch work.
+
+The maintained implementation's host mechanism is secondary to the semantic result. A Win32, OpenGL, OpenAL, SDL, legacy Osiris, cache, ABI, or compatibility change can still reveal a valuable player-visible result, invariant, dependency, or test. Extract that work first, then express it through the one native design or record why no product contract remains. Merely labeling the carrier architecture “not transferable” does not complete the differential review.
+
+Maintained descendants are not additional census roots, do not require fork-wide parity, and do not expand or reopen an island without a concrete affected product contract. Record every applied correction or improvement and its GPL provenance in the existing source-ledger row or deliberate-difference record.
 
 ### Deterministic relationship evidence
 
@@ -90,14 +100,15 @@ Each island is the smallest end-to-end path that can become observable in every 
 1. perform the bounded fog-of-war preflight and refine the proposed island boundary;
 2. construct the bounded source census from declared runtime and editor roots, including forward semantic dependencies and bounded reverse callers for entries and owned or mutated state;
 3. record every census file, relevant symbol or range, outward-edge classification, and provisional disposition;
-4. capture the observable baseline with source, fixtures, the reference executable, or a local retail level;
-5. write one focused failing test for the next native contract when production behavior is about to be added;
-6. translate the smallest coherent path into Swift and MSL;
-7. render, play, save, or inspect it through the real product path;
-8. record every intentional difference;
-9. simplify the native implementation while the behavior remains protected;
-10. split mixed rows as needed and drive every current-census range to its terminal disposition before the island closes;
-11. consolidate ordinary review, then apply the independent [`revival-completion-gate`](../../.agents/skills/revival-completion-gate/SKILL.md) once before closure, `HOLD`, additional terminal evidence, or expensive profiling.
+4. inspect every mapped pinned maintained-source delta that intersects the census and extract its corrected semantics, direct native application, regression case, stability, and provenance before implementing the older path;
+5. capture the observable baseline with source, fixtures, the reference executable, or a local retail level;
+6. write one focused failing test for the next native contract when production behavior is about to be added;
+7. translate the smallest coherent path into Swift and MSL, incorporating applicable maintained-source corrections directly rather than recreating known defects;
+8. render, play, save, or inspect it through the real product path;
+9. record every intentional difference;
+10. simplify the native implementation while the behavior remains protected;
+11. split mixed rows as needed and drive every current-census range to its terminal disposition before the island closes;
+12. consolidate ordinary review, then apply the independent [`revival-completion-gate`](../../.agents/skills/revival-completion-gate/SKILL.md) once before closure, `HOLD`, additional terminal evidence, or expensive profiling.
 
 Temporary research code may be used to learn an unknown format or behavior. It does not enter a shipping target, does not become a second product path, and is deleted or archived as evidence when the question is answered.
 
@@ -142,6 +153,8 @@ Do not preserve a mechanism solely because it exists in the tree. In particular:
 Boundary validation happens once when untrusted retail, project, package, save, or network data becomes canonical. Trusted internal code should not repeat defensive checks that canonical construction already guarantees.
 
 ## Modernization rule
+
+An exact maintained-source defect correction, restored intended behavior, or clarification accepted for a reached path is part of defining the translation target; it does not require Revival to ship the older defect first. The measurement gate below governs new Revival redesigns and performance changes, not the direct native expression of a source-supported correction. Quality-of-life changes and other deliberate differences still follow their existing product owner and evidence rules.
 
 Modernization is a separate, explicit step:
 

@@ -20,6 +20,7 @@ This skill implements the repository's accepted rules. It cannot amend them. Rea
 - [`docs/revival/current-plan.md`](../../../docs/revival/current-plan.md)
 - [`docs/revival/verification.md`](../../../docs/revival/verification.md)
 - [`docs/revival/skills-and-agents.md`](../../../docs/revival/skills-and-agents.md)
+- [`docs/revival/primary-source-index.md`](../../../docs/revival/primary-source-index.md) and every exact maintained-source delta already mapped to the current island
 
 Read the current domain document before touching its behavior, and use `current-plan.md` to select the active packet, owner, lane, and checkpoint inside the roadmap. Loading and residency work also requires [`world-loading.md`](../../../docs/revival/world-loading.md); import work requires [`content-pipeline.md`](../../../docs/revival/content-pipeline.md); editor work requires [`creator-suite.md`](../../../docs/revival/creator-suite.md); gameplay behavior requires [`behavior-system.md`](../../../docs/revival/behavior-system.md); music requires [`adaptive-music.md`](../../../docs/revival/adaptive-music.md).
 
@@ -43,6 +44,20 @@ Record the inspected roots, newly exposed dependencies or unknowns, and any cano
 
 A deterministic relationship view may direct this pass only under the provenance and uncertainty rules in the accepted document. Treat its compiler-derived edges, manually evidenced edges, and inferences as different categories. Never turn generated output into a second ledger, infer missing calls with a model, or require a whole-program graph before implementation.
 
+## Use maintained descendants as work already investigated
+
+When an R1 or later pinned PiccuEngine or DESCENT 3MASTERED change intersects the current roots or dependencies, inspect its exact before/after diff before writing the native implementation. The useful unit is not the descendant's C++ shape; it is the investigation embodied by the change.
+
+For each mapped delta, determine:
+
+1. what defect, limitation, ambiguity, or improvement prompted it;
+2. what observable result, invariant, ordering, formula, dependency, ownership, or lifetime changed;
+3. what focused input or regression case distinguishes the corrected result;
+4. how to express that result directly with Swift values, canonical content, MSL, or the concrete Apple framework owner; and
+5. whether the exact revision is a stable correction, restored behavior, quality-of-life change, deliberate-modernization candidate, or experiment.
+
+Implement a clear reached defect correction or restored intended result directly; do not intentionally reproduce the known bad behavior and schedule a later cleanup. Route a deliberate product change through its existing owner and evidence gate. If the delta is inapplicable, state the concrete reason and provenance. A platform-only carrier may still contain a transferable semantic result or test, so rejecting Win32, OpenGL, OpenAL, SDL, legacy Osiris, ABI, cache, or compatibility machinery is the final mechanism decision—not a substitute for understanding the change.
+
 ## Prove a repeated mapping before parallelizing it
 
 Before parallelizing a repeated source-to-Swift mapping, take a small representative case through the island loop and its real product checkpoint. If the source contains meaningfully different variants, include enough cases to expose those differences. Evidence determines the trial size; there is no file or reviewer quota.
@@ -53,7 +68,7 @@ Use the trial's failures to correct this skill, the island trace, or the shared 
 
 Before production implementation:
 
-1. Name the next observable player or editor result, its `current-plan.md` packet and checkpoint, pinned source revision, runtime and editor entry symbols, applicable build variants, refined preflight boundary, native owners, and every concrete shipping shell applicable to that checkpoint.
+1. Name the next observable player or editor result, its `current-plan.md` packet and checkpoint, pinned released-source revision, mapped maintained-source revisions, runtime and editor entry symbols, applicable build variants, refined preflight boundary, native owners, and every concrete shipping shell applicable to that checkpoint.
 2. Build a sorted bounded source census: trace forward through definitions, calls, data flow, important globals, ordering, dependency discovery, initialization, teardown, and editor consumers; search backward across the pinned tree for callers and registrations of the island entry symbols and state or types the island defines, mutates, or owns; and inspect callbacks, virtual dispatch, function pointers, macros, generated blocks, and handwritten behavior when actually present. Classify and stop at an outside caller that cannot reach the named contract instead of recursively reverse-tracing every shared helper.
 3. Continue until every discovered semantic dependency and outward edge is included, evidenced as irrelevant, excluded, or deferred to a named roadmap phase and missing dependency. Add or split ledger rows for every census file and relevant symbol or range; do not treat the original row list as proof that discovery is complete. Persist one compact census block in the source ledger with the revision, claim, roots, variants, native owners, sorted row anchors, deferred outward edges, and later independent-review result.
 4. Capture the historical baseline with source evidence, a synthetic fixture, the reference executable, or owned local retail content.
@@ -79,7 +94,7 @@ Record the hazard and its evidence in the existing ledger text. Do not create a 
 
 ## Translate directly
 
-Preserve source-supported data flow, formulas, update order, dependency discovery, lifetime, and observable results until evidence supports a deliberate change. Keep those semantics recognizable enough for side-by-side review.
+Preserve source-supported data flow, formulas, update order, dependency discovery, lifetime, and observable results until evidence supports a deliberate change. When a pinned maintained delta supplies a clear correction for a reached path, the corrected semantics are the source-supported target; keep the released and corrected forms recognizable enough for side-by-side review without implementing the known defect first.
 
 Use native ownership immediately when the replacement is clear:
 
@@ -124,7 +139,7 @@ Use [`revival-review`](../revival-review/SKILL.md) before closing a material isl
 
 After that review is consolidated, use [`revival-completion-gate`](../revival-completion-gate/SKILL.md) once before holding or closing the island, collecting more terminal evidence, or authorizing expensive profiling. The gate cannot waive source accounting or observable fidelity. It prevents a translation packet from expanding into later-milestone proof, unsupported failure engineering, repeated verification, or an unlimited negative after its current checkpoint is satisfied.
 
-A source-specific finding must name observable drift, missing file or range accounting, a false deliberate-difference claim, or an obsolete mechanism mistaken for semantics. Literal C++ shape, personal style, and hypothetical future needs are not defects.
+A source-specific finding must name observable drift, missing file or range accounting, a mapped maintained-source correction whose useful semantics were not extracted, a false deliberate-difference claim, or an obsolete mechanism mistaken for semantics. Literal C++ shape, personal style, and hypothetical future needs are not defects.
 
 ## Repair the process when the pattern is wrong
 
@@ -149,6 +164,7 @@ Reject:
 - speculative protocols, managers, services, ECSs, job systems, render graphs, resource managers, custom allocators, or broad package graphs;
 - defensive checks inside trusted runtime code for states canonical construction already excludes;
 - preservation of MFC, Win32, OpenGL, SDL, native Osiris, ABI, packet, binary-layout, or editor/game handoff machinery;
+- dismissal of a mapped maintained-source change solely because its carrier uses one of those obsolete mechanisms, without first extracting any corrected behavior, invariant, dependency, lifetime lesson, or regression case;
 - optimization or scheduler changes without the accepted evidence gate;
 - file-count or compiler-error burndown presented as product completion.
 

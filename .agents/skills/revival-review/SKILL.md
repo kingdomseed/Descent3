@@ -21,7 +21,7 @@ Read:
 - [`docs/revival/current-plan.md`](../../../docs/revival/current-plan.md)
 - the owning roadmap and domain documents
 
-Resolve the exact base and review target. The target may be a commit, index, or uncommitted working tree; record its identity with the applicable commit, status, and diff rather than inventing a head revision. Gather the full changed-file contents, current observable contract, active plan packet and checkpoint, involved ledger rows, baseline, deliberate differences, and claimed evidence. Review reachable consequences outside the diff when the changed path calls or owns them.
+Resolve the exact base and review target. The target may be a commit, index, or uncommitted working tree; record its identity with the applicable commit, status, and diff rather than inventing a head revision. Gather the full changed-file contents, current observable contract, active plan packet and checkpoint, involved ledger rows, released baseline, every exact mapped maintained-source delta that intersects the bounded island, deliberate differences, and claimed evidence. Review reachable consequences outside the diff when the changed path calls or owns them.
 
 Reviewers report findings and evidence. The island owner or root integrator changes the implementation and resolves findings.
 
@@ -45,6 +45,8 @@ Check:
 - the reviewer independently reconstructs the bounded source census from the declared pinned revision, runtime and editor roots, and applicable build variants by tracing forward semantic dependencies and searching backward for callers and registrations of entries and owned or mutated state; unrelated reverse callers of shared helpers are classified at the boundary rather than recursively expanded, and reviewing only the implementer's supplied rows is insufficient;
 - every reconstructed census file, important symbol, editor caller, generated block, handwritten behavior range, and outward edge is accounted for, with mixed completed and deferred ranges split and every current-slice range in a terminal state;
 - the source ledger contains the compact census block with its revision, claim, roots, variants, sorted row anchors, deferred outward edges, and this independent-review result;
+- every mapped maintained-source delta intersecting a reached census path was inspected at its exact pinned before/after revision before the older path was translated; the review identifies the diagnosed problem, corrected observable behavior or invariant, ordering, formula, dependency or lifetime, distinguishing regression case, stability and provenance, and direct Swift/MSL expression;
+- each such maintained result is explicitly adopted, deferred to its named owner, or found inapplicable with evidence; an obsolete Win32, OpenGL, OpenAL, SDL, ABI, allocation or compatibility carrier is classified only after its useful semantics have been extracted, and is not by itself grounds to dismiss the prior investigation;
 - data flow, formulas, evaluation order, update order, dependency discovery, eager and lazy behavior, stable identity, and teardown remain source-supported;
 - ownership and final GPU-use lifetime preserve observable results;
 - the complete canonical `Level` and RevivalMac, RevivalMobile and RevivalEditor relationships are not reduced to a fixture or partial production model;
@@ -70,7 +72,7 @@ Check:
 - human creator workflows remain first-class where the slice requires them;
 - any binding product or cross-workstream change received the required amendment instead of entering through code.
 
-Source evidence informs original semantics. It cannot reopen a product boundary that the accepted documents rejected.
+Source evidence informs original semantics and maintained-source corrections can clarify the direct native translation target. Neither can reopen a product boundary that the accepted documents rejected.
 
 ## Concern 3: tests, evidence, and terminal closure
 

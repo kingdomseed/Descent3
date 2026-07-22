@@ -1,7 +1,7 @@
 # Skills and agents
 
 - Status: accepted, amended
-- Date: July 18, 2026
+- Date: July 22, 2026
 - Authority: skill selection and agent operating rules
 
 ## Principle
@@ -29,6 +29,12 @@ The pinned source is the main translation source for formats, data flow, order, 
 Use it systematically, not only to answer isolated questions. Trace both runtime and editor callers. Account for generated and handwritten behavior ranges. Record platform replacement, evidence-only, exclusion, and deliberate differences in the source-translation ledger.
 
 Do not link it into a product target or mirror mixed legacy file boundaries blindly.
+
+### Maintained descendants
+
+Pinned PiccuEngine and DESCENT 3MASTERED commits are a source-cited patch history over the released baseline. When a mapped change intersects the current island, read its exact before/after diff before translating the older path. Extract the problem already diagnosed, corrected observable result, invariant or ordering, useful regression case, and direct Swift/MSL mapping. Clear reached defect corrections and restorations belong in the native contract without first reproducing the old bug; quality-of-life and deliberate-modernization changes remain subject to their existing product owner and evidence rule.
+
+The descendant's Windows, OpenGL, OpenAL, SDL, legacy Osiris, ABI, cache, or compatibility mechanism is not Revival architecture. That is a mechanism decision made after semantic extraction, not a reason to ignore work that has already clarified the old system. Exact pins, evidentiary limits, and lineage live in the [primary source index](primary-source-index.md); adopted semantics and GPL provenance live in the existing source ledger or deliberate-difference owner.
 
 ### Historical development evidence
 
@@ -146,9 +152,9 @@ Do not auto-update skills. Review upstream changes before moving a pin. The curr
 Use only the steps the current work needs:
 
 1. **Restore current state and check the constitution.** Apply `revival-documentation-steward` at material packet entry or resumption: read [`current-plan.md`](current-plan.md), inspect the actual tree and last landed evidence, select a named work packet, and confirm the requested result fits the accepted platform, product, content, ownership, and one-path boundaries. Resolve stale state before implementation without creating another recovery or planning file.
-2. **Uncover the fog of war.** At every new phase, milestone checkpoint, dependency island, subsystem, or material code group, test the proposed packet against the relevant source, current code, callers, state, ordering, lifetime, editor and runtime consumers, fixtures, and evidence. Record what was checked and any real correction. `No new gap found` is valid. Stop when the next observable contract and island boundary are safe to state; do not turn discovery into whole-program analysis.
+2. **Uncover the fog of war.** At every new phase, milestone checkpoint, dependency island, subsystem, or material code group, test the proposed packet against the relevant released source, mapped maintained-source deltas, current code, callers, state, ordering, lifetime, editor and runtime consumers, fixtures, and evidence. Read intersecting maintained changes before translating the older path and extract their corrected semantics and native application. Record what was checked and any real correction. `No new gap found` is valid. Stop when the next observable contract and island boundary are safe to state; do not turn discovery into whole-program analysis.
 3. **Wayfind only when discovery exposes a blocker.** Use `revival-wayfinding` when several linked unknowns still prevent a concrete contract. One direct lookup or a clean preflight proceeds immediately to island tracing and implementation.
-4. **Trace one dependency island.** Name the observable player or editor result, each applicable concrete Mac, mobile, and editor shell, legacy and editor callers, important symbols, ordering, lifetime, baseline, dispositions, and deliberate modernization boundary.
+4. **Trace one dependency island.** Name the observable player or editor result, each applicable concrete Mac, mobile, and editor shell, legacy and editor callers, important symbols, ordering, lifetime, baseline, mapped maintained changes, their corrected contracts and regression cases, dispositions, and deliberate modernization boundary.
 5. **Check the real blast radius.** Prove the affected Mac-player, mobile-player, runtime, and editor callers, canonical consumers, update order, resource lifetime, and current acceptance path. Record what evidence confirms, clears, or leaves a risk open; do not produce a speculative caller essay.
 6. **Implement one contract.** Use the current domain skill. Observe focused red, make the smallest direct green, and keep validation at the untrusted-to-canonical boundary. Concrete Swift values and exhaustive state represent real invariants; wrapper types and protocols need an actual ownership or semantic job.
 7. **Simplify the diff.** Protect the named behavior surface, then remove duplicated paths, defensive runtime branches, needless indirection, stale comments, speculative flexibility, and measured hot-path waste. Rerun the focused and affected evidence after every accepted simplification.
@@ -165,7 +171,7 @@ Use the following bounded evidence-producing roles rather than standing personas
 
 ### Translation foundation
 
-1. Source and chronology reviewer: trace the current dependency island across runtime, editor, and revision evidence; maintain dispositions.
+1. Source and chronology reviewer: trace the current dependency island across runtime, editor, released-source and mapped maintained-source revision evidence; extract corrected semantics and direct native implications before maintaining dispositions.
 2. Swift and Metal implementer: establish the current shared world, renderer, scheduler, and simulation path through the concrete AppKit player and editor shells; early UIKit target/build work is optional compatibility evidence, and Phase 8 composes and profiles the accumulated shared contract on physical mobile devices.
 3. Content and creator implementer: import each Phase 1–7 slice on macOS and deliver its real editor mutation, validation, save, and play loop; early mobile package wiring may proceed without device closure, while Phase 8 proves the accumulated canonical-package intake without inventing an adapter or second package path.
 
@@ -191,12 +197,12 @@ The steward may audit in parallel with implementation when it remains read-only 
 
 After every material slice, cover four concerns independently:
 
-- source fidelity and complete runtime/editor accounting;
+- source fidelity and complete runtime/editor accounting, including exact before/after inspection and native semantic extraction for every mapped maintained-source delta intersecting a reached path;
 - architecture, constitutional scope, canonical boundaries, and one production path;
 - focused tests, evidence claims, Mac/editor acceptance, early mobile compatibility where present, Phase 8+ physical-device proof where current, and terminal rows;
 - simplicity, maintainability, reuse of existing direct code, and measured efficiency.
 
-Use separate reviewers when capacity allows. Run the remaining concern in the next wave when capacity is limited. For a small change one reviewer may cover multiple concerns only when the report keeps them distinct. Reviewers identify concrete paths and observable consequences; they do not demand preservation of obsolete machinery, literal source shape, defensive branches after canonical validation, or speculative future-proofing. [`revival-review`](../../.agents/skills/revival-review/SKILL.md) defines consolidation and closure.
+Use separate reviewers when capacity allows. Run the remaining concern in the next wave when capacity is limited. For a small change one reviewer may cover multiple concerns only when the report keeps them distinct. Reviewers identify concrete paths and observable consequences. They do not demand preservation of obsolete machinery, literal source shape, defensive branches after canonical validation, or speculative future-proofing, and they do not use an obsolete maintained-source carrier mechanism as a substitute for extracting its corrected behavior, invariant, regression case, and direct Swift/MSL application. [`revival-review`](../../.agents/skills/revival-review/SKILL.md) defines consolidation and closure.
 
 After those concerns are consolidated and corrected, one independent [`revival-completion-gate`](../../.agents/skills/revival-completion-gate/SKILL.md) reviewer decides whether any proposed remainder belongs to the current checkpoint. This reviewer consumes the existing review rather than repeating it. `HOLD` requires a concrete reachable defect or exact current-checkpoint evidence gap; later work, unsupported failure, unlimited negative proof, and reassuring-but-decisionless evidence are deferred or rejected. A `STOP - READY` verdict explicitly ends implementation.
 
