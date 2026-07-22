@@ -1,6 +1,114 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testSchemaTwoAndIncompleteObjectModelDependenciesAreRejected() throws {
+        let base = makeMinimalCanonicalPackageLevel()
+        assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 2))
+
+        let modelSource = SourceResource(storedIndex: 0, sourceName: "Synthetic.OOF")
+        let missingTexture = SourceResource(storedIndex: 1, sourceName: "model-surface")
+        let model = CanonicalModel(
+            source: modelSource,
+            submodels: [
+                .init(
+                    sourceIndex: 0,
+                    parentIndex: nil,
+                    offset: .zero,
+                    vertices: [
+                        .init(position: .zero, alpha: 1),
+                        .init(position: .init(x: 1, y: 0, z: 0), alpha: 1),
+                        .init(position: .init(x: 0, y: 1, z: 0), alpha: 1),
+                    ],
+                    faces: [
+                        .init(
+                            normal: .init(x: 0, y: 0, z: 1),
+                            corners: [
+                                .init(vertexIndex: 0, u: 0, v: 0),
+                                .init(vertexIndex: 1, u: 1, v: 0),
+                                .init(vertexIndex: 2, u: 0, v: 1),
+                            ],
+                            material: .texture(missingTexture)
+                        ),
+                    ],
+                    presentation: .standard
+                ),
+            ],
+            bounds: .init(minimum: .zero, maximum: .init(x: 1, y: 1, z: 0)),
+            sourceArchive: base.source.profileFiles[0].relativePath,
+            sourceSHA256: String(repeating: "e", count: 64)
+        )
+        let player = makePlacedObject(
+            handle: 2_048,
+            type: D3SourceIdentity.playerObjectType,
+            storedID: 0,
+            location: .room(3)
+        )
+        let presentation = ObjectPresentationReference(
+            objectHandle: player.handle,
+            primaryModel: modelSource,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil
+        )
+        let dependency = DependencyRecord(
+            category: "model",
+            source: modelSource,
+            state: "presentation-payload-imported",
+            provenance: "synthetic canonical fixture"
+        )
+        let incomplete = replacing(
+            base,
+            objects: [player],
+            models: [model],
+            objectPresentations: [presentation],
+            dependencyManifest: .init(
+                current: base.dependencyManifest.current + [dependency],
+                historicalEagerBaseline: nil
+            )
+        )
+
+        assertValidationError(
+            .invalidDependency("missing texture:model-surface"),
+            incomplete
+        )
+
+        let modelMaterial = PresentationMaterial(
+            texture: missingTexture,
+            bitmapSourceName: "model-surface.ogf",
+            image: .init(width: 1, height: 1, rgba8: Data([255, 255, 255, 255])),
+            blend: .opaque,
+            lightmapBlend: .none,
+            waterProcedural: nil,
+            sourceArchive: base.source.profileFiles[0].relativePath,
+            sourceSHA256: String(repeating: "f", count: 64)
+        )
+        let textureDependency = DependencyRecord(
+            category: "texture",
+            source: missingTexture,
+            state: "presentation-payload-imported",
+            provenance: "synthetic canonical fixture"
+        )
+        let complete = replacing(
+            base,
+            objects: [player],
+            presentationMaterials: base.presentationMaterials + [modelMaterial],
+            models: [model],
+            objectPresentations: [presentation],
+            dependencyManifest: .init(
+                current: base.dependencyManifest.current + [dependency, textureDependency],
+                historicalEagerBaseline: nil
+            )
+        )
+
+        XCTAssertNoThrow(try complete.validate())
+        XCTAssertEqual(
+            try JSONDecoder().decode(Level.self, from: canonicalJSONData(complete)),
+            complete
+        )
+    }
+
     func testRevivalMobileBackupExclusionIsScopedToReimportableContent() {
         let library = CanonicalPackageLibrary.revivalMobile
 
@@ -1875,6 +1983,7 @@ private func overwriteCanonicalPackageLevel(_ level: Level, at packageURL: URL) 
 
 func replacing(
     _ level: Level,
+    schemaVersion: Int? = nil,
     source: LevelSource? = nil,
     metadata: LevelMetadata? = nil,
     rooms: [LevelRoom]? = nil,
@@ -1888,11 +1997,13 @@ func replacing(
     lightmaps: LightmapCatalog? = nil,
     presentationMaterials: [PresentationMaterial]? = nil,
     presentationCoronaAssets: [PresentationCoronaAsset]? = nil,
+    models: [CanonicalModel]? = nil,
+    objectPresentations: [ObjectPresentationReference]? = nil,
     dependencyManifest: DependencyManifest? = nil,
     sourceChunks: [SourceChunkRecord]? = nil
 ) -> Level {
     Level(
-        schemaVersion: level.schemaVersion,
+        schemaVersion: schemaVersion ?? level.schemaVersion,
         missionKey: level.missionKey,
         levelKey: level.levelKey,
         source: source ?? level.source,
@@ -1909,6 +2020,8 @@ func replacing(
         lightmaps: lightmaps ?? level.lightmaps,
         presentationMaterials: presentationMaterials ?? level.presentationMaterials,
         presentationCoronaAssets: presentationCoronaAssets ?? level.presentationCoronaAssets,
+        models: models ?? level.models,
+        objectPresentations: objectPresentations ?? level.objectPresentations,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
         sourceChunks: sourceChunks ?? level.sourceChunks
     )

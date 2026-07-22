@@ -71,6 +71,18 @@ struct RoomDrawItem: Equatable, Sendable {
     let triangleIndices: [UInt32]
 }
 
+struct ModelDrawItem: Equatable, Sendable {
+    let objectHandle: UInt32
+    let roomSourceIndex: Int
+    let model: SourceResource
+    let submodelIndex: Int
+    let faceIndex: Int
+    let material: ModelFaceMaterial
+    let blend: PresentationBlend
+    let vertices: [WorldRenderVertex]
+    let triangleIndices: [UInt32]
+}
+
 struct WorldLightCorona: Equatable, Sendable {
     let roomSourceIndex: Int
     let faceIndex: Int
@@ -85,6 +97,8 @@ struct WorldRenderExtraction: Equatable, Sendable {
     let visibleRoomSourceIndices: [Int]
     let opaqueDrawItems: [RoomDrawItem]
     let translucentDrawItems: [RoomDrawItem]
+    let admittedObjectHandles: [UInt32]
+    let modelDrawItems: [ModelDrawItem]
     let lightCoronas: [WorldLightCorona]
     let portalEdges: [RenderPortalEdge]
 }
@@ -98,6 +112,7 @@ struct SourceVisibleWorld: Equatable, Sendable {
     let visibleRoomSourceIndices: [Int]
     let faces: [SourceVisibleFace]
     let portalEdges: [RenderPortalEdge]
+    let objectClipWindowsByRoom: [Int: [SourceClipWindow]]
 }
 
 enum RoomRenderExtractionError: Error, Equatable {
@@ -336,13 +351,260 @@ func extractWorldForRendering(
         camera: camera,
         visibility: visibility
     )
+    let objectPresentation = extractObjectPresentation(
+        level,
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        visibility: visibility
+    )
     return WorldRenderExtraction(
         visibleRoomSourceIndices: visibility.visibleRoomSourceIndices,
         opaqueDrawItems: opaqueDrawItems,
         translucentDrawItems: translucentDrawItems.map(\.item),
+        admittedObjectHandles: objectPresentation.handles,
+        modelDrawItems: objectPresentation.drawItems,
         lightCoronas: lightCoronas,
         portalEdges: visibility.portalEdges
     )
+}
+
+private func extractObjectPresentation(
+    _ level: Level,
+    camera: RoomCamera,
+    startRoomSourceIndex: Int,
+    visibility: SourceVisibleWorld
+) -> (handles: [UInt32], drawItems: [ModelDrawItem]) {
+    guard !level.objectPresentations.isEmpty else { return ([], []) }
+    let presentationByHandle = Dictionary(
+        uniqueKeysWithValues: level.objectPresentations.map { ($0.objectHandle, $0) }
+    )
+    let modelBySource = Dictionary(
+        uniqueKeysWithValues: level.models.map { ($0.source, $0) }
+    )
+    let materialByTexture = Dictionary(
+        uniqueKeysWithValues: level.presentationMaterials.map { ($0.texture, $0) }
+    )
+    let visibleRooms = Set(visibility.visibleRoomSourceIndices)
+    let view = CameraView(camera)
+    var accepted: [(depth: Float, ordinal: Int, object: PlacedObject,
+                    presentation: ObjectPresentationReference, model: CanonicalModel)] = []
+    for (ordinal, object) in level.objects.enumerated() {
+        guard let presentation = presentationByHandle[object.handle],
+              case let .room(roomSourceIndex) = object.location,
+              visibleRooms.contains(roomSourceIndex),
+              let primary = modelBySource[presentation.primaryModel] else {
+            continue
+        }
+        let size = sourceObjectPresentationSize(model: primary, objectType: object.type)
+        guard sourceObjectIsPortalSafe(
+            object,
+            size: size,
+            startRoomSourceIndex: startRoomSourceIndex,
+            clipWindowsByRoom: visibility.objectClipWindowsByRoom,
+            view: view
+        ), sourceSphereIsVisible(object.position, radius: size, view: view) else {
+            continue
+        }
+        let depth = view.depth(of: object.position)
+        let selectedSource = sourceLODModel(presentation, depth: depth)
+        guard let model = modelBySource[selectedSource] else {
+            preconditionFailure("validated object presentation references must resolve")
+        }
+        accepted.append((depth, ordinal, object, presentation, model))
+    }
+    accepted.sort {
+        $0.depth == $1.depth ? $0.ordinal < $1.ordinal : $0.depth > $1.depth
+    }
+    return (
+        accepted.map { $0.object.handle },
+        accepted.flatMap {
+            makeModelDrawItems(
+                object: $0.object,
+                model: $0.model,
+                materialByTexture: materialByTexture,
+                camera: camera
+            )
+        }
+    )
+}
+
+private func sourceObjectPresentationSize(
+    model: CanonicalModel,
+    objectType: UInt8
+) -> Float {
+    let offsets = accumulatedModelOffsets(model)
+    var maximumDistanceSquared: Float = 0
+    for submodel in model.submodels {
+        let offset = offsets[submodel.sourceIndex]
+        for vertex in submodel.vertices {
+            let transformed = offset + vertex.position
+            maximumDistanceSquared = max(
+                maximumDistanceSquared,
+                dot(transformed, transformed)
+            )
+        }
+    }
+    var size = sqrt(maximumDistanceSquared) + 0.01
+    if objectType == 7 { size *= 2 }
+    return size
+}
+
+private func sourceObjectIsPortalSafe(
+    _ object: PlacedObject,
+    size: Float,
+    startRoomSourceIndex: Int,
+    clipWindowsByRoom: [Int: [SourceClipWindow]],
+    view: CameraView
+) -> Bool {
+    guard case let .room(roomSourceIndex) = object.location else { return false }
+    if roomSourceIndex == startRoomSourceIndex { return true }
+    return (clipWindowsByRoom[roomSourceIndex] ?? []).contains { window in
+        sourceCubeIntersectsWindow(
+            center: object.position,
+            halfExtent: size,
+            view: view,
+            window: window
+        )
+    }
+}
+
+private func sourceCubeIntersectsWindow(
+    center: Vector3,
+    halfExtent: Float,
+    view: CameraView,
+    window: SourceClipWindow
+) -> Bool {
+    var combined = UInt8.max
+    for x in [-halfExtent, halfExtent] {
+        for y in [-halfExtent, halfExtent] {
+            for z in [-halfExtent, halfExtent] {
+                let point = view.project(center + .init(x: x, y: y, z: z))
+                if point.depth <= 0 { return true }
+                combined &= clipCode(point, window: window)
+            }
+        }
+    }
+    return combined == 0
+}
+
+private func sourceSphereIsVisible(
+    _ position: Vector3,
+    radius: Float,
+    view: CameraView
+) -> Bool {
+    let relative = position - view.eye
+    let horizontal = dot(relative, view.right)
+    let vertical = dot(relative, view.up)
+    let depth = dot(relative, view.forward)
+    guard depth >= -radius else { return false }
+    let horizontalHalfFOV = atan(1 / view.horizontalProjectionScale)
+    let verticalHalfFOV = atan(1 / view.verticalProjectionScale)
+    guard abs(horizontal) * cos(horizontalHalfFOV)
+            - depth * sin(horizontalHalfFOV) <= radius,
+          abs(vertical) * cos(verticalHalfFOV)
+            - depth * sin(verticalHalfFOV) <= radius else {
+        return false
+    }
+    return true
+}
+
+private func sourceLODModel(
+    _ presentation: ObjectPresentationReference,
+    depth: Float
+) -> SourceResource {
+    if let mediumDistance = presentation.mediumDistance,
+       depth >= mediumDistance {
+        if let lowDistance = presentation.lowDistance,
+           depth >= lowDistance {
+            return presentation.lowModel
+                ?? presentation.mediumModel
+                ?? presentation.primaryModel
+        }
+        return presentation.mediumModel ?? presentation.primaryModel
+    }
+    return presentation.primaryModel
+}
+
+private func makeModelDrawItems(
+    object: PlacedObject,
+    model: CanonicalModel,
+    materialByTexture: [SourceResource: PresentationMaterial],
+    camera: RoomCamera
+) -> [ModelDrawItem] {
+    guard case let .room(roomSourceIndex) = object.location else {
+        preconditionFailure("model presentation is indoor in the Slice 6 island")
+    }
+    let offsets = accumulatedModelOffsets(model)
+    var opaque: [ModelDrawItem] = []
+    var alpha: [ModelDrawItem] = []
+    for submodel in model.submodels.sorted(by: { $0.sourceIndex < $1.sourceIndex }) {
+        guard submodel.presentation == .standard else { continue }
+        let offset = offsets[submodel.sourceIndex]
+        for (faceIndex, face) in submodel.faces.enumerated() {
+            let transformedNormal = transform(face.normal, by: object.orientation)
+            let firstLocal = offset + submodel.vertices[face.corners[0].vertexIndex].position
+            let firstWorld = object.position + transform(firstLocal, by: object.orientation)
+            guard dot(camera.position - firstWorld, transformedNormal) >= 0 else { continue }
+            let vertices = face.corners.map { corner in
+                let source = submodel.vertices[corner.vertexIndex]
+                let local = offset + source.position
+                return WorldRenderVertex(
+                    position: object.position + transform(local, by: object.orientation),
+                    u: corner.u,
+                    v: corner.v,
+                    lightmapU: 0,
+                    lightmapV: 0,
+                    alpha: source.alpha
+                )
+            }
+            var indices: [UInt32] = []
+            for index in 1..<(vertices.count - 1) {
+                indices.append(contentsOf: [0, UInt32(index), UInt32(index + 1)])
+            }
+            let blend: PresentationBlend
+            switch face.material {
+            case let .texture(texture):
+                guard let material = materialByTexture[texture] else {
+                    preconditionFailure("validated model materials must resolve")
+                }
+                blend = material.blend
+            case .sourceColor:
+                blend = .sourceAlpha(opacity: 255)
+            }
+            let item = ModelDrawItem(
+                objectHandle: object.handle,
+                roomSourceIndex: roomSourceIndex,
+                model: model.source,
+                submodelIndex: submodel.sourceIndex,
+                faceIndex: faceIndex,
+                material: face.material,
+                blend: blend,
+                vertices: vertices,
+                triangleIndices: indices
+            )
+            switch blend {
+            case .opaque: opaque.append(item)
+            case .sourceAlpha, .additiveSourceAlpha: alpha.append(item)
+            }
+        }
+    }
+    return opaque + alpha
+}
+
+private func accumulatedModelOffsets(_ model: CanonicalModel) -> [Vector3] {
+    var offsets = [Vector3?](repeating: nil, count: model.submodels.count)
+
+    func resolve(_ sourceIndex: Int) -> Vector3 {
+        if let offset = offsets[sourceIndex] { return offset }
+
+        let submodel = model.submodels[sourceIndex]
+        let parentOffset = submodel.parentIndex.map(resolve) ?? .zero
+        let offset = parentOffset + submodel.offset
+        offsets[sourceIndex] = offset
+        return offset
+    }
+
+    return model.submodels.indices.map(resolve)
 }
 
 func extractSourceLightCoronas(
@@ -513,6 +775,7 @@ func extractSourceVisibleWorld(
     var visibleRoomSourceIndices: [Int] = []
     var visibleFacesByRoom: [Int: Set<Int>] = [:]
     var portalEdges: [RenderPortalEdge] = []
+    var objectClipWindowsByRoom: [Int: [SourceClipWindow]] = [:]
 
     func renderPastPortal(_ room: LevelRoom, portalIndex: Int) throws -> Bool {
         let portal = room.portals[portalIndex]
@@ -532,6 +795,7 @@ func extractSourceVisibleWorld(
         if seenRooms.insert(roomSourceIndex).inserted {
             visibleRoomSourceIndices.append(roomSourceIndex)
         }
+        objectClipWindowsByRoom[roomSourceIndex, default: []].append(window)
         if visibleFacesByRoom[roomSourceIndex] == nil {
             visibleFacesByRoom[roomSourceIndex] = depth == 0
                 ? Set(room.faces.indices.filter {
@@ -602,7 +866,8 @@ func extractSourceVisibleWorld(
                     : nil
             }
         },
-        portalEdges: portalEdges
+        portalEdges: portalEdges,
+        objectClipWindowsByRoom: objectClipWindowsByRoom
     )
 }
 
@@ -702,6 +967,10 @@ private struct CameraView {
             depth: depth
         )
     }
+
+    func depth(of point: Vector3) -> Float {
+        dot(point - eye, forward)
+    }
 }
 
 private struct ProjectedPoint {
@@ -710,12 +979,14 @@ private struct ProjectedPoint {
     let depth: Float
 }
 
-private struct ClipWindow {
+struct SourceClipWindow: Equatable, Sendable {
     let left: Float
     let top: Float
     let right: Float
     let bottom: Float
 }
+
+private typealias ClipWindow = SourceClipWindow
 
 private func projectedPortalWindow(
     _ room: LevelRoom,
@@ -814,6 +1085,18 @@ private func normalized(_ value: Vector3) -> Vector3 {
 
 private func - (lhs: Vector3, rhs: Vector3) -> Vector3 {
     Vector3(x: lhs.x - rhs.x, y: lhs.y - rhs.y, z: lhs.z - rhs.z)
+}
+
+private func + (lhs: Vector3, rhs: Vector3) -> Vector3 {
+    Vector3(x: lhs.x + rhs.x, y: lhs.y + rhs.y, z: lhs.z + rhs.z)
+}
+
+private func transform(_ value: Vector3, by matrix: Matrix3) -> Vector3 {
+    matrix.right * value.x + matrix.up * value.y + matrix.forward * value.z
+}
+
+private func * (lhs: Vector3, rhs: Float) -> Vector3 {
+    Vector3(x: lhs.x * rhs, y: lhs.y * rhs, z: lhs.z * rhs)
 }
 
 private func / (lhs: Vector3, rhs: Float) -> Vector3 {

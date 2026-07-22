@@ -1,6 +1,36 @@
 import XCTest
 
 final class MetalWorldPlanTests: XCTestCase {
+    func testAddsObjectModelsToTheOneWorldPlanWithTypedMaterials() throws {
+        let plan = try makeMetalWorldPlan(
+            level: makeSliceSixObjectRenderLevel(),
+            camera: .trainingRoom3,
+            startRoomSourceIndex: 3
+        )
+
+        let objectDraws = plan.draws.filter { $0.objectHandle != nil }
+        XCTAssertEqual(
+            objectDraws.compactMap(\.objectHandle),
+            [18_441, 2_048, 12_300, 6_147]
+        )
+        let player = try XCTUnwrap(objectDraws.first { $0.objectHandle == 2_048 })
+        XCTAssertEqual(player.model?.sourceName, "PyroGLMed.OOF")
+        XCTAssertEqual(player.texture?.sourceName, "model-surface")
+        XCTAssertEqual(player.blend, .sourceAlpha(opacity: 255))
+        XCTAssertTrue(player.writesDepth)
+        XCTAssertEqual(player.vertices[0].position.x, 2_058.6497, accuracy: 0.0002)
+
+        let startCourse = try XCTUnwrap(
+            objectDraws.first { $0.objectHandle == 6_147 }
+        )
+        XCTAssertNil(startCourse.texture)
+        XCTAssertEqual(
+            startCourse.sourceColor,
+            SIMD3<Float>(32.0 / 255, 64.0 / 255, 96.0 / 255)
+        )
+        XCTAssertEqual(startCourse.vertices[0].surfaceColor.w, 1)
+    }
+
     func testBuildsTheSourceOrderedRoomThreeMetalPlanFromTypedPresentationValues() throws {
         let plan = try makeMetalWorldPlan(
             level: makeSelectedRoomRenderLevel(),

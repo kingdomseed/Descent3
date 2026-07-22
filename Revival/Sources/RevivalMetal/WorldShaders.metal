@@ -7,6 +7,7 @@ struct RevivalWorldVertex {
     float4 position;
     float4 textureAndLightmapUV;
     float4 presentation;
+    float4 surfaceColor;
 };
 
 struct RevivalWorldUniforms {
@@ -18,6 +19,7 @@ struct RevivalWorldRaster {
     float2 textureUV;
     float2 lightmapUV;
     float opacity;
+    float4 surfaceColor;
 };
 
 vertex RevivalWorldRaster revivalWorldVertex(
@@ -37,6 +39,7 @@ vertex RevivalWorldRaster revivalWorldVertex(
         1.0 - sourceVertex.textureAndLightmapUV.w
     );
     output.opacity = sourceVertex.presentation.x;
+    output.surfaceColor = sourceVertex.surfaceColor;
     return output;
 }
 
@@ -47,7 +50,10 @@ fragment float4 revivalWorldFragment(
     sampler baseSampler [[sampler(0)]],
     sampler lightmapSampler [[sampler(1)]])
 {
-    float4 base = baseTexture.sample(baseSampler, input.textureUV);
+    float4 sampled = baseTexture.sample(baseSampler, input.textureUV);
+    float4 base = input.surfaceColor.w > 0.5
+        ? float4(input.surfaceColor.rgb, 1.0)
+        : sampled;
     float3 lightmap = lightmapTexture.sample(
         lightmapSampler,
         input.lightmapUV

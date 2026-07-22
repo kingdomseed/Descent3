@@ -32,6 +32,7 @@ enum D3SourceIdentity {
         switch category.lowercased() {
         case "texture": return 3_100
         case "object-definition": return 910
+        case "model": return 10_000
         case "door-definition": return 60
         case "lightmap-page", "lightmap-info": return 65_534
         case "presentation-effect": return 256
@@ -473,6 +474,7 @@ struct CanonicalRGBA8Image: Codable, Equatable, Sendable {
 
 enum PresentationBlend: Codable, Equatable, Sendable {
     case opaque
+    case sourceAlpha(opacity: UInt8)
     case additiveSourceAlpha(opacity: UInt8)
 }
 
@@ -552,6 +554,66 @@ struct PresentationMaterial: Codable, Equatable, Sendable {
     }
 }
 
+struct ModelBounds: Codable, Equatable, Sendable {
+    let minimum: Vector3
+    let maximum: Vector3
+}
+
+struct ModelVertex: Codable, Equatable, Sendable {
+    let position: Vector3
+    let alpha: Float
+}
+
+struct ModelFaceCorner: Codable, Equatable, Sendable {
+    let vertexIndex: Int
+    let u: Float
+    let v: Float
+}
+
+enum ModelFaceMaterial: Codable, Equatable, Sendable {
+    case texture(SourceResource)
+    case sourceColor(red: UInt8, green: UInt8, blue: UInt8)
+}
+
+struct ModelFace: Codable, Equatable, Sendable {
+    let normal: Vector3
+    let corners: [ModelFaceCorner]
+    let material: ModelFaceMaterial
+}
+
+enum ModelSubmodelPresentation: Codable, Equatable, Sendable {
+    case standard
+    case custom
+    case glow(color: Vector3, size: Float)
+}
+
+struct ModelSubmodel: Codable, Equatable, Sendable {
+    let sourceIndex: Int
+    let parentIndex: Int?
+    let offset: Vector3
+    let vertices: [ModelVertex]
+    let faces: [ModelFace]
+    let presentation: ModelSubmodelPresentation
+}
+
+struct CanonicalModel: Codable, Equatable, Sendable {
+    let source: SourceResource
+    let submodels: [ModelSubmodel]
+    let bounds: ModelBounds
+    let sourceArchive: String
+    let sourceSHA256: String
+}
+
+struct ObjectPresentationReference: Codable, Equatable, Sendable {
+    let objectHandle: UInt32
+    let primaryModel: SourceResource
+    let mediumModel: SourceResource?
+    let lowModel: SourceResource?
+    let dyingModel: SourceResource?
+    let mediumDistance: Float?
+    let lowDistance: Float?
+}
+
 struct DependencyRecord: Codable, Equatable, Hashable, Sendable {
     let category: String
     let source: SourceResource
@@ -596,11 +658,13 @@ struct Level: Codable, Equatable, Sendable {
     let lightmaps: LightmapCatalog
     let presentationMaterials: [PresentationMaterial]
     let presentationCoronaAssets: [PresentationCoronaAsset]
+    let models: [CanonicalModel]
+    let objectPresentations: [ObjectPresentationReference]
     let dependencyManifest: DependencyManifest
     let sourceChunks: [SourceChunkRecord]
 
     init(
-        schemaVersion: Int = 2,
+        schemaVersion: Int = 3,
         missionKey: String,
         levelKey: String,
         source: LevelSource,
@@ -617,6 +681,8 @@ struct Level: Codable, Equatable, Sendable {
         lightmaps: LightmapCatalog,
         presentationMaterials: [PresentationMaterial] = [],
         presentationCoronaAssets: [PresentationCoronaAsset] = [],
+        models: [CanonicalModel] = [],
+        objectPresentations: [ObjectPresentationReference] = [],
         dependencyManifest: DependencyManifest,
         sourceChunks: [SourceChunkRecord]
     ) {
@@ -637,6 +703,8 @@ struct Level: Codable, Equatable, Sendable {
         self.lightmaps = lightmaps
         self.presentationMaterials = presentationMaterials
         self.presentationCoronaAssets = presentationCoronaAssets
+        self.models = models
+        self.objectPresentations = objectPresentations
         self.dependencyManifest = dependencyManifest
         self.sourceChunks = sourceChunks
     }
@@ -650,7 +718,7 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     private func validate(allowImportStagingPresentation: Bool) throws {
-        guard schemaVersion == 2, source.d3lvVersion == 127,
+        guard schemaVersion == 3, source.d3lvVersion == 127,
               !missionKey.isEmpty, !levelKey.isEmpty else {
             throw LevelValidationError.invalidIdentity
         }
@@ -659,6 +727,13 @@ struct Level: Codable, Equatable, Sendable {
         try validatePresentation(
             materials: presentationMaterials,
             coronaAssets: presentationCoronaAssets,
+            source: source
+        )
+        try validateModels(
+            models,
+            objectPresentations: objectPresentations,
+            materials: presentationMaterials,
+            objects: objects,
             source: source
         )
 
@@ -1011,6 +1086,86 @@ struct Level: Codable, Equatable, Sendable {
             lightmaps: retainedLightmaps,
             presentationMaterials: materials,
             presentationCoronaAssets: coronaAssets,
+            models: models,
+            objectPresentations: objectPresentations,
+            dependencyManifest: .init(
+                current: dependencies,
+                historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
+            ),
+            sourceChunks: sourceChunks
+        )
+    }
+
+    func addingObjectPresentation(
+        models newModels: [CanonicalModel],
+        objectPresentations newObjectPresentations: [ObjectPresentationReference],
+        materials newMaterials: [PresentationMaterial]
+    ) -> Level {
+        let combinedMaterials = presentationMaterials + newMaterials.filter { candidate in
+            !presentationMaterials.contains(where: { $0.texture == candidate.texture })
+        }
+        let reachedModelSources = Set(newModels.map(\.source))
+        let reachedTextureSources = referencedModelTextures(in: newModels)
+        var dependencies = dependencyManifest.current.map { dependency in
+            let reached = dependency.category == "model"
+                ? reachedModelSources.contains(dependency.source)
+                : dependency.category == "texture"
+                    && reachedTextureSources.contains(dependency.source)
+            guard reached else { return dependency }
+            return DependencyRecord(
+                category: dependency.category,
+                source: dependency.source,
+                state: "presentation-payload-imported",
+                provenance: dependency.provenance
+            )
+        }
+        var identities = Set(dependencies.map {
+            DependencyIdentity(category: $0.category, source: $0.source)
+        })
+        for model in newModels where identities.insert(
+            .init(category: "model", source: model.source)
+        ).inserted {
+            dependencies.append(
+                .init(
+                    category: "model",
+                    source: model.source,
+                    state: "presentation-payload-imported",
+                    provenance: "D3Import-resolved reached object model"
+                )
+            )
+        }
+        for texture in reachedTextureSources where identities.insert(
+            .init(category: "texture", source: texture)
+        ).inserted {
+            dependencies.append(
+                .init(
+                    category: "texture",
+                    source: texture,
+                    state: "presentation-payload-imported",
+                    provenance: "D3Import-resolved reached model material"
+                )
+            )
+        }
+        return Level(
+            schemaVersion: schemaVersion,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            lightmaps: lightmaps,
+            presentationMaterials: combinedMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: newModels,
+            objectPresentations: newObjectPresentations,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
@@ -1058,9 +1213,11 @@ struct Level: Codable, Equatable, Sendable {
         let roomBySourceIndex = Dictionary(
             uniqueKeysWithValues: rooms.map { ($0.sourceIndex, $0) }
         )
-        let requiredTextures = Set(visibility.faces.map {
+        let requiredRoomTextures = Set(visibility.faces.map {
             roomBySourceIndex[$0.roomSourceIndex]!.faces[$0.faceIndex].texture
         })
+        let requiredModelTextures = referencedModelTextures(in: models)
+        let requiredTextures = requiredRoomTextures.union(requiredModelTextures)
         guard Set(presentationMaterials.map(\.texture)) == requiredTextures else {
             throw LevelValidationError.invalidDependency("selected-room textures")
         }
@@ -1096,6 +1253,8 @@ struct Level: Codable, Equatable, Sendable {
         })
         let requiredDependencies = Set(requiredTextures.map {
             DependencyIdentity(category: "texture", source: $0)
+        }).union(models.map {
+            DependencyIdentity(category: "model", source: $0.source)
         }).union(requiredLightmapPages.map {
             DependencyIdentity(
                 category: "lightmap-page",
@@ -1178,6 +1337,8 @@ enum LevelValidationError: Error, Equatable {
     case duplicatePlayerID(handle: UInt32, playerID: Int)
     case invalidObjectDefinition(UInt32)
     case invalidObjectOrientation(UInt32)
+    case invalidObjectPresentation(UInt32)
+    case invalidModel(String)
     case invalidLocation
     case invalidGoalObject(UInt32)
     case invalidTrigger(String)
@@ -1261,6 +1422,12 @@ extension Level {
             guard let definition = object.definition else { continue }
             require(object.type == 17 ? "door-definition" : "object-definition", definition)
         }
+        for model in models {
+            require("model", model.source)
+        }
+        for texture in referencedModelTextures(in: models) {
+            require("texture", texture)
+        }
         for index in lightmaps.pages.indices {
             require(
                 "lightmap-page",
@@ -1283,6 +1450,200 @@ extension Level {
             )
         }
     }
+}
+
+private func validateModels(
+    _ models: [CanonicalModel],
+    objectPresentations: [ObjectPresentationReference],
+    materials: [PresentationMaterial],
+    objects: [PlacedObject],
+    source: LevelSource
+) throws {
+    let acceptedSourcePaths = Set(source.profileFiles.map(\.relativePath))
+    guard models.count <= 256,
+          Set(models.map(\.source)).count == models.count,
+          Set(objectPresentations.map(\.objectHandle)).count == objectPresentations.count else {
+        throw LevelValidationError.invalidCount("models")
+    }
+    let materialSources = Set(materials.map(\.texture))
+    var modelBySource: [SourceResource: CanonicalModel] = [:]
+    for model in models {
+        guard D3SourceIdentity.isValidSourceResource(model.source, category: "model"),
+              isSafeRelativePath(model.sourceArchive),
+              acceptedSourcePaths.contains(model.sourceArchive),
+              isSHA256(model.sourceSHA256),
+              !model.submodels.isEmpty,
+              model.submodels.count <= 1_000 else {
+            throw LevelValidationError.invalidModel("\(model.source.sourceName): identity")
+        }
+        let faceTextures = Set(model.submodels.flatMap { submodel in
+            submodel.faces.compactMap { face -> SourceResource? in
+                if case .texture(let texture) = face.material { return texture }
+                return nil
+            }
+        })
+        for texture in faceTextures {
+            guard D3SourceIdentity.isValidSourceResource(texture, category: "texture"),
+                  materialSources.contains(texture) else {
+                throw LevelValidationError.invalidDependency(
+                    "missing texture:\(texture.sourceName)"
+                )
+            }
+        }
+        let indices = Set(model.submodels.map(\.sourceIndex))
+        guard indices == Set(model.submodels.indices) else {
+            throw LevelValidationError.invalidModel("\(model.source.sourceName): submodel indices")
+        }
+        var transformedBounds: ModelBounds?
+        var accumulatedOffsets = [Vector3?](repeating: nil, count: model.submodels.count)
+        func resolvedOffset(_ index: Int, visiting: inout Set<Int>) throws -> Vector3 {
+            if let resolved = accumulatedOffsets[index] { return resolved }
+            guard visiting.insert(index).inserted else {
+                throw LevelValidationError.invalidModel("\(model.source.sourceName): cyclic hierarchy")
+            }
+            let submodel = model.submodels[index]
+            let parentOffset: Vector3
+            if let parent = submodel.parentIndex {
+                guard model.submodels.indices.contains(parent) else {
+                    throw LevelValidationError.invalidModel("\(model.source.sourceName): invalid parent")
+                }
+                parentOffset = try resolvedOffset(parent, visiting: &visiting)
+            } else {
+                parentOffset = .zero
+            }
+            visiting.remove(index)
+            let resolved = adding(parentOffset, submodel.offset)
+            accumulatedOffsets[index] = resolved
+            return resolved
+        }
+        for submodel in model.submodels.sorted(by: { $0.sourceIndex < $1.sourceIndex }) {
+            var visiting: Set<Int> = []
+            let accumulatedOffset = try resolvedOffset(submodel.sourceIndex, visiting: &visiting)
+            guard submodel.vertices.count <= 100_000,
+                  submodel.faces.count <= 100_000 else {
+                throw LevelValidationError.invalidModel("\(model.source.sourceName): geometry count")
+            }
+            for vertex in submodel.vertices {
+                guard isFinite(vertex.position) else {
+                    throw LevelValidationError.invalidModel("\(model.source.sourceName): vertex position")
+                }
+                guard vertex.alpha.isFinite, (0...1).contains(vertex.alpha) else {
+                    throw LevelValidationError.invalidModel("\(model.source.sourceName): vertex alpha")
+                }
+                let transformed = adding(
+                    accumulatedOffset,
+                    vertex.position
+                )
+                transformedBounds = expanding(transformedBounds, toInclude: transformed)
+            }
+            for face in submodel.faces {
+                guard isFinite(face.normal),
+                      face.corners.count >= 3,
+                      face.corners.count <= 100_000 else {
+                    throw LevelValidationError.invalidModel("\(model.source.sourceName): face")
+                }
+                for corner in face.corners {
+                    guard submodel.vertices.indices.contains(corner.vertexIndex),
+                          corner.u.isFinite, corner.v.isFinite else {
+                        throw LevelValidationError.invalidModel("\(model.source.sourceName): face corner")
+                    }
+                }
+            }
+            switch submodel.presentation {
+            case .glow(let color, let size):
+                guard isFinite(color), size.isFinite, size > 0 else {
+                    throw LevelValidationError.invalidModel("\(model.source.sourceName): presentation")
+                }
+            case .standard, .custom:
+                break
+            }
+        }
+        guard let transformedBounds,
+              approximatelyEqual(model.bounds.minimum, transformedBounds.minimum),
+              approximatelyEqual(model.bounds.maximum, transformedBounds.maximum) else {
+            throw LevelValidationError.invalidModel("\(model.source.sourceName): bounds")
+        }
+        modelBySource[model.source] = model
+    }
+
+    let objectHandles = Set(objects.map(\.handle))
+    var referencedModels = Set<SourceResource>()
+    for presentation in objectPresentations {
+        guard objectHandles.contains(presentation.objectHandle) else {
+            throw LevelValidationError.invalidObjectPresentation(presentation.objectHandle)
+        }
+        let choices = [
+            presentation.primaryModel,
+            presentation.mediumModel,
+            presentation.lowModel,
+            presentation.dyingModel,
+        ].compactMap { $0 }
+        guard choices.allSatisfy({ modelBySource[$0] != nil }) else {
+            throw LevelValidationError.invalidObjectPresentation(presentation.objectHandle)
+        }
+        referencedModels.formUnion(choices)
+        let hasMedium = presentation.mediumModel != nil
+        let hasLow = presentation.lowModel != nil
+        guard hasMedium == (presentation.mediumDistance != nil),
+              hasLow == (presentation.lowDistance != nil) else {
+            throw LevelValidationError.invalidObjectPresentation(presentation.objectHandle)
+        }
+        if let medium = presentation.mediumDistance {
+            guard medium.isFinite, medium > 0 else {
+                throw LevelValidationError.invalidObjectPresentation(presentation.objectHandle)
+            }
+        }
+        if let low = presentation.lowDistance {
+            guard low.isFinite,
+                  low > (presentation.mediumDistance ?? 0) else {
+                throw LevelValidationError.invalidObjectPresentation(presentation.objectHandle)
+            }
+        }
+    }
+    guard referencedModels == Set(models.map(\.source)) else {
+        throw LevelValidationError.invalidDependency("orphan model")
+    }
+}
+
+private func referencedModelTextures(in models: [CanonicalModel]) -> Set<SourceResource> {
+    Set(models.flatMap { model in
+        model.submodels.flatMap { submodel in
+            submodel.faces.compactMap { face -> SourceResource? in
+                if case .texture(let texture) = face.material { return texture }
+                return nil
+            }
+        }
+    })
+}
+
+private func adding(_ lhs: Vector3, _ rhs: Vector3) -> Vector3 {
+    .init(x: lhs.x + rhs.x, y: lhs.y + rhs.y, z: lhs.z + rhs.z)
+}
+
+private func expanding(_ bounds: ModelBounds?, toInclude point: Vector3) -> ModelBounds {
+    guard let bounds else { return .init(minimum: point, maximum: point) }
+    return .init(
+        minimum: .init(
+            x: min(bounds.minimum.x, point.x),
+            y: min(bounds.minimum.y, point.y),
+            z: min(bounds.minimum.z, point.z)
+        ),
+        maximum: .init(
+            x: max(bounds.maximum.x, point.x),
+            y: max(bounds.maximum.y, point.y),
+            z: max(bounds.maximum.z, point.z)
+        )
+    )
+}
+
+private func isFinite(_ value: Vector3) -> Bool {
+    value.x.isFinite && value.y.isFinite && value.z.isFinite
+}
+
+private func approximatelyEqual(_ lhs: Vector3, _ rhs: Vector3) -> Bool {
+    abs(lhs.x - rhs.x) <= 0.0001
+        && abs(lhs.y - rhs.y) <= 0.0001
+        && abs(lhs.z - rhs.z) <= 0.0001
 }
 
 private func validateLightmaps(_ lightmaps: LightmapCatalog) throws {

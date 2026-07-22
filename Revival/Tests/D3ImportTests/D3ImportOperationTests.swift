@@ -2,6 +2,91 @@ import Darwin
 import XCTest
 
 final class D3ImportOperationTests: XCTestCase {
+    func testReachedOOFPreservesCustomAndRejectsUnreachedPresentationProperties() throws {
+        let texture = SourceResource(storedIndex: 0, sourceName: "Synthetic")
+        let custom = try parseReachedOutrageModel(
+            makeReachedOOFFixture(properties: "$custom"),
+            sourceName: "Synthetic.OOF",
+            sourceArchive: "d3.hog",
+            textureResources: [texture]
+        )
+
+        XCTAssertEqual(custom.submodels[1].presentation, .custom)
+        for properties in ["$facing", "$thruster=1, 0.5, 0.25, 2"] {
+            XCTAssertThrowsError(
+                try parseReachedOutrageModel(
+                    makeReachedOOFFixture(properties: properties),
+                    sourceName: "Synthetic.OOF",
+                    sourceArchive: "d3.hog",
+                    textureResources: [texture]
+                )
+            ) {
+                XCTAssertEqual(
+                    $0 as? OutrageModelImportError,
+                    .unsupportedPresentation(properties)
+                )
+            }
+        }
+    }
+
+    func testReachedOOFUsesFirstActualTransformedVertexAndDynamicGlowGeometry() throws {
+        let data = makeReachedOOFFixture()
+
+        let model = try parseReachedOutrageModel(
+            data,
+            sourceName: "Synthetic.OOF",
+            sourceArchive: "d3.hog",
+            textureResources: [.init(storedIndex: 0, sourceName: "Synthetic")]
+        )
+
+        XCTAssertEqual(model.bounds.minimum.x, 104.00513, accuracy: 0.0001)
+        XCTAssertEqual(model.bounds.maximum.x, 106, accuracy: 0.0001)
+        XCTAssertEqual(model.bounds.minimum.y, -0.9987165, accuracy: 0.0001)
+        XCTAssertEqual(model.bounds.maximum.y, 0.9987165, accuracy: 0.0001)
+        XCTAssertEqual(model.submodels[0].vertices, [])
+        XCTAssertEqual(model.submodels[1].faces[0].corners.count, 31)
+        XCTAssertEqual(
+            model.submodels[1].presentation,
+            .glow(color: .init(x: 1, y: 0.5, z: 0.25), size: 2)
+        )
+        XCTAssertEqual(
+            model.submodels[1].faces[0].material,
+            .texture(.init(storedIndex: 0, sourceName: "Synthetic"))
+        )
+        XCTAssertEqual(model.sourceSHA256, canonicalSHA256(data))
+    }
+
+    func testReachedOOFDiscardsUnreachedVertexNormalsAndRejectsMissingFaceTexture() throws {
+        let data = makeReachedOOFWithNonfiniteVertexNormal()
+        let texture = SourceResource(storedIndex: 0, sourceName: "Synthetic")
+
+        let model = try parseReachedOutrageModel(
+            data,
+            sourceName: "Synthetic.OOF",
+            sourceArchive: "d3.hog",
+            textureResources: [texture]
+        )
+        let encoded = try JSONEncoder().encode(model)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        let submodels = try XCTUnwrap(object["submodels"] as? [[String: Any]])
+        let vertices = try XCTUnwrap(submodels[0]["vertices"] as? [[String: Any]])
+        XCTAssertNil(vertices[0]["normal"])
+
+        XCTAssertThrowsError(
+            try parseReachedOutrageModel(
+                data,
+                sourceName: "Synthetic.OOF",
+                sourceArchive: "d3.hog",
+                textureResources: [nil]
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? OutrageModelImportError,
+                .invalidIndex("missing texture slot")
+            )
+        }
+    }
+
     func testBlockedTerminationSignalBecomesACancellationRequest() throws {
         var originalMask = sigset_t()
         XCTAssertEqual(pthread_sigmask(SIG_SETMASK, nil, &originalMask), 0)
@@ -656,6 +741,171 @@ final class D3ImportOperationTests: XCTestCase {
         ) { error in
             XCTAssertEqual(error as? D3ImportOperationError, .overlappingPaths)
         }
+    }
+}
+
+private func makeReachedOOFFixture(
+    properties: String = "$glow=1, 0.5, 0.25, 2"
+) -> Data {
+    var data = Data("PSPO".utf8)
+    data.appendInt32(2_300)
+
+    var header = Data()
+    header.appendInt32(2)
+    header.appendFloat(200)
+    header.appendVector(.zero)
+    header.appendVector(.zero)
+    header.appendInt32(0)
+    data.appendChunk("OHDR", body: header)
+
+    var textures = Data()
+    textures.appendInt32(1)
+    textures.appendModelString("SAMPLE TEXTURE")
+    data.appendChunk("TXTR", body: textures)
+
+    data.appendChunk(
+        "SOBJ",
+        body: makeReachedSOBJ(
+            index: 0,
+            parent: -1,
+            offset: .init(x: 100, y: 0, z: 0),
+            properties: "",
+            vertices: [],
+            faceVertexIndices: []
+        )
+    )
+    let vertices = (0..<31).map { index -> Vector3 in
+        let angle = Float(index) * 2 * .pi / 31
+        return .init(x: 5 + cos(angle), y: sin(angle), z: 2)
+    }
+    data.appendChunk(
+        "SOBJ",
+        body: makeReachedSOBJ(
+            index: 1,
+            parent: 0,
+            offset: .init(x: 0, y: 0, z: 0),
+            properties: properties,
+            vertices: vertices,
+            faceVertexIndices: Array(vertices.indices)
+        )
+    )
+    return data
+}
+
+private func makeReachedOOFWithNonfiniteVertexNormal() -> Data {
+    var data = Data("PSPO".utf8)
+    data.appendInt32(2_300)
+
+    var header = Data()
+    header.appendInt32(1)
+    header.appendFloat(1)
+    header.appendVector(.zero)
+    header.appendVector(.zero)
+    header.appendInt32(0)
+    data.appendChunk("OHDR", body: header)
+
+    var textures = Data()
+    textures.appendInt32(1)
+    textures.appendModelString("Synthetic")
+    data.appendChunk("TXTR", body: textures)
+    data.appendChunk(
+        "SOBJ",
+        body: makeReachedSOBJ(
+            index: 0,
+            parent: -1,
+            offset: .zero,
+            properties: "",
+            vertices: [
+                .init(x: 0, y: 0, z: 0),
+                .init(x: 1, y: 0, z: 0),
+                .init(x: 0, y: 1, z: 0),
+                .init(x: 2, y: 2, z: 2),
+            ],
+            normals: [
+                .init(x: .nan, y: .nan, z: .nan),
+                .init(x: 0, y: 0, z: 1),
+                .init(x: 0, y: 0, z: 1),
+                .init(x: .nan, y: .nan, z: .nan),
+            ],
+            faceVertexIndices: [0, 1, 2]
+        )
+    )
+    return data
+}
+
+private func makeReachedSOBJ(
+    index: Int32,
+    parent: Int32,
+    offset: Vector3,
+    properties: String,
+    vertices: [Vector3],
+    normals: [Vector3]? = nil,
+    faceVertexIndices: [Int]
+) -> Data {
+    var body = Data()
+    body.appendInt32(index)
+    body.appendInt32(parent)
+    body.appendVector(.zero)
+    body.appendFloat(0)
+    body.appendVector(.zero)
+    body.appendVector(offset)
+    body.appendFloat(1)
+    body.appendInt32(0)
+    body.appendInt32(0)
+    body.appendVector(.zero)
+    body.appendModelString("submodel-\(index)")
+    body.appendModelString(properties)
+    body.appendInt32(0)
+    body.appendInt32(0)
+    body.appendInt32(0)
+    body.appendInt32(Int32(vertices.count))
+    vertices.forEach { body.appendVector($0) }
+    (normals ?? vertices.map { _ in .init(x: 0, y: 0, z: 1) })
+        .forEach { body.appendVector($0) }
+    vertices.forEach { _ in body.appendFloat(1) }
+    body.appendInt32(faceVertexIndices.isEmpty ? 0 : 1)
+    if !faceVertexIndices.isEmpty {
+        body.appendVector(.init(x: 0, y: 0, z: 1))
+        body.appendInt32(Int32(faceVertexIndices.count))
+        body.appendInt32(1)
+        body.appendInt32(0)
+        for index in faceVertexIndices {
+            body.appendInt32(Int32(index))
+            body.appendFloat(0)
+            body.appendFloat(0)
+        }
+        body.appendFloat(0)
+        body.appendFloat(0)
+    }
+    return body
+}
+
+private extension Data {
+    mutating func appendChunk(_ name: String, body: Data) {
+        append(contentsOf: name.utf8)
+        appendInt32(Int32(body.count))
+        append(body)
+    }
+
+    mutating func appendInt32(_ value: Int32) {
+        var littleEndian = value.littleEndian
+        Swift.withUnsafeBytes(of: &littleEndian) { append(contentsOf: $0) }
+    }
+
+    mutating func appendFloat(_ value: Float) {
+        appendInt32(Int32(bitPattern: value.bitPattern))
+    }
+
+    mutating func appendVector(_ value: Vector3) {
+        appendFloat(value.x)
+        appendFloat(value.y)
+        appendFloat(value.z)
+    }
+
+    mutating func appendModelString(_ value: String) {
+        appendInt32(Int32(value.utf8.count + 1))
+        append(contentsOf: value.utf8)
+        append(0)
     }
 }
 

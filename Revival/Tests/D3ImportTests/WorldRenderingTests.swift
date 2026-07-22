@@ -235,6 +235,42 @@ final class WorldRenderingTests: XCTestCase {
             extraction.portalEdges.contains(where: { $0.roomSourceIndex == 4 })
         )
     }
+
+    func testAdmitsTheFixedSliceSixObjectsAndSelectsTheSourceLOD() throws {
+        let level = makeSliceSixObjectRenderLevel()
+        try level.validate()
+
+        let extraction = try extractWorldForRendering(
+            level,
+            camera: .trainingRoom3,
+            startRoomSourceIndex: 3
+        )
+
+        XCTAssertEqual(
+            extraction.admittedObjectHandles,
+            [18_441, 2_048, 12_300, 6_147]
+        )
+        XCTAssertEqual(
+            Set(extraction.modelDrawItems.map(\.objectHandle)),
+            Set(extraction.admittedObjectHandles)
+        )
+        XCTAssertEqual(
+            Set(
+                extraction.modelDrawItems
+                    .filter { $0.objectHandle == 2_048 }
+                    .map(\.model)
+            ),
+            [.init(storedIndex: 1, sourceName: "PyroGLMed.OOF")]
+        )
+        XCTAssertFalse(extraction.admittedObjectHandles.contains(2_052))
+        XCTAssertTrue(
+            extraction.modelDrawItems.contains {
+                $0.objectHandle == 6_147
+                    && $0.material == .sourceColor(red: 32, green: 64, blue: 96)
+            }
+        )
+        XCTAssertFalse(extraction.modelDrawItems.contains { $0.submodelIndex == 2 })
+    }
 }
 
 private extension Array {
@@ -583,6 +619,257 @@ func makeSelectedRoomRenderLevel() -> Level {
                 ),
                 .init(category: "texture", source: forceField, state: "presentation-payload-imported", provenance: "test"),
             ],
+            historicalEagerBaseline: nil
+        ),
+        sourceChunks: base.sourceChunks
+    )
+}
+
+func makeSliceSixObjectRenderLevel() -> Level {
+    let base = makeSelectedRoomRenderLevel()
+    let cameraOrigin = RoomCamera.trainingRoom3.position
+    func translated(_ point: Vector3) -> Vector3 {
+        .init(
+            x: point.x + cameraOrigin.x,
+            y: point.y + cameraOrigin.y,
+            z: point.z + cameraOrigin.z
+        )
+    }
+    let rooms = base.rooms.map { room in
+        LevelRoom(
+            sourceIndex: room.sourceIndex,
+            name: room.name,
+            pathPoint: translated(room.pathPoint),
+            vertices: room.vertices.map(translated),
+            faces: room.faces,
+            portals: room.portals,
+            flags: room.flags,
+            pulseTime: room.pulseTime,
+            pulseOffset: room.pulseOffset,
+            mirrorFaceIndex: room.mirrorFaceIndex,
+            door: room.door,
+            volumeLights: room.volumeLights,
+            fog: room.fog,
+            ambientSoundPattern: room.ambientSoundPattern,
+            reverb: room.reverb,
+            damage: room.damage,
+            damageType: room.damageType
+        )
+    }
+    let modelTexture = SourceResource(storedIndex: 50, sourceName: "model-surface")
+    let modelSources = [
+        SourceResource(storedIndex: 0, sourceName: "PyroGL.OOF"),
+        SourceResource(storedIndex: 1, sourceName: "PyroGLMed.OOF"),
+        SourceResource(storedIndex: 2, sourceName: "PyroGLLo.OOF"),
+        SourceResource(storedIndex: 3, sourceName: "PyroDeath.OOF"),
+        SourceResource(storedIndex: 4, sourceName: "invisiblepowerup.OOF"),
+    ]
+    let modelVertices = [
+        ModelVertex(
+            position: .init(x: -5, y: 0, z: -0.4),
+            alpha: 1
+        ),
+        ModelVertex(
+            position: .init(x: 5, y: 0, z: -0.4),
+            alpha: 1
+        ),
+        ModelVertex(
+            position: .init(x: 0, y: 0, z: 0.4),
+            alpha: 1
+        ),
+    ]
+    let modelCorners = [
+        ModelFaceCorner(vertexIndex: 0, u: 0, v: 0),
+        ModelFaceCorner(vertexIndex: 1, u: 1, v: 0),
+        ModelFaceCorner(vertexIndex: 2, u: 0.5, v: 1),
+    ]
+    let models = modelSources.map { source in
+        CanonicalModel(
+            source: source,
+            submodels: [
+                .init(
+                    sourceIndex: 0,
+                    parentIndex: 1,
+                    offset: .zero,
+                    vertices: modelVertices,
+                    faces: [
+                        .init(
+                            normal: .init(x: 0, y: -1, z: 0),
+                            corners: modelCorners,
+                            material: .texture(modelTexture)
+                        ),
+                        .init(
+                            normal: .init(x: 0, y: 1, z: 0),
+                            corners: Array(modelCorners.reversed()),
+                            material: .sourceColor(red: 32, green: 64, blue: 96)
+                        ),
+                    ],
+                    presentation: .standard
+                ),
+                .init(
+                    sourceIndex: 1,
+                    parentIndex: nil,
+                    offset: .init(x: 3, y: 0, z: 0),
+                    vertices: [],
+                    faces: [],
+                    presentation: .standard
+                ),
+                .init(
+                    sourceIndex: 2,
+                    parentIndex: nil,
+                    offset: .init(x: 3, y: 0, z: 0),
+                    vertices: modelVertices,
+                    faces: [
+                        .init(
+                            normal: .init(x: 0, y: -1, z: 0),
+                            corners: modelCorners,
+                            material: .sourceColor(red: 255, green: 0, blue: 255)
+                        ),
+                    ],
+                    presentation: .custom
+                ),
+            ],
+            bounds: .init(
+                minimum: .init(x: -2, y: 0, z: -0.4),
+                maximum: .init(x: 8, y: 0, z: 0.4)
+            ),
+            sourceArchive: base.source.profileFiles[0].relativePath,
+            sourceSHA256: String(repeating: "e", count: 64)
+        )
+    }
+    let identity = Matrix3(
+        right: .init(x: 1, y: 0, z: 0),
+        up: .init(x: 0, y: 1, z: 0),
+        forward: .init(x: 0, y: 0, z: 1)
+    )
+    let invisibleDefinition = SourceResource(
+        storedIndex: 67,
+        sourceName: "Invisiblepowerup"
+    )
+    func object(
+        handle: UInt32,
+        type: UInt8,
+        storedID: Int,
+        name: String?,
+        room: Int,
+        position: Vector3
+    ) -> PlacedObject {
+        PlacedObject(
+            handle: handle,
+            type: type,
+            storedID: storedID,
+            definition: type == 7 ? invisibleDefinition : nil,
+            instanceName: name,
+            flags: 0,
+            doorShields: nil,
+            location: .room(room),
+            position: position,
+            orientation: identity,
+            containsType: 0,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        )
+    }
+    let objects = [
+        object(handle: 2_048, type: 4, storedID: 0, name: nil, room: 1,
+               position: .init(x: 2_060.6497, y: -131.22517, z: 2_204.4216)),
+        object(handle: 6_147, type: 7, storedID: 67, name: "StartCourse", room: 3,
+               position: .init(x: 2_061.4604, y: -230.09009, z: 2_203.0276)),
+        object(handle: 2_052, type: 4, storedID: 2, name: nil, room: 1,
+               position: .init(x: 1_962.3759, y: -130.63771, z: 2_206.575)),
+        object(handle: 18_441, type: 7, storedID: 67, name: "UpGoal", room: 1,
+               position: .init(x: 2_060.6682, y: -25.897497, z: 2_204.6843)),
+        object(handle: 12_299, type: 7, storedID: 67, name: "LeftGoal", room: 1,
+               position: .init(x: 1_958.2805, y: -131.22517, z: 2_205.8071)),
+        object(handle: 12_300, type: 7, storedID: 67, name: "StartGoal", room: 1,
+               position: .init(x: 2_062.7678, y: -134.19601, z: 2_201.679)),
+        object(handle: 12_301, type: 7, storedID: 67, name: "ForwardGoal", room: 1,
+               position: .init(x: 2_060.4836, y: -131.22517, z: 2_310.928)),
+    ]
+    let pyroPresentation = ObjectPresentationReference(
+        objectHandle: 2_048,
+        primaryModel: modelSources[0],
+        mediumModel: modelSources[1],
+        lowModel: modelSources[2],
+        dyingModel: modelSources[3],
+        mediumDistance: 75,
+        lowDistance: 100
+    )
+    let objectPresentations = [pyroPresentation,
+        .init(
+            objectHandle: 2_052,
+            primaryModel: modelSources[0],
+            mediumModel: modelSources[1],
+            lowModel: modelSources[2],
+            dyingModel: modelSources[3],
+            mediumDistance: 75,
+            lowDistance: 100
+        ),
+    ] + objects.filter { $0.type == 7 }.map {
+        ObjectPresentationReference(
+            objectHandle: $0.handle,
+            primaryModel: modelSources[4],
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil
+        )
+    }
+    let modelMaterial = PresentationMaterial(
+        texture: modelTexture,
+        bitmapSourceName: "model-surface.ogf",
+        image: .init(width: 1, height: 1, rgba8: Data([255, 255, 255, 128])),
+        blend: .sourceAlpha(opacity: 255),
+        lightmapBlend: .none,
+        waterProcedural: nil,
+        sourceArchive: base.source.profileFiles[0].relativePath,
+        sourceSHA256: String(repeating: "f", count: 64)
+    )
+    let dependencies = base.dependencyManifest.current + [
+        DependencyRecord(
+            category: "object-definition",
+            source: invisibleDefinition,
+            state: "identity-recorded",
+            provenance: "synthetic Slice 6 fixture"
+        ),
+        DependencyRecord(
+            category: "texture",
+            source: modelTexture,
+            state: "presentation-payload-imported",
+            provenance: "synthetic Slice 6 fixture"
+        ),
+    ] + modelSources.map {
+        DependencyRecord(
+            category: "model",
+            source: $0,
+            state: "presentation-payload-imported",
+            provenance: "synthetic Slice 6 fixture"
+        )
+    }
+    return Level(
+        missionKey: base.missionKey,
+        levelKey: base.levelKey,
+        source: base.source,
+        metadata: base.metadata,
+        rooms: rooms,
+        terrain: base.terrain,
+        objects: objects,
+        paths: base.paths,
+        goals: base.goals,
+        triggers: base.triggers,
+        playerStartFlags: [0, 0],
+        lightmaps: base.lightmaps,
+        presentationMaterials: base.presentationMaterials + [modelMaterial],
+        models: models,
+        objectPresentations: objectPresentations,
+        dependencyManifest: .init(
+            current: dependencies,
             historicalEagerBaseline: nil
         ),
         sourceChunks: base.sourceChunks

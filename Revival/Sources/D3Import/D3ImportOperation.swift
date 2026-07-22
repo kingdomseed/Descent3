@@ -360,7 +360,7 @@ func runD3Import(
             && canonicalSHA256(coronaAssets[0].image.rgba8)
                 == "2649897647d5b3b3584b5c6c474f53a95ab5f397bb3ecb76bb92cef66c1c5e3f"
     )
-    let materials = makePresentationMaterials(
+    let materials = try makePresentationMaterials(
         definitions,
         textureByName: textureByName,
         archives: presentationArchives
@@ -382,10 +382,139 @@ func runD3Import(
         return face.lightmapInfoIndex.map { topologyLevel.lightmaps.infos[$0].pageIndex }
     })
     precondition(reachedLightmapPages == [8, 13, 19])
-    let level = topologyLevel.addingPresentationMaterials(
+    let roomPresentationLevel = topologyLevel.addingPresentationMaterials(
         materials,
         retainingLightmapPages: reachedLightmapPages,
         coronaAssets: coronaAssets
+    )
+    let reachedPages = try resolveReachedObjectModelPages(
+        table: tableData,
+        overlay: overlayData,
+        shipName: "Pyro-GL",
+        genericName: "Invisiblepowerup"
+    )
+    let reachedModelNames = Set([
+        reachedPages.ship.primaryModelName,
+        reachedPages.ship.mediumModelName,
+        reachedPages.ship.lowModelName,
+        reachedPages.ship.dyingModelName,
+        reachedPages.generic.primaryModelName,
+        reachedPages.generic.mediumModelName,
+        reachedPages.generic.lowModelName,
+    ].compactMap { $0 })
+    precondition(Set(reachedModelNames.map { $0.lowercased() }) == Set([
+        "pyrogl.oof", "pyroglmed.oof", "pyrogllo.oof", "pyrodeath.oof",
+        "invisiblepowerup.oof",
+    ]))
+    let sortedModelNames = reachedModelNames.sorted {
+        $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+    }
+    var modelPayloadByName: [String: (data: Data, archive: String)] = [:]
+    var textureNamesByModel: [String: [String]] = [:]
+    var referencedTextureSlotsByModel: [String: Set<Int>] = [:]
+    for name in sortedModelNames {
+        guard let indexed = presentationArchives.first(where: {
+            $0.archive.entry(named: name) != nil
+        }), let entry = indexed.archive.entry(named: name) else {
+            throw D3ImportOperationError.missingPresentationAsset(name)
+        }
+        let payload = indexed.validated.data.subdata(in: entry.payloadRange)
+        modelPayloadByName[name.lowercased()] = (
+            payload,
+            indexed.validated.file.relativePath
+        )
+        textureNamesByModel[name.lowercased()] = try reachedOutrageModelTextureNames(payload)
+        referencedTextureSlotsByModel[name.lowercased()]
+            = try reachedOutrageModelReferencedTextureSlotIndices(payload)
+    }
+    let reachedTextureNames = Set(textureNamesByModel.flatMap { key, names in
+        referencedTextureSlotsByModel[key]!.sorted().map { names[$0] }
+    }).filter { $0.caseInsensitiveCompare("SAMPLE TEXTURE") != .orderedSame }
+    let resolvedReachedTextureDefinitions = try resolveRetailTextureDefinitions(
+        table: tableData,
+        overlay: overlayData,
+        names: reachedTextureNames
+    )
+    let reachedTextureDefinitions = Dictionary(
+        resolvedReachedTextureDefinitions.map { ($0.storedIndex, $0) },
+        uniquingKeysWith: { first, _ in first }
+    ).values.sorted { $0.storedIndex < $1.storedIndex }
+    let modelTextureByName = Dictionary(
+        uniqueKeysWithValues: reachedTextureDefinitions.map {
+            ($0.name.lowercased(), SourceResource(storedIndex: $0.storedIndex, sourceName: $0.name))
+        }
+    )
+    var modelTextureBySlotName = modelTextureByName
+    for definition in reachedTextureDefinitions {
+        let bitmapKey = URL(fileURLWithPath: definition.bitmapSourceName)
+            .deletingPathExtension().lastPathComponent.lowercased()
+        modelTextureBySlotName[bitmapKey] = modelTextureByName[definition.name.lowercased()]!
+    }
+    let modelMaterials = try makePresentationMaterials(
+        reachedTextureDefinitions,
+        textureByName: modelTextureByName,
+        archives: presentationArchives
+    )
+    let modelSources = Dictionary(
+        uniqueKeysWithValues: sortedModelNames.enumerated().map {
+            ($0.element.lowercased(), SourceResource(storedIndex: $0.offset, sourceName: $0.element))
+        }
+    )
+    let reachedModels = try sortedModelNames.map { name in
+        let key = name.lowercased()
+        let payload = modelPayloadByName[key]!
+        let slots = textureNamesByModel[key]!.enumerated().map {
+            index, textureName -> SourceResource? in
+            guard referencedTextureSlotsByModel[key]!.contains(index) else { return nil }
+            guard textureName.caseInsensitiveCompare("SAMPLE TEXTURE") != .orderedSame else {
+                return nil
+            }
+            return modelTextureBySlotName[textureName.lowercased()]
+        }
+        guard slots.enumerated().allSatisfy({ index, source in
+            !referencedTextureSlotsByModel[key]!.contains(index)
+                || source != nil || textureNamesByModel[key]![index]
+                .caseInsensitiveCompare("SAMPLE TEXTURE") == .orderedSame
+        }) else {
+            throw D3ImportOperationError.missingPresentationAsset(name)
+        }
+        return try parseReachedOutrageModel(
+            payload.data,
+            sourceName: name,
+            sourceIndex: modelSources[key]!.storedIndex,
+            sourceArchive: payload.archive,
+            textureResources: slots
+        )
+    }
+    let ship = reachedPages.ship
+    let generic = reachedPages.generic
+    let reachedObjectPresentations = topologyLevel.objects.compactMap {
+        object -> ObjectPresentationReference? in
+        guard case .room(let room) = object.location, room == 1 || room == 3 else { return nil }
+        let page: RetailModelPageSelection
+        if object.type == D3SourceIdentity.playerObjectType {
+            page = ship
+        } else if object.definition?.sourceName.caseInsensitiveCompare(generic.name)
+            == .orderedSame {
+            page = generic
+        } else {
+            return nil
+        }
+        return ObjectPresentationReference(
+            objectHandle: object.handle,
+            primaryModel: modelSources[page.primaryModelName.lowercased()]!,
+            mediumModel: page.mediumModelName.map { modelSources[$0.lowercased()]! },
+            lowModel: page.lowModelName.map { modelSources[$0.lowercased()]! },
+            dyingModel: page.dyingModelName.map { modelSources[$0.lowercased()]! },
+            mediumDistance: page.mediumDistance,
+            lowDistance: page.lowDistance
+        )
+    }
+    precondition(reachedObjectPresentations.count == 7)
+    let level = roomPresentationLevel.addingObjectPresentation(
+        models: reachedModels,
+        objectPresentations: reachedObjectPresentations,
+        materials: modelMaterials
     )
 
     let ppicsFile = profile.files.first { $0.relativePath == "ppics.hog" }!
@@ -435,23 +564,22 @@ private func makePresentationMaterials(
     _ definitions: [RetailTextureDefinition],
     textureByName: [String: SourceResource],
     archives: [IndexedPreparedArchive]
-) -> [PresentationMaterial] {
+) throws -> [PresentationMaterial] {
     let coronaNames = Set(definitions.compactMap { $0.lightCorona?.bitmapSourceName }).sorted()
     let coronaIndexByName = Dictionary(
         uniqueKeysWithValues: coronaNames.enumerated().map { ($0.element, $0.offset) }
     )
-    return definitions.map { definition in
-        let indexed = archives.first { archive in
+    return try definitions.map { definition throws -> PresentationMaterial in
+        guard let indexed = archives.first(where: { archive in
             archive.archive.entry(named: definition.bitmapSourceName) != nil
-        }!
-        let entry = indexed.archive.uniqueEntry(named: definition.bitmapSourceName)
+        }), let entry = indexed.archive.entry(named: definition.bitmapSourceName),
+              let texture = textureByName[definition.name.lowercased()] else {
+            throw D3ImportOperationError.missingPresentationAsset(definition.bitmapSourceName)
+        }
         let payload = indexed.validated.data.subdata(in: entry.payloadRange)
-        let image = try! decodeReachedOutrage16OGF(payload)
-        precondition(
-            !definition.requiresARGB4444ForOpaqueTMap2 || image.sourceWasARGB4444
-        )
+        let image = try decodeReachedOutrage16OGF(payload)
         return PresentationMaterial(
-            texture: textureByName[definition.name.lowercased()]!,
+            texture: texture,
             bitmapSourceName: definition.bitmapSourceName,
             image: .init(width: image.width, height: image.height, rgba8: image.rgba8),
             blend: definition.blend,
@@ -748,6 +876,7 @@ enum D3ImportOperationError: Error, Equatable {
     case invalidPreparedFile(String)
     case preparedFileSizeMismatch(String)
     case preparedFileDigestMismatch(String)
+    case missingPresentationAsset(String)
     case stagingIsNotDestinationAdjacent
     case overlappingPaths
     case invalidOutputDirectory

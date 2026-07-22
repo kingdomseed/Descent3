@@ -209,6 +209,7 @@ After those concerns are consolidated and corrected, one independent [`revival-c
 ## Operating rules
 
 - Give each agent one bounded output and one owner.
+- A separately created Codex task must name the integration-owner task when it is launched. Before posting its local final, it sends the complete final `READY` or `HOLD` handoff exactly once to that task with the Codex task-message tool and verifies successful delivery. If delivery fails, its local final begins `HANDOFF NOT DELIVERED`, followed by the integration-owner task ID and delivery error. A final answer that exists only inside the worker task is not a completed handoff. Collaboration subagents whose final result is automatically returned to their parent already satisfy this rule.
 - A material handoff records the one completion-gate verdict and stop condition. Do not invoke the gate recursively or add a reviewer to review its style; resolve only a named contract conflict or concrete contrary evidence.
 - At a material packet boundary, require a documentation-continuity handoff naming the actual base and target, packet and owners, durable facts and canonical files changed, proposed current-plan update and integration-owner disposition, row transitions, exact evidence, blockers, and next slices. Do not require a documentation edit when no durable fact changed.
 - Separate verified fact, inference, current decision, and open hypothesis.

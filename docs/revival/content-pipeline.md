@@ -1,7 +1,7 @@
 # One-way content pipeline
 
 - Status: accepted, amended
-- Date: July 18, 2026
+- Date: July 22, 2026
 - Authority: binding content and import contract
 
 ## Boundary
@@ -109,7 +109,7 @@ Cancellation, provider revocation, insufficient storage, process suspension and 
 
 ## Initial canonical package
 
-The package is an ordinary directory package using deterministic Codable JSON for structured values and ordinary Apple-readable files for media where practical. It declares one project-owned content type so the same directory package can cross the macOS and mobile system document-picker boundary; this is packaging metadata, not a second archive or schema. Schema 2 is presentation-usable: the shared validator rejects a topology-only package that lacks the canonical selected-view RGBA, typed material/procedural, and reached lightmap payloads rather than accepting a package no current player or editor viewport can render.
+The package is an ordinary directory package using deterministic Codable JSON for structured values and ordinary Apple-readable files for media where practical. It declares one project-owned content type so the same directory package can cross the macOS and mobile system document-picker boundary; this is packaging metadata, not a second archive or schema. Schema 3 is the current presentation-usable boundary. It retains schema 2's canonical selected-view RGBA, typed material/procedural, and reached lightmap requirements and adds the reached object-presentation references plus canonical OOF model hierarchy, geometry, material, submodel-presentation, provenance, and LOD values. The shared validator rejects schema 2 topology/presentation packages rather than silently accepting content that cannot satisfy the current player and editor viewport contract.
 
     Descent3Revival.content/
       content.json

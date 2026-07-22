@@ -24,13 +24,13 @@ enum Outrage1555DecodeError: Error, Equatable {
 }
 
 struct RetailTextureDefinition: Equatable, Sendable {
+    let storedIndex: Int
     let name: String
     let bitmapSourceName: String
     let blend: PresentationBlend
     let lightmapBlend: PresentationLightmapBlend
     let waterProcedural: WaterProceduralDefinition?
     let lightCorona: RetailLightCoronaDefinition?
-    let requiresARGB4444ForOpaqueTMap2: Bool
 }
 
 struct RetailLightCoronaDefinition: Equatable, Sendable {
@@ -61,11 +61,26 @@ func resolveRetailTextureDefinitions(
         guard pageByName[key] == nil else { continue }
         pageByName[key] = page
     }
+    var nextStoredIndex = (basePages.map(\.storedIndex).max() ?? -1) + 1
     for page in overlayPages {
-        pageByName[page.name.lowercased()] = page
+        let key = page.name.lowercased()
+        if let replaced = pageByName[key] {
+            pageByName[key] = page.replacingStoredIndex(replaced.storedIndex)
+        } else {
+            pageByName[key] = page.replacingStoredIndex(nextStoredIndex)
+            nextStoredIndex += 1
+        }
+    }
+    var pageByBitmapBase: [String: RetailTexturePage] = [:]
+    for page in pageByName.values where !page.bitmapSourceName.isEmpty {
+        let base = URL(fileURLWithPath: page.bitmapSourceName)
+            .deletingPathExtension().lastPathComponent.lowercased()
+        if pageByBitmapBase[base] == nil { pageByBitmapBase[base] = page }
     }
     return try requestedNames.sorted().map { name in
-        guard let page = pageByName[name.lowercased()] else {
+        let key = URL(fileURLWithPath: name)
+            .deletingPathExtension().lastPathComponent.lowercased()
+        guard let page = pageByBitmapBase[key] ?? pageByName[key] else {
             throw RetailTextureTableError.missingName(name)
         }
         return try canonicalTextureDefinition(page)
@@ -73,6 +88,7 @@ func resolveRetailTextureDefinitions(
 }
 
 private struct RetailTexturePage {
+    let storedIndex: Int
     let name: String
     let bitmapSourceName: String
     let lightColor: Vector3
@@ -80,6 +96,21 @@ private struct RetailTexturePage {
     let flags: UInt32
     let alpha: Float
     let procedural: RetailProceduralPage?
+}
+
+private extension RetailTexturePage {
+    func replacingStoredIndex(_ index: Int) -> RetailTexturePage {
+        .init(
+            storedIndex: index,
+            name: name,
+            bitmapSourceName: bitmapSourceName,
+            lightColor: lightColor,
+            coronaType: coronaType,
+            flags: flags,
+            alpha: alpha,
+            procedural: procedural
+        )
+    }
 }
 
 private struct RetailProceduralPage {
@@ -104,6 +135,7 @@ private struct RetailProceduralElement {
 private func parseRetailTexturePages(_ data: Data) throws -> [RetailTexturePage] {
     var offset = 0
     var pages: [RetailTexturePage] = []
+    var textureIndex = 0
     while offset < data.count {
         guard data.count - offset >= 5 else { throw RetailTextureTableError.truncated }
         let type = data[offset]
@@ -178,6 +210,7 @@ private func parseRetailTexturePages(_ data: Data) throws -> [RetailTexturePage]
             if !name.isEmpty {
                 pages.append(
                     RetailTexturePage(
+                        storedIndex: textureIndex,
                         name: name,
                         bitmapSourceName: bitmapSourceName,
                         lightColor: .init(x: red, y: green, z: blue),
@@ -188,6 +221,7 @@ private func parseRetailTexturePages(_ data: Data) throws -> [RetailTexturePage]
                     )
                 )
             }
+            textureIndex += 1
         }
         offset += 1 + length
     }
@@ -236,6 +270,7 @@ private func canonicalTextureDefinition(
             )
         }
         return RetailTextureDefinition(
+            storedIndex: page.storedIndex,
             name: page.name,
             bitmapSourceName: page.bitmapSourceName,
             blend: .additiveSourceAlpha(opacity: UInt8(page.alpha * 255)),
@@ -247,22 +282,25 @@ private func canonicalTextureDefinition(
                 elements: elements
             ),
             lightCorona: lightCorona,
-            requiresARGB4444ForOpaqueTMap2: false
         )
     }
-    guard page.alpha >= 0.9999,
-          page.flags & 0x0040_0000 == 0,
-          page.flags & 0x0020_0000 == 0 else {
-        throw RetailTextureTableError.unsupportedPresentation(page.name)
+    let usesConstantAlpha = page.flags & 0x0040_0000 != 0
+    let blend: PresentationBlend
+    if isSaturated {
+        blend = .additiveSourceAlpha(opacity: UInt8(page.alpha * 255))
+    } else if usesConstantAlpha {
+        blend = .sourceAlpha(opacity: UInt8(page.alpha * 255))
+    } else {
+        blend = .opaque
     }
     return RetailTextureDefinition(
+        storedIndex: page.storedIndex,
         name: page.name,
         bitmapSourceName: page.bitmapSourceName,
-        blend: .opaque,
-        lightmapBlend: .multiply,
+        blend: blend,
+        lightmapBlend: blend == .opaque ? .multiply : .none,
         waterProcedural: nil,
         lightCorona: lightCorona,
-        requiresARGB4444ForOpaqueTMap2: page.flags & 0x0000_4000 != 0
     )
 }
 
@@ -358,6 +396,478 @@ private struct RetailPageCursor {
             throw RetailTextureTableError.invalidPageLength
         }
     }
+}
+
+struct RetailModelPageSelection: Equatable, Sendable {
+    let name: String
+    let primaryModelName: String
+    let mediumModelName: String?
+    let lowModelName: String?
+    let dyingModelName: String?
+    let mediumDistance: Float?
+    let lowDistance: Float?
+}
+
+struct ReachedObjectModelPages: Equatable, Sendable {
+    let ship: RetailModelPageSelection
+    let generic: RetailModelPageSelection
+}
+
+func resolveReachedObjectModelPages(
+    table: Data,
+    overlay: Data,
+    shipName: String,
+    genericName: String
+) throws -> ReachedObjectModelPages {
+    let base = try parseRetailModelPages(table)
+    let overlayPages = try parseRetailModelPages(overlay)
+    var pages = Dictionary(uniqueKeysWithValues: base.map { ($0.name.lowercased(), $0) })
+    for page in overlayPages { pages[page.name.lowercased()] = page }
+    guard let ship = pages[shipName.lowercased()], ship.dyingModelName != nil else {
+        throw RetailTextureTableError.missingName(shipName)
+    }
+    guard let generic = pages[genericName.lowercased()], generic.dyingModelName == nil else {
+        throw RetailTextureTableError.missingName(genericName)
+    }
+    return .init(ship: ship, generic: generic)
+}
+
+private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelection] {
+    var offset = 0
+    var pages: [RetailModelPageSelection] = []
+    while offset < data.count {
+        guard data.count - offset >= 5 else { throw RetailTextureTableError.truncated }
+        let type = data[offset]
+        let length = Int(readTableUInt32(data, at: offset + 1))
+        guard length >= 4, length - 4 <= data.count - offset - 5 else {
+            throw RetailTextureTableError.invalidPageLength
+        }
+        if type == 6 || type == 10 {
+            let body = Data(data[(offset + 5)..<(offset + 1 + length)])
+            var cursor = RetailPageCursor(body)
+            let version = Int(try cursor.readUInt16())
+            if type == 6 {
+                let name = try cursor.readCString()
+                _ = try cursor.readCString(allowEmpty: true)
+                _ = try cursor.readCString(allowEmpty: true)
+                let primary = try cursor.readCString()
+                let dying = try cursor.readCString()
+                let medium = try cursor.readCString(allowEmpty: true)
+                let low = try cursor.readCString(allowEmpty: true)
+                let mediumDistance = try cursor.readFloat()
+                let lowDistance = try cursor.readFloat()
+                guard version >= 1,
+                      mediumDistance.isFinite,
+                      lowDistance.isFinite,
+                      mediumDistance > 0,
+                      lowDistance > mediumDistance else {
+                    throw RetailTextureTableError.unsupportedPresentation(name)
+                }
+                pages.append(
+                    .init(
+                        name: name,
+                        primaryModelName: primary,
+                        mediumModelName: medium.isEmpty ? nil : medium,
+                        lowModelName: low.isEmpty ? nil : low,
+                        dyingModelName: dying,
+                        mediumDistance: medium.isEmpty ? nil : mediumDistance,
+                        lowDistance: low.isEmpty ? nil : lowDistance
+                    )
+                )
+            } else {
+                let objectType = try cursor.readUInt8()
+                let name = try cursor.readCString()
+                let primary = try cursor.readCString()
+                let medium = try cursor.readCString(allowEmpty: true)
+                let low = try cursor.readCString(allowEmpty: true)
+                try cursor.skip(12)
+                try cursor.skip(version >= 24 ? 2 : 1)
+                if objectType == 7, version >= 25 { try cursor.skip(2) }
+                _ = try cursor.readCString(allowEmpty: true)
+                if version >= 18 { _ = try cursor.readCString(allowEmpty: true) }
+                if version >= 19 { _ = try cursor.readCString(allowEmpty: true) }
+                if try cursor.readUInt8() != 0 {
+                    _ = try cursor.readCString(allowEmpty: true)
+                }
+                _ = try cursor.readCString(allowEmpty: true)
+                let mediumDistance = try cursor.readFloat()
+                let lowDistance = try cursor.readFloat()
+                guard version >= 1,
+                      mediumDistance.isFinite,
+                      lowDistance.isFinite else {
+                    throw RetailTextureTableError.unsupportedPresentation(name)
+                }
+                pages.append(
+                    .init(
+                        name: name,
+                        primaryModelName: primary,
+                        mediumModelName: medium.isEmpty ? nil : medium,
+                        lowModelName: low.isEmpty ? nil : low,
+                        dyingModelName: nil,
+                        mediumDistance: medium.isEmpty ? nil : mediumDistance,
+                        lowDistance: low.isEmpty ? nil : lowDistance
+                    )
+                )
+            }
+        }
+        offset += 1 + length
+    }
+    return pages
+}
+
+enum OutrageModelImportError: Error, Equatable {
+    case truncated
+    case invalidHeader
+    case unsupportedVersion(Int)
+    case invalidChunk(String)
+    case invalidCount(String)
+    case invalidIndex(String)
+    case invalidString
+    case missingChunk(String)
+    case geometryFree
+    case unsupportedPresentation(String)
+}
+
+func reachedOutrageModelTextureNames(_ data: Data) throws -> [String] {
+    var cursor = OutrageModelCursor(data)
+    guard try cursor.readASCII(4) == "PSPO" else {
+        throw OutrageModelImportError.invalidHeader
+    }
+    var version = Int(try cursor.readInt32())
+    if version < 18 { version *= 100 }
+    guard version == 2_300 else { throw OutrageModelImportError.unsupportedVersion(version) }
+    while !cursor.isAtEnd {
+        let chunkName = try cursor.readASCII(4)
+        let byteCount = try cursor.readCount(maximum: cursor.remaining, name: chunkName)
+        var chunk = try cursor.readSubcursor(byteCount)
+        guard chunkName == "TXTR" else { continue }
+        let count = try chunk.readCount(maximum: 256, name: "texture slots")
+        var names: [String] = []
+        names.reserveCapacity(count)
+        for _ in 0..<count { names.append(try chunk.readModelString(allowEmpty: false)) }
+        try chunk.requireEnd(chunkName)
+        return names
+    }
+    throw OutrageModelImportError.missingChunk("TXTR")
+}
+
+func reachedOutrageModelReferencedTextureSlotIndices(_ data: Data) throws -> Set<Int> {
+    let names = try reachedOutrageModelTextureNames(data)
+    let placeholders = names.enumerated().map {
+        SourceResource(storedIndex: $0.offset, sourceName: $0.element)
+    }
+    let model = try parseReachedOutrageModel(
+        data,
+        sourceName: "dependency-probe.OOF",
+        sourceArchive: "d3.hog",
+        textureResources: placeholders.map(Optional.some)
+    )
+    return Set(model.submodels.flatMap { submodel in
+        submodel.faces.compactMap { face in
+            if case .texture(let source) = face.material { return source.storedIndex }
+            return nil
+        }
+    })
+}
+
+func parseReachedOutrageModel(
+    _ data: Data,
+    sourceName: String,
+    sourceIndex: Int = 0,
+    sourceArchive: String,
+    textureResources: [SourceResource?]
+) throws -> CanonicalModel {
+    var cursor = OutrageModelCursor(data)
+    guard try cursor.readASCII(4) == "PSPO" else {
+        throw OutrageModelImportError.invalidHeader
+    }
+    var version = Int(try cursor.readInt32())
+    if version < 18 { version *= 100 }
+    guard (2_300...2_300).contains(version) else {
+        throw OutrageModelImportError.unsupportedVersion(version)
+    }
+    var declaredSubmodelCount: Int?
+    var textureNames: [String]?
+    var submodels: [ModelSubmodel] = []
+    while !cursor.isAtEnd {
+        let chunkName = try cursor.readASCII(4)
+        let byteCount = try cursor.readCount(maximum: cursor.remaining, name: chunkName)
+        var chunk = try cursor.readSubcursor(byteCount)
+        switch chunkName {
+        case "OHDR":
+            declaredSubmodelCount = try chunk.readCount(maximum: 1_000, name: "submodels")
+            _ = try chunk.readFloat()
+            _ = try chunk.readVector()
+            _ = try chunk.readVector()
+            let detailCount = try chunk.readCount(maximum: 32, name: "detail levels")
+            for _ in 0..<detailCount { _ = try chunk.readInt32() }
+            try chunk.requireEnd(chunkName)
+        case "TXTR":
+            let count = try chunk.readCount(maximum: 256, name: "texture slots")
+            var names: [String] = []
+            names.reserveCapacity(count)
+            for _ in 0..<count { names.append(try chunk.readModelString(allowEmpty: false)) }
+            try chunk.requireEnd(chunkName)
+            textureNames = names
+        case "SOBJ":
+            submodels.append(
+                try parseReachedSubmodel(
+                    &chunk,
+                    version: version,
+                    textureResources: textureResources
+                )
+            )
+            try chunk.requireEnd(chunkName)
+        default:
+            break
+        }
+    }
+    guard let declaredSubmodelCount else {
+        throw OutrageModelImportError.missingChunk("OHDR")
+    }
+    guard let textureNames else {
+        throw OutrageModelImportError.missingChunk("TXTR")
+    }
+    guard textureNames.count == textureResources.count,
+          submodels.count == declaredSubmodelCount,
+          Set(submodels.map(\.sourceIndex)) == Set(0..<declaredSubmodelCount) else {
+        throw OutrageModelImportError.invalidCount("model closure")
+    }
+    let sortedSubmodels = submodels.sorted { $0.sourceIndex < $1.sourceIndex }
+    var accumulatedOffsets = [Vector3?](repeating: nil, count: sortedSubmodels.count)
+    func resolvedOffset(_ index: Int, visiting: inout Set<Int>) throws -> Vector3 {
+        if let resolved = accumulatedOffsets[index] { return resolved }
+        guard visiting.insert(index).inserted else {
+            throw OutrageModelImportError.invalidIndex("submodel hierarchy")
+        }
+        let submodel = sortedSubmodels[index]
+        let parentOffset: Vector3
+        if let parent = submodel.parentIndex {
+            guard sortedSubmodels.indices.contains(parent) else {
+                throw OutrageModelImportError.invalidIndex("submodel parent")
+            }
+            parentOffset = try resolvedOffset(parent, visiting: &visiting)
+        } else {
+            parentOffset = .zero
+        }
+        visiting.remove(index)
+        let result = addModelVectors(parentOffset, submodel.offset)
+        accumulatedOffsets[index] = result
+        return result
+    }
+    var bounds: ModelBounds?
+    for submodel in sortedSubmodels {
+        var visiting: Set<Int> = []
+        let offset = try resolvedOffset(submodel.sourceIndex, visiting: &visiting)
+        for vertex in submodel.vertices {
+            bounds = expandModelBounds(bounds, addModelVectors(offset, vertex.position))
+        }
+    }
+    guard let bounds else { throw OutrageModelImportError.geometryFree }
+    return CanonicalModel(
+        source: .init(storedIndex: sourceIndex, sourceName: sourceName),
+        submodels: sortedSubmodels,
+        bounds: bounds,
+        sourceArchive: sourceArchive,
+        sourceSHA256: canonicalSHA256(data)
+    )
+}
+
+private func parseReachedSubmodel(
+    _ cursor: inout OutrageModelCursor,
+    version: Int,
+    textureResources: [SourceResource?]
+) throws -> ModelSubmodel {
+    let sourceIndex = Int(try cursor.readInt32())
+    let rawParent = Int(try cursor.readInt32())
+    _ = try cursor.readVector()
+    _ = try cursor.readFloat()
+    _ = try cursor.readVector()
+    let offset = try cursor.readVector()
+    _ = try cursor.readFloat()
+    _ = try cursor.readInt32()
+    _ = try cursor.readInt32()
+    if version > 1_805 { _ = try cursor.readVector() }
+    _ = try cursor.readModelString(allowEmpty: true)
+    let properties = try cursor.readModelString(allowEmpty: true)
+    _ = try cursor.readInt32()
+    _ = try cursor.readInt32()
+    let freeChunkCount = try cursor.readCount(maximum: 10_000, name: "free chunks")
+    for _ in 0..<freeChunkCount { _ = try cursor.readInt32() }
+    let vertexCount = try cursor.readCount(maximum: 100_000, name: "vertices")
+    var positions: [Vector3] = []
+    positions.reserveCapacity(vertexCount)
+    for _ in 0..<vertexCount { positions.append(try cursor.readVector()) }
+    for _ in 0..<vertexCount { _ = try cursor.readVector() }
+    var alphas = [Float](repeating: 1, count: vertexCount)
+    if version / 100 >= 23 {
+        for index in alphas.indices { alphas[index] = try cursor.readFloat() }
+    }
+    let vertices = positions.indices.map { ModelVertex(position: positions[$0], alpha: alphas[$0]) }
+    let faceCount = try cursor.readCount(maximum: 100_000, name: "faces")
+    var faces: [ModelFace] = []
+    faces.reserveCapacity(faceCount)
+    for _ in 0..<faceCount {
+        let normal = try cursor.readVector()
+        let cornerCount = try cursor.readCount(maximum: 100_000, name: "face vertices")
+        guard cornerCount >= 3 else { throw OutrageModelImportError.invalidCount("face vertices") }
+        let textured = try cursor.readInt32() != 0
+        let material: ModelFaceMaterial
+        if textured {
+            let slot = Int(try cursor.readInt32())
+            guard textureResources.indices.contains(slot),
+                  let texture = textureResources[slot] else {
+                throw OutrageModelImportError.invalidIndex("missing texture slot")
+            }
+            material = .texture(texture)
+        } else {
+            material = .sourceColor(
+                red: try cursor.readUInt8(),
+                green: try cursor.readUInt8(),
+                blue: try cursor.readUInt8()
+            )
+        }
+        var corners: [ModelFaceCorner] = []
+        corners.reserveCapacity(cornerCount)
+        for _ in 0..<cornerCount {
+            let vertexIndex = Int(try cursor.readInt32())
+            guard vertices.indices.contains(vertexIndex) else {
+                throw OutrageModelImportError.invalidIndex("face vertex")
+            }
+            corners.append(
+                .init(vertexIndex: vertexIndex, u: try cursor.readFloat(), v: try cursor.readFloat())
+            )
+        }
+        if version / 100 >= 21 {
+            _ = try cursor.readFloat()
+            _ = try cursor.readFloat()
+        }
+        faces.append(.init(normal: normal, corners: corners, material: material))
+    }
+    return .init(
+        sourceIndex: sourceIndex,
+        parentIndex: rawParent < 0 ? nil : rawParent,
+        offset: offset,
+        vertices: vertices,
+        faces: faces,
+        presentation: try parseSubmodelPresentation(properties)
+    )
+}
+
+private func parseSubmodelPresentation(_ properties: String) throws -> ModelSubmodelPresentation {
+    let lower = properties.lowercased()
+    if lower == "$custom" { return .custom }
+    if lower.hasPrefix("$facing") || lower.hasPrefix("$thruster") {
+        throw OutrageModelImportError.unsupportedPresentation(properties)
+    }
+    if lower.hasPrefix("$glow=") {
+        let values = properties.dropFirst("$glow=".count).split(separator: ",").compactMap {
+            Float($0.trimmingCharacters(in: .whitespaces))
+        }
+        guard values.count == 4, values.allSatisfy(\.isFinite), values[3] > 0 else {
+            throw OutrageModelImportError.invalidString
+        }
+        return .glow(
+            color: .init(x: values[0], y: values[1], z: values[2]),
+            size: values[3]
+        )
+    }
+    if lower.hasPrefix("$") {
+        throw OutrageModelImportError.unsupportedPresentation(properties)
+    }
+    return .standard
+}
+
+private struct OutrageModelCursor {
+    let data: Data
+    var offset = 0
+    var remaining: Int { data.count - offset }
+    var isAtEnd: Bool { offset == data.count }
+
+    init(_ data: Data) { self.data = data }
+
+    mutating func readUInt8() throws -> UInt8 {
+        guard remaining >= 1 else { throw OutrageModelImportError.truncated }
+        defer { offset += 1 }
+        return data[offset]
+    }
+
+    mutating func readInt32() throws -> Int32 {
+        let value = UInt32(try readUInt8())
+            | UInt32(try readUInt8()) << 8
+            | UInt32(try readUInt8()) << 16
+            | UInt32(try readUInt8()) << 24
+        return Int32(bitPattern: value)
+    }
+
+    mutating func readFloat() throws -> Float {
+        Float(bitPattern: UInt32(bitPattern: try readInt32()))
+    }
+
+    mutating func readVector() throws -> Vector3 {
+        .init(x: try readFloat(), y: try readFloat(), z: try readFloat())
+    }
+
+    mutating func readCount(maximum: Int, name: String) throws -> Int {
+        let value = Int(try readInt32())
+        guard value >= 0, value <= maximum else {
+            throw OutrageModelImportError.invalidCount(name)
+        }
+        return value
+    }
+
+    mutating func readASCII(_ count: Int) throws -> String {
+        guard count >= 0, remaining >= count else { throw OutrageModelImportError.truncated }
+        let bytes = data[offset..<(offset + count)]
+        offset += count
+        guard bytes.allSatisfy({ $0 >= 0x20 && $0 < 0x7f }) else {
+            throw OutrageModelImportError.invalidString
+        }
+        return String(decoding: bytes, as: UTF8.self)
+    }
+
+    mutating func readModelString(allowEmpty: Bool) throws -> String {
+        let count = try readCount(maximum: 4_096, name: "string")
+        guard count > 0, remaining >= count else { throw OutrageModelImportError.invalidString }
+        let bytes = data[offset..<(offset + count)]
+        offset += count
+        guard bytes.last == 0,
+              bytes.dropLast().allSatisfy({ $0 < 0x80 }),
+              allowEmpty || count > 1 else {
+            throw OutrageModelImportError.invalidString
+        }
+        return String(decoding: bytes.dropLast(), as: UTF8.self)
+    }
+
+    mutating func readSubcursor(_ count: Int) throws -> OutrageModelCursor {
+        guard count >= 0, remaining >= count else { throw OutrageModelImportError.truncated }
+        defer { offset += count }
+        return .init(Data(data[offset..<(offset + count)]))
+    }
+
+    func requireEnd(_ chunk: String) throws {
+        guard isAtEnd else { throw OutrageModelImportError.invalidChunk(chunk) }
+    }
+}
+
+private func addModelVectors(_ lhs: Vector3, _ rhs: Vector3) -> Vector3 {
+    .init(x: lhs.x + rhs.x, y: lhs.y + rhs.y, z: lhs.z + rhs.z)
+}
+
+private func expandModelBounds(_ bounds: ModelBounds?, _ point: Vector3) -> ModelBounds {
+    guard let bounds else { return .init(minimum: point, maximum: point) }
+    return .init(
+        minimum: .init(
+            x: min(bounds.minimum.x, point.x),
+            y: min(bounds.minimum.y, point.y),
+            z: min(bounds.minimum.z, point.z)
+        ),
+        maximum: .init(
+            x: max(bounds.maximum.x, point.x),
+            y: max(bounds.maximum.y, point.y),
+            z: max(bounds.maximum.z, point.z)
+        )
+    )
 }
 
 func decodeReachedOutrage16OGF(_ data: Data) throws -> Outrage1555Image {

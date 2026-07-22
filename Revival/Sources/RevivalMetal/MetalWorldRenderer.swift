@@ -48,6 +48,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
     private let device: any MTLDevice
     private let queue: any MTL4CommandQueue
     private let opaquePipeline: any MTLRenderPipelineState
+    private let sourceAlphaPipeline: any MTLRenderPipelineState
     private let additivePipeline: any MTLRenderPipelineState
     private let opaqueDepthState: any MTLDepthStencilState
     private let translucentDepthState: any MTLDepthStencilState
@@ -104,12 +105,17 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
         opaquePipeline = try makeWorldPipeline(
             compiler: compiler,
             library: library,
-            additive: false
+            blend: .opaque
+        )
+        sourceAlphaPipeline = try makeWorldPipeline(
+            compiler: compiler,
+            library: library,
+            blend: .sourceAlpha
         )
         additivePipeline = try makeWorldPipeline(
             compiler: compiler,
             library: library,
-            additive: true
+            blend: .additiveSourceAlpha
         )
         opaqueDepthState = try makeDepthState(device: device, writesDepth: true)
         translucentDepthState = try makeDepthState(device: device, writesDepth: false)
@@ -259,22 +265,31 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
         argumentTable.setAddress(slot.uniformBuffer.gpuAddress, index: 1)
         encoder.setArgumentTable(argumentTable, stages: [.vertex, .fragment])
 
-        var encodingAdditive: Bool?
+        var encodingBlend: MetalWorldBlendMode?
+        var encodingDepthWrite: Bool?
         for draw in presentation.draws {
-            let drawIsAdditive: Bool
+            let blend: MetalWorldBlendMode
             switch draw.blend {
-            case .opaque: drawIsAdditive = false
-            case .additiveSourceAlpha: drawIsAdditive = true
+            case .opaque: blend = .opaque
+            case .sourceAlpha: blend = .sourceAlpha
+            case .additiveSourceAlpha: blend = .additiveSourceAlpha
             }
-            if encodingAdditive != drawIsAdditive {
-                if drawIsAdditive {
-                    encoder.setRenderPipelineState(additivePipeline)
-                    encoder.setDepthStencilState(translucentDepthState)
-                } else {
+            if encodingBlend != blend {
+                switch blend {
+                case .opaque:
                     encoder.setRenderPipelineState(opaquePipeline)
-                    encoder.setDepthStencilState(opaqueDepthState)
+                case .sourceAlpha:
+                    encoder.setRenderPipelineState(sourceAlphaPipeline)
+                case .additiveSourceAlpha:
+                    encoder.setRenderPipelineState(additivePipeline)
                 }
-                encodingAdditive = drawIsAdditive
+                encodingBlend = blend
+            }
+            if encodingDepthWrite != draw.writesDepth {
+                encoder.setDepthStencilState(
+                    draw.writesDepth ? opaqueDepthState : translucentDepthState
+                )
+                encodingDepthWrite = draw.writesDepth
             }
             argumentTable.setAddress(
                 presentation.vertexBuffer.gpuAddress + UInt64(draw.vertexByteOffset),
@@ -397,8 +412,9 @@ private struct MetalWorldUniforms {
 }
 
 private struct MetalEncodedDraw {
-    let texture: SourceResource
+    let texture: SourceResource?
     let blend: PresentationBlend
+    let writesDepth: Bool
     let lightmapBlend: PresentationLightmapBlend
     let lightmapPageIndex: Int?
     let vertexByteOffset: Int
@@ -438,6 +454,7 @@ private final class MetalLevelPresentation {
                 MetalEncodedDraw(
                     texture: draw.texture,
                     blend: draw.blend,
+                    writesDepth: draw.writesDepth,
                     lightmapBlend: draw.lightmapBlend,
                     lightmapPageIndex: draw.lightmapPageIndex,
                     vertexByteOffset: vertexByteOffset,
@@ -521,7 +538,8 @@ private final class MetalLevelPresentation {
         for draw: MetalEncodedDraw,
         frameSlotIndex: Int
     ) -> any MTLTexture {
-        materials[draw.texture]!.texture(frameSlotIndex: frameSlotIndex)
+        guard let texture = draw.texture else { return whiteLightmap }
+        return materials[texture]!.texture(frameSlotIndex: frameSlotIndex)
     }
 
     func lightmapTexture(for draw: MetalEncodedDraw) -> any MTLTexture {
@@ -584,10 +602,16 @@ private final class MetalMaterialResources {
     }
 }
 
+private enum MetalWorldBlendMode: Equatable {
+    case opaque
+    case sourceAlpha
+    case additiveSourceAlpha
+}
+
 private func makeWorldPipeline(
     compiler: any MTL4Compiler,
     library: any MTLLibrary,
-    additive: Bool
+    blend: MetalWorldBlendMode
 ) throws -> any MTLRenderPipelineState {
     let vertex = MTL4LibraryFunctionDescriptor()
     vertex.library = library
@@ -597,19 +621,27 @@ private func makeWorldPipeline(
     fragment.name = "revivalWorldFragment"
 
     let descriptor = MTL4RenderPipelineDescriptor()
-    descriptor.label = additive ? "Revival additive world" : "Revival opaque world"
+    switch blend {
+    case .opaque: descriptor.label = "Revival opaque world"
+    case .sourceAlpha: descriptor.label = "Revival source-alpha world"
+    case .additiveSourceAlpha: descriptor.label = "Revival additive world"
+    }
     descriptor.vertexFunctionDescriptor = vertex
     descriptor.fragmentFunctionDescriptor = fragment
     descriptor.inputPrimitiveTopology = .triangle
     let attachment = descriptor.colorAttachments[0]!
     attachment.pixelFormat = .bgra8Unorm
-    if additive {
+    if blend != .opaque {
         attachment.blendingState = .enabled
         attachment.sourceRGBBlendFactor = .sourceAlpha
-        attachment.destinationRGBBlendFactor = .one
+        attachment.destinationRGBBlendFactor = blend == .additiveSourceAlpha
+            ? .one
+            : .oneMinusSourceAlpha
         attachment.rgbBlendOperation = .add
         attachment.sourceAlphaBlendFactor = .sourceAlpha
-        attachment.destinationAlphaBlendFactor = .one
+        attachment.destinationAlphaBlendFactor = blend == .additiveSourceAlpha
+            ? .one
+            : .oneMinusSourceAlpha
         attachment.alphaBlendOperation = .add
     }
     return try compiler.makeRenderPipelineState(
