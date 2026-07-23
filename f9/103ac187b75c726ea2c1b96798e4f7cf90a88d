@@ -1,0 +1,24 @@
+docs/revival/skills-and-agents.md
+  s_c503f7c0529e13::t_ee80c758398dd5 119,161,207
+  s_c503f7c0529e13::t_1637b68459f85b 208
+.agents/skills/revival-review/SKILL.md
+  s_c503f7c0529e13::t_ee80c758398dd5 3,119-120,123,134-168,177-179,217
+docs/revival/skill-supply-chain.md
+  s_c503f7c0529e13::t_3e9485b11867fb 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "f9103ac187b75c726ea2c1b96798e4f7cf90a88d",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
