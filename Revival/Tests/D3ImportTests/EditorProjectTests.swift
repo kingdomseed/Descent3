@@ -1083,6 +1083,76 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testDisposablePlaySessionTracesRenderedAndOpenRoomThreePortal() throws {
+        let document = RevivalProjectDocument(
+            project: try makeProject(importedBase: makeEditableProjectLevel())
+        )
+        let room = try XCTUnwrap(
+            document.project.level.rooms.first { $0.sourceIndex == 3 }
+        )
+        let face = room.faces[0]
+        let points = face.corners.map { room.vertices[$0.vertexIndex] }
+        let center = points.reduce(Vector3.zero) {
+            .init(x: $0.x + $1.x, y: $0.y + $1.y, z: $0.z + $1.z)
+        }
+        let faceCenter = Vector3(
+            x: center.x / Float(points.count),
+            y: center.y / Float(points.count),
+            z: center.z / Float(points.count)
+        )
+        let normal = try XCTUnwrap(canonicalFaceNormal(room: room, face: face))
+        let start = Vector3(
+            x: faceCenter.x + normal.x * 0.5,
+            y: faceCenter.y + normal.y * 0.5,
+            z: faceCenter.z + normal.z * 0.5
+        )
+        let end = Vector3(
+            x: faceCenter.x - normal.x * 0.5,
+            y: faceCenter.y - normal.y * 0.5,
+            z: faceCenter.z - normal.z * 0.5
+        )
+
+        try document.selectPortal(0)
+        document.commitPlaySession(try document.makePlaySession())
+        let blocked = try document.tracePlayIndoorMovement(
+            startRoom: 3,
+            start: start,
+            end: end,
+            radius: 0
+        )
+        guard case .wallHit(let contact) = blocked.outcome else {
+            return XCTFail("Rendered room 3 portal 0 must block")
+        }
+        XCTAssertEqual(contact.roomSourceIndex, 3)
+        XCTAssertEqual(contact.faceIndex, 0)
+        XCTAssertEqual(blocked.containingRoomSourceIndex, 3)
+        let blockedDiagnostic = try document.traceSelectedPlayPortal(radius: 0.25)
+        XCTAssertEqual(
+            indoorMovementDiagnosticMessage(blockedDiagnostic),
+            "Blocked at source room 3 face 0; resulting room 3."
+        )
+
+        document.returnToEditor()
+        try document.selectPortal(0)
+        try document.setSelectedPortalRendersFaces(false)
+        document.commitPlaySession(try document.makePlaySession())
+        let open = try document.tracePlayIndoorMovement(
+            startRoom: 3,
+            start: start,
+            end: end,
+            radius: 0
+        )
+        XCTAssertEqual(open.outcome, .noHit)
+        XCTAssertEqual(open.containingRoomSourceIndex, 2)
+        XCTAssertEqual(open.visitedRoomSourceIndices, [3, 2])
+        let openDiagnostic = try document.traceSelectedPlayPortal(radius: 0.25)
+        XCTAssertEqual(
+            indoorMovementDiagnosticMessage(openDiagnostic),
+            "Crossed selected portal; resulting room 2."
+        )
+    }
+
+    @MainActor
     func testPlayReturnPreservesEditorSelectionAndFixedCameraIdentity() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeConnectedRoomProjectLevel())
@@ -1420,6 +1490,9 @@ private func makeEditableProjectLevel() -> Level {
         triggers: base.triggers,
         playerStartFlags: base.playerStartFlags,
         lightmaps: base.lightmaps,
+        surfacePhysics: base.surfacePhysics + [
+            .init(texture: alternateTexture, behavior: .blocking),
+        ],
         presentationMaterials: base.presentationMaterials + [alternateMaterial],
         presentationCoronaAssets: base.presentationCoronaAssets,
         models: base.models,

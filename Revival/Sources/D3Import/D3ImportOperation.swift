@@ -228,7 +228,7 @@ func runD3Import(
         referenceChecksum: "6db74a2eb0c563de4eb11e6d4e91e59c",
         referenceChecksumBasis: "pinned-source-provenance-implied-by-exact-level-sha256"
     )
-    let topologyLevel = try! parseD3LV127(levelData, source: source)
+    let parsedLevel = try! parseD3LV127(levelData, source: source)
 
     let mercFile = profile.files.first { $0.relativePath == "merc.hog" }!
     let merc = try readValidatedPreparedRetailFile(mercFile, at: arguments.source)
@@ -243,6 +243,15 @@ func runD3Import(
     let overlayData = extra13.data.subdata(
         in: extra13Archive.uniqueEntry(named: "extra.gam").payloadRange
     )
+    let residentFaceTextures = Set(parsedLevel.rooms.flatMap {
+        $0.faces.map(\.texture)
+    })
+    let surfacePhysics = try resolveRetailSurfacePhysics(
+        table: tableData,
+        overlay: overlayData,
+        textures: residentFaceTextures
+    )
+    let topologyLevel = parsedLevel.addingSurfacePhysics(surfacePhysics)
 
     let extraFile = profile.files.first { $0.relativePath == "extra.hog" }!
     let extra = try readValidatedPreparedRetailFile(extraFile, at: arguments.source)

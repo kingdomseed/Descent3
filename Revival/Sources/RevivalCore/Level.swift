@@ -554,6 +554,16 @@ struct PresentationMaterial: Codable, Equatable, Sendable {
     }
 }
 
+enum SurfacePhysicsBehavior: String, Codable, Equatable, Sendable {
+    case blocking
+    case passThrough
+}
+
+struct SurfacePhysicsEntry: Codable, Equatable, Sendable {
+    let texture: SourceResource
+    let behavior: SurfacePhysicsBehavior
+}
+
 struct ModelBounds: Codable, Equatable, Sendable {
     let minimum: Vector3
     let maximum: Vector3
@@ -656,6 +666,7 @@ struct Level: Codable, Equatable, Sendable {
     let triggers: [LevelTrigger]
     let playerStartFlags: [UInt32]
     let lightmaps: LightmapCatalog
+    let surfacePhysics: [SurfacePhysicsEntry]
     let presentationMaterials: [PresentationMaterial]
     let presentationCoronaAssets: [PresentationCoronaAsset]
     let models: [CanonicalModel]
@@ -664,7 +675,7 @@ struct Level: Codable, Equatable, Sendable {
     let sourceChunks: [SourceChunkRecord]
 
     init(
-        schemaVersion: Int = 3,
+        schemaVersion: Int = 4,
         missionKey: String,
         levelKey: String,
         source: LevelSource,
@@ -679,6 +690,7 @@ struct Level: Codable, Equatable, Sendable {
         triggers: [LevelTrigger],
         playerStartFlags: [UInt32],
         lightmaps: LightmapCatalog,
+        surfacePhysics: [SurfacePhysicsEntry]? = nil,
         presentationMaterials: [PresentationMaterial] = [],
         presentationCoronaAssets: [PresentationCoronaAsset] = [],
         models: [CanonicalModel] = [],
@@ -701,6 +713,7 @@ struct Level: Codable, Equatable, Sendable {
         self.triggers = triggers
         self.playerStartFlags = playerStartFlags
         self.lightmaps = lightmaps
+        self.surfacePhysics = surfacePhysics ?? Self.defaultSurfacePhysics(for: rooms)
         self.presentationMaterials = presentationMaterials
         self.presentationCoronaAssets = presentationCoronaAssets
         self.models = models
@@ -718,7 +731,7 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     private func validate(allowImportStagingPresentation: Bool) throws {
-        guard schemaVersion == 3, source.d3lvVersion == 127,
+        guard schemaVersion == 4, source.d3lvVersion == 127,
               !missionKey.isEmpty, !levelKey.isEmpty else {
             throw LevelValidationError.invalidIdentity
         }
@@ -744,6 +757,11 @@ struct Level: Codable, Equatable, Sendable {
         guard Set(rooms.map(\.sourceIndex)).count == rooms.count else {
             throw LevelValidationError.duplicateRoom
         }
+        try validateSurfacePhysics(
+            surfacePhysics,
+            rooms: rooms,
+            allowIncomplete: allowImportStagingPresentation
+        )
         guard objects.count <= 1_500 else {
             throw LevelValidationError.invalidCount("objects")
         }
@@ -1124,6 +1142,7 @@ struct Level: Codable, Equatable, Sendable {
             triggers: triggers,
             playerStartFlags: playerStartFlags,
             lightmaps: retainedLightmaps,
+            surfacePhysics: surfacePhysics,
             presentationMaterials: materials,
             presentationCoronaAssets: coronaAssets,
             models: models,
@@ -1202,6 +1221,7 @@ struct Level: Codable, Equatable, Sendable {
             triggers: triggers,
             playerStartFlags: playerStartFlags,
             lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
             presentationMaterials: combinedMaterials,
             presentationCoronaAssets: presentationCoronaAssets,
             models: newModels,
@@ -1216,6 +1236,40 @@ struct Level: Codable, Equatable, Sendable {
 
     var hasSelectedRoomPresentation: Bool {
         rooms.contains(where: { $0.sourceIndex == 3 }) && !presentationMaterials.isEmpty
+    }
+
+    func addingSurfacePhysics(_ entries: [SurfacePhysicsEntry]) -> Level {
+        Level(
+            schemaVersion: schemaVersion,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            lightmaps: lightmaps,
+            surfacePhysics: entries,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            objectPresentations: objectPresentations,
+            dependencyManifest: dependencyManifest,
+            sourceChunks: sourceChunks
+        )
+    }
+
+    private static func defaultSurfacePhysics(for rooms: [LevelRoom]) -> [SurfacePhysicsEntry] {
+        let textures = Set(rooms.flatMap { $0.faces.map(\.texture) })
+        return textures.sorted(by: sourceResourceIsOrdered).map {
+            .init(texture: $0, behavior: .blocking)
+        }
     }
 
     private func validateSelectedRoomPresentationClosure(allowIncomplete: Bool) throws {
@@ -1355,6 +1409,368 @@ func canonicalFaceNormal(room: LevelRoom, face: LevelFace) -> Vector3? {
     return normal
 }
 
+struct IndoorWallContact: Equatable, Sendable {
+    let roomSourceIndex: Int
+    let faceIndex: Int
+    let contactPoint: Vector3
+    let normal: Vector3
+    let distance: Float
+}
+
+enum IndoorMovementTraceOutcome: Equatable, Sendable {
+    case noHit
+    case wallHit(IndoorWallContact)
+}
+
+struct IndoorMovementTrace: Equatable, Sendable {
+    let outcome: IndoorMovementTraceOutcome
+    let finalPosition: Vector3
+    let containingRoomSourceIndex: Int
+    let visitedRoomSourceIndices: [Int]
+}
+
+func traceIndoorMovement(
+    in level: Level,
+    startRoom: Int,
+    start: Vector3,
+    end: Vector3,
+    radius: Float
+) -> IndoorMovementTrace {
+    precondition(radius.isFinite && radius >= 0)
+    precondition(isFinite(start) && isFinite(end))
+
+    let rooms = Dictionary(uniqueKeysWithValues: level.rooms.map { ($0.sourceIndex, $0) })
+    let surfacePhysics = Dictionary(
+        uniqueKeysWithValues: level.surfacePhysics.map { ($0.texture, $0.behavior) }
+    )
+    precondition(rooms[startRoom] != nil)
+
+    let movement = subtract(end, start)
+    let movementLength = sqrt(dot(movement, movement))
+    var visited: [Int] = []
+    var visitedSet: Set<Int> = []
+    var nearest: IndoorWallContact?
+
+    func visit(_ roomIndex: Int) {
+        guard visitedSet.insert(roomIndex).inserted else { return }
+        let room = rooms[roomIndex]!
+        visited.append(roomIndex)
+
+        var reachedPortals: [Int: Float] = [:]
+        for (faceIndex, face) in room.faces.enumerated() {
+            guard let hit = sweptSphereFaceHit(
+                room: room,
+                face: face,
+                start: start,
+                movement: movement,
+                radius: radius
+            ) else {
+                continue
+            }
+
+            let portalIndex = face.portalIndex
+            let portal = portalIndex.map { room.portals[$0] }
+            if indoorFaceIsPassable(
+                portal: portal,
+                face: face,
+                surfacePhysics: surfacePhysics
+            ) {
+                if let portalIndex {
+                    reachedPortals[portalIndex] = min(
+                        reachedPortals[portalIndex] ?? 1,
+                        hit.fraction
+                    )
+                }
+                continue
+            }
+
+            let candidate = IndoorWallContact(
+                roomSourceIndex: roomIndex,
+                faceIndex: faceIndex,
+                contactPoint: hit.contactPoint,
+                normal: hit.normal,
+                distance: movementLength * hit.fraction
+            )
+            if nearest == nil || candidate.distance < nearest!.distance {
+                nearest = candidate
+            }
+        }
+
+        for (portalIndex, portal) in room.portals.enumerated()
+        where reachedPortals[portalIndex].map({
+            movementLength * $0 <= (nearest?.distance ?? movementLength)
+        }) == true {
+            visit(portal.connectedRoom)
+        }
+    }
+
+    visit(startRoom)
+
+    if let nearest {
+        let fraction = movementLength > 0 ? nearest.distance / movementLength : 0
+        let finalPosition = add(start, scaled(movement, fraction))
+        let containingRoom = radius == 0
+            ? nearest.roomSourceIndex
+            : visited.first {
+                indoorRoomContains(finalPosition, room: rooms[$0]!)
+            } ?? startRoom
+        return IndoorMovementTrace(
+            outcome: .wallHit(nearest),
+            finalPosition: finalPosition,
+            containingRoomSourceIndex: containingRoom,
+            visitedRoomSourceIndices: visited
+        )
+    }
+
+    let containingRoom = visited.first {
+        indoorRoomContains(end, room: rooms[$0]!)
+    } ?? startRoom
+    return IndoorMovementTrace(
+        outcome: .noHit,
+        finalPosition: end,
+        containingRoomSourceIndex: containingRoom,
+        visitedRoomSourceIndices: visited
+    )
+}
+
+private func indoorFaceIsPassable(
+    portal: LevelPortal?,
+    face: LevelFace,
+    surfacePhysics: [SourceResource: SurfacePhysicsBehavior]
+) -> Bool {
+    if surfacePhysics[face.texture]! == .passThrough {
+        return true
+    }
+    guard let portal else { return false }
+    let rendersFaces: UInt32 = 0x0000_0001
+    let renderedFlythrough: UInt32 = 0x0000_0002
+    return portal.flags & rendersFaces == 0
+        || portal.flags & renderedFlythrough != 0
+}
+
+private struct IndoorFaceHit {
+    let fraction: Float
+    let contactPoint: Vector3
+    let normal: Vector3
+}
+
+private func sweptSphereFaceHit(
+    room: LevelRoom,
+    face: LevelFace,
+    start: Vector3,
+    movement: Vector3,
+    radius: Float
+) -> IndoorFaceHit? {
+    let normal = canonicalFaceNormal(room: room, face: face)!
+    let planeVertexIndex = face.corners.map(\.vertexIndex).min()!
+    let planePoint = room.vertices[planeVertexIndex]
+    let projectedMovement = dot(movement, normal)
+    guard projectedMovement < 0 else { return nil }
+
+    let startDistance = dot(subtract(planePoint, start), normal)
+    guard startDistance <= 0 else { return nil }
+    let shiftedDistance = startDistance + radius
+    let planeFraction: Float
+    if shiftedDistance > 0 {
+        planeFraction = 0
+    } else {
+        guard shiftedDistance > projectedMovement else { return nil }
+        planeFraction = shiftedDistance / projectedMovement
+    }
+
+    var nearest: IndoorFaceHit?
+    let centerAtPlane = add(start, scaled(movement, planeFraction))
+    let planeContact = subtract(centerAtPlane, scaled(normal, radius))
+    if pointIsInsideFace(planeContact, room: room, face: face, normal: normal) {
+        nearest = .init(
+            fraction: planeFraction,
+            contactPoint: planeContact,
+            normal: normal
+        )
+    }
+
+    guard radius > 0 else { return nearest }
+    for cornerIndex in face.corners.indices {
+        let a = room.vertices[face.corners[cornerIndex].vertexIndex]
+        let b = room.vertices[
+            face.corners[(cornerIndex + 1) % face.corners.count].vertexIndex
+        ]
+        guard let edgeHit = sweptSphereSegmentHit(
+            start: start,
+            movement: movement,
+            radius: radius,
+            a: a,
+            b: b
+        ) else {
+            continue
+        }
+        if nearest == nil || edgeHit.fraction < nearest!.fraction {
+            nearest = edgeHit
+        }
+    }
+    return nearest
+}
+
+private func sweptSphereSegmentHit(
+    start: Vector3,
+    movement: Vector3,
+    radius: Float,
+    a: Vector3,
+    b: Vector3
+) -> IndoorFaceHit? {
+    let edge = subtract(b, a)
+    let edgeLengthSquared = dot(edge, edge)
+    precondition(edgeLengthSquared > 0)
+
+    let fromA = subtract(start, a)
+    let startAlong = dot(fromA, edge) / edgeLengthSquared
+    let movementAlong = dot(movement, edge) / edgeLengthSquared
+    let perpendicularStart = subtract(fromA, scaled(edge, startAlong))
+    let perpendicularMovement = subtract(movement, scaled(edge, movementAlong))
+    let quadraticA = dot(perpendicularMovement, perpendicularMovement)
+    let quadraticB = 2 * dot(perpendicularStart, perpendicularMovement)
+    let quadraticC = dot(perpendicularStart, perpendicularStart) - radius * radius
+
+    var candidates: [IndoorFaceHit] = []
+    if let fraction = firstUnitIntervalRoot(
+        a: quadraticA,
+        b: quadraticB,
+        c: quadraticC
+    ) {
+        let along = startAlong + movementAlong * fraction
+        if (0...1).contains(along) {
+            let center = add(start, scaled(movement, fraction))
+            let contactPoint = add(a, scaled(edge, along))
+            if let normal = normalized(subtract(center, contactPoint)) {
+                candidates.append(
+                    .init(
+                        fraction: fraction,
+                        contactPoint: contactPoint,
+                        normal: normal
+                    )
+                )
+            }
+        }
+    }
+    if let aHit = sweptSpherePointHit(
+        start: start,
+        movement: movement,
+        radius: radius,
+        point: a
+    ) {
+        candidates.append(aHit)
+    }
+    if let bHit = sweptSpherePointHit(
+        start: start,
+        movement: movement,
+        radius: radius,
+        point: b
+    ) {
+        candidates.append(bHit)
+    }
+    return candidates.min { $0.fraction < $1.fraction }
+}
+
+private func sweptSpherePointHit(
+    start: Vector3,
+    movement: Vector3,
+    radius: Float,
+    point: Vector3
+) -> IndoorFaceHit? {
+    let relative = subtract(start, point)
+    guard let fraction = firstUnitIntervalRoot(
+        a: dot(movement, movement),
+        b: 2 * dot(relative, movement),
+        c: dot(relative, relative) - radius * radius
+    ) else {
+        return nil
+    }
+    let center = add(start, scaled(movement, fraction))
+    guard let normal = normalized(subtract(center, point)) else { return nil }
+    return .init(fraction: fraction, contactPoint: point, normal: normal)
+}
+
+private func firstUnitIntervalRoot(a: Float, b: Float, c: Float) -> Float? {
+    if c <= 0 {
+        return b < 0 ? 0 : nil
+    }
+    guard a > 0 else { return nil }
+    let discriminant = b * b - 4 * a * c
+    guard discriminant >= 0 else { return nil }
+    let root = (-b - sqrt(discriminant)) / (2 * a)
+    return (0...1).contains(root) ? root : nil
+}
+
+private func pointIsInsideFace(
+    _ point: Vector3,
+    room: LevelRoom,
+    face: LevelFace,
+    normal: Vector3
+) -> Bool {
+    let tolerance: Float = 0.0001
+    for cornerIndex in face.corners.indices {
+        let a = room.vertices[face.corners[cornerIndex].vertexIndex]
+        let b = room.vertices[
+            face.corners[(cornerIndex + 1) % face.corners.count].vertexIndex
+        ]
+        let edge = subtract(b, a)
+        let fromEdge = subtract(point, a)
+        if dot(cross(edge, fromEdge), normal) < -tolerance {
+            return false
+        }
+    }
+    return true
+}
+
+private func indoorRoomContains(_ point: Vector3, room: LevelRoom) -> Bool {
+    let directions = [
+        Vector3(x: 0.811_107, y: 0.324_443, z: 0.486_664),
+        Vector3(x: -0.811_107, y: -0.324_443, z: -0.486_664),
+    ]
+    for direction in directions {
+        var nearest: (fraction: Float, frontFacing: Bool)?
+        for face in room.faces {
+            let normal = canonicalFaceNormal(room: room, face: face)!
+            let planeVertexIndex = face.corners.map(\.vertexIndex).min()!
+            let denominator = dot(direction, normal)
+            guard abs(denominator) > 0.000_001 else { continue }
+            let planePoint = room.vertices[planeVertexIndex]
+            let fraction = dot(subtract(planePoint, point), normal) / denominator
+            guard fraction >= 0 else { continue }
+            let intersection = add(point, scaled(direction, fraction))
+            guard pointIsInsideFace(
+                intersection,
+                room: room,
+                face: face,
+                normal: normal
+            ) else {
+                continue
+            }
+            if nearest == nil || fraction < nearest!.fraction {
+                nearest = (fraction, denominator < 0)
+            }
+        }
+        if let nearest {
+            return nearest.frontFacing
+        }
+    }
+    return false
+}
+
+private func add(_ a: Vector3, _ b: Vector3) -> Vector3 {
+    .init(x: a.x + b.x, y: a.y + b.y, z: a.z + b.z)
+}
+
+private func scaled(_ vector: Vector3, _ scalar: Float) -> Vector3 {
+    .init(x: vector.x * scalar, y: vector.y * scalar, z: vector.z * scalar)
+}
+
+private func normalized(_ vector: Vector3) -> Vector3? {
+    let magnitude = sqrt(dot(vector, vector))
+    guard magnitude > 0 else { return nil }
+    return scaled(vector, 1 / magnitude)
+}
+
 enum LevelValidationError: Error, Equatable {
     case invalidIdentity
     case duplicateRoom
@@ -1370,6 +1786,7 @@ enum LevelValidationError: Error, Equatable {
     case nonreciprocalPortal(room: Int, portal: Int)
     case mismatchedPortalGeometry(room: Int, portal: Int)
     case invalidLightmapReference(Int)
+    case invalidSurfacePhysics
     case invalidLightmapPage(Int)
     case invalidLightmapInfo(Int)
     case invalidVolumeLights(room: Int)
@@ -1503,6 +1920,37 @@ private func validateSourceResource(_ source: SourceResource, category: String) 
             storedIndex: source.storedIndex
         )
     }
+}
+
+private func validateSurfacePhysics(
+    _ entries: [SurfacePhysicsEntry],
+    rooms: [LevelRoom],
+    allowIncomplete: Bool
+) throws {
+    if allowIncomplete && entries.isEmpty {
+        return
+    }
+    let residentTextures = Set(rooms.flatMap { $0.faces.map(\.texture) })
+    let entryTextures = entries.map(\.texture)
+    guard entries.count == residentTextures.count,
+          Set(entryTextures).count == entries.count,
+          Set(entryTextures) == residentTextures,
+          entries.map(\.texture) == entryTextures.sorted(by: sourceResourceIsOrdered) else {
+        throw LevelValidationError.invalidSurfacePhysics
+    }
+    for entry in entries {
+        try validateSourceResource(entry.texture, category: "texture")
+    }
+}
+
+private func sourceResourceIsOrdered(_ lhs: SourceResource, _ rhs: SourceResource) -> Bool {
+    if lhs.storedIndex != rhs.storedIndex {
+        return lhs.storedIndex < rhs.storedIndex
+    }
+    if lhs.sourceName != rhs.sourceName {
+        return lhs.sourceName < rhs.sourceName
+    }
+    return (lhs.referenceRuntimeIndex ?? -1) < (rhs.referenceRuntimeIndex ?? -1)
 }
 
 private func validateSource(_ source: LevelSource) throws {

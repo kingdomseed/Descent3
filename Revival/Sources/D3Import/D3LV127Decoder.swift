@@ -120,6 +120,7 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
         triggers: triggers,
         playerStartFlags: playerStarts,
         lightmaps: lightmaps,
+        surfacePhysics: [],
         dependencyManifest: manifest,
         sourceChunks: sourceChunks
     )

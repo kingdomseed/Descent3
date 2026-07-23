@@ -394,6 +394,63 @@ final class RevivalProjectDocument: NSDocument {
         refreshWindowControllers()
     }
 
+    func tracePlayIndoorMovement(
+        startRoom: Int,
+        start: Vector3,
+        end: Vector3,
+        radius: Float
+    ) throws -> IndoorMovementTrace {
+        guard let playSession else {
+            throw RevivalProjectDocumentError.playNotActive
+        }
+        return traceIndoorMovement(
+            in: playSession.level,
+            startRoom: startRoom,
+            start: start,
+            end: end,
+            radius: radius
+        )
+    }
+
+    func traceSelectedPlayPortal(radius: Float) throws -> IndoorMovementTrace {
+        guard let playSession else {
+            throw RevivalProjectDocumentError.playNotActive
+        }
+        let selection = editorSelection.portal!
+        let room = playSession.level.rooms.first {
+            $0.sourceIndex == selection.roomSourceIndex
+        }!
+        let face = room.faces[room.portals[selection.portalIndex].faceIndex]
+        let points = face.corners.map { room.vertices[$0.vertexIndex] }
+        let sum = points.reduce(Vector3.zero) {
+            .init(x: $0.x + $1.x, y: $0.y + $1.y, z: $0.z + $1.z)
+        }
+        let center = Vector3(
+            x: sum.x / Float(points.count),
+            y: sum.y / Float(points.count),
+            z: sum.z / Float(points.count)
+        )
+        let normal = canonicalFaceNormal(room: room, face: face)!
+        let probeDistance = radius + 0.5
+        let start = Vector3(
+            x: center.x + normal.x * probeDistance,
+            y: center.y + normal.y * probeDistance,
+            z: center.z + normal.z * probeDistance
+        )
+        let end = Vector3(
+            x: center.x - normal.x * probeDistance,
+            y: center.y - normal.y * probeDistance,
+            z: center.z - normal.z * probeDistance
+        )
+        return traceIndoorMovement(
+            in: playSession.level,
+            startRoom: selection.roomSourceIndex,
+            start: start,
+            end: end,
+            radius: radius
+        )
+    }
+
     private func validateCameraRoom(
         _ proposedCamera: RoomCamera,
         session: RevivalPlaySession

@@ -31,6 +31,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     private let rotatePlayerStartButton: NSButton
     private let changesLabel: NSTextField
     private let playButton: NSButton
+    private let collisionDiagnosticButton: NSButton
     private let cameraButtons: [NSButton]
     private let statusLabel: NSTextField
     private var rendererError: String?
@@ -131,6 +132,16 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         playButton.bezelStyle = .rounded
         playButton.setAccessibilityLabel("Play disposable copy")
 
+        collisionDiagnosticButton = NSButton(
+            title: "Probe Selected Portal",
+            target: nil,
+            action: nil
+        )
+        collisionDiagnosticButton.setAccessibilityLabel("Probe selected portal collision")
+        collisionDiagnosticButton.setAccessibilityHelp(
+            "Reports whether the disposable play copy crosses the selected portal and which source room owns the result."
+        )
+
         let cameraButtonDefinitions: [(String, CameraMotion)] = [
             ("Move Left", .left),
             ("Move Right", .right),
@@ -195,6 +206,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         playSeparator.boxType = .separator
         sidebar.addArrangedSubview(playSeparator)
         sidebar.addArrangedSubview(playButton)
+        sidebar.addArrangedSubview(collisionDiagnosticButton)
 
         let cameraHeading = NSTextField(labelWithString: "Play Camera")
         cameraHeading.font = .preferredFont(forTextStyle: .headline)
@@ -271,6 +283,8 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         rotatePlayerStartButton.action = #selector(rotatePlayerStart(_:))
         playButton.target = self
         playButton.action = #selector(togglePlay(_:))
+        collisionDiagnosticButton.target = self
+        collisionDiagnosticButton.action = #selector(probeSelectedPortal(_:))
         for button in cameraButtons {
             button.target = self
             button.action = #selector(movePlayCamera(_:))
@@ -314,6 +328,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         rotatePlayerStartButton.isEnabled = playerStartPopup.isEnabled
         playButton.title = isPlaying ? "Return to Editor" : "Play Disposable Copy"
         playButton.setAccessibilityLabel(playButton.title)
+        collisionDiagnosticButton.isEnabled = isPlaying && selection.portal != nil
         for button in cameraButtons {
             button.isEnabled = isPlaying
         }
@@ -495,6 +510,16 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                 "That camera move left the imported presentation closure: \(error.localizedDescription)",
                 isError: true
             )
+            NSSound.beep()
+        }
+    }
+
+    @objc private func probeSelectedPortal(_ sender: Any?) {
+        do {
+            let trace = try projectDocument.traceSelectedPlayPortal(radius: 0.25)
+            setSuccessStatus(indoorMovementDiagnosticMessage(trace))
+        } catch {
+            setStatus(error.localizedDescription, isError: true)
             NSSound.beep()
         }
     }
@@ -686,4 +711,13 @@ func boundedSemanticChangesText(_ summaries: [String]) -> String {
     guard let first = summaries.first else { return "No authored changes" }
     guard summaries.count > 1 else { return first }
     return "\(first) (+\(summaries.count - 1) more)"
+}
+
+func indoorMovementDiagnosticMessage(_ trace: IndoorMovementTrace) -> String {
+    switch trace.outcome {
+    case .noHit:
+        "Crossed selected portal; resulting room \(trace.containingRoomSourceIndex)."
+    case .wallHit(let contact):
+        "Blocked at source room \(contact.roomSourceIndex) face \(contact.faceIndex); resulting room \(trace.containingRoomSourceIndex)."
+    }
 }

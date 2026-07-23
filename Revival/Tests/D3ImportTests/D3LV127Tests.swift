@@ -2,6 +2,51 @@ import Foundation
 import XCTest
 
 final class D3LV127Tests: XCTestCase {
+    func testTranslatesEveryResidentFaceTextureFlythroughFlagIntoSurfacePhysics() throws {
+        let wall = SourceResource(storedIndex: 20, sourceName: "wall")
+        let flythrough = SourceResource(storedIndex: 21, sourceName: "flythrough")
+        let table = makeSimpleTextureTablePage(
+            name: "wall",
+            bitmapSourceName: "wall.ogf",
+            flags: 0
+        ) + makeSimpleTextureTablePage(
+            name: "flythrough",
+            bitmapSourceName: "flythrough.ogf",
+            flags: 0x0001_0000
+        )
+
+        let physics = try resolveRetailSurfacePhysics(
+            table: table,
+            overlay: Data(),
+            textures: [wall, flythrough]
+        )
+
+        XCTAssertEqual(
+            physics,
+            [
+                .init(texture: wall, behavior: .blocking),
+                .init(texture: flythrough, behavior: .passThrough),
+            ]
+        )
+    }
+
+    func testClassifiesUnpagedSourceDefaultTexturesAsBlocking() throws {
+        let sample = SourceResource(storedIndex: 0, sourceName: "SAMPLE TEXTURE")
+        let rainbow = SourceResource(storedIndex: 1, sourceName: "Rainbow Texture")
+
+        XCTAssertEqual(
+            try resolveRetailSurfacePhysics(
+                table: Data(),
+                overlay: Data(),
+                textures: [sample, rainbow]
+            ),
+            [
+                .init(texture: sample, behavior: .blocking),
+                .init(texture: rainbow, behavior: .blocking),
+            ]
+        )
+    }
+
     func testDecodesReachedOutrage1555FirstMip() throws {
         var ogf = Data([0, 0, 122])
         ogf.appendCString("slice3.ogf")
@@ -280,6 +325,12 @@ final class D3LV127Tests: XCTestCase {
         )
         XCTAssertNoThrow(try level.validateForImportStaging())
         XCTAssertThrowsError(try level.validate()) { error in
+            XCTAssertEqual(error as? LevelValidationError, .invalidSurfacePhysics)
+        }
+        let surfaceComplete = level.addingSurfacePhysics([
+            .init(texture: level.rooms[0].faces[0].texture, behavior: .blocking),
+        ])
+        XCTAssertThrowsError(try surfaceComplete.validate()) { error in
             XCTAssertEqual(
                 error as? LevelValidationError,
                 .invalidDependency("orphan presentation payload")
@@ -667,7 +718,11 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertEqual(dispositions["OHND"], "canonical-retired-handle-continuity")
         XCTAssertEqual(dispositions["INFO"], "canonical")
         XCTAssertEqual(dispositions["EDIT"], "evidence-only-phase-1-slice-3-native-editor-state")
-        XCTAssertNoThrow(try level.validate())
+        XCTAssertTrue(level.surfacePhysics.isEmpty)
+        XCTAssertNoThrow(try level.validateForImportStaging())
+        XCTAssertThrowsError(try level.validate()) {
+            XCTAssertEqual($0 as? LevelValidationError, .invalidSurfacePhysics)
+        }
     }
 
     func testAcceptsZeroAlignmentPaddingAfterNameTables() throws {
@@ -995,6 +1050,36 @@ private func makeTextureTablePage(
             element.y2,
         ])
     }
+    body.appendCString("")
+    body.appendFloat(1)
+
+    var page = Data([1])
+    page.appendLittleEndian(UInt32(body.count + 4))
+    page.append(body)
+    return page
+}
+
+private func makeSimpleTextureTablePage(
+    name: String,
+    bitmapSourceName: String,
+    flags: UInt32
+) -> Data {
+    var body = Data()
+    body.appendLittleEndian(UInt16(7))
+    body.appendCString(name)
+    body.appendCString(bitmapSourceName)
+    body.appendCString("")
+    body.appendFloat(0)
+    body.appendFloat(0)
+    body.appendFloat(0)
+    body.appendFloat(1)
+    body.appendFloat(1)
+    body.appendFloat(0)
+    body.appendFloat(0)
+    body.appendFloat(0.5)
+    body.append(0)
+    body.appendLittleEndian(UInt32(0))
+    body.appendLittleEndian(flags)
     body.appendCString("")
     body.appendFloat(1)
 

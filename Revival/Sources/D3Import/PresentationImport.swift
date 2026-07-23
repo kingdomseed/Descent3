@@ -53,6 +53,64 @@ func resolveRetailTextureDefinitions(
     overlay: Data,
     names requestedNames: Set<String>
 ) throws -> [RetailTextureDefinition] {
+    let pages = try mergedRetailTexturePages(table: table, overlay: overlay)
+    return try requestedNames.sorted().map { name in
+        try canonicalTextureDefinition(resolvedRetailTexturePage(named: name, in: pages))
+    }
+}
+
+func resolveRetailSurfacePhysics(
+    table: Data,
+    overlay: Data,
+    textures: Set<SourceResource>
+) throws -> [SurfacePhysicsEntry] {
+    let pages = try mergedRetailTexturePages(table: table, overlay: overlay)
+    return try textures.sorted {
+        if $0.storedIndex != $1.storedIndex {
+            return $0.storedIndex < $1.storedIndex
+        }
+        return $0.sourceName < $1.sourceName
+    }.map { texture in
+        let page: RetailTexturePage
+        do {
+            page = try resolvedRetailTexturePage(named: texture.sourceName, in: pages)
+        } catch let error as RetailTextureTableError {
+            guard case .missingName = error,
+                  let behavior = sourceDefaultSurfaceBehavior(texture) else {
+                throw error
+            }
+            return SurfacePhysicsEntry(
+                texture: texture,
+                behavior: behavior
+            )
+        }
+        return SurfacePhysicsEntry(
+            texture: texture,
+            behavior: page.flags & 0x0001_0000 != 0 ? .passThrough : .blocking
+        )
+    }
+}
+
+private func sourceDefaultSurfaceBehavior(
+    _ texture: SourceResource
+) -> SurfacePhysicsBehavior? {
+    switch (texture.storedIndex, texture.sourceName.lowercased()) {
+    case (0, "sample texture"), (1, "rainbow texture"):
+        .blocking
+    default:
+        nil
+    }
+}
+
+private struct MergedRetailTexturePages {
+    let byName: [String: RetailTexturePage]
+    let byBitmapBase: [String: RetailTexturePage]
+}
+
+private func mergedRetailTexturePages(
+    table: Data,
+    overlay: Data
+) throws -> MergedRetailTexturePages {
     let basePages = try parseRetailTexturePages(table)
     let overlayPages = try parseRetailTexturePages(overlay)
     var pageByName: [String: RetailTexturePage] = [:]
@@ -77,14 +135,19 @@ func resolveRetailTextureDefinitions(
             .deletingPathExtension().lastPathComponent.lowercased()
         if pageByBitmapBase[base] == nil { pageByBitmapBase[base] = page }
     }
-    return try requestedNames.sorted().map { name in
-        let key = URL(fileURLWithPath: name)
-            .deletingPathExtension().lastPathComponent.lowercased()
-        guard let page = pageByBitmapBase[key] ?? pageByName[key] else {
-            throw RetailTextureTableError.missingName(name)
-        }
-        return try canonicalTextureDefinition(page)
+    return .init(byName: pageByName, byBitmapBase: pageByBitmapBase)
+}
+
+private func resolvedRetailTexturePage(
+    named name: String,
+    in pages: MergedRetailTexturePages
+) throws -> RetailTexturePage {
+    let key = URL(fileURLWithPath: name)
+        .deletingPathExtension().lastPathComponent.lowercased()
+    guard let page = pages.byBitmapBase[key] ?? pages.byName[key] else {
+        throw RetailTextureTableError.missingName(name)
     }
+    return page
 }
 
 private struct RetailTexturePage {
