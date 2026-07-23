@@ -251,7 +251,7 @@ struct LevelRoom: Codable, Equatable, Sendable {
     let sourceIndex: Int
     var name: String?
     let pathPoint: Vector3
-    let vertices: [Vector3]
+    var vertices: [Vector3]
     var faces: [LevelFace]
     var portals: [LevelPortal]
     let flags: UInt32
@@ -1711,6 +1711,21 @@ func traceIndoorMovement(
         containingRoomSourceIndex: containingRoom,
         visitedRoomSourceIndices: visited
     )
+}
+
+func containingIndoorRoomSourceIndex(
+    in level: Level,
+    position: Vector3,
+    candidates: [Int]? = nil
+) -> Int? {
+    guard isFinite(position) else { return nil }
+    let rooms = Dictionary(uniqueKeysWithValues: level.rooms.map {
+        ($0.sourceIndex, $0)
+    })
+    let sourceIndices = candidates ?? level.rooms.map(\.sourceIndex).sorted()
+    return sourceIndices.first {
+        rooms[$0].map { indoorRoomContains(position, room: $0) } == true
+    }
 }
 
 private func indoorFaceIsPassable(

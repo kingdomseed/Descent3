@@ -287,6 +287,44 @@ final class RevivalProjectDocument: NSDocument {
         refreshWindowControllers()
     }
 
+    func setRoomVertex(
+        roomSourceIndex: Int,
+        vertexIndex: Int,
+        to position: Vector3
+    ) throws {
+        try applyRoomVertex(
+            roomSourceIndex: roomSourceIndex,
+            vertexIndex: vertexIndex,
+            to: position,
+            actionName: "Set Room Vertex"
+        )
+    }
+
+    func snapRoomVertex(
+        roomSourceIndex: Int,
+        vertexIndex: Int,
+        toRoomSourceIndex: Int,
+        toVertexIndex: Int
+    ) throws {
+        guard let targetRoom = project.level.rooms.first(where: {
+            $0.sourceIndex == toRoomSourceIndex
+        }) else {
+            throw RevivalProjectError.roomMissing(toRoomSourceIndex)
+        }
+        guard targetRoom.vertices.indices.contains(toVertexIndex) else {
+            throw RevivalProjectError.vertexMissing(
+                roomSourceIndex: toRoomSourceIndex,
+                vertexIndex: toVertexIndex
+            )
+        }
+        try applyRoomVertex(
+            roomSourceIndex: roomSourceIndex,
+            vertexIndex: vertexIndex,
+            to: targetRoom.vertices[toVertexIndex],
+            actionName: "Snap Room Vertex"
+        )
+    }
+
     func setObjectTransform(
         handle: UInt32,
         to transform: RevivalRigidTransform
@@ -370,6 +408,64 @@ final class RevivalProjectDocument: NSDocument {
         )
         undoManager?.setActionName("Transform Player Start")
         refreshWindowControllers()
+    }
+
+    @discardableResult
+    func moveObject(
+        handle: UInt32,
+        to position: Vector3
+    ) throws -> RevivalPlacementResult {
+        let previous = try project.level.objects.first {
+            $0.handle == handle
+        }.map(\.position) ?? { throw RevivalProjectError.objectMissing(handle) }()
+        var result: RevivalPlacementResult?
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            result = try project.moveObject(handle: handle, to: position)
+            storedProject = project
+        }
+        registerObjectPlacementUndo(handle: handle, position: previous)
+        undoManager?.setActionName("Move Object")
+        refreshWindowControllers()
+        return result!
+    }
+
+    @discardableResult
+    func movePlayerStart(
+        playerID: Int,
+        handle: UInt32,
+        to position: Vector3
+    ) throws -> RevivalPlacementResult {
+        let previous = try project.level.objects.first {
+            $0.handle == handle
+        }.map(\.position) ?? {
+            throw RevivalProjectError.playerStartMissing(
+                playerID: playerID,
+                handle: handle
+            )
+        }()
+        var result: RevivalPlacementResult?
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            result = try project.movePlayerStart(
+                playerID: playerID,
+                handle: handle,
+                to: position
+            )
+            storedProject = project
+        }
+        registerPlayerStartPlacementUndo(
+            playerID: playerID,
+            handle: handle,
+            position: previous
+        )
+        undoManager?.setActionName("Move Player Start")
+        refreshWindowControllers()
+        return result!
     }
 
     func makePlaySession() -> RevivalPlaySession {
@@ -535,6 +631,54 @@ final class RevivalProjectDocument: NSDocument {
         }
     }
 
+    private func applyRoomVertex(
+        roomSourceIndex: Int,
+        vertexIndex: Int,
+        to position: Vector3,
+        actionName: String
+    ) throws {
+        var previous: Vector3?
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            previous = try project.setRoomVertex(
+                roomSourceIndex: roomSourceIndex,
+                vertexIndex: vertexIndex,
+                to: position
+            )
+            storedProject = project
+        }
+        registerRoomVertexUndo(
+            roomSourceIndex: roomSourceIndex,
+            vertexIndex: vertexIndex,
+            position: previous!,
+            actionName: actionName
+        )
+        undoManager?.setActionName(actionName)
+        refreshWindowControllers()
+    }
+
+    private func registerRoomVertexUndo(
+        roomSourceIndex: Int,
+        vertexIndex: Int,
+        position: Vector3,
+        actionName: String
+    ) {
+        undoManager?.registerUndo(withTarget: self) { document in
+            do {
+                try document.applyRoomVertex(
+                    roomSourceIndex: roomSourceIndex,
+                    vertexIndex: vertexIndex,
+                    to: position,
+                    actionName: actionName
+                )
+            } catch {
+                preconditionFailure("Room-vertex undo invariant failed: \(error)")
+            }
+        }
+    }
+
     private func registerObjectTransformUndo(
         handle: UInt32,
         transform: RevivalRigidTransform
@@ -562,6 +706,34 @@ final class RevivalProjectDocument: NSDocument {
                 )
             } catch {
                 preconditionFailure("Player-start transform undo invariant failed: \(error)")
+            }
+        }
+    }
+
+    private func registerObjectPlacementUndo(handle: UInt32, position: Vector3) {
+        undoManager?.registerUndo(withTarget: self) { document in
+            do {
+                try document.moveObject(handle: handle, to: position)
+            } catch {
+                preconditionFailure("Object-placement undo invariant failed: \(error)")
+            }
+        }
+    }
+
+    private func registerPlayerStartPlacementUndo(
+        playerID: Int,
+        handle: UInt32,
+        position: Vector3
+    ) {
+        undoManager?.registerUndo(withTarget: self) { document in
+            do {
+                try document.movePlayerStart(
+                    playerID: playerID,
+                    handle: handle,
+                    to: position
+                )
+            } catch {
+                preconditionFailure("Player-start placement undo invariant failed: \(error)")
             }
         }
     }

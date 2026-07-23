@@ -110,6 +110,7 @@ final class EditorProjectTests: XCTestCase {
                 "playerStartTransformEdits",
                 "portalRenderingEdits",
                 "roomNameEdits",
+                "roomVertexEdits",
                 "schemaVersion",
             ]
         )
@@ -379,7 +380,7 @@ final class EditorProjectTests: XCTestCase {
         ) {
             XCTAssertEqual(
                 $0 as? RevivalProjectError,
-                .objectPositionEditDeferred(6_147)
+                .invalidObjectTransformEdit(6_147)
             )
         }
         XCTAssertEqual(
@@ -417,7 +418,7 @@ final class EditorProjectTests: XCTestCase {
         ) {
             XCTAssertEqual(
                 $0 as? RevivalProjectError,
-                .playerStartPositionEditDeferred(playerID: 0, handle: 2_048)
+                .invalidPlayerStartTransformEdit(playerID: 0, handle: 2_048)
             )
         }
         try document.rotatePlayerStartQuarterTurn(handle: 2_048)
@@ -1012,7 +1013,7 @@ final class EditorProjectTests: XCTestCase {
                 with: canonicalJSONData(original.persistedSource)
             ) as? [String: Any]
         )
-        object["schemaVersion"] = 3
+        object["schemaVersion"] = 4
         var base = try XCTUnwrap(object["base"] as? [String: Any])
         base["identitySHA256"] = String(repeating: "b", count: 64)
         object["base"] = base
@@ -1031,7 +1032,7 @@ final class EditorProjectTests: XCTestCase {
                 ofType: RevivalProjectDocument.projectType
             )
         ) {
-            XCTAssertEqual($0 as? RevivalProjectError, .unsupportedSchema(3))
+            XCTAssertEqual($0 as? RevivalProjectError, .unsupportedSchema(4))
         }
         XCTAssertEqual(document.project, original)
     }
@@ -1333,6 +1334,399 @@ final class EditorProjectTests: XCTestCase {
         }
         XCTAssertEqual(document.playSession, before)
     }
+
+    @MainActor
+    func testTypedVertexMutationAndPointSnapPreserveIdentityValidationAndNamedUndo() throws {
+        let document = RevivalProjectDocument(
+            project: try makeProject(importedBase: makeGeometryProjectLevel())
+        )
+        let original = document.project.level.rooms.first {
+            $0.sourceIndex == 40
+        }!.vertices[0]
+        let typedPosition = Vector3(x: 0.25, y: 0.125, z: 0)
+
+        try document.setRoomVertex(
+            roomSourceIndex: 40,
+            vertexIndex: 0,
+            to: typedPosition
+        )
+        XCTAssertEqual(
+            document.project.level.rooms.first { $0.sourceIndex == 40 }!.vertices[0],
+            typedPosition
+        )
+        XCTAssertEqual(document.undoManager?.undoActionName, "Set Room Vertex")
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.rooms.first { $0.sourceIndex == 40 }!.vertices[0],
+            original
+        )
+
+        let target = document.project.level.rooms.first {
+            $0.sourceIndex == 41
+        }!.vertices[0]
+        try document.snapRoomVertex(
+            roomSourceIndex: 40,
+            vertexIndex: 0,
+            toRoomSourceIndex: 41,
+            toVertexIndex: 0
+        )
+        XCTAssertEqual(
+            document.project.level.rooms.first { $0.sourceIndex == 40 }!.vertices[0],
+            target
+        )
+        XCTAssertEqual(document.undoManager?.undoActionName, "Snap Room Vertex")
+        try document.project.validate()
+    }
+
+    @MainActor
+    func testObjectAndPlayerPlacementUseIndoorTraceRelinkAndOwnerDiagnostics() throws {
+        let document = RevivalProjectDocument(
+            project: try makeProject(importedBase: makeEditableProjectLevel())
+        )
+        document.undoManager?.groupsByEvent = false
+        let room3 = document.project.level.rooms.first { $0.sourceIndex == 3 }!
+        let face = room3.faces[0]
+        let points = face.corners.map { room3.vertices[$0.vertexIndex] }
+        let center = points.reduce(Vector3.zero) {
+            .init(x: $0.x + $1.x, y: $0.y + $1.y, z: $0.z + $1.z)
+        }
+        let portalCenter = Vector3(
+            x: center.x / Float(points.count),
+            y: center.y / Float(points.count),
+            z: center.z / Float(points.count)
+        )
+        let normal = try XCTUnwrap(canonicalFaceNormal(room: room3, face: face))
+        let room2Point = Vector3(
+            x: portalCenter.x - normal.x * 0.5,
+            y: portalCenter.y - normal.y * 0.5,
+            z: portalCenter.z - normal.z * 0.5
+        )
+        let room3Point = Vector3(
+            x: portalCenter.x + normal.x * 0.5,
+            y: portalCenter.y + normal.y * 0.5,
+            z: portalCenter.z + normal.z * 0.5
+        )
+
+        try document.selectPortal(0)
+        document.undoManager?.beginUndoGrouping()
+        try document.setSelectedPortalRendersFaces(false)
+        document.undoManager?.endUndoGrouping()
+        document.undoManager?.beginUndoGrouping()
+        let room3Result = try document.moveObject(handle: 6_147, to: room3Point)
+        document.undoManager?.endUndoGrouping()
+        document.undoManager?.beginUndoGrouping()
+        let objectResult = try document.moveObject(handle: 6_147, to: room2Point)
+        document.undoManager?.endUndoGrouping()
+        XCTAssertEqual(objectResult.committedLocation, .room(2))
+        XCTAssertNil(objectResult.diagnostic)
+        XCTAssertEqual(
+            document.project.level.objects.first { $0.handle == 6_147 }?.location,
+            .room(2)
+        )
+        XCTAssertEqual(document.undoManager?.undoActionName, "Move Object")
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first { $0.handle == 6_147 }?.position,
+            room3Result.committedPosition
+        )
+        XCTAssertEqual(
+            document.project.level.objects.first { $0.handle == 6_147 }?.location,
+            .room(3)
+        )
+        XCTAssertEqual(document.undoManager?.redoActionName, "Move Object")
+        document.undoManager?.redo()
+        XCTAssertEqual(
+            document.project.level.objects.first { $0.handle == 6_147 }?.position,
+            objectResult.committedPosition
+        )
+        XCTAssertEqual(
+            document.project.level.objects.first { $0.handle == 6_147 }?.location,
+            .room(2)
+        )
+
+        let beforeRefusal = document.project
+        XCTAssertThrowsError(
+            try document.moveObject(
+                handle: 6_147,
+                to: .init(x: room2Point.x, y: room2Point.y, z: room2Point.z + 100)
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? RevivalProjectError,
+                .placementHasNoContainingRoom(owner: "Object 6147")
+            )
+        }
+        XCTAssertEqual(document.project, beforeRefusal)
+
+        let closed = RevivalProjectDocument(
+            project: try makeProject(importedBase: makeClosedRoomProjectLevel())
+        )
+        let player = try XCTUnwrap(
+            closed.project.level.objects.first {
+                $0.type == D3SourceIdentity.playerObjectType && $0.storedID == 0
+            }
+        )
+        let result = try closed.movePlayerStart(
+            playerID: 0,
+            handle: player.handle,
+            to: .init(x: player.position.x - 10, y: player.position.y, z: player.position.z)
+        )
+        XCTAssertEqual(result.committedLocation, .room(3))
+        XCTAssertNotNil(result.diagnostic)
+        XCTAssertEqual(closed.undoManager?.undoActionName, "Move Player Start")
+        closed.undoManager?.undo()
+        XCTAssertEqual(
+            closed.project.level.objects.first { $0.handle == player.handle }?.position,
+            player.position
+        )
+        XCTAssertEqual(
+            closed.project.level.objects.first { $0.handle == player.handle }?.location,
+            player.location
+        )
+        XCTAssertEqual(closed.undoManager?.redoActionName, "Move Player Start")
+        closed.undoManager?.redo()
+        XCTAssertEqual(
+            closed.project.level.objects.first { $0.handle == player.handle }?.position,
+            result.committedPosition
+        )
+        XCTAssertEqual(
+            closed.project.level.objects.first { $0.handle == player.handle }?.location,
+            result.committedLocation
+        )
+    }
+
+    @MainActor
+    func testNewAuthoredValuesRoundTripByteStablyAndPlayThroughSeparateCopy() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        let base = makeGeometryProjectLevel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        try writeCanonicalPackage(base, to: candidate)
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+
+        try document.setRoomVertex(
+            roomSourceIndex: 40,
+            vertexIndex: 0,
+            to: .init(x: 0.25, y: 0.125, z: 0)
+        )
+        let room3 = document.project.level.rooms.first { $0.sourceIndex == 3 }!
+        let portalFace = room3.faces[0]
+        let portalPoints = portalFace.corners.map {
+            room3.vertices[$0.vertexIndex]
+        }
+        let portalSum = portalPoints.reduce(Vector3.zero) {
+            .init(x: $0.x + $1.x, y: $0.y + $1.y, z: $0.z + $1.z)
+        }
+        let portalCenter = Vector3(
+            x: portalSum.x / Float(portalPoints.count),
+            y: portalSum.y / Float(portalPoints.count),
+            z: portalSum.z / Float(portalPoints.count)
+        )
+        let portalNormal = try XCTUnwrap(
+            canonicalFaceNormal(room: room3, face: portalFace)
+        )
+        try document.selectRoom(sourceIndex: 3)
+        try document.selectPortal(0)
+        try document.setSelectedPortalRendersFaces(false)
+        _ = try document.moveObject(
+            handle: 6_147,
+            to: .init(
+                x: portalCenter.x + portalNormal.x * 0.5,
+                y: portalCenter.y + portalNormal.y * 0.5,
+                z: portalCenter.z + portalNormal.z * 0.5
+            )
+        )
+        _ = try document.moveObject(
+            handle: 6_147,
+            to: .init(
+                x: portalCenter.x - portalNormal.x * 0.5,
+                y: portalCenter.y - portalNormal.y * 0.5,
+                z: portalCenter.z - portalNormal.z * 0.5
+            )
+        )
+        let player = try XCTUnwrap(
+            document.project.level.objects.first { $0.handle == 2_048 }
+        )
+        _ = try document.movePlayerStart(
+            playerID: 0,
+            handle: player.handle,
+            to: .init(
+                x: player.position.x + 0.05,
+                y: player.position.y,
+                z: player.position.z
+            )
+        )
+        XCTAssertTrue(
+            document.project.semanticDiff.map(\.summary).contains {
+                $0.contains("room 3 → room 2")
+            }
+        )
+        let first = try document.fileWrapper(ofType: RevivalProjectDocument.projectType)
+        let second = try document.fileWrapper(ofType: RevivalProjectDocument.projectType)
+        XCTAssertEqual(
+            first.fileWrappers?["project.json"]?.regularFileContents,
+            second.fileWrappers?["project.json"]?.regularFileContents
+        )
+
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(from: first, ofType: RevivalProjectDocument.projectType)
+        XCTAssertEqual(
+            reopened.project.level.objects.first { $0.handle == 6_147 }?.location,
+            .room(2)
+        )
+        XCTAssertEqual(
+            reopened.project.level.objects.first { $0.handle == 2_048 }?.position,
+            .init(
+                x: player.position.x + 0.05,
+                y: player.position.y,
+                z: player.position.z
+            )
+        )
+        XCTAssertEqual(reopened.project.semanticDiff, document.project.semanticDiff)
+        let selection = reopened.editorSelection
+        let camera = reopened.camera
+        let authored = reopened.project.level
+        let staged = reopened.makePlaySession()
+        XCTAssertEqual(staged.level, authored)
+        reopened.commitPlaySession(staged)
+        reopened.returnToEditor()
+        XCTAssertEqual(reopened.project.level, authored)
+        XCTAssertEqual(reopened.editorSelection, selection)
+        XCTAssertEqual(reopened.camera, camera)
+        XCTAssertEqual(try library.load(activation.reference), base)
+    }
+
+    func testProjectBoundaryRejectsPlacementWhoseRecordedRoomDoesNotContainIt() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        let base = makeGeometryProjectLevel()
+        try writeCanonicalPackage(base, to: candidate)
+        let activation = try library.installAndActivate(from: candidate)
+        var source = RevivalProjectSource(base: activation.reference)
+        let object = try XCTUnwrap(base.objects.first { $0.handle == 6_147 })
+        source.objectTransformEdits = [
+            .init(
+                handle: object.handle,
+                location: .room(2),
+                transform: .init(
+                    position: .init(
+                        x: object.position.x + 0.05,
+                        y: object.position.y,
+                        z: object.position.z
+                    ),
+                    orientation: object.orientation
+                )
+            ),
+        ]
+
+        XCTAssertThrowsError(try RevivalProject(source: source, library: library)) {
+            XCTAssertEqual(
+                $0 as? RevivalProjectError,
+                .placementHasNoContainingRoom(owner: "Object 6147")
+            )
+        }
+    }
+
+    func testProjectBoundaryValidatesGeometryBeforeContainment() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        let base = makeClosedRoomProjectLevel()
+        try writeCanonicalPackage(base, to: candidate)
+        let activation = try library.installAndActivate(from: candidate)
+        let room = try XCTUnwrap(base.rooms.first { $0.sourceIndex == 3 })
+        var source = RevivalProjectSource(base: activation.reference)
+        source.roomVertexEdits = [3, 4, 7].map {
+            .init(
+                roomSourceIndex: room.sourceIndex,
+                vertexIndex: $0,
+                position: room.vertices[0]
+            )
+        }
+
+        XCTAssertThrowsError(try RevivalProject(source: source, library: library)) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidFace(room: 3, face: 0)
+            )
+        }
+    }
+
+    func testProjectBoundaryRejectsDeferredTerrainPlacement() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        let base = makeGeometryProjectLevel()
+        try writeCanonicalPackage(base, to: candidate)
+        let activation = try library.installAndActivate(from: candidate)
+        let object = try XCTUnwrap(base.objects.first { $0.handle == 6_147 })
+        var source = RevivalProjectSource(base: activation.reference)
+        source.objectTransformEdits = [
+            .init(
+                handle: object.handle,
+                location: .terrainCell(0),
+                transform: .init(
+                    position: object.position,
+                    orientation: object.orientation
+                )
+            ),
+        ]
+
+        XCTAssertThrowsError(try RevivalProject(source: source, library: library)) {
+            XCTAssertEqual(
+                $0 as? RevivalProjectError,
+                .placementHasNoContainingRoom(owner: "Object 6147")
+            )
+        }
+    }
+
+    func testReachedPhysicsObjectPlacementUsesCanonicalModelRadius() throws {
+        var project = try makeProject(importedBase: makeGeometryProjectLevel())
+        let object = try XCTUnwrap(project.level.objects.first { $0.handle == 6_147 })
+        let end = Vector3(
+            x: object.position.x - 10,
+            y: object.position.y,
+            z: object.position.z
+        )
+
+        XCTAssertThrowsError(try project.moveObject(handle: object.handle, to: end)) {
+            guard case .placementBlocked(
+                owner: "Object 6147",
+                roomSourceIndex: 3,
+                faceIndex: _
+            ) = $0 as? RevivalProjectError else {
+                return XCTFail("Expected the canonical object radius to refuse a near-wall move")
+            }
+        }
+    }
 }
 
 private func makeProject(importedBase: Level) throws -> RevivalProject {
@@ -1588,5 +1982,74 @@ private func makeEditableProjectLevel() -> Level {
             historicalEagerBaseline: base.dependencyManifest.historicalEagerBaseline
         ),
         sourceChunks: base.sourceChunks
+    )
+}
+
+private func makeGeometryProjectLevel() -> Level {
+    let base = makeEditableProjectLevel()
+    let texture = base.presentationMaterials[0].texture
+    let face: ([Int]) -> LevelFace = { indices in
+        LevelFace(
+            corners: indices.enumerated().map { offset, vertexIndex in
+                FaceCorner(
+                    vertexIndex: vertexIndex,
+                    u: offset == 1 ? 1 : 0,
+                    v: offset == 2 ? 1 : 0,
+                    alpha: 255
+                )
+            },
+            flags: 0,
+            portalIndex: nil,
+            texture: texture
+        )
+    }
+    let rooms = [
+        LevelRoom(
+            sourceIndex: 40,
+            vertices: [
+                .init(x: 0, y: 0, z: 0),
+                .init(x: 2, y: 0, z: 0),
+                .init(x: 0, y: 2, z: 0),
+            ],
+            faces: [face([0, 1, 2])],
+            portals: []
+        ),
+        LevelRoom(
+            sourceIndex: 41,
+            vertices: [
+                .init(x: 0.5, y: 0.25, z: 0),
+                .init(x: 2.5, y: 0.25, z: 0),
+                .init(x: 0.5, y: 2.25, z: 0),
+            ],
+            faces: [face([0, 1, 2])],
+            portals: []
+        ),
+    ]
+    var objects = base.objects
+    for index in objects.indices {
+        guard objects[index].handle == 2_048 || objects[index].handle == 6_147 else {
+            continue
+        }
+        objects[index].location = .room(3)
+        objects[index].position = RoomCamera.trainingRoom3.position
+    }
+    var presentations = base.objectPresentations
+    if !presentations.contains(where: { $0.objectHandle == 6_147 }),
+       let model = base.models.first {
+        presentations.append(.init(
+            objectHandle: 6_147,
+            primaryModel: model.source,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil
+        ))
+    }
+    return replacing(
+        base,
+        rooms: base.rooms + rooms,
+        objects: objects,
+        objectPresentations: presentations
     )
 }

@@ -12,8 +12,11 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
     case objectMissing(UInt32)
     case objectIsPlayer(UInt32)
     case playerStartMissing(playerID: Int, handle: UInt32)
-    case objectPositionEditDeferred(UInt32)
-    case playerStartPositionEditDeferred(playerID: Int, handle: UInt32)
+    case vertexMissing(roomSourceIndex: Int, vertexIndex: Int)
+    case invalidRoomVertexEdit(roomSourceIndex: Int, vertexIndex: Int)
+    case roomVertexEditRejected(roomSourceIndex: Int, vertexIndex: Int, reason: String)
+    case placementHasNoContainingRoom(owner: String)
+    case placementBlocked(owner: String, roomSourceIndex: Int, faceIndex: Int)
     case invalidRoomNameEdit(Int)
     case invalidFaceMaterialEdit(roomSourceIndex: Int, faceIndex: Int)
     case invalidPortalRenderingEdit(roomSourceIndex: Int, portalIndex: Int)
@@ -54,10 +57,16 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
             "Object handle \(handle) is a player start and must be edited by player identity."
         case let .playerStartMissing(playerID, handle):
             "Player \(playerID) does not own player-start object handle \(handle)."
-        case let .objectPositionEditDeferred(handle):
-            "Object \(handle) position cannot change until placement owns point-in-room and collision validation."
-        case let .playerStartPositionEditDeferred(playerID, handle):
-            "Player \(playerID) start \(handle) position cannot change until placement owns point-in-room and collision validation."
+        case let .vertexMissing(roomSourceIndex, vertexIndex):
+            "Source room \(roomSourceIndex) has no vertex \(vertexIndex) to edit."
+        case let .invalidRoomVertexEdit(roomSourceIndex, vertexIndex):
+            "The project contains an invalid or redundant vertex edit for source room \(roomSourceIndex) vertex \(vertexIndex)."
+        case let .roomVertexEditRejected(roomSourceIndex, vertexIndex, reason):
+            "Source room \(roomSourceIndex) vertex \(vertexIndex) was not changed: \(reason)"
+        case let .placementHasNoContainingRoom(owner):
+            "\(owner) was not moved because no indoor room owns the proposed position."
+        case let .placementBlocked(owner, roomSourceIndex, faceIndex):
+            "\(owner) was not moved because source room \(roomSourceIndex) face \(faceIndex) blocks it at the current position."
         case let .invalidRoomNameEdit(sourceIndex):
             "The project contains an invalid or redundant name edit for source room \(sourceIndex)."
         case let .invalidFaceMaterialEdit(roomSourceIndex, faceIndex):
@@ -309,6 +318,12 @@ struct RevivalPortalRenderingEdit: Codable, Equatable, Sendable {
     let rendersFace: Bool
 }
 
+struct RevivalRoomVertexEdit: Codable, Equatable, Sendable {
+    let roomSourceIndex: Int
+    let vertexIndex: Int
+    let position: Vector3
+}
+
 struct RevivalRigidTransform: Codable, Equatable, Sendable {
     let position: Vector3
     let orientation: Matrix3
@@ -328,13 +343,21 @@ func quarterTurnedProjectOrientation(_ orientation: Matrix3) -> Matrix3 {
 
 struct RevivalObjectTransformEdit: Codable, Equatable, Sendable {
     let handle: UInt32
+    let location: SpatialLocation
     let transform: RevivalRigidTransform
 }
 
 struct RevivalPlayerStartTransformEdit: Codable, Equatable, Sendable {
     let playerID: Int
     let handle: UInt32
+    let location: SpatialLocation
     let transform: RevivalRigidTransform
+}
+
+struct RevivalPlacementResult: Equatable, Sendable {
+    let committedLocation: SpatialLocation
+    let committedPosition: Vector3
+    let diagnostic: String?
 }
 
 enum RevivalProjectDifference: Equatable, Sendable {
@@ -351,14 +374,24 @@ enum RevivalProjectDifference: Equatable, Sendable {
         before: Bool,
         after: Bool
     )
+    case roomVertex(
+        roomSourceIndex: Int,
+        vertexIndex: Int,
+        before: Vector3,
+        after: Vector3
+    )
     case objectTransform(
         handle: UInt32,
+        beforeLocation: SpatialLocation,
+        afterLocation: SpatialLocation,
         before: RevivalRigidTransform,
         after: RevivalRigidTransform
     )
     case playerStartTransform(
         playerID: Int,
         handle: UInt32,
+        beforeLocation: SpatialLocation,
+        afterLocation: SpatialLocation,
         before: RevivalRigidTransform,
         after: RevivalRigidTransform
     )
@@ -371,10 +404,19 @@ enum RevivalProjectDifference: Equatable, Sendable {
             "Room \(roomSourceIndex) face \(faceIndex) material: \(before.sourceName) → \(after.sourceName)"
         case let .portalRendering(roomSourceIndex, portalIndex, before, after):
             "Room \(roomSourceIndex) portal \(portalIndex) renders face: \(before) → \(after)"
-        case let .objectTransform(handle, _, _):
-            "Object \(handle) transform changed"
-        case let .playerStartTransform(playerID, handle, _, _):
-            "Player \(playerID) start \(handle) transform changed"
+        case let .roomVertex(roomSourceIndex, vertexIndex, _, _):
+            "Room \(roomSourceIndex) vertex \(vertexIndex) position changed"
+        case let .objectTransform(handle, beforeLocation, afterLocation, _, _):
+            "Object \(handle) transform changed; \(locationSummary(beforeLocation)) → \(locationSummary(afterLocation))"
+        case let .playerStartTransform(
+            playerID,
+            handle,
+            beforeLocation,
+            afterLocation,
+            _,
+            _
+        ):
+            "Player \(playerID) start \(handle) transform changed; \(locationSummary(beforeLocation)) → \(locationSummary(afterLocation))"
         }
     }
 }
@@ -385,15 +427,17 @@ struct RevivalProjectSource: Codable, Equatable, Sendable {
     var roomNameEdits: [RevivalRoomNameEdit]
     var faceMaterialEdits: [RevivalFaceMaterialEdit]
     var portalRenderingEdits: [RevivalPortalRenderingEdit]
+    var roomVertexEdits: [RevivalRoomVertexEdit]
     var objectTransformEdits: [RevivalObjectTransformEdit]
     var playerStartTransformEdits: [RevivalPlayerStartTransformEdit]
 
     init(base: CanonicalPackageReference) {
-        schemaVersion = 2
+        schemaVersion = 3
         self.base = base
         roomNameEdits = []
         faceMaterialEdits = []
         portalRenderingEdits = []
+        roomVertexEdits = []
         objectTransformEdits = []
         playerStartTransformEdits = []
     }
@@ -436,9 +480,23 @@ struct RevivalProject: Equatable, Sendable {
                 after: edit.rendersFace
             )
         })
+        differences.append(contentsOf: source.roomVertexEdits.map { edit in
+            .roomVertex(
+                roomSourceIndex: edit.roomSourceIndex,
+                vertexIndex: edit.vertexIndex,
+                before: importedBase.rooms.first {
+                    $0.sourceIndex == edit.roomSourceIndex
+                }!.vertices[edit.vertexIndex],
+                after: edit.position
+            )
+        })
         differences.append(contentsOf: source.objectTransformEdits.map { edit in
             .objectTransform(
                 handle: edit.handle,
+                beforeLocation: importedBase.objects.first {
+                    $0.handle == edit.handle
+                }!.location,
+                afterLocation: edit.location,
                 before: rigidTransform(of: importedBase.objects.first {
                     $0.handle == edit.handle
                 }!),
@@ -449,6 +507,10 @@ struct RevivalProject: Equatable, Sendable {
             .playerStartTransform(
                 playerID: edit.playerID,
                 handle: edit.handle,
+                beforeLocation: importedBase.objects.first {
+                    $0.handle == edit.handle
+                }!.location,
+                afterLocation: edit.location,
                 before: rigidTransform(of: importedBase.objects.first {
                     $0.handle == edit.handle
                 }!),
@@ -471,7 +533,7 @@ struct RevivalProject: Equatable, Sendable {
         source: RevivalProjectSource,
         library: CanonicalPackageLibrary
     ) throws {
-        guard source.schemaVersion == 2 else {
+        guard source.schemaVersion == 3 else {
             throw RevivalProjectError.unsupportedSchema(source.schemaVersion)
         }
         let importedBase = try library.load(source.base)
@@ -546,6 +608,27 @@ struct RevivalProject: Equatable, Sendable {
                 )
             previousPortalIdentity = identity
         }
+        var previousVertexIdentity: (Int, Int)?
+        for edit in source.roomVertexEdits {
+            let identity = (edit.roomSourceIndex, edit.vertexIndex)
+            guard previousVertexIdentity.map({ $0 < identity }) ?? true,
+                  let roomIndex = materializedLevel.rooms.firstIndex(where: {
+                      $0.sourceIndex == edit.roomSourceIndex
+                  }),
+                  materializedLevel.rooms[roomIndex].vertices.indices.contains(edit.vertexIndex),
+                  let baseRoom = importedBase.rooms.first(where: {
+                      $0.sourceIndex == edit.roomSourceIndex
+                  }),
+                  baseRoom.vertices[edit.vertexIndex] != edit.position,
+                  isFiniteProjectPosition(edit.position) else {
+                throw RevivalProjectError.invalidRoomVertexEdit(
+                    roomSourceIndex: edit.roomSourceIndex,
+                    vertexIndex: edit.vertexIndex
+                )
+            }
+            materializedLevel.rooms[roomIndex].vertices[edit.vertexIndex] = edit.position
+            previousVertexIdentity = identity
+        }
         var previousObjectHandle: UInt32?
         for edit in source.objectTransformEdits {
             guard previousObjectHandle.map({ $0 < edit.handle }) ?? true,
@@ -556,11 +639,12 @@ struct RevivalProject: Equatable, Sendable {
                   let baseObject = importedBase.objects.first(where: {
                       $0.handle == edit.handle
                   }),
-                  baseObject.position == edit.transform.position,
-                  rigidTransform(of: baseObject) != edit.transform,
+                  (baseObject.location != edit.location
+                    || rigidTransform(of: baseObject) != edit.transform),
                   isValidRigidTransform(edit.transform) else {
                 throw RevivalProjectError.invalidObjectTransformEdit(edit.handle)
             }
+            materializedLevel.objects[objectIndex].location = edit.location
             materializedLevel.objects[objectIndex].position = edit.transform.position
             materializedLevel.objects[objectIndex].orientation = edit.transform.orientation
             previousObjectHandle = edit.handle
@@ -577,14 +661,15 @@ struct RevivalProject: Equatable, Sendable {
                   let baseObject = importedBase.objects.first(where: {
                       $0.handle == edit.handle
                   }),
-                  baseObject.position == edit.transform.position,
-                  rigidTransform(of: baseObject) != edit.transform,
+                  (baseObject.location != edit.location
+                    || rigidTransform(of: baseObject) != edit.transform),
                   isValidRigidTransform(edit.transform) else {
                 throw RevivalProjectError.invalidPlayerStartTransformEdit(
                     playerID: edit.playerID,
                     handle: edit.handle
                 )
             }
+            materializedLevel.objects[objectIndex].location = edit.location
             materializedLevel.objects[objectIndex].position = edit.transform.position
             materializedLevel.objects[objectIndex].orientation = edit.transform.orientation
             previousPlayerIdentity = identity
@@ -722,6 +807,80 @@ struct RevivalProject: Equatable, Sendable {
     }
 
     @discardableResult
+    mutating func setRoomVertex(
+        roomSourceIndex: Int,
+        vertexIndex: Int,
+        to position: Vector3
+    ) throws -> Vector3 {
+        guard let roomIndex = level.rooms.firstIndex(where: {
+            $0.sourceIndex == roomSourceIndex
+        }) else {
+            throw RevivalProjectError.roomMissing(roomSourceIndex)
+        }
+        guard level.rooms[roomIndex].vertices.indices.contains(vertexIndex) else {
+            throw RevivalProjectError.vertexMissing(
+                roomSourceIndex: roomSourceIndex,
+                vertexIndex: vertexIndex
+            )
+        }
+        guard isFiniteProjectPosition(position) else {
+            throw RevivalProjectError.invalidRoomVertexEdit(
+                roomSourceIndex: roomSourceIndex,
+                vertexIndex: vertexIndex
+            )
+        }
+        let previous = level.rooms[roomIndex].vertices[vertexIndex]
+        guard previous != position else { throw RevivalProjectError.unchangedProperty }
+        var candidate = level
+        candidate.rooms[roomIndex].vertices[vertexIndex] = position
+        do {
+            try candidate.validate()
+        } catch let error as LevelValidationError {
+            throw RevivalProjectError.roomVertexEditRejected(
+                roomSourceIndex: roomSourceIndex,
+                vertexIndex: vertexIndex,
+                reason: String(describing: error)
+            )
+        }
+        try validateAuthoredIndoorOwnership(
+            in: candidate,
+            editedRoomSourceIndices: Set([roomSourceIndex]),
+            editedObjectHandles: []
+        )
+        level = candidate
+        updateRoomVertexEdit(
+            roomSourceIndex: roomSourceIndex,
+            vertexIndex: vertexIndex
+        )
+        return previous
+    }
+
+    @discardableResult
+    mutating func snapRoomVertex(
+        roomSourceIndex: Int,
+        vertexIndex: Int,
+        toRoomSourceIndex: Int,
+        toVertexIndex: Int
+    ) throws -> Vector3 {
+        guard let targetRoom = level.rooms.first(where: {
+            $0.sourceIndex == toRoomSourceIndex
+        }) else {
+            throw RevivalProjectError.roomMissing(toRoomSourceIndex)
+        }
+        guard targetRoom.vertices.indices.contains(toVertexIndex) else {
+            throw RevivalProjectError.vertexMissing(
+                roomSourceIndex: toRoomSourceIndex,
+                vertexIndex: toVertexIndex
+            )
+        }
+        return try setRoomVertex(
+            roomSourceIndex: roomSourceIndex,
+            vertexIndex: vertexIndex,
+            to: targetRoom.vertices[toVertexIndex]
+        )
+    }
+
+    @discardableResult
     mutating func setObjectTransform(
         handle: UInt32,
         to transform: RevivalRigidTransform
@@ -735,7 +894,7 @@ struct RevivalProject: Equatable, Sendable {
         let previous = rigidTransform(of: level.objects[objectIndex])
         guard previous != transform else { throw RevivalProjectError.unchangedProperty }
         guard previous.position == transform.position else {
-            throw RevivalProjectError.objectPositionEditDeferred(handle)
+            throw RevivalProjectError.invalidObjectTransformEdit(handle)
         }
         guard isValidRigidTransform(transform) else {
             throw RevivalProjectError.invalidObjectTransformEdit(handle)
@@ -781,7 +940,7 @@ struct RevivalProject: Equatable, Sendable {
         let previous = rigidTransform(of: level.objects[objectIndex])
         guard previous != transform else { throw RevivalProjectError.unchangedProperty }
         guard previous.position == transform.position else {
-            throw RevivalProjectError.playerStartPositionEditDeferred(
+            throw RevivalProjectError.invalidPlayerStartTransformEdit(
                 playerID: playerID,
                 handle: handle
             )
@@ -823,8 +982,61 @@ struct RevivalProject: Equatable, Sendable {
         )
     }
 
+    @discardableResult
+    mutating func moveObject(
+        handle: UInt32,
+        to proposedPosition: Vector3
+    ) throws -> RevivalPlacementResult {
+        guard let objectIndex = level.objects.firstIndex(where: {
+            $0.handle == handle
+        }) else {
+            throw RevivalProjectError.objectMissing(handle)
+        }
+        guard level.objects[objectIndex].type != D3SourceIdentity.playerObjectType else {
+            throw RevivalProjectError.objectIsPlayer(handle)
+        }
+        return try moveObject(
+            at: objectIndex,
+            owner: "Object \(handle)",
+            proposedPosition: proposedPosition,
+            radius: editorPlacementRadius(
+                for: level.objects[objectIndex],
+                in: level
+            )
+        )
+    }
+
+    @discardableResult
+    mutating func movePlayerStart(
+        playerID: Int,
+        handle: UInt32,
+        to proposedPosition: Vector3
+    ) throws -> RevivalPlacementResult {
+        guard let objectIndex = level.objects.firstIndex(where: {
+            $0.handle == handle
+                && $0.type == D3SourceIdentity.playerObjectType
+                && $0.storedID == playerID
+        }) else {
+            throw RevivalProjectError.playerStartMissing(
+                playerID: playerID,
+                handle: handle
+            )
+        }
+        let radius = level.defaultPlayerBinding.map { binding in
+            binding.objectHandle == handle
+                ? level.shipDefinitions.first { $0.source == binding.ship }!.presentationSize * 0.8
+                : 0
+        } ?? 0
+        return try moveObject(
+            at: objectIndex,
+            owner: "Player \(playerID) start \(handle)",
+            proposedPosition: proposedPosition,
+            radius: radius
+        )
+    }
+
     func validate() throws {
-        guard source.schemaVersion == 2 else {
+        guard source.schemaVersion == 3 else {
             throw RevivalProjectError.unsupportedSchema(source.schemaVersion)
         }
         guard importedBase.missionKey == source.base.missionKey,
@@ -867,6 +1079,7 @@ struct RevivalProject: Equatable, Sendable {
 
         var expectedFaceEdits: [RevivalFaceMaterialEdit] = []
         var expectedPortalEdits: [RevivalPortalRenderingEdit] = []
+        var expectedVertexEdits: [RevivalRoomVertexEdit] = []
         for room in level.rooms {
             guard let baseRoom = importedBase.rooms.first(where: {
                 $0.sourceIndex == room.sourceIndex
@@ -892,9 +1105,20 @@ struct RevivalProject: Equatable, Sendable {
                     ))
                 }
             }
+            for vertexIndex in room.vertices.indices
+            where room.vertices[vertexIndex] != baseRoom.vertices[vertexIndex] {
+                expectedVertexEdits.append(.init(
+                    roomSourceIndex: room.sourceIndex,
+                    vertexIndex: vertexIndex,
+                    position: room.vertices[vertexIndex]
+                ))
+            }
         }
         expectedFaceEdits.sort { ($0.roomSourceIndex, $0.faceIndex) < ($1.roomSourceIndex, $1.faceIndex) }
         expectedPortalEdits.sort { ($0.roomSourceIndex, $0.portalIndex) < ($1.roomSourceIndex, $1.portalIndex) }
+        expectedVertexEdits.sort {
+            ($0.roomSourceIndex, $0.vertexIndex) < ($1.roomSourceIndex, $1.vertexIndex)
+        }
         guard source.faceMaterialEdits == expectedFaceEdits else {
             let identity = source.faceMaterialEdits.first ?? expectedFaceEdits.first!
             throw RevivalProjectError.invalidFaceMaterialEdit(
@@ -909,6 +1133,13 @@ struct RevivalProject: Equatable, Sendable {
                 portalIndex: identity.portalIndex
             )
         }
+        guard source.roomVertexEdits == expectedVertexEdits else {
+            let identity = source.roomVertexEdits.first ?? expectedVertexEdits.first!
+            throw RevivalProjectError.invalidRoomVertexEdit(
+                roomSourceIndex: identity.roomSourceIndex,
+                vertexIndex: identity.vertexIndex
+            )
+        }
         var expectedObjectEdits: [RevivalObjectTransformEdit] = []
         var expectedPlayerEdits: [RevivalPlayerStartTransformEdit] = []
         for object in level.objects {
@@ -918,15 +1149,23 @@ struct RevivalProject: Equatable, Sendable {
                 throw RevivalProjectError.objectMissing(object.handle)
             }
             let transform = rigidTransform(of: object)
-            guard transform != rigidTransform(of: baseObject) else { continue }
+            guard object.location != baseObject.location
+                    || transform != rigidTransform(of: baseObject) else {
+                continue
+            }
             if object.type == D3SourceIdentity.playerObjectType {
                 expectedPlayerEdits.append(.init(
                     playerID: object.storedID,
                     handle: object.handle,
+                    location: object.location,
                     transform: transform
                 ))
             } else {
-                expectedObjectEdits.append(.init(handle: object.handle, transform: transform))
+                expectedObjectEdits.append(.init(
+                    handle: object.handle,
+                    location: object.location,
+                    transform: transform
+                ))
             }
         }
         expectedObjectEdits.sort { $0.handle < $1.handle }
@@ -946,6 +1185,14 @@ struct RevivalProject: Equatable, Sendable {
             )
         }
         try level.validate()
+        try validateAuthoredIndoorOwnership(
+            in: level,
+            editedRoomSourceIndices: Set(source.roomVertexEdits.map(\.roomSourceIndex)),
+            editedObjectHandles: placementEditedHandles(
+                source: source,
+                importedBase: importedBase
+            )
+        )
     }
 
     @discardableResult
@@ -982,6 +1229,76 @@ struct RevivalProject: Equatable, Sendable {
             source.roomNameEdits.append(.init(sourceIndex: sourceIndex, name: currentName))
             source.roomNameEdits.sort { $0.sourceIndex < $1.sourceIndex }
         }
+    }
+
+    private mutating func moveObject(
+        at objectIndex: Int,
+        owner: String,
+        proposedPosition: Vector3,
+        radius: Float
+    ) throws -> RevivalPlacementResult {
+        guard isFiniteProjectPosition(proposedPosition),
+              case let .room(startRoom) = level.objects[objectIndex].location else {
+            throw RevivalProjectError.placementHasNoContainingRoom(owner: owner)
+        }
+        let object = level.objects[objectIndex]
+        guard object.position != proposedPosition else {
+            throw RevivalProjectError.unchangedProperty
+        }
+        let trace = traceIndoorMovement(
+            in: level,
+            startRoom: startRoom,
+            start: object.position,
+            end: proposedPosition,
+            radius: radius
+        )
+        if case let .wallHit(contact) = trace.outcome,
+           contact.distance < 0.1 {
+            throw RevivalProjectError.placementBlocked(
+                owner: owner,
+                roomSourceIndex: contact.roomSourceIndex,
+                faceIndex: contact.faceIndex
+            )
+        }
+        let containingRoom: Int
+        switch trace.outcome {
+        case .noHit:
+            guard let ownerRoom = containingIndoorRoomSourceIndex(
+                in: level,
+                position: trace.finalPosition,
+                candidates: trace.visitedRoomSourceIndices
+            ) else {
+                throw RevivalProjectError.placementHasNoContainingRoom(owner: owner)
+            }
+            containingRoom = ownerRoom
+        case .wallHit:
+            containingRoom = trace.containingRoomSourceIndex
+        }
+
+        var candidate = level
+        candidate.objects[objectIndex].location = .room(containingRoom)
+        candidate.objects[objectIndex].position = trace.finalPosition
+        try candidate.validate()
+        level = candidate
+        if object.type == D3SourceIdentity.playerObjectType {
+            updatePlayerStartTransformEdit(
+                playerID: object.storedID,
+                handle: object.handle
+            )
+        } else {
+            updateObjectTransformEdit(handle: object.handle)
+        }
+        let diagnostic: String?
+        if case let .wallHit(contact) = trace.outcome {
+            diagnostic = "\(owner) stopped at source room \(contact.roomSourceIndex) face \(contact.faceIndex) and remains owned by source room \(containingRoom)."
+        } else {
+            diagnostic = nil
+        }
+        return RevivalPlacementResult(
+            committedLocation: .room(containingRoom),
+            committedPosition: trace.finalPosition,
+            diagnostic: diagnostic
+        )
     }
 
     private mutating func updateFaceMaterialEdit(roomSourceIndex: Int, faceIndex: Int) {
@@ -1022,13 +1339,42 @@ struct RevivalProject: Equatable, Sendable {
         }
     }
 
+    private mutating func updateRoomVertexEdit(
+        roomSourceIndex: Int,
+        vertexIndex: Int
+    ) {
+        let base = importedBase.rooms.first {
+            $0.sourceIndex == roomSourceIndex
+        }!.vertices[vertexIndex]
+        let current = level.rooms.first {
+            $0.sourceIndex == roomSourceIndex
+        }!.vertices[vertexIndex]
+        source.roomVertexEdits.removeAll {
+            $0.roomSourceIndex == roomSourceIndex && $0.vertexIndex == vertexIndex
+        }
+        if base != current {
+            source.roomVertexEdits.append(.init(
+                roomSourceIndex: roomSourceIndex,
+                vertexIndex: vertexIndex,
+                position: current
+            ))
+            source.roomVertexEdits.sort {
+                ($0.roomSourceIndex, $0.vertexIndex) < ($1.roomSourceIndex, $1.vertexIndex)
+            }
+        }
+    }
+
     private mutating func updateObjectTransformEdit(handle: UInt32) {
         let base = importedBase.objects.first { $0.handle == handle }!
         let current = level.objects.first { $0.handle == handle }!
         source.objectTransformEdits.removeAll { $0.handle == handle }
         let transform = rigidTransform(of: current)
-        if rigidTransform(of: base) != transform {
-            source.objectTransformEdits.append(.init(handle: handle, transform: transform))
+        if base.location != current.location || rigidTransform(of: base) != transform {
+            source.objectTransformEdits.append(.init(
+                handle: handle,
+                location: current.location,
+                transform: transform
+            ))
             source.objectTransformEdits.sort { $0.handle < $1.handle }
         }
     }
@@ -1040,10 +1386,11 @@ struct RevivalProject: Equatable, Sendable {
             $0.playerID == playerID && $0.handle == handle
         }
         let transform = rigidTransform(of: current)
-        if rigidTransform(of: base) != transform {
+        if base.location != current.location || rigidTransform(of: base) != transform {
             source.playerStartTransformEdits.append(.init(
                 playerID: playerID,
                 handle: handle,
+                location: current.location,
                 transform: transform
             ))
             source.playerStartTransformEdits.sort {
@@ -1068,6 +1415,82 @@ private func isValidRigidTransform(_ transform: RevivalRigidTransform) -> Bool {
         position: transform.position,
         orientation: transform.orientation
     )
+}
+
+private func isFiniteProjectPosition(_ position: Vector3) -> Bool {
+    position.x.isFinite && position.y.isFinite && position.z.isFinite
+}
+
+private func locationSummary(_ location: SpatialLocation) -> String {
+    switch location {
+    case .room(let sourceIndex):
+        "room \(sourceIndex)"
+    case .terrainCell(let cell):
+        "terrain cell \(cell)"
+    }
+}
+
+private func editorPlacementRadius(
+    for object: PlacedObject,
+    in level: Level
+) -> Float {
+    guard let presentation = level.objectPresentations.first(where: {
+        $0.objectHandle == object.handle
+    }),
+          let model = level.models.first(where: {
+              $0.source == presentation.primaryModel
+          }) else {
+        return 0
+    }
+    return sourceObjectPresentationSize(model: model, objectType: object.type)
+}
+
+private func validateAuthoredIndoorOwnership(
+    in level: Level,
+    editedRoomSourceIndices: Set<Int>,
+    editedObjectHandles: Set<UInt32>
+) throws {
+    for object in level.objects {
+        let editedRoomContainsObject = if case let .room(roomSourceIndex) = object.location {
+            editedRoomSourceIndices.contains(roomSourceIndex)
+        } else {
+            false
+        }
+        guard editedRoomContainsObject || editedObjectHandles.contains(object.handle) else {
+            continue
+        }
+        let owner = object.type == D3SourceIdentity.playerObjectType
+            ? "Player \(object.storedID) start \(object.handle)"
+            : "Object \(object.handle)"
+        guard case let .room(roomSourceIndex) = object.location,
+              containingIndoorRoomSourceIndex(
+            in: level,
+            position: object.position,
+            candidates: [roomSourceIndex]
+        ) == roomSourceIndex else {
+            throw RevivalProjectError.placementHasNoContainingRoom(owner: owner)
+        }
+    }
+}
+
+private func placementEditedHandles(
+    source: RevivalProjectSource,
+    importedBase: Level
+) -> Set<UInt32> {
+    let edits = source.objectTransformEdits.map {
+        ($0.handle, $0.location, $0.transform.position)
+    } + source.playerStartTransformEdits.map {
+        ($0.handle, $0.location, $0.transform.position)
+    }
+    return Set(edits.compactMap { handle, location, position in
+        guard let base = importedBase.objects.first(where: {
+            $0.handle == handle
+        }),
+              base.location != location || base.position != position else {
+            return nil
+        }
+        return handle
+    })
 }
 
 private func attributedProjectValidationError(

@@ -1535,7 +1535,7 @@ private func extractObjectPresentation(
     )
 }
 
-private func sourceObjectPresentationSize(
+func sourceObjectPresentationSize(
     model: CanonicalModel,
     objectType: UInt8
 ) -> Float {
