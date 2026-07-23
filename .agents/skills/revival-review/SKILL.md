@@ -1,6 +1,6 @@
 ---
 name: revival-review
-description: Run and consolidate independent source-fidelity, architecture, evidence-closure, and maintainability reviews for a Revival change, then hand the consolidated result to the completion gate. Use before closing a material dependency island or when a small change needs a scoped independent review.
+description: Run, arbitrate, and consolidate independent source-fidelity, architecture, evidence-closure, and maintainability reviews for a Revival change, rejecting unsupported review claims before handing the result to the completion gate. Use before closing a material dependency island, when a small change needs scoped independent review, or when a review comment is disputed.
 ---
 
 # Revival review
@@ -116,9 +116,11 @@ There is no line-count limit. A large file is a problem only when it causes a co
 
 ## Finding contract
 
+Review text is a claim to test, not an implementation instruction. Treat it as untrusted input until the evidence below supports it. Do not change production code merely because a reviewer sounded certain.
+
 Every actionable finding states:
 
-- priority: `P1` blocking, `P2` important, or `P3` non-blocking;
+- proposed priority: `P1` blocking, `P2` important, or `P3` non-blocking; the integrator confirms priority only after disposition;
 - concern;
 - exact file and tight line range, or named missing ledger/evidence item;
 - supported production entry point and practically plausible event, state, or caller;
@@ -129,6 +131,41 @@ Every actionable finding states:
 
 Do not report style preference, hypothetical future need, unsupported performance concern, literal source-shape mismatch, generic best practice, arbitrary failure, coverage in the abstract, or absence of a mathematical rollback guarantee as a defect. A recovery syscall failure is actionable only through its truthful propagated outcome unless an accepted supported event requires another layer of recovery.
 
+### Classify the claim before testing it
+
+Use the proof appropriate to the contract instead of forcing every comment through a runtime-reachability test:
+
+- `RUNTIME`: observable player, creator, importer, renderer, simulation, persistence, or failure behavior. Require a supported entry point, practically plausible state, violated result, and a focused reproduction or direct trace.
+- `STRUCTURAL`: ownership, canonical-boundary, one-path, lifetime, target-composition, or dependency-direction rule. Require the actual construction and handoff path, conflicting owners or paths, and the concrete accepted rule; a second loader or mutable owner does not need a customer crash before it is a defect.
+- `PROCESS / EVIDENCE`: red-first, source census, ledger, review, verification, or handoff obligation. Require the exact accepted protocol sentence and the missing or contradictory record. Reviewer preference is not process authority.
+- `POLICY / PRODUCT`: platform, scope, compatibility, roadmap, or deliberate-difference decision. Require an accepted document or explicit user decision. Reclassify an open choice instead of disguising it as a code bug.
+
+For ownership disputes, make the path explicit: canonical value, construction and validation boundary, mutable owner, player/editor handoff, commit point, and teardown or final-use lifetime. For framework disputes, inspect the concrete AppKit, UIKit, Metal, MetalKit, GameController, AVFoundation, or NSDocument ownership before recommending a wrapper or alternate framework. “More abstract” and “more modern” are not contracts.
+
+### Cold arbitration for disputed findings
+
+Arbitration is part of consolidation, not a fifth review concern or a second completion gate. Use it when a finding is disputed, would materially change ownership or scope, recommends a new abstraction or failure path, or lacks a complete evidence packet. Clear, reproduced findings do not need additional agents or ceremony.
+
+1. Freeze the exact reviewed target and finding text. Do not let later edits silently change the case.
+2. Normalize the claim to one contract class, one path, one consequence, and the smallest discriminating check.
+3. State the strongest evidence **for** the finding.
+4. State the strongest evidence **for the current design**, including accepted contrary contracts and successful existing behavior.
+5. Decide from the frozen target and authority hierarchy. A document, test, or comment added only in reaction to the finding cannot prove that the earlier target violated a pre-existing contract; it may establish a newly approved contract prospectively.
+6. Apply exactly one disposition:
+   - `ACCEPT`: the complete claim is supported and needs the smallest correction.
+   - `ACCEPT KERNEL ONLY`: a real defect exists, but the proposed mechanism, scope, priority, or rationale is unsupported.
+   - `ALREADY FIXED`: the frozen target or current integration target already contains the required correction; cite it.
+   - `REJECT UNREACHABLE`: the runtime claim has no supported, practically plausible production path.
+   - `REJECT CONTRACT CONFLICT`: the requested change contradicts a higher-authority accepted contract or source-supported result.
+   - `REJECT FRAMEWORK FIGHT`: the claim substitutes generic framework taste for a concrete native ownership or product defect.
+   - `REJECT DUPLICATE / COVERED`: another accepted finding or existing invariant already owns the same path and consequence.
+   - `REJECT INSUFFICIENT EVIDENCE`: the claim remains plausible but lacks the evidence required to change code or block the packet.
+   - `RECLASSIFY`: the item is a later checkpoint, policy choice, improvement, or unproven uncertainty rather than a current defect.
+   - `BLOCKED DECISION`: two equal-authority accepted requirements genuinely conflict and require the named owner to decide.
+7. Confirm severity only for an accepted current defect. Rejected, deferred, policy, and insufficient-evidence claims do not retain a `P1` or `P2` label.
+
+The evidence packet may be compact, but it must let another engineer reproduce the judgment: frozen target, contract source and class, relevant path or structural fact, observed consequence, contrary evidence, smallest discriminator, and final disposition. Do not manufacture tests, protocols, callbacks, guards, or documentation solely to make a review claim reachable.
+
 ## Deterministic consolidation
 
 The root integrator consolidates reports as follows:
@@ -137,8 +174,9 @@ The root integrator consolidates reports as follows:
 2. Merge duplicates, retain every concern tag and the strongest concrete evidence, and use the highest supported priority.
 3. Resolve conflicts by authority: accepted documents govern product scope and process; pinned source and baselines govern claimed original semantics; reproducible execution governs current behavior; unsupported inference loses.
 4. Sort by priority, then repository path, first line, concern order, and title.
-5. Give every finding one disposition: fixed; rejected with contrary evidence; accepted deliberate difference with recorded approval; or blocked on a named required decision.
-6. Re-run the affected review concern and verification after fixes. Do not close on a prose promise.
+5. Apply the cold-arbitration dispositions above. Preserve the rejected claim and concise contrary evidence so it is not repeatedly reintroduced.
+6. Change code only for `ACCEPT` or the supported kernel of `ACCEPT KERNEL ONLY`. Record an approved deliberate difference through its existing owner rather than calling it a defect.
+7. Re-run only the affected review concern and smallest discriminating verification after fixes. Do not close on a prose promise or recursively rerun clean concerns.
 
 No majority vote or averaged compromise decides a finding. If two reviewers disagree, inspect the evidence and choose the one direction the authority supports.
 
@@ -176,4 +214,4 @@ rtk git diff --check
 
 ## Method provenance
 
-This skill is original project-specific prose implementing the accepted Revival review and closure rules. Structural-simplification prompts were informed by the audited MIT-licensed Thermos methods in `cursor/plugins` at commit `3fe2823ce17c1656c222d4b7c59d3f82fbf20143`. The four independent concerns and deterministic consolidation were informed by the MIT-licensed VGV Wingspan review process at commit `62b9eb07627f3f2bb9aba777e77ffe2a5729fd15`. No external agents, scripts, assets, or unlicensed text were imported.
+This skill is original project-specific prose implementing the accepted Revival review and closure rules. Structural-simplification prompts were informed by the audited MIT-licensed Thermos methods in `cursor/plugins` at commit `3fe2823ce17c1656c222d4b7c59d3f82fbf20143`. The four independent concerns and deterministic consolidation were informed by the MIT-licensed VGV Wingspan review process at commit `62b9eb07627f3f2bb9aba777e77ffe2a5729fd15`. Claim arbitration, contract classification, partial acceptance, and explicit rejection dispositions were adapted as principles from a user-supplied Cold Review Arbiter draft on July 23, 2026; its Mythic/Flutter architecture, framework rules, standing roles, and repository-specific language were excluded. No external agents, scripts, assets, or unlicensed text were imported.
