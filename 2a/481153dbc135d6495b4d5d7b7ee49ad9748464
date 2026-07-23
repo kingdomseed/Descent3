@@ -1,0 +1,59 @@
+docs/revival/functional-completeness-ledger.md
+  s_f0acc6709688e2::t_daeec4c161374b 25,52,69
+  s_c503f7c0529e13::t_cc804fee769ed4 53
+docs/revival/source-translation-ledger.md
+  s_f0acc6709688e2::t_daeec4c161374b 455-465,467-469,472-481
+  s_c503f7c0529e13::t_cc804fee769ed4 466,470-471
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_d371373af2a6b5 22-25,27-29,31,45-48
+  s_c503f7c0529e13::t_484ef24e49d7bf 182,186,202-204
+Revival/Sources/RevivalAppKit/RevivalGameplayView.swift
+  s_f0acc6709688e2::t_560eaee9791c98 19,76-84,122,130-133,140-141,153-154,162-163,168-170,188-189
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_f0acc6709688e2::t_560eaee9791c98 61,74,87,125,138,223
+  s_f0acc6709688e2::t_f1a3968d86b996 298-301,315-316,348-352,400-403,408-421,423-451,453-466,468-471,473-474,492,633-645,655,701-710,712,714-715,717,720-724
+  s_f0acc6709688e2::t_d1a70b6779730a 452
+  s_c503f7c0529e13::t_1782a440a7b7bf 467,696-698
+  s_f0acc6709688e2::t_231a9d9fc400df 404-407,688-692,694-695,700,711,713,716,718-719
+  s_f0acc6709688e2::t_9d4eb9e00af9ad 472
+  s_f0acc6709688e2::t_9bbe2644cd5239 422,693
+  s_f0acc6709688e2::t_fcf2ba22567cac 725
+  s_c503f7c0529e13::t_7408f97855d897 699
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_f0acc6709688e2::t_da15d6b64861b4 557-563,571,766,769,2005,2022
+  s_c503f7c0529e13::t_9be63dd4ef1f31 564-570,707-726
+  s_f0acc6709688e2::t_3d2729d3d42ce8 507-555,642-656,727-734,736-738,743-747,749-765,767-768,1967-2004,2006-2021,2023-2047
+  s_f0acc6709688e2::t_d6eee02ea668df 460-506,610-641,657-679,682-684,770-791,1953-1966
+  s_f0acc6709688e2::t_1ba7fb62795e7a 739-742,748
+  s_f0acc6709688e2::t_3fc63e5bf128db 556,572-609,687-706
+  s_f0acc6709688e2::t_8c39160ecd4382 680-681,685-686
+  s_f0acc6709688e2::t_eac327a804139a 735
+  s_f0acc6709688e2::t_f62b3b176e3e04 4-35
+  s_f0acc6709688e2::t_26eba84f7dde7e 2048
+Revival/Tests/D3ImportTests/EditorProjectTests.swift
+  s_f0acc6709688e2::t_50e13247deb987 1256,1260-1265
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "2a481153dbc135d6495b4d5d7b7ee49ad9748464",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_f0acc6709688e2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8fc3-fb0d-71d3-bb9a-272149e87a52",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
