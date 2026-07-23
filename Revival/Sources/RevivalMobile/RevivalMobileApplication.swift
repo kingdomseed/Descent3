@@ -408,8 +408,9 @@ final class RevivalMobileViewController: UIViewController,
         _ activation: ActivatedCanonicalPackage,
         for request: RevivalMobilePresentationRequest
     ) {
+        let playerView = defaultPlayerView(in: activation.level)
         let summary =
-            "\(activation.level.metadata.name) — \(activation.level.rooms.count) rooms — source room 3 — \(activation.reference.identitySHA256.prefix(12))"
+            "\(activation.level.metadata.name) — \(activation.level.rooms.count) rooms — source room \(playerView.roomSourceIndex) — \(activation.reference.identitySHA256.prefix(12))"
 
         #if targetEnvironment(simulator)
         _ = presentationState.didFailReplacement(
@@ -437,8 +438,7 @@ final class RevivalMobileViewController: UIViewController,
         do {
             try renderer.replace(
                 level: activation.level,
-                camera: .trainingRoom3,
-                startRoomSourceIndex: 3
+                playerView: playerView
             )
             let shouldResume = presentationState.didReplacePresentation(for: request)
             metalView.isPaused = !shouldResume
@@ -453,7 +453,7 @@ final class RevivalMobileViewController: UIViewController,
             )
             metalView.isPaused = !shouldResume
             setStatus(
-                "Could not present source room 3: \(error.localizedDescription)",
+                "Could not present source room \(playerView.roomSourceIndex): \(error.localizedDescription)",
                 isError: true
             )
         }

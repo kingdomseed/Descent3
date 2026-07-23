@@ -187,7 +187,16 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             camera: camera,
             startRoomSourceIndex: startRoomSourceIndex
         )
+        try install(candidate)
+    }
 
+    func replace(level: Level, playerView: PlayerView) throws {
+        try install(
+            try makeMetalWorldPlan(level: level, playerView: playerView)
+        )
+    }
+
+    private func install(_ candidate: MetalWorldPlan) throws {
         drainFinalGPUUse()
         presentation = nil
 
@@ -444,7 +453,7 @@ private final class MetalLevelPresentation {
         var packedVertices: [MetalWorldVertex] = []
         var packedIndices: [UInt32] = []
         var encodedDraws: [MetalEncodedDraw] = []
-        for draw in plan.draws {
+        for draw in plan.preparedDraws {
             let vertexByteOffset = packedVertices.count
                 * MemoryLayout<MetalWorldVertex>.stride
             let indexByteOffset = packedIndices.count * MemoryLayout<UInt32>.stride
@@ -469,7 +478,7 @@ private final class MetalLevelPresentation {
         }
         self.vertexBuffer = vertexBuffer
         self.indexBuffer = indexBuffer
-        draws = encodedDraws
+        draws = plan.activeDrawIndices.map { encodedDraws[$0] }
 
         var materialResources: [SourceResource: MetalMaterialResources] = [:]
         for material in plan.level.presentationMaterials {

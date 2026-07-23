@@ -199,10 +199,9 @@ private final class RevivalMacApplicationDelegate: NSObject,
     ) throws {
         try renderer.replace(
             level: activation.level,
-            camera: .trainingRoom3,
-            startRoomSourceIndex: 3
+            playerView: defaultPlayerView(in: activation.level)
         )
-        let contentSummary = "\(activation.level.metadata.name) — \(activation.level.rooms.count) rooms — source room 3"
+        let contentSummary = "\(activation.level.metadata.name) — \(activation.level.rooms.count) rooms — player 0 source room 1"
         if let preparationError = libraryPreparationError {
             setStatus(
                 "\(contentSummary) — new installs blocked: \(preparationError)",

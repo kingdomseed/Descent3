@@ -2,17 +2,6 @@
 
 import Foundation
 
-enum MetalWorldPlanError: Error, Equatable, LocalizedError {
-    case nonzeroLightCorona(roomSourceIndex: Int, faceIndex: Int)
-
-    var errorDescription: String? {
-        switch self {
-        case let .nonzeroLightCorona(roomSourceIndex, faceIndex):
-            "Source room \(roomSourceIndex) face \(faceIndex) reaches temporal light-corona behavior outside Slice 3."
-        }
-    }
-}
-
 struct MetalWorldVertex: Equatable, Sendable {
     let position: SIMD4<Float>
     let textureAndLightmapUV: SIMD4<Float>
@@ -25,6 +14,7 @@ struct MetalWorldDraw: Equatable, Sendable {
     let faceIndex: Int
     let objectHandle: UInt32?
     let model: SourceResource?
+    let submodelIndex: Int?
     let texture: SourceResource?
     let sourceColor: SIMD3<Float>?
     let blend: PresentationBlend
@@ -39,6 +29,9 @@ struct MetalWorldPlan: Equatable, Sendable {
     let level: Level
     let camera: RoomCamera
     let visibleRoomSourceIndices: [Int]
+    let preparedLightCoronaCandidates: [WorldLightCorona]
+    let preparedDraws: [MetalWorldDraw]
+    let activeDrawIndices: [Int]
     let draws: [MetalWorldDraw]
 }
 
@@ -52,21 +45,75 @@ func makeMetalWorldPlan(
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex
     )
-    if let corona = extraction.lightCoronas.first {
-        throw MetalWorldPlanError.nonzeroLightCorona(
-            roomSourceIndex: corona.roomSourceIndex,
-            faceIndex: corona.faceIndex
-        )
-    }
+    return try makeMetalWorldPlan(
+        level: level,
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        extraction: extraction
+    )
+}
+
+func makeMetalWorldPlan(
+    level: Level,
+    playerView: PlayerView
+) throws -> MetalWorldPlan {
+    let extraction = try extractWorldForRendering(level, playerView: playerView)
+    return try makeMetalWorldPlan(
+        level: level,
+        camera: playerView.camera,
+        startRoomSourceIndex: playerView.roomSourceIndex,
+        extraction: extraction
+    )
+}
+
+private func makeMetalWorldPlan(
+    level: Level,
+    camera: RoomCamera,
+    startRoomSourceIndex: Int,
+    extraction: WorldRenderExtraction
+) throws -> MetalWorldPlan {
     let opaqueRoomDraws = extraction.opaqueDrawItems.map(makeMetalWorldDraw)
     let translucentRoomDraws = extraction.translucentDrawItems.map(makeMetalWorldDraw)
     let objectDraws = extraction.modelDrawItems.map(makeMetalWorldDraw)
+    let preparedRoomDraws = try extractPreparedRoomDrawItems(
+        level,
+        startRoomSourceIndex: startRoomSourceIndex
+    ).map(makeMetalWorldDraw)
+    let preparedRoomIndexByIdentity = Dictionary(
+        uniqueKeysWithValues: preparedRoomDraws.enumerated().map {
+            (MetalRoomDrawIdentity($0.element), $0.offset)
+        }
+    )
+    let initialRoomDraws = opaqueRoomDraws + translucentRoomDraws
+    let initialRoomIndices = initialRoomDraws.map {
+        preparedRoomIndexByIdentity[MetalRoomDrawIdentity($0)]!
+    }
+    let objectOffset = preparedRoomDraws.count
+    let activeDrawIndices =
+        Array(initialRoomIndices.prefix(opaqueRoomDraws.count))
+        + objectDraws.indices.map { objectOffset + $0 }
+        + Array(initialRoomIndices.dropFirst(opaqueRoomDraws.count))
+    let preparedDraws = preparedRoomDraws + objectDraws
+    let draws = activeDrawIndices.map { preparedDraws[$0] }
     return MetalWorldPlan(
         level: level,
         camera: camera,
         visibleRoomSourceIndices: extraction.visibleRoomSourceIndices,
-        draws: opaqueRoomDraws + objectDraws + translucentRoomDraws
+        preparedLightCoronaCandidates: extraction.lightCoronas,
+        preparedDraws: preparedDraws,
+        activeDrawIndices: Array(activeDrawIndices),
+        draws: draws
     )
+}
+
+private struct MetalRoomDrawIdentity: Hashable {
+    let roomSourceIndex: Int
+    let faceIndex: Int
+
+    init(_ draw: MetalWorldDraw) {
+        roomSourceIndex = draw.roomSourceIndex
+        faceIndex = draw.faceIndex
+    }
 }
 
 private func makeMetalWorldDraw(_ item: RoomDrawItem) -> MetalWorldDraw {
@@ -91,6 +138,7 @@ private func makeMetalWorldDraw(_ item: RoomDrawItem) -> MetalWorldDraw {
         faceIndex: item.faceIndex,
         objectHandle: nil,
         model: nil,
+        submodelIndex: nil,
         texture: item.texture,
         sourceColor: nil,
         blend: item.blend,
@@ -146,6 +194,7 @@ private func makeMetalWorldDraw(_ item: ModelDrawItem) -> MetalWorldDraw {
         faceIndex: item.faceIndex,
         objectHandle: item.objectHandle,
         model: item.model,
+        submodelIndex: item.submodelIndex,
         texture: texture,
         sourceColor: sourceColor,
         blend: item.blend,

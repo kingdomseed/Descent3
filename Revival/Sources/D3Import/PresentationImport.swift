@@ -427,6 +427,10 @@ private struct RetailPageCursor {
             | UInt32(try readUInt8()) << 24
     }
 
+    mutating func readInt32() throws -> Int32 {
+        Int32(bitPattern: try readUInt32())
+    }
+
     mutating func readFloat() throws -> Float {
         Float(bitPattern: try readUInt32())
     }
@@ -469,6 +473,13 @@ struct RetailModelPageSelection: Equatable, Sendable {
     let dyingModelName: String?
     let mediumDistance: Float?
     let lowDistance: Float?
+    let shipDefinition: RetailShipDefinition?
+}
+
+struct RetailShipDefinition: Equatable, Sendable {
+    let name: String
+    let presentationSize: Float
+    let physics: CanonicalShipPhysics
 }
 
 struct ReachedObjectModelPages: Equatable, Sendable {
@@ -519,11 +530,17 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                 let low = try cursor.readCString(allowEmpty: true)
                 let mediumDistance = try cursor.readFloat()
                 let lowDistance = try cursor.readFloat()
+                let physics = try cursor.readCanonicalShipPhysics()
+                let presentationSize = try cursor.readFloat()
+                _ = try cursor.readFloat()
+                _ = try cursor.readInt32()
                 guard version >= 1,
                       mediumDistance.isFinite,
                       lowDistance.isFinite,
                       mediumDistance > 0,
-                      lowDistance > mediumDistance else {
+                      lowDistance > mediumDistance,
+                      presentationSize.isFinite,
+                      presentationSize > 0 else {
                     throw RetailTextureTableError.unsupportedPresentation(name)
                 }
                 pages.append(
@@ -534,7 +551,12 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                         lowModelName: low.isEmpty ? nil : low,
                         dyingModelName: dying,
                         mediumDistance: medium.isEmpty ? nil : mediumDistance,
-                        lowDistance: low.isEmpty ? nil : lowDistance
+                        lowDistance: low.isEmpty ? nil : lowDistance,
+                        shipDefinition: .init(
+                            name: name,
+                            presentationSize: presentationSize,
+                            physics: physics
+                        )
                     )
                 )
             } else {
@@ -568,7 +590,8 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                         lowModelName: low.isEmpty ? nil : low,
                         dyingModelName: nil,
                         mediumDistance: medium.isEmpty ? nil : mediumDistance,
-                        lowDistance: low.isEmpty ? nil : lowDistance
+                        lowDistance: low.isEmpty ? nil : lowDistance,
+                        shipDefinition: nil
                     )
                 )
             }
@@ -576,6 +599,65 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
         offset += 1 + length
     }
     return pages
+}
+
+private extension RetailPageCursor {
+    mutating func readCanonicalShipPhysics() throws -> CanonicalShipPhysics {
+        let mass = try readFloat()
+        let drag = try readFloat()
+        let fullThrust = try readFloat()
+        let rawFlags = try readUInt32()
+        let supportedFlags: UInt32 = 0x01 | 0x08 | 0x40
+        guard rawFlags & ~supportedFlags == 0 else {
+            throw RetailTextureTableError.unsupportedPresentation("ship physics flags")
+        }
+        var behaviors: [ShipPhysicsBehavior] = []
+        if rawFlags & 0x01 != 0 { behaviors.append(.turnroll) }
+        if rawFlags & 0x08 != 0 { behaviors.append(.wiggle) }
+        if rawFlags & 0x40 != 0 { behaviors.append(.usesThrust) }
+        let rotationalDrag = try readFloat()
+        let fullRotationalThrust = try readFloat()
+        let numberOfBounces = try readInt32()
+        let initialForwardVelocity = try readFloat()
+        let initialAngularVelocity = Vector3(
+            x: try readFloat(),
+            y: try readFloat(),
+            z: try readFloat()
+        )
+        let wiggleAmplitude = try readFloat()
+        let wigglesPerSecond = try readFloat()
+        let coefficientOfRestitution = try readFloat()
+        let hitDieDot = try readFloat()
+        let maximumTurnrollRate = try readFloat()
+        let turnrollRatio = try readFloat()
+        let finite = [
+            mass, drag, fullThrust, rotationalDrag, fullRotationalThrust,
+            initialForwardVelocity, initialAngularVelocity.x,
+            initialAngularVelocity.y, initialAngularVelocity.z,
+            wiggleAmplitude, wigglesPerSecond, coefficientOfRestitution,
+            hitDieDot, maximumTurnrollRate, turnrollRatio,
+        ].allSatisfy(\.isFinite)
+        guard finite else {
+            throw RetailTextureTableError.unsupportedPresentation("ship physics")
+        }
+        return CanonicalShipPhysics(
+            mass: mass,
+            drag: drag,
+            fullThrust: fullThrust,
+            behaviors: behaviors,
+            rotationalDrag: rotationalDrag,
+            fullRotationalThrust: fullRotationalThrust,
+            numberOfBounces: numberOfBounces,
+            initialForwardVelocity: initialForwardVelocity,
+            initialAngularVelocity: initialAngularVelocity,
+            wiggleAmplitude: wiggleAmplitude,
+            wigglesPerSecond: wigglesPerSecond,
+            coefficientOfRestitution: coefficientOfRestitution,
+            hitDieDot: hitDieDot,
+            maximumTurnrollRate: maximumTurnrollRate,
+            turnrollRatio: turnrollRatio
+        )
+    }
 }
 
 enum OutrageModelImportError: Error, Equatable {
@@ -650,6 +732,7 @@ func parseReachedOutrageModel(
         throw OutrageModelImportError.unsupportedVersion(version)
     }
     var declaredSubmodelCount: Int?
+    var collisionRadius: Float?
     var textureNames: [String]?
     var submodels: [ModelSubmodel] = []
     while !cursor.isAtEnd {
@@ -659,7 +742,7 @@ func parseReachedOutrageModel(
         switch chunkName {
         case "OHDR":
             declaredSubmodelCount = try chunk.readCount(maximum: 1_000, name: "submodels")
-            _ = try chunk.readFloat()
+            collisionRadius = try chunk.readFloat()
             _ = try chunk.readVector()
             _ = try chunk.readVector()
             let detailCount = try chunk.readCount(maximum: 32, name: "detail levels")
@@ -685,7 +768,8 @@ func parseReachedOutrageModel(
             break
         }
     }
-    guard let declaredSubmodelCount else {
+    guard let declaredSubmodelCount, let collisionRadius,
+          collisionRadius.isFinite, collisionRadius > 0 else {
         throw OutrageModelImportError.missingChunk("OHDR")
     }
     guard let textureNames else {
@@ -729,6 +813,7 @@ func parseReachedOutrageModel(
     guard let bounds else { throw OutrageModelImportError.geometryFree }
     return CanonicalModel(
         source: .init(storedIndex: sourceIndex, sourceName: sourceName),
+        collisionRadius: collisionRadius,
         submodels: sortedSubmodels,
         bounds: bounds,
         sourceArchive: sourceArchive,

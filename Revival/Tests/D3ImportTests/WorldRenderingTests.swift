@@ -1,6 +1,56 @@
 import XCTest
 
 final class WorldRenderingTests: XCTestCase {
+    func testReciprocalPortalComponentIgnoresPresentationPassabilityAndDisconnectedRooms() {
+        let level = makeSelectedRoomRenderLevel()
+        let disconnected = LevelRoom(
+            sourceIndex: 99,
+            vertices: [],
+            faces: [],
+            portals: []
+        )
+
+        XCTAssertEqual(
+            reciprocalPortalComponent(
+                rooms: level.rooms + [disconnected],
+                startRoomSourceIndex: 1
+            ),
+            Set([1, 2, 3, 4])
+        )
+    }
+
+    func testDefaultPlayerViewDerivesCanonicalPoseRadiusAndExcludesViewer() throws {
+        let level = makeSliceSixObjectRenderLevel()
+        let view = defaultPlayerView(in: level)
+
+        XCTAssertEqual(view.playerID, 0)
+        XCTAssertEqual(view.objectHandle, 2_048)
+        XCTAssertEqual(view.roomSourceIndex, 1)
+        XCTAssertEqual(
+            view.camera.position,
+            .init(x: 2_060.6497, y: -131.22517, z: 2_204.4216)
+        )
+        XCTAssertEqual(
+            view.camera.target,
+            .init(x: 2_060.6497, y: -131.22517, z: 2_205.4216)
+        )
+        XCTAssertEqual(view.camera.up, .init(x: 0, y: 1, z: 0))
+        XCTAssertEqual(view.collisionRadius.bitPattern, UInt32(0x40d9_5869))
+
+        let extraction = try extractWorldForRendering(level, playerView: view)
+        XCTAssertEqual(extraction.admittedObjectHandles, [12_301, 12_300])
+        XCTAssertFalse(extraction.admittedObjectHandles.contains(view.objectHandle))
+
+        let plan = try makeMetalWorldPlan(level: level, playerView: view)
+        XCTAssertEqual(plan.camera, view.camera)
+        XCTAssertGreaterThan(plan.preparedDraws.count, plan.draws.count)
+        XCTAssertEqual(
+            plan.activeDrawIndices.map { plan.preparedDraws[$0] },
+            plan.draws
+        )
+        XCTAssertFalse(plan.draws.contains { $0.objectHandle == view.objectHandle })
+    }
+
     func testCentersSquareWorldViewportInsideAnyDrawableShape() {
         let portrait = centeredSquareMetalViewport(
             drawableWidth: 1_170,
@@ -67,18 +117,18 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(corona.center, .init(x: 0, y: 20.75, z: 0))
         XCTAssertEqual(corona.tint, .init(x: 0.25, y: 0.5, z: 0.75))
         XCTAssertEqual(corona.blend, .additiveSourceAlpha(opacity: 102))
-        XCTAssertThrowsError(
-            try makeMetalWorldPlan(
-                level: makeCoronaEvaluationLevel(blocked: false),
-                camera: camera,
-                startRoomSourceIndex: 3
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? MetalWorldPlanError,
-                .nonzeroLightCorona(roomSourceIndex: 3, faceIndex: 0)
-            )
-        }
+        let plan = try makeMetalWorldPlan(
+            level: makeCoronaEvaluationLevel(blocked: false),
+            camera: camera,
+            startRoomSourceIndex: 3
+        )
+        XCTAssertEqual(plan.preparedLightCoronaCandidates, [corona])
+        XCTAssertEqual(
+            plan.draws.count,
+            visible.opaqueDrawItems.count
+                + visible.modelDrawItems.count
+                + visible.translucentDrawItems.count
+        )
 
         let nearCamera = RoomCamera(
             position: .init(x: 0, y: 1, z: 0),
@@ -664,6 +714,7 @@ func makeSliceSixObjectRenderLevel() -> Level {
         SourceResource(storedIndex: 3, sourceName: "PyroDeath.OOF"),
         SourceResource(storedIndex: 4, sourceName: "invisiblepowerup.OOF"),
     ]
+    let shipSource = SourceResource(storedIndex: 0, sourceName: "Pyro-GL")
     let modelVertices = [
         ModelVertex(
             position: .init(x: -5, y: 0, z: -0.4),
@@ -686,6 +737,9 @@ func makeSliceSixObjectRenderLevel() -> Level {
     let models = modelSources.map { source in
         CanonicalModel(
             source: source,
+            collisionRadius: source == modelSources[0]
+                ? Float(bitPattern: 0x40d9_5869)
+                : 1,
             submodels: [
                 .init(
                     sourceIndex: 0,
@@ -851,7 +905,36 @@ func makeSliceSixObjectRenderLevel() -> Level {
             state: "presentation-payload-imported",
             provenance: "synthetic Slice 6 fixture"
         )
-    }
+    } + [
+        DependencyRecord(
+            category: "ship-definition",
+            source: shipSource,
+            state: "canonical-typed-definition",
+            provenance: "synthetic Slice 9 fixture"
+        ),
+    ]
+    let ship = CanonicalShipDefinition(
+        source: shipSource,
+        primaryModel: modelSources[0],
+        presentationSize: 6.676084041595459,
+        physics: .init(
+            mass: 30,
+            drag: 90,
+            fullThrust: 5_400,
+            behaviors: [.turnroll, .wiggle, .usesThrust],
+            rotationalDrag: 225,
+            fullRotationalThrust: 6_860_000,
+            numberOfBounces: -1,
+            initialForwardVelocity: 0,
+            initialAngularVelocity: .zero,
+            wiggleAmplitude: 0.17,
+            wigglesPerSecond: 0.9,
+            coefficientOfRestitution: 1,
+            hitDieDot: -1,
+            maximumTurnrollRate: 8_000,
+            turnrollRatio: 0.13
+        )
+    )
     return Level(
         missionKey: base.missionKey,
         levelKey: base.levelKey,
@@ -867,6 +950,12 @@ func makeSliceSixObjectRenderLevel() -> Level {
         lightmaps: base.lightmaps,
         presentationMaterials: base.presentationMaterials + [modelMaterial],
         models: models,
+        shipDefinitions: [ship],
+        defaultPlayerBinding: .init(
+            playerID: 0,
+            objectHandle: 2_048,
+            ship: shipSource
+        ),
         objectPresentations: objectPresentations,
         dependencyManifest: .init(
             current: dependencies,

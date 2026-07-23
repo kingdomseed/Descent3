@@ -33,6 +33,7 @@ enum D3SourceIdentity {
         case "texture": return 3_100
         case "object-definition": return 910
         case "model": return 10_000
+        case "ship-definition": return 60
         case "door-definition": return 60
         case "lightmap-page", "lightmap-info": return 65_534
         case "presentation-effect": return 256
@@ -608,10 +609,48 @@ struct ModelSubmodel: Codable, Equatable, Sendable {
 
 struct CanonicalModel: Codable, Equatable, Sendable {
     let source: SourceResource
+    let collisionRadius: Float
     let submodels: [ModelSubmodel]
     let bounds: ModelBounds
     let sourceArchive: String
     let sourceSHA256: String
+}
+
+enum ShipPhysicsBehavior: String, Codable, Equatable, Hashable, Sendable {
+    case turnroll
+    case wiggle
+    case usesThrust
+}
+
+struct CanonicalShipPhysics: Codable, Equatable, Sendable {
+    let mass: Float
+    let drag: Float
+    let fullThrust: Float
+    let behaviors: [ShipPhysicsBehavior]
+    let rotationalDrag: Float
+    let fullRotationalThrust: Float
+    let numberOfBounces: Int32
+    let initialForwardVelocity: Float
+    let initialAngularVelocity: Vector3
+    let wiggleAmplitude: Float
+    let wigglesPerSecond: Float
+    let coefficientOfRestitution: Float
+    let hitDieDot: Float
+    let maximumTurnrollRate: Float
+    let turnrollRatio: Float
+}
+
+struct CanonicalShipDefinition: Codable, Equatable, Sendable {
+    let source: SourceResource
+    let primaryModel: SourceResource
+    let presentationSize: Float
+    let physics: CanonicalShipPhysics
+}
+
+struct DefaultPlayerBinding: Codable, Equatable, Sendable {
+    let playerID: Int
+    let objectHandle: UInt32
+    let ship: SourceResource
 }
 
 struct ObjectPresentationReference: Codable, Equatable, Sendable {
@@ -670,12 +709,14 @@ struct Level: Codable, Equatable, Sendable {
     let presentationMaterials: [PresentationMaterial]
     let presentationCoronaAssets: [PresentationCoronaAsset]
     let models: [CanonicalModel]
+    let shipDefinitions: [CanonicalShipDefinition]
+    let defaultPlayerBinding: DefaultPlayerBinding?
     let objectPresentations: [ObjectPresentationReference]
     let dependencyManifest: DependencyManifest
     let sourceChunks: [SourceChunkRecord]
 
     init(
-        schemaVersion: Int = 4,
+        schemaVersion: Int = 5,
         missionKey: String,
         levelKey: String,
         source: LevelSource,
@@ -694,6 +735,8 @@ struct Level: Codable, Equatable, Sendable {
         presentationMaterials: [PresentationMaterial] = [],
         presentationCoronaAssets: [PresentationCoronaAsset] = [],
         models: [CanonicalModel] = [],
+        shipDefinitions: [CanonicalShipDefinition] = [],
+        defaultPlayerBinding: DefaultPlayerBinding? = nil,
         objectPresentations: [ObjectPresentationReference] = [],
         dependencyManifest: DependencyManifest,
         sourceChunks: [SourceChunkRecord]
@@ -717,6 +760,8 @@ struct Level: Codable, Equatable, Sendable {
         self.presentationMaterials = presentationMaterials
         self.presentationCoronaAssets = presentationCoronaAssets
         self.models = models
+        self.shipDefinitions = shipDefinitions
+        self.defaultPlayerBinding = defaultPlayerBinding
         self.objectPresentations = objectPresentations
         self.dependencyManifest = dependencyManifest
         self.sourceChunks = sourceChunks
@@ -731,7 +776,7 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     private func validate(allowImportStagingPresentation: Bool) throws {
-        guard schemaVersion == 4, source.d3lvVersion == 127,
+        guard schemaVersion == 5, source.d3lvVersion == 127,
               !missionKey.isEmpty, !levelKey.isEmpty else {
             throw LevelValidationError.invalidIdentity
         }
@@ -749,7 +794,6 @@ struct Level: Codable, Equatable, Sendable {
             objects: objects,
             source: source
         )
-
         guard rooms.count <= 400,
               rooms.allSatisfy({ (0..<400).contains($0.sourceIndex) }) else {
             throw LevelValidationError.invalidCount("rooms")
@@ -762,6 +806,7 @@ struct Level: Codable, Equatable, Sendable {
             rooms: rooms,
             allowIncomplete: allowImportStagingPresentation
         )
+        try validatePlayerShipBinding()
         guard objects.count <= 1_500 else {
             throw LevelValidationError.invalidCount("objects")
         }
@@ -1049,7 +1094,7 @@ struct Level: Codable, Equatable, Sendable {
             }
         }
         try validateDependencyClosure(availableDependencies)
-        try validateSelectedRoomPresentationClosure(
+        try validatePlayerPresentationClosure(
             allowIncomplete: allowImportStagingPresentation
         )
 
@@ -1146,6 +1191,8 @@ struct Level: Codable, Equatable, Sendable {
             presentationMaterials: materials,
             presentationCoronaAssets: coronaAssets,
             models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
             dependencyManifest: .init(
                 current: dependencies,
@@ -1193,9 +1240,8 @@ struct Level: Codable, Equatable, Sendable {
                 )
             )
         }
-        for texture in reachedTextureSources where identities.insert(
-            .init(category: "texture", source: texture)
-        ).inserted {
+        for texture in reachedTextureSources.sorted(by: sourceResourceIsOrdered)
+        where identities.insert(.init(category: "texture", source: texture)).inserted {
             dependencies.append(
                 .init(
                     category: "texture",
@@ -1225,6 +1271,8 @@ struct Level: Codable, Equatable, Sendable {
             presentationMaterials: combinedMaterials,
             presentationCoronaAssets: presentationCoronaAssets,
             models: newModels,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: newObjectPresentations,
             dependencyManifest: .init(
                 current: dependencies,
@@ -1234,8 +1282,9 @@ struct Level: Codable, Equatable, Sendable {
         )
     }
 
-    var hasSelectedRoomPresentation: Bool {
-        rooms.contains(where: { $0.sourceIndex == 3 }) && !presentationMaterials.isEmpty
+    var hasPlayerPresentation: Bool {
+        !presentationMaterials.isEmpty
+            && defaultPlayerBinding != nil
     }
 
     func addingSurfacePhysics(_ entries: [SurfacePhysicsEntry]) -> Level {
@@ -1259,8 +1308,59 @@ struct Level: Codable, Equatable, Sendable {
             presentationMaterials: presentationMaterials,
             presentationCoronaAssets: presentationCoronaAssets,
             models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
             dependencyManifest: dependencyManifest,
+            sourceChunks: sourceChunks
+        )
+    }
+
+    func addingDefaultPlayerShip(
+        _ ship: CanonicalShipDefinition,
+        binding: DefaultPlayerBinding
+    ) -> Level {
+        var dependencies = dependencyManifest.current
+        let identity = DependencyIdentity(category: "ship-definition", source: ship.source)
+        if !dependencies.contains(where: {
+            DependencyIdentity(category: $0.category, source: $0.source) == identity
+        }) {
+            dependencies.append(
+                .init(
+                    category: "ship-definition",
+                    source: ship.source,
+                    state: "canonical-typed-definition",
+                    provenance: "D3Import-resolved default player ship"
+                )
+            )
+        }
+        return Level(
+            schemaVersion: schemaVersion,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            shipDefinitions: [ship],
+            defaultPlayerBinding: binding,
+            objectPresentations: objectPresentations,
+            dependencyManifest: .init(
+                current: dependencies,
+                historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
+            ),
             sourceChunks: sourceChunks
         )
     }
@@ -1272,12 +1372,104 @@ struct Level: Codable, Equatable, Sendable {
         }
     }
 
-    private func validateSelectedRoomPresentationClosure(allowIncomplete: Bool) throws {
+    private func validatePlayerShipBinding() throws {
+        let playerZero = objects.first {
+            $0.type == D3SourceIdentity.playerObjectType && $0.storedID == 0
+        }
+        if shipDefinitions.isEmpty && defaultPlayerBinding == nil {
+            return
+        }
+        guard let playerZero,
+              shipDefinitions.count == 1,
+              let binding = defaultPlayerBinding,
+              binding.playerID == 0,
+              binding.objectHandle == playerZero.handle,
+              binding.ship == shipDefinitions[0].source,
+              case .room = playerZero.location else {
+            throw LevelValidationError.invalidDependency("default player ship binding")
+        }
+        let ship = shipDefinitions[0]
+        guard D3SourceIdentity.isValidSourceResource(
+            ship.source,
+            category: "ship-definition"
+        ),
+              models.contains(where: { $0.source == ship.primaryModel }),
+              objectPresentations.contains(where: {
+                  $0.objectHandle == binding.objectHandle
+                      && $0.primaryModel == ship.primaryModel
+              }),
+              ship.presentationSize.isFinite,
+              ship.presentationSize > 0,
+              Set(ship.physics.behaviors).count == ship.physics.behaviors.count,
+              ship.physics.behaviors == [.turnroll, .wiggle, .usesThrust] else {
+            throw LevelValidationError.invalidDependency("default player ship definition")
+        }
+        let values = [
+            ship.physics.mass,
+            ship.physics.drag,
+            ship.physics.fullThrust,
+            ship.physics.rotationalDrag,
+            ship.physics.fullRotationalThrust,
+            ship.physics.initialForwardVelocity,
+            ship.physics.initialAngularVelocity.x,
+            ship.physics.initialAngularVelocity.y,
+            ship.physics.initialAngularVelocity.z,
+            ship.physics.wiggleAmplitude,
+            ship.physics.wigglesPerSecond,
+            ship.physics.coefficientOfRestitution,
+            ship.physics.hitDieDot,
+            ship.physics.maximumTurnrollRate,
+            ship.physics.turnrollRatio,
+        ]
+        guard values.allSatisfy(\.isFinite),
+              ship.physics.mass > 0,
+              ship.physics.drag > 0,
+              ship.physics.fullThrust >= 0,
+              ship.physics.rotationalDrag >= 0,
+              ship.physics.fullRotationalThrust >= 0 else {
+            throw LevelValidationError.invalidDependency("default player ship physics")
+        }
+    }
+
+    private func validatePlayerPresentationClosure(allowIncomplete: Bool) throws {
         if allowIncomplete && presentationMaterials.isEmpty && presentationCoronaAssets.isEmpty {
             return
         }
 
-        guard let room = rooms.first(where: { $0.sourceIndex == 3 }) else {
+        let roomBySourceIndex = Dictionary(
+            uniqueKeysWithValues: rooms.map { ($0.sourceIndex, $0) }
+        )
+        let presentationFaces: [SourceVisibleFace]
+        if let binding = defaultPlayerBinding,
+           let player = objects.first(where: { $0.handle == binding.objectHandle }),
+           case .room(let playerRoomSourceIndex) = player.location {
+            let presentationRoomIndices = reciprocalPortalComponent(
+                rooms: rooms,
+                startRoomSourceIndex: playerRoomSourceIndex
+            )
+            presentationFaces = rooms
+                .filter { presentationRoomIndices.contains($0.sourceIndex) }
+                .flatMap { room in
+                    room.faces.indices.map {
+                        SourceVisibleFace(roomSourceIndex: room.sourceIndex, faceIndex: $0)
+                    }
+                }
+        } else if rooms.contains(where: { $0.sourceIndex == 3 }) {
+            do {
+                presentationFaces = try extractSourceVisibleWorld(
+                    self,
+                    camera: .trainingRoom3,
+                    startRoomSourceIndex: 3,
+                    portalBlends: Dictionary(
+                        uniqueKeysWithValues: presentationMaterials.map {
+                            ($0.texture, $0.blend)
+                        }
+                    )
+                ).faces
+            } catch {
+                throw LevelValidationError.invalidDependency("reference presentation view")
+            }
+        } else {
             guard presentationMaterials.isEmpty,
                   presentationCoronaAssets.isEmpty,
                   lightmaps.pages.allSatisfy({ $0.rgba8 == nil }),
@@ -1288,48 +1480,29 @@ struct Level: Codable, Equatable, Sendable {
             }
             return
         }
-
-        let visibility: SourceVisibleWorld
-        do {
-            visibility = try extractSourceVisibleWorld(
-                self,
-                camera: .trainingRoom3,
-                startRoomSourceIndex: room.sourceIndex,
-                portalBlends: Dictionary(
-                    uniqueKeysWithValues: presentationMaterials.map {
-                        ($0.texture, $0.blend)
-                    }
-                )
-            )
-        } catch {
-            throw LevelValidationError.invalidDependency("fixed-camera portal traversal")
-        }
-        let roomBySourceIndex = Dictionary(
-            uniqueKeysWithValues: rooms.map { ($0.sourceIndex, $0) }
-        )
-        let requiredRoomTextures = Set(visibility.faces.map {
+        let requiredRoomTextures = Set(presentationFaces.map {
             roomBySourceIndex[$0.roomSourceIndex]!.faces[$0.faceIndex].texture
         })
         let requiredModelTextures = referencedModelTextures(in: models)
         let requiredTextures = requiredRoomTextures.union(requiredModelTextures)
         guard Set(presentationMaterials.map(\.texture)) == requiredTextures else {
-            throw LevelValidationError.invalidDependency("selected-room textures")
+            throw LevelValidationError.invalidDependency("player-component textures")
         }
         let materialByTexture = Dictionary(
             uniqueKeysWithValues: presentationMaterials.map { ($0.texture, $0) }
         )
         var requiredCoronaAssetIndices: Set<Int> = []
-        for reference in visibility.faces {
+        for reference in presentationFaces {
             let face = roomBySourceIndex[reference.roomSourceIndex]!.faces[reference.faceIndex]
             guard face.allowsLightCorona,
                   let corona = materialByTexture[face.texture]?.lightCorona else { continue }
             requiredCoronaAssetIndices.insert(corona.assetIndex)
         }
         guard requiredCoronaAssetIndices == Set(presentationCoronaAssets.indices) else {
-            throw LevelValidationError.invalidDependency("selected-room corona assets")
+            throw LevelValidationError.invalidDependency("player-component corona assets")
         }
 
-        let requiredLightmapPages = Set(visibility.faces.compactMap { reference -> Int? in
+        let requiredLightmapPages = Set(presentationFaces.compactMap { reference -> Int? in
             let face = roomBySourceIndex[reference.roomSourceIndex]!.faces[reference.faceIndex]
             return face.lightmapInfoIndex.map { lightmaps.infos[$0].pageIndex }
         })
@@ -1337,7 +1510,7 @@ struct Level: Codable, Equatable, Sendable {
             lightmaps.pages[index].rgba8 != nil
         })
         guard importedLightmapPages == requiredLightmapPages else {
-            throw LevelValidationError.invalidDependency("selected-room lightmaps")
+            throw LevelValidationError.invalidDependency("player-component lightmaps")
         }
 
         let importedDependencies = Set(dependencyManifest.current.compactMap {
@@ -1361,21 +1534,15 @@ struct Level: Codable, Equatable, Sendable {
             )
         })
         guard importedDependencies == requiredDependencies else {
-            throw LevelValidationError.invalidDependency("selected-room presentation state")
+            throw LevelValidationError.invalidDependency("player-component presentation state")
         }
 
-        let fixedCameraCoronas: [WorldLightCorona]
-        do {
-            fixedCameraCoronas = try extractSourceLightCoronas(
-                self,
-                camera: .trainingRoom3,
-                visibility: visibility
-            )
-        } catch {
-            throw LevelValidationError.invalidDependency("fixed-camera light coronas")
-        }
-        guard fixedCameraCoronas.isEmpty else {
-            throw LevelValidationError.invalidDependency("fixed-camera light coronas")
+        if defaultPlayerBinding != nil {
+            do {
+                _ = try extractWorldForRendering(self, playerView: defaultPlayerView(in: self))
+            } catch {
+                throw LevelValidationError.invalidDependency("player initial view")
+            }
         }
     }
 }
@@ -2059,6 +2226,8 @@ private func validateModels(
     var modelBySource: [SourceResource: CanonicalModel] = [:]
     for model in models {
         guard D3SourceIdentity.isValidSourceResource(model.source, category: "model"),
+              model.collisionRadius.isFinite,
+              model.collisionRadius > 0,
               isSafeRelativePath(model.sourceArchive),
               acceptedSourcePaths.contains(model.sourceArchive),
               isSHA256(model.sourceSHA256),

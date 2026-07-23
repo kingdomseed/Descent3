@@ -2,6 +2,37 @@ import Darwin
 import XCTest
 
 final class D3ImportOperationTests: XCTestCase {
+    func testParsesReachedShipPhysicsInReleasedFieldOrderAndTypesFlags() throws {
+        let pages = try resolveReachedObjectModelPages(
+            table: makeRetailShipTablePage() + makeRetailGenericModelTablePage(),
+            overlay: Data(),
+            shipName: "Pyro-GL",
+            genericName: "Invisiblepowerup"
+        )
+        let definition = try XCTUnwrap(pages.ship.shipDefinition)
+
+        XCTAssertEqual(definition.name, "Pyro-GL")
+        XCTAssertEqual(definition.presentationSize, 6.676084041595459)
+        XCTAssertEqual(definition.physics.mass, 30)
+        XCTAssertEqual(definition.physics.drag, 90)
+        XCTAssertEqual(definition.physics.fullThrust, 5_400)
+        XCTAssertEqual(
+            definition.physics.behaviors,
+            [.turnroll, .wiggle, .usesThrust]
+        )
+        XCTAssertEqual(definition.physics.rotationalDrag, 225)
+        XCTAssertEqual(definition.physics.fullRotationalThrust, 6_860_000)
+        XCTAssertEqual(definition.physics.numberOfBounces, -1)
+        XCTAssertEqual(definition.physics.initialForwardVelocity, 0)
+        XCTAssertEqual(definition.physics.initialAngularVelocity, .zero)
+        XCTAssertEqual(definition.physics.wiggleAmplitude, 0.17)
+        XCTAssertEqual(definition.physics.wigglesPerSecond, 0.9)
+        XCTAssertEqual(definition.physics.coefficientOfRestitution, 1)
+        XCTAssertEqual(definition.physics.hitDieDot, -1)
+        XCTAssertEqual(definition.physics.maximumTurnrollRate, 8_000)
+        XCTAssertEqual(definition.physics.turnrollRatio, 0.13)
+    }
+
     func testReachedOOFPreservesCustomAndRejectsUnreachedPresentationProperties() throws {
         let texture = SourceResource(storedIndex: 0, sourceName: "Synthetic")
         let custom = try parseReachedOutrageModel(
@@ -30,7 +61,8 @@ final class D3ImportOperationTests: XCTestCase {
     }
 
     func testReachedOOFUsesFirstActualTransformedVertexAndDynamicGlowGeometry() throws {
-        let data = makeReachedOOFFixture()
+        let sourceRadius = Float(bitPattern: 0x40d9_5869)
+        let data = makeReachedOOFFixture(collisionRadius: sourceRadius)
 
         let model = try parseReachedOutrageModel(
             data,
@@ -43,6 +75,8 @@ final class D3ImportOperationTests: XCTestCase {
         XCTAssertEqual(model.bounds.maximum.x, 106, accuracy: 0.0001)
         XCTAssertEqual(model.bounds.minimum.y, -0.9987165, accuracy: 0.0001)
         XCTAssertEqual(model.bounds.maximum.y, 0.9987165, accuracy: 0.0001)
+        XCTAssertEqual(model.collisionRadius.bitPattern, sourceRadius.bitPattern)
+        XCTAssertNotEqual(model.collisionRadius, 200)
         XCTAssertEqual(model.submodels[0].vertices, [])
         XCTAssertEqual(model.submodels[1].faces[0].corners.count, 31)
         XCTAssertEqual(
@@ -54,6 +88,11 @@ final class D3ImportOperationTests: XCTestCase {
             .texture(.init(storedIndex: 0, sourceName: "Synthetic"))
         )
         XCTAssertEqual(model.sourceSHA256, canonicalSHA256(data))
+        let decoded = try JSONDecoder().decode(
+            CanonicalModel.self,
+            from: JSONEncoder().encode(model)
+        )
+        XCTAssertEqual(decoded.collisionRadius.bitPattern, sourceRadius.bitPattern)
     }
 
     func testReachedOOFDiscardsUnreachedVertexNormalsAndRejectsMissingFaceTexture() throws {
@@ -745,14 +784,15 @@ final class D3ImportOperationTests: XCTestCase {
 }
 
 private func makeReachedOOFFixture(
-    properties: String = "$glow=1, 0.5, 0.25, 2"
+    properties: String = "$glow=1, 0.5, 0.25, 2",
+    collisionRadius: Float = 200
 ) -> Data {
     var data = Data("PSPO".utf8)
     data.appendInt32(2_300)
 
     var header = Data()
     header.appendInt32(2)
-    header.appendFloat(200)
+    header.appendFloat(collisionRadius)
     header.appendVector(.zero)
     header.appendVector(.zero)
     header.appendInt32(0)
@@ -790,6 +830,66 @@ private func makeReachedOOFFixture(
         )
     )
     return data
+}
+
+private func makeRetailShipTablePage() -> Data {
+    var body = Data()
+    body.appendUInt16(6)
+    body.appendCString("Pyro-GL")
+    body.appendCString("PyroCockpit")
+    body.appendCString("PyroHUD")
+    body.appendCString("PyroGL.OOF")
+    body.appendCString("PyroGLDying.OOF")
+    body.appendCString("PyroGLMed.OOF")
+    body.appendCString("PyroGLLow.OOF")
+    body.appendFloat(70)
+    body.appendFloat(120)
+    body.appendFloat(30)
+    body.appendFloat(90)
+    body.appendFloat(5_400)
+    body.appendInt32(0x49)
+    body.appendFloat(225)
+    body.appendFloat(6_860_000)
+    body.appendInt32(-1)
+    body.appendFloat(0)
+    body.appendVector(.zero)
+    body.appendFloat(0.17)
+    body.appendFloat(0.9)
+    body.appendFloat(1)
+    body.appendFloat(-1)
+    body.appendFloat(8_000)
+    body.appendFloat(0.13)
+    body.appendFloat(6.676084041595459)
+    body.appendFloat(1)
+    body.appendInt32(1)
+
+    var table = Data([6])
+    table.appendUInt32(UInt32(body.count + 4))
+    table.append(body)
+    return table
+}
+
+private func makeRetailGenericModelTablePage() -> Data {
+    var body = Data()
+    body.appendUInt16(25)
+    body.append(7)
+    body.appendCString("Invisiblepowerup")
+    body.appendCString("invisiblepowerup.OOF")
+    body.appendCString("")
+    body.appendCString("")
+    body.append(Data(repeating: 0, count: 16))
+    body.appendCString("")
+    body.appendCString("")
+    body.appendCString("")
+    body.append(0)
+    body.appendCString("")
+    body.appendFloat(0)
+    body.appendFloat(0)
+
+    var table = Data([10])
+    table.appendUInt32(UInt32(body.count + 4))
+    table.append(body)
+    return table
 }
 
 private func makeReachedOOFWithNonfiniteVertexNormal() -> Data {
@@ -892,6 +992,16 @@ private extension Data {
         Swift.withUnsafeBytes(of: &littleEndian) { append(contentsOf: $0) }
     }
 
+    mutating func appendUInt16(_ value: UInt16) {
+        var littleEndian = value.littleEndian
+        Swift.withUnsafeBytes(of: &littleEndian) { append(contentsOf: $0) }
+    }
+
+    mutating func appendUInt32(_ value: UInt32) {
+        var littleEndian = value.littleEndian
+        Swift.withUnsafeBytes(of: &littleEndian) { append(contentsOf: $0) }
+    }
+
     mutating func appendFloat(_ value: Float) {
         appendInt32(Int32(bitPattern: value.bitPattern))
     }
@@ -904,6 +1014,11 @@ private extension Data {
 
     mutating func appendModelString(_ value: String) {
         appendInt32(Int32(value.utf8.count + 1))
+        append(contentsOf: value.utf8)
+        append(0)
+    }
+
+    mutating func appendCString(_ value: String) {
         append(contentsOf: value.utf8)
         append(0)
     }

@@ -112,10 +112,13 @@ final class CanonicalLevelTests: XCTestCase {
         XCTAssertEqual(trace.containingRoomSourceIndex, 10)
     }
 
-    func testSchemaThreeAndIncompleteCanonicalTablesAreRejected() throws {
-        let base = makeMinimalCanonicalPackageLevel()
+    func testEarlierSchemasAndIncompleteCanonicalTablesAreRejected() throws {
+        let base = removingDefaultPlayerPresentation(
+            from: makeMinimalCanonicalPackageLevel()
+        )
         assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 2))
         assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 3))
+        assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 4))
         assertValidationError(
             .invalidSurfacePhysics,
             replacing(base, surfacePhysics: [])
@@ -125,6 +128,7 @@ final class CanonicalLevelTests: XCTestCase {
         let missingTexture = SourceResource(storedIndex: 1, sourceName: "model-surface")
         let model = CanonicalModel(
             source: modelSource,
+            collisionRadius: 1,
             submodels: [
                 .init(
                     sourceIndex: 0,
@@ -174,13 +178,49 @@ final class CanonicalLevelTests: XCTestCase {
             state: "presentation-payload-imported",
             provenance: "synthetic canonical fixture"
         )
+        let shipSource = SourceResource(storedIndex: 0, sourceName: "Pyro-GL")
+        let ship = CanonicalShipDefinition(
+            source: shipSource,
+            primaryModel: modelSource,
+            presentationSize: 1,
+            physics: .init(
+                mass: 30,
+                drag: 90,
+                fullThrust: 5_400,
+                behaviors: [.turnroll, .wiggle, .usesThrust],
+                rotationalDrag: 225,
+                fullRotationalThrust: 6_860_000,
+                numberOfBounces: -1,
+                initialForwardVelocity: 0,
+                initialAngularVelocity: .zero,
+                wiggleAmplitude: 0.17,
+                wigglesPerSecond: 0.9,
+                coefficientOfRestitution: 1,
+                hitDieDot: -1,
+                maximumTurnrollRate: 8_000,
+                turnrollRatio: 0.13
+            )
+        )
+        let binding = DefaultPlayerBinding(
+            playerID: 0,
+            objectHandle: player.handle,
+            ship: shipSource
+        )
+        let shipDependency = DependencyRecord(
+            category: "ship-definition",
+            source: shipSource,
+            state: "canonical-typed-definition",
+            provenance: "synthetic canonical fixture"
+        )
         let incomplete = replacing(
             base,
             objects: [player],
             models: [model],
+            shipDefinitions: [ship],
+            defaultPlayerBinding: binding,
             objectPresentations: [presentation],
             dependencyManifest: .init(
-                current: base.dependencyManifest.current + [dependency],
+                current: base.dependencyManifest.current + [dependency, shipDependency],
                 historicalEagerBaseline: nil
             )
         )
@@ -211,9 +251,15 @@ final class CanonicalLevelTests: XCTestCase {
             objects: [player],
             presentationMaterials: base.presentationMaterials + [modelMaterial],
             models: [model],
+            shipDefinitions: [ship],
+            defaultPlayerBinding: binding,
             objectPresentations: [presentation],
             dependencyManifest: .init(
-                current: base.dependencyManifest.current + [dependency, textureDependency],
+                current: base.dependencyManifest.current + [
+                    dependency,
+                    shipDependency,
+                    textureDependency,
+                ],
                 historicalEagerBaseline: nil
             )
         )
@@ -319,6 +365,74 @@ final class CanonicalLevelTests: XCTestCase {
                 atPath: library.rootURL.appending(path: "packages").path
             ),
             [prior.installedPackageURL.lastPathComponent]
+        )
+    }
+
+    func testUnboundPresentationPackageCannotReplaceTheActiveBase() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let priorCandidate = root.appending(path: "prior.revival", directoryHint: .isDirectory)
+        let unboundCandidate = root.appending(
+            path: "unbound.revival",
+            directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        let bound = makeSliceSixObjectRenderLevel()
+        try writeCanonicalPackage(bound, to: priorCandidate)
+        let prior = try library.installAndActivate(from: priorCandidate)
+        try writeCanonicalPackage(bound, to: unboundCandidate)
+        try overwriteCanonicalPackageLevel(
+            removingDefaultPlayerPresentation(from: makeMinimalCanonicalPackageLevel()),
+            at: unboundCandidate
+        )
+
+        XCTAssertThrowsError(try library.installAndActivate(from: unboundCandidate))
+        XCTAssertEqual(try library.loadActive(), prior)
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(
+                atPath: library.rootURL.appending(path: "packages").path
+            ),
+            [prior.installedPackageURL.lastPathComponent]
+        )
+    }
+
+    func testDefaultPlayerBindingRequiresAnIndoorRoom() throws {
+        let base = makeMinimalCanonicalPackageLevel()
+        let binding = try XCTUnwrap(base.defaultPlayerBinding)
+        var objects = base.objects
+        let playerIndex = try XCTUnwrap(
+            objects.firstIndex { $0.handle == binding.objectHandle }
+        )
+        let player = objects[playerIndex]
+        objects[playerIndex] = PlacedObject(
+            handle: player.handle,
+            type: player.type,
+            storedID: player.storedID,
+            definition: player.definition,
+            instanceName: player.instanceName,
+            flags: player.flags,
+            doorShields: player.doorShields,
+            location: .terrainCell(0),
+            position: player.position,
+            orientation: player.orientation,
+            containsType: player.containsType,
+            containsID: player.containsID,
+            containsCount: player.containsCount,
+            lifeLeft: player.lifeLeft,
+            soundSource: player.soundSource,
+            inertScriptName: player.inertScriptName,
+            inertModuleName: player.inertModuleName,
+            lightmapSubmodels: player.lightmapSubmodels
+        )
+
+        assertValidationError(
+            .invalidDependency("default player ship binding"),
+            replacing(base, objects: objects)
         )
     }
 
@@ -635,10 +749,15 @@ final class CanonicalLevelTests: XCTestCase {
             sha256: String(repeating: "a", count: 64),
             disposition: "canonical-topology"
         )
+        let dependencies = base.dependencyManifest.current.map {
+            $0.category == dependency.category && $0.source == dependency.source
+                ? dependency
+                : $0
+        }
         let level = replacing(
             base,
             source: source,
-            dependencyManifest: .init(current: [dependency], historicalEagerBaseline: nil),
+            dependencyManifest: .init(current: dependencies, historicalEagerBaseline: nil),
             sourceChunks: [chunk]
         )
         let temporaryDirectory = FileManager.default.temporaryDirectory
@@ -676,7 +795,7 @@ final class CanonicalLevelTests: XCTestCase {
         ])
         XCTAssertEqual(manifest.source, source)
         XCTAssertEqual(manifest.sourceEntries, [chunk])
-        XCTAssertEqual(manifest.currentDependencies, [dependency])
+        XCTAssertEqual(manifest.currentDependencies, dependencies)
         XCTAssertEqual(manifest.rights.classification, "user-owned-retail")
         XCTAssertTrue(manifest.rights.localOnly)
         XCTAssertFalse(manifest.rights.redistributionAllowed)
@@ -704,16 +823,19 @@ final class CanonicalLevelTests: XCTestCase {
     }
 
     func testCanonicalLoaderRejectsInvalidPlayerIDs() throws {
-        let firstPlayer = makePlacedObject(handle: 2_048, type: 4, storedID: 0)
+        let base = makeMinimalCanonicalPackageLevel()
+        let firstPlayer = base.objects.first {
+            $0.handle == base.defaultPlayerBinding?.objectHandle
+        }!
         let secondPlayer = makePlacedObject(handle: 2_049, type: 4, storedID: 2)
         let validLevel = replacing(
-            makeMinimalCanonicalPackageLevel(),
+            base,
             objects: [firstPlayer, secondPlayer]
         )
         let cases: [([PlacedObject], LevelValidationError)] = [
             (
-                [makePlacedObject(handle: 2_048, type: 4, storedID: 32), secondPlayer],
-                .invalidPlayerID(handle: 2_048, playerID: 32)
+                [firstPlayer, makePlacedObject(handle: 2_049, type: 4, storedID: 32)],
+                .invalidPlayerID(handle: 2_049, playerID: 32)
             ),
             (
                 [firstPlayer, makePlacedObject(handle: 2_049, type: 4, storedID: 0)],
@@ -868,7 +990,7 @@ final class CanonicalLevelTests: XCTestCase {
         }
     }
 
-    func testNativeLibraryRejectsNonzeroFixedCameraCoronaBeforeActivation() throws {
+    func testNativeLibraryAcceptsPreparedButUnscheduledCoronaBeforeActivation() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let priorCandidate = root.appending(path: "prior.revival", directoryHint: .isDirectory)
@@ -879,11 +1001,35 @@ final class CanonicalLevelTests: XCTestCase {
         let library = CanonicalPackageLibrary(
             rootURL: root.appending(path: "library", directoryHint: .isDirectory)
         )
-        let priorLevel = makeMinimalCanonicalPackageLevel()
-        let validSuccessor = makeMinimalCanonicalPackageLevel(
-            levelKey: "descent3.level.training-mission-corona-hostile"
+        let priorLevel = makeSliceSixObjectRenderLevel()
+        let validSuccessor = priorLevel
+        let playerView = defaultPlayerView(in: validSuccessor)
+        let referencePlayerView = PlayerView(
+            playerID: playerView.playerID,
+            objectHandle: playerView.objectHandle,
+            roomSourceIndex: 3,
+            camera: .trainingRoom3,
+            collisionRadius: playerView.collisionRadius
         )
-        let material = validSuccessor.presentationMaterials[0]
+        let visibleFace = try XCTUnwrap(
+            try extractWorldForRendering(
+                validSuccessor,
+                playerView: referencePlayerView
+            ).opaqueDrawItems.first
+        )
+        let roomIndex = try XCTUnwrap(
+            validSuccessor.rooms.firstIndex {
+                $0.sourceIndex == visibleFace.roomSourceIndex
+            }
+        )
+        let room = validSuccessor.rooms[roomIndex]
+        let face = room.faces[visibleFace.faceIndex]
+        let materialIndex = try XCTUnwrap(
+            validSuccessor.presentationMaterials.firstIndex {
+                $0.texture == face.texture
+            }
+        )
+        let material = validSuccessor.presentationMaterials[materialIndex]
         let coronaSource = SourceResource(storedIndex: 0, sourceName: "hostile-flare.ogf")
         let hostileMaterial = PresentationMaterial(
             texture: material.texture,
@@ -907,17 +1053,17 @@ final class CanonicalLevelTests: XCTestCase {
             sourceArchive: validSuccessor.source.profileFiles[0].relativePath,
             sourceSHA256: String(repeating: "e", count: 64)
         )
-        let roomIndex = try XCTUnwrap(
-            validSuccessor.rooms.firstIndex { $0.sourceIndex == 3 }
-        )
-        let room = validSuccessor.rooms[roomIndex]
-        let hostileFace = replacing(room.faces[0], allowsLightCorona: true)
+        let hostileFace = replacing(face, allowsLightCorona: true)
         var hostileRooms = validSuccessor.rooms
-        hostileRooms[roomIndex] = replacing(room, faces: [hostileFace])
+        var hostileFaces = room.faces
+        hostileFaces[visibleFace.faceIndex] = hostileFace
+        hostileRooms[roomIndex] = replacing(room, faces: hostileFaces)
+        var hostileMaterials = validSuccessor.presentationMaterials
+        hostileMaterials[materialIndex] = hostileMaterial
         let hostile = replacing(
             validSuccessor,
             rooms: hostileRooms,
-            presentationMaterials: [hostileMaterial],
+            presentationMaterials: hostileMaterials,
             presentationCoronaAssets: [coronaAsset],
             dependencyManifest: .init(
                 current: validSuccessor.dependencyManifest.current + [
@@ -933,12 +1079,10 @@ final class CanonicalLevelTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
-        XCTAssertFalse(
-            try extractWorldForRendering(
-                hostile,
-                camera: .trainingRoom3,
-                startRoomSourceIndex: 3
-            ).lightCoronas.isEmpty
+        XCTAssertEqual(hostile.presentationCoronaAssets, [coronaAsset])
+        XCTAssertEqual(
+            hostile.presentationMaterials[materialIndex].lightCorona,
+            hostileMaterial.lightCorona
         )
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         try writeCanonicalPackage(priorLevel, to: priorCandidate)
@@ -946,15 +1090,10 @@ final class CanonicalLevelTests: XCTestCase {
         try writeCanonicalPackage(validSuccessor, to: successorCandidate)
         try overwriteCanonicalPackageLevel(hostile, at: successorCandidate)
 
-        XCTAssertThrowsError(
-            try library.installAndActivate(from: successorCandidate)
-        ) { error in
-            XCTAssertEqual(
-                error as? LevelValidationError,
-                .invalidDependency("fixed-camera light coronas")
-            )
-        }
-        XCTAssertEqual(try library.loadActive(), prior)
+        let activated = try library.installAndActivate(from: successorCandidate)
+        XCTAssertEqual(activated.level, hostile)
+        XCTAssertNotEqual(activated, prior)
+        XCTAssertEqual(try library.loadActive(), activated)
     }
 
     func testCanonicalLoaderRejectsNegativeSourceEntryExtentsWithCompleteProvenance() throws {
@@ -1381,6 +1520,44 @@ final class CanonicalLevelTests: XCTestCase {
                 )
             )
         }
+    }
+
+    func testRejectsUsesThrustPlayerShipWithoutPositiveDrag() {
+        let level = makeSliceSixObjectRenderLevel()
+        let ship = level.shipDefinitions[0]
+        let physics = ship.physics
+        let zeroDrag = CanonicalShipPhysics(
+            mass: physics.mass,
+            drag: 0,
+            fullThrust: physics.fullThrust,
+            behaviors: physics.behaviors,
+            rotationalDrag: physics.rotationalDrag,
+            fullRotationalThrust: physics.fullRotationalThrust,
+            numberOfBounces: physics.numberOfBounces,
+            initialForwardVelocity: physics.initialForwardVelocity,
+            initialAngularVelocity: physics.initialAngularVelocity,
+            wiggleAmplitude: physics.wiggleAmplitude,
+            wigglesPerSecond: physics.wigglesPerSecond,
+            coefficientOfRestitution: physics.coefficientOfRestitution,
+            hitDieDot: physics.hitDieDot,
+            maximumTurnrollRate: physics.maximumTurnrollRate,
+            turnrollRatio: physics.turnrollRatio
+        )
+
+        assertValidationError(
+            .invalidDependency("default player ship physics"),
+            replacing(
+                level,
+                shipDefinitions: [
+                    .init(
+                        source: ship.source,
+                        primaryModel: ship.primaryModel,
+                        presentationSize: ship.presentationSize,
+                        physics: zeroDrag
+                    ),
+                ]
+            )
+        )
     }
 
     func testRejectsDegenerateCanonicalObjectOrientation() {
@@ -2255,6 +2432,8 @@ func replacing(
     presentationMaterials: [PresentationMaterial]? = nil,
     presentationCoronaAssets: [PresentationCoronaAsset]? = nil,
     models: [CanonicalModel]? = nil,
+    shipDefinitions: [CanonicalShipDefinition]? = nil,
+    defaultPlayerBinding: DefaultPlayerBinding? = nil,
     objectPresentations: [ObjectPresentationReference]? = nil,
     dependencyManifest: DependencyManifest? = nil,
     sourceChunks: [SourceChunkRecord]? = nil
@@ -2286,6 +2465,8 @@ func replacing(
         presentationMaterials: presentationMaterials ?? level.presentationMaterials,
         presentationCoronaAssets: presentationCoronaAssets ?? level.presentationCoronaAssets,
         models: models ?? level.models,
+        shipDefinitions: shipDefinitions ?? level.shipDefinitions,
+        defaultPlayerBinding: defaultPlayerBinding ?? level.defaultPlayerBinding,
         objectPresentations: objectPresentations ?? level.objectPresentations,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
         sourceChunks: sourceChunks ?? level.sourceChunks
@@ -2482,6 +2663,73 @@ func makeMinimalCanonicalPackageLevel(
         sourceArchive: base.source.profileFiles[0].relativePath,
         sourceSHA256: String(repeating: "d", count: 64)
     )
+    let modelSource = SourceResource(storedIndex: 0, sourceName: "Synthetic.OOF")
+    let shipSource = SourceResource(storedIndex: 0, sourceName: "Pyro-GL")
+    let player = makePlacedObject(
+        handle: 2_048,
+        type: D3SourceIdentity.playerObjectType,
+        storedID: 0,
+        location: .room(3),
+        position: RoomCamera.trainingRoom3.position,
+        orientation: .init(
+            right: .init(x: -1, y: 0, z: 0),
+            up: RoomCamera.trainingRoom3.up,
+            forward: .init(x: 0, y: 1, z: 0)
+        )
+    )
+    let model = CanonicalModel(
+        source: modelSource,
+        collisionRadius: 1,
+        submodels: [
+            .init(
+                sourceIndex: 0,
+                parentIndex: nil,
+                offset: .zero,
+                vertices: [
+                    .init(position: .zero, alpha: 1),
+                    .init(position: .init(x: 1, y: 0, z: 0), alpha: 1),
+                    .init(position: .init(x: 0, y: 1, z: 0), alpha: 1),
+                ],
+                faces: [
+                    .init(
+                        normal: .init(x: 0, y: 0, z: 1),
+                        corners: [
+                            .init(vertexIndex: 0, u: 0, v: 0),
+                            .init(vertexIndex: 1, u: 1, v: 0),
+                            .init(vertexIndex: 2, u: 0, v: 1),
+                        ],
+                        material: .texture(texture)
+                    ),
+                ],
+                presentation: .standard
+            ),
+        ],
+        bounds: .init(minimum: .zero, maximum: .init(x: 1, y: 1, z: 0)),
+        sourceArchive: base.source.profileFiles[0].relativePath,
+        sourceSHA256: String(repeating: "e", count: 64)
+    )
+    let ship = CanonicalShipDefinition(
+        source: shipSource,
+        primaryModel: modelSource,
+        presentationSize: 1,
+        physics: .init(
+            mass: 30,
+            drag: 90,
+            fullThrust: 5_400,
+            behaviors: [.turnroll, .wiggle, .usesThrust],
+            rotationalDrag: 225,
+            fullRotationalThrust: 6_860_000,
+            numberOfBounces: -1,
+            initialForwardVelocity: 0,
+            initialAngularVelocity: .zero,
+            wiggleAmplitude: 0.17,
+            wigglesPerSecond: 0.9,
+            coefficientOfRestitution: 1,
+            hitDieDot: -1,
+            maximumTurnrollRate: 8_000,
+            turnrollRatio: 0.13
+        )
+    )
     return Level(
         missionKey: base.missionKey,
         levelKey: base.levelKey,
@@ -2489,7 +2737,7 @@ func makeMinimalCanonicalPackageLevel(
         metadata: base.metadata,
         rooms: base.rooms + [room],
         terrain: base.terrain,
-        objects: base.objects,
+        objects: [player],
         retiredObjectHandles: base.retiredObjectHandles,
         paths: base.paths,
         goals: base.goals,
@@ -2498,12 +2746,42 @@ func makeMinimalCanonicalPackageLevel(
         playerStartFlags: base.playerStartFlags,
         lightmaps: base.lightmaps,
         presentationMaterials: [material],
+        models: [model],
+        shipDefinitions: [ship],
+        defaultPlayerBinding: .init(
+            playerID: 0,
+            objectHandle: player.handle,
+            ship: shipSource
+        ),
+        objectPresentations: [
+            .init(
+                objectHandle: player.handle,
+                primaryModel: modelSource,
+                mediumModel: nil,
+                lowModel: nil,
+                dyingModel: nil,
+                mediumDistance: nil,
+                lowDistance: nil
+            ),
+        ],
         dependencyManifest: .init(
             current: [
                 .init(
                     category: "texture",
                     source: texture,
                     state: "presentation-payload-imported",
+                    provenance: "synthetic canonical fixture"
+                ),
+                .init(
+                    category: "model",
+                    source: modelSource,
+                    state: "presentation-payload-imported",
+                    provenance: "synthetic canonical fixture"
+                ),
+                .init(
+                    category: "ship-definition",
+                    source: shipSource,
+                    state: "canonical-typed-definition",
                     provenance: "synthetic canonical fixture"
                 ),
             ],
@@ -2584,6 +2862,38 @@ func makeMinimalCanonicalLevel(levelKey: String = "descent3.level.training-missi
                 disposition: "synthetic-test-fixture"
             ),
         ]
+    )
+}
+
+private func removingDefaultPlayerPresentation(from level: Level) -> Level {
+    Level(
+        schemaVersion: level.schemaVersion,
+        missionKey: level.missionKey,
+        levelKey: level.levelKey,
+        source: level.source,
+        metadata: level.metadata,
+        rooms: level.rooms,
+        terrain: level.terrain,
+        objects: [],
+        retiredObjectHandles: level.retiredObjectHandles,
+        paths: level.paths,
+        goals: level.goals,
+        goalFlags: level.goalFlags,
+        triggers: level.triggers,
+        playerStartFlags: level.playerStartFlags,
+        lightmaps: level.lightmaps,
+        surfacePhysics: level.surfacePhysics,
+        presentationMaterials: level.presentationMaterials,
+        presentationCoronaAssets: level.presentationCoronaAssets,
+        models: [],
+        shipDefinitions: [],
+        defaultPlayerBinding: nil,
+        objectPresentations: [],
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current.filter { $0.category == "texture" },
+            historicalEagerBaseline: level.dependencyManifest.historicalEagerBaseline
+        ),
+        sourceChunks: level.sourceChunks
     )
 }
 

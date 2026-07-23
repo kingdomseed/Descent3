@@ -19,6 +19,7 @@ enum RevivalProjectDocumentError: Error, Equatable, LocalizedError {
     case projectNotLoaded
     case unexpectedPackageContents
     case projectFileTooLarge
+    case playerPresentationUnavailable
     case playNotActive
     case cameraOutsideRoom(Int)
 
@@ -32,6 +33,8 @@ enum RevivalProjectDocumentError: Error, Equatable, LocalizedError {
             "A Revival project package must contain exactly one regular project.json file."
         case .projectFileTooLarge:
             "project.json exceeds the 64 MiB Revival project limit."
+        case .playerPresentationUnavailable:
+            "The canonical project base has no default player presentation."
         case .playNotActive:
             "Start a disposable play session before moving its camera."
         case let .cameraOutsideRoom(sourceIndex):
@@ -373,7 +376,10 @@ final class RevivalProjectDocument: NSDocument {
     }
 
     func makePlaySession() throws -> RevivalPlaySession {
-        let session = project.makePlaySession(camera: camera)
+        guard project.level.defaultPlayerBinding != nil else {
+            throw RevivalProjectDocumentError.playerPresentationUnavailable
+        }
+        let session = project.makePlayerPlaySession()
         try validateCameraRoom(session.camera, session: session)
         return session
     }
@@ -389,9 +395,12 @@ final class RevivalProjectDocument: NSDocument {
         return session
     }
 
-    func commitPlaySession(_ session: RevivalPlaySession) {
+    func commitPlaySession(
+        _ session: RevivalPlaySession,
+        renderingWorld: Bool = true
+    ) {
         playSession = session
-        refreshWindowControllers()
+        refreshWindowControllers(renderWorld: renderingWorld)
     }
 
     func tracePlayIndoorMovement(
@@ -456,22 +465,21 @@ final class RevivalProjectDocument: NSDocument {
         session: RevivalPlaySession
     ) throws {
         let room = session.level.rooms.first {
-            $0.sourceIndex == cameraContainingRoomSourceIndex
+            $0.sourceIndex == session.cameraContainingRoomSourceIndex
         }!
-        guard sourceRoomThreeContains(proposedCamera.position, in: room) else {
+        guard sourceConvexRoomContains(proposedCamera.position, in: room) else {
             throw RevivalProjectDocumentError.cameraOutsideRoom(
-                cameraContainingRoomSourceIndex
+                session.cameraContainingRoomSourceIndex
             )
         }
     }
 
-    func returnToEditor() {
-        guard let session = playSession else {
+    func returnToEditor(renderingWorld: Bool = true) {
+        guard playSession != nil else {
             preconditionFailure("A play session must be active before returning to the editor")
         }
-        camera = session.camera
         playSession = nil
-        refreshWindowControllers()
+        refreshWindowControllers(renderWorld: renderingWorld)
     }
 
     private func restoreRoomName(
@@ -566,9 +574,9 @@ final class RevivalProjectDocument: NSDocument {
         }
     }
 
-    private func refreshWindowControllers() {
+    private func refreshWindowControllers(renderWorld: Bool = true) {
         for case let controller as RevivalEditorWindowController in windowControllers {
-            controller.refreshFromDocument()
+            controller.refreshFromDocument(renderWorld: renderWorld)
         }
     }
 }

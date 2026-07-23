@@ -298,7 +298,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         return nil
     }
 
-    func refreshFromDocument() {
+    func refreshFromDocument(renderWorld: Bool = true) {
         let selection = projectDocument.editorSelection
         let level = projectDocument.project.level
         let room = projectDocument.project.level.rooms.first {
@@ -346,7 +346,9 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                 isError: false
             )
         }
-        renderCurrentWorld()
+        if renderWorld {
+            renderCurrentWorld()
+        }
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -467,18 +469,15 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         do {
             if projectDocument.playSession == nil {
                 let candidate = try projectDocument.makePlaySession()
-                try replaceRenderedWorld(
-                    level: candidate.level,
-                    camera: candidate.camera
-                )
-                projectDocument.commitPlaySession(candidate)
+                try replaceRenderedWorld(session: candidate)
+                projectDocument.commitPlaySession(candidate, renderingWorld: false)
                 setSuccessStatus("Playing a disposable complete-level copy.")
-            } else if let playSession = projectDocument.playSession {
+            } else if projectDocument.playSession != nil {
                 try replaceRenderedWorld(
                     level: projectDocument.project.level,
-                    camera: playSession.camera
+                    camera: projectDocument.camera
                 )
-                projectDocument.returnToEditor()
+                projectDocument.returnToEditor(renderingWorld: false)
                 window?.makeFirstResponder(roomNameField)
                 setSuccessStatus("Returned to the unchanged editor document state.")
             }
@@ -499,11 +498,8 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             let candidate = try projectDocument.makePlaySession(
                 movingCameraTo: proposedCamera
             )
-            try replaceRenderedWorld(
-                level: candidate.level,
-                camera: candidate.camera
-            )
-            projectDocument.commitPlaySession(candidate)
+            try replaceRenderedWorld(session: candidate)
+            projectDocument.commitPlaySession(candidate, renderingWorld: false)
             setSuccessStatus("Moved the disposable play camera through the shared render path.")
         } catch {
             setStatus(
@@ -534,17 +530,23 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     }
 
     private func replaceRenderedWorld() throws {
-        let level: Level
-        let camera: RoomCamera
         if let session = projectDocument.playSession {
-            level = session.level
-            camera = session.camera
+            try replaceRenderedWorld(session: session)
         } else {
-            level = projectDocument.project.level
-            camera = projectDocument.camera
+            try replaceRenderedWorld(
+                level: projectDocument.project.level,
+                camera: projectDocument.camera
+            )
         }
+    }
 
-        try replaceRenderedWorld(level: level, camera: camera)
+    private func replaceRenderedWorld(session: RevivalPlaySession) throws {
+        guard let renderer else {
+            throw MetalWorldRendererError.metalUnavailable
+        }
+        try renderer.replace(level: session.level, playerView: session.playerView)
+        renderer.drawNow()
+        rendererError = nil
     }
 
     private func replaceRenderedWorld(

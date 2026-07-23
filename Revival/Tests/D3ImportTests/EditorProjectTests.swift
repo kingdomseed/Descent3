@@ -1061,7 +1061,10 @@ final class EditorProjectTests: XCTestCase {
             up: RoomCamera.trainingRoom3.up
         )
         let movedPlaySession = try document.makePlaySession(movingCameraTo: movedCamera)
-        XCTAssertEqual(document.playSession?.camera, .trainingRoom3)
+        XCTAssertEqual(
+            document.playSession?.camera,
+            defaultPlayerView(in: document.project.level).camera
+        )
         document.commitPlaySession(movedPlaySession)
         try document.renameSelectedRoom(to: "Course Revised")
 
@@ -1075,11 +1078,57 @@ final class EditorProjectTests: XCTestCase {
         document.returnToEditor()
         XCTAssertNil(document.playSession)
         XCTAssertEqual(document.selectedRoomSourceIndex, 3)
-        XCTAssertEqual(document.camera, movedCamera)
+        XCTAssertEqual(document.camera, .trainingRoom3)
         XCTAssertEqual(
             document.project.level.rooms.first { $0.sourceIndex == 3 }?.name,
             "Course Revised"
         )
+    }
+
+    @MainActor
+    func testPlayerBoundPlaySessionUsesCanonicalViewWithoutReplacingEditorCamera() throws {
+        let base = makeSliceSixObjectRenderLevel()
+        let binding = try XCTUnwrap(base.defaultPlayerBinding)
+        var objects = base.objects
+        let playerIndex = try XCTUnwrap(
+            objects.firstIndex { $0.handle == binding.objectHandle }
+        )
+        let player = objects[playerIndex]
+        objects[playerIndex] = PlacedObject(
+            handle: player.handle,
+            type: player.type,
+            storedID: player.storedID,
+            definition: player.definition,
+            instanceName: player.instanceName,
+            flags: player.flags,
+            doorShields: player.doorShields,
+            location: .room(3),
+            position: RoomCamera.trainingRoom3.position,
+            orientation: player.orientation,
+            containsType: player.containsType,
+            containsID: player.containsID,
+            containsCount: player.containsCount,
+            lifeLeft: player.lifeLeft,
+            soundSource: player.soundSource,
+            inertScriptName: player.inertScriptName,
+            inertModuleName: player.inertModuleName,
+            lightmapSubmodels: player.lightmapSubmodels
+        )
+        let project = try makeProject(
+            importedBase: replacing(base, objects: objects)
+        )
+        let document = RevivalProjectDocument(
+            project: project
+        )
+        let editorCamera = document.camera
+
+        let staged = try document.makePlaySession()
+
+        XCTAssertEqual(staged.playerView, defaultPlayerView(in: staged.level))
+        XCTAssertEqual(staged.level, document.project.level)
+        document.commitPlaySession(staged)
+        document.returnToEditor()
+        XCTAssertEqual(document.camera, editorCamera)
     }
 
     @MainActor
@@ -1153,7 +1202,7 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
-    func testPlayReturnPreservesEditorSelectionAndFixedCameraIdentity() throws {
+    func testPlayReturnPreservesEditorSelectionAndPlayerCameraIdentity() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeConnectedRoomProjectLevel())
         )
@@ -1164,7 +1213,7 @@ final class EditorProjectTests: XCTestCase {
         let selectionBeforePlay = document.editorSelection
 
         let staged = try document.makePlaySession()
-        XCTAssertEqual(staged.camera, .trainingRoom3)
+        XCTAssertEqual(staged.camera, defaultPlayerView(in: staged.level).camera)
         document.commitPlaySession(staged)
         XCTAssertEqual(document.editorSelection, selectionBeforePlay)
 
@@ -1189,7 +1238,7 @@ final class EditorProjectTests: XCTestCase {
         document.returnToEditor()
         XCTAssertEqual(document.editorSelection, selectionBeforePlay)
         XCTAssertEqual(document.cameraContainingRoomSourceIndex, 3)
-        XCTAssertEqual(document.camera, movedCamera)
+        XCTAssertEqual(document.camera, .trainingRoom3)
     }
 
     @MainActor
@@ -1496,6 +1545,8 @@ private func makeEditableProjectLevel() -> Level {
         presentationMaterials: base.presentationMaterials + [alternateMaterial],
         presentationCoronaAssets: base.presentationCoronaAssets,
         models: base.models,
+        shipDefinitions: base.shipDefinitions,
+        defaultPlayerBinding: base.defaultPlayerBinding,
         objectPresentations: base.objectPresentations,
         dependencyManifest: .init(
             current: base.dependencyManifest.current + [

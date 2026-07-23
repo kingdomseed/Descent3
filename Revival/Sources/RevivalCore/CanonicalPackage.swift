@@ -298,7 +298,7 @@ struct CanonicalPackageLibrary: Sendable {
 
 func writeCanonicalPackage(_ level: Level, to packageURL: URL) throws {
     try level.validate()
-    guard level.hasSelectedRoomPresentation else {
+    guard level.hasPlayerPresentation else {
         throw LevelValidationError.invalidDependency("missing canonical presentation")
     }
     guard !FileManager.default.fileExists(atPath: packageURL.path) else {
@@ -409,7 +409,7 @@ private func validateCanonicalPackage(
         throw CanonicalPackageError.identityMismatch
     }
     try level.validate()
-    guard level.hasSelectedRoomPresentation else {
+    guard level.hasPlayerPresentation else {
         throw CanonicalPackageError.identityMismatch
     }
     let reference = CanonicalPackageReference(

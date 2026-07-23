@@ -268,61 +268,58 @@ func runD3Import(
         IndexedPreparedArchive(validated: extra, archive: extraArchive),
         IndexedPreparedArchive(validated: d3, archive: d3Archive),
     ]
-    let sourceTextureByName = topologyLevel.rooms.reduce(
-        into: [String: SourceResource]()
-    ) { result, room in
-        for face in room.faces {
-            result[face.texture.sourceName.lowercased()] = face.texture
-        }
-    }
-    var portalBlends: [SourceResource: PresentationBlend] = [:]
-    var discoveredVisibility: SourceVisibleWorld?
-    while discoveredVisibility == nil {
-        do {
-            discoveredVisibility = try extractSourceVisibleWorld(
-                topologyLevel,
-                camera: .trainingRoom3,
-                startRoomSourceIndex: 3,
-                portalBlends: portalBlends
-            )
-        } catch RoomRenderExtractionError.missingMaterial(let sourceName) {
-            let key = sourceName.lowercased()
-            let definition = try! resolveRetailTextureDefinitions(
-                table: tableData,
-                overlay: overlayData,
-                names: [key]
-            )
-            portalBlends[sourceTextureByName[key]!] = definition[0].blend
-        }
-    }
-    let visibility = discoveredVisibility!
-    precondition(visibility.visibleRoomSourceIndices == [3, 2, 1])
-    precondition(visibility.faces.count == 125)
-
     let roomBySourceIndex = Dictionary(
         uniqueKeysWithValues: topologyLevel.rooms.map { ($0.sourceIndex, $0) }
     )
-    let sortedVisibleFaces = visibility.faces.sorted {
-        ($0.roomSourceIndex, $0.faceIndex) < ($1.roomSourceIndex, $1.faceIndex)
+    let playerObject = topologyLevel.objects.first {
+        $0.type == D3SourceIdentity.playerObjectType && $0.storedID == 0
+    }!
+    guard case .room(let playerRoomSourceIndex) = playerObject.location else {
+        preconditionFailure("Training player 0 must start in a room")
     }
-    let visibleFaceEvidence = sortedVisibleFaces.map {
-        "\($0.roomSourceIndex):\($0.faceIndex)\n"
+    precondition(
+        playerObject.handle == 2_048
+            && playerRoomSourceIndex == 1
+            && playerObject.position == .init(
+                x: 2_060.6497,
+                y: -131.22517,
+                z: 2_204.4216
+            )
+            && playerObject.orientation == .init(
+                right: .init(x: 1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: 0),
+                forward: .init(x: 0, y: 0, z: 1)
+            )
+    )
+    let presentationRoomIndices = reciprocalPortalComponent(
+        rooms: topologyLevel.rooms,
+        startRoomSourceIndex: playerRoomSourceIndex
+    )
+    precondition(
+        presentationRoomIndices.count == 48
+            && presentationRoomIndices == Set(topologyLevel.rooms.map(\.sourceIndex))
+    )
+    let componentEvidence = presentationRoomIndices.sorted().map {
+        "\($0)\n"
     }.joined()
     precondition(
-        canonicalSHA256(Data(visibleFaceEvidence.utf8))
-            == "564a9fd0b1264cbf19b124e55e36bd2ca1275dc86926093db538df1c97001002"
+        topologyLevel.rooms.reduce(0) { $0 + $1.portals.count } == 112
+            && canonicalSHA256(Data(componentEvidence.utf8))
+                == "eb1bbb096d75873279fd0dc02d3c599052ba94f129e6f0f539867144c5c4a712"
     )
-    precondition(
-        sortedVisibleFaces.filter {
-            let face = roomBySourceIndex[$0.roomSourceIndex]!.faces[$0.faceIndex]
-            return face.allowsLightCorona && [1_205, 1_332].contains(face.texture.storedIndex)
-        }.map { "\($0.roomSourceIndex):\($0.faceIndex)" } == [
-            "1:332", "1:336", "1:340", "1:344",
-            "3:2", "3:4", "3:6", "3:8", "3:10", "3:12", "3:14", "3:16",
-        ]
-    )
+    let presentationFaceReferences = topologyLevel.rooms
+        .filter { presentationRoomIndices.contains($0.sourceIndex) }
+        .flatMap { room in
+            room.faces.indices.map {
+                SourceVisibleFace(roomSourceIndex: room.sourceIndex, faceIndex: $0)
+            }
+        }
+        .sorted {
+            ($0.roomSourceIndex, $0.faceIndex) < ($1.roomSourceIndex, $1.faceIndex)
+        }
+    precondition(presentationFaceReferences.count == 3_485)
     var lightmapPageByInfo: [Int: Int] = [:]
-    let perFaceLightmapEvidence = sortedVisibleFaces.compactMap { reference -> String? in
+    let perFaceLightmapEvidence = presentationFaceReferences.compactMap { reference -> String? in
         let face = roomBySourceIndex[reference.roomSourceIndex]!.faces[reference.faceIndex]
         guard let infoIndex = face.lightmapInfoIndex else { return nil }
         let pageIndex = topologyLevel.lightmaps.infos[infoIndex].pageIndex
@@ -331,28 +328,38 @@ func runD3Import(
     }.joined()
     precondition(
         perFaceLightmapEvidence.utf8.count > 0
-            && perFaceLightmapEvidence.filter({ $0 == "\n" }).count == 123
+            && perFaceLightmapEvidence.filter({ $0 == "\n" }).count == 3_454
             && canonicalSHA256(Data(perFaceLightmapEvidence.utf8))
-                == "e3e01bf4d0619be753ac4361f3829e780811497866b69bcb6de9da2deefd4456"
+                == "8466bc5b21fb3d4fe3f703778eaed28c15ef6d4cf4833d296e0f766e71e1ba7d"
     )
     let uniqueLightmapEvidence = lightmapPageByInfo.keys.sorted().map {
         "\($0):\(lightmapPageByInfo[$0]!)\n"
     }.joined()
     precondition(
-        lightmapPageByInfo.count == 98
+        lightmapPageByInfo.count == 2_486
             && canonicalSHA256(Data(uniqueLightmapEvidence.utf8))
-                == "022c80403ef6d37064b74f11b38e441cbdbc9fef29c13c6ea0a68dfc53cfac76"
+                == "4f8cf214788187dadf30f987d08c077ed2576346cd64a48d1795da83cee2bcde"
     )
-    let textureByName = visibility.faces.reduce(
+    let textureByName = presentationFaceReferences.reduce(
         into: [String: SourceResource]()
     ) { result, reference in
         let texture = roomBySourceIndex[reference.roomSourceIndex]!
             .faces[reference.faceIndex].texture
         result[texture.sourceName.lowercased()] = texture
     }
-    precondition(Set(textureByName.values.map(\.storedIndex)) == [
-        698, 793, 797, 908, 985, 1_205, 1_331, 1_332,
-    ])
+    let roomMaterialEvidence = textureByName.values.sorted {
+        if $0.storedIndex != $1.storedIndex {
+            return $0.storedIndex < $1.storedIndex
+        }
+        return $0.sourceName < $1.sourceName
+    }.map {
+        "\($0.storedIndex):\($0.sourceName)\n"
+    }.joined()
+    precondition(
+        textureByName.count == 22
+            && canonicalSHA256(Data(roomMaterialEvidence.utf8))
+                == "50a51f618ae1c7fa0cbe62f911b584cb3b1d7961a384ac48e5ff6ff8a40056aa"
+    )
     let definitions = try! resolveRetailTextureDefinitions(
         table: tableData,
         overlay: overlayData,
@@ -380,17 +387,18 @@ func runD3Import(
         }
     )
     precondition(
-        Set(coronaByTexture.keys) == [908, 1_205, 1_332]
+        Set(coronaByTexture.keys) == [908, 1_199, 1_202, 1_204, 1_205, 1_332]
             && coronaByTexture[1_205]?.tint
                 == .init(x: Float(16) / 18, y: 1, z: 1)
             && coronaByTexture[1_332]?.tint
-                == .init(x: 0.2, y: 0.2, z: 0.2)
+                == .init(x: 0.2, y: 0.2, z: 0.2),
+        "unexpected corona textures: \(coronaByTexture.keys.sorted())"
     )
-    let reachedLightmapPages = Set(visibility.faces.compactMap { reference -> Int? in
+    let reachedLightmapPages = Set(presentationFaceReferences.compactMap { reference -> Int? in
         let face = roomBySourceIndex[reference.roomSourceIndex]!.faces[reference.faceIndex]
         return face.lightmapInfoIndex.map { topologyLevel.lightmaps.infos[$0].pageIndex }
     })
-    precondition(reachedLightmapPages == [8, 13, 19])
+    precondition(reachedLightmapPages == Set(0..<20))
     let roomPresentationLevel = topologyLevel.addingPresentationMaterials(
         materials,
         retainingLightmapPages: reachedLightmapPages,
@@ -495,6 +503,14 @@ func runD3Import(
             textureResources: slots
         )
     }
+    let pyroModel = reachedModels.first {
+        $0.source.sourceName.caseInsensitiveCompare("PyroGL.OOF") == .orderedSame
+    }!
+    precondition(
+        pyroModel.sourceSHA256
+            == "0b004302ffe60a50e39b8f8261a3c11ca0044f11000ef6e039527e4c1ebff75b"
+            && pyroModel.collisionRadius.bitPattern == 0x40d9_5869
+    )
     let ship = reachedPages.ship
     let generic = reachedPages.generic
     let reachedObjectPresentations = topologyLevel.objects.compactMap {
@@ -520,10 +536,78 @@ func runD3Import(
         )
     }
     precondition(reachedObjectPresentations.count == 7)
-    let level = roomPresentationLevel.addingObjectPresentation(
+    let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
+    let deferredRoomObjects = topologyLevel.objects.filter {
+        guard case .room = $0.location else { return false }
+        return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
+    }
+    precondition(deferredRoomObjects.count == 32)
+    let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
         materials: modelMaterials
+    )
+    precondition(objectPresentationLevel.presentationMaterials.count == 41)
+    let retailShip = ship.shipDefinition!
+    precondition(
+        retailShip.name == "Pyro-GL"
+            && retailShip.presentationSize == 6.676084041595459
+            && retailShip.physics.mass == 30
+            && retailShip.physics.drag == 90
+            && retailShip.physics.fullThrust == 5_400
+            && retailShip.physics.behaviors == [.turnroll, .wiggle, .usesThrust]
+            && retailShip.physics.rotationalDrag == 225
+            && retailShip.physics.fullRotationalThrust == 6_860_000
+            && retailShip.physics.numberOfBounces == -1
+            && retailShip.physics.initialForwardVelocity == 0
+            && retailShip.physics.initialAngularVelocity == .zero
+            && retailShip.physics.wiggleAmplitude == 0.17
+            && retailShip.physics.wigglesPerSecond == 0.9
+            && retailShip.physics.coefficientOfRestitution == 1
+            && retailShip.physics.hitDieDot == -1
+            && retailShip.physics.maximumTurnrollRate == 8_000
+            && retailShip.physics.turnrollRatio == 0.13
+    )
+    let shipSource = SourceResource(storedIndex: 0, sourceName: retailShip.name)
+    let level = objectPresentationLevel.addingDefaultPlayerShip(
+        .init(
+            source: shipSource,
+            primaryModel: modelSources[ship.primaryModelName.lowercased()]!,
+            presentationSize: retailShip.presentationSize,
+            physics: retailShip.physics
+        ),
+        binding: .init(
+            playerID: 0,
+            objectHandle: playerObject.handle,
+            ship: shipSource
+        )
+    )
+    let playerView = defaultPlayerView(in: level)
+    let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
+    precondition(
+        initialExtraction.opaqueDrawItems.count
+            + initialExtraction.translucentDrawItems.count == 232
+    )
+    let initialFaceSHA256 = canonicalSHA256(Data(
+        (initialExtraction.opaqueDrawItems + initialExtraction.translucentDrawItems)
+            .sorted {
+                $0.roomSourceIndex == $1.roomSourceIndex
+                    ? $0.faceIndex < $1.faceIndex
+                    : $0.roomSourceIndex < $1.roomSourceIndex
+            }
+            .map { "\($0.roomSourceIndex):\($0.faceIndex)\n" }
+            .joined()
+            .utf8
+    ))
+    precondition(
+        initialFaceSHA256
+            == "9540339832d41b1ff667a9a08a627e989694fec246509a081e08413544838100"
+    )
+    precondition(initialExtraction.admittedObjectHandles == [12_301, 12_300])
+    precondition(
+        initialExtraction.lightCoronas.map {
+            "\($0.roomSourceIndex):\($0.faceIndex)"
+        } == ["1:296"]
     )
 
     let ppicsFile = profile.files.first { $0.relativePath == "ppics.hog" }!

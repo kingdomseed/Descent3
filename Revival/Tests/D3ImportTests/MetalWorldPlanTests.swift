@@ -47,6 +47,11 @@ final class MetalWorldPlanTests: XCTestCase {
             plan.draws.map { "\($0.roomSourceIndex):\($0.faceIndex)" },
             ["1:1", "2:0", "3:0"]
         )
+        XCTAssertGreaterThan(plan.preparedDraws.count, plan.draws.count)
+        XCTAssertEqual(
+            plan.activeDrawIndices.map { plan.preparedDraws[$0] },
+            plan.draws
+        )
         XCTAssertEqual(plan.draws.map(\.blend), [
             .opaque,
             .additiveSourceAlpha(opacity: 178),

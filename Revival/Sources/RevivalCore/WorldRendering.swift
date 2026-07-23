@@ -37,6 +37,69 @@ struct RoomCamera: Codable, Equatable, Sendable {
     )
 }
 
+struct PlayerView: Equatable, Sendable {
+    let playerID: Int
+    let objectHandle: UInt32
+    let roomSourceIndex: Int
+    let camera: RoomCamera
+    let collisionRadius: Float
+}
+
+func reciprocalPortalComponent(
+    rooms: [LevelRoom],
+    startRoomSourceIndex: Int
+) -> Set<Int> {
+    let roomsBySourceIndex = Dictionary(
+        uniqueKeysWithValues: rooms.map { ($0.sourceIndex, $0) }
+    )
+    guard roomsBySourceIndex[startRoomSourceIndex] != nil else {
+        return []
+    }
+
+    var reached: Set<Int> = [startRoomSourceIndex]
+    var pending = [startRoomSourceIndex]
+    while let sourceIndex = pending.popLast() {
+        let room = roomsBySourceIndex[sourceIndex]!
+        for (portalIndex, portal) in room.portals.enumerated() {
+            guard let destination = roomsBySourceIndex[portal.connectedRoom],
+                  destination.portals.indices.contains(portal.connectedPortal)
+            else {
+                continue
+            }
+            let reciprocal = destination.portals[portal.connectedPortal]
+            guard reciprocal.connectedRoom == sourceIndex,
+                  reciprocal.connectedPortal == portalIndex,
+                  reached.insert(destination.sourceIndex).inserted
+            else {
+                continue
+            }
+            pending.append(destination.sourceIndex)
+        }
+    }
+    return reached
+}
+
+func defaultPlayerView(in level: Level) -> PlayerView {
+    let binding = level.defaultPlayerBinding!
+    let object = level.objects.first { $0.handle == binding.objectHandle }!
+    let ship = level.shipDefinitions.first { $0.source == binding.ship }!
+    let model = level.models.first { $0.source == ship.primaryModel }!
+    guard case let .room(roomSourceIndex) = object.location else {
+        preconditionFailure("The validated default player start is indoor.")
+    }
+    return PlayerView(
+        playerID: binding.playerID,
+        objectHandle: object.handle,
+        roomSourceIndex: roomSourceIndex,
+        camera: RoomCamera(
+            position: object.position,
+            target: object.position + object.orientation.forward,
+            up: object.orientation.up
+        ),
+        collisionRadius: model.collisionRadius
+    )
+}
+
 enum PortalPresentation: String, Codable, Equatable, Sendable {
     case renderedSurface
     case openBoundary
@@ -294,6 +357,66 @@ func extractWorldForRendering(
     camera: RoomCamera,
     startRoomSourceIndex: Int
 ) throws -> WorldRenderExtraction {
+    try extractWorldForRendering(
+        level,
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        excludedObjectHandle: nil
+    )
+}
+
+func extractWorldForRendering(
+    _ level: Level,
+    playerView: PlayerView
+) throws -> WorldRenderExtraction {
+    try extractWorldForRendering(
+        level,
+        camera: playerView.camera,
+        startRoomSourceIndex: playerView.roomSourceIndex,
+        excludedObjectHandle: playerView.objectHandle
+    )
+}
+
+func extractPreparedRoomDrawItems(
+    _ level: Level,
+    startRoomSourceIndex: Int
+) throws -> [RoomDrawItem] {
+    let component = reciprocalPortalComponent(
+        rooms: level.rooms,
+        startRoomSourceIndex: startRoomSourceIndex
+    )
+    let materialByTexture = Dictionary(
+        uniqueKeysWithValues: level.presentationMaterials.map { ($0.texture, $0) }
+    )
+    var items: [RoomDrawItem] = []
+    for room in level.rooms
+        .filter({ component.contains($0.sourceIndex) })
+        .sorted(by: { $0.sourceIndex < $1.sourceIndex }) {
+        for faceIndex in room.faces.indices {
+            let face = room.faces[faceIndex]
+            guard faceIsRenderable(room, face: face) else { continue }
+            guard let material = materialByTexture[face.texture] else {
+                throw RoomRenderExtractionError.missingMaterial(face.texture.sourceName)
+            }
+            items.append(
+                try makeDrawItem(
+                    room: room,
+                    faceIndex: faceIndex,
+                    material: material,
+                    lightmaps: level.lightmaps
+                )
+            )
+        }
+    }
+    return items
+}
+
+private func extractWorldForRendering(
+    _ level: Level,
+    camera: RoomCamera,
+    startRoomSourceIndex: Int,
+    excludedObjectHandle: UInt32?
+) throws -> WorldRenderExtraction {
     let visibility = try extractSourceVisibleWorld(
         level,
         camera: camera,
@@ -355,7 +478,8 @@ func extractWorldForRendering(
         level,
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex,
-        visibility: visibility
+        visibility: visibility,
+        excludedObjectHandle: excludedObjectHandle
     )
     return WorldRenderExtraction(
         visibleRoomSourceIndices: visibility.visibleRoomSourceIndices,
@@ -372,7 +496,8 @@ private func extractObjectPresentation(
     _ level: Level,
     camera: RoomCamera,
     startRoomSourceIndex: Int,
-    visibility: SourceVisibleWorld
+    visibility: SourceVisibleWorld,
+    excludedObjectHandle: UInt32?
 ) -> (handles: [UInt32], drawItems: [ModelDrawItem]) {
     guard !level.objectPresentations.isEmpty else { return ([], []) }
     let presentationByHandle = Dictionary(
@@ -389,7 +514,8 @@ private func extractObjectPresentation(
     var accepted: [(depth: Float, ordinal: Int, object: PlacedObject,
                     presentation: ObjectPresentationReference, model: CanonicalModel)] = []
     for (ordinal, object) in level.objects.enumerated() {
-        guard let presentation = presentationByHandle[object.handle],
+        guard object.handle != excludedObjectHandle,
+              let presentation = presentationByHandle[object.handle],
               case let .room(roomSourceIndex) = object.location,
               visibleRooms.contains(roomSourceIndex),
               let primary = modelBySource[presentation.primaryModel] else {
@@ -876,7 +1002,11 @@ func sourceRoomThreeContains(_ point: Vector3, in room: LevelRoom) -> Bool {
         room.sourceIndex == 3,
         "Slice 3 camera containment is defined only for source room 3"
     )
-    return room.faces.allSatisfy { face in
+    return sourceConvexRoomContains(point, in: room)
+}
+
+func sourceConvexRoomContains(_ point: Vector3, in room: LevelRoom) -> Bool {
+    room.faces.allSatisfy { face in
         let first = room.vertices[face.corners[0].vertexIndex]
         return dot(point - first, faceNormal(room, face: face)) >= 0
     }

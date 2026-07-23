@@ -260,7 +260,27 @@ struct RevivalEditorSelection: Equatable, Sendable {
 
 struct RevivalPlaySession: Equatable, Sendable {
     let level: Level
-    var camera: RoomCamera
+    var playerView: PlayerView
+    let cameraContainingRoomSourceIndex: Int
+
+    init(level: Level, playerView: PlayerView) {
+        self.level = level
+        self.playerView = playerView
+        cameraContainingRoomSourceIndex = playerView.roomSourceIndex
+    }
+
+    var camera: RoomCamera {
+        get { playerView.camera }
+        set {
+            playerView = PlayerView(
+                playerID: playerView.playerID,
+                objectHandle: playerView.objectHandle,
+                roomSourceIndex: playerView.roomSourceIndex,
+                camera: newValue,
+                collisionRadius: playerView.collisionRadius
+            )
+        }
+    }
 }
 
 struct RevivalRoomNameEdit: Codable, Equatable, Sendable {
@@ -937,8 +957,8 @@ struct RevivalProject: Equatable, Sendable {
         return previousName
     }
 
-    func makePlaySession(camera: RoomCamera) -> RevivalPlaySession {
-        RevivalPlaySession(level: level, camera: camera)
+    func makePlayerPlaySession() -> RevivalPlaySession {
+        RevivalPlaySession(level: level, playerView: defaultPlayerView(in: level))
     }
 
     private mutating func updateRoomNameEdit(sourceIndex: Int) {
