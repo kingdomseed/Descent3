@@ -119,6 +119,7 @@ final class CanonicalLevelTests: XCTestCase {
         assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 2))
         assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 3))
         assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 4))
+        assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 5))
         assertValidationError(
             .invalidSurfacePhysics,
             replacing(base, surfacePhysics: [])

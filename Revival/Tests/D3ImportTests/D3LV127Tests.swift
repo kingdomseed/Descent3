@@ -30,6 +30,26 @@ final class D3LV127Tests: XCTestCase {
         )
     }
 
+    func testTranslatesForceFieldTextureFlagIntoSurfacePhysics() throws {
+        let forceField = SourceResource(
+            storedIndex: 22,
+            sourceName: "Alien Force Field_1"
+        )
+
+        XCTAssertEqual(
+            try resolveRetailSurfacePhysics(
+                table: makeSimpleTextureTablePage(
+                    name: forceField.sourceName,
+                    bitmapSourceName: "forcefield.ogf",
+                    flags: 0x0000_0020
+                ),
+                overlay: Data(),
+                textures: [forceField]
+            ),
+            [.init(texture: forceField, behavior: .forceField)]
+        )
+    }
+
     func testClassifiesUnpagedSourceDefaultTexturesAsBlocking() throws {
         let sample = SourceResource(storedIndex: 0, sourceName: "SAMPLE TEXTURE")
         let rainbow = SourceResource(storedIndex: 1, sourceName: "Rainbow Texture")

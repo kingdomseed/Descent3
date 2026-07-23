@@ -163,38 +163,20 @@ final class WorldRenderingTests: XCTestCase {
         )
     }
 
-    func testPlayerSimulationStopsAtFirstContactAndCommitsContainingRoom() throws {
+    func testPlayerSimulationCommitsContactResponseToSamePlayerAndRoom() throws {
         let simulation = PlayerSimulation(
             level: makeSliceTenContactLevel(),
             presentationReadyTimestamp: 0
         )
         var timestamp = 0.1
         var contactFrame: PlayerSimulationFrame?
-        var expectedContactVelocity: Vector3?
         for _ in 0..<100 {
-            let start = defaultPlayerView(in: simulation.level).camera.position
-            let startingVelocity = simulation.velocity
-            let duration = simulation.frameDuration
             let frame = simulation.update(
                 at: timestamp,
                 input: .init(forward: 1)
             )
             timestamp += 0.1
-            if let contact = frame.wallContact {
-                let decay = exp(-3 * Double(duration))
-                let attemptedZ = Double(start.z)
-                    + 60 * Double(duration)
-                    + (30.0 / 90.0) * (Double(startingVelocity.z) - 60)
-                        * (1 - decay)
-                let attemptedDistance = Float(attemptedZ) - start.z
-                let movedTime = duration * contact.distance / attemptedDistance
-                expectedContactVelocity = movedTime > 0.0001
-                    ? .init(
-                        x: 0,
-                        y: 0,
-                        z: (frame.playerView.camera.position.z - start.z) / movedTime
-                    )
-                    : startingVelocity
+            if frame.wallContact != nil {
                 contactFrame = frame
                 break
             }
@@ -213,15 +195,18 @@ final class WorldRenderingTests: XCTestCase {
             .room(frame.playerView.roomSourceIndex)
         )
         XCTAssertEqual(contact.roomSourceIndex, frame.playerView.roomSourceIndex)
-        XCTAssertEqual(frame.velocity.x, expectedContactVelocity!.x, accuracy: 0.000_01)
-        XCTAssertEqual(frame.velocity.y, expectedContactVelocity!.y, accuracy: 0.000_01)
-        XCTAssertEqual(frame.velocity.z, expectedContactVelocity!.z, accuracy: 0.000_01)
+        XCTAssertGreaterThan(
+            contact.normal.x * frame.velocity.x
+                + contact.normal.y * frame.velocity.y
+                + contact.normal.z * frame.velocity.z,
+            0
+        )
         XCTAssertLessThan(frame.playerView.camera.position.z, 2_310.928)
     }
 
-    func testNearImmediateContactRetainsStartingVelocity() throws {
+    func testPlayerSimulationSlidesAndRetracesRemainingFrameAfterContact() throws {
         let base = makeSliceSixObjectRenderLevel()
-        let clearance = defaultPlayerView(in: base).collisionRadius + 0.0005
+        let clearance = defaultPlayerView(in: base).collisionRadius + 0.5
         let simulation = PlayerSimulation(
             level: makeSliceTenContactLevel(clearance: clearance),
             presentationReadyTimestamp: 0
@@ -229,7 +214,89 @@ final class WorldRenderingTests: XCTestCase {
 
         let frame = simulation.update(
             at: 0.016,
-            input: .init(forward: 1)
+            input: .init(forward: 1, sideways: 1)
+        )
+        let contact = try XCTUnwrap(frame.wallContact)
+
+        XCTAssertGreaterThan(
+            frame.playerView.camera.position.x,
+            contact.contactPoint.x + 0.1
+        )
+        XCTAssertLessThanOrEqual(
+            frame.playerView.camera.position.z,
+            contact.contactPoint.z
+                + contact.normal.z * frame.playerView.collisionRadius
+        )
+        XCTAssertGreaterThan(frame.velocity.x, 0)
+        XCTAssertLessThanOrEqual(frame.velocity.z, 0)
+        XCTAssertLessThan(abs(frame.velocity.z), frame.velocity.x * 0.03)
+
+        XCTAssertEqual(frame.velocity.x, 15.360_591, accuracy: 0.000_1)
+        XCTAssertEqual(frame.velocity.z, -0.015_361_632, accuracy: 0.000_1)
+    }
+
+    func testIndoorTraceCombinesTwoExactNearestWallNormals() throws {
+        let level = makeSliceElevenCornerLevel(clearance: 20)
+        let view = defaultPlayerView(in: level)
+        let trace = traceIndoorMovement(
+            in: level,
+            startRoom: view.roomSourceIndex,
+            start: view.camera.position,
+            end: Vector3(
+                x: view.camera.position.x + 20,
+                y: view.camera.position.y,
+                z: view.camera.position.z + 20
+            ),
+            radius: view.collisionRadius
+        )
+
+        guard case let .wallHit(contact) = trace.outcome else {
+            return XCTFail("Expected the equal-distance corner contact.")
+        }
+        let component = -Float(1 / sqrt(2.0))
+        XCTAssertEqual(contact.normal.x, component, accuracy: 0.000_001)
+        XCTAssertEqual(contact.normal.y, 0, accuracy: 0.000_001)
+        XCTAssertEqual(contact.normal.z, component, accuracy: 0.000_001)
+    }
+
+    func testPlayerSimulationUsesSourceDefaultForceFieldBounce() throws {
+        let simulation = PlayerSimulation(
+            level: makeSliceElevenForceFieldLevel(clearance: 20),
+            presentationReadyTimestamp: 0
+        )
+        var timestamp = 0.1
+        var contactFrame: PlayerSimulationFrame?
+        for _ in 0..<100 {
+            let frame = simulation.update(
+                at: timestamp,
+                input: .init(forward: 1)
+            )
+            timestamp += 0.1
+            if frame.wallContact != nil {
+                contactFrame = frame
+                break
+            }
+        }
+
+        let frame = try XCTUnwrap(contactFrame)
+        let contact = try XCTUnwrap(frame.wallContact)
+        let collisionCenterZ = contact.contactPoint.z
+            + contact.normal.z * frame.playerView.collisionRadius
+        XCTAssertLessThan(frame.playerView.camera.position.z, collisionCenterZ - 1)
+        XCTAssertLessThan(frame.velocity.z, -90)
+    }
+
+    func testNearImmediateContactUsesReleasedNormalNudge() throws {
+        let base = makeSliceSixObjectRenderLevel()
+        let clearance = defaultPlayerView(in: base).collisionRadius - 0.0005
+        let simulation = PlayerSimulation(
+            level: makeSliceTenContactLevel(clearance: clearance),
+            presentationReadyTimestamp: 0
+        )
+
+        let frame = simulation.update(
+            at: 0.016,
+            input: .init(forward: 0.001_351)
         )
         let contact = try XCTUnwrap(frame.wallContact)
         let attemptedDistance = Float(
@@ -239,7 +306,27 @@ final class WorldRenderingTests: XCTestCase {
             * contact.distance
             / attemptedDistance
 
-        XCTAssertLessThanOrEqual(movedTime, 0.0001)
+        XCTAssertEqual(movedTime, 0, accuracy: 0.000_001)
+        let outwardVelocity = contact.normal.x * frame.velocity.x
+            + contact.normal.y * frame.velocity.y
+            + contact.normal.z * frame.velocity.z
+        XCTAssertGreaterThan(outwardVelocity, 0.3)
+    }
+
+    func testPlayerSimulationStopsAtReleasedNineContactLimit() throws {
+        let base = makeSliceSixObjectRenderLevel()
+        let clearance = defaultPlayerView(in: base).collisionRadius - 0.0005
+        let simulation = PlayerSimulation(
+            level: makeSliceElevenTrappedLevel(clearance: clearance),
+            presentationReadyTimestamp: 0
+        )
+
+        let frame = simulation.update(
+            at: 0.1,
+            input: .init(forward: 1)
+        )
+
+        XCTAssertNotNil(frame.wallContact)
         XCTAssertEqual(frame.velocity, .zero)
     }
 
@@ -277,7 +364,10 @@ final class WorldRenderingTests: XCTestCase {
             .init(x: 2_060.6497, y: -131.22517, z: 2_205.4216)
         )
         XCTAssertEqual(view.camera.up, .init(x: 0, y: 1, z: 0))
-        XCTAssertEqual(view.collisionRadius.bitPattern, UInt32(0x40d9_5869))
+        XCTAssertEqual(
+            view.collisionRadius,
+            level.shipDefinitions[0].presentationSize * 0.8
+        )
 
         let extraction = try extractWorldForRendering(level, playerView: view)
         XCTAssertEqual(extraction.admittedObjectHandles, [12_301, 12_300])
@@ -1249,5 +1339,108 @@ func makeSliceTenContactLevel(clearance: Float = 20) -> Level {
     )
     var rooms = level.rooms
     rooms[roomIndex] = contactRoom
+    return replacing(level, rooms: rooms)
+}
+
+func makeSliceElevenCornerLevel(clearance: Float) -> Level {
+    let level = makeSliceTenContactLevel(clearance: clearance)
+    let player = level.objects.first { $0.handle == 2_048 }!
+    let roomIndex = level.rooms.firstIndex { $0.sourceIndex == 1 }!
+    let room = level.rooms[roomIndex]
+    let firstVertex = room.vertices.count
+    let x = player.position.x + clearance
+    let vertices = room.vertices + [
+        Vector3(x: x, y: player.position.y - 20, z: player.position.z - 20),
+        Vector3(x: x, y: player.position.y - 20, z: player.position.z + 20),
+        Vector3(x: x, y: player.position.y + 20, z: player.position.z + 20),
+        Vector3(x: x, y: player.position.y + 20, z: player.position.z - 20),
+    ]
+    let wall = LevelFace(
+        corners: (0..<4).map {
+            .init(vertexIndex: firstVertex + $0, u: 0, v: 0, alpha: 255)
+        },
+        flags: 0,
+        portalIndex: nil,
+        texture: room.faces[0].texture
+    )
+    let cornerRoom = LevelRoom(
+        sourceIndex: room.sourceIndex,
+        name: room.name,
+        pathPoint: room.pathPoint,
+        vertices: vertices,
+        faces: room.faces + [wall],
+        portals: room.portals,
+        flags: room.flags,
+        pulseTime: room.pulseTime,
+        pulseOffset: room.pulseOffset,
+        mirrorFaceIndex: room.mirrorFaceIndex,
+        door: room.door,
+        volumeLights: room.volumeLights,
+        fog: room.fog,
+        ambientSoundPattern: room.ambientSoundPattern,
+        reverb: room.reverb,
+        damage: room.damage,
+        damageType: room.damageType
+    )
+    var rooms = level.rooms
+    rooms[roomIndex] = cornerRoom
+    return replacing(level, rooms: rooms)
+}
+
+func makeSliceElevenForceFieldLevel(clearance: Float) -> Level {
+    let level = makeSliceTenContactLevel(clearance: clearance)
+    let texture = level.rooms.first { $0.sourceIndex == 1 }!.faces.last!.texture
+    return replacing(
+        level,
+        surfacePhysics: level.surfacePhysics.map {
+            $0.texture == texture
+                ? .init(texture: $0.texture, behavior: .forceField)
+                : $0
+        }
+    )
+}
+
+func makeSliceElevenTrappedLevel(clearance: Float) -> Level {
+    let level = makeSliceTenContactLevel(clearance: clearance)
+    let player = level.objects.first { $0.handle == 2_048 }!
+    let roomIndex = level.rooms.firstIndex { $0.sourceIndex == 1 }!
+    let room = level.rooms[roomIndex]
+    let firstVertex = room.vertices.count
+    let z = player.position.z - clearance
+    let vertices = room.vertices + [
+        Vector3(x: player.position.x - 20, y: player.position.y - 20, z: z),
+        Vector3(x: player.position.x + 20, y: player.position.y - 20, z: z),
+        Vector3(x: player.position.x + 20, y: player.position.y + 20, z: z),
+        Vector3(x: player.position.x - 20, y: player.position.y + 20, z: z),
+    ]
+    let wall = LevelFace(
+        corners: (0..<4).map {
+            .init(vertexIndex: firstVertex + $0, u: 0, v: 0, alpha: 255)
+        },
+        flags: 0,
+        portalIndex: nil,
+        texture: room.faces[0].texture
+    )
+    let trappedRoom = LevelRoom(
+        sourceIndex: room.sourceIndex,
+        name: room.name,
+        pathPoint: room.pathPoint,
+        vertices: vertices,
+        faces: room.faces + [wall],
+        portals: room.portals,
+        flags: room.flags,
+        pulseTime: room.pulseTime,
+        pulseOffset: room.pulseOffset,
+        mirrorFaceIndex: room.mirrorFaceIndex,
+        door: room.door,
+        volumeLights: room.volumeLights,
+        fog: room.fog,
+        ambientSoundPattern: room.ambientSoundPattern,
+        reverb: room.reverb,
+        damage: room.damage,
+        damageType: room.damageType
+    )
+    var rooms = level.rooms
+    rooms[roomIndex] = trappedRoom
     return replacing(level, rooms: rooms)
 }

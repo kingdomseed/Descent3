@@ -84,10 +84,15 @@ func resolveRetailSurfacePhysics(
                 behavior: behavior
             )
         }
-        return SurfacePhysicsEntry(
-            texture: texture,
-            behavior: page.flags & 0x0001_0000 != 0 ? .passThrough : .blocking
-        )
+        let behavior: SurfacePhysicsBehavior
+        if page.flags & 0x0001_0000 != 0 {
+            behavior = .passThrough
+        } else if page.flags & 0x0000_0020 != 0 {
+            behavior = .forceField
+        } else {
+            behavior = .blocking
+        }
+        return SurfacePhysicsEntry(texture: texture, behavior: behavior)
     }
 }
 

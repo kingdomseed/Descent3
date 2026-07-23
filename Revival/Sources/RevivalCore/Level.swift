@@ -557,6 +557,7 @@ struct PresentationMaterial: Codable, Equatable, Sendable {
 
 enum SurfacePhysicsBehavior: String, Codable, Equatable, Sendable {
     case blocking
+    case forceField
     case passThrough
 }
 
@@ -716,7 +717,7 @@ struct Level: Codable, Equatable, Sendable {
     let sourceChunks: [SourceChunkRecord]
 
     init(
-        schemaVersion: Int = 5,
+        schemaVersion: Int = 6,
         missionKey: String,
         levelKey: String,
         source: LevelSource,
@@ -776,7 +777,7 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     private func validate(allowImportStagingPresentation: Bool) throws {
-        guard schemaVersion == 5, source.d3lvVersion == 127,
+        guard schemaVersion == 6, source.d3lvVersion == 127,
               !missionKey.isEmpty, !levelKey.isEmpty else {
             throw LevelValidationError.invalidIdentity
         }
@@ -1617,6 +1618,7 @@ func traceIndoorMovement(
     var visited: [Int] = []
     var visitedSet: Set<Int> = []
     var nearest: IndoorWallContact?
+    var nearestNormalCount = 0
 
     func visit(_ roomIndex: Int) {
         guard visitedSet.insert(roomIndex).inserted else { return }
@@ -1660,6 +1662,17 @@ func traceIndoorMovement(
             )
             if nearest == nil || candidate.distance < nearest!.distance {
                 nearest = candidate
+                nearestNormalCount = 1
+            } else if candidate.distance == nearest!.distance,
+                      nearestNormalCount < 2 {
+                nearest = IndoorWallContact(
+                    roomSourceIndex: nearest!.roomSourceIndex,
+                    faceIndex: nearest!.faceIndex,
+                    contactPoint: nearest!.contactPoint,
+                    normal: normalized(add(nearest!.normal, candidate.normal))!,
+                    distance: nearest!.distance
+                )
+                nearestNormalCount += 1
             }
         }
 

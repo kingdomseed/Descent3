@@ -222,7 +222,6 @@ func defaultPlayerView(in level: Level) -> PlayerView {
     let binding = level.defaultPlayerBinding!
     let object = level.objects.first { $0.handle == binding.objectHandle }!
     let ship = level.shipDefinitions.first { $0.source == binding.ship }!
-    let model = level.models.first { $0.source == ship.primaryModel }!
     guard case let .room(roomSourceIndex) = object.location else {
         preconditionFailure("The validated default player start is indoor.")
     }
@@ -235,7 +234,7 @@ func defaultPlayerView(in level: Level) -> PlayerView {
             target: object.position + object.orientation.forward,
             up: object.orientation.up
         ),
-        collisionRadius: model.collisionRadius
+        collisionRadius: ship.presentationSize * 0.8
     )
 }
 
@@ -295,42 +294,81 @@ final class PlayerSimulation {
                     + object.orientation.right.z * input.sideways
             )
         )
-        let integrated = analyticLinearMotion(
-            position: object.position,
-            velocity: velocity,
-            force: force,
-            mass: ship.physics.mass,
-            drag: ship.physics.drag,
-            duration: systemsFrameDuration
-        )
         let view = defaultPlayerView(in: level)
-        let trace = traceIndoorMovement(
-            in: level,
-            startRoom: startRoom,
-            start: object.position,
-            end: integrated.position,
-            radius: view.collisionRadius
-        )
-        let attemptedDistance = vectorDistance(object.position, integrated.position)
+        var position = object.position
+        var roomSourceIndex = startRoom
+        var remainingDuration = systemsFrameDuration
+        var responseForce = force
         var wallContact: IndoorWallContact?
-        switch trace.outcome {
-        case .noHit:
-            velocity = integrated.velocity
-        case let .wallHit(contact):
-            wallContact = contact
-            let movedTime = attemptedDistance > 0
-                ? systemsFrameDuration * contact.distance / attemptedDistance
+        var collisionCount = 0
+        while remainingDuration > 0 && collisionCount < 9 {
+            let integrated = analyticLinearMotion(
+                position: position,
+                velocity: velocity,
+                force: responseForce,
+                mass: ship.physics.mass,
+                drag: ship.physics.drag,
+                duration: remainingDuration
+            )
+            let trace = traceIndoorMovement(
+                in: level,
+                startRoom: roomSourceIndex,
+                start: position,
+                end: integrated.position,
+                radius: view.collisionRadius
+            )
+            guard case let .wallHit(contact) = trace.outcome else {
+                position = trace.finalPosition
+                roomSourceIndex = trace.containingRoomSourceIndex
+                velocity = integrated.velocity
+                remainingDuration = 0
+                break
+            }
+
+            wallContact = wallContact ?? contact
+            let attemptedDistance = vectorDistance(position, integrated.position)
+            let priorRemainingDuration = remainingDuration
+            remainingDuration = attemptedDistance > 0
+                ? priorRemainingDuration
+                    * ((attemptedDistance - contact.distance) / attemptedDistance)
                 : 0
+            let movedTime = priorRemainingDuration - remainingDuration
             if movedTime > 0.0001 {
                 velocity = Vector3(
-                    x: (trace.finalPosition.x - object.position.x) / movedTime,
-                    y: (trace.finalPosition.y - object.position.y) / movedTime,
-                    z: (trace.finalPosition.z - object.position.z) / movedTime
+                    x: (trace.finalPosition.x - position.x) / movedTime,
+                    y: (trace.finalPosition.y - position.y) / movedTime,
+                    z: (trace.finalPosition.z - position.z) / movedTime
                 )
             }
+            position = trace.finalPosition
+            roomSourceIndex = trace.containingRoomSourceIndex
+
+            let normalVelocity = dot(contact.normal, velocity)
+            if surfacePhysicsBehavior(for: contact, in: level) == .forceField {
+                velocity = velocity + contact.normal * (-4 * normalVelocity)
+            } else {
+                let speedBeforeResponse = sqrt(dot(velocity, velocity))
+                let normalForce = dot(contact.normal, responseForce)
+                responseForce = responseForce
+                    + contact.normal * (-1.001 * normalForce)
+                velocity = velocity
+                    + contact.normal * (-1.001 * normalVelocity)
+                if remainingDuration == priorRemainingDuration {
+                    velocity = velocity + contact.normal
+                }
+                let projectedSpeed = sqrt(dot(velocity, velocity))
+                if projectedSpeed > 0 {
+                    velocity = velocity / projectedSpeed
+                        * ((projectedSpeed + speedBeforeResponse) / 2)
+                }
+            }
+            collisionCount += 1
         }
-        level.objects[objectIndex].position = trace.finalPosition
-        level.objects[objectIndex].location = .room(trace.containingRoomSourceIndex)
+        if remainingDuration > 0 {
+            velocity = .zero
+        }
+        level.objects[objectIndex].position = position
+        level.objects[objectIndex].location = .room(roomSourceIndex)
 
         frameDuration = Float(timestamp - lastTimestamp)
         lastTimestamp = timestamp
@@ -366,6 +404,15 @@ final class PlayerSimulation {
             pauseTimestamp = nil
         }
     }
+}
+
+private func surfacePhysicsBehavior(
+    for contact: IndoorWallContact,
+    in level: Level
+) -> SurfacePhysicsBehavior {
+    let room = level.rooms.first { $0.sourceIndex == contact.roomSourceIndex }!
+    let texture = room.faces[contact.faceIndex].texture
+    return level.surfacePhysics.first { $0.texture == texture }!.behavior
 }
 
 private func analyticLinearMotion(
