@@ -1242,6 +1242,28 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testDisposablePlayBuildsTheSameCoreSimulationWithoutMutatingAuthoredLevel() throws {
+        let base = makeSliceSixObjectRenderLevel()
+        let project = try makeProject(importedBase: base)
+        let staged = project.makePlayerPlaySession()
+        let authoredPosition = defaultPlayerView(in: project.level).camera.position
+        let simulation = staged.makePlayerSimulation(
+            presentationReadyTimestamp: 0
+        )
+
+        let frame = simulation.update(
+            at: 0.016,
+            input: .init(forward: 1)
+        )
+
+        XCTAssertNotEqual(frame.playerView.camera.position, authoredPosition)
+        XCTAssertEqual(
+            defaultPlayerView(in: project.level).camera.position,
+            authoredPosition
+        )
+    }
+
+    @MainActor
     func testEditedValuesPlayThroughSeparateCopyAndReturnToSameDocumentState() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())

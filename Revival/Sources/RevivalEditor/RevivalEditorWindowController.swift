@@ -4,17 +4,53 @@ import AppKit
 import MetalKit
 
 @MainActor
-final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate {
-    private enum CameraMotion: Int {
-        case left = 1
-        case right
-        case forward
-        case backward
-        case lookLeft
-        case lookRight
+private final class RevivalEditorGameplayView: MTKView {
+    var heldInputChanged: ((InputSnapshot) -> Void)?
+    private var heldKeys: Set<UInt16> = []
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        guard Self.gameplayKeyCodes.contains(event.keyCode) else {
+            super.keyDown(with: event)
+            return
+        }
+        heldKeys.insert(event.keyCode)
+        publish()
     }
 
+    override func keyUp(with event: NSEvent) {
+        guard Self.gameplayKeyCodes.contains(event.keyCode) else {
+            super.keyUp(with: event)
+            return
+        }
+        heldKeys.remove(event.keyCode)
+        publish()
+    }
+
+    func clearHeldInput() {
+        heldKeys.removeAll()
+        publish()
+    }
+
+    private func publish() {
+        heldInputChanged?(
+            InputSnapshot(
+                forward: (heldKeys.contains(13) ? 1 : 0)
+                    - (heldKeys.contains(1) ? 1 : 0),
+                sideways: (heldKeys.contains(2) ? 1 : 0)
+                    - (heldKeys.contains(0) ? 1 : 0)
+            )
+        )
+    }
+
+    private static let gameplayKeyCodes: Set<UInt16> = [0, 1, 2, 13]
+}
+
+@MainActor
+final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate {
     private unowned let projectDocument: RevivalProjectDocument
+    private let gameplayView: RevivalEditorGameplayView
     private let renderer: MetalWorldRenderer?
     private let selectedRoomHeading: NSTextField
     private let roomPopup: NSPopUpButton
@@ -32,16 +68,21 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     private let changesLabel: NSTextField
     private let playButton: NSButton
     private let collisionDiagnosticButton: NSButton
-    private let cameraButtons: [NSButton]
     private let statusLabel: NSTextField
     private var rendererError: String?
     private var selectedObjectHandle: UInt32?
     private var selectedPlayerStartHandle: UInt32?
+    private var playSimulation: PlayerSimulation?
+    private var playerInput = PlayerInputState()
 
     init(document: RevivalProjectDocument) {
         projectDocument = document
 
-        let metalView = MTKView(frame: .zero, device: MTLCreateSystemDefaultDevice())
+        let metalView = RevivalEditorGameplayView(
+            frame: .zero,
+            device: MTLCreateSystemDefaultDevice()
+        )
+        gameplayView = metalView
         metalView.translatesAutoresizingMaskIntoConstraints = false
         metalView.setAccessibilityLabel("Training level viewport")
         metalView.setAccessibilityHelp(
@@ -142,24 +183,6 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             "Reports whether the disposable play copy crosses the selected portal and which source room owns the result."
         )
 
-        let cameraButtonDefinitions: [(String, CameraMotion)] = [
-            ("Move Left", .left),
-            ("Move Right", .right),
-            ("Move Forward", .forward),
-            ("Move Back", .backward),
-            ("Look Left", .lookLeft),
-            ("Look Right", .lookRight),
-        ]
-        cameraButtons = cameraButtonDefinitions.map { title, motion in
-            let button = NSButton(title: title, target: nil, action: nil)
-            button.tag = motion.rawValue
-            button.setAccessibilityLabel(title)
-            button.setAccessibilityHelp(
-                "Moves the disposable play camera only when the canonical presentation closure remains complete."
-            )
-            return button
-        }
-
         let statusLabel = NSTextField(wrappingLabelWithString: "")
         statusLabel.setAccessibilityLabel("Editor status")
         statusLabel.textColor = .secondaryLabelColor
@@ -208,12 +231,6 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         sidebar.addArrangedSubview(playButton)
         sidebar.addArrangedSubview(collisionDiagnosticButton)
 
-        let cameraHeading = NSTextField(labelWithString: "Play Camera")
-        cameraHeading.font = .preferredFont(forTextStyle: .headline)
-        sidebar.addArrangedSubview(cameraHeading)
-        for button in cameraButtons {
-            sidebar.addArrangedSubview(button)
-        }
         let statusSeparator = NSBox()
         statusSeparator.boxType = .separator
         sidebar.addArrangedSubview(statusSeparator)
@@ -256,6 +273,9 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         super.init(window: window)
 
         window.delegate = self
+        metalView.heldInputChanged = {
+            [weak self] in self?.playerInput.setHeld($0)
+        }
         window.initialFirstResponder = roomNameField
         roomNameField.target = self
         roomNameField.action = #selector(commitRoomName(_:))
@@ -285,11 +305,6 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         playButton.action = #selector(togglePlay(_:))
         collisionDiagnosticButton.target = self
         collisionDiagnosticButton.action = #selector(probeSelectedPortal(_:))
-        for button in cameraButtons {
-            button.target = self
-            button.action = #selector(movePlayCamera(_:))
-        }
-
         refreshFromDocument()
     }
 
@@ -329,15 +344,11 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         playButton.title = isPlaying ? "Return to Editor" : "Play Disposable Copy"
         playButton.setAccessibilityLabel(playButton.title)
         collisionDiagnosticButton.isEnabled = isPlaying && selection.portal != nil
-        for button in cameraButtons {
-            button.isEnabled = isPlaying
-        }
-
         if let rendererError {
             setStatus(rendererError, isError: true)
         } else if isPlaying {
             setStatus(
-                "Playing a separately owned complete-level copy. Camera moves are accepted only while the imported presentation closure remains usable.",
+                "Playing a separately owned complete-level copy. Use W/S to thrust and A/D to slide.",
                 isError: false
             )
         } else {
@@ -353,6 +364,25 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
 
     func windowWillClose(_ notification: Notification) {
         renderer?.shutdown()
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        gameplayView.clearHeldInput()
+        playerInput.setGameplayActive(
+            false,
+            simulation: playSimulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        guard playSimulation != nil else { return }
+        playerInput.setGameplayActive(
+            true,
+            simulation: playSimulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+        window?.makeFirstResponder(gameplayView)
     }
 
     @objc private func commitRoomName(_ sender: Any?) {
@@ -470,9 +500,44 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             if projectDocument.playSession == nil {
                 let candidate = try projectDocument.makePlaySession()
                 try replaceRenderedWorld(session: candidate)
+                let simulation = candidate.makePlayerSimulation(
+                    presentationReadyTimestamp: ProcessInfo.processInfo.systemUptime
+                )
+                playSimulation = simulation
+                playerInput = PlayerInputState()
+                playerInput.setGameplayActive(
+                    window?.isKeyWindow == true,
+                    simulation: simulation,
+                    at: ProcessInfo.processInfo.systemUptime
+                )
+                renderer?.setFrameUpdate { [weak self, weak renderer] timestamp in
+                    guard let self, let renderer,
+                          self.playSimulation === simulation,
+                          self.playerInput.gameplayIsActive else {
+                        return
+                    }
+                    let input = self.playerInput.snapshot(
+                        frameDuration: simulation.frameDuration
+                    )
+                    let frame = simulation.update(at: timestamp, input: input)
+                    do {
+                        try renderer.update(
+                            level: simulation.level,
+                            playerView: frame.playerView
+                        )
+                    } catch {
+                        renderer.setFrameUpdate(nil)
+                        self.setStatus(error.localizedDescription, isError: true)
+                    }
+                }
                 projectDocument.commitPlaySession(candidate, renderingWorld: false)
+                window?.makeFirstResponder(gameplayView)
                 setSuccessStatus("Playing a disposable complete-level copy.")
             } else if projectDocument.playSession != nil {
+                renderer?.setFrameUpdate(nil)
+                playSimulation = nil
+                gameplayView.clearHeldInput()
+                playerInput = PlayerInputState()
                 try replaceRenderedWorld(
                     level: projectDocument.project.level,
                     camera: projectDocument.camera
@@ -483,29 +548,6 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             }
         } catch {
             setStatus(error.localizedDescription, isError: true)
-            NSSound.beep()
-        }
-    }
-
-    @objc private func movePlayCamera(_ sender: NSButton) {
-        guard let motion = CameraMotion(rawValue: sender.tag),
-              let session = projectDocument.playSession else {
-            return
-        }
-
-        let proposedCamera = movedCamera(session.camera, motion: motion)
-        do {
-            let candidate = try projectDocument.makePlaySession(
-                movingCameraTo: proposedCamera
-            )
-            try replaceRenderedWorld(session: candidate)
-            projectDocument.commitPlaySession(candidate, renderingWorld: false)
-            setSuccessStatus("Moved the disposable play camera through the shared render path.")
-        } catch {
-            setStatus(
-                "That camera move left the imported presentation closure: \(error.localizedDescription)",
-                isError: true
-            )
             NSSound.beep()
         }
     }
@@ -670,43 +712,6 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         setStatus(message, isError: false)
     }
 
-    private func movedCamera(
-        _ camera: RoomCamera,
-        motion: CameraMotion
-    ) -> RoomCamera {
-        let moveX: Float
-        let moveY: Float
-        let lookX: Float
-        switch motion {
-        case .left:
-            (moveX, moveY, lookX) = (-0.25, 0, 0)
-        case .right:
-            (moveX, moveY, lookX) = (0.25, 0, 0)
-        case .forward:
-            (moveX, moveY, lookX) = (0, 0.25, 0)
-        case .backward:
-            (moveX, moveY, lookX) = (0, -0.25, 0)
-        case .lookLeft:
-            (moveX, moveY, lookX) = (0, 0, -0.25)
-        case .lookRight:
-            (moveX, moveY, lookX) = (0, 0, 0.25)
-        }
-
-        return RoomCamera(
-            position: .init(
-                x: camera.position.x + moveX,
-                y: camera.position.y + moveY,
-                z: camera.position.z
-            ),
-            target: .init(
-                x: camera.target.x + moveX + lookX,
-                y: camera.target.y + moveY,
-                z: camera.target.z
-            ),
-            up: camera.up,
-            projection: camera.projection
-        )
-    }
 }
 
 func boundedSemanticChangesText(_ summaries: [String]) -> String {

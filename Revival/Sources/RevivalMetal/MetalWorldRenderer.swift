@@ -64,6 +64,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
     private var submittedValue: UInt64 = 0
     private var submittedFrameCount = 0
     private var firstFrameTime = CACurrentMediaTime()
+    private var frameUpdate: ((Double) -> Void)?
 
     var hasPresentation: Bool {
         presentation != nil
@@ -196,6 +197,24 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
         )
     }
 
+    func update(level: Level, playerView: PlayerView) throws {
+        guard let presentation else {
+            try replace(level: level, playerView: playerView)
+            return
+        }
+        presentation.update(
+            try updateMetalWorldPlan(
+                presentation.plan,
+                level: level,
+                playerView: playerView
+            )
+        )
+    }
+
+    func setFrameUpdate(_ update: ((Double) -> Void)?) {
+        frameUpdate = update
+    }
+
     private func install(_ candidate: MetalWorldPlan) throws {
         drainFinalGPUUse()
         presentation = nil
@@ -220,11 +239,13 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
     }
 
     func shutdown() {
+        frameUpdate = nil
         view.delegate = nil
         unload()
     }
 
     func draw(in view: MTKView) {
+        frameUpdate?(CACurrentMediaTime())
         guard let presentation,
               let slotIndex = availableFrameSlotIndex(),
               let drawable = view.currentDrawable,
@@ -433,12 +454,13 @@ private struct MetalEncodedDraw {
 
 @MainActor
 private final class MetalLevelPresentation {
-    let plan: MetalWorldPlan
+    private(set) var plan: MetalWorldPlan
     let residencySet: any MTLResidencySet
     let vertexBuffer: any MTLBuffer
     let indexBuffer: any MTLBuffer
-    let draws: [MetalEncodedDraw]
+    private(set) var draws: [MetalEncodedDraw]
 
+    private let preparedDraws: [MetalEncodedDraw]
     private let materials: [SourceResource: MetalMaterialResources]
     private let lightmaps: [Int: any MTLTexture]
     private let whiteLightmap: any MTLTexture
@@ -478,6 +500,7 @@ private final class MetalLevelPresentation {
         }
         self.vertexBuffer = vertexBuffer
         self.indexBuffer = indexBuffer
+        preparedDraws = encodedDraws
         draws = plan.activeDrawIndices.map { encodedDraws[$0] }
 
         var materialResources: [SourceResource: MetalMaterialResources] = [:]
@@ -527,6 +550,12 @@ private final class MetalLevelPresentation {
         residencySet.addAllocation(whiteLightmap)
         residencySet.commit()
         residencySet.requestResidency()
+    }
+
+    func update(_ plan: MetalWorldPlan) {
+        precondition(plan.preparedDraws == self.plan.preparedDraws)
+        self.plan = plan
+        draws = plan.activeDrawIndices.map { preparedDraws[$0] }
     }
 
     func updateProceduralTextures(

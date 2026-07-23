@@ -281,6 +281,15 @@ struct RevivalPlaySession: Equatable, Sendable {
             )
         }
     }
+
+    func makePlayerSimulation(
+        presentationReadyTimestamp: Double
+    ) -> PlayerSimulation {
+        PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: presentationReadyTimestamp
+        )
+    }
 }
 
 struct RevivalRoomNameEdit: Codable, Equatable, Sendable {

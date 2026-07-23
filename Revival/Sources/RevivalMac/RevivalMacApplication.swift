@@ -3,6 +3,50 @@
 import AppKit
 import MetalKit
 
+@MainActor
+private final class RevivalMacGameplayView: MTKView {
+    var heldInputChanged: ((InputSnapshot) -> Void)?
+    private var heldKeys: Set<UInt16> = []
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        guard Self.gameplayKeyCodes.contains(event.keyCode) else {
+            super.keyDown(with: event)
+            return
+        }
+        heldKeys.insert(event.keyCode)
+        publish()
+    }
+
+    override func keyUp(with event: NSEvent) {
+        guard Self.gameplayKeyCodes.contains(event.keyCode) else {
+            super.keyUp(with: event)
+            return
+        }
+        heldKeys.remove(event.keyCode)
+        publish()
+    }
+
+    func clearHeldInput() {
+        heldKeys.removeAll()
+        publish()
+    }
+
+    private func publish() {
+        heldInputChanged?(
+            InputSnapshot(
+                forward: (heldKeys.contains(13) ? 1 : 0)
+                    - (heldKeys.contains(1) ? 1 : 0),
+                sideways: (heldKeys.contains(2) ? 1 : 0)
+                    - (heldKeys.contains(0) ? 1 : 0)
+            )
+        )
+    }
+
+    private static let gameplayKeyCodes: Set<UInt16> = [0, 1, 2, 13]
+}
+
 @main
 @MainActor
 enum RevivalMacApplication {
@@ -32,6 +76,9 @@ private final class RevivalMacApplicationDelegate: NSObject,
     private let library = CanonicalPackageLibrary.revivalMac
     private var window: NSWindow?
     private var renderer: MetalWorldRenderer?
+    private var gameplayView: RevivalMacGameplayView?
+    private var simulation: PlayerSimulation?
+    private var playerInput = PlayerInputState()
     private var statusLabel: NSTextField?
     private var contentRequests = CanonicalPackageRequestQueue<ContentRequest>()
     private var libraryPreparationError: String?
@@ -43,7 +90,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             showWindow(rendererView: nil, message: "No Metal device is available.")
             return
         }
-        let metalView = MTKView(frame: .zero, device: device)
+        let metalView = RevivalMacGameplayView(frame: .zero, device: device)
         do {
             renderer = try MetalWorldRenderer(view: metalView)
             showWindow(
@@ -95,6 +142,22 @@ private final class RevivalMacApplicationDelegate: NSObject,
     func applicationWillTerminate(_ notification: Notification) {
         renderer?.shutdown()
         renderer = nil
+    }
+
+    func applicationDidResignActive(_ notification: Notification) {
+        updateGameplayActivity()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        updateGameplayActivity()
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        updateGameplayActivity()
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        updateGameplayActivity()
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -201,6 +264,32 @@ private final class RevivalMacApplicationDelegate: NSObject,
             level: activation.level,
             playerView: defaultPlayerView(in: activation.level)
         )
+        let presentationReadyTimestamp = ProcessInfo.processInfo.systemUptime
+        let simulation = PlayerSimulation(
+            level: activation.level,
+            presentationReadyTimestamp: presentationReadyTimestamp
+        )
+        self.simulation = simulation
+        playerInput = PlayerInputState()
+        playerInput.setGameplayActive(
+            NSApplication.shared.isActive && window?.isKeyWindow == true,
+            simulation: simulation,
+            at: presentationReadyTimestamp
+        )
+        renderer.setFrameUpdate { [weak self, weak renderer] timestamp in
+            guard let self, let renderer, self.simulation === simulation else { return }
+            guard self.playerInput.gameplayIsActive else { return }
+            let input = self.playerInput.snapshot(
+                frameDuration: simulation.frameDuration
+            )
+            let frame = simulation.update(at: timestamp, input: input)
+            do {
+                try renderer.update(level: simulation.level, playerView: frame.playerView)
+            } catch {
+                renderer.setFrameUpdate(nil)
+                self.setStatus(error.localizedDescription, isError: true)
+            }
+        }
         let contentSummary = "\(activation.level.metadata.name) — \(activation.level.rooms.count) rooms — player 0 source room 1"
         if let preparationError = libraryPreparationError {
             setStatus(
@@ -258,7 +347,28 @@ private final class RevivalMacApplicationDelegate: NSObject,
         window.delegate = self
         window.center()
         window.makeKeyAndOrderFront(nil)
+        if let gameplayView = rendererView as? RevivalMacGameplayView {
+            gameplayView.heldInputChanged = {
+                [weak self] in self?.playerInput.setHeld($0)
+            }
+            window.makeFirstResponder(gameplayView)
+            self.gameplayView = gameplayView
+        }
         self.window = window
+    }
+
+    private func updateGameplayActivity() {
+        let active =
+            NSApplication.shared.isActive
+            && window?.isKeyWindow == true
+        if !active {
+            gameplayView?.clearHeldInput()
+        }
+        playerInput.setGameplayActive(
+            active,
+            simulation: simulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
     }
 
     private func setStatus(_ message: String, isError: Bool) {

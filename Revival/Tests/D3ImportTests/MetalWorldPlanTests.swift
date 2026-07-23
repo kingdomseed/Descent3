@@ -1,6 +1,67 @@
 import XCTest
 
 final class MetalWorldPlanTests: XCTestCase {
+    func testUpdatesPlayerCameraAndActiveDrawsWithoutReplacingPreparedPresentation() throws {
+        let level = makeSliceSixObjectRenderLevel()
+        let initialView = defaultPlayerView(in: level)
+        let initial = try makeMetalWorldPlan(level: level, playerView: initialView)
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(
+            at: 0.016,
+            input: .init(forward: 1, sideways: 1)
+        )
+
+        let updated = try updateMetalWorldPlan(
+            initial,
+            level: simulation.level,
+            playerView: frame.playerView
+        )
+
+        XCTAssertEqual(updated.preparedDraws, initial.preparedDraws)
+        XCTAssertNotEqual(updated.camera, initial.camera)
+        XCTAssertEqual(
+            updated.activeDrawIndices.map { updated.preparedDraws[$0] },
+            updated.draws
+        )
+        XCTAssertFalse(updated.draws.contains {
+            $0.objectHandle == frame.playerView.objectHandle
+        })
+    }
+
+    func testDynamicPlanMatchesFreshVisibilityAdmissionBackfaceAndLODSelection() throws {
+        var level = makeSliceSixObjectRenderLevel()
+        let initialView = defaultPlayerView(in: level)
+        let initial = try makeMetalWorldPlan(level: level, playerView: initialView)
+        let playerIndex = level.objects.firstIndex {
+            $0.handle == initialView.objectHandle
+        }!
+        level.objects[playerIndex].location = .room(3)
+        level.objects[playerIndex].position = RoomCamera.trainingRoom3.position
+        level.objects[playerIndex].orientation = .init(
+            right: .init(x: 1, y: 0, z: 0),
+            up: .init(x: 0, y: 0, z: 1),
+            forward: .init(x: 0, y: 1, z: 0)
+        )
+        let movedView = defaultPlayerView(in: level)
+
+        let updated = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            playerView: movedView
+        )
+        let fresh = try makeMetalWorldPlan(level: level, playerView: movedView)
+
+        XCTAssertEqual(updated.preparedDraws, initial.preparedDraws)
+        XCTAssertNotEqual(updated.visibleRoomSourceIndices, initial.visibleRoomSourceIndices)
+        XCTAssertNotEqual(updated.activeDrawIndices, initial.activeDrawIndices)
+        XCTAssertEqual(updated.visibleRoomSourceIndices, fresh.visibleRoomSourceIndices)
+        XCTAssertEqual(updated.activeDrawIndices, fresh.activeDrawIndices)
+        XCTAssertEqual(updated.draws, fresh.draws)
+    }
+
     func testAddsObjectModelsToTheOneWorldPlanWithTypedMaterials() throws {
         let plan = try makeMetalWorldPlan(
             level: makeSliceSixObjectRenderLevel(),

@@ -49,6 +49,7 @@ func makeMetalWorldPlan(
         level: level,
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex,
+        excludedObjectHandle: nil,
         extraction: extraction
     )
 }
@@ -62,6 +63,7 @@ func makeMetalWorldPlan(
         level: level,
         camera: playerView.camera,
         startRoomSourceIndex: playerView.roomSourceIndex,
+        excludedObjectHandle: playerView.objectHandle,
         extraction: extraction
     )
 }
@@ -70,6 +72,7 @@ private func makeMetalWorldPlan(
     level: Level,
     camera: RoomCamera,
     startRoomSourceIndex: Int,
+    excludedObjectHandle: UInt32?,
     extraction: WorldRenderExtraction
 ) throws -> MetalWorldPlan {
     let opaqueRoomDraws = extraction.opaqueDrawItems.map(makeMetalWorldDraw)
@@ -78,6 +81,11 @@ private func makeMetalWorldPlan(
     let preparedRoomDraws = try extractPreparedRoomDrawItems(
         level,
         startRoomSourceIndex: startRoomSourceIndex
+    ).map(makeMetalWorldDraw)
+    let preparedObjectDraws = extractPreparedModelDrawItems(
+        level,
+        startRoomSourceIndex: startRoomSourceIndex,
+        excludedObjectHandle: excludedObjectHandle
     ).map(makeMetalWorldDraw)
     let preparedRoomIndexByIdentity = Dictionary(
         uniqueKeysWithValues: preparedRoomDraws.enumerated().map {
@@ -88,12 +96,19 @@ private func makeMetalWorldPlan(
     let initialRoomIndices = initialRoomDraws.map {
         preparedRoomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
+    let preparedObjectIndexByIdentity = Dictionary(
+        uniqueKeysWithValues: preparedObjectDraws.enumerated().map {
+            (MetalModelDrawIdentity($0.element), $0.offset)
+        }
+    )
     let objectOffset = preparedRoomDraws.count
     let activeDrawIndices =
         Array(initialRoomIndices.prefix(opaqueRoomDraws.count))
-        + objectDraws.indices.map { objectOffset + $0 }
+        + objectDraws.map {
+            objectOffset + preparedObjectIndexByIdentity[MetalModelDrawIdentity($0)]!
+        }
         + Array(initialRoomIndices.dropFirst(opaqueRoomDraws.count))
-    let preparedDraws = preparedRoomDraws + objectDraws
+    let preparedDraws = preparedRoomDraws + preparedObjectDraws
     let draws = activeDrawIndices.map { preparedDraws[$0] }
     return MetalWorldPlan(
         level: level,
@@ -106,12 +121,66 @@ private func makeMetalWorldPlan(
     )
 }
 
+func updateMetalWorldPlan(
+    _ prepared: MetalWorldPlan,
+    level: Level,
+    playerView: PlayerView
+) throws -> MetalWorldPlan {
+    let extraction = try extractWorldForRendering(level, playerView: playerView)
+    let opaqueRoomDraws = extraction.opaqueDrawItems.map(makeMetalWorldDraw)
+    let translucentRoomDraws = extraction.translucentDrawItems.map(makeMetalWorldDraw)
+    let objectDraws = extraction.modelDrawItems.map(makeMetalWorldDraw)
+    let roomIndexByIdentity = Dictionary(
+        uniqueKeysWithValues: prepared.preparedDraws.enumerated()
+            .filter { $0.element.objectHandle == nil }
+            .map { (MetalRoomDrawIdentity($0.element), $0.offset) }
+    )
+    let objectIndexByIdentity = Dictionary(
+        uniqueKeysWithValues: prepared.preparedDraws.enumerated()
+            .filter { $0.element.objectHandle != nil }
+            .map { (MetalModelDrawIdentity($0.element), $0.offset) }
+    )
+    let opaqueIndices = opaqueRoomDraws.map {
+        roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
+    }
+    let objectIndices = objectDraws.map {
+        objectIndexByIdentity[MetalModelDrawIdentity($0)]!
+    }
+    let translucentIndices = translucentRoomDraws.map {
+        roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
+    }
+    let activeDrawIndices = opaqueIndices + objectIndices + translucentIndices
+    return MetalWorldPlan(
+        level: level,
+        camera: playerView.camera,
+        visibleRoomSourceIndices: extraction.visibleRoomSourceIndices,
+        preparedLightCoronaCandidates: prepared.preparedLightCoronaCandidates,
+        preparedDraws: prepared.preparedDraws,
+        activeDrawIndices: activeDrawIndices,
+        draws: activeDrawIndices.map { prepared.preparedDraws[$0] }
+    )
+}
+
 private struct MetalRoomDrawIdentity: Hashable {
     let roomSourceIndex: Int
     let faceIndex: Int
 
     init(_ draw: MetalWorldDraw) {
         roomSourceIndex = draw.roomSourceIndex
+        faceIndex = draw.faceIndex
+    }
+}
+
+private struct MetalModelDrawIdentity: Hashable {
+    let objectHandle: UInt32
+    let model: SourceResource
+    let submodelIndex: Int
+    let faceIndex: Int
+
+    init(_ draw: MetalWorldDraw) {
+        objectHandle = draw.objectHandle!
+        model = draw.model!
+        submodelIndex = draw.submodelIndex!
         faceIndex = draw.faceIndex
     }
 }

@@ -384,7 +384,7 @@ struct PlacedObject: Codable, Equatable, Sendable {
     let instanceName: String?
     let flags: UInt32
     let doorShields: Int16?
-    let location: SpatialLocation
+    var location: SpatialLocation
     var position: Vector3
     var orientation: Matrix3
     let containsType: UInt8

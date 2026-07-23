@@ -1,6 +1,248 @@
 import XCTest
 
 final class WorldRenderingTests: XCTestCase {
+    func testInputSnapshotRampsHeldAxesAndClearsInactiveGameplay() {
+        var ramp = PlayerInputRamp(rampDuration: 0.5)
+
+        let first = ramp.snapshot(
+            held: .init(forward: 1, sideways: -1),
+            frameDuration: 0.1,
+            gameplayIsActive: true
+        )
+        XCTAssertEqual(first.forward, 0.2, accuracy: 0.000_001)
+        XCTAssertEqual(first.sideways, -0.2, accuracy: 0.000_001)
+        XCTAssertEqual(first.vertical, 0)
+        XCTAssertEqual(first.pitch, 0)
+        XCTAssertEqual(first.yaw, 0)
+        XCTAssertEqual(first.roll, 0)
+
+        let second = ramp.snapshot(
+            held: .init(forward: 1, sideways: -1),
+            frameDuration: 0.1,
+            gameplayIsActive: true
+        )
+        XCTAssertEqual(second.forward, 0.4, accuracy: 0.000_001)
+        XCTAssertEqual(second.sideways, -0.4, accuracy: 0.000_001)
+
+        let released = ramp.snapshot(
+            held: .zero,
+            frameDuration: 0.1,
+            gameplayIsActive: true
+        )
+        XCTAssertEqual(released, .zero)
+        let restarted = ramp.snapshot(
+            held: .init(forward: 1),
+            frameDuration: 0.1,
+            gameplayIsActive: true
+        )
+        XCTAssertEqual(restarted.forward, 0.2, accuracy: 0.000_001)
+        let reversed = ramp.snapshot(
+            held: .init(forward: -1),
+            frameDuration: 0.1,
+            gameplayIsActive: true
+        )
+        XCTAssertEqual(reversed.forward, -0.4, accuracy: 0.000_001)
+
+        XCTAssertEqual(
+            ramp.snapshot(
+                held: .init(forward: 1, sideways: 1),
+                frameDuration: 0.1,
+                gameplayIsActive: false
+            ),
+            .zero
+        )
+        XCTAssertEqual(
+            ramp.snapshot(
+                held: .zero,
+                frameDuration: 0.1,
+                gameplayIsActive: true
+            ),
+            .zero
+        )
+
+        var immediate = PlayerInputRamp(rampDuration: 0)
+        XCTAssertEqual(
+            immediate.snapshot(
+                held: .init(forward: -0.01, sideways: 0.25),
+                frameDuration: 0,
+                gameplayIsActive: true
+            ),
+            .init(forward: -1, sideways: 1)
+        )
+    }
+
+    func testPlayerInputStateClearsAndRebasesAcrossFocusChanges() {
+        let simulation = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 10
+        )
+        var input = PlayerInputState(rampDuration: 0.5)
+        input.setHeld(.init(forward: 1))
+        XCTAssertEqual(
+            input.snapshot(frameDuration: 0.1).forward,
+            0.2,
+            accuracy: 0.000_001
+        )
+
+        input.setGameplayActive(false, simulation: simulation, at: 10)
+        input.setGameplayActive(false, simulation: simulation, at: 15)
+        input.setHeld(.init(forward: 1))
+        XCTAssertFalse(input.gameplayIsActive)
+        XCTAssertEqual(input.snapshot(frameDuration: 0.1), .zero)
+
+        input.setGameplayActive(true, simulation: simulation, at: 20)
+        input.setHeld(.init(forward: 1))
+        XCTAssertTrue(input.gameplayIsActive)
+        XCTAssertEqual(
+            input.snapshot(frameDuration: 0.1).forward,
+            0.2,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            simulation.update(at: 20.016, input: .zero).storedFrameDuration,
+            0.016,
+            accuracy: 0.000_001
+        )
+    }
+
+    func testPlayerSimulationPreservesPriorFrameTimingAndNestedPauseRebasing() {
+        let simulation = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 10
+        )
+
+        let first = simulation.update(at: 10.016, input: .zero)
+        XCTAssertEqual(first.systemsFrameDuration, 0.1, accuracy: 0.000_001)
+        XCTAssertEqual(first.systemsGameTime, 0, accuracy: 0.000_001)
+        XCTAssertEqual(first.storedFrameDuration, 0.016, accuracy: 0.000_001)
+        XCTAssertEqual(first.gameTime, 0.016, accuracy: 0.000_001)
+
+        let second = simulation.update(at: 10.05, input: .zero)
+        XCTAssertEqual(second.systemsFrameDuration, 0.016, accuracy: 0.000_001)
+        XCTAssertEqual(second.systemsGameTime, 0.016, accuracy: 0.000_001)
+        XCTAssertEqual(second.storedFrameDuration, 0.034, accuracy: 0.000_001)
+        XCTAssertEqual(second.gameTime, 0.05, accuracy: 0.000_001)
+
+        simulation.stopTime(at: 10.06)
+        simulation.stopTime(at: 10.07)
+        simulation.startTime(at: 11)
+        simulation.startTime(at: 12)
+        let resumed = simulation.update(at: 12.04, input: .zero)
+        XCTAssertEqual(resumed.storedFrameDuration, 0.05, accuracy: 0.000_001)
+        XCTAssertEqual(resumed.gameTime, 0.1, accuracy: 0.000_001)
+    }
+
+    func testPlayerSimulationUsesPyroAnalyticThrustWithoutDiagonalNormalization() {
+        let level = makeSliceSixObjectRenderLevel()
+        let start = defaultPlayerView(in: level).camera.position
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        let frame = simulation.update(
+            at: 0.016,
+            input: .init(forward: 1, sideways: 1)
+        )
+
+        let decay = exp(-3.0 * 0.1)
+        let expectedVelocity = Float(60 * (1 - decay))
+        let expectedDisplacement = Float(60 * 0.1 - 20 * (1 - decay))
+        XCTAssertEqual(frame.velocity.x, expectedVelocity, accuracy: 0.000_01)
+        XCTAssertEqual(frame.velocity.y, 0, accuracy: 0.000_01)
+        XCTAssertEqual(frame.velocity.z, expectedVelocity, accuracy: 0.000_01)
+        XCTAssertEqual(
+            frame.playerView.camera.position.x,
+            start.x + expectedDisplacement,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            frame.playerView.camera.position.z,
+            start.z + expectedDisplacement,
+            accuracy: 0.000_1
+        )
+    }
+
+    func testPlayerSimulationStopsAtFirstContactAndCommitsContainingRoom() throws {
+        let simulation = PlayerSimulation(
+            level: makeSliceTenContactLevel(),
+            presentationReadyTimestamp: 0
+        )
+        var timestamp = 0.1
+        var contactFrame: PlayerSimulationFrame?
+        var expectedContactVelocity: Vector3?
+        for _ in 0..<100 {
+            let start = defaultPlayerView(in: simulation.level).camera.position
+            let startingVelocity = simulation.velocity
+            let duration = simulation.frameDuration
+            let frame = simulation.update(
+                at: timestamp,
+                input: .init(forward: 1)
+            )
+            timestamp += 0.1
+            if let contact = frame.wallContact {
+                let decay = exp(-3 * Double(duration))
+                let attemptedZ = Double(start.z)
+                    + 60 * Double(duration)
+                    + (30.0 / 90.0) * (Double(startingVelocity.z) - 60)
+                        * (1 - decay)
+                let attemptedDistance = Float(attemptedZ) - start.z
+                let movedTime = duration * contact.distance / attemptedDistance
+                expectedContactVelocity = movedTime > 0.0001
+                    ? .init(
+                        x: 0,
+                        y: 0,
+                        z: (frame.playerView.camera.position.z - start.z) / movedTime
+                    )
+                    : startingVelocity
+                contactFrame = frame
+                break
+            }
+        }
+
+        let frame = try XCTUnwrap(contactFrame)
+        let contact = try XCTUnwrap(frame.wallContact)
+        let player = try XCTUnwrap(
+            simulation.level.objects.first {
+                $0.handle == frame.playerView.objectHandle
+            }
+        )
+        XCTAssertEqual(player.position, frame.playerView.camera.position)
+        XCTAssertEqual(
+            player.location,
+            .room(frame.playerView.roomSourceIndex)
+        )
+        XCTAssertEqual(contact.roomSourceIndex, frame.playerView.roomSourceIndex)
+        XCTAssertEqual(frame.velocity.x, expectedContactVelocity!.x, accuracy: 0.000_01)
+        XCTAssertEqual(frame.velocity.y, expectedContactVelocity!.y, accuracy: 0.000_01)
+        XCTAssertEqual(frame.velocity.z, expectedContactVelocity!.z, accuracy: 0.000_01)
+        XCTAssertLessThan(frame.playerView.camera.position.z, 2_310.928)
+    }
+
+    func testNearImmediateContactRetainsStartingVelocity() throws {
+        let base = makeSliceSixObjectRenderLevel()
+        let clearance = defaultPlayerView(in: base).collisionRadius + 0.0005
+        let simulation = PlayerSimulation(
+            level: makeSliceTenContactLevel(clearance: clearance),
+            presentationReadyTimestamp: 0
+        )
+
+        let frame = simulation.update(
+            at: 0.016,
+            input: .init(forward: 1)
+        )
+        let contact = try XCTUnwrap(frame.wallContact)
+        let attemptedDistance = Float(
+            60 * 0.1 - 20 * (1 - exp(-3.0 * 0.1))
+        )
+        let movedTime = frame.systemsFrameDuration
+            * contact.distance
+            / attemptedDistance
+
+        XCTAssertLessThanOrEqual(movedTime, 0.0001)
+        XCTAssertEqual(frame.velocity, .zero)
+    }
+
     func testReciprocalPortalComponentIgnoresPresentationPassabilityAndDisconnectedRooms() {
         let level = makeSelectedRoomRenderLevel()
         let disconnected = LevelRoom(
@@ -963,4 +1205,49 @@ func makeSliceSixObjectRenderLevel() -> Level {
         ),
         sourceChunks: base.sourceChunks
     )
+}
+
+func makeSliceTenContactLevel(clearance: Float = 20) -> Level {
+    let level = makeSliceSixObjectRenderLevel()
+    let player = level.objects.first { $0.handle == 2_048 }!
+    let roomIndex = level.rooms.firstIndex { $0.sourceIndex == 1 }!
+    let room = level.rooms[roomIndex]
+    let firstVertex = room.vertices.count
+    let z = player.position.z + clearance
+    let vertices = room.vertices + [
+        Vector3(x: player.position.x - 20, y: player.position.y - 20, z: z),
+        Vector3(x: player.position.x - 20, y: player.position.y + 20, z: z),
+        Vector3(x: player.position.x + 20, y: player.position.y + 20, z: z),
+        Vector3(x: player.position.x + 20, y: player.position.y - 20, z: z),
+    ]
+    let wall = LevelFace(
+        corners: (0..<4).map {
+            .init(vertexIndex: firstVertex + $0, u: 0, v: 0, alpha: 255)
+        },
+        flags: 0,
+        portalIndex: nil,
+        texture: room.faces[0].texture
+    )
+    let contactRoom = LevelRoom(
+        sourceIndex: room.sourceIndex,
+        name: room.name,
+        pathPoint: room.pathPoint,
+        vertices: vertices,
+        faces: room.faces + [wall],
+        portals: room.portals,
+        flags: room.flags,
+        pulseTime: room.pulseTime,
+        pulseOffset: room.pulseOffset,
+        mirrorFaceIndex: room.mirrorFaceIndex,
+        door: room.door,
+        volumeLights: room.volumeLights,
+        fog: room.fog,
+        ambientSoundPattern: room.ambientSoundPattern,
+        reverb: room.reverb,
+        damage: room.damage,
+        damageType: room.damageType
+    )
+    var rooms = level.rooms
+    rooms[roomIndex] = contactRoom
+    return replacing(level, rooms: rooms)
 }

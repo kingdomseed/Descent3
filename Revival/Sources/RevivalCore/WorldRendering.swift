@@ -37,6 +37,145 @@ struct RoomCamera: Codable, Equatable, Sendable {
     )
 }
 
+struct InputSnapshot: Equatable, Sendable {
+    let forward: Float
+    let sideways: Float
+    let vertical: Float
+    let pitch: Float
+    let yaw: Float
+    let roll: Float
+
+    static let zero = InputSnapshot()
+
+    init(
+        forward: Float = 0,
+        sideways: Float = 0,
+        vertical: Float = 0,
+        pitch: Float = 0,
+        yaw: Float = 0,
+        roll: Float = 0
+    ) {
+        self.forward = max(-1, min(1, forward))
+        self.sideways = max(-1, min(1, sideways))
+        self.vertical = max(-1, min(1, vertical))
+        self.pitch = max(-1, min(1, pitch))
+        self.yaw = max(-1, min(1, yaw))
+        self.roll = max(-1, min(1, roll))
+    }
+}
+
+struct PlayerInputRamp: Sendable {
+    let rampDuration: Float
+
+    private var state = InputSnapshot.zero
+    private var previousHeld = InputSnapshot.zero
+
+    init(rampDuration: Float = 0.5) {
+        precondition(rampDuration.isFinite && rampDuration >= 0)
+        self.rampDuration = rampDuration
+    }
+
+    mutating func snapshot(
+        held: InputSnapshot,
+        frameDuration: Float,
+        gameplayIsActive: Bool
+    ) -> InputSnapshot {
+        precondition(frameDuration.isFinite && frameDuration >= 0)
+        guard gameplayIsActive else {
+            state = .zero
+            previousHeld = .zero
+            return .zero
+        }
+        guard rampDuration > 0 else {
+            state = .zero
+            previousHeld = held
+            return InputSnapshot(
+                forward: inputSign(held.forward),
+                sideways: inputSign(held.sideways),
+                vertical: inputSign(held.vertical),
+                pitch: inputSign(held.pitch),
+                yaw: inputSign(held.yaw),
+                roll: inputSign(held.roll)
+            )
+        }
+
+        state = InputSnapshot(
+            forward: ramped(held.forward, state.forward, previousHeld.forward, frameDuration),
+            sideways: ramped(held.sideways, state.sideways, previousHeld.sideways, frameDuration),
+            vertical: ramped(held.vertical, state.vertical, previousHeld.vertical, frameDuration),
+            pitch: ramped(held.pitch, state.pitch, previousHeld.pitch, frameDuration),
+            yaw: ramped(held.yaw, state.yaw, previousHeld.yaw, frameDuration),
+            roll: ramped(held.roll, state.roll, previousHeld.roll, frameDuration)
+        )
+        previousHeld = held
+        return state
+    }
+
+    private func ramped(
+        _ held: Float,
+        _ current: Float,
+        _ previous: Float,
+        _ frameDuration: Float
+    ) -> Float {
+        guard held != 0 else { return 0 }
+        var ramp = current * rampDuration
+        if previous != 0, held.sign != previous.sign {
+            ramp = -ramp
+        }
+        ramp += inputSign(held) * frameDuration
+        return max(-rampDuration, min(rampDuration, ramp)) / rampDuration
+    }
+
+    private func inputSign(_ value: Float) -> Float {
+        value < 0 ? -1 : value > 0 ? 1 : 0
+    }
+}
+
+struct PlayerInputState: Sendable {
+    private var ramp: PlayerInputRamp
+    private var held = InputSnapshot.zero
+    private(set) var gameplayIsActive = true
+
+    init(rampDuration: Float = 0.5) {
+        ramp = PlayerInputRamp(rampDuration: rampDuration)
+    }
+
+    mutating func setHeld(_ snapshot: InputSnapshot) {
+        held = gameplayIsActive ? snapshot : .zero
+    }
+
+    mutating func snapshot(frameDuration: Float) -> InputSnapshot {
+        ramp.snapshot(
+            held: held,
+            frameDuration: frameDuration,
+            gameplayIsActive: gameplayIsActive
+        )
+    }
+
+    mutating func setGameplayActive(
+        _ active: Bool,
+        simulation: PlayerSimulation?,
+        at timestamp: Double
+    ) {
+        precondition(timestamp.isFinite)
+        if !active {
+            held = .zero
+            _ = ramp.snapshot(
+                held: .zero,
+                frameDuration: simulation?.frameDuration ?? 0,
+                gameplayIsActive: false
+            )
+        }
+        guard active != gameplayIsActive else { return }
+        if active {
+            simulation?.startTime(at: timestamp)
+        } else {
+            simulation?.stopTime(at: timestamp)
+        }
+        gameplayIsActive = active
+    }
+}
+
 struct PlayerView: Equatable, Sendable {
     let playerID: Int
     let objectHandle: UInt32
@@ -98,6 +237,175 @@ func defaultPlayerView(in level: Level) -> PlayerView {
         ),
         collisionRadius: model.collisionRadius
     )
+}
+
+struct PlayerSimulationFrame: Equatable, Sendable {
+    let systemsFrameDuration: Float
+    let systemsGameTime: Float
+    let storedFrameDuration: Float
+    let gameTime: Float
+    let playerView: PlayerView
+    let velocity: Vector3
+    let wallContact: IndoorWallContact?
+}
+
+final class PlayerSimulation {
+    private(set) var level: Level
+    private(set) var frameDuration: Float = 0.1
+    private(set) var gameTime: Float = 0
+    private(set) var velocity = Vector3.zero
+
+    private var lastTimestamp: Double
+    private var pauseDepth = 0
+    private var pauseTimestamp: Double?
+
+    init(level: Level, presentationReadyTimestamp: Double) {
+        precondition(presentationReadyTimestamp.isFinite)
+        precondition(level.defaultPlayerBinding != nil)
+        self.level = level
+        lastTimestamp = presentationReadyTimestamp
+    }
+
+    func update(at timestamp: Double, input: InputSnapshot) -> PlayerSimulationFrame {
+        precondition(timestamp.isFinite && timestamp >= lastTimestamp)
+        precondition(pauseDepth == 0)
+        let systemsFrameDuration = frameDuration
+        let systemsGameTime = gameTime
+
+        let binding = level.defaultPlayerBinding!
+        let objectIndex = level.objects.firstIndex {
+            $0.handle == binding.objectHandle
+        }!
+        let object = level.objects[objectIndex]
+        let ship = level.shipDefinitions.first { $0.source == binding.ship }!
+        guard case let .room(startRoom) = object.location else {
+            preconditionFailure("The Slice 10 player simulation is indoor.")
+        }
+        let force = Vector3(
+            x: ship.physics.fullThrust * (
+                object.orientation.forward.x * input.forward
+                    + object.orientation.right.x * input.sideways
+            ),
+            y: ship.physics.fullThrust * (
+                object.orientation.forward.y * input.forward
+                    + object.orientation.right.y * input.sideways
+            ),
+            z: ship.physics.fullThrust * (
+                object.orientation.forward.z * input.forward
+                    + object.orientation.right.z * input.sideways
+            )
+        )
+        let integrated = analyticLinearMotion(
+            position: object.position,
+            velocity: velocity,
+            force: force,
+            mass: ship.physics.mass,
+            drag: ship.physics.drag,
+            duration: systemsFrameDuration
+        )
+        let view = defaultPlayerView(in: level)
+        let trace = traceIndoorMovement(
+            in: level,
+            startRoom: startRoom,
+            start: object.position,
+            end: integrated.position,
+            radius: view.collisionRadius
+        )
+        let attemptedDistance = vectorDistance(object.position, integrated.position)
+        var wallContact: IndoorWallContact?
+        switch trace.outcome {
+        case .noHit:
+            velocity = integrated.velocity
+        case let .wallHit(contact):
+            wallContact = contact
+            let movedTime = attemptedDistance > 0
+                ? systemsFrameDuration * contact.distance / attemptedDistance
+                : 0
+            if movedTime > 0.0001 {
+                velocity = Vector3(
+                    x: (trace.finalPosition.x - object.position.x) / movedTime,
+                    y: (trace.finalPosition.y - object.position.y) / movedTime,
+                    z: (trace.finalPosition.z - object.position.z) / movedTime
+                )
+            }
+        }
+        level.objects[objectIndex].position = trace.finalPosition
+        level.objects[objectIndex].location = .room(trace.containingRoomSourceIndex)
+
+        frameDuration = Float(timestamp - lastTimestamp)
+        lastTimestamp = timestamp
+        gameTime += frameDuration
+
+        return PlayerSimulationFrame(
+            systemsFrameDuration: systemsFrameDuration,
+            systemsGameTime: systemsGameTime,
+            storedFrameDuration: frameDuration,
+            gameTime: gameTime,
+            playerView: defaultPlayerView(in: level),
+            velocity: velocity,
+            wallContact: wallContact
+        )
+    }
+
+    func stopTime(at timestamp: Double) {
+        precondition(timestamp.isFinite && timestamp >= lastTimestamp)
+        if pauseDepth == 0 {
+            pauseTimestamp = timestamp
+        }
+        pauseDepth += 1
+    }
+
+    func startTime(at timestamp: Double) {
+        precondition(timestamp.isFinite)
+        guard pauseDepth > 0 else { return }
+        pauseDepth -= 1
+        if pauseDepth == 0 {
+            let pausedAt = pauseTimestamp!
+            precondition(timestamp >= pausedAt)
+            lastTimestamp += timestamp - pausedAt
+            pauseTimestamp = nil
+        }
+    }
+}
+
+private func analyticLinearMotion(
+    position: Vector3,
+    velocity: Vector3,
+    force: Vector3,
+    mass: Float,
+    drag: Float,
+    duration: Float
+) -> (position: Vector3, velocity: Vector3) {
+    precondition(mass > 0 && drag > 0 && duration >= 0)
+    func component(_ p: Float, _ v: Float, _ force: Float) -> (Float, Float) {
+        let p = Double(p)
+        let v = Double(v)
+        let force = Double(force)
+        let mass = Double(mass)
+        let drag = Double(drag)
+        let duration = Double(duration)
+        let q = force / drag
+        let massOverDrag = mass / drag
+        let decay = exp(-(drag / mass) * duration)
+        return (
+            Float(p + q * duration + massOverDrag * (v - q) * (1 - decay)),
+            Float((v - q) * decay + q)
+        )
+    }
+    let x = component(position.x, velocity.x, force.x)
+    let y = component(position.y, velocity.y, force.y)
+    let z = component(position.z, velocity.z, force.z)
+    return (
+        Vector3(x: x.0, y: y.0, z: z.0),
+        Vector3(x: x.1, y: y.1, z: z.1)
+    )
+}
+
+private func vectorDistance(_ lhs: Vector3, _ rhs: Vector3) -> Float {
+    let x = rhs.x - lhs.x
+    let y = rhs.y - lhs.y
+    let z = rhs.z - lhs.z
+    return sqrt(x * x + y * y + z * z)
 }
 
 enum PortalPresentation: String, Codable, Equatable, Sendable {
@@ -411,6 +719,50 @@ func extractPreparedRoomDrawItems(
     return items
 }
 
+func extractPreparedModelDrawItems(
+    _ level: Level,
+    startRoomSourceIndex: Int,
+    excludedObjectHandle: UInt32?
+) -> [ModelDrawItem] {
+    let component = reciprocalPortalComponent(
+        rooms: level.rooms,
+        startRoomSourceIndex: startRoomSourceIndex
+    )
+    let presentationByHandle = Dictionary(
+        uniqueKeysWithValues: level.objectPresentations.map { ($0.objectHandle, $0) }
+    )
+    let modelBySource = Dictionary(
+        uniqueKeysWithValues: level.models.map { ($0.source, $0) }
+    )
+    let materialByTexture = Dictionary(
+        uniqueKeysWithValues: level.presentationMaterials.map { ($0.texture, $0) }
+    )
+    var items: [ModelDrawItem] = []
+    for object in level.objects {
+        guard object.handle != excludedObjectHandle,
+              case let .room(roomSourceIndex) = object.location,
+              component.contains(roomSourceIndex),
+              let presentation = presentationByHandle[object.handle] else {
+            continue
+        }
+        var seen: Set<SourceResource> = []
+        for source in [
+            presentation.primaryModel,
+            presentation.mediumModel,
+            presentation.lowModel,
+        ].compactMap({ $0 }) where seen.insert(source).inserted {
+            items += makeModelDrawItems(
+                object: object,
+                model: modelBySource[source]!,
+                materialByTexture: materialByTexture,
+                camera: .trainingRoom3,
+                cullBackfaces: false
+            )
+        }
+    }
+    return items
+}
+
 private func extractWorldForRendering(
     _ level: Level,
     camera: RoomCamera,
@@ -655,7 +1007,8 @@ private func makeModelDrawItems(
     object: PlacedObject,
     model: CanonicalModel,
     materialByTexture: [SourceResource: PresentationMaterial],
-    camera: RoomCamera
+    camera: RoomCamera,
+    cullBackfaces: Bool = true
 ) -> [ModelDrawItem] {
     guard case let .room(roomSourceIndex) = object.location else {
         preconditionFailure("model presentation is indoor in the Slice 6 island")
@@ -670,7 +1023,10 @@ private func makeModelDrawItems(
             let transformedNormal = transform(face.normal, by: object.orientation)
             let firstLocal = offset + submodel.vertices[face.corners[0].vertexIndex].position
             let firstWorld = object.position + transform(firstLocal, by: object.orientation)
-            guard dot(camera.position - firstWorld, transformedNormal) >= 0 else { continue }
+            guard !cullBackfaces
+                    || dot(camera.position - firstWorld, transformedNormal) >= 0 else {
+                continue
+            }
             let vertices = face.corners.map { corner in
                 let source = submodel.vertices[corner.vertexIndex]
                 let local = offset + source.position
