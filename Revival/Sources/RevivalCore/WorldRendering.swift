@@ -6,10 +6,24 @@ struct PerspectiveProjection: Codable, Equatable, Sendable {
     let horizontalFieldOfViewRadians: Float
     let aspectRatio: Float
 
+    static let sourceDefault = PerspectiveProjection(
+        horizontalFieldOfViewRadians: 3.14 * 72 / 180,
+        aspectRatio: 4.0 / 3.0
+    )
+
     static let squareNinetyDegrees = PerspectiveProjection(
         horizontalFieldOfViewRadians: .pi / 2,
         aspectRatio: 1
     )
+
+    func withAspectRatio(_ aspectRatio: Float) -> PerspectiveProjection {
+        precondition(aspectRatio.isFinite && aspectRatio > 0)
+        let verticalTangent = tan(horizontalFieldOfViewRadians / 2) / self.aspectRatio
+        return PerspectiveProjection(
+            horizontalFieldOfViewRadians: 2 * atan(verticalTangent * aspectRatio),
+            aspectRatio: aspectRatio
+        )
+    }
 }
 
 struct RoomCamera: Codable, Equatable, Sendable {
@@ -22,7 +36,7 @@ struct RoomCamera: Codable, Equatable, Sendable {
         position: Vector3,
         target: Vector3,
         up: Vector3,
-        projection: PerspectiveProjection = .squareNinetyDegrees
+        projection: PerspectiveProjection = .sourceDefault
     ) {
         self.position = position
         self.target = target
@@ -44,6 +58,8 @@ struct InputSnapshot: Equatable, Sendable {
     let pitch: Float
     let yaw: Float
     let roll: Float
+    let directLookPitchRadians: Float
+    let directLookYawRadians: Float
 
     static let zero = InputSnapshot()
 
@@ -53,14 +69,21 @@ struct InputSnapshot: Equatable, Sendable {
         vertical: Float = 0,
         pitch: Float = 0,
         yaw: Float = 0,
-        roll: Float = 0
+        roll: Float = 0,
+        directLookPitchRadians: Float = 0,
+        directLookYawRadians: Float = 0
     ) {
+        precondition(
+            directLookPitchRadians.isFinite && directLookYawRadians.isFinite
+        )
         self.forward = max(-1, min(1, forward))
         self.sideways = max(-1, min(1, sideways))
         self.vertical = max(-1, min(1, vertical))
         self.pitch = max(-1, min(1, pitch))
         self.yaw = max(-1, min(1, yaw))
         self.roll = max(-1, min(1, roll))
+        self.directLookPitchRadians = directLookPitchRadians
+        self.directLookYawRadians = directLookYawRadians
     }
 }
 
@@ -70,7 +93,7 @@ struct PlayerInputRamp: Sendable {
     private var state = InputSnapshot.zero
     private var previousHeld = InputSnapshot.zero
 
-    init(rampDuration: Float = 0.5) {
+    init(rampDuration: Float = 0.35) {
         precondition(rampDuration.isFinite && rampDuration >= 0)
         self.rampDuration = rampDuration
     }
@@ -95,7 +118,9 @@ struct PlayerInputRamp: Sendable {
                 vertical: inputSign(held.vertical),
                 pitch: inputSign(held.pitch),
                 yaw: inputSign(held.yaw),
-                roll: inputSign(held.roll)
+                roll: inputSign(held.roll),
+                directLookPitchRadians: 0,
+                directLookYawRadians: 0
             )
         }
 
@@ -105,7 +130,9 @@ struct PlayerInputRamp: Sendable {
             vertical: ramped(held.vertical, state.vertical, previousHeld.vertical, frameDuration),
             pitch: ramped(held.pitch, state.pitch, previousHeld.pitch, frameDuration),
             yaw: ramped(held.yaw, state.yaw, previousHeld.yaw, frameDuration),
-            roll: ramped(held.roll, state.roll, previousHeld.roll, frameDuration)
+            roll: ramped(held.roll, state.roll, previousHeld.roll, frameDuration),
+            directLookPitchRadians: 0,
+            directLookYawRadians: 0
         )
         previousHeld = held
         return state
@@ -134,9 +161,13 @@ struct PlayerInputRamp: Sendable {
 struct PlayerInputState: Sendable {
     private var ramp: PlayerInputRamp
     private var held = InputSnapshot.zero
+    private var controller = InputSnapshot.zero
+    private var mouseDeltaX: Float = 0
+    private var mouseDeltaY: Float = 0
     private(set) var gameplayIsActive = true
+    var mouseLookEnabled = false
 
-    init(rampDuration: Float = 0.5) {
+    init(rampDuration: Float = 0.35) {
         ramp = PlayerInputRamp(rampDuration: rampDuration)
     }
 
@@ -144,11 +175,48 @@ struct PlayerInputState: Sendable {
         held = gameplayIsActive ? snapshot : .zero
     }
 
+    mutating func setController(_ snapshot: InputSnapshot) {
+        controller = gameplayIsActive ? snapshot : .zero
+    }
+
+    mutating func accumulateMouseDelta(x: Float, y: Float) {
+        precondition(x.isFinite && y.isFinite)
+        guard gameplayIsActive else { return }
+        mouseDeltaX += x
+        mouseDeltaY += y
+    }
+
     mutating func snapshot(frameDuration: Float) -> InputSnapshot {
-        ramp.snapshot(
+        let keyboard = ramp.snapshot(
             held: held,
             frameDuration: frameDuration,
             gameplayIsActive: gameplayIsActive
+        )
+        guard gameplayIsActive else {
+            mouseDeltaX = 0
+            mouseDeltaY = 0
+            return .zero
+        }
+        let deltaX = mouseDeltaX
+        let deltaY = mouseDeltaY
+        mouseDeltaX = 0
+        mouseDeltaY = 0
+        let mouseNormalizer = 10_000 * max(frameDuration, 0.005)
+        let mouseYaw = mouseLookEnabled ? 0 : deltaX / mouseNormalizer
+        let mousePitch = mouseLookEnabled ? 0 : -deltaY / mouseNormalizer
+        let directScale = 2 * Float.pi / 10_000
+        return InputSnapshot(
+            forward: keyboard.forward + controller.forward,
+            sideways: keyboard.sideways + controller.sideways,
+            vertical: keyboard.vertical + controller.vertical,
+            pitch: max(
+                -0.75,
+                min(0.75, keyboard.pitch + controller.pitch + mousePitch)
+            ),
+            yaw: keyboard.yaw + controller.yaw + mouseYaw,
+            roll: keyboard.roll + controller.roll,
+            directLookPitchRadians: mouseLookEnabled ? -deltaY * directScale : 0,
+            directLookYawRadians: mouseLookEnabled ? deltaX * directScale : 0
         )
     }
 
@@ -160,6 +228,9 @@ struct PlayerInputState: Sendable {
         precondition(timestamp.isFinite)
         if !active {
             held = .zero
+            controller = .zero
+            mouseDeltaX = 0
+            mouseDeltaY = 0
             _ = ramp.snapshot(
                 held: .zero,
                 frameDuration: simulation?.frameDuration ?? 0,
@@ -245,7 +316,15 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let gameTime: Float
     let playerView: PlayerView
     let velocity: Vector3
+    let angularVelocity: Vector3
+    let turnrollFixedAngle: Float
     let wallContact: IndoorWallContact?
+}
+
+enum IndoorAutoLevelMode: Int, Sendable {
+    case off = 0
+    case standard = 1
+    case newPlayer = 2
 }
 
 final class PlayerSimulation {
@@ -253,8 +332,12 @@ final class PlayerSimulation {
     private(set) var frameDuration: Float = 0.1
     private(set) var gameTime: Float = 0
     private(set) var velocity = Vector3.zero
+    private(set) var angularVelocity: Vector3
+    private(set) var turnrollFixedAngle: Float = 0
+    private(set) var indoorAutoLevelMode = IndoorAutoLevelMode.newPlayer
 
     private var lastTimestamp: Double
+    private var lastThrustTime: Float = 0
     private var pauseDepth = 0
     private var pauseTimestamp: Double?
 
@@ -262,6 +345,9 @@ final class PlayerSimulation {
         precondition(presentationReadyTimestamp.isFinite)
         precondition(level.defaultPlayerBinding != nil)
         self.level = level
+        let binding = level.defaultPlayerBinding!
+        let ship = level.shipDefinitions.first { $0.source == binding.ship }!
+        angularVelocity = ship.physics.initialAngularVelocity
         lastTimestamp = presentationReadyTimestamp
     }
 
@@ -275,23 +361,127 @@ final class PlayerSimulation {
         let objectIndex = level.objects.firstIndex {
             $0.handle == binding.objectHandle
         }!
-        let object = level.objects[objectIndex]
+        var object = level.objects[objectIndex]
         let ship = level.shipDefinitions.first { $0.source == binding.ship }!
         guard case let .room(startRoom) = object.location else {
             preconditionFailure("The Slice 10 player simulation is indoor.")
         }
+        var orientation = object.orientation
+        if input.directLookPitchRadians != 0 || input.directLookYawRadians != 0 {
+            orientation = sourceMatrixMultiply(
+                orientation,
+                sourceRotationMatrix(
+                    pitch: sourceFixedAngleRadians(
+                        input.directLookPitchRadians
+                    ),
+                    yaw: sourceFixedAngleRadians(
+                        input.directLookYawRadians
+                    ),
+                    roll: 0
+                )
+            )
+        }
+        let linearThrustOrientation = orientation
+        if turnrollFixedAngle != 0 {
+            orientation = sourceMatrixMultiply(
+                orientation,
+                sourceRotationMatrix(
+                    pitch: 0,
+                    yaw: 0,
+                    roll: sourceFixedAngleUnits(-turnrollFixedAngle)
+                )
+            )
+        }
+
+        var rotationalThrust = Vector3(
+            x: ship.physics.fullRotationalThrust
+                * max(-0.75, min(0.75, input.pitch)),
+            y: ship.physics.fullRotationalThrust * input.yaw,
+            z: ship.physics.fullRotationalThrust * input.roll
+        )
+        if input.forward != 0 || input.sideways != 0 || input.vertical != 0
+            || rotationalThrust != .zero {
+            lastThrustTime = gameTime
+        }
+        rotationalThrust = sourceIndoorAutoLevelThrust(
+            rotationalThrust,
+            orientation: orientation,
+            storedOrientation: object.orientation,
+            fullRotationalThrust: ship.physics.fullRotationalThrust,
+            turnrollFixedAngle: turnrollFixedAngle,
+            mode: indoorAutoLevelMode,
+            gameTime: gameTime,
+            lastThrustTime: lastThrustTime
+        )
+        angularVelocity = analyticAngularVelocity(
+            velocity: angularVelocity,
+            force: rotationalThrust,
+            mass: ship.physics.mass,
+            drag: ship.physics.rotationalDrag,
+            duration: systemsFrameDuration
+        )
+        orientation = sourceMatrixMultiply(
+            orientation,
+            sourceRotationMatrix(
+                pitch: sourceFixedAngleUnits(
+                    angularVelocity.x * systemsFrameDuration
+                ),
+                yaw: sourceFixedAngleUnits(
+                    angularVelocity.y * systemsFrameDuration
+                ),
+                roll: sourceFixedAngleUnits(
+                    angularVelocity.z * systemsFrameDuration
+                )
+            )
+        )
+        if ship.physics.behaviors.contains(.turnroll) {
+            let desired = max(
+                -32_000,
+                min(
+                    32_000,
+                    -angularVelocity.y * ship.physics.turnrollRatio
+                )
+            )
+            let maximumChange = Float(
+                Int(ship.physics.maximumTurnrollRate * systemsFrameDuration)
+            )
+            if abs(desired - turnrollFixedAngle) > maximumChange {
+                turnrollFixedAngle += desired > turnrollFixedAngle
+                    ? maximumChange
+                    : -maximumChange
+            } else {
+                turnrollFixedAngle = Float(Int(desired))
+            }
+        }
+        if turnrollFixedAngle != 0 {
+            orientation = sourceMatrixMultiply(
+                orientation,
+                sourceRotationMatrix(
+                    pitch: 0,
+                    yaw: 0,
+                    roll: sourceFixedAngleUnits(turnrollFixedAngle)
+                )
+            )
+        }
+        orientation = sourceOrthogonalized(orientation)
+        object.orientation = orientation
+        level.objects[objectIndex].orientation = orientation
+
         let force = Vector3(
             x: ship.physics.fullThrust * (
-                object.orientation.forward.x * input.forward
-                    + object.orientation.right.x * input.sideways
+                linearThrustOrientation.forward.x * input.forward
+                    + linearThrustOrientation.up.x * input.vertical
+                    + linearThrustOrientation.right.x * input.sideways
             ),
             y: ship.physics.fullThrust * (
-                object.orientation.forward.y * input.forward
-                    + object.orientation.right.y * input.sideways
+                linearThrustOrientation.forward.y * input.forward
+                    + linearThrustOrientation.up.y * input.vertical
+                    + linearThrustOrientation.right.y * input.sideways
             ),
             z: ship.physics.fullThrust * (
-                object.orientation.forward.z * input.forward
-                    + object.orientation.right.z * input.sideways
+                linearThrustOrientation.forward.z * input.forward
+                    + linearThrustOrientation.up.z * input.vertical
+                    + linearThrustOrientation.right.z * input.sideways
             )
         )
         let view = defaultPlayerView(in: level)
@@ -381,6 +571,8 @@ final class PlayerSimulation {
             gameTime: gameTime,
             playerView: defaultPlayerView(in: level),
             velocity: velocity,
+            angularVelocity: angularVelocity,
+            turnrollFixedAngle: turnrollFixedAngle,
             wallContact: wallContact
         )
     }
@@ -391,6 +583,10 @@ final class PlayerSimulation {
             pauseTimestamp = timestamp
         }
         pauseDepth += 1
+    }
+
+    func setIndoorAutoLevelMode(_ mode: IndoorAutoLevelMode) {
+        indoorAutoLevelMode = mode
     }
 
     func startTime(at timestamp: Double) {
@@ -404,6 +600,271 @@ final class PlayerSimulation {
             pauseTimestamp = nil
         }
     }
+}
+
+private func sourceIndoorAutoLevelThrust(
+    _ input: Vector3,
+    orientation: Matrix3,
+    storedOrientation: Matrix3,
+    fullRotationalThrust: Float,
+    turnrollFixedAngle: Float,
+    mode: IndoorAutoLevelMode,
+    gameTime: Float,
+    lastThrustTime: Float
+) -> Vector3 {
+    guard mode != .off else { return input }
+    var result = input
+    let angles = sourceExtractAngles(orientation)
+    let firedRecently = gameTime < 1.5
+    var pitchWasLeveled = false
+
+    if mode == .newPlayer,
+       !firedRecently,
+       lastThrustTime + 1.5 < gameTime {
+        let bound = 750
+        var pitch = angles.pitch
+        if pitch > bound,
+           pitch < 65_535 - bound,
+           abs(pitch - 32_768) > bound {
+            pitchWasLeveled = true
+            if storedOrientation.up.y < 0 {
+                pitch = (pitch + 16_384) & 0xffff
+            }
+            let scale = min(1, 1.05 - abs(storedOrientation.up.y))
+            if pitch < 16_834 {
+                result = Vector3(
+                    x: result.x - scale * fullRotationalThrust,
+                    y: result.y,
+                    z: result.z
+                )
+            } else if pitch < 32_768 {
+                result = Vector3(
+                    x: result.x + scale * fullRotationalThrust,
+                    y: result.y,
+                    z: result.z
+                )
+            } else if pitch < 49_152 {
+                result = Vector3(
+                    x: result.x - scale * fullRotationalThrust,
+                    y: result.y,
+                    z: result.z
+                )
+            } else {
+                result = Vector3(
+                    x: result.x + scale * fullRotationalThrust,
+                    y: result.y,
+                    z: result.z
+                )
+            }
+        }
+    }
+
+    guard !pitchWasLeveled, abs(result.z) < 100 else { return result }
+    let maximumTilt: Float = mode == .newPlayer ? 13_750 : 11_000
+    let pitchIsBeyondTilt: Bool
+    if angles.pitch < 32_768 {
+        pitchIsBeyondTilt =
+            Float(abs(angles.pitch - 16_834)) > maximumTilt
+    } else {
+        pitchIsBeyondTilt =
+            Float(abs(angles.pitch - 49_152)) > maximumTilt
+    }
+    guard pitchIsBeyondTilt else { return result }
+
+    let turnrollBound = turnrollFixedAngle == 0
+        ? 10
+        : Int(abs(turnrollFixedAngle))
+    guard angles.roll > turnrollBound,
+          angles.roll < 65_535 - turnrollBound else {
+        return result
+    }
+
+    var scale: Float
+    if angles.pitch < 32_768 {
+        scale = (
+            Float(abs(16_834 - angles.pitch)) - maximumTilt
+        ) / (16_384 - maximumTilt)
+    } else {
+        scale = (
+            Float(abs(49_152 - angles.pitch)) - maximumTilt
+        ) / (16_384 - maximumTilt)
+    }
+    if angles.roll < 32_768 {
+        let bankDistance = angles.roll > 28_672
+            ? 28_672 - 16_834
+            : abs(16_834 - angles.roll)
+        var bankScale = 1.04 - Float(bankDistance) / 16_384
+        bankScale *= bankScale
+        scale *= bankScale
+        if firedRecently { scale *= 0.25 }
+        result = Vector3(
+            x: result.x,
+            y: result.y,
+            z: result.z - scale * 2 * fullRotationalThrust
+        )
+    } else {
+        let bankDistance = angles.roll < 36_864
+            ? 49_152 - 36_864
+            : abs(49_152 - angles.roll)
+        var bankScale = 1.04 - Float(bankDistance) / 16_384
+        bankScale *= bankScale
+        scale *= bankScale
+        if firedRecently { scale *= 0.25 }
+        result = Vector3(
+            x: result.x,
+            y: result.y,
+            z: result.z + scale * 2 * fullRotationalThrust
+        )
+    }
+    return result
+}
+
+private func sourceExtractAngles(
+    _ matrix: Matrix3
+) -> (pitch: Int, yaw: Int, roll: Int) {
+    if abs(matrix.forward.x) < 0.000_01,
+       abs(matrix.forward.z) < 0.000_01 {
+        return (
+            matrix.forward.y > 0 ? 0xc000 : 0x4000,
+            sourceFixedAtan2(
+                cosine: matrix.right.x,
+                sine: -matrix.right.z
+            ),
+            0
+        )
+    }
+    let yaw = sourceFixedAtan2(
+        cosine: matrix.forward.z,
+        sine: matrix.forward.x
+    )
+    let yawRadians = Float(yaw) * (2 * Float.pi / 65_536)
+    let sinYaw = sin(yawRadians)
+    let cosYaw = cos(yawRadians)
+    let cosPitch = abs(sinYaw) > abs(cosYaw)
+        ? matrix.forward.x / sinYaw
+        : matrix.forward.z / cosYaw
+    let pitch = sourceFixedAtan2(
+        cosine: cosPitch,
+        sine: -matrix.forward.y
+    )
+    let roll = sourceFixedAtan2(
+        cosine: matrix.up.y / cosPitch,
+        sine: matrix.right.y / cosPitch
+    )
+    return (pitch, yaw, roll)
+}
+
+private func sourceFixedAtan2(cosine: Float, sine: Float) -> Int {
+    let radians = atan2(sine, cosine)
+    let positive = radians < 0 ? radians + 2 * Float.pi : radians
+    return Int(positive * (65_536 / (2 * Float.pi))) & 0xffff
+}
+
+private func analyticAngularVelocity(
+    velocity: Vector3,
+    force: Vector3,
+    mass: Float,
+    drag: Float,
+    duration: Float
+) -> Vector3 {
+    precondition(mass > 0 && drag > 0 && duration >= 0)
+    let oneOverDrag = 1.0 / Double(drag)
+    let decay = exp(-(Double(drag) / Double(mass)) * Double(duration))
+    func component(_ velocity: Float, _ force: Float) -> Float {
+        let forceOverDrag = Double(force) * oneOverDrag
+        return Float(
+            (Double(velocity) - forceOverDrag) * decay + forceOverDrag
+        )
+    }
+    return Vector3(
+        x: component(velocity.x, force.x),
+        y: component(velocity.y, force.y),
+        z: component(velocity.z, force.z)
+    )
+}
+
+private func sourceFixedAngleUnits(_ fixedAngleUnits: Float) -> Int16 {
+    Int16(truncatingIfNeeded: Int64(fixedAngleUnits.rounded(.towardZero)))
+}
+
+private func sourceFixedAngleRadians(_ radians: Float) -> Int16 {
+    sourceFixedAngleUnits(radians * (65_536 / (2 * Float.pi)))
+}
+
+private func sourceRotationMatrix(
+    pitch: Int16,
+    yaw: Int16,
+    roll: Int16
+) -> Matrix3 {
+    let radiansPerUnit = 2 * Float.pi / 65_536
+    let pitchRadians = Float(pitch) * radiansPerUnit
+    let yawRadians = Float(yaw) * radiansPerUnit
+    let rollRadians = Float(roll) * radiansPerUnit
+    let sinPitch = sin(pitchRadians)
+    let cosPitch = cos(pitchRadians)
+    let sinRoll = sin(rollRadians)
+    let cosRoll = cos(rollRadians)
+    let sinYaw = sin(yawRadians)
+    let cosYaw = cos(yawRadians)
+    let sinRollSinYaw = sinRoll * sinYaw
+    let cosRollCosYaw = cosRoll * cosYaw
+    let cosRollSinYaw = cosRoll * sinYaw
+    let sinRollCosYaw = sinRoll * cosYaw
+    return Matrix3(
+        right: Vector3(
+            x: cosRollCosYaw + sinPitch * sinRollSinYaw,
+            y: sinRoll * cosPitch,
+            z: sinPitch * sinRollCosYaw - cosRollSinYaw
+        ),
+        up: Vector3(
+            x: sinPitch * cosRollSinYaw - sinRollCosYaw,
+            y: cosRoll * cosPitch,
+            z: sinRollSinYaw + sinPitch * cosRollCosYaw
+        ),
+        forward: Vector3(
+            x: sinYaw * cosPitch,
+            y: -sinPitch,
+            z: cosYaw * cosPitch
+        )
+    )
+}
+
+private func sourceMatrixMultiply(_ lhs: Matrix3, _ rhs: Matrix3) -> Matrix3 {
+    Matrix3(
+        right: sourceTransform(rhs.right, by: lhs),
+        up: sourceTransform(rhs.up, by: lhs),
+        forward: sourceTransform(rhs.forward, by: lhs)
+    )
+}
+
+private func sourceTransform(_ value: Vector3, by matrix: Matrix3) -> Vector3 {
+    Vector3(
+        x: matrix.right.x * value.x
+            + matrix.up.x * value.y
+            + matrix.forward.x * value.z,
+        y: matrix.right.y * value.x
+            + matrix.up.y * value.y
+            + matrix.forward.y * value.z,
+        z: matrix.right.z * value.x
+            + matrix.up.z * value.y
+            + matrix.forward.z * value.z
+    )
+}
+
+private func sourceOrthogonalized(_ matrix: Matrix3) -> Matrix3 {
+    let forward = sourceNormalized(matrix.forward)
+    let right = sourceNormalized(cross(matrix.up, forward))
+    return Matrix3(
+        right: right,
+        up: cross(forward, right),
+        forward: forward
+    )
+}
+
+private func sourceNormalized(_ value: Vector3) -> Vector3 {
+    let magnitude = sqrt(dot(value, value))
+    precondition(magnitude > 0)
+    return value / magnitude
 }
 
 private func surfacePhysicsBehavior(
@@ -810,7 +1271,7 @@ func extractPreparedModelDrawItems(
     return items
 }
 
-private func extractWorldForRendering(
+func extractWorldForRendering(
     _ level: Level,
     camera: RoomCamera,
     startRoomSourceIndex: Int,

@@ -3,50 +3,6 @@
 import AppKit
 import MetalKit
 
-@MainActor
-private final class RevivalMacGameplayView: MTKView {
-    var heldInputChanged: ((InputSnapshot) -> Void)?
-    private var heldKeys: Set<UInt16> = []
-
-    override var acceptsFirstResponder: Bool { true }
-
-    override func keyDown(with event: NSEvent) {
-        guard Self.gameplayKeyCodes.contains(event.keyCode) else {
-            super.keyDown(with: event)
-            return
-        }
-        heldKeys.insert(event.keyCode)
-        publish()
-    }
-
-    override func keyUp(with event: NSEvent) {
-        guard Self.gameplayKeyCodes.contains(event.keyCode) else {
-            super.keyUp(with: event)
-            return
-        }
-        heldKeys.remove(event.keyCode)
-        publish()
-    }
-
-    func clearHeldInput() {
-        heldKeys.removeAll()
-        publish()
-    }
-
-    private func publish() {
-        heldInputChanged?(
-            InputSnapshot(
-                forward: (heldKeys.contains(13) ? 1 : 0)
-                    - (heldKeys.contains(1) ? 1 : 0),
-                sideways: (heldKeys.contains(2) ? 1 : 0)
-                    - (heldKeys.contains(0) ? 1 : 0)
-            )
-        )
-    }
-
-    private static let gameplayKeyCodes: Set<UInt16> = [0, 1, 2, 13]
-}
-
 @main
 @MainActor
 enum RevivalMacApplication {
@@ -76,7 +32,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
     private let library = CanonicalPackageLibrary.revivalMac
     private var window: NSWindow?
     private var renderer: MetalWorldRenderer?
-    private var gameplayView: RevivalMacGameplayView?
+    private var gameplayView: RevivalGameplayView?
     private var simulation: PlayerSimulation?
     private var playerInput = PlayerInputState()
     private var statusLabel: NSTextField?
@@ -90,7 +46,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             showWindow(rendererView: nil, message: "No Metal device is available.")
             return
         }
-        let metalView = RevivalMacGameplayView(frame: .zero, device: device)
+        let metalView = RevivalGameplayView(frame: .zero, device: device)
         do {
             renderer = try MetalWorldRenderer(view: metalView)
             showWindow(
@@ -276,9 +232,12 @@ private final class RevivalMacApplicationDelegate: NSObject,
             simulation: simulation,
             at: presentationReadyTimestamp
         )
+        gameplayView?.setGameplayActive(playerInput.gameplayIsActive)
         renderer.setFrameUpdate { [weak self, weak renderer] timestamp in
             guard let self, let renderer, self.simulation === simulation else { return }
             guard self.playerInput.gameplayIsActive else { return }
+            let mouse = self.gameplayView?.drainMouseDelta() ?? (0, 0)
+            self.playerInput.accumulateMouseDelta(x: mouse.0, y: mouse.1)
             let input = self.playerInput.snapshot(
                 frameDuration: simulation.frameDuration
             )
@@ -347,9 +306,12 @@ private final class RevivalMacApplicationDelegate: NSObject,
         window.delegate = self
         window.center()
         window.makeKeyAndOrderFront(nil)
-        if let gameplayView = rendererView as? RevivalMacGameplayView {
+        if let gameplayView = rendererView as? RevivalGameplayView {
             gameplayView.heldInputChanged = {
                 [weak self] in self?.playerInput.setHeld($0)
+            }
+            gameplayView.controllerInputChanged = {
+                [weak self] in self?.playerInput.setController($0)
             }
             window.makeFirstResponder(gameplayView)
             self.gameplayView = gameplayView
@@ -361,14 +323,12 @@ private final class RevivalMacApplicationDelegate: NSObject,
         let active =
             NSApplication.shared.isActive
             && window?.isKeyWindow == true
-        if !active {
-            gameplayView?.clearHeldInput()
-        }
         playerInput.setGameplayActive(
             active,
             simulation: simulation,
             at: ProcessInfo.processInfo.systemUptime
         )
+        gameplayView?.setGameplayActive(active && simulation != nil)
     }
 
     private func setStatus(_ message: String, isError: Bool) {

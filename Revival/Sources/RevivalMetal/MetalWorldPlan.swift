@@ -28,6 +28,8 @@ struct MetalWorldDraw: Equatable, Sendable {
 struct MetalWorldPlan: Equatable, Sendable {
     let level: Level
     let camera: RoomCamera
+    let startRoomSourceIndex: Int
+    let excludedObjectHandle: UInt32?
     let visibleRoomSourceIndices: [Int]
     let preparedLightCoronaCandidates: [WorldLightCorona]
     let preparedDraws: [MetalWorldDraw]
@@ -113,6 +115,8 @@ private func makeMetalWorldPlan(
     return MetalWorldPlan(
         level: level,
         camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        excludedObjectHandle: excludedObjectHandle,
         visibleRoomSourceIndices: extraction.visibleRoomSourceIndices,
         preparedLightCoronaCandidates: extraction.lightCoronas,
         preparedDraws: preparedDraws,
@@ -126,7 +130,41 @@ func updateMetalWorldPlan(
     level: Level,
     playerView: PlayerView
 ) throws -> MetalWorldPlan {
-    let extraction = try extractWorldForRendering(level, playerView: playerView)
+    try updateMetalWorldPlan(
+        prepared,
+        level: level,
+        camera: playerView.camera,
+        startRoomSourceIndex: playerView.roomSourceIndex,
+        excludedObjectHandle: playerView.objectHandle
+    )
+}
+
+func updateMetalWorldPlan(
+    _ prepared: MetalWorldPlan,
+    camera: RoomCamera
+) throws -> MetalWorldPlan {
+    try updateMetalWorldPlan(
+        prepared,
+        level: prepared.level,
+        camera: camera,
+        startRoomSourceIndex: prepared.startRoomSourceIndex,
+        excludedObjectHandle: prepared.excludedObjectHandle
+    )
+}
+
+private func updateMetalWorldPlan(
+    _ prepared: MetalWorldPlan,
+    level: Level,
+    camera: RoomCamera,
+    startRoomSourceIndex: Int,
+    excludedObjectHandle: UInt32?
+) throws -> MetalWorldPlan {
+    let extraction = try extractWorldForRendering(
+        level,
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        excludedObjectHandle: excludedObjectHandle
+    )
     let opaqueRoomDraws = extraction.opaqueDrawItems.map(makeMetalWorldDraw)
     let translucentRoomDraws = extraction.translucentDrawItems.map(makeMetalWorldDraw)
     let objectDraws = extraction.modelDrawItems.map(makeMetalWorldDraw)
@@ -152,7 +190,9 @@ func updateMetalWorldPlan(
     let activeDrawIndices = opaqueIndices + objectIndices + translucentIndices
     return MetalWorldPlan(
         level: level,
-        camera: playerView.camera,
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        excludedObjectHandle: excludedObjectHandle,
         visibleRoomSourceIndices: extraction.visibleRoomSourceIndices,
         preparedLightCoronaCandidates: prepared.preparedLightCoronaCandidates,
         preparedDraws: prepared.preparedDraws,

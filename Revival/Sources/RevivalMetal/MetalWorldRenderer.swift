@@ -27,16 +27,15 @@ enum MetalWorldRendererError: Error, LocalizedError {
     }
 }
 
-func centeredSquareMetalViewport(
+func fullDrawableMetalViewport(
     drawableWidth: Double,
     drawableHeight: Double
 ) -> MTLViewport {
-    let side = min(drawableWidth, drawableHeight)
     return MTLViewport(
-        originX: (drawableWidth - side) / 2,
-        originY: (drawableHeight - side) / 2,
-        width: side,
-        height: side,
+        originX: 0,
+        originY: 0,
+        width: drawableWidth,
+        height: drawableHeight,
         znear: 0,
         zfar: 1
     )
@@ -185,7 +184,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
     ) throws {
         let candidate = try makeMetalWorldPlan(
             level: level,
-            camera: camera,
+            camera: cameraWithDrawableAspect(camera),
             startRoomSourceIndex: startRoomSourceIndex
         )
         try install(candidate)
@@ -193,7 +192,10 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
 
     func replace(level: Level, playerView: PlayerView) throws {
         try install(
-            try makeMetalWorldPlan(level: level, playerView: playerView)
+            try makeMetalWorldPlan(
+                level: level,
+                playerView: playerViewWithDrawableAspect(playerView)
+            )
         )
     }
 
@@ -206,7 +208,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             try updateMetalWorldPlan(
                 presentation.plan,
                 level: level,
-                playerView: playerView
+                playerView: playerViewWithDrawableAspect(playerView)
             )
         )
     }
@@ -286,7 +288,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
         }
 
         encoder.setViewport(
-            centeredSquareMetalViewport(
+            fullDrawableMetalViewport(
                 drawableWidth: Double(view.drawableSize.width),
                 drawableHeight: Double(view.drawableSize.height)
             )
@@ -367,6 +369,43 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             slot.depthTexture = nil
             slot.depthSize = .zero
         }
+        guard let presentation else { return }
+        do {
+            presentation.update(
+                try updateMetalWorldPlan(
+                    presentation.plan,
+                    camera: cameraWithDrawableAspect(presentation.plan.camera)
+                )
+            )
+        } catch {
+            preconditionFailure(
+                "A validated retained presentation must survive drawable resize: \(error)"
+            )
+        }
+    }
+
+    private func cameraWithDrawableAspect(_ camera: RoomCamera) -> RoomCamera {
+        let width = Float(view.drawableSize.width)
+        let height = Float(view.drawableSize.height)
+        guard width.isFinite, height.isFinite, width > 0, height > 0 else {
+            return camera
+        }
+        return RoomCamera(
+            position: camera.position,
+            target: camera.target,
+            up: camera.up,
+            projection: camera.projection.withAspectRatio(width / height)
+        )
+    }
+
+    private func playerViewWithDrawableAspect(_ playerView: PlayerView) -> PlayerView {
+        PlayerView(
+            playerID: playerView.playerID,
+            objectHandle: playerView.objectHandle,
+            roomSourceIndex: playerView.roomSourceIndex,
+            camera: cameraWithDrawableAspect(playerView.camera),
+            collisionRadius: playerView.collisionRadius
+        )
     }
 
     private func availableFrameSlotIndex() -> Int? {

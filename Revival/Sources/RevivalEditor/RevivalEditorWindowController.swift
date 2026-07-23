@@ -4,53 +4,9 @@ import AppKit
 import MetalKit
 
 @MainActor
-private final class RevivalEditorGameplayView: MTKView {
-    var heldInputChanged: ((InputSnapshot) -> Void)?
-    private var heldKeys: Set<UInt16> = []
-
-    override var acceptsFirstResponder: Bool { true }
-
-    override func keyDown(with event: NSEvent) {
-        guard Self.gameplayKeyCodes.contains(event.keyCode) else {
-            super.keyDown(with: event)
-            return
-        }
-        heldKeys.insert(event.keyCode)
-        publish()
-    }
-
-    override func keyUp(with event: NSEvent) {
-        guard Self.gameplayKeyCodes.contains(event.keyCode) else {
-            super.keyUp(with: event)
-            return
-        }
-        heldKeys.remove(event.keyCode)
-        publish()
-    }
-
-    func clearHeldInput() {
-        heldKeys.removeAll()
-        publish()
-    }
-
-    private func publish() {
-        heldInputChanged?(
-            InputSnapshot(
-                forward: (heldKeys.contains(13) ? 1 : 0)
-                    - (heldKeys.contains(1) ? 1 : 0),
-                sideways: (heldKeys.contains(2) ? 1 : 0)
-                    - (heldKeys.contains(0) ? 1 : 0)
-            )
-        )
-    }
-
-    private static let gameplayKeyCodes: Set<UInt16> = [0, 1, 2, 13]
-}
-
-@MainActor
 final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate {
     private unowned let projectDocument: RevivalProjectDocument
-    private let gameplayView: RevivalEditorGameplayView
+    private let gameplayView: RevivalGameplayView
     private let renderer: MetalWorldRenderer?
     private let selectedRoomHeading: NSTextField
     private let roomPopup: NSPopUpButton
@@ -78,7 +34,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     init(document: RevivalProjectDocument) {
         projectDocument = document
 
-        let metalView = RevivalEditorGameplayView(
+        let metalView = RevivalGameplayView(
             frame: .zero,
             device: MTLCreateSystemDefaultDevice()
         )
@@ -276,6 +232,9 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.heldInputChanged = {
             [weak self] in self?.playerInput.setHeld($0)
         }
+        metalView.controllerInputChanged = {
+            [weak self] in self?.playerInput.setController($0)
+        }
         window.initialFirstResponder = roomNameField
         roomNameField.target = self
         roomNameField.action = #selector(commitRoomName(_:))
@@ -367,12 +326,12 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        gameplayView.clearHeldInput()
         playerInput.setGameplayActive(
             false,
             simulation: playSimulation,
             at: ProcessInfo.processInfo.systemUptime
         )
+        gameplayView.setGameplayActive(false)
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
@@ -382,6 +341,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             simulation: playSimulation,
             at: ProcessInfo.processInfo.systemUptime
         )
+        gameplayView.setGameplayActive(true)
         window?.makeFirstResponder(gameplayView)
     }
 
@@ -498,7 +458,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     @objc private func togglePlay(_ sender: Any?) {
         do {
             if projectDocument.playSession == nil {
-                let candidate = try projectDocument.makePlaySession()
+                let candidate = projectDocument.makePlaySession()
                 try replaceRenderedWorld(session: candidate)
                 let simulation = candidate.makePlayerSimulation(
                     presentationReadyTimestamp: ProcessInfo.processInfo.systemUptime
@@ -510,12 +470,15 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                     simulation: simulation,
                     at: ProcessInfo.processInfo.systemUptime
                 )
+                gameplayView.setGameplayActive(playerInput.gameplayIsActive)
                 renderer?.setFrameUpdate { [weak self, weak renderer] timestamp in
                     guard let self, let renderer,
                           self.playSimulation === simulation,
                           self.playerInput.gameplayIsActive else {
                         return
                     }
+                    let mouse = self.gameplayView.drainMouseDelta()
+                    self.playerInput.accumulateMouseDelta(x: mouse.x, y: mouse.y)
                     let input = self.playerInput.snapshot(
                         frameDuration: simulation.frameDuration
                     )
@@ -536,7 +499,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             } else if projectDocument.playSession != nil {
                 renderer?.setFrameUpdate(nil)
                 playSimulation = nil
-                gameplayView.clearHeldInput()
+                gameplayView.setGameplayActive(false)
                 playerInput = PlayerInputState()
                 try replaceRenderedWorld(
                     level: projectDocument.project.level,

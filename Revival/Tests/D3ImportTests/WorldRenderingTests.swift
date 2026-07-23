@@ -71,6 +71,64 @@ final class WorldRenderingTests: XCTestCase {
         )
     }
 
+    func testPlayerInputStateCombinesKeyboardControllerAndOneShotMousePerAxis() {
+        var input = PlayerInputState(rampDuration: 0.35)
+        input.setHeld(
+            .init(
+                forward: 1,
+                sideways: -1,
+                vertical: 1,
+                pitch: -1,
+                yaw: 1,
+                roll: -1
+            )
+        )
+        input.setController(
+            .init(
+                forward: 0.2,
+                sideways: 0.1,
+                vertical: 0.3,
+                pitch: 0.2,
+                yaw: 0.4,
+                roll: 0.1
+            )
+        )
+        input.accumulateMouseDelta(x: 10, y: -5)
+
+        let first = input.snapshot(frameDuration: 0.1)
+        XCTAssertEqual(first.forward, 0.485_714_3, accuracy: 0.000_001)
+        XCTAssertEqual(first.sideways, -0.185_714_3, accuracy: 0.000_001)
+        XCTAssertEqual(first.vertical, 0.585_714_3, accuracy: 0.000_001)
+        XCTAssertEqual(first.pitch, -0.080_714_3, accuracy: 0.000_001)
+        XCTAssertEqual(first.yaw, 0.695_714_3, accuracy: 0.000_001)
+        XCTAssertEqual(first.roll, -0.185_714_3, accuracy: 0.000_001)
+        XCTAssertEqual(first.directLookPitchRadians, 0)
+        XCTAssertEqual(first.directLookYawRadians, 0)
+
+        let second = input.snapshot(frameDuration: 0.1)
+        XCTAssertEqual(second.pitch, -0.371_428_6, accuracy: 0.000_001)
+        XCTAssertEqual(second.yaw, 0.971_428_6, accuracy: 0.000_001)
+
+        input.mouseLookEnabled = true
+        input.accumulateMouseDelta(x: 10, y: -5)
+        let mouseLook = input.snapshot(frameDuration: 0.1)
+        XCTAssertEqual(mouseLook.pitch, -0.657_142_9, accuracy: 0.000_001)
+        XCTAssertEqual(mouseLook.yaw, 1, accuracy: 0.000_001)
+        XCTAssertEqual(
+            mouseLook.directLookPitchRadians,
+            Float.pi / 1_000,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            mouseLook.directLookYawRadians,
+            Float.pi / 500,
+            accuracy: 0.000_001
+        )
+        let drained = input.snapshot(frameDuration: 0.1)
+        XCTAssertEqual(drained.directLookPitchRadians, 0)
+        XCTAssertEqual(drained.directLookYawRadians, 0)
+    }
+
     func testPlayerInputStateClearsAndRebasesAcrossFocusChanges() {
         let simulation = PlayerSimulation(
             level: makeSliceSixObjectRenderLevel(),
@@ -78,6 +136,8 @@ final class WorldRenderingTests: XCTestCase {
         )
         var input = PlayerInputState(rampDuration: 0.5)
         input.setHeld(.init(forward: 1))
+        input.setController(.init(sideways: 0.75, roll: -0.5))
+        input.accumulateMouseDelta(x: 25, y: -10)
         XCTAssertEqual(
             input.snapshot(frameDuration: 0.1).forward,
             0.2,
@@ -93,16 +153,56 @@ final class WorldRenderingTests: XCTestCase {
         input.setGameplayActive(true, simulation: simulation, at: 20)
         input.setHeld(.init(forward: 1))
         XCTAssertTrue(input.gameplayIsActive)
-        XCTAssertEqual(
-            input.snapshot(frameDuration: 0.1).forward,
-            0.2,
-            accuracy: 0.000_001
-        )
+        let resumed = input.snapshot(frameDuration: 0.1)
+        XCTAssertEqual(resumed.forward, 0.2, accuracy: 0.000_001)
+        XCTAssertEqual(resumed.sideways, 0)
+        XCTAssertEqual(resumed.roll, 0)
+        XCTAssertEqual(resumed.pitch, 0)
+        XCTAssertEqual(resumed.yaw, 0)
         XCTAssertEqual(
             simulation.update(at: 20.016, input: .zero).storedFrameDuration,
             0.016,
             accuracy: 0.000_001
         )
+    }
+
+    func testConcreteAppKitOwnerMapsSixAxesAndSourceControllerDeadzone() {
+        XCTAssertEqual(
+            RevivalGameplayView.heldInput(
+                for: [13, 0, 15, 126, 124, 12]
+            ),
+            .init(
+                forward: 1,
+                sideways: -1,
+                vertical: 1,
+                pitch: -1,
+                yaw: 1,
+                roll: 1
+            )
+        )
+        XCTAssertEqual(
+            RevivalGameplayView.heldInput(
+                for: [13, 1, 0, 2, 15, 3, 126, 125, 123, 124, 12, 14]
+            ),
+            .zero
+        )
+
+        let controller = RevivalGameplayView.controllerInput(
+            leftX: 0.6,
+            leftY: 0.7,
+            rightX: 0.4,
+            rightY: 0.6,
+            leftTrigger: 0.2,
+            rightTrigger: 0.6,
+            leftShoulder: 1,
+            rightShoulder: 0
+        )
+        XCTAssertEqual(controller.forward, 0.625, accuracy: 0.000_001)
+        XCTAssertEqual(controller.sideways, 0.5, accuracy: 0.000_001)
+        XCTAssertEqual(controller.vertical, 0.5, accuracy: 0.000_001)
+        XCTAssertEqual(controller.pitch, -0.5, accuracy: 0.000_001)
+        XCTAssertEqual(controller.yaw, 0.25, accuracy: 0.000_001)
+        XCTAssertEqual(controller.roll, 1, accuracy: 0.000_001)
     }
 
     func testPlayerSimulationPreservesPriorFrameTimingAndNestedPauseRebasing() {
@@ -161,6 +261,127 @@ final class WorldRenderingTests: XCTestCase {
             start.z + expectedDisplacement,
             accuracy: 0.000_1
         )
+    }
+
+    func testPlayerSimulationUsesSampledBasisThenCommitsRotationalFlight() {
+        let level = makeSliceSixObjectRenderLevel()
+        let start = defaultPlayerView(in: level).camera.position
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        let frame = simulation.update(
+            at: 0.016,
+            input: .init(vertical: 1, pitch: 0.75, yaw: 1)
+        )
+
+        XCTAssertEqual(
+            frame.angularVelocity.x,
+            12_065.218,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            frame.angularVelocity.y,
+            16_086.958,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(frame.angularVelocity.z, 0, accuracy: 0.001)
+        XCTAssertEqual(frame.turnrollFixedAngle, -800, accuracy: 0.001)
+
+        let camera = frame.playerView.camera
+        XCTAssertEqual(
+            camera.target.x - camera.position.x,
+            0.152_529_84,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            camera.target.y - camera.position.y,
+            -0.115_366_35,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            camera.target.z - camera.position.z,
+            0.981_542_3,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            frame.playerView.camera.position.x,
+            start.x,
+            accuracy: 0.000_1
+        )
+        XCTAssertGreaterThan(frame.playerView.camera.position.y, start.y)
+        XCTAssertEqual(
+            frame.playerView.camera.position.z,
+            start.z,
+            accuracy: 0.000_1
+        )
+    }
+
+    func testPlayerSimulationAppliesIsolatedRollToAngularVelocityAndCameraUp() {
+        let simulation = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 0
+        )
+        let start = defaultPlayerView(in: simulation.level)
+
+        let frame = simulation.update(
+            at: 0.016,
+            input: .init(roll: 1)
+        )
+
+        XCTAssertGreaterThan(frame.angularVelocity.z, 0)
+        XCTAssertNotEqual(frame.playerView.camera.up, start.camera.up)
+        XCTAssertEqual(
+            frame.playerView.camera.target.x - frame.playerView.camera.position.x,
+            start.camera.target.x - start.camera.position.x,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            frame.playerView.camera.target.y - frame.playerView.camera.position.y,
+            start.camera.target.y - start.camera.position.y,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            frame.playerView.camera.target.z - frame.playerView.camera.position.z,
+            start.camera.target.z - start.camera.position.z,
+            accuracy: 0.000_1
+        )
+    }
+
+    func testIndoorNewPlayerAutolevelCanBeTurnedOffAfterSourceDelay() {
+        let active = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 0
+        )
+        let disabled = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 0
+        )
+        disabled.setIndoorAutoLevelMode(.off)
+
+        let initialInput = InputSnapshot(directLookPitchRadians: 0.25)
+        _ = active.update(at: 0.016, input: initialInput)
+        _ = disabled.update(at: 0.016, input: initialInput)
+
+        var activeFrame: PlayerSimulationFrame!
+        var disabledFrame: PlayerSimulationFrame!
+        for frameIndex in 2...110 {
+            let timestamp = Double(frameIndex) * 0.016
+            activeFrame = active.update(at: timestamp, input: .zero)
+            disabledFrame = disabled.update(at: timestamp, input: .zero)
+        }
+
+        let activePitch = abs(
+            activeFrame.playerView.camera.target.y
+                - activeFrame.playerView.camera.position.y
+        )
+        let disabledPitch = abs(
+            disabledFrame.playerView.camera.target.y
+                - disabledFrame.playerView.camera.position.y
+        )
+        XCTAssertLessThan(activePitch, disabledPitch)
+        XCTAssertEqual(disabledPitch, sin(0.25), accuracy: 0.000_1)
     }
 
     func testPlayerSimulationCommitsContactResponseToSamePlayerAndRoom() throws {
@@ -383,23 +604,46 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertFalse(plan.draws.contains { $0.objectHandle == view.objectHandle })
     }
 
-    func testCentersSquareWorldViewportInsideAnyDrawableShape() {
-        let portrait = centeredSquareMetalViewport(
+    func testSourceProjectionPreservesVerticalFramingAcrossFullDrawableAspect() {
+        let fourByThree = PerspectiveProjection.sourceDefault
+        let wide = fourByThree.withAspectRatio(16.0 / 9.0)
+        let fourByThreeVerticalScale =
+            (1 / tan(fourByThree.horizontalFieldOfViewRadians / 2))
+            * fourByThree.aspectRatio
+        let wideVerticalScale =
+            (1 / tan(wide.horizontalFieldOfViewRadians / 2))
+            * wide.aspectRatio
+        XCTAssertEqual(
+            fourByThree.horizontalFieldOfViewRadians,
+            3.14 * 72 / 180,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            wideVerticalScale,
+            fourByThreeVerticalScale,
+            accuracy: 0.000_001
+        )
+        XCTAssertLessThan(
+            1 / tan(wide.horizontalFieldOfViewRadians / 2),
+            1 / tan(fourByThree.horizontalFieldOfViewRadians / 2)
+        )
+
+        let portrait = fullDrawableMetalViewport(
             drawableWidth: 1_170,
             drawableHeight: 2_532
         )
         XCTAssertEqual(portrait.originX, 0)
-        XCTAssertEqual(portrait.originY, 681)
+        XCTAssertEqual(portrait.originY, 0)
         XCTAssertEqual(portrait.width, 1_170)
-        XCTAssertEqual(portrait.height, 1_170)
+        XCTAssertEqual(portrait.height, 2_532)
 
-        let landscape = centeredSquareMetalViewport(
+        let landscape = fullDrawableMetalViewport(
             drawableWidth: 2_360,
             drawableHeight: 1_640
         )
-        XCTAssertEqual(landscape.originX, 360)
+        XCTAssertEqual(landscape.originX, 0)
         XCTAssertEqual(landscape.originY, 0)
-        XCTAssertEqual(landscape.width, 1_640)
+        XCTAssertEqual(landscape.width, 2_360)
         XCTAssertEqual(landscape.height, 1_640)
     }
 

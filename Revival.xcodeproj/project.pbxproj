@@ -69,6 +69,9 @@
 		F10000000000000000000008 /* RevivalMobilePresentationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* RevivalMobilePresentationStateTests.swift */; };
 		F10000000000000000000009 /* RevivalMobilePresentationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000004 /* RevivalMobilePresentationState.swift */; };
 		F1000000000000000000000A /* RevivalMobilePresentationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000004 /* RevivalMobilePresentationState.swift */; };
+		G10000000000000000000001 /* RevivalGameplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000000000000000001 /* RevivalGameplayView.swift */; };
+		G10000000000000000000002 /* RevivalGameplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000000000000000001 /* RevivalGameplayView.swift */; };
+		G10000000000000000000003 /* RevivalGameplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000000000000000001 /* RevivalGameplayView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -108,6 +111,7 @@
 		F20000000000000000000002 /* RevivalMobileApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalMobileApplication.swift; sourceTree = "<group>"; };
 		F20000000000000000000003 /* RevivalMobilePresentationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalMobilePresentationStateTests.swift; sourceTree = "<group>"; };
 		F20000000000000000000004 /* RevivalMobilePresentationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalMobilePresentationState.swift; sourceTree = "<group>"; };
+		G20000000000000000000001 /* RevivalGameplayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalGameplayView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -185,6 +189,7 @@
 				A30000000000000000000005 /* D3Import */,
 				A30000000000000000000008 /* RevivalCore */,
 				A30000000000000000000009 /* RevivalMetal */,
+				G30000000000000000000001 /* RevivalAppKit */,
 				A30000000000000000000006 /* RevivalMac */,
 				F30000000000000000000001 /* RevivalMobile */,
 				A30000000000000000000007 /* RevivalEditor */,
@@ -244,6 +249,14 @@
 				D20000000000000000000002 /* MetalWorldPlan.swift */,
 			);
 			path = RevivalMetal;
+			sourceTree = "<group>";
+		};
+		G30000000000000000000001 /* RevivalAppKit */ = {
+			isa = PBXGroup;
+			children = (
+				G20000000000000000000001 /* RevivalGameplayView.swift */,
+			);
+			path = RevivalAppKit;
 			sourceTree = "<group>";
 		};
 		F30000000000000000000001 /* RevivalMobile */ = {
@@ -495,6 +508,7 @@
 				C10000000000000000000005 /* WorldRendering.swift in Sources */,
 				B10000000000000000000011 /* CanonicalPackage.swift in Sources */,
 				B1000000000000000000000B /* Level.swift in Sources */,
+				G10000000000000000000001 /* RevivalGameplayView.swift in Sources */,
 				A10000000000000000000002 /* RevivalMacApplication.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -512,6 +526,7 @@
 				C10000000000000000000006 /* WorldRendering.swift in Sources */,
 				B10000000000000000000012 /* CanonicalPackage.swift in Sources */,
 				B1000000000000000000000C /* Level.swift in Sources */,
+				G10000000000000000000002 /* RevivalGameplayView.swift in Sources */,
 				A10000000000000000000003 /* RevivalEditorApplication.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -545,6 +560,7 @@
 				A10000000000000000000004 /* HOG2ArchiveTests.swift in Sources */,
 				B10000000000000000000006 /* D3LV127Tests.swift in Sources */,
 				B10000000000000000000001 /* PreparedRetailProfileTests.swift in Sources */,
+				G10000000000000000000003 /* RevivalGameplayView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

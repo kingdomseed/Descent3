@@ -19,7 +19,6 @@ enum RevivalProjectDocumentError: Error, Equatable, LocalizedError {
     case projectNotLoaded
     case unexpectedPackageContents
     case projectFileTooLarge
-    case playerPresentationUnavailable
     case playNotActive
     case cameraOutsideRoom(Int)
 
@@ -33,8 +32,6 @@ enum RevivalProjectDocumentError: Error, Equatable, LocalizedError {
             "A Revival project package must contain exactly one regular project.json file."
         case .projectFileTooLarge:
             "project.json exceeds the 64 MiB Revival project limit."
-        case .playerPresentationUnavailable:
-            "The canonical project base has no default player presentation."
         case .playNotActive:
             "Start a disposable play session before moving its camera."
         case let .cameraOutsideRoom(sourceIndex):
@@ -375,13 +372,8 @@ final class RevivalProjectDocument: NSDocument {
         refreshWindowControllers()
     }
 
-    func makePlaySession() throws -> RevivalPlaySession {
-        guard project.level.defaultPlayerBinding != nil else {
-            throw RevivalProjectDocumentError.playerPresentationUnavailable
-        }
-        let session = project.makePlayerPlaySession()
-        try validateCameraRoom(session.camera, session: session)
-        return session
+    func makePlaySession() -> RevivalPlaySession {
+        project.makePlayerPlaySession()
     }
 
     func makePlaySession(

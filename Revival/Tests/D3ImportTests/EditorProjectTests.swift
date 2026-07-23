@@ -1043,7 +1043,7 @@ final class EditorProjectTests: XCTestCase {
             project: try makeProject(importedBase: importedBase)
         )
         try document.renameSelectedRoom(to: "Course Start")
-        let initialPlaySession = try document.makePlaySession()
+        let initialPlaySession = document.makePlaySession()
         XCTAssertNil(document.playSession)
         document.commitPlaySession(initialPlaySession)
 
@@ -1122,7 +1122,7 @@ final class EditorProjectTests: XCTestCase {
         )
         let editorCamera = document.camera
 
-        let staged = try document.makePlaySession()
+        let staged = document.makePlaySession()
 
         XCTAssertEqual(staged.playerView, defaultPlayerView(in: staged.level))
         XCTAssertEqual(staged.level, document.project.level)
@@ -1162,7 +1162,7 @@ final class EditorProjectTests: XCTestCase {
         )
 
         try document.selectPortal(0)
-        document.commitPlaySession(try document.makePlaySession())
+        document.commitPlaySession(document.makePlaySession())
         let blocked = try document.tracePlayIndoorMovement(
             startRoom: 3,
             start: start,
@@ -1184,7 +1184,7 @@ final class EditorProjectTests: XCTestCase {
         document.returnToEditor()
         try document.selectPortal(0)
         try document.setSelectedPortalRendersFaces(false)
-        document.commitPlaySession(try document.makePlaySession())
+        document.commitPlaySession(document.makePlaySession())
         let open = try document.tracePlayIndoorMovement(
             startRoom: 3,
             start: start,
@@ -1212,7 +1212,7 @@ final class EditorProjectTests: XCTestCase {
         document.followSelectedPortal()
         let selectionBeforePlay = document.editorSelection
 
-        let staged = try document.makePlaySession()
+        let staged = document.makePlaySession()
         XCTAssertEqual(staged.camera, defaultPlayerView(in: staged.level).camera)
         document.commitPlaySession(staged)
         XCTAssertEqual(document.editorSelection, selectionBeforePlay)
@@ -1282,7 +1282,7 @@ final class EditorProjectTests: XCTestCase {
         )
         let diffBeforePlay = document.project.semanticDiff
 
-        let staged = try document.makePlaySession()
+        let staged = document.makePlaySession()
         XCTAssertEqual(staged.level.rooms.first { $0.sourceIndex == 3 }?.faces[1].texture, editedTexture)
         XCTAssertEqual(
             staged.level.objects.first { $0.handle == object.handle }?.orientation,
@@ -1302,7 +1302,7 @@ final class EditorProjectTests: XCTestCase {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeClosedRoomProjectLevel())
         )
-        document.commitPlaySession(try document.makePlaySession())
+        document.commitPlaySession(document.makePlaySession())
         let before = try XCTUnwrap(document.playSession)
         let proposed = RoomCamera(
             position: .init(

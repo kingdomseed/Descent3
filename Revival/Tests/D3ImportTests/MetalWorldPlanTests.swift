@@ -62,6 +62,33 @@ final class MetalWorldPlanTests: XCTestCase {
         XCTAssertEqual(updated.draws, fresh.draws)
     }
 
+    func testResizeRecomputesRetainedPlanFromCurrentDrawableAspect() throws {
+        let level = makeSliceSixObjectRenderLevel()
+        let initialView = defaultPlayerView(in: level)
+        let initial = try makeMetalWorldPlan(level: level, playerView: initialView)
+        let resizedCamera = RoomCamera(
+            position: initial.camera.position,
+            target: initial.camera.target,
+            up: initial.camera.up,
+            projection: initial.camera.projection.withAspectRatio(16.0 / 9.0)
+        )
+
+        let resized = try updateMetalWorldPlan(
+            initial,
+            camera: resizedCamera
+        )
+
+        XCTAssertEqual(resized.camera, resizedCamera)
+        XCTAssertEqual(resized.preparedDraws, initial.preparedDraws)
+        XCTAssertEqual(
+            resized.activeDrawIndices.map { resized.preparedDraws[$0] },
+            resized.draws
+        )
+        XCTAssertFalse(resized.draws.contains {
+            $0.objectHandle == initialView.objectHandle
+        })
+    }
+
     func testAddsObjectModelsToTheOneWorldPlanWithTypedMaterials() throws {
         let plan = try makeMetalWorldPlan(
             level: makeSliceSixObjectRenderLevel(),
