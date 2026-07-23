@@ -1,0 +1,155 @@
+Revival/Sources/RevivalEditor/RevivalEditorWindowController.swift
+  s_f36ecb2405ee76::t_c6a325299168b8 472,475,478,501,534,541,543-549
+  s_f36ecb2405ee76::t_a5d8f731bb023c 301,349-351,473,480,502
+  s_c503f7c0529e13::t_553b3ee0877eaf 536-539
+Revival/Sources/RevivalCore/Level.swift
+  s_c503f7c0529e13::t_183a9f51cf6dc6 1097,1285,1434,1483,1489,1495,1502,1505,1513,1537
+  s_c503f7c0529e13::t_5a1780750f18b6 612,2229-2230
+  s_c503f7c0529e13::t_3a2e0e605411a1 1286
+  s_f36ecb2405ee76::t_3d097e28ee54e2 1287
+  s_c503f7c0529e13::t_8abc0ef73e12dc 619
+  s_f36ecb2405ee76::t_1b2efecd890335 1243-1244
+  s_c503f7c0529e13::t_6dbe31cadd5196 1319-1367,1376-1378,1380-1386,1389-1425,1427-1432
+  s_c503f7c0529e13::t_130f12662aeeb6 1379,1439-1472,1540-1545
+  s_f36ecb2405ee76::t_c6a325299168b8 1387-1388
+  s_f36ecb2405ee76::t_124adf44323fc6 809,1375
+  s_c503f7c0529e13::t_877cfe61326870 1426
+  s_c503f7c0529e13::t_6bc8870010c3d4 36,712-713,719,738-739,763-764,779,1194-1195,1274-1275,1311-1312
+  s_c503f7c0529e13::t_5ccdfd3e8c50de 620-622
+  s_c503f7c0529e13::t_2d1459b2b145f8 1433
+  s_f36ecb2405ee76::t_b33d4e5a46c18a 623-655
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_c503f7c0529e13::t_13eca0c80978d6 40-47,82-102,359-379,414-418,481-482,499-500,517-518
+  s_c503f7c0529e13::t_f84c71ff5bbb6a 380-413
+  s_c503f7c0529e13::t_d1564458962b55 48-81
+  s_c503f7c0529e13::t_edb627495bbc1f 1005-1009
+Revival/Sources/RevivalMac/RevivalMacApplication.swift
+  s_c503f7c0529e13::t_96549811fbf4d7 202,204
+Revival/Sources/RevivalMobile/RevivalMobileApplication.swift
+  s_f36ecb2405ee76::t_c6a325299168b8 411,413,441,456
+Revival/Tests/D3ImportTests/MetalWorldPlanTests.swift
+  s_c503f7c0529e13::t_334ae37d7c276f 50-54
+Revival/Tests/D3ImportTests/D3ImportOperationTests.swift
+  s_f36ecb2405ee76::t_c6a325299168b8 6-7,9-10,12,867-889
+  s_c503f7c0529e13::t_62cb4e2358bc4d 64-65,78-79,91-95,787-788,795
+  s_c503f7c0529e13::t_b29f7724b7ad24 5,8,11,13-35,835-866,890-894,995-1004,1020-1021,1024
+  s_c503f7c0529e13::t_f712ef1749bb1c 1022-1023
+docs/revival/source-translation-ledger.md
+  s_f36ecb2405ee76::t_5510e5218a6538 339-348,350-351,353-354,357-363,365-366,370-372
+  s_f36ecb2405ee76::t_8aa93e2c12eb9f 355
+  s_f36ecb2405ee76::t_3d8523ca0b3acb 367-368
+  s_f36ecb2405ee76::t_a16a7006a26d3c 352,364,369
+  s_f36ecb2405ee76::t_4be280671bc49d 4
+  s_f36ecb2405ee76::t_735c09932f7773 349,356
+docs/revival/functional-completeness-ledger.md
+  s_f36ecb2405ee76::t_735c09932f7773 256,263
+  s_f36ecb2405ee76::t_4be280671bc49d 4
+  s_f36ecb2405ee76::t_329a544bc2c0c4 25,264,268
+Revival/Tests/D3ImportTests/CanonicalLevelTests.swift
+  s_f36ecb2405ee76::t_c92fd803e15e1a 2666-2674,2676-2732,2740,2749-2766,2775-2786,2897
+  s_f36ecb2405ee76::t_40f8072089f431 2675
+  s_f36ecb2405ee76::t_d0eeff96a7cca5 390,2868-2896
+  s_f36ecb2405ee76::t_adb23152ffebbd 1082-1085
+  s_c503f7c0529e13::t_5a1780750f18b6 131
+  s_f36ecb2405ee76::t_1b7613275e4e8b 404-438
+  s_f36ecb2405ee76::t_2e17a71b391762 1004-1006,1014-1016,1018-1030,1032,1056,1058-1062,1066
+  s_c503f7c0529e13::t_e6e4b3be5a5ae4 993,1093-1096
+  s_f36ecb2405ee76::t_5f89eb99ed1485 116-118,752-756,760,798,826-829,832,837-838
+  s_f36ecb2405ee76::t_a329f9b1c576ab 371-389,391-403
+  s_c503f7c0529e13::t_8060264bec4a30 1525-1562,2435-2436,2468-2469
+  s_f36ecb2405ee76::t_19a319369bf695 181-214,219-220,223,254-255,258-262
+  s_f36ecb2405ee76::t_2e43f145173c1f 1007-1013,1017
+  s_c503f7c0529e13::t_cb1a5b767f12ab 115,121
+  s_f36ecb2405ee76::t_713746809c8e70 2898-2899
+Revival/Sources/RevivalCore/CanonicalPackage.swift
+  s_c503f7c0529e13::t_f3a8ed419c1bfd 301,412
+Revival/Sources/RevivalMetal/MetalWorldPlan.swift
+  s_c503f7c0529e13::t_07ecb66fdaf680 61
+  s_c503f7c0529e13::t_0c132d7a018fcf 32,54-60,62-63,65-71,73,102
+  s_c503f7c0529e13::t_fd606474ae1883 17,33-34,74,78-79,81-91,94,96-97,103-105,109-118,141,197
+  s_c503f7c0529e13::t_ba1ed4a6439f32 48-53,64,72,80
+  s_c503f7c0529e13::t_cfd21dbd284501 92-93,95
+Revival/Sources/RevivalMetal/MetalWorldRenderer.swift
+  s_c503f7c0529e13::t_e28ab429734845 190-197,199
+  s_c503f7c0529e13::t_8b46891e960ced 456,481
+Revival/Sources/RevivalEditor/RevivalProject.swift
+  s_f36ecb2405ee76::t_c6a325299168b8 263,273,275-281
+  s_c503f7c0529e13::t_6a468bb8354f31 264-272,274,282-283,960-961
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_c503f7c0529e13::t_67c01a44fa29a4 4-21
+  s_c503f7c0529e13::t_f959e8b336e552 717,740-742,908-937,953-958
+  s_f36ecb2405ee76::t_f764514c8c330b 43-51
+  s_c503f7c0529e13::t_987e27ccea8dcf 120-125
+  s_c503f7c0529e13::t_ec2393f860ad11 126-131
+  s_c503f7c0529e13::t_95577d46fc5cff 22-42,52-53
+Revival/Sources/D3Import/PresentationImport.swift
+  s_c503f7c0529e13::t_f4768f50a72692 430-433,660
+  s_c503f7c0529e13::t_5a1780750f18b6 735,745,771-772,816
+  s_c503f7c0529e13::t_eecc0c4fd27d34 657-659
+  s_c503f7c0529e13::t_c10b022c364928 661-662
+  s_f36ecb2405ee76::t_8565bc2f7db65b 476-482,533-536,541-543,554-559,593-594,604-656
+Revival/Sources/D3Import/D3ImportOperation.swift
+  s_c503f7c0529e13::t_06c38e02f6c8f6 288-292,314
+  s_c503f7c0529e13::t_52110cdff242b7 394-395
+  s_c503f7c0529e13::t_7a9d7f6195cfb3 591,603-604
+  s_c503f7c0529e13::t_5fd4522881ac7d 293,602,605,611
+  s_c503f7c0529e13::t_14b7234187bb6f 539-545,550-551,571-590,606-608
+  s_c503f7c0529e13::t_750e1754137010 390
+  s_f36ecb2405ee76::t_8a76043605bd30 302-304,306-308,333,339,341,350-362,506-513,552-570
+  s_c503f7c0529e13::t_7384360e15784a 592-593,597-601
+  s_c503f7c0529e13::t_a9115c801ecd2f 594-596
+  s_c503f7c0529e13::t_718d9df8aed730 274-278,281-287,294-300,310-313,315-320,322,331,343,397,401
+  s_c503f7c0529e13::t_13d508fb9f98e9 609-610
+Revival/Sources/RevivalEditor/RevivalProjectDocument.swift
+  s_f36ecb2405ee76::t_3d097e28ee54e2 22,36-37,379-382
+  s_c503f7c0529e13::t_3ad5f9a1fbd3a5 470
+  s_c503f7c0529e13::t_47c593fbf42953 468,472
+  s_f36ecb2405ee76::t_c6a325299168b8 478
+  s_f36ecb2405ee76::t_a5d8f731bb023c 398-401,403,477,482,577,579
+Revival/Tests/D3ImportTests/EditorProjectTests.swift
+  s_f36ecb2405ee76::t_0f44aaf8183abe 1089,1120,1122-1133
+  s_f36ecb2405ee76::t_426464f8f779d0 1116
+  s_f36ecb2405ee76::t_198210850808bb 1106
+  s_f36ecb2405ee76::t_2e43f145173c1f 1119,1121
+  s_f36ecb2405ee76::t_151bc0252ef7ec 1064-1067,1205,1216,1548-1549
+  s_f36ecb2405ee76::t_851c3b5cb1e869 1096-1105,1107-1115
+  s_f36ecb2405ee76::t_9fc521fe7f3fa1 1081,1241
+  s_f36ecb2405ee76::t_adb23152ffebbd 1090-1095,1117-1118
+  s_5298687380d222::t_8837bf78a58b4b 1088
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_73a49418b4ed6c 4,22-25,27-29,31,42-44
+  s_c503f7c0529e13::t_12569119766793 41
+  s_c503f7c0529e13::t_f392525308c687 178,182,194-196
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "3c471efc6dba8b489adb95af31e4055e737f0072",
+  "prompts": {},
+  "sessions": {
+    "s_5298687380d222": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "agent-cd403bd7-ee20-46e4-a061-f3270c98b3fb",
+        "model": "unknown"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_f36ecb2405ee76": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8e2c-7953-7842-bb77-5b188c9e8770",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
