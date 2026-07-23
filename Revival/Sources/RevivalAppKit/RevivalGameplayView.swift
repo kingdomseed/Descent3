@@ -16,6 +16,7 @@ final class RevivalGameplayView: MTKView {
     private var activeController: GCController?
     private var gameplayIsActive = false
     private var mouseIsCaptured = false
+    private var afterburnerIsHeld = false
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -72,6 +73,15 @@ final class RevivalGameplayView: MTKView {
         publishHeldInput()
     }
 
+    override func flagsChanged(with event: NSEvent) {
+        guard event.keyCode == 56 || event.keyCode == 60 else {
+            super.flagsChanged(with: event)
+            return
+        }
+        afterburnerIsHeld = event.modifierFlags.contains(.shift)
+        publishHeldInput()
+    }
+
     override func mouseDown(with event: NSEvent) {
         guard gameplayIsActive else {
             super.mouseDown(with: event)
@@ -109,6 +119,7 @@ final class RevivalGameplayView: MTKView {
 
     func clearInput() {
         heldKeys.removeAll()
+        afterburnerIsHeld = false
         pendingMouseX = 0
         pendingMouseY = 0
         heldInputChanged?(.zero)
@@ -116,14 +127,18 @@ final class RevivalGameplayView: MTKView {
         releaseMouse()
     }
 
-    nonisolated static func heldInput(for keyCodes: Set<UInt16>) -> InputSnapshot {
+    nonisolated static func heldInput(
+        for keyCodes: Set<UInt16>,
+        afterburner: Bool = false
+    ) -> InputSnapshot {
         InputSnapshot(
             forward: direction(positive: 13, negative: 1, in: keyCodes),
             sideways: direction(positive: 2, negative: 0, in: keyCodes),
             vertical: direction(positive: 15, negative: 3, in: keyCodes),
             pitch: direction(positive: 125, negative: 126, in: keyCodes),
             yaw: direction(positive: 124, negative: 123, in: keyCodes),
-            roll: direction(positive: 12, negative: 14, in: keyCodes)
+            roll: direction(positive: 12, negative: 14, in: keyCodes),
+            afterburner: afterburner ? 1 : 0
         )
     }
 
@@ -135,7 +150,8 @@ final class RevivalGameplayView: MTKView {
         leftTrigger: Float,
         rightTrigger: Float,
         leftShoulder: Float,
-        rightShoulder: Float
+        rightShoulder: Float,
+        afterburner: Float = 0
     ) -> InputSnapshot {
         InputSnapshot(
             forward: adjusted(leftY),
@@ -143,12 +159,15 @@ final class RevivalGameplayView: MTKView {
             vertical: adjusted(rightTrigger) - adjusted(leftTrigger),
             pitch: -adjusted(rightY),
             yaw: adjusted(rightX),
-            roll: leftShoulder - rightShoulder
+            roll: leftShoulder - rightShoulder,
+            afterburner: afterburner
         )
     }
 
     private func publishHeldInput() {
-        heldInputChanged?(Self.heldInput(for: heldKeys))
+        heldInputChanged?(
+            Self.heldInput(for: heldKeys, afterburner: afterburnerIsHeld)
+        )
     }
 
     private func publishControllerInput() {
@@ -166,7 +185,8 @@ final class RevivalGameplayView: MTKView {
                 leftTrigger: gamepad.leftTrigger.value,
                 rightTrigger: gamepad.rightTrigger.value,
                 leftShoulder: gamepad.leftShoulder.value,
-                rightShoulder: gamepad.rightShoulder.value
+                rightShoulder: gamepad.rightShoulder.value,
+                afterburner: gamepad.buttonA.value
             )
         )
     }

@@ -1,6 +1,38 @@
 import XCTest
 
 final class WorldRenderingTests: XCTestCase {
+    func testAfterburnerInputBypassesRampCombinesCarriersAndClearsInactiveGameplay() {
+        var input = PlayerInputState(rampDuration: 0.5)
+        input.setHeld(.init(forward: 1, afterburner: 1))
+        input.setController(.init(afterburner: 0.75))
+
+        let first = input.snapshot(frameDuration: 0.1)
+        XCTAssertEqual(first.forward, 0.2, accuracy: 0.000_001)
+        XCTAssertEqual(first.afterburner, 1)
+
+        input.setGameplayActive(false, simulation: nil, at: 1)
+        XCTAssertEqual(input.snapshot(frameDuration: 0.1), .zero)
+
+        XCTAssertEqual(
+            RevivalGameplayView.heldInput(for: [], afterburner: true),
+            .init(afterburner: 1)
+        )
+        XCTAssertEqual(
+            RevivalGameplayView.controllerInput(
+                leftX: 0,
+                leftY: 0,
+                rightX: 0,
+                rightY: 0,
+                leftTrigger: 0,
+                rightTrigger: 0,
+                leftShoulder: 0,
+                rightShoulder: 0,
+                afterburner: 0.6
+            ),
+            .init(afterburner: 0.6)
+        )
+    }
+
     func testInputSnapshotRampsHeldAxesAndClearsInactiveGameplay() {
         var ramp = PlayerInputRamp(rampDuration: 0.5)
 
@@ -423,6 +455,338 @@ final class WorldRenderingTests: XCTestCase {
             0
         )
         XCTAssertLessThan(frame.playerView.camera.position.z, 2_310.928)
+    }
+
+    func testBaseAfterburnerUsesReleasedBoostFuelAndProjectionState() {
+        let boosted = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 0
+        )
+        let ordinary = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 0
+        )
+
+        let boostedFrame = boosted.update(
+            at: 0.1,
+            input: .init(afterburner: 1)
+        )
+        let ordinaryFrame = ordinary.update(
+            at: 0.1,
+            input: .init(forward: 1)
+        )
+
+        XCTAssertTrue(boosted.afterburnerIsActive)
+        XCTAssertEqual(boosted.afterburnerFuel, 4.9, accuracy: 0.000_001)
+        XCTAssertEqual(boosted.energy, 100)
+        XCTAssertEqual(boosted.afterburnerMagnitude, 0.2, accuracy: 0.000_001)
+        XCTAssertEqual(
+            boostedFrame.velocity.z,
+            ordinaryFrame.velocity.z * 1.6 * 1.8,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            boostedFrame.playerView.camera.projection.horizontalFieldOfViewRadians,
+            PerspectiveProjection.sourceDefault.horizontalFieldOfViewRadians
+                * (1 + 0.2 * 0.08),
+            accuracy: 0.000_001
+        )
+
+        var timestamp = 0.2
+        while boosted.afterburnerFuel > 0 {
+            _ = boosted.update(at: timestamp, input: .init(afterburner: 1))
+            timestamp += 0.1
+        }
+        XCTAssertTrue(boosted.afterburnerIsActive)
+        XCTAssertEqual(boosted.afterburnerFuel, 0)
+
+        _ = boosted.update(at: timestamp, input: .init(afterburner: 1))
+        XCTAssertFalse(boosted.afterburnerIsActive)
+    }
+
+    func testReleasedAfterburnerPunchKeepsStrictFuelBoundaries() {
+        func thrustRatio(
+            afterburnerFrames: Int
+        ) -> Float {
+            let simulations = (0..<3).map { _ in
+                PlayerSimulation(
+                    level: makeSliceSixObjectRenderLevel(),
+                    presentationReadyTimestamp: 0
+                )
+            }
+            var timestamp = 0.125
+            for simulation in simulations {
+                _ = simulation.update(at: timestamp, input: .zero)
+            }
+            for _ in 0..<afterburnerFrames {
+                timestamp += 0.125
+                for simulation in simulations {
+                    _ = simulation.update(
+                        at: timestamp,
+                        input: .init(afterburner: 0.000_001)
+                    )
+                }
+            }
+            timestamp += 0.125
+            let boosted = simulations[0].update(
+                at: timestamp,
+                input: .init(afterburner: 1)
+            )
+            let ordinary = simulations[1].update(
+                at: timestamp,
+                input: .init(forward: 1)
+            )
+            let coasting = simulations[2].update(
+                at: timestamp,
+                input: .zero
+            )
+            return (boosted.velocity.z - coasting.velocity.z)
+                / (ordinary.velocity.z - coasting.velocity.z)
+        }
+
+        XCTAssertEqual(thrustRatio(afterburnerFrames: 4), 1.6, accuracy: 0.000_01)
+        XCTAssertEqual(
+            thrustRatio(afterburnerFrames: 6),
+            1.6 * 1.4,
+            accuracy: 0.000_01
+        )
+        XCTAssertEqual(thrustRatio(afterburnerFrames: 8), 1.6, accuracy: 0.000_01)
+    }
+
+    func testReleasedAfterburnerLinearPunchPreservesDoublePromotion() {
+        XCTAssertEqual(
+            sourceAfterburnerForwardControl(
+                afterburner: 1,
+                fuel: 4.400_000_1
+            ).bitPattern,
+            0x4027_ef9e
+        )
+        XCTAssertEqual(
+            sourceAfterburnerForwardControl(
+                afterburner: 1,
+                fuel: Float(bitPattern: 0x408a_0003)
+            ).bitPattern,
+            0x4019_99a9
+        )
+
+        let simulation = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 0
+        )
+        for frame in 1...6 {
+            _ = simulation.update(
+                at: Double(frame) * 0.1,
+                input: .init(afterburner: 0.000_001)
+            )
+        }
+        let ship = simulation.level.shipDefinitions.first {
+            $0.source == simulation.level.defaultPlayerBinding!.ship
+        }!
+        let fuel = simulation.afterburnerFuel
+        let punch = Float(
+            1 + ((Double(fuel) - 4) / 0.5) * 0.8
+        )
+        let forwardControl = Float(1.6 * Double(punch))
+        let force = Float(
+            Double(ship.physics.fullThrust) * Double(forwardControl)
+        )
+        let q = Double(force) / Double(ship.physics.drag)
+        let decay = exp(
+            -(Double(ship.physics.drag) / Double(ship.physics.mass))
+                * Double(simulation.frameDuration)
+        )
+        let expectedVelocity = Float(
+            (Double(simulation.velocity.z) - q) * decay + q
+        )
+
+        let frame = simulation.update(
+            at: 0.7,
+            input: .init(afterburner: 1)
+        )
+
+        XCTAssertEqual(frame.velocity.z.bitPattern, expectedVelocity.bitPattern)
+    }
+
+    func testReleasedNoCoolerRechargeConsumesEnergyAboveThreshold() {
+        let simulation = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 0
+        )
+        var timestamp = 0.1
+
+        _ = simulation.update(at: timestamp, input: .init(afterburner: 1))
+        timestamp += 0.1
+        _ = simulation.update(at: timestamp, input: .zero)
+        timestamp += 0.1
+        XCTAssertEqual(simulation.afterburnerFuel, 5, accuracy: 0.000_001)
+        XCTAssertEqual(simulation.energy, 99.9, accuracy: 0.000_01)
+
+        while simulation.energy > 5 {
+            _ = simulation.update(
+                at: timestamp,
+                input: .init(afterburner: 1)
+            )
+            timestamp += 0.1
+            _ = simulation.update(at: timestamp, input: .zero)
+            timestamp += 0.1
+        }
+        _ = simulation.update(at: timestamp, input: .init(afterburner: 1))
+        timestamp += 0.1
+        let depletedFuel = simulation.afterburnerFuel
+        let thresholdEnergy = simulation.energy
+        _ = simulation.update(at: timestamp, input: .zero)
+
+        XCTAssertLessThan(depletedFuel, 5)
+        XCTAssertEqual(simulation.afterburnerFuel, depletedFuel)
+        XCTAssertEqual(simulation.energy, thresholdEnergy)
+    }
+
+    func testReleasedRechargeConsumesUntrimmedFrameWhenFuelCaps() {
+        let simulation = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 0
+        )
+
+        _ = simulation.update(at: 0.125, input: .zero)
+        _ = simulation.update(at: 0.625, input: .init(afterburner: 1))
+        XCTAssertEqual(simulation.afterburnerFuel, 4.875)
+        _ = simulation.update(at: 1.125, input: .zero)
+
+        XCTAssertEqual(simulation.afterburnerFuel, 5)
+        XCTAssertEqual(simulation.energy, 99.5)
+    }
+
+    func testPyroWiggleIsSourceQuantizedAuthoritativeMovementWithFalloff() {
+        let stationary = PlayerSimulation(
+            level: makeSliceThirteenWiggleLevel(),
+            presentationReadyTimestamp: 0
+        )
+        let thrusting = PlayerSimulation(
+            level: makeSliceThirteenWiggleLevel(),
+            presentationReadyTimestamp: 0
+        )
+        let start = defaultPlayerView(in: stationary.level).camera.position
+
+        let stationaryFrame = stationary.update(at: 0.1, input: .zero)
+        let thrustingFrame = thrusting.update(
+            at: 0.1,
+            input: .init(forward: 1)
+        )
+
+        XCTAssertEqual(stationary.wiggleFalloff, 0)
+        XCTAssertEqual(thrusting.wiggleFalloff, 0.05, accuracy: 0.000_001)
+        XCTAssertEqual(
+            stationaryFrame.playerView.camera.position.z - start.z,
+            0.091_064_45,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            thrustingFrame.playerView.camera.position.z - start.z,
+            0.086_425_78,
+            accuracy: 0.000_001
+        )
+    }
+
+    func testPyroWiggleUsesReleasedFloatSineTableQuantization() {
+        var level = makeSliceThirteenWiggleLevel()
+        var objects = level.objects
+        let playerIndex = objects.firstIndex { $0.handle == 2_048 }!
+        objects[playerIndex].position = .zero
+        level = replacing(level, objects: objects)
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        _ = simulation.update(at: 0.1, input: .zero)
+        let frame = simulation.update(at: 0.2, input: .zero)
+
+        XCTAssertEqual(
+            frame.playerView.camera.position.z.bitPattern,
+            0x3e3a_8b68
+        )
+    }
+
+    func testPyroWiggleUsesPostMouselookPreRotationUpAxis() {
+        let simulation = PlayerSimulation(
+            level: makeSliceThirteenWiggleLevel(),
+            presentationReadyTimestamp: 0
+        )
+        let start = defaultPlayerView(in: simulation.level).camera.position
+
+        let frame = simulation.update(
+            at: 0.1,
+            input: .init(directLookPitchRadians: .pi / 2)
+        )
+
+        XCTAssertLessThan(frame.playerView.camera.position.y, start.y - 0.09)
+        XCTAssertEqual(
+            frame.playerView.camera.position.z,
+            start.z,
+            accuracy: 0.000_01
+        )
+    }
+
+    func testPyroWiggleRetainsTenPercentMovementAtFullFalloff() {
+        let simulation = PlayerSimulation(
+            level: makeSliceThirteenWiggleLevel(),
+            presentationReadyTimestamp: 0
+        )
+        simulation.setIndoorAutoLevelMode(.off)
+        var timestamp = 0.1
+
+        for _ in 0..<20 {
+            _ = simulation.update(
+                at: timestamp,
+                input: .init(afterburner: 0.000_02)
+            )
+            timestamp += 0.1
+        }
+        let priorPosition = defaultPlayerView(in: simulation.level).camera.position
+        let frame = simulation.update(
+            at: timestamp,
+            input: .init(afterburner: 0.000_02)
+        )
+
+        XCTAssertEqual(simulation.wiggleFalloff, 1)
+        XCTAssertGreaterThan(
+            abs(frame.playerView.camera.position.z - priorPosition.z),
+            0.000_1
+        )
+    }
+
+    func testPyroWiggleCommitsReturnedRoomAfterPortalCrossing() {
+        let simulation = PlayerSimulation(
+            level: makeSliceThirteenPortalWiggleLevel(),
+            presentationReadyTimestamp: 0
+        )
+
+        let frame = simulation.update(at: 0.1, input: .zero)
+
+        XCTAssertEqual(frame.playerView.roomSourceIndex, 99)
+        XCTAssertEqual(
+            simulation.level.objects.first { $0.handle == 2_048 }!.location,
+            .room(99)
+        )
+    }
+
+    func testPyroWiggleRefusesMovementOnIndoorContact() {
+        let open = PlayerSimulation(
+            level: makeSliceThirteenWiggleLevel(),
+            presentationReadyTimestamp: 0
+        )
+        let blocked = PlayerSimulation(
+            level: makeSliceThirteenWiggleLevel(blocked: true),
+            presentationReadyTimestamp: 0
+        )
+        let blockedStart = defaultPlayerView(in: blocked.level).camera.position
+
+        let openFrame = open.update(at: 0.1, input: .zero)
+        let blockedFrame = blocked.update(at: 0.1, input: .zero)
+
+        XCTAssertGreaterThan(openFrame.playerView.camera.position.z, blockedStart.z)
+        XCTAssertEqual(blockedFrame.playerView.camera.position, blockedStart)
+        XCTAssertNil(blockedFrame.wallContact)
     }
 
     func testPlayerSimulationSlidesAndRetracesRemainingFrameAfterContact() throws {
@@ -1583,6 +1947,102 @@ func makeSliceTenContactLevel(clearance: Float = 20) -> Level {
     )
     var rooms = level.rooms
     rooms[roomIndex] = contactRoom
+    return replacing(level, rooms: rooms)
+}
+
+func makeSliceThirteenWiggleLevel(blocked: Bool = false) -> Level {
+    let base = makeSliceSixObjectRenderLevel()
+    let radius = defaultPlayerView(in: base).collisionRadius
+    let level = blocked
+        ? makeSliceTenContactLevel(clearance: radius + 0.01)
+        : base
+    var objects = level.objects
+    let playerIndex = objects.firstIndex { $0.handle == 2_048 }!
+    objects[playerIndex].orientation = Matrix3(
+        right: .init(x: 1, y: 0, z: 0),
+        up: .init(x: 0, y: 0, z: 1),
+        forward: .init(x: 0, y: -1, z: 0)
+    )
+    return replacing(level, objects: objects)
+}
+
+func makeSliceThirteenPortalWiggleLevel() -> Level {
+    let level = makeSliceThirteenWiggleLevel()
+    let player = level.objects.first { $0.handle == 2_048 }!
+    let roomIndex = level.rooms.firstIndex { $0.sourceIndex == 1 }!
+    let room = level.rooms[roomIndex]
+    let firstVertex = room.vertices.count
+    let z = player.position.z + 0.04
+    let portalVertices = [
+        Vector3(x: player.position.x - 20, y: player.position.y - 20, z: z),
+        Vector3(x: player.position.x - 20, y: player.position.y + 20, z: z),
+        Vector3(x: player.position.x + 20, y: player.position.y + 20, z: z),
+        Vector3(x: player.position.x + 20, y: player.position.y - 20, z: z),
+    ]
+    let corners = (0..<4).map {
+        FaceCorner(
+            vertexIndex: firstVertex + $0,
+            u: 0,
+            v: 0,
+            alpha: 255
+        )
+    }
+    let portalFace = LevelFace(
+        corners: corners,
+        flags: 0,
+        portalIndex: room.portals.count,
+        texture: room.faces[0].texture
+    )
+    let sourceRoom = LevelRoom(
+        sourceIndex: room.sourceIndex,
+        name: room.name,
+        pathPoint: room.pathPoint,
+        vertices: room.vertices + portalVertices,
+        faces: room.faces + [portalFace],
+        portals: room.portals + [
+            .init(
+                faceIndex: room.faces.count,
+                connectedRoom: 99,
+                connectedPortal: 0
+            ),
+        ],
+        flags: room.flags,
+        pulseTime: room.pulseTime,
+        pulseOffset: room.pulseOffset,
+        mirrorFaceIndex: room.mirrorFaceIndex,
+        door: room.door,
+        volumeLights: room.volumeLights,
+        fog: room.fog,
+        ambientSoundPattern: room.ambientSoundPattern,
+        reverb: room.reverb,
+        damage: room.damage,
+        damageType: room.damageType
+    )
+    let connectedRoom = LevelRoom(
+        sourceIndex: 99,
+        vertices: portalVertices,
+        faces: [
+            .init(
+                corners: corners.reversed().map {
+                    FaceCorner(
+                        vertexIndex: $0.vertexIndex - firstVertex,
+                        u: $0.u,
+                        v: $0.v,
+                        alpha: $0.alpha
+                    )
+                },
+                flags: 0,
+                portalIndex: 0,
+                texture: room.faces[0].texture
+            ),
+        ],
+        portals: [
+            .init(faceIndex: 0, connectedRoom: 1, connectedPortal: room.portals.count),
+        ]
+    )
+    var rooms = level.rooms
+    rooms[roomIndex] = sourceRoom
+    rooms.append(connectedRoom)
     return replacing(level, rooms: rooms)
 }
 

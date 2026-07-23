@@ -1253,10 +1253,16 @@ final class EditorProjectTests: XCTestCase {
 
         let frame = simulation.update(
             at: 0.016,
-            input: .init(forward: 1)
+            input: .init(afterburner: 1)
         )
 
         XCTAssertNotEqual(frame.playerView.camera.position, authoredPosition)
+        XCTAssertTrue(simulation.afterburnerIsActive)
+        XCTAssertLessThan(simulation.afterburnerFuel, 5)
+        XCTAssertGreaterThan(
+            frame.playerView.camera.projection.horizontalFieldOfViewRadians,
+            PerspectiveProjection.sourceDefault.horizontalFieldOfViewRadians
+        )
         XCTAssertEqual(
             defaultPlayerView(in: project.level).camera.position,
             authoredPosition

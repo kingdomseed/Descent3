@@ -58,6 +58,7 @@ struct InputSnapshot: Equatable, Sendable {
     let pitch: Float
     let yaw: Float
     let roll: Float
+    let afterburner: Float
     let directLookPitchRadians: Float
     let directLookYawRadians: Float
 
@@ -70,6 +71,7 @@ struct InputSnapshot: Equatable, Sendable {
         pitch: Float = 0,
         yaw: Float = 0,
         roll: Float = 0,
+        afterburner: Float = 0,
         directLookPitchRadians: Float = 0,
         directLookYawRadians: Float = 0
     ) {
@@ -82,6 +84,7 @@ struct InputSnapshot: Equatable, Sendable {
         self.pitch = max(-1, min(1, pitch))
         self.yaw = max(-1, min(1, yaw))
         self.roll = max(-1, min(1, roll))
+        self.afterburner = max(0, min(1, afterburner))
         self.directLookPitchRadians = directLookPitchRadians
         self.directLookYawRadians = directLookYawRadians
     }
@@ -119,6 +122,7 @@ struct PlayerInputRamp: Sendable {
                 pitch: inputSign(held.pitch),
                 yaw: inputSign(held.yaw),
                 roll: inputSign(held.roll),
+                afterburner: held.afterburner,
                 directLookPitchRadians: 0,
                 directLookYawRadians: 0
             )
@@ -131,6 +135,7 @@ struct PlayerInputRamp: Sendable {
             pitch: ramped(held.pitch, state.pitch, previousHeld.pitch, frameDuration),
             yaw: ramped(held.yaw, state.yaw, previousHeld.yaw, frameDuration),
             roll: ramped(held.roll, state.roll, previousHeld.roll, frameDuration),
+            afterburner: held.afterburner,
             directLookPitchRadians: 0,
             directLookYawRadians: 0
         )
@@ -215,6 +220,7 @@ struct PlayerInputState: Sendable {
             ),
             yaw: keyboard.yaw + controller.yaw + mouseYaw,
             roll: keyboard.roll + controller.roll,
+            afterburner: max(keyboard.afterburner, controller.afterburner),
             directLookPitchRadians: mouseLookEnabled ? -deltaY * directScale : 0,
             directLookYawRadians: mouseLookEnabled ? deltaX * directScale : 0
         )
@@ -289,7 +295,10 @@ func reciprocalPortalComponent(
     return reached
 }
 
-func defaultPlayerView(in level: Level) -> PlayerView {
+func defaultPlayerView(
+    in level: Level,
+    projection: PerspectiveProjection = .sourceDefault
+) -> PlayerView {
     let binding = level.defaultPlayerBinding!
     let object = level.objects.first { $0.handle == binding.objectHandle }!
     let ship = level.shipDefinitions.first { $0.source == binding.ship }!
@@ -303,7 +312,8 @@ func defaultPlayerView(in level: Level) -> PlayerView {
         camera: RoomCamera(
             position: object.position,
             target: object.position + object.orientation.forward,
-            up: object.orientation.up
+            up: object.orientation.up,
+            projection: projection
         ),
         collisionRadius: ship.presentationSize * 0.8
     )
@@ -335,6 +345,11 @@ final class PlayerSimulation {
     private(set) var angularVelocity: Vector3
     private(set) var turnrollFixedAngle: Float = 0
     private(set) var indoorAutoLevelMode = IndoorAutoLevelMode.newPlayer
+    private(set) var afterburnerFuel: Float = 5
+    private(set) var afterburnerIsActive = false
+    private(set) var energy: Float = 100
+    private(set) var afterburnerMagnitude: Float = 0
+    private(set) var wiggleFalloff: Float = 0
 
     private var lastTimestamp: Double
     private var lastThrustTime: Float = 0
@@ -382,6 +397,81 @@ final class PlayerSimulation {
             )
         }
         let linearThrustOrientation = orientation
+        var forwardControl = input.forward
+        if input.afterburner > 0 {
+            if afterburnerFuel > 0 {
+                afterburnerIsActive = true
+                forwardControl = sourceAfterburnerForwardControl(
+                    afterburner: input.afterburner,
+                    fuel: afterburnerFuel
+                )
+                afterburnerFuel -= systemsFrameDuration
+                if afterburnerFuel < 0 {
+                    afterburnerFuel = 0
+                }
+            } else {
+                afterburnerIsActive = false
+            }
+        } else {
+            afterburnerIsActive = false
+            if afterburnerFuel < 5, energy > 5 {
+                afterburnerFuel += systemsFrameDuration
+                if afterburnerFuel > 5 {
+                    afterburnerFuel = 5
+                }
+                energy -= systemsFrameDuration
+            }
+        }
+        let force = Vector3(
+            x: ship.physics.fullThrust * (
+                linearThrustOrientation.forward.x * forwardControl
+                    + linearThrustOrientation.up.x * input.vertical
+                    + linearThrustOrientation.right.x * input.sideways
+            ),
+            y: ship.physics.fullThrust * (
+                linearThrustOrientation.forward.y * forwardControl
+                    + linearThrustOrientation.up.y * input.vertical
+                    + linearThrustOrientation.right.y * input.sideways
+            ),
+            z: ship.physics.fullThrust * (
+                linearThrustOrientation.forward.z * forwardControl
+                    + linearThrustOrientation.up.z * input.vertical
+                    + linearThrustOrientation.right.z * input.sideways
+            )
+        )
+        let view = defaultPlayerView(in: level)
+        var position = object.position
+        var roomSourceIndex = startRoom
+        if ship.physics.behaviors.contains(.wiggle) {
+            if sqrt(dot(force, force)) < 0.1 {
+                wiggleFalloff -= systemsFrameDuration / 2
+            } else {
+                wiggleFalloff += systemsFrameDuration / 2
+            }
+            wiggleFalloff = max(0, min(1, wiggleFalloff))
+            let scale = max(0.1, 1 - wiggleFalloff)
+            let wiggle = ship.physics.wiggleAmplitude * scale * (
+                sourceFixedSine(
+                    gameTime: systemsGameTime,
+                    wigglesPerSecond: ship.physics.wigglesPerSecond
+                )
+                    - sourceFixedSine(
+                        gameTime: systemsGameTime - systemsFrameDuration,
+                        wigglesPerSecond: ship.physics.wigglesPerSecond
+                    )
+            )
+            let trace = traceIndoorMovement(
+                in: level,
+                startRoom: roomSourceIndex,
+                start: position,
+                end: position + linearThrustOrientation.up * wiggle,
+                radius: view.collisionRadius
+            )
+            if case .noHit = trace.outcome {
+                position = trace.finalPosition
+                roomSourceIndex = trace.containingRoomSourceIndex
+            }
+        }
         if turnrollFixedAngle != 0 {
             orientation = sourceMatrixMultiply(
                 orientation,
@@ -399,7 +489,7 @@ final class PlayerSimulation {
             y: ship.physics.fullRotationalThrust * input.yaw,
             z: ship.physics.fullRotationalThrust * input.roll
         )
-        if input.forward != 0 || input.sideways != 0 || input.vertical != 0
+        if forwardControl != 0 || input.sideways != 0 || input.vertical != 0
             || rotationalThrust != .zero {
             lastThrustTime = gameTime
         }
@@ -467,26 +557,6 @@ final class PlayerSimulation {
         object.orientation = orientation
         level.objects[objectIndex].orientation = orientation
 
-        let force = Vector3(
-            x: ship.physics.fullThrust * (
-                linearThrustOrientation.forward.x * input.forward
-                    + linearThrustOrientation.up.x * input.vertical
-                    + linearThrustOrientation.right.x * input.sideways
-            ),
-            y: ship.physics.fullThrust * (
-                linearThrustOrientation.forward.y * input.forward
-                    + linearThrustOrientation.up.y * input.vertical
-                    + linearThrustOrientation.right.y * input.sideways
-            ),
-            z: ship.physics.fullThrust * (
-                linearThrustOrientation.forward.z * input.forward
-                    + linearThrustOrientation.up.z * input.vertical
-                    + linearThrustOrientation.right.z * input.sideways
-            )
-        )
-        let view = defaultPlayerView(in: level)
-        var position = object.position
-        var roomSourceIndex = startRoom
         var remainingDuration = systemsFrameDuration
         var responseForce = force
         var wallContact: IndoorWallContact?
@@ -560,6 +630,19 @@ final class PlayerSimulation {
         level.objects[objectIndex].position = position
         level.objects[objectIndex].location = .room(roomSourceIndex)
 
+        if afterburnerIsActive {
+            afterburnerMagnitude += 2 * systemsFrameDuration
+        } else {
+            afterburnerMagnitude -= 2 * systemsFrameDuration
+        }
+        afterburnerMagnitude = max(0, min(1, afterburnerMagnitude))
+        let projection = PerspectiveProjection(
+            horizontalFieldOfViewRadians:
+                PerspectiveProjection.sourceDefault.horizontalFieldOfViewRadians
+                * (1 + afterburnerMagnitude * 0.08),
+            aspectRatio: PerspectiveProjection.sourceDefault.aspectRatio
+        )
+
         frameDuration = Float(timestamp - lastTimestamp)
         lastTimestamp = timestamp
         gameTime += frameDuration
@@ -569,7 +652,7 @@ final class PlayerSimulation {
             systemsGameTime: systemsGameTime,
             storedFrameDuration: frameDuration,
             gameTime: gameTime,
-            playerView: defaultPlayerView(in: level),
+            playerView: defaultPlayerView(in: level, projection: projection),
             velocity: velocity,
             angularVelocity: angularVelocity,
             turnrollFixedAngle: turnrollFixedAngle,
@@ -600,6 +683,44 @@ final class PlayerSimulation {
             pauseTimestamp = nil
         }
     }
+}
+
+func sourceAfterburnerForwardControl(
+    afterburner: Float,
+    fuel: Float
+) -> Float {
+    var punch: Float = 1
+    if fuel > 4.5 {
+        punch = 1.8
+    } else if fuel > 4, fuel < 4.5 {
+        var normalizedFuel = Float(Double(fuel) - 5.0 * 0.8)
+        normalizedFuel = Float(Double(normalizedFuel) / (5.0 * 0.1))
+        punch = Float(1.0 + Double(normalizedFuel) * 0.8)
+    }
+    return Float(Double(afterburner) * 1.6 * Double(punch))
+}
+
+private func sourceFixedSine(
+    gameTime: Float,
+    wigglesPerSecond: Float
+) -> Float {
+    let sourceValue = Int(gameTime * wigglesPerSecond * 65_535) % 65_535
+    let angle = UInt16(truncatingIfNeeded: sourceValue)
+    let index = Int(angle >> 8) & 0xff
+    let fraction = Int(angle & 0xff)
+    let sourcePi: Float = 3.141592654
+    let firstRadians = Float(
+        Double(index) / 256 * 2 * Double(sourcePi)
+    )
+    let secondRadians = Float(
+        Double(index + 1) / 256 * 2 * Double(sourcePi)
+    )
+    let first = sin(firstRadians)
+    let second = sin(secondRadians)
+    return Float(
+        Double(first)
+            + Double(second - first) * Double(fraction) / 256
+    )
 }
 
 private func sourceIndoorAutoLevelThrust(
