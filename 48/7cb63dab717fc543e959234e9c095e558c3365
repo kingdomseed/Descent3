@@ -1,0 +1,75 @@
+Revival/Sources/RevivalCore/Level.swift
+  s_6ac1fd81b8e517::t_528665034b90de 720,780
+  s_6ac1fd81b8e517::t_1bcf4d8a2e46c3 560
+  s_6ac1fd81b8e517::t_a4f2330c63f388 1621,1665-1675
+Revival/Sources/D3Import/PresentationImport.swift
+  s_6ac1fd81b8e517::t_1bcf4d8a2e46c3 87-95
+docs/revival/functional-completeness-ledger.md
+  s_6ac1fd81b8e517::t_e6b52e45e9e7e5 263
+  s_6ac1fd81b8e517::t_d7170ff56b439c 24-25
+  s_6ac1fd81b8e517::t_f14aa641ed3b82 264
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_6ac1fd81b8e517::t_6a913c26d38778 333,356
+  s_6ac1fd81b8e517::t_d75cb2e7c7fccf 367
+  s_6ac1fd81b8e517::t_6b29905751ea92 237
+  s_6ac1fd81b8e517::t_073366f7ce2c42 298-301,303-332,335,338-340,343-346,348-355,357-361,363-365,368-371,409-415
+  s_6ac1fd81b8e517::t_8558e44668f320 347
+  s_6ac1fd81b8e517::t_33a8f8ad9426a5 362
+  s_6ac1fd81b8e517::t_e1bd0689d09700 416-417
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_6ac1fd81b8e517::t_1320d9def1df64 166,179,198-203
+  s_6ac1fd81b8e517::t_86374d8a275ed6 245-249
+  s_6ac1fd81b8e517::t_e27f459ddcb57d 234-235
+  s_6ac1fd81b8e517::t_b3b22669a12ca5 209,233
+  s_6ac1fd81b8e517::t_1d8ac7d6ecdd31 262-284,287-288,314,1388-1399,1442
+  s_6ac1fd81b8e517::t_aa49c950b69ccf 291,309,313
+  s_6ac1fd81b8e517::t_d00064841f3e1a 207,217-224,226,229-230,236-237
+  s_6ac1fd81b8e517::t_edb98ae893ad2e 286
+  s_6ac1fd81b8e517::t_561d280fc4b6b0 295,367-370
+  s_6ac1fd81b8e517::t_9c8f40d04b326b 238-244,250-261,1344-1386
+  s_6ac1fd81b8e517::t_5ca01076b27832 290,292,294,297,316-329,1387,1400-1441,1443-1446
+  s_6ac1fd81b8e517::t_cc69ef03159c6b 227,231
+  s_6ac1fd81b8e517::t_dacc90ebd2bcef 225,228,232
+  s_6ac1fd81b8e517::t_01bd254c2bccb7 289,310-312
+  s_6ac1fd81b8e517::t_21f0a40181fc1f 285
+  s_6ac1fd81b8e517::t_53e6921befbdfb 299
+  s_6ac1fd81b8e517::t_67d84edc66ed42 293
+  s_6ac1fd81b8e517::t_209cc8bf0782db 296
+  s_6ac1fd81b8e517::t_abe6979a0ebd28 298
+  s_6ac1fd81b8e517::t_9b6a7dd92307a9 315
+docs/revival/source-translation-ledger.md
+  s_6ac1fd81b8e517::t_e6b52e45e9e7e5 402-408,410-412,414-416,419-421,423-428
+  s_6ac1fd81b8e517::t_d7170ff56b439c 409,413,417-418,422
+Revival/Tests/D3ImportTests/CanonicalLevelTests.swift
+  s_6ac1fd81b8e517::t_083d3cbb1e0132 122
+Revival/Tests/D3ImportTests/D3LV127Tests.swift
+  s_6ac1fd81b8e517::t_9197f5fc6db09a 33-52
+docs/revival/content-pipeline.md
+  s_6ac1fd81b8e517::t_e6b52e45e9e7e5 112
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_8447eea3fffdd0 22-25,27-29,31,43-46,180,184,198-200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "487cb63dab717fc543e959234e9c095e558c3365",
+  "prompts": {},
+  "sessions": {
+    "s_6ac1fd81b8e517": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8f0a-facc-77a3-9d15-64fc9c719ca6",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
