@@ -973,8 +973,8 @@ final class CanonicalLevelTests: XCTestCase {
                 )
             )
 
-            let evaluated = evaluator.rgba8(frameCount: 0, timeSeconds: 0)
-            let unchanged = noElements.rgba8(frameCount: 0, timeSeconds: 0)
+            let evaluated = evaluator.rgba8(visualTick: 0)
+            let unchanged = noElements.rgba8(visualTick: 0)
             if writes {
                 XCTAssertNotEqual(
                     evaluated,

@@ -264,6 +264,176 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(resumed.gameTime, 0.1, accuracy: 0.000_001)
     }
 
+    func testVariableDeltaDecisionMatchesBoundedFixedCadenceReferenceTrace() {
+        func run(measuredDeltas: [Double]) -> PlayerSimulationFrame {
+            let simulation = PlayerSimulation(
+                level: makeSliceSixObjectRenderLevel(),
+                presentationReadyTimestamp: 0
+            )
+            var timestamp = 0.0
+            var frame: PlayerSimulationFrame?
+            for measuredDelta in measuredDeltas {
+                timestamp += measuredDelta
+                frame = simulation.update(
+                    at: timestamp,
+                    input: .init(forward: 1)
+                )
+            }
+            return frame!
+        }
+
+        // Both traces consume exactly 0.25 seconds of old-delta systems time:
+        // the historical 0.1 first duration plus all measured deltas except the
+        // final stored duration. The 120 Hz trace is a bounded research
+        // comparison, not a second production mode.
+        let variable = run(measuredDeltas: [0.018, 0.044, 0.031, 0.057, 0.016])
+        let fixed = run(
+            measuredDeltas: Array(repeating: 1.0 / 120.0, count: 19)
+        )
+        XCTAssertEqual(variable.velocity.z, fixed.velocity.z, accuracy: 0.000_01)
+        XCTAssertEqual(
+            variable.playerView.camera.position.z,
+            fixed.playerView.camera.position.z,
+            accuracy: 0.000_3
+        )
+        XCTAssertEqual(variable.playerView.roomSourceIndex, fixed.playerView.roomSourceIndex)
+        XCTAssertEqual(variable.wallContact, fixed.wallContact)
+    }
+
+    func testSelectedVariableDeltaKeepsReachedCarrierCollisionBoostAndWiggleWithinCadenceTolerances() throws {
+        let jitter = [0.018, 0.044, 0.031, 0.057, 0.016]
+        let cadence120 = Array(repeating: 1.0 / 120.0, count: 19)
+
+        func runCarrierCollision(
+            measuredDeltas: [Double]
+        ) -> (
+            frame: PlayerSimulationFrame,
+            input: InputSnapshot,
+            firstContact: IndoorWallContact?
+        ) {
+            let base = makeSliceSixObjectRenderLevel()
+            let clearance = defaultPlayerView(in: base).collisionRadius + 0.5
+            let simulation = PlayerSimulation(
+                level: makeSliceTenContactLevel(clearance: clearance),
+                presentationReadyTimestamp: 0
+            )
+            var inputState = PlayerInputState()
+            inputState.setHeld(.init(forward: 1, sideways: 1))
+            var timestamp = 0.0
+            var frame: PlayerSimulationFrame?
+            var input = InputSnapshot.zero
+            var firstContact: IndoorWallContact?
+            for measuredDelta in measuredDeltas {
+                input = inputState.snapshot(
+                    frameDuration: simulation.frameDuration
+                )
+                timestamp += measuredDelta
+                frame = simulation.update(at: timestamp, input: input)
+                if firstContact == nil {
+                    firstContact = frame?.wallContact
+                }
+            }
+            return (frame!, input, firstContact)
+        }
+
+        let variableCarrier = runCarrierCollision(measuredDeltas: jitter)
+        let fixedCarrier = runCarrierCollision(measuredDeltas: cadence120)
+        XCTAssertEqual(
+            variableCarrier.input.forward,
+            fixedCarrier.input.forward,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            variableCarrier.input.sideways,
+            fixedCarrier.input.sideways,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            variableCarrier.frame.playerView.roomSourceIndex,
+            fixedCarrier.frame.playerView.roomSourceIndex
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(variableCarrier.firstContact).roomSourceIndex,
+            try XCTUnwrap(fixedCarrier.firstContact).roomSourceIndex
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(variableCarrier.firstContact).faceIndex,
+            try XCTUnwrap(fixedCarrier.firstContact).faceIndex
+        )
+        XCTAssertEqual(
+            variableCarrier.frame.velocity.x,
+            fixedCarrier.frame.velocity.x,
+            accuracy: 2.6
+        )
+        XCTAssertEqual(
+            variableCarrier.frame.playerView.camera.position.x,
+            fixedCarrier.frame.playerView.camera.position.x,
+            accuracy: 0.24
+        )
+
+        func runBoostAndWiggle(
+            level: Level,
+            measuredDeltas: [Double],
+            input: InputSnapshot
+        ) -> (frame: PlayerSimulationFrame, fuel: Float, falloff: Float) {
+            let simulation = PlayerSimulation(
+                level: level,
+                presentationReadyTimestamp: 0
+            )
+            simulation.setIndoorAutoLevelMode(.off)
+            var timestamp = 0.0
+            var frame: PlayerSimulationFrame?
+            for measuredDelta in measuredDeltas {
+                timestamp += measuredDelta
+                frame = simulation.update(at: timestamp, input: input)
+            }
+            return (
+                frame!,
+                simulation.afterburnerFuel,
+                simulation.wiggleFalloff
+            )
+        }
+
+        let variableBoost = runBoostAndWiggle(
+            level: makeSliceThirteenWiggleLevel(),
+            measuredDeltas: jitter,
+            input: .init(afterburner: 1)
+        )
+        let fixedBoost = runBoostAndWiggle(
+            level: makeSliceThirteenWiggleLevel(),
+            measuredDeltas: cadence120,
+            input: .init(afterburner: 1)
+        )
+        XCTAssertEqual(variableBoost.fuel, fixedBoost.fuel, accuracy: 0.000_004)
+        XCTAssertEqual(variableBoost.falloff, fixedBoost.falloff, accuracy: 0.000_001)
+        XCTAssertEqual(
+            variableBoost.frame.velocity.z,
+            fixedBoost.frame.velocity.z,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            variableBoost.frame.playerView.camera.position.z,
+            fixedBoost.frame.playerView.camera.position.z,
+            accuracy: 0.001_6
+        )
+
+        let variablePortal = runBoostAndWiggle(
+            level: makeSliceThirteenPortalWiggleLevel(),
+            measuredDeltas: jitter,
+            input: .zero
+        )
+        let fixedPortal = runBoostAndWiggle(
+            level: makeSliceThirteenPortalWiggleLevel(),
+            measuredDeltas: cadence120,
+            input: .zero
+        )
+        XCTAssertEqual(
+            variablePortal.frame.playerView.roomSourceIndex,
+            fixedPortal.frame.playerView.roomSourceIndex
+        )
+        XCTAssertEqual(variablePortal.frame.playerView.roomSourceIndex, 99)
+    }
+
     func testPlayerSimulationUsesPyroAnalyticThrustWithoutDiagonalNormalization() {
         let level = makeSliceSixObjectRenderLevel()
         let start = defaultPlayerView(in: level).camera.position
@@ -1089,9 +1259,25 @@ final class WorldRenderingTests: XCTestCase {
                 startRoomSourceIndex: 3
             ).lightCoronas.isEmpty
         )
+        XCTAssertTrue(
+            try extractWorldForRendering(
+                makeCoronaEvaluationLevel(objectBlocked: true),
+                camera: camera,
+                startRoomSourceIndex: 3
+            ).lightCoronas.isEmpty
+        )
+        XCTAssertEqual(
+            try extractWorldForRendering(
+                makeCoronaEvaluationLevel(objectBlocked: true),
+                camera: camera,
+                startRoomSourceIndex: 3,
+                excludedObjectHandle: 99
+            ).lightCoronas.count,
+            1
+        )
     }
 
-    func testEvaluatesTypedWaterDeterministicallyAndOnlyOncePerFrame() throws {
+    func testEvaluatesTypedWaterOnTheSimulationOwnedSixtyHertzVisualTick() throws {
         var base = Data()
         base.reserveCapacity(128 * 128 * 4)
         for y in 0..<128 {
@@ -1107,18 +1293,15 @@ final class WorldRenderingTests: XCTestCase {
             definition: alienForceFieldWaterDefinition()
         )
 
-        let frame0 = evaluator.rgba8(frameCount: 0, timeSeconds: 0)
+        let frame0 = evaluator.rgba8(visualTick: 0)
         XCTAssertEqual(
-            evaluator.rgba8(frameCount: 0, timeSeconds: 10),
+            evaluator.rgba8(visualTick: 0),
             frame0
         )
-        let frame1 = evaluator.rgba8(frameCount: 1, timeSeconds: 1 / 60)
+        let frame1 = evaluator.rgba8(visualTick: 1)
         var frame15 = frame1
         for frame in 2...15 {
-            frame15 = evaluator.rgba8(
-                frameCount: frame,
-                timeSeconds: Float(frame) / 60
-            )
+            frame15 = evaluator.rgba8(visualTick: frame)
         }
 
         XCTAssertEqual(
@@ -1134,15 +1317,30 @@ final class WorldRenderingTests: XCTestCase {
             "a6421e077e293fe63fb6d67f6977fdf575028ff946a0f229e3b21d366afbdeb0"
         )
 
+        var boundedSequentialEvaluator = WaterProceduralEvaluator(
+            image: .init(width: 128, height: 128, rgba8: base),
+            definition: alienForceFieldWaterDefinition()
+        )
+        var boundedSequentialFrame = boundedSequentialEvaluator.rgba8(visualTick: 0)
+        for frame in 1...7 {
+            boundedSequentialFrame = boundedSequentialEvaluator.rgba8(visualTick: frame)
+        }
+        var boundedSkippedEvaluator = WaterProceduralEvaluator(
+            image: .init(width: 128, height: 128, rgba8: base),
+            definition: alienForceFieldWaterDefinition()
+        )
+        _ = boundedSkippedEvaluator.rgba8(visualTick: 0)
+        XCTAssertEqual(
+            boundedSkippedEvaluator.rgba8(visualTick: 7),
+            boundedSequentialFrame
+        )
+
         var skippedEvaluator = WaterProceduralEvaluator(
             image: .init(width: 128, height: 128, rgba8: base),
             definition: alienForceFieldWaterDefinition()
         )
-        _ = skippedEvaluator.rgba8(frameCount: 0, timeSeconds: 0)
-        let directlyDemandedFrame15 = skippedEvaluator.rgba8(
-            frameCount: 15,
-            timeSeconds: 15 / 60
-        )
+        _ = skippedEvaluator.rgba8(visualTick: 0)
+        let directlyDemandedFrame15 = skippedEvaluator.rgba8(visualTick: 15)
         XCTAssertEqual(
             canonicalSHA256(directlyDemandedFrame15),
             "314d89786dd2c0ae2917f3fe44d420a469a9eede2a424d7256e6a87beccb2d49"
@@ -1176,7 +1374,7 @@ final class WorldRenderingTests: XCTestCase {
             )
         )
 
-        let frame0 = evaluator.rgba8(frameCount: 0, timeSeconds: 0)
+        let frame0 = evaluator.rgba8(visualTick: 0)
 
         let discriminatingPixelOffset = (64 * 128 + 65) * 4
         XCTAssertEqual(
@@ -1267,7 +1465,10 @@ private extension Array {
     var only: Element? { count == 1 ? self[0] : nil }
 }
 
-private func makeCoronaEvaluationLevel(blocked: Bool) -> Level {
+func makeCoronaEvaluationLevel(
+    blocked: Bool = false,
+    objectBlocked: Bool = false
+) -> Level {
     let base = makeMinimalCanonicalLevel()
     let light = SourceResource(storedIndex: 1, sourceName: "light")
     let blocker = SourceResource(storedIndex: 2, sourceName: "blocker")
@@ -1340,6 +1541,55 @@ private func makeCoronaEvaluationLevel(blocked: Bool) -> Level {
             .init(flags: 1, faceIndex: 0, connectedRoom: 3, connectedPortal: 0),
         ] : []
     )
+    let blockerModelSource = SourceResource(storedIndex: 3, sourceName: "blocker.oof")
+    let blockerObject = PlacedObject(
+        handle: 99,
+        type: 2,
+        storedID: 0,
+        definition: nil,
+        instanceName: nil,
+        flags: 0,
+        doorShields: nil,
+        location: .room(3),
+        position: .init(x: 0, y: 10, z: 0),
+        orientation: .init(
+            right: .init(x: 1, y: 0, z: 0),
+            up: .init(x: 0, y: 1, z: 0),
+            forward: .init(x: 0, y: 0, z: 1)
+        ),
+        containsType: 0,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    )
+    let blockerModel = CanonicalModel(
+        source: blockerModelSource,
+        collisionRadius: 2,
+        submodels: [
+            .init(
+                sourceIndex: 0,
+                parentIndex: nil,
+                offset: .zero,
+                vertices: [
+                    .init(position: .init(x: -2, y: 0, z: -2), alpha: 1),
+                    .init(position: .init(x: 2, y: 0, z: -2), alpha: 1),
+                    .init(position: .init(x: 0, y: 0, z: 2), alpha: 1),
+                ],
+                faces: [],
+                presentation: .standard
+            ),
+        ],
+        bounds: .init(
+            minimum: .init(x: -2, y: 0, z: -2),
+            maximum: .init(x: 2, y: 0, z: 2)
+        ),
+        sourceArchive: "test.hog",
+        sourceSHA256: String(repeating: "d", count: 64)
+    )
     return Level(
         missionKey: base.missionKey,
         levelKey: base.levelKey,
@@ -1347,7 +1597,7 @@ private func makeCoronaEvaluationLevel(blocked: Bool) -> Level {
         metadata: base.metadata,
         rooms: blocked ? [room3, room4] : [room3],
         terrain: base.terrain,
-        objects: [],
+        objects: objectBlocked ? [blockerObject] : [],
         paths: [],
         goals: [],
         triggers: [],
@@ -1389,6 +1639,18 @@ private func makeCoronaEvaluationLevel(blocked: Bool) -> Level {
                 sourceSHA256: String(repeating: "c", count: 64)
             ),
         ],
+        models: objectBlocked ? [blockerModel] : [],
+        objectPresentations: objectBlocked ? [
+            .init(
+                objectHandle: blockerObject.handle,
+                primaryModel: blockerModelSource,
+                mediumModel: nil,
+                lowModel: nil,
+                dyingModel: nil,
+                mediumDistance: nil,
+                lowDistance: nil
+            ),
+        ] : [],
         dependencyManifest: .init(current: [], historicalEagerBaseline: nil),
         sourceChunks: base.sourceChunks
     )

@@ -19,6 +19,7 @@ struct RevivalWorldRaster {
     float2 textureUV;
     float2 lightmapUV;
     float opacity;
+    float tintMode;
     float4 surfaceColor;
 };
 
@@ -39,6 +40,7 @@ vertex RevivalWorldRaster revivalWorldVertex(
         1.0 - sourceVertex.textureAndLightmapUV.w
     );
     output.opacity = sourceVertex.presentation.x;
+    output.tintMode = sourceVertex.presentation.z;
     output.surfaceColor = sourceVertex.surfaceColor;
     return output;
 }
@@ -51,9 +53,14 @@ fragment float4 revivalWorldFragment(
     sampler lightmapSampler [[sampler(1)]])
 {
     float4 sampled = baseTexture.sample(baseSampler, input.textureUV);
-    float4 base = input.surfaceColor.w > 0.5
-        ? float4(input.surfaceColor.rgb, 1.0)
-        : sampled;
+    float4 base;
+    if (input.surfaceColor.w > 0.5) {
+        base = float4(input.surfaceColor.rgb, 1.0);
+    } else if (input.tintMode > 0.5) {
+        base = float4(sampled.rgb * input.surfaceColor.rgb, sampled.a);
+    } else {
+        base = sampled;
+    }
     float3 lightmap = lightmapTexture.sample(
         lightmapSampler,
         input.lightmapUV

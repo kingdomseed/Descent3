@@ -691,7 +691,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                     do {
                         try renderer.update(
                             level: simulation.level,
-                            playerView: frame.playerView
+                            frame: frame
                         )
                     } catch {
                         renderer.setFrameUpdate(nil)

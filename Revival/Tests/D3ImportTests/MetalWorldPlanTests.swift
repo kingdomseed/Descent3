@@ -1,6 +1,236 @@
 import XCTest
 
 final class MetalWorldPlanTests: XCTestCase {
+    func testUsesPerDrawLocalCoronaIndicesWithOffsetVertexBindings() {
+        XCTAssertEqual(
+            makeMetalLightCoronaIndices(drawCapacity: 3),
+            [
+                0, 1, 2, 0, 2, 3,
+                0, 1, 2, 0, 2, 3,
+                0, 1, 2, 0, 2, 3,
+            ]
+        )
+    }
+
+    func testSchedulesCoronaWithOldDeltaDrawThenPostUpdateAndFadeLifetime() throws {
+        let level = makeCoronaEvaluationLevel()
+        let camera = RoomCamera(
+            position: .init(x: 0, y: -100, z: 0),
+            target: .init(x: 0, y: -99, z: 0),
+            up: .init(x: 0, y: 0, z: 1)
+        )
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            camera: camera,
+            startRoomSourceIndex: 3
+        )
+        XCTAssertEqual(initial.lightCoronaStates.map(\.scalar), [0])
+        XCTAssertEqual(initial.lightCoronaDraws.map(\.opacity), [0])
+
+        let fullScalar = try updateMetalWorldPlan(
+            initial,
+            camera: camera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.25,
+                systemsGameTime: 0
+            )
+        )
+        let clamped = try updateMetalWorldPlan(
+            fullScalar,
+            camera: camera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0,
+                systemsGameTime: 0
+            )
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(clamped.lightCoronaDraws.first).opacity,
+            102.0 / 255.0,
+            accuracy: 0.000_001
+        )
+
+        let interiorCamera = RoomCamera(
+            position: .init(x: 0, y: -19, z: 0),
+            target: .init(x: 0, y: -18, z: 0),
+            up: .init(x: 0, y: 0, z: 1)
+        )
+        let interior = try updateMetalWorldPlan(
+            fullScalar,
+            camera: interiorCamera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0,
+                systemsGameTime: 0
+            )
+        )
+        let interiorCorona = try XCTUnwrap(
+            fullScalar.lightCoronaStates.first
+        ).corona
+        let toEye = Vector3(
+            x: interiorCamera.position.x - interiorCorona.firstVertex.x,
+            y: interiorCamera.position.y - interiorCorona.firstVertex.y,
+            z: interiorCamera.position.z - interiorCorona.firstVertex.z
+        )
+        let toEyeSquared = toEye.x * toEye.x
+            + toEye.y * toEye.y
+            + toEye.z * toEye.z
+        let toEyeLength = sqrt(toEyeSquared)
+        let facingDot = toEye.x * interiorCorona.normal.x
+            + toEye.y * interiorCorona.normal.y
+            + toEye.z * interiorCorona.normal.z
+        let expectedInteriorFacing = 2 * facingDot / toEyeLength
+        let offset = Vector3(
+            x: interiorCorona.center.x - interiorCamera.position.x,
+            y: interiorCorona.center.y - interiorCamera.position.y,
+            z: interiorCorona.center.z - interiorCamera.position.z
+        )
+        let distanceSquared = offset.x * offset.x
+            + offset.y * offset.y
+            + offset.z * offset.z
+        let interiorDistance = sqrt(distanceSquared)
+        let expectedInteriorFade = (
+            interiorDistance - interiorCorona.size * 5
+        ) / (interiorCorona.size * 15)
+        XCTAssertEqual(
+            try XCTUnwrap(interior.lightCoronaDraws.first).opacity,
+            expectedInteriorFacing * expectedInteriorFade * (102.0 / 255.0),
+            accuracy: 0.000_001
+        )
+
+        let first = try updateMetalWorldPlan(
+            initial,
+            camera: camera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1,
+                systemsGameTime: 0
+            )
+        )
+        XCTAssertEqual(first.lightCoronaDraws.map(\.opacity), [0])
+        XCTAssertEqual(first.lightCoronaStates.map(\.scalar), [0.4])
+        XCTAssertEqual(first.presentationVisualTick, 0)
+
+        let second = try updateMetalWorldPlan(
+            first,
+            camera: camera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.016,
+                systemsGameTime: 0.016
+            )
+        )
+        XCTAssertGreaterThan(try XCTUnwrap(second.lightCoronaDraws.first).opacity, 0)
+        XCTAssertEqual(
+            try XCTUnwrap(second.lightCoronaStates.first).scalar,
+            0.464,
+            accuracy: 0.000_001
+        )
+        let expectedFacing = 2 * 121 / sqrt(Float(121 * 121 + 2))
+        XCTAssertEqual(
+            try XCTUnwrap(second.lightCoronaDraws.first).opacity,
+            min(expectedFacing * 0.4, 1) * (102.0 / 255.0),
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(second.presentationVisualTick, 0)
+
+        let nearCamera = RoomCamera(
+            position: .init(x: 0, y: 1, z: 0),
+            target: .init(x: 0, y: 2, z: 0),
+            up: .init(x: 0, y: 0, z: 1)
+        )
+        let fading = try updateMetalWorldPlan(
+            second,
+            camera: nearCamera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1,
+                systemsGameTime: 1.0 / 60
+            )
+        )
+        XCTAssertEqual(fading.lightCoronaDraws.count, 1)
+        XCTAssertEqual(try XCTUnwrap(fading.lightCoronaDraws.first).opacity, 0)
+        XCTAssertEqual(
+            try XCTUnwrap(fading.lightCoronaStates.first).scalar,
+            0.064,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(fading.presentationVisualTick, 1)
+
+        let retainedAtZero = try updateMetalWorldPlan(
+            fading,
+            camera: nearCamera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.016,
+                systemsGameTime: 2.0 / 60
+            )
+        )
+        XCTAssertEqual(retainedAtZero.lightCoronaDraws.count, 1)
+        XCTAssertEqual(try XCTUnwrap(retainedAtZero.lightCoronaDraws.first).opacity, 0)
+        XCTAssertEqual(
+            try XCTUnwrap(retainedAtZero.lightCoronaStates.first).scalar,
+            0,
+            accuracy: 0.000_001
+        )
+
+        let removedAfterZeroDraw = try updateMetalWorldPlan(
+            retainedAtZero,
+            camera: nearCamera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.001,
+                systemsGameTime: 3.0 / 60
+            )
+        )
+        XCTAssertEqual(removedAfterZeroDraw.lightCoronaDraws.count, 1)
+        XCTAssertTrue(removedAfterZeroDraw.lightCoronaStates.isEmpty)
+
+        let absent = try updateMetalWorldPlan(
+            removedAfterZeroDraw,
+            camera: nearCamera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.001,
+                systemsGameTime: 4.0 / 60
+            )
+        )
+        XCTAssertTrue(absent.lightCoronaDraws.isEmpty)
+        XCTAssertTrue(absent.lightCoronaStates.isEmpty)
+    }
+
+    func testBuildsCameraFacingTintedCoronaVerticesForTheSharedWorldPass() throws {
+        let level = makeCoronaEvaluationLevel()
+        let camera = RoomCamera(
+            position: .zero,
+            target: .init(x: 0, y: 1, z: 0),
+            up: .init(x: 0, y: 0, z: 1)
+        )
+        let corona = try XCTUnwrap(
+            try makeMetalWorldPlan(
+                level: level,
+                camera: camera,
+                startRoomSourceIndex: 3
+            ).preparedLightCoronaCandidates.first
+        )
+
+        let vertices = makeMetalLightCoronaVertices(
+            corona,
+            camera: camera,
+            imageWidth: 2,
+            imageHeight: 1,
+            opacity: 0.25
+        )
+
+        XCTAssertEqual(vertices.count, 4)
+        XCTAssertEqual(vertices.map(\.textureAndLightmapUV), [
+            .init(0, 0, 0, 0),
+            .init(1, 0, 0, 0),
+            .init(1, 1, 0, 0),
+            .init(0, 1, 0, 0),
+        ])
+        XCTAssertTrue(vertices.allSatisfy {
+            $0.presentation == .init(0.25, 0, 1, 0)
+                && $0.surfaceColor == .init(0.25, 0.5, 0.75, 0)
+        })
+        XCTAssertEqual(vertices[0].position.x, -4, accuracy: 0.000_001)
+        XCTAssertEqual(vertices[0].position.z, 2, accuracy: 0.000_001)
+        XCTAssertEqual(vertices[2].position.x, 4, accuracy: 0.000_001)
+        XCTAssertEqual(vertices[2].position.z, -2, accuracy: 0.000_001)
+    }
+
     func testUpdatesPlayerCameraAndActiveDrawsWithoutReplacingPreparedPresentation() throws {
         let level = makeSliceSixObjectRenderLevel()
         let initialView = defaultPlayerView(in: level)

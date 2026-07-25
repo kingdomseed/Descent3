@@ -243,7 +243,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             )
             let frame = simulation.update(at: timestamp, input: input)
             do {
-                try renderer.update(level: simulation.level, playerView: frame.playerView)
+                try renderer.update(level: simulation.level, frame: frame)
             } catch {
                 renderer.setFrameUpdate(nil)
                 self.setStatus(error.localizedDescription, isError: true)

@@ -1089,6 +1089,8 @@ struct WorldLightCorona: Equatable, Sendable {
     let assetIndex: Int
     let center: Vector3
     let size: Float
+    let firstVertex: Vector3
+    let normal: Vector3
     let tint: Vector3
     let blend: PresentationBlend
 }
@@ -1131,8 +1133,7 @@ struct WaterProceduralEvaluator: Sendable {
     private var current = [Int16](repeating: 0, count: pixelCount)
     private var previous = [Int16](repeating: 0, count: pixelCount)
     private var output = Data(repeating: 0, count: pixelCount * 4)
-    private var lastFrameCount: Int?
-    private var lastEvaluationTime: Float = 0
+    private var lastVisualTick: Int?
 
     init(
         image: CanonicalRGBA8Image,
@@ -1153,18 +1154,18 @@ struct WaterProceduralEvaluator: Sendable {
         self.definition = definition
     }
 
-    mutating func rgba8(frameCount: Int, timeSeconds: Float) -> Data {
-        if lastFrameCount == frameCount { return output }
-        if timeSeconds < lastEvaluationTime + definition.evaluationIntervalSeconds {
-            return output
-        }
+    mutating func rgba8(visualTick: Int) -> Data {
+        if lastVisualTick == visualTick { return output }
 
-        injectStaticElements(frameCount: frameCount)
-        output = renderCurrentWater()
-        calculateNextWater()
-        swap(&current, &previous)
-        lastFrameCount = frameCount
-        lastEvaluationTime = timeSeconds
+        let elapsedTicks = lastVisualTick.map { visualTick - $0 } ?? 1
+        let stepCount = (1...8).contains(elapsedTicks) ? elapsedTicks : 1
+        for step in stride(from: stepCount - 1, through: 0, by: -1) {
+            injectStaticElements(frameCount: visualTick - step)
+            output = renderCurrentWater()
+            calculateNextWater()
+            swap(&current, &previous)
+        }
+        lastVisualTick = visualTick
         return output
     }
 
@@ -1453,7 +1454,9 @@ func extractWorldForRendering(
     let lightCoronas = try extractSourceLightCoronas(
         level,
         camera: camera,
-        visibility: visibility
+        visibility: visibility,
+        startRoomSourceIndex: startRoomSourceIndex,
+        excludedObjectHandle: excludedObjectHandle
     )
     let objectPresentation = extractObjectPresentation(
         level,
@@ -1721,7 +1724,9 @@ private func accumulatedModelOffsets(_ model: CanonicalModel) -> [Vector3] {
 func extractSourceLightCoronas(
     _ level: Level,
     camera: RoomCamera,
-    visibility: SourceVisibleWorld
+    visibility: SourceVisibleWorld,
+    startRoomSourceIndex: Int,
+    excludedObjectHandle: UInt32? = nil
 ) throws -> [WorldLightCorona] {
     let roomBySourceIndex = Dictionary(
         uniqueKeysWithValues: level.rooms.map { ($0.sourceIndex, $0) }
@@ -1749,7 +1754,9 @@ func extractSourceLightCoronas(
             from: camera.position,
             to: geometry.center,
             level: level,
-            visibleRoomSourceIndices: visibility.visibleRoomSourceIndices
+            visibleRoomSourceIndices: visibility.visibleRoomSourceIndices,
+            startRoomSourceIndex: startRoomSourceIndex,
+            excludedObjectHandle: excludedObjectHandle
         ) else {
             continue
         }
@@ -1760,6 +1767,8 @@ func extractSourceLightCoronas(
                 assetIndex: corona.assetIndex,
                 center: geometry.center,
                 size: geometry.size,
+                firstVertex: room.vertices[face.corners[0].vertexIndex],
+                normal: faceNormal(room, face: face),
                 tint: corona.tint,
                 blend: corona.blend
             )
@@ -1803,69 +1812,52 @@ private func sourceCoronaRayIsOccluded(
     from origin: Vector3,
     to destination: Vector3,
     level: Level,
-    visibleRoomSourceIndices: [Int]
+    visibleRoomSourceIndices: [Int],
+    startRoomSourceIndex: Int,
+    excludedObjectHandle: UInt32?
 ) -> Bool {
     let ray = destination - origin
     let distance = sqrt(dot(ray, ray))
     let direction = ray / distance
     let visibleRooms = Set(visibleRoomSourceIndices)
-    for room in level.rooms where visibleRooms.contains(room.sourceIndex) {
-        for face in room.faces where sourceFaceBlocksCoronaRay(room: room, face: face) {
-            let first = room.vertices[face.corners[0].vertexIndex]
-            for index in 1..<(face.corners.count - 1) {
-                let second = room.vertices[face.corners[index].vertexIndex]
-                let third = room.vertices[face.corners[index + 1].vertexIndex]
-                if let hitDistance = rayTriangleDistance(
-                    origin: origin,
-                    direction: direction,
-                    first: first,
-                    second: second,
-                    third: third
-                ), hitDistance < distance - 0.000_1 {
-                    return true
-                }
-            }
+    if case let .wallHit(contact) = traceIndoorMovement(
+        in: level,
+        startRoom: startRoomSourceIndex,
+        start: origin,
+        end: destination,
+        radius: 0
+    ).outcome, contact.distance < distance - 0.000_1 {
+        return true
+    }
+    let presentationByHandle = Dictionary(
+        uniqueKeysWithValues: level.objectPresentations.map { ($0.objectHandle, $0) }
+    )
+    let modelBySource = Dictionary(
+        uniqueKeysWithValues: level.models.map { ($0.source, $0) }
+    )
+    for object in level.objects {
+        guard object.handle != excludedObjectHandle,
+              object.type == 2 || object.type == 4,
+              case let .room(roomSourceIndex) = object.location,
+              visibleRooms.contains(roomSourceIndex),
+              let presentation = presentationByHandle[object.handle],
+              let model = modelBySource[presentation.primaryModel] else {
+            continue
+        }
+        let radius = sourceObjectPresentationSize(
+            model: model,
+            objectType: object.type
+        )
+        let originToCenter = object.position - origin
+        let projectedDistance = dot(originToCenter, direction)
+        guard projectedDistance > 0, projectedDistance < distance else { continue }
+        let closest = origin + direction * projectedDistance
+        let centerOffset = object.position - closest
+        if dot(centerOffset, centerOffset) <= radius * radius {
+            return true
         }
     }
     return false
-}
-
-private func sourceFaceBlocksCoronaRay(room: LevelRoom, face: LevelFace) -> Bool {
-    guard let portalIndex = face.portalIndex else { return true }
-    let flags = room.portals[portalIndex].flags
-    let explicitlyBlocked = flags & 0x0000_0020 != 0
-    let renderedAndNotFlyThrough = flags & 0x0000_0001 != 0
-        && flags & 0x0000_0002 == 0
-    return explicitlyBlocked || renderedAndNotFlyThrough
-}
-
-private func rayTriangleDistance(
-    origin: Vector3,
-    direction: Vector3,
-    first: Vector3,
-    second: Vector3,
-    third: Vector3
-) -> Float? {
-    let epsilon: Float = 0.000_01
-    let firstEdge = second - first
-    let secondEdge = third - first
-    let determinantVector = cross(direction, secondEdge)
-    let determinant = dot(firstEdge, determinantVector)
-    guard abs(determinant) > epsilon else { return nil }
-    let inverseDeterminant = 1 / determinant
-    let originOffset = origin - first
-    let firstCoordinate = dot(originOffset, determinantVector) * inverseDeterminant
-    guard firstCoordinate >= -epsilon, firstCoordinate <= 1 + epsilon else {
-        return nil
-    }
-    let secondCoordinateVector = cross(originOffset, firstEdge)
-    let secondCoordinate = dot(direction, secondCoordinateVector) * inverseDeterminant
-    guard secondCoordinate >= -epsilon,
-          firstCoordinate + secondCoordinate <= 1 + epsilon else {
-        return nil
-    }
-    let distance = dot(secondEdge, secondCoordinateVector) * inverseDeterminant
-    return distance > epsilon ? distance : nil
 }
 
 func extractSourceVisibleWorld(

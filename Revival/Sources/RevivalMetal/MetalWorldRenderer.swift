@@ -51,6 +51,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
     private let additivePipeline: any MTLRenderPipelineState
     private let opaqueDepthState: any MTLDepthStencilState
     private let translucentDepthState: any MTLDepthStencilState
+    private let coronaDepthState: any MTLDepthStencilState
     private let argumentTable: any MTL4ArgumentTable
     private let baseSampler: any MTLSamplerState
     private let lightmapSampler: any MTLSamplerState
@@ -61,8 +62,6 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
     private var presentation: MetalLevelPresentation?
     private var nextSlotIndex = 0
     private var submittedValue: UInt64 = 0
-    private var submittedFrameCount = 0
-    private var firstFrameTime = CACurrentMediaTime()
     private var frameUpdate: ((Double) -> Void)?
 
     var hasPresentation: Bool {
@@ -119,6 +118,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
         )
         opaqueDepthState = try makeDepthState(device: device, writesDepth: true)
         translucentDepthState = try makeDepthState(device: device, writesDepth: false)
+        coronaDepthState = try makeCoronaDepthState(device: device)
 
         let argumentDescriptor = MTL4ArgumentTableDescriptor()
         argumentDescriptor.maxBufferBindCount = 2
@@ -213,6 +213,24 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
         )
     }
 
+    func update(level: Level, frame: PlayerSimulationFrame) throws {
+        guard let presentation else {
+            try replace(level: level, playerView: frame.playerView)
+            return
+        }
+        presentation.update(
+            try updateMetalWorldPlan(
+                presentation.plan,
+                level: level,
+                playerView: playerViewWithDrawableAspect(frame.playerView),
+                presentationFrame: .init(
+                    systemsFrameDuration: frame.systemsFrameDuration,
+                    systemsGameTime: frame.systemsGameTime
+                )
+            )
+        )
+    }
+
     func setFrameUpdate(_ update: ((Double) -> Void)?) {
         frameUpdate = update
     }
@@ -227,8 +245,6 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             frameSlotCount: frameSlots.count
         )
         presentation = prepared
-        submittedFrameCount = 0
-        firstFrameTime = CACurrentMediaTime()
     }
 
     func drawNow() {
@@ -247,13 +263,14 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
     }
 
     func draw(in view: MTKView) {
-        frameUpdate?(CACurrentMediaTime())
-        guard let presentation,
+        guard presentation != nil,
               let slotIndex = availableFrameSlotIndex(),
               let drawable = view.currentDrawable,
               let renderPass = view.currentMTL4RenderPassDescriptor else {
             return
         }
+        frameUpdate?(CACurrentMediaTime())
+        guard let presentation else { return }
         let slot = frameSlots[slotIndex]
         guard let depthTexture = makeDepthTextureIfNeeded(
             for: slot,
@@ -264,9 +281,9 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
 
         presentation.updateProceduralTextures(
             frameSlotIndex: slotIndex,
-            frameCount: submittedFrameCount,
-            timeSeconds: Float(CACurrentMediaTime() - firstFrameTime)
+            visualTick: presentation.plan.presentationVisualTick
         )
+        presentation.updateCoronaDraws(frameSlotIndex: slotIndex)
         writeWorldUniforms(
             camera: presentation.plan.camera,
             to: slot.uniformBuffer
@@ -348,6 +365,37 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
                     - draw.indexByteOffset
             )
         }
+        if !presentation.coronaDraws.isEmpty {
+            encoder.setRenderPipelineState(additivePipeline)
+            encoder.setDepthStencilState(coronaDepthState)
+            for draw in presentation.coronaDraws {
+                argumentTable.setAddress(
+                    presentation.coronaVertexBuffer(
+                        frameSlotIndex: slotIndex
+                    ).gpuAddress + UInt64(draw.vertexByteOffset),
+                    index: 0
+                )
+                argumentTable.setTexture(
+                    presentation.coronaTexture(
+                        assetIndex: draw.assetIndex
+                    ).gpuResourceID,
+                    index: 0
+                )
+                argumentTable.setTexture(
+                    presentation.whiteLightmap.gpuResourceID,
+                    index: 1
+                )
+                encoder.drawIndexedPrimitives(
+                    primitiveType: .triangle,
+                    indexCount: draw.indexCount,
+                    indexType: .uint32,
+                    indexBuffer: presentation.coronaIndexBuffer.gpuAddress
+                        + UInt64(draw.indexByteOffset),
+                    indexBufferLength: presentation.coronaIndexBuffer.length
+                        - draw.indexByteOffset
+                )
+            }
+        }
         encoder.endEncoding()
         slot.commandBuffer.endCommandBuffer()
 
@@ -359,7 +407,6 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
         drawable.present()
 
         slot.completionValue = submittedValue
-        submittedFrameCount += 1
         nextSlotIndex = (slotIndex + 1) % frameSlots.count
     }
 
@@ -491,6 +538,13 @@ private struct MetalEncodedDraw {
     let indexCount: Int
 }
 
+private struct MetalEncodedCoronaDraw {
+    let assetIndex: Int
+    let vertexByteOffset: Int
+    let indexByteOffset: Int
+    let indexCount: Int
+}
+
 @MainActor
 private final class MetalLevelPresentation {
     private(set) var plan: MetalWorldPlan
@@ -498,11 +552,15 @@ private final class MetalLevelPresentation {
     let vertexBuffer: any MTLBuffer
     let indexBuffer: any MTLBuffer
     private(set) var draws: [MetalEncodedDraw]
+    private(set) var coronaDraws: [MetalEncodedCoronaDraw] = []
+    let coronaIndexBuffer: any MTLBuffer
+    let whiteLightmap: any MTLTexture
 
     private let preparedDraws: [MetalEncodedDraw]
     private let materials: [SourceResource: MetalMaterialResources]
     private let lightmaps: [Int: any MTLTexture]
-    private let whiteLightmap: any MTLTexture
+    private let coronaVertexBuffers: [any MTLBuffer]
+    private let coronaTextures: [any MTLTexture]
 
     init(
         device: any MTLDevice,
@@ -542,6 +600,37 @@ private final class MetalLevelPresentation {
         preparedDraws = encodedDraws
         draws = plan.activeDrawIndices.map { encodedDraws[$0] }
 
+        let coronaCapacity = max(
+            1,
+            plan.level.rooms.reduce(0) { count, room in
+                count + room.faces.filter(\.allowsLightCorona).count
+            }
+        )
+        var coronaVertexBuffers: [any MTLBuffer] = []
+        for _ in 0..<frameSlotCount {
+            guard let buffer = device.makeBuffer(
+                length: coronaCapacity * 4 * MemoryLayout<MetalWorldVertex>.stride,
+                options: .storageModeShared
+            ) else {
+                throw MetalWorldRendererError.allocationFailed("corona geometry")
+            }
+            coronaVertexBuffers.append(buffer)
+        }
+        self.coronaVertexBuffers = coronaVertexBuffers
+        let coronaIndices = makeMetalLightCoronaIndices(
+            drawCapacity: coronaCapacity
+        )
+        guard let coronaIndexBuffer = makeBuffer(
+            device: device,
+            values: coronaIndices
+        ) else {
+            throw MetalWorldRendererError.allocationFailed("corona indices")
+        }
+        self.coronaIndexBuffer = coronaIndexBuffer
+        coronaTextures = try plan.level.presentationCoronaAssets.map {
+            try makeRGBA8Texture(device: device, image: $0.image)
+        }
+
         var materialResources: [SourceResource: MetalMaterialResources] = [:]
         for material in plan.level.presentationMaterials {
             materialResources[material.texture] = try MetalMaterialResources(
@@ -571,13 +660,22 @@ private final class MetalLevelPresentation {
         )
 
         let descriptor = MTLResidencySetDescriptor()
-        descriptor.initialCapacity = 2
+        descriptor.initialCapacity = 3
             + materialResources.values.reduce(0) { $0 + $1.textures.count }
             + lightmapTextures.count
+            + coronaVertexBuffers.count
+            + coronaTextures.count
             + 1
         residencySet = try device.makeResidencySet(descriptor: descriptor)
         residencySet.addAllocation(vertexBuffer)
         residencySet.addAllocation(indexBuffer)
+        residencySet.addAllocation(coronaIndexBuffer)
+        for buffer in coronaVertexBuffers {
+            residencySet.addAllocation(buffer)
+        }
+        for texture in coronaTextures {
+            residencySet.addAllocation(texture)
+        }
         for material in materialResources.values {
             for texture in material.textures {
                 residencySet.addAllocation(texture)
@@ -599,16 +697,54 @@ private final class MetalLevelPresentation {
 
     func updateProceduralTextures(
         frameSlotIndex: Int,
-        frameCount: Int,
-        timeSeconds: Float
+        visualTick: Int
     ) {
         for material in materials.values {
             material.updateProceduralTexture(
                 frameSlotIndex: frameSlotIndex,
-                frameCount: frameCount,
-                timeSeconds: timeSeconds
+                visualTick: visualTick
             )
         }
+    }
+
+    func updateCoronaDraws(frameSlotIndex: Int) {
+        var vertices: [MetalWorldVertex] = []
+        var encoded: [MetalEncodedCoronaDraw] = []
+        for (index, draw) in plan.lightCoronaDraws.enumerated() {
+            let asset = plan.level.presentationCoronaAssets[draw.corona.assetIndex]
+            vertices += makeMetalLightCoronaVertices(
+                draw.corona,
+                camera: plan.camera,
+                imageWidth: asset.image.width,
+                imageHeight: asset.image.height,
+                opacity: draw.opacity
+            )
+            encoded.append(
+                MetalEncodedCoronaDraw(
+                    assetIndex: draw.corona.assetIndex,
+                    vertexByteOffset: index * 4
+                        * MemoryLayout<MetalWorldVertex>.stride,
+                    indexByteOffset: index * 6 * MemoryLayout<UInt32>.stride,
+                    indexCount: 6
+                )
+            )
+        }
+        vertices.withUnsafeBytes { bytes in
+            guard let source = bytes.baseAddress else { return }
+            coronaVertexBuffers[frameSlotIndex].contents().copyMemory(
+                from: source,
+                byteCount: bytes.count
+            )
+        }
+        coronaDraws = encoded
+    }
+
+    func coronaVertexBuffer(frameSlotIndex: Int) -> any MTLBuffer {
+        coronaVertexBuffers[frameSlotIndex]
+    }
+
+    func coronaTexture(assetIndex: Int) -> any MTLTexture {
+        coronaTextures[assetIndex]
     }
 
     func baseTexture(
@@ -663,14 +799,10 @@ private final class MetalMaterialResources {
 
     func updateProceduralTexture(
         frameSlotIndex: Int,
-        frameCount: Int,
-        timeSeconds: Float
+        visualTick: Int
     ) {
         guard var evaluator else { return }
-        let rgba8 = evaluator.rgba8(
-            frameCount: frameCount,
-            timeSeconds: timeSeconds
-        )
+        let rgba8 = evaluator.rgba8(visualTick: visualTick)
         self.evaluator = evaluator
         replaceRGBA8(
             texture: textures[frameSlotIndex],
@@ -740,6 +872,18 @@ private func makeDepthState(
     return state
 }
 
+private func makeCoronaDepthState(
+    device: any MTLDevice
+) throws -> any MTLDepthStencilState {
+    let descriptor = MTLDepthStencilDescriptor()
+    descriptor.depthCompareFunction = .always
+    descriptor.isDepthWriteEnabled = false
+    guard let state = device.makeDepthStencilState(descriptor: descriptor) else {
+        throw MetalWorldRendererError.allocationFailed("corona depth state")
+    }
+    return state
+}
+
 private func makeSampler(
     device: any MTLDevice,
     addressMode: MTLSamplerAddressMode
@@ -751,6 +895,13 @@ private func makeSampler(
     descriptor.sAddressMode = addressMode
     descriptor.tAddressMode = addressMode
     return device.makeSamplerState(descriptor: descriptor)
+}
+
+func makeMetalLightCoronaIndices(drawCapacity: Int) -> [UInt32] {
+    precondition(drawCapacity >= 0)
+    return (0..<drawCapacity).flatMap { _ in
+        [0, 1, 2, 0, 2, 3]
+    }
 }
 
 private func makeBuffer<Value>(
