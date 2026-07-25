@@ -243,6 +243,10 @@ private final class RevivalMacApplicationDelegate: NSObject,
             )
             let frame = simulation.update(at: timestamp, input: input)
             do {
+                try self.gameplayView?.presentTrainingOpening(
+                    frame: frame,
+                    voiceClips: simulation.level.voiceClips
+                )
                 try renderer.update(level: simulation.level, frame: frame)
             } catch {
                 renderer.setFrameUpdate(nil)

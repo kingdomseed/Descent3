@@ -37,6 +37,7 @@ enum D3SourceIdentity {
         case "door-definition": return 60
         case "lightmap-page", "lightmap-info": return 65_534
         case "presentation-effect": return 256
+        case "voice": return 65_534
         default: return nil
         }
     }
@@ -437,6 +438,28 @@ struct LevelTrigger: Codable, Equatable, Sendable {
     let activator: UInt16
 }
 
+struct TrainingOpeningLesson: Codable, Equatable, Sendable {
+    var forwardGoalObjectHandle: UInt32
+    let welcomeDelay: Float
+    let welcomeMessage: String
+    let forwardInstruction: String
+    let welcomeVoiceSourceName: String
+    let successMessage: String
+    let reverseInstruction: String
+    let successVoiceSourceName: String
+}
+
+struct CanonicalVoiceClip: Codable, Equatable, Sendable {
+    let sourceName: String
+    let sourceEntryIndex: Int
+    let sampleRate: Int
+    let channelCount: Int
+    let frameCount: Int
+    let pcm16LittleEndian: Data
+    let sourceArchive: String
+    let sourceSHA256: String
+}
+
 struct LightmapPageMetadata: Codable, Equatable, Sendable {
     let width: Int
     let height: Int
@@ -662,6 +685,27 @@ struct ObjectPresentationReference: Codable, Equatable, Sendable {
     let dyingModel: SourceResource?
     let mediumDistance: Float?
     let lowDistance: Float?
+    let isVisible: Bool
+
+    init(
+        objectHandle: UInt32,
+        primaryModel: SourceResource,
+        mediumModel: SourceResource?,
+        lowModel: SourceResource?,
+        dyingModel: SourceResource?,
+        mediumDistance: Float?,
+        lowDistance: Float?,
+        isVisible: Bool = true
+    ) {
+        self.objectHandle = objectHandle
+        self.primaryModel = primaryModel
+        self.mediumModel = mediumModel
+        self.lowModel = lowModel
+        self.dyingModel = dyingModel
+        self.mediumDistance = mediumDistance
+        self.lowDistance = lowDistance
+        self.isVisible = isVisible
+    }
 }
 
 struct DependencyRecord: Codable, Equatable, Hashable, Sendable {
@@ -713,11 +757,13 @@ struct Level: Codable, Equatable, Sendable {
     let shipDefinitions: [CanonicalShipDefinition]
     let defaultPlayerBinding: DefaultPlayerBinding?
     let objectPresentations: [ObjectPresentationReference]
+    var trainingOpeningLesson: TrainingOpeningLesson?
+    let voiceClips: [CanonicalVoiceClip]
     let dependencyManifest: DependencyManifest
     let sourceChunks: [SourceChunkRecord]
 
     init(
-        schemaVersion: Int = 6,
+        schemaVersion: Int = 7,
         missionKey: String,
         levelKey: String,
         source: LevelSource,
@@ -739,6 +785,8 @@ struct Level: Codable, Equatable, Sendable {
         shipDefinitions: [CanonicalShipDefinition] = [],
         defaultPlayerBinding: DefaultPlayerBinding? = nil,
         objectPresentations: [ObjectPresentationReference] = [],
+        trainingOpeningLesson: TrainingOpeningLesson? = nil,
+        voiceClips: [CanonicalVoiceClip] = [],
         dependencyManifest: DependencyManifest,
         sourceChunks: [SourceChunkRecord]
     ) {
@@ -764,6 +812,8 @@ struct Level: Codable, Equatable, Sendable {
         self.shipDefinitions = shipDefinitions
         self.defaultPlayerBinding = defaultPlayerBinding
         self.objectPresentations = objectPresentations
+        self.trainingOpeningLesson = trainingOpeningLesson
+        self.voiceClips = voiceClips
         self.dependencyManifest = dependencyManifest
         self.sourceChunks = sourceChunks
     }
@@ -777,7 +827,7 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     private func validate(allowImportStagingPresentation: Bool) throws {
-        guard schemaVersion == 6, source.d3lvVersion == 127,
+        guard schemaVersion == 7, source.d3lvVersion == 127,
               !missionKey.isEmpty, !levelKey.isEmpty else {
             throw LevelValidationError.invalidIdentity
         }
@@ -1024,6 +1074,98 @@ struct Level: Codable, Equatable, Sendable {
                 }
             }
         }
+        if let lesson = trainingOpeningLesson {
+            let clipNames = Set(voiceClips.map { $0.sourceName.lowercased() })
+            guard lesson.welcomeDelay.isFinite,
+                  lesson.welcomeDelay > 0,
+                  isNonempty(lesson.welcomeMessage),
+                  isNonempty(lesson.forwardInstruction),
+                  isNonempty(lesson.welcomeVoiceSourceName),
+                  isNonempty(lesson.successMessage),
+                  isNonempty(lesson.reverseInstruction),
+                  isNonempty(lesson.successVoiceSourceName),
+                  let target = objects.first(where: {
+                      $0.handle == lesson.forwardGoalObjectHandle
+                  }),
+                  target.type == 7,
+                  objectPresentations.contains(where: {
+                      $0.objectHandle == target.handle && !$0.isVisible
+                  }),
+                  clipNames.contains(lesson.welcomeVoiceSourceName.lowercased()),
+                  clipNames.contains(lesson.successVoiceSourceName.lowercased()) else {
+                throw LevelValidationError.invalidDependency(
+                    "Training opening lesson"
+                )
+            }
+        }
+        var voiceNames = Set<String>()
+        for clip in voiceClips {
+            let voiceSource = SourceResource(
+                storedIndex: clip.sourceEntryIndex,
+                sourceName: clip.sourceName
+            )
+            guard D3SourceIdentity.isValidSourceResource(
+                    voiceSource,
+                    category: "voice"
+                  ),
+                  voiceNames.insert(clip.sourceName.lowercased()).inserted,
+                  (4_096...192_000).contains(clip.sampleRate),
+                  (1...2).contains(clip.channelCount),
+                  clip.frameCount > 0,
+                  clip.frameCount <= Int.max / clip.channelCount,
+                  clip.pcm16LittleEndian.count
+                    == clip.frameCount * clip.channelCount * 2,
+                  isSafeRelativePath(clip.sourceArchive),
+                  source.profileFiles.contains(where: {
+                      $0.relativePath == clip.sourceArchive
+                  }),
+                  isSHA256(clip.sourceSHA256),
+                  dependencyManifest.current.contains(where: {
+                      $0.category == "voice" && $0.source == voiceSource
+                  }) else {
+                throw LevelValidationError.invalidDependency(
+                    "Canonical voice clip"
+                )
+            }
+        }
+        let hasStockTrainingSource =
+            source.archiveSHA256
+                == "fc1d81921cc4b2618e441b7b9d08c4bcb5cff90731be1bfa6f3a7b054fc0cb54"
+            && source.levelSHA256
+                == "915a561cd3bd720d88bffed72fe41b4ff711c287711f060ecd9696e2cd5f7d41"
+        if hasStockTrainingSource && !allowImportStagingPresentation {
+            let welcome = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("welcome.osf")
+                    == .orderedSame
+            }
+            let return1 = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("return1.osf")
+                    == .orderedSame
+            }
+            guard let lesson = trainingOpeningLesson,
+                  missionKey == "descent3.mission.pilot-training",
+                  levelKey == "descent3.level.training-mission",
+                  lesson.forwardGoalObjectHandle == 12_301,
+                  lesson.welcomeDelay == 1,
+                  voiceClips.count == 2,
+                  welcome?.sourceEntryIndex == 38,
+                  welcome?.sampleRate == 22_050,
+                  welcome?.channelCount == 1,
+                  welcome?.sourceArchive == "missions/training.mn3",
+                  welcome?.sourceSHA256
+                    == "35e31517adb824f3637b877d500e12625b99d1a7044a2ce743087505c88ece36",
+                  return1?.sourceEntryIndex == 28,
+                  return1?.sampleRate == 22_050,
+                  return1?.channelCount == 1,
+                  return1?.sourceArchive == "missions/training.mn3",
+                  return1?.sourceSHA256
+                    == "048067398846141f61a2d503f6ec582f0dbbc5f3bf3feead48047eab808e540f"
+            else {
+                throw LevelValidationError.invalidDependency(
+                    "Training opening package"
+                )
+            }
+        }
         var retiredSlots = Set<Int>()
         for handle in retiredObjectHandles {
             let slot = Int(handle & 0x7ff)
@@ -1195,6 +1337,8 @@ struct Level: Codable, Equatable, Sendable {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
@@ -1275,6 +1419,8 @@ struct Level: Codable, Equatable, Sendable {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: newObjectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
@@ -1312,6 +1458,8 @@ struct Level: Codable, Equatable, Sendable {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            voiceClips: voiceClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
         )
@@ -1358,6 +1506,74 @@ struct Level: Codable, Equatable, Sendable {
             shipDefinitions: [ship],
             defaultPlayerBinding: binding,
             objectPresentations: objectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            voiceClips: voiceClips,
+            dependencyManifest: .init(
+                current: dependencies,
+                historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
+            ),
+            sourceChunks: sourceChunks
+        )
+    }
+
+    func addingTrainingOpeningLesson(
+        _ lesson: TrainingOpeningLesson,
+        voiceClips: [CanonicalVoiceClip]
+    ) -> Level {
+        let lessonPresentations = objectPresentations.map { presentation in
+            guard presentation.objectHandle == lesson.forwardGoalObjectHandle else {
+                return presentation
+            }
+            return ObjectPresentationReference(
+                objectHandle: presentation.objectHandle,
+                primaryModel: presentation.primaryModel,
+                mediumModel: presentation.mediumModel,
+                lowModel: presentation.lowModel,
+                dyingModel: presentation.dyingModel,
+                mediumDistance: presentation.mediumDistance,
+                lowDistance: presentation.lowDistance,
+                isVisible: false
+            )
+        }
+        var dependencies = dependencyManifest.current
+        for clip in voiceClips {
+            dependencies.append(
+                .init(
+                    category: "voice",
+                    source: .init(
+                        storedIndex: clip.sourceEntryIndex,
+                        sourceName: clip.sourceName
+                    ),
+                    state: "canonical-pcm-imported",
+                    provenance: "\(clip.sourceArchive) \(clip.sourceSHA256)"
+                )
+            )
+        }
+        return Level(
+            schemaVersion: schemaVersion,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
+            objectPresentations: lessonPresentations,
+            trainingOpeningLesson: lesson,
+            voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline

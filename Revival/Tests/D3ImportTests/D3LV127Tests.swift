@@ -2,6 +2,79 @@ import Foundation
 import XCTest
 
 final class D3LV127Tests: XCTestCase {
+    func testDecodesOSFACMToCanonicalMonoPCMWithoutForcingStereo() throws {
+        var bits: [(UInt32, Int)] = [
+            (0x03_28_97, 24),
+            (1, 8),
+            (5, 16),
+            (0, 16),
+            (1, 16),
+            (22_050, 16),
+            (0, 4),
+            (4, 12),
+            (1, 4),
+            (1, 16),
+            (0, 5),
+        ]
+        var compressed = Data()
+        var accumulator: UInt64 = 0
+        var available = 0
+        for (value, count) in bits {
+            accumulator |= UInt64(value) << available
+            available += count
+            while available >= 8 {
+                compressed.append(UInt8(truncatingIfNeeded: accumulator))
+                accumulator >>= 8
+                available -= 8
+            }
+        }
+        if available > 0 {
+            compressed.append(UInt8(truncatingIfNeeded: accumulator))
+        }
+
+        var header = Data(repeating: 0, count: 128)
+        header.replaceSubrange(0..<4, with: "OSF1".utf8)
+        header[4] = 0
+        header[5] = 1
+        header[6] = 1
+        header[7] = 0
+        header.replaceSubrange(8..<12, with: [0x44, 0xac, 0, 0])
+        header.replaceSubrange(12..<16, with: [4, 0, 0, 0])
+        header.replaceSubrange(64..<69, with: "Voice".utf8)
+
+        let voice = try decodeOSFACMVoice(compressed + header)
+
+        XCTAssertEqual(voice.sampleRate, 22_050)
+        XCTAssertEqual(voice.channelCount, 1)
+        XCTAssertEqual(voice.frameCount, 4)
+        XCTAssertEqual(voice.pcm16LittleEndian, Data(repeating: 0, count: 8))
+
+        let wave = RevivalGameplayView.waveData(
+            for: .init(
+                sourceName: "voice.osf",
+                sourceEntryIndex: 7,
+                sampleRate: voice.sampleRate,
+                channelCount: voice.channelCount,
+                frameCount: voice.frameCount,
+                pcm16LittleEndian: voice.pcm16LittleEndian,
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: String(repeating: "a", count: 64)
+            )
+        )
+        XCTAssertEqual(String(decoding: wave.prefix(4), as: UTF8.self), "RIFF")
+        XCTAssertEqual(String(decoding: wave[8..<12], as: UTF8.self), "WAVE")
+        XCTAssertEqual(wave.count, 52)
+
+        XCTAssertThrowsError(try decodeOSFACMVoice(Data("OSF1".utf8))) {
+            XCTAssertEqual($0 as? OSFACMDecodeError, .truncated)
+        }
+        var malformed = compressed + header
+        malformed[0] = 0
+        XCTAssertThrowsError(try decodeOSFACMVoice(malformed)) {
+            XCTAssertEqual($0 as? OSFACMDecodeError, .invalidACM)
+        }
+    }
+
     func testTranslatesEveryResidentFaceTextureFlythroughFlagIntoSurfacePhysics() throws {
         let wall = SourceResource(storedIndex: 20, sourceName: "wall")
         let flythrough = SourceResource(storedIndex: 21, sourceName: "flythrough")

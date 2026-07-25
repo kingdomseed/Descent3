@@ -569,7 +569,7 @@ func runD3Import(
             && retailShip.physics.turnrollRatio == 0.13
     )
     let shipSource = SourceResource(storedIndex: 0, sourceName: retailShip.name)
-    let level = objectPresentationLevel.addingDefaultPlayerShip(
+    let playerLevel = objectPresentationLevel.addingDefaultPlayerShip(
         .init(
             source: shipSource,
             primaryModel: modelSources[ship.primaryModelName.lowercased()]!,
@@ -581,6 +581,44 @@ func runD3Import(
             objectHandle: playerObject.handle,
             ship: shipSource
         )
+    )
+    let messageEntry = trainingArchive.uniqueEntry(named: "TrainingMission.msg")
+    let messages = try parseTrainingMessages(
+        trainingData.subdata(in: messageEntry.payloadRange)
+    )
+    let forwardGoal = playerLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("ForwardGoal") == .orderedSame
+    }!
+    precondition(forwardGoal.handle == 12_301 && forwardGoal.type == 7)
+    let voiceNames = ["Welcome.osf", "Return1.osf"]
+    let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
+        let entry = trainingArchive.uniqueEntry(named: name)
+        let entryIndex = trainingArchive.entries.firstIndex(of: entry)!
+        let payload = trainingData.subdata(in: entry.payloadRange)
+        let decoded = try decodeOSFACMVoice(payload)
+        return CanonicalVoiceClip(
+            sourceName: name.lowercased(),
+            sourceEntryIndex: entryIndex,
+            sampleRate: decoded.sampleRate,
+            channelCount: decoded.channelCount,
+            frameCount: decoded.frameCount,
+            pcm16LittleEndian: decoded.pcm16LittleEndian,
+            sourceArchive: trainingFile.relativePath,
+            sourceSHA256: canonicalSHA256(payload)
+        )
+    }
+    let level = playerLevel.addingTrainingOpeningLesson(
+        .init(
+            forwardGoalObjectHandle: forwardGoal.handle,
+            welcomeDelay: 1,
+            welcomeMessage: messages["Welcome"]!,
+            forwardInstruction: messages["GoForward"]!,
+            welcomeVoiceSourceName: "welcome.osf",
+            successMessage: messages["GoodJob"]!,
+            reverseInstruction: messages["GoBackwards"]!,
+            successVoiceSourceName: "return1.osf"
+        ),
+        voiceClips: voiceClips
     )
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
@@ -603,7 +641,7 @@ func runD3Import(
         initialFaceSHA256
             == "9540339832d41b1ff667a9a08a627e989694fec246509a081e08413544838100"
     )
-    precondition(initialExtraction.admittedObjectHandles == [12_301, 12_300])
+    precondition(initialExtraction.admittedObjectHandles == [12_300])
     precondition(
         initialExtraction.lightCoronas.map {
             "\($0.roomSourceIndex):\($0.faceIndex)"
@@ -646,6 +684,35 @@ func runD3Import(
         cancellationCheck: cancellationCheck
     )
     return report
+}
+
+private func parseTrainingMessages(_ data: Data) throws -> [String: String] {
+    guard let text = String(data: data, encoding: .utf8) else {
+        throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
+    }
+    var messages: [String: String] = [:]
+    for rawLine in text.split(whereSeparator: \.isNewline) {
+        let line = rawLine.trimmingCharacters(in: .whitespaces)
+        guard !line.isEmpty,
+              !line.hasPrefix("//"),
+              let separator = line.firstIndex(of: "=") else {
+            continue
+        }
+        let key = String(line[..<separator])
+            .trimmingCharacters(in: .whitespaces)
+        let value = String(line[line.index(after: separator)...])
+            .trimmingCharacters(in: .whitespaces)
+        guard !key.isEmpty, !value.isEmpty, messages[key] == nil else {
+            throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
+        }
+        messages[key] = value
+    }
+    guard ["Welcome", "GoForward", "GoodJob", "GoBackwards"].allSatisfy({
+        messages[$0] != nil
+    }) else {
+        throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
+    }
+    return messages
 }
 
 private struct IndexedPreparedArchive {

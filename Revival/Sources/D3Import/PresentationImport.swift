@@ -2,6 +2,389 @@
 
 import Foundation
 
+// The bounded ACM decoder below is a direct Swift translation of the ISC-licensed
+// `third_party/libacm/decode.c`; the OSF wrapper follows the released
+// `lib/audio/streamaudio.cpp` header contract. Maintained commit
+// 113b0ba4ecd1fc43d31c31b8ae49013e658a4446 supplies the adopted invariant that
+// the ACM header's channel count is authoritative instead of forcing mono to stereo.
+struct DecodedOSFVoice: Equatable, Sendable {
+    let sampleRate: Int
+    let channelCount: Int
+    let frameCount: Int
+    let pcm16LittleEndian: Data
+}
+
+enum OSFACMDecodeError: Error, Equatable {
+    case truncated
+    case invalidOSF
+    case unsupportedOSF
+    case invalidACM
+    case corruptACM
+}
+
+func decodeOSFACMVoice(_ data: Data) throws -> DecodedOSFVoice {
+    let headerSize = 128
+    guard data.count > headerSize else { throw OSFACMDecodeError.truncated }
+    let headerOffset = data.count - headerSize
+    guard data[headerOffset..<(headerOffset + 4)].elementsEqual("OSF1".utf8) else {
+        throw OSFACMDecodeError.invalidOSF
+    }
+    let type = data[headerOffset + 4]
+    let compression = data[headerOffset + 5]
+    let format = data[headerOffset + 6]
+    let rateCode = data[headerOffset + 7]
+    guard type == 0, compression == 1, format & 0x01 == 0x01 else {
+        throw OSFACMDecodeError.unsupportedOSF
+    }
+    let osfRate: Int?
+    switch rateCode {
+    case 0: osfRate = nil
+    case 11: osfRate = 11_025
+    case 22: osfRate = 22_050
+    case 44: osfRate = 44_100
+    default: throw OSFACMDecodeError.unsupportedOSF
+    }
+
+    var decoder = try ACMDecoder(data: data.prefix(headerOffset))
+    guard osfRate.map({ decoder.sampleRate == $0 }) ?? true else {
+        throw OSFACMDecodeError.invalidOSF
+    }
+    let pcm = try decoder.decodeAll()
+    return DecodedOSFVoice(
+        sampleRate: decoder.sampleRate,
+        channelCount: decoder.channelCount,
+        frameCount: pcm.count / 2 / decoder.channelCount,
+        pcm16LittleEndian: pcm
+    )
+}
+
+private struct ACMBitReader {
+    let data: Data
+    var bitOffset = 0
+
+    mutating func read(_ count: Int) throws -> UInt32 {
+        guard (0...31).contains(count),
+              bitOffset <= data.count * 8 - count else {
+            throw OSFACMDecodeError.truncated
+        }
+        var value: UInt32 = 0
+        for bit in 0..<count {
+            let byte = data[(bitOffset + bit) >> 3]
+            value |= UInt32((byte >> ((bitOffset + bit) & 7)) & 1) << bit
+        }
+        bitOffset += count
+        return value
+    }
+}
+
+private struct ACMDecoder {
+    private var bits: ACMBitReader
+    let totalValueCount: Int
+    let channelCount: Int
+    let sampleRate: Int
+    private let level: Int
+    private let rows: Int
+    private let columns: Int
+    private var wrap: [Int64]
+
+    init(data: Data) throws {
+        var bits = ACMBitReader(data: data)
+        guard try bits.read(24) == 0x03_28_97,
+              try bits.read(8) == 1 else {
+            throw OSFACMDecodeError.invalidACM
+        }
+        let low = try bits.read(16)
+        let high = try bits.read(16)
+        let valueCount = Int(low | high << 16)
+        let channels = Int(try bits.read(16))
+        let rate = Int(try bits.read(16))
+        let level = Int(try bits.read(4))
+        let rows = Int(try bits.read(12))
+        guard valueCount > 0,
+              (1...2).contains(channels),
+              rate >= 4_096,
+              level <= 15,
+              rows > 0,
+              rows <= Int.max >> level else {
+            throw OSFACMDecodeError.invalidACM
+        }
+        let columns = 1 << level
+        guard rows * columns <= 1_048_576 else {
+            throw OSFACMDecodeError.invalidACM
+        }
+        self.bits = bits
+        totalValueCount = valueCount
+        channelCount = channels
+        sampleRate = rate
+        self.level = level
+        self.rows = rows
+        self.columns = columns
+        wrap = Array(repeating: 0, count: max(0, columns * 2 - 2))
+    }
+
+    mutating func decodeAll() throws -> Data {
+        var remaining = totalValueCount
+        var result = Data()
+        result.reserveCapacity(totalValueCount * 2)
+        while remaining > 0 {
+            guard let block = try decodeBlock() else { break }
+            let count = min(remaining, block.count)
+            guard channelCount == 1 || count % channelCount == 0 else {
+                throw OSFACMDecodeError.corruptACM
+            }
+            for value in block.prefix(count) {
+                let shifted = value >> level
+                let sample = Int16(truncatingIfNeeded: shifted)
+                result.append(UInt8(truncatingIfNeeded: sample))
+                result.append(UInt8(truncatingIfNeeded: sample >> 8))
+            }
+            remaining -= count
+        }
+        return result
+    }
+
+    private mutating func decodeBlock() throws -> [Int64]? {
+        guard let powerBits = try readExpectingEnd(4),
+              let amplitudeBits = try readExpectingEnd(16) else {
+            return nil
+        }
+        let power = Int(powerBits)
+        let amplitude = Int64(amplitudeBits)
+        guard power <= 15 else { throw OSFACMDecodeError.corruptACM }
+        var block = Array(repeating: Int64(0), count: rows * columns)
+        for column in 0..<columns {
+            guard let fillerBits = try readExpectingEnd(5) else { return nil }
+            let filler = Int(fillerBits)
+            try fill(
+                filler,
+                column: column,
+                amplitude: amplitude,
+                block: &block
+            )
+        }
+        juggle(&block)
+        return block
+    }
+
+    private mutating func readExpectingEnd(_ count: Int) throws -> UInt32? {
+        do {
+            return try bits.read(count)
+        } catch OSFACMDecodeError.truncated {
+            return nil
+        }
+    }
+
+    private mutating func fill(
+        _ filler: Int,
+        column: Int,
+        amplitude: Int64,
+        block: inout [Int64]
+    ) throws {
+        func store(_ row: Int, _ symbol: Int) {
+            block[row * columns + column] = Int64(symbol) * amplitude
+        }
+        let one = [-1, 1]
+        let twoNear = [-2, -1, 1, 2]
+        let twoFar = [-3, -2, 2, 3]
+        let three = [-4, -3, -2, -1, 1, 2, 3, 4]
+        var row = 0
+        switch filler {
+        case 0:
+            return
+        case 3...16:
+            let middle = 1 << (filler - 1)
+            while row < rows {
+                store(row, Int(try bits.read(filler)) - middle)
+                row += 1
+            }
+        case 17:
+            while row < rows {
+                if try bits.read(1) == 0 {
+                    row += min(2, rows - row)
+                } else if try bits.read(1) == 0 {
+                    row += 1
+                } else {
+                    store(row, one[Int(try bits.read(1))])
+                    row += 1
+                }
+            }
+        case 18:
+            while row < rows {
+                if try bits.read(1) != 0 {
+                    store(row, one[Int(try bits.read(1))])
+                }
+                row += 1
+            }
+        case 19:
+            while row < rows {
+                let packed = Int(try bits.read(5))
+                guard packed < 27 else { throw OSFACMDecodeError.corruptACM }
+                let values = [
+                    packed % 3 - 1,
+                    packed / 3 % 3 - 1,
+                    packed / 9 - 1,
+                ]
+                for value in values where row < rows {
+                    store(row, value)
+                    row += 1
+                }
+            }
+        case 20:
+            while row < rows {
+                if try bits.read(1) == 0 {
+                    row += min(2, rows - row)
+                } else if try bits.read(1) == 0 {
+                    row += 1
+                } else {
+                    store(row, twoNear[Int(try bits.read(2))])
+                    row += 1
+                }
+            }
+        case 21:
+            while row < rows {
+                if try bits.read(1) != 0 {
+                    store(row, twoNear[Int(try bits.read(2))])
+                }
+                row += 1
+            }
+        case 22:
+            while row < rows {
+                let packed = Int(try bits.read(7))
+                guard packed < 125 else { throw OSFACMDecodeError.corruptACM }
+                let values = [
+                    packed % 5 - 2,
+                    packed / 5 % 5 - 2,
+                    packed / 25 - 2,
+                ]
+                for value in values where row < rows {
+                    store(row, value)
+                    row += 1
+                }
+            }
+        case 23:
+            while row < rows {
+                if try bits.read(1) == 0 {
+                    row += min(2, rows - row)
+                } else if try bits.read(1) == 0 {
+                    row += 1
+                } else if try bits.read(1) == 0 {
+                    store(row, one[Int(try bits.read(1))])
+                    row += 1
+                } else {
+                    store(row, twoFar[Int(try bits.read(2))])
+                    row += 1
+                }
+            }
+        case 24:
+            while row < rows {
+                if try bits.read(1) != 0 {
+                    if try bits.read(1) == 0 {
+                        store(row, one[Int(try bits.read(1))])
+                    } else {
+                        store(row, twoFar[Int(try bits.read(2))])
+                    }
+                }
+                row += 1
+            }
+        case 26:
+            while row < rows {
+                if try bits.read(1) == 0 {
+                    row += min(2, rows - row)
+                } else if try bits.read(1) == 0 {
+                    row += 1
+                } else {
+                    store(row, three[Int(try bits.read(3))])
+                    row += 1
+                }
+            }
+        case 27:
+            while row < rows {
+                if try bits.read(1) != 0 {
+                    store(row, three[Int(try bits.read(3))])
+                }
+                row += 1
+            }
+        case 29:
+            while row < rows {
+                let packed = Int(try bits.read(7))
+                guard packed < 121 else { throw OSFACMDecodeError.corruptACM }
+                for value in [packed % 11 - 5, packed / 11 - 5] where row < rows {
+                    store(row, value)
+                    row += 1
+                }
+            }
+        default:
+            throw OSFACMDecodeError.corruptACM
+        }
+    }
+
+    private mutating func juggle(_ block: inout [Int64]) {
+        guard level > 0 else { return }
+        let stepRows = level > 9 ? 1 : (2_048 >> level) - 2
+        var rowsRemaining = rows
+        var blockOffset = 0
+        repeat {
+            var subCount = min(stepRows, rowsRemaining) * 2
+            var subLength = columns / 2
+            var wrapOffset = 0
+            jugglePass(
+                block: &block,
+                blockOffset: blockOffset,
+                wrapOffset: wrapOffset,
+                subLength: subLength,
+                subCount: subCount
+            )
+            wrapOffset += subLength * 2
+            var position = blockOffset
+            for _ in 0..<subCount {
+                block[position] += 1
+                position += subLength
+            }
+            while subLength > 1 {
+                subLength /= 2
+                subCount *= 2
+                jugglePass(
+                    block: &block,
+                    blockOffset: blockOffset,
+                    wrapOffset: wrapOffset,
+                    subLength: subLength,
+                    subCount: subCount
+                )
+                wrapOffset += subLength * 2
+            }
+            if rowsRemaining <= stepRows { break }
+            rowsRemaining -= stepRows
+            blockOffset += stepRows << level
+        } while true
+    }
+
+    private mutating func jugglePass(
+        block: inout [Int64],
+        blockOffset: Int,
+        wrapOffset: Int,
+        subLength: Int,
+        subCount: Int
+    ) {
+        for column in 0..<subLength {
+            var position = blockOffset + column
+            var r0 = wrap[wrapOffset + column * 2]
+            var r1 = wrap[wrapOffset + column * 2 + 1]
+            for _ in 0..<(subCount / 2) {
+                let r2 = block[position]
+                block[position] = r1 * 2 + r0 + r2
+                position += subLength
+                let r3 = block[position]
+                block[position] = r2 * 2 - r1 - r3
+                position += subLength
+                r0 = r2
+                r1 = r3
+            }
+            wrap[wrapOffset + column * 2] = r0
+            wrap[wrapOffset + column * 2 + 1] = r1
+        }
+    }
+}
+
 struct Outrage1555Image: Equatable, Sendable {
     let width: Int
     let height: Int

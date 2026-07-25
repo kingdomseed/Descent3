@@ -1,6 +1,348 @@
 import XCTest
 
 final class WorldRenderingTests: XCTestCase {
+    func testTrainingOpeningUsesPriorFrameTimerThenForwardGoalOnceAndRestores() throws {
+        var level = makeSliceSixObjectRenderLevel()
+        let goalHandle: UInt32 = 12_301
+        let lesson = TrainingOpeningLesson(
+            forwardGoalObjectHandle: goalHandle,
+            welcomeDelay: 1,
+            welcomeMessage: "Welcome to the Descent 3 Training session.",
+            forwardInstruction: "Move forward until you stop.",
+            welcomeVoiceSourceName: "welcome.osf",
+            successMessage: "Excellent!",
+            reverseInstruction: "Now use the reverse Key to return to where you started!",
+            successVoiceSourceName: "return1.osf"
+        )
+        level = level.addingTrainingOpeningLesson(lesson, voiceClips: [])
+
+        let timerLevel = level
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 2_048 }
+        )
+        let playerRoomSourceIndex = try XCTUnwrap({
+            if case let .room(roomSourceIndex) =
+                level.objects[playerIndex].location {
+                return roomSourceIndex
+            }
+            return nil
+        }())
+        let containedPlayerStart = level.objects[playerIndex].position
+        let playerRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex {
+                $0.sourceIndex == playerRoomSourceIndex
+            }
+        )
+        level.rooms[playerRoomIndex] = makeSourceContainmentRoom(
+            center: containedPlayerStart,
+            texture: level.surfacePhysics[0].texture,
+            sourceIndex: playerRoomSourceIndex,
+            halfExtent: 200
+        )
+        XCTAssertEqual(
+            containingIndoorRoomSourceIndex(
+                in: level,
+                position: containedPlayerStart,
+                candidates: [playerRoomSourceIndex]
+            ),
+            playerRoomSourceIndex
+        )
+        level.objects[playerIndex].position = containedPlayerStart
+        let goalIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == goalHandle }
+        )
+        level.objects[goalIndex].position = Vector3(
+            x: level.objects[playerIndex].position.x,
+            y: level.objects[playerIndex].position.y,
+            z: level.objects[playerIndex].position.z + 0.5
+        )
+        level.objects[goalIndex].location = level.objects[playerIndex].location
+        level.objects[playerIndex].orientation = Matrix3(
+            right: .init(x: 1, y: 0, z: 0),
+            up: .init(x: 0, y: 1, z: 0),
+            forward: .init(x: 0, y: 0, z: 1)
+        )
+        let hiddenGoalExtraction = try extractWorldForRendering(
+            level,
+            playerView: defaultPlayerView(in: level)
+        )
+        XCTAssertFalse(
+            hiddenGoalExtraction.admittedObjectHandles.contains(goalHandle)
+        )
+
+        let timerOnly = PlayerSimulation(
+            level: timerLevel,
+            presentationReadyTimestamp: 0
+        )
+        for frameIndex in 1...9 {
+            let frame = timerOnly.update(
+                at: Double(frameIndex) * 0.1,
+                input: .zero
+            )
+            XCTAssertTrue(frame.trainingOpeningFeedback.isEmpty)
+        }
+        let welcome = timerOnly.update(at: 1, input: .zero)
+        XCTAssertEqual(
+            welcome.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Welcome to the Descent 3 Training session.",
+                    "Move forward until you stop.",
+                ],
+                voiceSourceName: "welcome.osf"
+            )]
+        )
+        XCTAssertEqual(welcome.enabledPlayerControls, [.forward])
+
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var collisionFrame: PlayerSimulationFrame?
+        for frameIndex in 1...20 {
+            let frame = simulation.update(
+                at: Double(frameIndex) * 0.1,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "return1.osf"
+            }) {
+                collisionFrame = frame
+                break
+            }
+        }
+        let firstGoal = try XCTUnwrap(collisionFrame)
+        XCTAssertEqual(
+            firstGoal.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Excellent!",
+                    "Now use the reverse Key to return to where you started!",
+                ],
+                voiceSourceName: "return1.osf"
+            )]
+        )
+        XCTAssertEqual(firstGoal.enabledPlayerControls, [.reverse])
+
+        let continuationData = try JSONEncoder().encode(simulation.continuation)
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: continuationData
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 100
+        )
+        let afterRestore = restored.update(
+            at: 100.1,
+            input: .init(forward: 1)
+        )
+        XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(afterRestore.enabledPlayerControls, [.reverse])
+
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: continuationData)
+                as? [String: Any]
+        )
+        var hostileObject = continuationObject
+        var hostileLocation = try XCTUnwrap(
+            hostileObject["playerLocation"] as? [String: Any]
+        )
+        hostileLocation["room"] = ["_0": 999_999]
+        hostileObject["playerLocation"] = hostileLocation
+        let hostileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileContinuation,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        let wrongExistingRoom = try XCTUnwrap(
+            level.rooms.first {
+                $0.sourceIndex != firstGoal.playerView.roomSourceIndex
+                    && containingIndoorRoomSourceIndex(
+                        in: level,
+                        position: firstGoal.playerView.camera.position,
+                        candidates: [$0.sourceIndex]
+                    ) == nil
+            }?.sourceIndex
+        )
+        var hostileOwner = continuationObject
+        var hostileOwnerLocation = try XCTUnwrap(
+            hostileOwner["playerLocation"] as? [String: Any]
+        )
+        hostileOwnerLocation["room"] = ["_0": wrongExistingRoom]
+        hostileOwner["playerLocation"] = hostileOwnerLocation
+        let hostileOwnerContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileOwner)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileOwnerContinuation,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var hostileOpening = hostileObject
+        hostileOpening["playerLocation"] = try XCTUnwrap(
+            continuationObject["playerLocation"]
+        )
+        var openingState = try XCTUnwrap(
+            hostileOpening["trainingOpeningState"] as? [String: Any]
+        )
+        openingState["timerRemaining"] = -1
+        openingState["welcomeWasPresented"] = false
+        hostileOpening["trainingOpeningState"] = openingState
+        let hostileOpeningContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileOpening)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileOpeningContinuation,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
+    func testTrainingOpeningPreservesGoalThenTimerFeedbackOnTheSameFrame() throws {
+        var level = makeSliceSixObjectRenderLevel()
+        let goalHandle: UInt32 = 12_301
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 2_048 }
+        )
+        let goalIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == goalHandle }
+        )
+        level.objects[goalIndex].position = .init(
+            x: level.objects[playerIndex].position.x,
+            y: level.objects[playerIndex].position.y,
+            z: level.objects[playerIndex].position.z + 0.5
+        )
+        level.objects[goalIndex].location = level.objects[playerIndex].location
+        level = level.addingTrainingOpeningLesson(
+            .init(
+                forwardGoalObjectHandle: goalHandle,
+                welcomeDelay: 0.1,
+                welcomeMessage: "Welcome",
+                forwardInstruction: "Forward",
+                welcomeVoiceSourceName: "welcome.osf",
+                successMessage: "Excellent",
+                reverseInstruction: "Reverse",
+                successVoiceSourceName: "return1.osf"
+            ),
+            voiceClips: []
+        )
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let simultaneous = simulation.update(
+            at: 0.1,
+            input: .init(forward: 1)
+        )
+        XCTAssertEqual(
+            simultaneous.trainingOpeningFeedback.map(\.voiceSourceName),
+            ["return1.osf", "welcome.osf"]
+        )
+        XCTAssertEqual(
+            RevivalGameplayView.trainingMessageLineCount(
+                for: simultaneous.trainingOpeningFeedback
+            ),
+            4
+        )
+        XCTAssertEqual(
+            RevivalGameplayView.sourceStreamingVoiceName(
+                for: simultaneous.trainingOpeningFeedback
+            ),
+            "welcome.osf"
+        )
+    }
+
+    func testTrainingOpeningGoalContactStaysOnReachedIndoorTrace() throws {
+        var level = makeSliceSixObjectRenderLevel()
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 2_048 }
+        )
+        let goalHandle: UInt32 = 12_301
+        let goalIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == goalHandle }
+        )
+        let playerRoom = try XCTUnwrap(
+            level.rooms.first { $0.sourceIndex == 1 }
+        )
+        let disconnectedRoom = LevelRoom(
+            sourceIndex: 99,
+            pathPoint: playerRoom.pathPoint,
+            vertices: playerRoom.vertices,
+            faces: playerRoom.faces.map {
+                LevelFace(
+                    corners: $0.corners,
+                    flags: $0.flags,
+                    portalIndex: nil,
+                    texture: $0.texture,
+                    lightmapInfoIndex: $0.lightmapInfoIndex,
+                    allowsLightCorona: $0.allowsLightCorona,
+                    lightMultiple: $0.lightMultiple,
+                    special: $0.special
+                )
+            },
+            portals: []
+        )
+        level.rooms.append(disconnectedRoom)
+        level.objects[goalIndex].position = level.objects[playerIndex].position
+        level.objects[goalIndex].location = .room(disconnectedRoom.sourceIndex)
+        level = level.addingTrainingOpeningLesson(
+            .init(
+                forwardGoalObjectHandle: goalHandle,
+                welcomeDelay: 1,
+                welcomeMessage: "Welcome",
+                forwardInstruction: "Forward",
+                welcomeVoiceSourceName: "welcome.osf",
+                successMessage: "Excellent",
+                reverseInstruction: "Reverse",
+                successVoiceSourceName: "return1.osf"
+            ),
+            voiceClips: []
+        )
+
+        let frame = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        ).update(at: 0.1, input: .zero)
+
+        XCTAssertEqual(frame.enabledPlayerControls, [.forward])
+        XCTAssertFalse(
+            frame.trainingOpeningFeedback.contains {
+                $0.voiceSourceName == "return1.osf"
+            }
+        )
+    }
+
     func testAfterburnerInputBypassesRampCombinesCarriersAndClearsInactiveGameplay() {
         var input = PlayerInputState(rampDuration: 0.5)
         input.setHeld(.init(forward: 1, afterburner: 1))
@@ -1658,17 +2000,51 @@ func makeCoronaEvaluationLevel(
 
 func makeSourceContainmentRoom(
     center: Vector3,
-    texture: SourceResource
+    texture: SourceResource,
+    sourceIndex: Int = 3,
+    halfExtent: Float = 1
 ) -> LevelRoom {
     let vertices = [
-        Vector3(x: center.x - 1, y: center.y - 1, z: center.z - 1),
-        Vector3(x: center.x + 1, y: center.y - 1, z: center.z - 1),
-        Vector3(x: center.x + 1, y: center.y + 1, z: center.z - 1),
-        Vector3(x: center.x - 1, y: center.y + 1, z: center.z - 1),
-        Vector3(x: center.x - 1, y: center.y - 1, z: center.z + 1),
-        Vector3(x: center.x + 1, y: center.y - 1, z: center.z + 1),
-        Vector3(x: center.x + 1, y: center.y + 1, z: center.z + 1),
-        Vector3(x: center.x - 1, y: center.y + 1, z: center.z + 1),
+        Vector3(
+            x: center.x - halfExtent,
+            y: center.y - halfExtent,
+            z: center.z - halfExtent
+        ),
+        Vector3(
+            x: center.x + halfExtent,
+            y: center.y - halfExtent,
+            z: center.z - halfExtent
+        ),
+        Vector3(
+            x: center.x + halfExtent,
+            y: center.y + halfExtent,
+            z: center.z - halfExtent
+        ),
+        Vector3(
+            x: center.x - halfExtent,
+            y: center.y + halfExtent,
+            z: center.z - halfExtent
+        ),
+        Vector3(
+            x: center.x - halfExtent,
+            y: center.y - halfExtent,
+            z: center.z + halfExtent
+        ),
+        Vector3(
+            x: center.x + halfExtent,
+            y: center.y - halfExtent,
+            z: center.z + halfExtent
+        ),
+        Vector3(
+            x: center.x + halfExtent,
+            y: center.y + halfExtent,
+            z: center.z + halfExtent
+        ),
+        Vector3(
+            x: center.x - halfExtent,
+            y: center.y + halfExtent,
+            z: center.z + halfExtent
+        ),
     ]
     func face(_ indices: [Int]) -> LevelFace {
         LevelFace(
@@ -1686,7 +2062,7 @@ func makeSourceContainmentRoom(
         )
     }
     return LevelRoom(
-        sourceIndex: 3,
+        sourceIndex: sourceIndex,
         vertices: vertices,
         faces: [
             face([0, 3, 7, 4]),

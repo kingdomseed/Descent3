@@ -90,6 +90,61 @@ struct InputSnapshot: Equatable, Sendable {
     }
 }
 
+struct PlayerControlMask: OptionSet, Codable, Equatable, Sendable {
+    let rawValue: UInt32
+
+    static let forward = Self(rawValue: 1 << 0)
+    static let reverse = Self(rawValue: 1 << 1)
+    static let left = Self(rawValue: 1 << 2)
+    static let right = Self(rawValue: 1 << 3)
+    static let up = Self(rawValue: 1 << 4)
+    static let down = Self(rawValue: 1 << 5)
+    static let pitchUp = Self(rawValue: 1 << 6)
+    static let pitchDown = Self(rawValue: 1 << 7)
+    static let headingLeft = Self(rawValue: 1 << 8)
+    static let headingRight = Self(rawValue: 1 << 9)
+    static let bankLeft = Self(rawValue: 1 << 10)
+    static let bankRight = Self(rawValue: 1 << 11)
+    static let primaryWeapon = Self(rawValue: 1 << 12)
+    static let secondaryWeapon = Self(rawValue: 1 << 13)
+    static let afterburner = Self(rawValue: 1 << 14)
+    static let all = Self(rawValue: .max)
+}
+
+private extension InputSnapshot {
+    func applying(_ controls: PlayerControlMask) -> InputSnapshot {
+        InputSnapshot(
+            forward: forward >= 0
+                ? (controls.contains(.forward) ? forward : 0)
+                : (controls.contains(.reverse) ? forward : 0),
+            sideways: sideways >= 0
+                ? (controls.contains(.right) ? sideways : 0)
+                : (controls.contains(.left) ? sideways : 0),
+            vertical: vertical >= 0
+                ? (controls.contains(.up) ? vertical : 0)
+                : (controls.contains(.down) ? vertical : 0),
+            pitch: pitch >= 0
+                ? (controls.contains(.pitchDown) ? pitch : 0)
+                : (controls.contains(.pitchUp) ? pitch : 0),
+            yaw: yaw >= 0
+                ? (controls.contains(.headingRight) ? yaw : 0)
+                : (controls.contains(.headingLeft) ? yaw : 0),
+            roll: roll >= 0
+                ? (controls.contains(.bankRight) ? roll : 0)
+                : (controls.contains(.bankLeft) ? roll : 0),
+            afterburner: controls.contains(.afterburner) ? afterburner : 0,
+            directLookPitchRadians:
+                controls.contains(.pitchUp) || controls.contains(.pitchDown)
+                    ? directLookPitchRadians
+                    : 0,
+            directLookYawRadians:
+                controls.contains(.headingLeft) || controls.contains(.headingRight)
+                    ? directLookYawRadians
+                    : 0
+        )
+    }
+}
+
 struct PlayerInputRamp: Sendable {
     let rampDuration: Float
 
@@ -329,9 +384,51 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let angularVelocity: Vector3
     let turnrollFixedAngle: Float
     let wallContact: IndoorWallContact?
+    let enabledPlayerControls: PlayerControlMask
+    let trainingOpeningFeedback: [TrainingOpeningFeedback]
 }
 
-enum IndoorAutoLevelMode: Int, Sendable {
+struct TrainingOpeningFeedback: Equatable, Sendable {
+    let hudMessages: [String]
+    let voiceSourceName: String
+}
+
+private struct TrainingOpeningState: Codable, Equatable, Sendable {
+    var timerRemaining: Float
+    var welcomeWasPresented = false
+    var forwardGoalWasReached = false
+    var enabledControls: PlayerControlMask = [.forward]
+}
+
+struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
+    let schemaVersion: Int
+    let levelKey: String
+    let levelSHA256: String
+    let playerLocation: SpatialLocation
+    let playerPosition: Vector3
+    let playerOrientation: Matrix3
+    let frameDuration: Float
+    let gameTime: Float
+    let velocity: Vector3
+    let angularVelocity: Vector3
+    let turnrollFixedAngle: Float
+    let indoorAutoLevelMode: IndoorAutoLevelMode
+    let afterburnerFuel: Float
+    let afterburnerIsActive: Bool
+    let energy: Float
+    let afterburnerMagnitude: Float
+    let wiggleFalloff: Float
+    let lastThrustTime: Float
+    fileprivate let trainingOpeningState: TrainingOpeningState?
+}
+
+enum PlayerSimulationContinuationError: Error, Equatable {
+    case unsupportedSchema
+    case levelIdentityMismatch
+    case invalidState
+}
+
+enum IndoorAutoLevelMode: Int, Codable, Sendable {
     case off = 0
     case standard = 1
     case newPlayer = 2
@@ -355,6 +452,7 @@ final class PlayerSimulation {
     private var lastThrustTime: Float = 0
     private var pauseDepth = 0
     private var pauseTimestamp: Double?
+    private var trainingOpeningState: TrainingOpeningState?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -364,6 +462,119 @@ final class PlayerSimulation {
         let ship = level.shipDefinitions.first { $0.source == binding.ship }!
         angularVelocity = ship.physics.initialAngularVelocity
         lastTimestamp = presentationReadyTimestamp
+        trainingOpeningState = level.trainingOpeningLesson.map {
+            TrainingOpeningState(timerRemaining: $0.welcomeDelay)
+        }
+    }
+
+    init(
+        level: Level,
+        continuation: PlayerSimulationContinuation,
+        resumedAtTimestamp: Double
+    ) throws {
+        guard continuation.schemaVersion == 1 else {
+            throw PlayerSimulationContinuationError.unsupportedSchema
+        }
+        guard continuation.levelKey == level.levelKey,
+              continuation.levelSHA256 == level.source.levelSHA256 else {
+            throw PlayerSimulationContinuationError.levelIdentityMismatch
+        }
+        guard resumedAtTimestamp.isFinite,
+              continuation.frameDuration.isFinite,
+              continuation.frameDuration >= 0,
+              continuation.gameTime.isFinite,
+              continuation.gameTime >= 0,
+              isCanonicalRigidTransform(
+                  position: continuation.playerPosition,
+                  orientation: continuation.playerOrientation
+              ),
+              continuation.velocity.x.isFinite,
+              continuation.velocity.y.isFinite,
+              continuation.velocity.z.isFinite,
+              continuation.angularVelocity.x.isFinite,
+              continuation.angularVelocity.y.isFinite,
+              continuation.angularVelocity.z.isFinite,
+              continuation.turnrollFixedAngle.isFinite,
+              continuation.afterburnerFuel.isFinite,
+              (0...5).contains(continuation.afterburnerFuel),
+              continuation.energy.isFinite,
+              continuation.energy >= 0,
+              continuation.afterburnerMagnitude.isFinite,
+              (0...1).contains(continuation.afterburnerMagnitude),
+              continuation.wiggleFalloff.isFinite,
+              (0...1).contains(continuation.wiggleFalloff),
+              continuation.lastThrustTime.isFinite,
+              continuation.trainingOpeningState.map({
+                  $0.timerRemaining.isFinite
+                      && ($0.welcomeWasPresented || $0.timerRemaining > 0)
+                      && ($0.forwardGoalWasReached
+                          ? $0.enabledControls == [.reverse]
+                          : $0.enabledControls == [.forward])
+              }) ?? true,
+              (level.trainingOpeningLesson == nil)
+                == (continuation.trainingOpeningState == nil),
+              case .room(let restoredRoomSourceIndex)
+                = continuation.playerLocation,
+              level.rooms.contains(where: {
+                  $0.sourceIndex == restoredRoomSourceIndex
+              }),
+              containingIndoorRoomSourceIndex(
+                  in: level,
+                  position: continuation.playerPosition,
+                  candidates: [restoredRoomSourceIndex]
+              ) == restoredRoomSourceIndex else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
+        var restoredLevel = level
+        let binding = restoredLevel.defaultPlayerBinding!
+        let objectIndex = restoredLevel.objects.firstIndex {
+            $0.handle == binding.objectHandle
+        }!
+        restoredLevel.objects[objectIndex].location = continuation.playerLocation
+        restoredLevel.objects[objectIndex].position = continuation.playerPosition
+        restoredLevel.objects[objectIndex].orientation = continuation.playerOrientation
+
+        self.level = restoredLevel
+        frameDuration = continuation.frameDuration
+        gameTime = continuation.gameTime
+        velocity = continuation.velocity
+        angularVelocity = continuation.angularVelocity
+        turnrollFixedAngle = continuation.turnrollFixedAngle
+        indoorAutoLevelMode = continuation.indoorAutoLevelMode
+        afterburnerFuel = continuation.afterburnerFuel
+        afterburnerIsActive = continuation.afterburnerIsActive
+        energy = continuation.energy
+        afterburnerMagnitude = continuation.afterburnerMagnitude
+        wiggleFalloff = continuation.wiggleFalloff
+        lastThrustTime = continuation.lastThrustTime
+        lastTimestamp = resumedAtTimestamp
+        trainingOpeningState = continuation.trainingOpeningState
+    }
+
+    var continuation: PlayerSimulationContinuation {
+        let binding = level.defaultPlayerBinding!
+        let player = level.objects.first { $0.handle == binding.objectHandle }!
+        return PlayerSimulationContinuation(
+            schemaVersion: 1,
+            levelKey: level.levelKey,
+            levelSHA256: level.source.levelSHA256,
+            playerLocation: player.location,
+            playerPosition: player.position,
+            playerOrientation: player.orientation,
+            frameDuration: frameDuration,
+            gameTime: gameTime,
+            velocity: velocity,
+            angularVelocity: angularVelocity,
+            turnrollFixedAngle: turnrollFixedAngle,
+            indoorAutoLevelMode: indoorAutoLevelMode,
+            afterburnerFuel: afterburnerFuel,
+            afterburnerIsActive: afterburnerIsActive,
+            energy: energy,
+            afterburnerMagnitude: afterburnerMagnitude,
+            wiggleFalloff: wiggleFalloff,
+            lastThrustTime: lastThrustTime,
+            trainingOpeningState: trainingOpeningState
+        )
     }
 
     func update(at timestamp: Double, input: InputSnapshot) -> PlayerSimulationFrame {
@@ -377,6 +588,9 @@ final class PlayerSimulation {
             $0.handle == binding.objectHandle
         }!
         var object = level.objects[objectIndex]
+        let input = input.applying(
+            trainingOpeningState?.enabledControls ?? .all
+        )
         let ship = level.shipDefinitions.first { $0.source == binding.ship }!
         guard case let .room(startRoom) = object.location else {
             preconditionFailure("The Slice 10 player simulation is indoor.")
@@ -442,6 +656,7 @@ final class PlayerSimulation {
         let view = defaultPlayerView(in: level)
         var position = object.position
         var roomSourceIndex = startRoom
+        var trainingForwardGoalWasReachedThisFrame = false
         if ship.physics.behaviors.contains(.wiggle) {
             if sqrt(dot(force, force)) < 0.1 {
                 wiggleFalloff -= systemsFrameDuration / 2
@@ -460,6 +675,7 @@ final class PlayerSimulation {
                         wigglesPerSecond: ship.physics.wigglesPerSecond
                     )
             )
+            let traceStart = position
             let trace = traceIndoorMovement(
                 in: level,
                 startRoom: roomSourceIndex,
@@ -467,6 +683,18 @@ final class PlayerSimulation {
                 end: position + linearThrustOrientation.up * wiggle,
                 radius: view.collisionRadius
             )
+            if let lesson = level.trainingOpeningLesson {
+                trainingForwardGoalWasReachedThisFrame =
+                    trainingForwardGoalWasReached(
+                        in: level,
+                        lesson: lesson,
+                        playerStart: traceStart,
+                        playerEnd: trace.finalPosition,
+                        playerRadius: view.collisionRadius,
+                        visitedRoomSourceIndices:
+                            trace.visitedRoomSourceIndices
+                    )
+            }
             if case .noHit = trace.outcome {
                 position = trace.finalPosition
                 roomSourceIndex = trace.containingRoomSourceIndex
@@ -570,6 +798,7 @@ final class PlayerSimulation {
                 drag: ship.physics.drag,
                 duration: remainingDuration
             )
+            let traceStart = position
             let trace = traceIndoorMovement(
                 in: level,
                 startRoom: roomSourceIndex,
@@ -577,6 +806,19 @@ final class PlayerSimulation {
                 end: integrated.position,
                 radius: view.collisionRadius
             )
+            if !trainingForwardGoalWasReachedThisFrame,
+               let lesson = level.trainingOpeningLesson {
+                trainingForwardGoalWasReachedThisFrame =
+                    trainingForwardGoalWasReached(
+                        in: level,
+                        lesson: lesson,
+                        playerStart: traceStart,
+                        playerEnd: trace.finalPosition,
+                        playerRadius: view.collisionRadius,
+                        visitedRoomSourceIndices:
+                            trace.visitedRoomSourceIndices
+                    )
+            }
             guard case let .wallHit(contact) = trace.outcome else {
                 position = trace.finalPosition
                 roomSourceIndex = trace.containingRoomSourceIndex
@@ -630,6 +872,37 @@ final class PlayerSimulation {
         level.objects[objectIndex].position = position
         level.objects[objectIndex].location = .room(roomSourceIndex)
 
+        var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
+        if var openingState = trainingOpeningState,
+           let lesson = level.trainingOpeningLesson {
+            if !openingState.forwardGoalWasReached,
+               trainingForwardGoalWasReachedThisFrame {
+                openingState.forwardGoalWasReached = true
+                openingState.enabledControls = [.reverse]
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [
+                        lesson.successMessage,
+                        lesson.reverseInstruction,
+                    ],
+                    voiceSourceName: lesson.successVoiceSourceName
+                ))
+            }
+            if !openingState.welcomeWasPresented {
+                openingState.timerRemaining -= systemsFrameDuration
+                if openingState.timerRemaining <= 0.000_001 {
+                    openingState.welcomeWasPresented = true
+                    trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                        hudMessages: [
+                            lesson.welcomeMessage,
+                            lesson.forwardInstruction,
+                        ],
+                        voiceSourceName: lesson.welcomeVoiceSourceName
+                    ))
+                }
+            }
+            trainingOpeningState = openingState
+        }
+
         if afterburnerIsActive {
             afterburnerMagnitude += 2 * systemsFrameDuration
         } else {
@@ -656,7 +929,10 @@ final class PlayerSimulation {
             velocity: velocity,
             angularVelocity: angularVelocity,
             turnrollFixedAngle: turnrollFixedAngle,
-            wallContact: wallContact
+            wallContact: wallContact,
+            enabledPlayerControls:
+                trainingOpeningState?.enabledControls ?? .all,
+            trainingOpeningFeedback: trainingOpeningFeedback
         )
     }
 
@@ -683,6 +959,51 @@ final class PlayerSimulation {
             pauseTimestamp = nil
         }
     }
+}
+
+private func trainingForwardGoalWasReached(
+    in level: Level,
+    lesson: TrainingOpeningLesson,
+    playerStart: Vector3,
+    playerEnd: Vector3,
+    playerRadius: Float,
+    visitedRoomSourceIndices: [Int]
+) -> Bool {
+    let target = level.objects.first {
+        $0.handle == lesson.forwardGoalObjectHandle
+    }!
+    guard case let .room(targetRoomSourceIndex) = target.location,
+          visitedRoomSourceIndices.contains(targetRoomSourceIndex) else {
+        return false
+    }
+    let presentation = level.objectPresentations.first {
+        $0.objectHandle == target.handle
+    }!
+    let model = level.models.first {
+        $0.source == presentation.primaryModel
+    }!
+    let targetRadius = sourceObjectPresentationSize(
+        model: model,
+        objectType: target.type
+    )
+    let movement = playerEnd - playerStart
+    let lengthSquared = dot(movement, movement)
+    let fraction: Float
+    if lengthSquared > 0 {
+        fraction = max(
+            0,
+            min(
+                1,
+                dot(target.position - playerStart, movement) / lengthSquared
+            )
+        )
+    } else {
+        fraction = 0
+    }
+    let closest = playerStart + movement * fraction
+    let separation = target.position - closest
+    let collisionRadius = playerRadius + targetRadius
+    return dot(separation, separation) <= collisionRadius * collisionRadius
 }
 
 func sourceAfterburnerForwardControl(
@@ -1500,6 +1821,7 @@ private func extractObjectPresentation(
     for (ordinal, object) in level.objects.enumerated() {
         guard object.handle != excludedObjectHandle,
               let presentation = presentationByHandle[object.handle],
+              presentation.isVisible,
               case let .room(roomSourceIndex) = object.location,
               visibleRooms.contains(roomSourceIndex),
               let primary = modelBySource[presentation.primaryModel] else {

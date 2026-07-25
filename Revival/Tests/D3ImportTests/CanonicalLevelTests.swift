@@ -120,6 +120,7 @@ final class CanonicalLevelTests: XCTestCase {
         assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 3))
         assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 4))
         assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 5))
+        assertValidationError(.invalidIdentity, replacing(base, schemaVersion: 6))
         assertValidationError(
             .invalidSurfacePhysics,
             replacing(base, surfacePhysics: [])
@@ -269,6 +270,234 @@ final class CanonicalLevelTests: XCTestCase {
         XCTAssertEqual(
             try JSONDecoder().decode(Level.self, from: canonicalJSONData(complete)),
             complete
+        )
+    }
+
+    func testSchemaSevenRejectsHostileTrainingLessonAndVoiceMutations() throws {
+        let base = makeSliceSixObjectRenderLevel()
+        let archive = "missions/training.mn3"
+        let stockSource = replacing(
+            base.source,
+            profileIdentifier: "descent3.cd-1.4-mercenary.training.v1",
+            archiveSHA256:
+                "fc1d81921cc4b2618e441b7b9d08c4bcb5cff90731be1bfa6f3a7b054fc0cb54",
+            levelSHA256:
+                "915a561cd3bd720d88bffed72fe41b4ff711c287711f060ecd9696e2cd5f7d41"
+        )
+        let stockBase = replacing(
+            base,
+            missionKey: "descent3.mission.pilot-training",
+            levelKey: "descent3.level.training-mission",
+            source: stockSource
+        )
+        let goalHandle: UInt32 = 12_301
+        let lesson = TrainingOpeningLesson(
+            forwardGoalObjectHandle: goalHandle,
+            welcomeDelay: 1,
+            welcomeMessage: "Welcome",
+            forwardInstruction: "Forward",
+            welcomeVoiceSourceName: "welcome.osf",
+            successMessage: "Excellent",
+            reverseInstruction: "Reverse",
+            successVoiceSourceName: "return1.osf"
+        )
+        let clips = [
+            CanonicalVoiceClip(
+                sourceName: "welcome.osf",
+                sourceEntryIndex: 38,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: Data(repeating: 0, count: 2),
+                sourceArchive: archive,
+                sourceSHA256:
+                    "35e31517adb824f3637b877d500e12625b99d1a7044a2ce743087505c88ece36"
+            ),
+            CanonicalVoiceClip(
+                sourceName: "return1.osf",
+                sourceEntryIndex: 28,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: Data(repeating: 0, count: 2),
+                sourceArchive: archive,
+                sourceSHA256:
+                    "048067398846141f61a2d503f6ec582f0dbbc5f3bf3feead48047eab808e540f"
+            ),
+        ]
+        let voiceDependencies = clips.map {
+            DependencyRecord(
+                category: "voice",
+                source: .init(
+                    storedIndex: $0.sourceEntryIndex,
+                    sourceName: $0.sourceName
+                ),
+                state: "canonical-pcm-imported",
+                provenance: "test"
+            )
+        }
+        assertValidationError(
+            .invalidDependency("Training opening package"),
+            stockBase
+        )
+        assertValidationError(
+            .invalidDependency("Training opening package"),
+            replacing(
+                stockBase,
+                source: replacing(
+                    stockSource,
+                    profileIdentifier: "hostile.renamed-profile"
+                )
+            )
+        )
+        assertValidationError(
+            .invalidDependency("Training opening package"),
+            replacing(
+                stockBase,
+                missionKey: "hostile.renamed-mission",
+                levelKey: "hostile.renamed-level"
+            )
+        )
+        let level = stockBase.addingTrainingOpeningLesson(
+            lesson,
+            voiceClips: clips
+        )
+        XCTAssertNoThrow(try level.validate())
+        var wrongStockHash = clips
+        wrongStockHash[0] = CanonicalVoiceClip(
+            sourceName: clips[0].sourceName,
+            sourceEntryIndex: clips[0].sourceEntryIndex,
+            sampleRate: clips[0].sampleRate,
+            channelCount: clips[0].channelCount,
+            frameCount: clips[0].frameCount,
+            pcm16LittleEndian: clips[0].pcm16LittleEndian,
+            sourceArchive: clips[0].sourceArchive,
+            sourceSHA256: String(repeating: "d", count: 64)
+        )
+        assertValidationError(
+            .invalidDependency("Training opening package"),
+            replacing(level, voiceClips: wrongStockHash)
+        )
+        var wrongStockIndex = clips
+        wrongStockIndex[0] = CanonicalVoiceClip(
+            sourceName: clips[0].sourceName,
+            sourceEntryIndex: 39,
+            sampleRate: clips[0].sampleRate,
+            channelCount: clips[0].channelCount,
+            frameCount: clips[0].frameCount,
+            pcm16LittleEndian: clips[0].pcm16LittleEndian,
+            sourceArchive: clips[0].sourceArchive,
+            sourceSHA256: clips[0].sourceSHA256
+        )
+        let wrongStockDependencies = wrongStockIndex.map {
+            DependencyRecord(
+                category: "voice",
+                source: .init(
+                    storedIndex: $0.sourceEntryIndex,
+                    sourceName: $0.sourceName
+                ),
+                state: "canonical-pcm-imported",
+                provenance: "test"
+            )
+        }
+        assertValidationError(
+            .invalidDependency("Training opening package"),
+            replacing(
+                level,
+                voiceClips: wrongStockIndex,
+                dependencyManifest: .init(
+                    current: base.dependencyManifest.current
+                        + wrongStockDependencies,
+                    historicalEagerBaseline:
+                        base.dependencyManifest.historicalEagerBaseline
+                )
+            )
+        )
+        var visiblePresentations = level.objectPresentations
+        let goalPresentationIndex = try XCTUnwrap(
+            visiblePresentations.firstIndex {
+                $0.objectHandle == lesson.forwardGoalObjectHandle
+            }
+        )
+        let hiddenGoal = visiblePresentations[goalPresentationIndex]
+        visiblePresentations[goalPresentationIndex] = ObjectPresentationReference(
+            objectHandle: hiddenGoal.objectHandle,
+            primaryModel: hiddenGoal.primaryModel,
+            mediumModel: hiddenGoal.mediumModel,
+            lowModel: hiddenGoal.lowModel,
+            dyingModel: hiddenGoal.dyingModel,
+            mediumDistance: hiddenGoal.mediumDistance,
+            lowDistance: hiddenGoal.lowDistance,
+            isVisible: true
+        )
+        assertValidationError(
+            .invalidDependency("Training opening lesson"),
+            replacing(level, objectPresentations: visiblePresentations)
+        )
+
+        var missingTarget = lesson
+        missingTarget.forwardGoalObjectHandle = 999_999
+        assertValidationError(
+            .invalidDependency("Training opening lesson"),
+            replacing(level, trainingOpeningLesson: missingTarget)
+        )
+        assertValidationError(
+            .invalidDependency("Training opening lesson"),
+            replacing(
+                level,
+                trainingOpeningLesson: .init(
+                    forwardGoalObjectHandle: lesson.forwardGoalObjectHandle,
+                    welcomeDelay: lesson.welcomeDelay,
+                    welcomeMessage: lesson.welcomeMessage,
+                    forwardInstruction: lesson.forwardInstruction,
+                    welcomeVoiceSourceName: "missing.osf",
+                    successMessage: lesson.successMessage,
+                    reverseInstruction: lesson.reverseInstruction,
+                    successVoiceSourceName: lesson.successVoiceSourceName
+                )
+            )
+        )
+        var malformedClips = clips
+        malformedClips[0] = CanonicalVoiceClip(
+            sourceName: clips[0].sourceName,
+            sourceEntryIndex: clips[0].sourceEntryIndex,
+            sampleRate: clips[0].sampleRate,
+            channelCount: clips[0].channelCount,
+            frameCount: 2,
+            pcm16LittleEndian: clips[0].pcm16LittleEndian,
+            sourceArchive: clips[0].sourceArchive,
+            sourceSHA256: clips[0].sourceSHA256
+        )
+        assertValidationError(
+            .invalidDependency("Canonical voice clip"),
+            replacing(level, voiceClips: malformedClips)
+        )
+        var invalidProvenance = clips
+        invalidProvenance[0] = CanonicalVoiceClip(
+            sourceName: clips[0].sourceName,
+            sourceEntryIndex: clips[0].sourceEntryIndex,
+            sampleRate: clips[0].sampleRate,
+            channelCount: clips[0].channelCount,
+            frameCount: clips[0].frameCount,
+            pcm16LittleEndian: clips[0].pcm16LittleEndian,
+            sourceArchive: clips[0].sourceArchive,
+            sourceSHA256: "invalid"
+        )
+        assertValidationError(
+            .invalidDependency("Canonical voice clip"),
+            replacing(level, voiceClips: invalidProvenance)
+        )
+        assertValidationError(
+            .invalidDependency("Canonical voice clip"),
+            replacing(
+                level,
+                dependencyManifest: .init(
+                    current: base.dependencyManifest.current
+                        + Array(voiceDependencies.dropFirst()),
+                    historicalEagerBaseline:
+                        base.dependencyManifest.historicalEagerBaseline
+                )
+            )
         )
     }
 
@@ -2418,6 +2647,8 @@ private func overwriteCanonicalPackageLevel(_ level: Level, at packageURL: URL) 
 func replacing(
     _ level: Level,
     schemaVersion: Int? = nil,
+    missionKey: String? = nil,
+    levelKey: String? = nil,
     source: LevelSource? = nil,
     metadata: LevelMetadata? = nil,
     rooms: [LevelRoom]? = nil,
@@ -2436,13 +2667,15 @@ func replacing(
     shipDefinitions: [CanonicalShipDefinition]? = nil,
     defaultPlayerBinding: DefaultPlayerBinding? = nil,
     objectPresentations: [ObjectPresentationReference]? = nil,
+    trainingOpeningLesson: TrainingOpeningLesson? = nil,
+    voiceClips: [CanonicalVoiceClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
     sourceChunks: [SourceChunkRecord]? = nil
 ) -> Level {
     Level(
         schemaVersion: schemaVersion ?? level.schemaVersion,
-        missionKey: level.missionKey,
-        levelKey: level.levelKey,
+        missionKey: missionKey ?? level.missionKey,
+        levelKey: levelKey ?? level.levelKey,
         source: source ?? level.source,
         metadata: metadata ?? level.metadata,
         rooms: rooms ?? level.rooms,
@@ -2469,6 +2702,9 @@ func replacing(
         shipDefinitions: shipDefinitions ?? level.shipDefinitions,
         defaultPlayerBinding: defaultPlayerBinding ?? level.defaultPlayerBinding,
         objectPresentations: objectPresentations ?? level.objectPresentations,
+        trainingOpeningLesson:
+            trainingOpeningLesson ?? level.trainingOpeningLesson,
+        voiceClips: voiceClips ?? level.voiceClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
         sourceChunks: sourceChunks ?? level.sourceChunks
     )
