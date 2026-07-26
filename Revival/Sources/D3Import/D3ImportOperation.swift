@@ -410,6 +410,16 @@ func runD3Import(
         shipName: "Pyro-GL",
         genericName: "Invisiblepowerup"
     )
+    let guidebotPage = try resolveRetailGenericModelPage(
+        table: tableData,
+        overlay: overlayData,
+        name: "GuideBot"
+    )
+    let destroyRobotPage = try resolveRetailGenericModelPage(
+        table: tableData,
+        overlay: overlayData,
+        name: "RAS1 Light Security Flyer"
+    )
     let reachedModelNames = Set([
         reachedPages.ship.primaryModelName,
         reachedPages.ship.mediumModelName,
@@ -418,10 +428,16 @@ func runD3Import(
         reachedPages.generic.primaryModelName,
         reachedPages.generic.mediumModelName,
         reachedPages.generic.lowModelName,
+        guidebotPage.primaryModelName,
+        guidebotPage.mediumModelName,
+        guidebotPage.lowModelName,
+        destroyRobotPage.primaryModelName,
+        destroyRobotPage.mediumModelName,
+        destroyRobotPage.lowModelName,
     ].compactMap { $0 })
     precondition(Set(reachedModelNames.map { $0.lowercased() }) == Set([
         "pyrogl.oof", "pyroglmed.oof", "pyrogllo.oof", "pyrodeath.oof",
-        "invisiblepowerup.oof",
+        "invisiblepowerup.oof", "buddybot.oof", "gyro.oof",
     ]))
     let sortedModelNames = reachedModelNames.sorted {
         $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
@@ -447,13 +463,26 @@ func runD3Import(
     let reachedTextureNames = Set(textureNamesByModel.flatMap { key, names in
         referencedTextureSlotsByModel[key]!.sorted().map { names[$0] }
     }).filter { $0.caseInsensitiveCompare("SAMPLE TEXTURE") != .orderedSame }
+    let reachedGyroFlasherFrame = "SecFlyLit-Flashers000"
+    let reachedGyroFlareDefinitions = try resolveRetailTextureDefinitions(
+        table: tableData,
+        overlay: overlayData,
+        names: ["red flare"]
+    )
+    precondition(reachedGyroFlareDefinitions.count == 1)
+    let reachedGyroFlareDefinition = reachedGyroFlareDefinitions[0]
     let resolvedReachedTextureDefinitions = try resolveRetailTextureDefinitions(
         table: tableData,
         overlay: overlayData,
-        names: reachedTextureNames
+        names: Set(reachedTextureNames.filter {
+            $0.caseInsensitiveCompare(reachedGyroFlasherFrame)
+                != .orderedSame
+        })
     )
     let reachedTextureDefinitions = Dictionary(
-        resolvedReachedTextureDefinitions.map { ($0.storedIndex, $0) },
+        (resolvedReachedTextureDefinitions + [reachedGyroFlareDefinition]).map {
+            ($0.storedIndex, $0)
+        },
         uniquingKeysWith: { first, _ in first }
     ).values.sorted { $0.storedIndex < $1.storedIndex }
     let modelTextureByName = Dictionary(
@@ -467,6 +496,11 @@ func runD3Import(
             .deletingPathExtension().lastPathComponent.lowercased()
         modelTextureBySlotName[bitmapKey] = modelTextureByName[definition.name.lowercased()]!
     }
+    modelTextureBySlotName[reachedGyroFlasherFrame.lowercased()]
+        = modelTextureByName[reachedGyroFlareDefinition.name.lowercased()]
+    precondition(
+        modelTextureBySlotName[reachedGyroFlasherFrame.lowercased()] != nil
+    )
     let modelMaterials = try makePresentationMaterials(
         reachedTextureDefinitions,
         textureByName: modelTextureByName,
@@ -515,13 +549,25 @@ func runD3Import(
     let generic = reachedPages.generic
     let reachedObjectPresentations = topologyLevel.objects.compactMap {
         object -> ObjectPresentationReference? in
-        guard case .room(let room) = object.location, room == 1 || room == 3 else { return nil }
         let page: RetailModelPageSelection
         if object.type == D3SourceIdentity.playerObjectType {
+            guard case .room(let room) = object.location,
+                  room == 1 || room == 3 else {
+                return nil
+            }
             page = ship
         } else if object.definition?.sourceName.caseInsensitiveCompare(generic.name)
             == .orderedSame {
+            guard case .room(let room) = object.location,
+                  room == 1 || room == 3 else {
+                return nil
+            }
             page = generic
+        } else if object.handle == 4_112,
+                  object.definition?.sourceName.caseInsensitiveCompare(
+                      destroyRobotPage.name
+                  ) == .orderedSame {
+            page = destroyRobotPage
         } else {
             return nil
         }
@@ -535,19 +581,23 @@ func runD3Import(
             lowDistance: page.lowDistance
         )
     }
-    precondition(reachedObjectPresentations.count == 7)
+    precondition(reachedObjectPresentations.count == 8)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 32)
+    precondition(deferredRoomObjects.count == 31)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
         materials: modelMaterials
     )
-    precondition(objectPresentationLevel.presentationMaterials.count == 41)
+    precondition(modelMaterials.allSatisfy { material in
+        objectPresentationLevel.presentationMaterials.contains {
+            $0.texture == material.texture
+        }
+    })
     let retailShip = ship.shipDefinition!
     precondition(
         retailShip.name == "Pyro-GL"
@@ -590,7 +640,13 @@ func runD3Import(
         $0.instanceName?.caseInsensitiveCompare("ForwardGoal") == .orderedSame
     }!
     precondition(forwardGoal.handle == 12_301 && forwardGoal.type == 7)
-    let voiceNames = ["Welcome.osf", "Return1.osf", "GuideBotA.osf"]
+    let voiceNames = [
+        "Welcome.osf",
+        "Return1.osf",
+        "GuideBotA.osf",
+        "GuideBotB.osf",
+        "proceed5.osf",
+    ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
         let entryIndex = trainingArchive.entries.firstIndex(of: entry)!
@@ -647,7 +703,7 @@ func runD3Import(
             && markerLight.handle == 6_163
             && markerLight.type == 11
     )
-    let level = openingLevel.addingTrainingGalleryBarrier(
+    let galleryLevel = openingLevel.addingTrainingGalleryBarrier(
         .init(
             triggerName: galleryTrigger.name,
             triggerRoomSourceIndex: galleryTrigger.roomIndex,
@@ -661,6 +717,37 @@ func runD3Import(
             voiceSourceName: "guidebota.osf"
         ),
         voiceClip: voiceClips[2]
+    )
+    let destroyRobot = galleryLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("DestroyBot2")
+            == .orderedSame
+    }!
+    precondition(
+        destroyRobot.handle == 4_112
+            && destroyRobot.type == 2
+            && destroyRobot.storedID == 106
+            && destroyRobot.definition?.sourceName
+                == "RAS1 Light Security Flyer"
+            && destroyRobot.flags == 5_121
+            && destroyRobot.location == .room(37)
+    )
+    let level = galleryLevel.addingTrainingRobotGuidebotChain(
+        .init(
+            destroyRobotObjectHandle: destroyRobot.handle,
+            guidebotObjectHandle: 6_164,
+            destroyRobotRoomSourceIndex: 37,
+            destroyRobotFlags: 5_121,
+            destructionDelay: 2,
+            destructionMessage: messages["GoodJob"]!,
+            exitInstruction: messages["ExitManuveur"]!,
+            destructionVoiceSourceName: "proceed5.osf",
+            deployedGuidebotObjectType: 2,
+            deployedGuidebotMessage: messages["GetCameraMonitor"]!,
+            deployedGuidebotVoiceSourceName: "guidebotb.osf",
+            combat: .stockTraining,
+            guidebot: .stockTraining
+        ),
+        voiceClips: Array(voiceClips.suffix(2))
     )
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)

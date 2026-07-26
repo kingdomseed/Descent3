@@ -427,6 +427,1173 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(afterRestore.trainingGalleryMarkerLightDistance, 0)
     }
 
+    func testTrainingRobotDestructionAndGuidebotDeploymentContinueGalleryOnce() throws {
+        let level = makeTrainingRobotGuidebotLevel()
+        try level.validate()
+        var relocatedRobotLevel = level
+        let relocatedRobotIndex = try XCTUnwrap(
+            relocatedRobotLevel.objects.firstIndex {
+                $0.handle == 4_112
+            }
+        )
+        relocatedRobotLevel.objects[relocatedRobotIndex].location = .room(1)
+        XCTAssertThrowsError(try relocatedRobotLevel.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training robot Guidebot chain")
+            )
+        }
+        let chain = try XCTUnwrap(level.trainingRobotGuidebotChain)
+        let wrongRobotFlagsLevel = replacing(
+            level,
+            trainingRobotGuidebotChain: .init(
+                destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
+                guidebotObjectHandle: chain.guidebotObjectHandle,
+                destroyRobotRoomSourceIndex:
+                    chain.destroyRobotRoomSourceIndex,
+                destroyRobotFlags: 0,
+                destructionDelay: chain.destructionDelay,
+                destructionMessage: chain.destructionMessage,
+                exitInstruction: chain.exitInstruction,
+                destructionVoiceSourceName:
+                    chain.destructionVoiceSourceName,
+                deployedGuidebotObjectType:
+                    chain.deployedGuidebotObjectType,
+                deployedGuidebotMessage:
+                    chain.deployedGuidebotMessage,
+                deployedGuidebotVoiceSourceName:
+                    chain.deployedGuidebotVoiceSourceName,
+                combat: chain.combat,
+                guidebot: chain.guidebot
+            )
+        )
+        XCTAssertThrowsError(try wrongRobotFlagsLevel.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training robot Guidebot chain")
+            )
+        }
+        XCTAssertEqual(
+            trainingPlayerControlMask(
+                galleryWasTriggered: true,
+                controlsWereRestored: true,
+                openingControls: [.reverse]
+            ),
+            .all
+        )
+        let guidebotSimulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        var triggerFrame: PlayerSimulationFrame?
+        var triggerTimestamp = 0.0
+        for frameIndex in 1...20 {
+            triggerTimestamp = Double(frameIndex) * 0.1
+            let frame = guidebotSimulation.update(
+                at: triggerTimestamp,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebota.osf"
+            }) {
+                triggerFrame = frame
+                break
+            }
+        }
+        let triggered = try XCTUnwrap(triggerFrame)
+        XCTAssertEqual(triggered.enabledPlayerControls.rawValue, 0)
+        XCTAssertTrue(triggered.showsEnabledPlayerControls)
+
+        let triggeredContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(guidebotSimulation.continuation)
+        )
+        var hostileContinuation = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(triggeredContinuation)
+            ) as? [String: Any]
+        )
+        var hostileRobotState = try XCTUnwrap(
+            hostileContinuation["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        hostileRobotState["controlsWereRestored"] = true
+        hostileContinuation["trainingRobotGuidebotState"] =
+            hostileRobotState
+        let decodedHostile = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileContinuation)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: decodedHostile,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+        hostileRobotState["guidebotContinuationWasPresented"] = true
+        hostileContinuation["trainingRobotGuidebotState"] =
+            hostileRobotState
+        let consumedGuidebot = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileContinuation)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: consumedGuidebot,
+                resumedAtTimestamp: 200
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+        let deployed = guidebotSimulation.update(
+            at: triggerTimestamp + 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        XCTAssertEqual(
+            deployed.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
+                ],
+                voiceSourceName: "guidebotb.osf",
+                voicePrecedesHUDMessages: true
+            )]
+        )
+        XCTAssertEqual(deployed.enabledPlayerControls, .all)
+        XCTAssertTrue(deployed.showsEnabledPlayerControls)
+        XCTAssertEqual(deployed.trainingGalleryMarkerLightDistance, 0)
+        assertTrainingGalleryBarrier(
+            level: guidebotSimulation.level,
+            rendersFaces: true
+        )
+        let deployedContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(guidebotSimulation.continuation)
+        )
+        var deployedRestorationLevel = level
+        let deployedRoomIndex = try XCTUnwrap(
+            deployedRestorationLevel.rooms.firstIndex {
+                $0.sourceIndex == deployed.playerView.roomSourceIndex
+            }
+        )
+        deployedRestorationLevel.rooms[deployedRoomIndex] =
+            addingSourceContainmentShell(
+                to: deployedRestorationLevel.rooms[deployedRoomIndex],
+                center: deployed.playerView.camera.position,
+                texture: deployedRestorationLevel.surfacePhysics[0].texture,
+                halfExtent: 500
+            )
+        XCTAssertNoThrow(
+            try PlayerSimulation(
+                level: deployedRestorationLevel,
+                continuation: deployedContinuation,
+                resumedAtTimestamp: 100
+            )
+        )
+        let repeatedGuidebot = guidebotSimulation.update(
+            at: triggerTimestamp + 0.2,
+            input: .zero
+        )
+        XCTAssertTrue(repeatedGuidebot.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(repeatedGuidebot.enabledPlayerControls, .all)
+
+        let destructionSimulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        for frameIndex in 1...20 {
+            let frame = destructionSimulation.update(
+                at: Double(frameIndex) * 0.1,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebota.osf"
+            }) {
+                break
+            }
+        }
+        destructionSimulation.destroyTrainingRobot(handle: 4_112)
+        XCTAssertFalse(destructionSimulation.level.objects.contains {
+            $0.handle == 4_112
+        })
+        assertTrainingGalleryBarrier(
+            level: destructionSimulation.level,
+            rendersFaces: false
+        )
+
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(destructionSimulation.continuation)
+        )
+        var consumedDestructionObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(continuation)
+            ) as? [String: Any]
+        )
+        var consumedDestructionState = try XCTUnwrap(
+            consumedDestructionObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        consumedDestructionState.removeValue(
+            forKey: "destructionTimerRemaining"
+        )
+        consumedDestructionState["destructionFeedbackWasPresented"] = true
+        consumedDestructionState["enabledControlHUDIsVisible"] = false
+        consumedDestructionObject["trainingRobotGuidebotState"] =
+            consumedDestructionState
+        let consumedDestruction = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: consumedDestructionObject
+            )
+        )
+        let consumedDestructionSimulation = try PlayerSimulation(
+            level: level,
+            continuation: consumedDestruction,
+            resumedAtTimestamp: 300
+        )
+        let afterDestructionReload = consumedDestructionSimulation.update(
+            at: 300.1,
+            input: .zero
+        )
+        XCTAssertTrue(afterDestructionReload.trainingOpeningFeedback.isEmpty)
+        XCTAssertFalse(afterDestructionReload.showsEnabledPlayerControls)
+        XCTAssertEqual(
+            afterDestructionReload.trainingGalleryMarkerLightDistance,
+            50
+        )
+        XCTAssertFalse(consumedDestructionSimulation.level.objects.contains {
+            $0.handle == 4_112
+        })
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 100
+        )
+        XCTAssertFalse(restored.level.objects.contains {
+            $0.handle == 4_112
+        })
+        let restoredForwardControls = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 150
+        )
+        let restoredNeutralControls = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 150
+        )
+        let restoredForwardFrame = restoredForwardControls.update(
+            at: 150.1,
+            input: .init(forward: 1)
+        )
+        let restoredNeutralFrame = restoredNeutralControls.update(
+            at: 150.1,
+            input: .zero
+        )
+        XCTAssertNotEqual(
+            restoredForwardFrame.velocity,
+            restoredNeutralFrame.velocity
+        )
+        let destruction = restored.update(at: 100.1, input: .zero)
+        XCTAssertTrue(destruction.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(destruction.enabledPlayerControls, .all)
+        XCTAssertTrue(destruction.showsEnabledPlayerControls)
+        XCTAssertEqual(destruction.trainingGalleryMarkerLightDistance, 50)
+        var delayedFrame: PlayerSimulationFrame?
+        for frameIndex in 2...21 {
+            let frame = restored.update(
+                at: 100 + Double(frameIndex) * 0.1,
+                input: .zero
+            )
+            if !frame.trainingOpeningFeedback.isEmpty {
+                delayedFrame = frame
+                break
+            }
+        }
+        let delayed = try XCTUnwrap(delayedFrame)
+        XCTAssertEqual(
+            delayed.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Excellent!",
+                    "Now go through the open doorway, and into the next room.",
+                ],
+                voiceSourceName: "proceed5.osf",
+                voicePrecedesHUDMessages: false
+            )]
+        )
+        XCTAssertFalse(delayed.showsEnabledPlayerControls)
+        let afterRestore = restored.update(
+            at: Double(delayed.gameTime) + 100,
+            input: .zero
+        )
+        XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(afterRestore.enabledPlayerControls, .all)
+        XCTAssertFalse(afterRestore.showsEnabledPlayerControls)
+        XCTAssertEqual(afterRestore.trainingGalleryMarkerLightDistance, 50)
+        assertTrainingGalleryBarrier(
+            level: consumedDestructionSimulation.level,
+            rendersFaces: false
+        )
+    }
+
+    func testTrainingGuidebotDeploymentReachesScript060InSameUpdate() throws {
+        let simulation = PlayerSimulation(
+            level: makeTrainingRobotGuidebotLevel(),
+            presentationReadyTimestamp: 0
+        )
+        var timestamp = 0.0
+        for frameIndex in 1...20 {
+            timestamp = Double(frameIndex) * 0.1
+            let frame = simulation.update(
+                at: timestamp,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebota.osf"
+            }) {
+                break
+            }
+        }
+
+        let deployed = simulation.update(
+            at: timestamp + 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+
+        XCTAssertEqual(
+            deployed.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
+                ],
+                voiceSourceName: "guidebotb.osf",
+                voicePrecedesHUDMessages: true
+            )]
+        )
+        XCTAssertEqual(deployed.enabledPlayerControls, .all)
+    }
+
+    func testTrainingGuidebotUsesVerifiedBoundaryNodesAroundBlockedDirectLine() throws {
+        var level = makeSliceTenContactLevel(clearance: 20)
+        let player = level.objects.first { $0.handle == 2_048 }!
+        guard case let .room(roomSourceIndex) = player.location else {
+            return XCTFail("expected indoor player")
+        }
+        let distractorRoomSourceIndex = try XCTUnwrap(
+            level.rooms.first {
+                $0.sourceIndex != roomSourceIndex
+            }?.sourceIndex
+        )
+        let wallOffset = Vector3(
+            x: player.orientation.right.x * 25,
+            y: player.orientation.right.y * 25,
+            z: player.orientation.right.z * 25
+        )
+        let forwardTen = Vector3(
+            x: player.orientation.forward.x * 10,
+            y: player.orientation.forward.y * 10,
+            z: player.orientation.forward.z * 10
+        )
+        let forwardThirty = Vector3(
+            x: player.orientation.forward.x * 30,
+            y: player.orientation.forward.y * 30,
+            z: player.orientation.forward.z * 30
+        )
+        let forwardForty = Vector3(
+            x: player.orientation.forward.x * 40,
+            y: player.orientation.forward.y * 40,
+            z: player.orientation.forward.z * 40
+        )
+        let beforeWall = Vector3(
+            x: player.position.x + forwardTen.x + wallOffset.x,
+            y: player.position.y + forwardTen.y + wallOffset.y,
+            z: player.position.z + forwardTen.z + wallOffset.z
+        )
+        let beyondWall = Vector3(
+            x: player.position.x + forwardThirty.x + wallOffset.x,
+            y: player.position.y + forwardThirty.y + wallOffset.y,
+            z: player.position.z + forwardThirty.z + wallOffset.z
+        )
+        let laterVisibleStart = Vector3(
+            x: beforeWall.x + player.orientation.forward.x * 2,
+            y: beforeWall.y + player.orientation.forward.y * 2,
+            z: beforeWall.z + player.orientation.forward.z * 2
+        )
+        let destination = Vector3(
+            x: player.position.x + forwardForty.x,
+            y: player.position.y + forwardForty.y,
+            z: player.position.z + forwardForty.z
+        )
+        level = replacing(
+            level,
+            indoorNavigation: .init(
+                sourceHighestRoomPlusTerrainRegions:
+                    level.rooms.map(\.sourceIndex).max()! + 8,
+                sourceWasVerified: true,
+                rooms: [
+                    .init(
+                        sourceIndex: roomSourceIndex,
+                        nodes: [
+                            .init(
+                                position: beforeWall,
+                                edges: [
+                                    .init(
+                                        destinationRoomSourceIndex:
+                                            roomSourceIndex,
+                                        destinationNodeIndex: 1,
+                                        flags: 0,
+                                        cost: 20,
+                                        maximumRadius: 6
+                                    ),
+                                ]
+                            ),
+                            .init(
+                                position: beyondWall,
+                                edges: [
+                                    .init(
+                                        destinationRoomSourceIndex:
+                                            roomSourceIndex,
+                                        destinationNodeIndex: 0,
+                                        flags: 0,
+                                        cost: 20,
+                                        maximumRadius: 6
+                                    ),
+                                    .init(
+                                        destinationRoomSourceIndex:
+                                            roomSourceIndex,
+                                        destinationNodeIndex: 2,
+                                        flags: 0,
+                                        cost: 20,
+                                        maximumRadius: 6
+                                    ),
+                                ]
+                            ),
+                            .init(
+                                position: laterVisibleStart,
+                                edges: [
+                                    .init(
+                                        destinationRoomSourceIndex:
+                                            distractorRoomSourceIndex,
+                                        destinationNodeIndex: 0,
+                                        flags: 0,
+                                        cost: 1,
+                                        maximumRadius: 6
+                                    ),
+                                    .init(
+                                        destinationRoomSourceIndex:
+                                            roomSourceIndex,
+                                        destinationNodeIndex: 1,
+                                        flags: 0,
+                                        cost: 20,
+                                        maximumRadius: 6
+                                    ),
+                                ]
+                            ),
+                        ]
+                    ),
+                    .init(
+                        sourceIndex: distractorRoomSourceIndex,
+                        nodes: [
+                            .init(
+                                position: laterVisibleStart,
+                                edges: [
+                                    .init(
+                                        destinationRoomSourceIndex:
+                                            roomSourceIndex,
+                                        destinationNodeIndex: 2,
+                                        flags: 0,
+                                        cost: 1,
+                                        maximumRadius: 6
+                                    ),
+                                ]
+                            ),
+                        ]
+                    ),
+                ]
+            )
+        )
+        XCTAssertNoThrow(try level.validate())
+
+        XCTAssertEqual(
+            trainingGuidebotRoute(
+                in: level,
+                startRoomSourceIndex: roomSourceIndex,
+                start: player.position,
+                startForward: player.orientation.forward,
+                destinationRoomSourceIndex: roomSourceIndex,
+                destination: destination,
+                radius: 1
+            ),
+            .success(.init(
+                mode: .boundaryNodes,
+                points: [laterVisibleStart, beyondWall, destination],
+                roomSourceIndices: [roomSourceIndex],
+                nodeReferences: [
+                    .init(roomSourceIndex: roomSourceIndex, nodeIndex: 2),
+                    .init(roomSourceIndex: roomSourceIndex, nodeIndex: 1),
+                ]
+            ))
+        )
+    }
+
+    func testTrainingGuidebotMovesThroughAllocatedRouteAndResumesDeterministically() throws {
+        let level = makeTrainingGuidebotBlockedMovementLevel()
+        let player = try XCTUnwrap(
+            level.objects.first { $0.handle == 2_048 }
+        )
+        guard case let .room(playerRoomSourceIndex) = player.location else {
+            return XCTFail("expected indoor player")
+        }
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        var timestamp = 0.1
+        var frame = simulation.update(
+            at: timestamp,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        var guidebot = try XCTUnwrap(frame.trainingGuidebot)
+        XCTAssertEqual(guidebot.route.mode, .boundaryNodes)
+        XCTAssertEqual(guidebot.activeSteeringMode, .allocatedRoute)
+        XCTAssertGreaterThan(
+            guidebot.velocity.x * player.orientation.right.x
+                + guidebot.velocity.y * player.orientation.right.y
+                + guidebot.velocity.z * player.orientation.right.z,
+            0
+        )
+        XCTAssertEqual(
+            try guidebotRoutePointIndex(in: simulation.continuation),
+            0
+        )
+
+        for _ in 0..<19 {
+            guard try guidebotRoutePointIndex(
+                in: simulation.continuation
+            ) == 0 else {
+                break
+            }
+            timestamp += 0.1
+            frame = simulation.update(at: timestamp, input: .zero)
+            guidebot = try XCTUnwrap(frame.trainingGuidebot)
+            XCTAssertEqual(guidebot.activeSteeringMode, .allocatedRoute)
+            XCTAssertEqual(
+                simulation.level.objects.first {
+                    $0.instanceName == "GuideBotB"
+                }?.location,
+                .room(playerRoomSourceIndex)
+            )
+        }
+        XCTAssertEqual(
+            try guidebotRoutePointIndex(in: simulation.continuation),
+            1
+        )
+
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(simulation.continuation)
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 100
+        )
+        XCTAssertEqual(restored.continuation, continuation)
+
+        var restoredTimestamp = 100.0
+        for _ in 0..<12 {
+            timestamp += 0.1
+            restoredTimestamp += 0.1
+            let originalFrame = simulation.update(
+                at: timestamp,
+                input: .zero
+            )
+            let restoredFrame = restored.update(
+                at: restoredTimestamp,
+                input: .zero
+            )
+            XCTAssertEqual(
+                originalFrame.trainingGuidebot,
+                restoredFrame.trainingGuidebot
+            )
+            XCTAssertEqual(simulation.continuation, restored.continuation)
+            XCTAssertEqual(
+                restored.level.objects.first {
+                    $0.instanceName == "GuideBotB"
+                }?.location,
+                .room(playerRoomSourceIndex)
+            )
+        }
+        let finalGuidebot = try XCTUnwrap(restored.update(
+            at: restoredTimestamp + 0.1,
+            input: .zero
+        ).trainingGuidebot)
+        let finalPosition = finalGuidebot.position
+        let finalDelta = Vector3(
+            x: finalPosition.x - player.position.x,
+            y: finalPosition.y - player.position.y,
+            z: finalPosition.z - player.position.z
+        )
+        let forwardTravel =
+            finalDelta.x * player.orientation.forward.x
+                + finalDelta.y * player.orientation.forward.y
+                + finalDelta.z * player.orientation.forward.z
+        XCTAssertGreaterThan(forwardTravel, 30)
+        XCTAssertEqual(
+            try guidebotRoutePointIndex(in: restored.continuation),
+            finalGuidebot.route.points.count - 1
+        )
+        XCTAssertNotEqual(finalGuidebot.activeSteeringMode, .direct)
+    }
+
+    func testContinuationRejectsGuidebotAndProjectileOutsideRecordedRooms() throws {
+        let level = makeTrainingGuidebotBlockedMovementLevel()
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        _ = simulation.update(at: 0.100_1, input: .zero)
+        _ = simulation.update(
+            at: 0.100_2,
+            input: .init(firesPrimaryWeapon: true)
+        )
+        let continuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: continuationData
+        )
+        XCTAssertNoThrow(
+            try PlayerSimulation(
+                level: level,
+                continuation: continuation,
+                resumedAtTimestamp: 100
+            )
+        )
+
+        for mutation in ["guidebot", "projectile"] {
+            var hostileObject = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: continuationData)
+                    as? [String: Any]
+            )
+            var hostileState = try XCTUnwrap(
+                hostileObject["trainingRobotGuidebotState"]
+                    as? [String: Any]
+            )
+            let outsidePosition: [String: Any] = [
+                "x": 1_000_000,
+                "y": 1_000_000,
+                "z": 1_000_000,
+            ]
+            if mutation == "guidebot" {
+                var guidebot = try XCTUnwrap(
+                    hostileState["guidebot"] as? [String: Any]
+                )
+                guidebot["position"] = outsidePosition
+                hostileState["guidebot"] = guidebot
+            } else {
+                var projectiles = try XCTUnwrap(
+                    hostileState["projectiles"] as? [[String: Any]]
+                )
+                XCTAssertFalse(projectiles.isEmpty)
+                projectiles[0]["position"] = outsidePosition
+                hostileState["projectiles"] = projectiles
+            }
+            hostileObject["trainingRobotGuidebotState"] = hostileState
+            let hostileContinuation = try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: hostileObject
+                )
+            )
+            XCTAssertThrowsError(
+                try PlayerSimulation(
+                    level: level,
+                    continuation: hostileContinuation,
+                    resumedAtTimestamp: 100
+                ),
+                mutation
+            ) {
+                XCTAssertEqual(
+                    $0 as? PlayerSimulationContinuationError,
+                    .invalidState
+                )
+            }
+        }
+    }
+
+    func testFourPrimaryLaserVolleysDestroyTrainingRobotThroughNormalPlay() throws {
+        var level = makeTrainingRobotGuidebotLevel()
+        let player = try XCTUnwrap(level.objects.first { $0.handle == 2_048 })
+        let robotIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 4_112 }
+        )
+        level.objects[robotIndex].position = Vector3(
+            x: player.position.x + player.orientation.forward.x * 20,
+            y: player.position.y + player.orientation.forward.y * 20,
+            z: player.position.z + player.orientation.forward.z * 20
+        )
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        for (timestamp, fires) in [
+            (0.1, true),
+            (0.35, false),
+            (0.36, true),
+            (0.61, false),
+            (0.62, true),
+            (0.87, false),
+            (0.88, true),
+        ] {
+            _ = simulation.update(
+                at: timestamp,
+                input: .init(firesPrimaryWeapon: fires)
+            )
+        }
+
+        XCTAssertFalse(simulation.level.objects.contains {
+            $0.handle == 4_112
+        })
+        assertTrainingGalleryBarrier(
+            level: simulation.level,
+            rendersFaces: false
+        )
+    }
+
+    func testF4BirthCopiesLivePlayerAndMovesGuidebotOnReachedGoal() throws {
+        let level = makeTrainingRobotGuidebotLevel()
+        let player = try XCTUnwrap(level.objects.first { $0.handle == 2_048 })
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        let frame = simulation.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        let guidebot = try XCTUnwrap(frame.trainingGuidebot)
+
+        XCTAssertEqual(guidebot.spawnPosition, player.position)
+        XCTAssertEqual(guidebot.orientation, player.orientation)
+        XCTAssertEqual(guidebot.spawnVelocity, Vector3(
+            x: player.orientation.forward.x * 40,
+            y: player.orientation.forward.y * 40,
+            z: player.orientation.forward.z * 40
+        ))
+        XCTAssertEqual(guidebot.destination, Vector3(
+            x: player.position.x + player.orientation.forward.x * 200,
+            y: player.position.y + player.orientation.forward.y * 200,
+            z: player.position.z + player.orientation.forward.z * 200
+        ))
+        XCTAssertEqual(guidebot.route.mode, .direct)
+        XCTAssertEqual(guidebot.activeSteeringMode, .direct)
+        XCTAssertNotEqual(guidebot.spawnPosition, guidebot.position)
+
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(simulation.continuation)
+        )
+        XCTAssertEqual(
+            continuation,
+            simulation.continuation
+        )
+    }
+
+    func testGuidebotBirthPreservesInheritedSpeedAndGoalCompletionDecelerates() throws {
+        var level = makeTrainingRobotGuidebotLevel()
+        let safeRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex { $0.sourceIndex == 1 }
+        )
+        let safeRoom = level.rooms[safeRoomIndex]
+        let safeCenter = safeRoom.pathPoint
+        level.rooms[safeRoomIndex] = addingSourceContainmentShell(
+            to: .init(
+                sourceIndex: safeRoom.sourceIndex,
+                name: safeRoom.name,
+                pathPoint: safeCenter,
+                vertices: [],
+                faces: [],
+                portals: []
+            ),
+            center: safeCenter,
+            texture: level.surfacePhysics[0].texture,
+            halfExtent: 500
+        )
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 2_048 }
+        )
+        level.objects[playerIndex].location = .room(1)
+        level.objects[playerIndex].position = safeCenter
+        let chain = try XCTUnwrap(level.trainingRobotGuidebotChain)
+        let inheritedSimulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var inheritedPlayerSpeed: Float = 0
+        for frameIndex in 1...20 {
+            let frame = inheritedSimulation.update(
+                at: Double(frameIndex) * 0.1,
+                input: .init(forward: 1)
+            )
+            inheritedPlayerSpeed = sqrt(
+                frame.velocity.x * frame.velocity.x
+                    + frame.velocity.y * frame.velocity.y
+                    + frame.velocity.z * frame.velocity.z
+            )
+        }
+        XCTAssertGreaterThan(inheritedPlayerSpeed, 20)
+        let inheritedFrame = inheritedSimulation.update(
+            at: 2.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        let inheritedGuidebot = try XCTUnwrap(
+            inheritedFrame.trainingGuidebot
+        )
+        let inheritedSpeed = sqrt(
+            inheritedGuidebot.velocity.x * inheritedGuidebot.velocity.x
+                + inheritedGuidebot.velocity.y * inheritedGuidebot.velocity.y
+                + inheritedGuidebot.velocity.z * inheritedGuidebot.velocity.z
+        )
+        XCTAssertEqual(
+            inheritedSpeed,
+            inheritedPlayerSpeed
+                + chain.guidebot.birthForwardVelocity
+                - chain.guidebot.maximumDeltaVelocity * 0.1,
+            accuracy: Float(0.000_1)
+        )
+
+        let shortGoalLevel = replacing(
+            level,
+            trainingRobotGuidebotChain: .init(
+                destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
+                guidebotObjectHandle: chain.guidebotObjectHandle,
+                destroyRobotRoomSourceIndex:
+                    chain.destroyRobotRoomSourceIndex,
+                destroyRobotFlags: chain.destroyRobotFlags,
+                destructionDelay: chain.destructionDelay,
+                destructionMessage: chain.destructionMessage,
+                exitInstruction: chain.exitInstruction,
+                destructionVoiceSourceName:
+                    chain.destructionVoiceSourceName,
+                deployedGuidebotObjectType:
+                    chain.deployedGuidebotObjectType,
+                deployedGuidebotMessage: chain.deployedGuidebotMessage,
+                deployedGuidebotVoiceSourceName:
+                    chain.deployedGuidebotVoiceSourceName,
+                combat: chain.combat,
+                guidebot: .init(
+                    collisionRadius: chain.guidebot.collisionRadius,
+                    maximumVelocity: chain.guidebot.maximumVelocity,
+                    maximumDeltaVelocity:
+                        chain.guidebot.maximumDeltaVelocity,
+                    birthForwardVelocity:
+                        chain.guidebot.birthForwardVelocity,
+                    goalForwardDistance: 0.5,
+                    goalCircleDistance:
+                        chain.guidebot.goalCircleDistance
+                )
+            )
+        )
+        let completionSimulation = PlayerSimulation(
+            level: shortGoalLevel,
+            presentationReadyTimestamp: 0
+        )
+        let completionFrame = completionSimulation.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        let completionGuidebot = try XCTUnwrap(
+            completionFrame.trainingGuidebot
+        )
+        let completionSpeed = sqrt(
+            completionGuidebot.velocity.x * completionGuidebot.velocity.x
+                + completionGuidebot.velocity.y
+                    * completionGuidebot.velocity.y
+                + completionGuidebot.velocity.z
+                    * completionGuidebot.velocity.z
+        )
+        XCTAssertEqual(
+            completionSpeed,
+            Float(20.000_002),
+            accuracy: Float(0.000_1)
+        )
+        XCTAssertEqual(completionGuidebot.activeSteeringMode, .stopped)
+    }
+
+    func testDeployedGuidebotContinuationRestoresPresentationWithoutRepeatingScript060() throws {
+        let level = makeTrainingRobotGuidebotLevel()
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var galleryTimestamp = 0.0
+        for frameIndex in 1...20 {
+            galleryTimestamp = Double(frameIndex) * 0.1
+            let frame = simulation.update(
+                at: galleryTimestamp,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebota.osf"
+            }) {
+                break
+            }
+        }
+        let deployed = simulation.update(
+            at: galleryTimestamp + 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        XCTAssertNotNil(deployed.trainingGuidebot)
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        let restoredRoomPoint = try XCTUnwrap(
+            level.rooms.first { $0.sourceIndex == 3 }
+        ).pathPoint
+        var restorationLevel = level
+        let restoredRoomIndex = try XCTUnwrap(
+            restorationLevel.rooms.firstIndex { $0.sourceIndex == 3 }
+        )
+        restorationLevel.rooms[restoredRoomIndex] =
+            addingSourceContainmentShell(
+                to: restorationLevel.rooms[restoredRoomIndex],
+                center: restoredRoomPoint,
+                texture: restorationLevel.surfacePhysics[0].texture,
+                halfExtent: 500
+            )
+        continuationObject["playerPosition"] = [
+            "x": restoredRoomPoint.x,
+            "y": restoredRoomPoint.y,
+            "z": restoredRoomPoint.z,
+        ]
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: continuationObject)
+        )
+        for (field, value) in [
+            ("roomSourceIndex", 99_999),
+            ("routePointIndex", 99_999),
+        ] {
+            var hostileObject = try XCTUnwrap(
+                JSONSerialization.jsonObject(
+                    with: JSONEncoder().encode(continuation)
+                ) as? [String: Any]
+            )
+            var hostileState = try XCTUnwrap(
+                hostileObject["trainingRobotGuidebotState"]
+                    as? [String: Any]
+            )
+            var hostileGuidebot = try XCTUnwrap(
+                hostileState["guidebot"] as? [String: Any]
+            )
+            hostileGuidebot[field] = value
+            hostileState["guidebot"] = hostileGuidebot
+            hostileObject["trainingRobotGuidebotState"] = hostileState
+            let hostileContinuation = try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: hostileObject
+                )
+            )
+            XCTAssertThrowsError(
+                try PlayerSimulation(
+                    level: restorationLevel,
+                    continuation: hostileContinuation,
+                    resumedAtTimestamp: 100
+                )
+            ) {
+                XCTAssertEqual(
+                    $0 as? PlayerSimulationContinuationError,
+                    .invalidState
+                )
+            }
+        }
+
+        let restored = try PlayerSimulation(
+            level: restorationLevel,
+            continuation: continuation,
+            resumedAtTimestamp: 100
+        )
+        XCTAssertEqual(restored.continuation, continuation)
+        let guidebot = try XCTUnwrap(
+            restored.level.objects.first { $0.instanceName == "GuideBotB" }
+        )
+        XCTAssertTrue(restored.level.objectPresentations.contains {
+            $0.objectHandle == guidebot.handle
+                && $0.primaryModel.sourceName
+                    .caseInsensitiveCompare("Buddybot.oof")
+                    == .orderedSame
+        })
+        let resumed = restored.update(at: 100.1, input: .zero)
+        XCTAssertNotNil(resumed.trainingGuidebot)
+        XCTAssertTrue(resumed.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(resumed.enabledPlayerControls, .all)
+    }
+
+    func testGuidebotRouteContinuationUsesItsClosedBarrierAllocationState() throws {
+        var level = makeTrainingRobotGuidebotLevel()
+        let chain = try XCTUnwrap(level.trainingRobotGuidebotChain)
+        level = replacing(
+            level,
+            trainingRobotGuidebotChain: .init(
+                destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
+                guidebotObjectHandle: chain.guidebotObjectHandle,
+                destroyRobotRoomSourceIndex:
+                    chain.destroyRobotRoomSourceIndex,
+                destroyRobotFlags: chain.destroyRobotFlags,
+                destructionDelay: chain.destructionDelay,
+                destructionMessage: chain.destructionMessage,
+                exitInstruction: chain.exitInstruction,
+                destructionVoiceSourceName:
+                    chain.destructionVoiceSourceName,
+                deployedGuidebotObjectType:
+                    chain.deployedGuidebotObjectType,
+                deployedGuidebotMessage: chain.deployedGuidebotMessage,
+                deployedGuidebotVoiceSourceName:
+                    chain.deployedGuidebotVoiceSourceName,
+                combat: chain.combat,
+                guidebot: .init(
+                    collisionRadius: chain.guidebot.collisionRadius,
+                    maximumVelocity: chain.guidebot.maximumVelocity,
+                    maximumDeltaVelocity:
+                        chain.guidebot.maximumDeltaVelocity,
+                    birthForwardVelocity:
+                        chain.guidebot.birthForwardVelocity,
+                    goalForwardDistance: 2,
+                    goalCircleDistance:
+                        chain.guidebot.goalCircleDistance
+                )
+            )
+        )
+        let portalCenter = RoomCamera.trainingRoom3.position
+        for roomSourceIndex in [2, 3] {
+            let roomIndex = try XCTUnwrap(
+                level.rooms.firstIndex {
+                    $0.sourceIndex == roomSourceIndex
+                }
+            )
+            for vertexIndex in 0..<4 {
+                let vertex =
+                    level.rooms[roomIndex].vertices[vertexIndex]
+                level.rooms[roomIndex].vertices[vertexIndex] = .init(
+                    x: portalCenter.x
+                        + (vertexIndex == 0 || vertexIndex == 3 ? 20 : -20),
+                    y: vertex.y,
+                    z: portalCenter.z
+                        + (vertexIndex < 2 ? 20 : -20)
+                )
+            }
+        }
+        let room2Index = try XCTUnwrap(
+            level.rooms.firstIndex { $0.sourceIndex == 2 }
+        )
+        for vertexIndex in 4..<8 {
+            level.rooms[room2Index].vertices[vertexIndex] = .init(
+                x: portalCenter.x
+                    + (vertexIndex == 4 || vertexIndex == 7 ? 20 : -20),
+                y: portalCenter.y + 20,
+                z: portalCenter.z
+                    + (vertexIndex < 6 ? 20 : -20)
+            )
+        }
+        let room3Index = try XCTUnwrap(
+            level.rooms.firstIndex { $0.sourceIndex == 3 }
+        )
+        for vertexIndex in 12..<16 {
+            level.rooms[room3Index].vertices[vertexIndex] = .init(
+                x: portalCenter.x
+                    + (vertexIndex == 12 || vertexIndex == 15 ? 20 : -20),
+                y: portalCenter.y - 20,
+                z: portalCenter.z
+                    + (vertexIndex < 14 ? 20 : -20)
+            )
+        }
+        let gallerySimulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var galleryTimestamp = 0.0
+        for frameIndex in 1...20 {
+            galleryTimestamp = Double(frameIndex) * 0.1
+            let frame = gallerySimulation.update(
+                at: galleryTimestamp,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebota.osf"
+            }) {
+                break
+            }
+        }
+        var reversedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(gallerySimulation.continuation)
+            ) as? [String: Any]
+        )
+        reversedObject["playerOrientation"] = [
+            "right": ["x": -1, "y": 0, "z": 0],
+            "up": ["x": 0, "y": 0, "z": 1],
+            "forward": ["x": 0, "y": 1, "z": 0],
+        ]
+        reversedObject["playerPosition"] = [
+            "x": portalCenter.x,
+            "y": portalCenter.y + 1.5,
+            "z": portalCenter.z,
+        ]
+        reversedObject["velocity"] = ["x": 0, "y": 0, "z": 0]
+        let reversedContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: reversedObject)
+        )
+        let simulation = try PlayerSimulation(
+            level: level,
+            continuation: reversedContinuation,
+            resumedAtTimestamp: 100
+        )
+        let deployed = simulation.update(
+            at: 100.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        XCTAssertNotNil(deployed.trainingGuidebot?.routeFailure)
+        simulation.destroyTrainingRobot(handle: 4_112)
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(simulation.continuation)
+        )
+
+        XCTAssertNoThrow(
+            try PlayerSimulation(
+                level: level,
+                continuation: continuation,
+                resumedAtTimestamp: 200
+            )
+        )
+    }
+
     func testTrainingGalleryTriggerRequiresPlayerCenterPassThrough() {
         let level = makeTrainingGalleryBarrierLevel()
         let barrier = level.trainingGalleryBarrier!
@@ -816,6 +1983,61 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(controller.pitch, -0.5, accuracy: 0.000_001)
         XCTAssertEqual(controller.yaw, 0.25, accuracy: 0.000_001)
         XCTAssertEqual(controller.roll, 1, accuracy: 0.000_001)
+    }
+
+    func testF4RequestsGuidebotDeploymentOnlyDuringGameplay() {
+        XCTAssertTrue(
+            RevivalGameplayView.requestsGuidebotDeployment(
+                keyCode: 118,
+                gameplayIsActive: true
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsGuidebotDeployment(
+                keyCode: 118,
+                gameplayIsActive: false
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsGuidebotDeployment(
+                keyCode: 117,
+                gameplayIsActive: true
+            )
+        )
+        var playerInput = PlayerInputState(rampDuration: 0)
+        playerInput.requestGuidebotDeployment()
+        XCTAssertTrue(
+            playerInput.snapshot(frameDuration: 0.1)
+                .deploysTrainingGuidebot
+        )
+        XCTAssertFalse(
+            playerInput.snapshot(frameDuration: 0.1)
+                .deploysTrainingGuidebot
+        )
+    }
+
+    func testPrimaryFireRequestIsOneShotAndClearsOutsideGameplay() {
+        var playerInput = PlayerInputState(rampDuration: 0)
+        playerInput.requestPrimaryFire()
+        XCTAssertTrue(
+            playerInput.snapshot(frameDuration: 0.1)
+                .firesPrimaryWeapon
+        )
+        XCTAssertFalse(
+            playerInput.snapshot(frameDuration: 0.1)
+                .firesPrimaryWeapon
+        )
+
+        playerInput.setGameplayActive(
+            false,
+            simulation: nil,
+            at: 1
+        )
+        playerInput.requestPrimaryFire()
+        XCTAssertFalse(
+            playerInput.snapshot(frameDuration: 0.1)
+                .firesPrimaryWeapon
+        )
     }
 
     func testPlayerSimulationPreservesPriorFrameTimingAndNestedPauseRebasing() {
@@ -1858,6 +3080,26 @@ final class WorldRenderingTests: XCTestCase {
         )
     }
 
+    func testHiddenObjectPresentationDoesNotOccludeTypedCorona() throws {
+        let camera = RoomCamera(
+            position: .zero,
+            target: .init(x: 0, y: 1, z: 0),
+            up: .init(x: 0, y: 0, z: 1)
+        )
+
+        XCTAssertEqual(
+            try extractWorldForRendering(
+                makeCoronaEvaluationLevel(
+                    objectBlocked: true,
+                    objectPresentationVisible: false
+                ),
+                camera: camera,
+                startRoomSourceIndex: 3
+            ).lightCoronas.count,
+            1
+        )
+    }
+
     func testEvaluatesTypedWaterOnTheSimulationOwnedSixtyHertzVisualTick() throws {
         var base = Data()
         base.reserveCapacity(128 * 128 * 4)
@@ -2039,6 +3281,59 @@ final class WorldRenderingTests: XCTestCase {
             }
         )
         XCTAssertFalse(extraction.modelDrawItems.contains { $0.submodelIndex == 2 })
+        let facing = try XCTUnwrap(
+            extraction.modelDrawItems.first {
+                $0.objectHandle == 6_147 && $0.submodelIndex == 3
+            }
+        )
+        XCTAssertEqual(
+            facing.material,
+            .texture(.init(storedIndex: 50, sourceName: "model-surface"))
+        )
+        XCTAssertEqual(facing.blend, .sourceAlpha(opacity: 255))
+        XCTAssertEqual(facing.triangleIndices, [0, 1, 2, 0, 2, 3])
+        XCTAssertEqual(facing.vertices.map(\.u), [0, 1, 1, 0])
+        XCTAssertEqual(facing.vertices.map(\.v), [0, 0, 1, 1])
+        let expectedFacingPositions = [
+            Vector3(x: 2_063.4604, y: -230.09009, z: 2_204.0276),
+            Vector3(x: 2_065.4604, y: -230.09009, z: 2_204.0276),
+            Vector3(x: 2_065.4604, y: -230.09009, z: 2_202.0276),
+            Vector3(x: 2_063.4604, y: -230.09009, z: 2_202.0276),
+        ]
+        for (actual, expected) in zip(
+            facing.vertices.map(\.position),
+            expectedFacingPositions
+        ) {
+            XCTAssertEqual(actual.x, expected.x, accuracy: 0.000_1)
+            XCTAssertEqual(actual.y, expected.y, accuracy: 0.000_1)
+            XCTAssertEqual(actual.z, expected.z, accuracy: 0.000_1)
+        }
+        XCTAssertTrue(extraction.modelDrawItems.contains {
+            $0.objectHandle == 6_147
+                && $0.submodelIndex == 4
+                && $0.vertices.count == 3
+        })
+        let rotating = try extractWorldForRendering(
+            level,
+            camera: .trainingRoom3,
+            startRoomSourceIndex: 3,
+            presentationGameTime: 0.25
+        )
+        let rotated = try XCTUnwrap(
+            rotating.modelDrawItems.first {
+                $0.objectHandle == 6_147 && $0.submodelIndex == 4
+            }
+        )
+        XCTAssertEqual(
+            rotated.vertices[0].position.x,
+            2_064.0604,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            rotated.vertices[0].position.z,
+            2_208.0276,
+            accuracy: 0.001
+        )
     }
 }
 
@@ -2048,7 +3343,8 @@ private extension Array {
 
 func makeCoronaEvaluationLevel(
     blocked: Bool = false,
-    objectBlocked: Bool = false
+    objectBlocked: Bool = false,
+    objectPresentationVisible: Bool = true
 ) -> Level {
     let base = makeMinimalCanonicalLevel()
     let light = SourceResource(storedIndex: 1, sourceName: "light")
@@ -2229,7 +3525,8 @@ func makeCoronaEvaluationLevel(
                 lowModel: nil,
                 dyingModel: nil,
                 mediumDistance: nil,
-                lowDistance: nil
+                lowDistance: nil,
+                isVisible: objectPresentationVisible
             ),
         ] : [],
         dependencyManifest: .init(current: [], historicalEagerBaseline: nil),
@@ -2312,6 +3609,55 @@ func makeSourceContainmentRoom(
             face([4, 7, 6, 5]),
         ],
         portals: []
+    )
+}
+
+func addingSourceContainmentShell(
+    to room: LevelRoom,
+    center: Vector3,
+    texture: SourceResource,
+    halfExtent: Float
+) -> LevelRoom {
+    let shell = makeSourceContainmentRoom(
+        center: center,
+        texture: texture,
+        sourceIndex: room.sourceIndex,
+        halfExtent: halfExtent
+    )
+    let vertexOffset = room.vertices.count
+    let shellFaces = shell.faces.map { face in
+        LevelFace(
+            corners: face.corners.map {
+                .init(
+                    vertexIndex: $0.vertexIndex + vertexOffset,
+                    u: $0.u,
+                    v: $0.v,
+                    alpha: $0.alpha
+                )
+            },
+            flags: face.flags,
+            portalIndex: nil,
+            texture: face.texture
+        )
+    }
+    return LevelRoom(
+        sourceIndex: room.sourceIndex,
+        name: room.name,
+        pathPoint: room.pathPoint,
+        vertices: room.vertices + shell.vertices,
+        faces: room.faces + shellFaces,
+        portals: room.portals,
+        flags: room.flags,
+        pulseTime: room.pulseTime,
+        pulseOffset: room.pulseOffset,
+        mirrorFaceIndex: room.mirrorFaceIndex,
+        door: room.door,
+        volumeLights: room.volumeLights,
+        fog: room.fog,
+        ambientSoundPattern: room.ambientSoundPattern,
+        reverb: room.reverb,
+        damage: room.damage,
+        damageType: room.damageType
     )
 }
 
@@ -2603,6 +3949,37 @@ func makeSliceSixObjectRenderLevel() -> Level {
                     ],
                     presentation: .custom
                 ),
+                .init(
+                    sourceIndex: 3,
+                    parentIndex: nil,
+                    offset: .init(x: 3, y: 0, z: 0),
+                    vertices: modelVertices,
+                    faces: [
+                        .init(
+                            normal: .init(x: 0, y: -1, z: 0),
+                            corners: modelCorners,
+                            material: .texture(modelTexture)
+                        ),
+                    ],
+                    presentation: .facing
+                ),
+                .init(
+                    sourceIndex: 4,
+                    parentIndex: nil,
+                    offset: .init(x: 3, y: 0, z: 0),
+                    vertices: modelVertices,
+                    faces: [
+                        .init(
+                            normal: .init(x: 0, y: 1, z: 0),
+                            corners: modelCorners,
+                            material: .texture(modelTexture)
+                        ),
+                    ],
+                    presentation: .rotate(
+                        rate: 1,
+                        axis: .init(x: 0, y: 1, z: 0)
+                    )
+                ),
             ],
             bounds: .init(
                 minimum: .init(x: -2, y: 0, z: -0.4),
@@ -2883,6 +4260,321 @@ func makeTrainingGalleryBarrierLevel() -> Level {
             sourceSHA256: String(repeating: "a", count: 64)
         )
     )
+}
+
+func makeTrainingRobotGuidebotLevel() -> Level {
+    var level = makeTrainingGalleryBarrierLevel()
+    let buddySource = SourceResource(
+        storedIndex: 200,
+        sourceName: "Buddybot.oof"
+    )
+    let gyroSource = SourceResource(
+        storedIndex: 201,
+        sourceName: "gyro.OOF"
+    )
+    let modelTemplate = level.models[0]
+    level = replacing(
+        level,
+        models: level.models + [
+            .init(
+                source: buddySource,
+                collisionRadius: 5.659_440_5,
+                submodels: modelTemplate.submodels,
+                bounds: modelTemplate.bounds,
+                sourceArchive: modelTemplate.sourceArchive,
+                sourceSHA256: String(repeating: "d", count: 64)
+            ),
+            .init(
+                source: gyroSource,
+                collisionRadius: 4.576_441_8,
+                submodels: modelTemplate.submodels,
+                bounds: modelTemplate.bounds,
+                sourceArchive: modelTemplate.sourceArchive,
+                sourceSHA256: String(repeating: "e", count: 64)
+            ),
+        ],
+        objectPresentations: level.objectPresentations + [
+            .init(
+                objectHandle: 4_112,
+                primaryModel: gyroSource,
+                mediumModel: nil,
+                lowModel: nil,
+                dyingModel: nil,
+                mediumDistance: nil,
+                lowDistance: nil
+            ),
+        ],
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current + [
+                .init(
+                    category: "model",
+                    source: buddySource,
+                    state: "presentation-payload-imported",
+                    provenance: "synthetic canonical fixture"
+                ),
+                .init(
+                    category: "model",
+                    source: gyroSource,
+                    state: "presentation-payload-imported",
+                    provenance: "synthetic canonical fixture"
+                ),
+            ],
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
+    let template = level.objects.first { $0.handle == 12_301 }!
+    level.objects.append(.init(
+        handle: 4_112,
+        type: 2,
+        storedID: 106,
+        definition: .init(
+            storedIndex: 106,
+            sourceName: "RAS1 Light Security Flyer"
+        ),
+        instanceName: "DestroyBot2",
+        flags: 5_121,
+        doorShields: nil,
+        location: .room(2),
+        position: template.position,
+        orientation: template.orientation,
+        containsType: 0,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    ))
+    level = replacing(
+        level,
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current + [
+                .init(
+                    category: "object-definition",
+                    source: .init(
+                        storedIndex: 106,
+                        sourceName: "RAS1 Light Security Flyer"
+                    ),
+                    state: "identity-recorded",
+                    provenance: "synthetic canonical fixture"
+                ),
+            ],
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
+    return level.addingTrainingRobotGuidebotChain(
+        .init(
+            destroyRobotObjectHandle: 4_112,
+            guidebotObjectHandle: 6_164,
+            destroyRobotRoomSourceIndex: 2,
+            destroyRobotFlags: 5_121,
+            destructionDelay: 2,
+            destructionMessage: "Excellent!",
+            exitInstruction:
+                "Now go through the open doorway, and into the next room.",
+            destructionVoiceSourceName: "proceed5.osf",
+            deployedGuidebotObjectType: 2,
+            deployedGuidebotMessage:
+                "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
+            deployedGuidebotVoiceSourceName: "guidebotb.osf",
+            combat: .stockTraining,
+            guidebot: .stockTraining
+        ),
+        voiceClips: [
+            .init(
+                sourceName: "proceed5.osf",
+                sourceEntryIndex: 1,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: Data(repeating: 0, count: 2),
+                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: String(repeating: "b", count: 64)
+            ),
+            .init(
+                sourceName: "guidebotb.osf",
+                sourceEntryIndex: 2,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: Data(repeating: 0, count: 2),
+                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: String(repeating: "c", count: 64)
+            ),
+        ]
+    )
+}
+
+func makeTrainingGuidebotBlockedMovementLevel() -> Level {
+    var level = makeTrainingRobotGuidebotLevel()
+    let player = level.objects.first { $0.handle == 2_048 }!
+    let chain = level.trainingRobotGuidebotChain!
+    level = replacing(
+        level,
+        trainingRobotGuidebotChain: .init(
+            destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
+            guidebotObjectHandle: chain.guidebotObjectHandle,
+            destroyRobotRoomSourceIndex:
+                chain.destroyRobotRoomSourceIndex,
+            destroyRobotFlags: chain.destroyRobotFlags,
+            destructionDelay: chain.destructionDelay,
+            destructionMessage: chain.destructionMessage,
+            exitInstruction: chain.exitInstruction,
+            destructionVoiceSourceName:
+                chain.destructionVoiceSourceName,
+            deployedGuidebotObjectType:
+                chain.deployedGuidebotObjectType,
+            deployedGuidebotMessage: chain.deployedGuidebotMessage,
+            deployedGuidebotVoiceSourceName:
+                chain.deployedGuidebotVoiceSourceName,
+            combat: chain.combat,
+            guidebot: .init(
+                collisionRadius: chain.guidebot.collisionRadius,
+                maximumVelocity: chain.guidebot.maximumVelocity,
+                maximumDeltaVelocity:
+                    chain.guidebot.maximumDeltaVelocity,
+                birthForwardVelocity:
+                    chain.guidebot.birthForwardVelocity,
+                goalForwardDistance: 40,
+                goalCircleDistance:
+                    chain.guidebot.goalCircleDistance
+            )
+        )
+    )
+    guard case let .room(roomSourceIndex) = player.location else {
+        preconditionFailure("expected indoor player")
+    }
+    let roomIndex = level.rooms.firstIndex {
+        $0.sourceIndex == roomSourceIndex
+    }!
+    func point(forward: Float, right: Float, up: Float = 0) -> Vector3 {
+        Vector3(
+            x: player.position.x
+                + player.orientation.forward.x * forward
+                + player.orientation.right.x * right
+                + player.orientation.up.x * up,
+            y: player.position.y
+                + player.orientation.forward.y * forward
+                + player.orientation.right.y * right
+                + player.orientation.up.y * up,
+            z: player.position.z
+                + player.orientation.forward.z * forward
+                + player.orientation.right.z * right
+                + player.orientation.up.z * up
+        )
+    }
+    var room = addingSourceContainmentShell(
+        to: level.rooms[roomIndex],
+        center: player.position,
+        texture: level.surfacePhysics[0].texture,
+        halfExtent: 100
+    )
+    let firstWallVertex = room.vertices.count
+    let wallVertices = [
+        point(forward: 20, right: -10, up: -20),
+        point(forward: 20, right: 10, up: -20),
+        point(forward: 20, right: 10, up: 20),
+        point(forward: 20, right: -10, up: 20),
+    ]
+    room = .init(
+        sourceIndex: room.sourceIndex,
+        name: room.name,
+        pathPoint: room.pathPoint,
+        vertices: room.vertices + wallVertices,
+        faces: room.faces + [
+            .init(
+                corners: (0..<4).reversed().map {
+                    .init(
+                        vertexIndex: firstWallVertex + $0,
+                        u: 0,
+                        v: 0,
+                        alpha: 255
+                    )
+                },
+                flags: 0,
+                portalIndex: nil,
+                texture: level.surfacePhysics[0].texture
+            ),
+        ],
+        portals: room.portals,
+        flags: room.flags,
+        pulseTime: room.pulseTime,
+        pulseOffset: room.pulseOffset,
+        mirrorFaceIndex: room.mirrorFaceIndex,
+        door: room.door,
+        volumeLights: room.volumeLights,
+        fog: room.fog,
+        ambientSoundPattern: room.ambientSoundPattern,
+        reverb: room.reverb,
+        damage: room.damage,
+        damageType: room.damageType
+    )
+    level.rooms[roomIndex] = room
+
+    let firstRoutePoint = point(forward: 12, right: 25)
+    let secondRoutePoint = point(forward: 30, right: 25)
+    level = replacing(
+        level,
+        indoorNavigation: .init(
+            sourceHighestRoomPlusTerrainRegions:
+                level.rooms.map(\.sourceIndex).max()! + 8,
+            sourceWasVerified: true,
+            rooms: [
+                .init(
+                    sourceIndex: roomSourceIndex,
+                    nodes: [
+                        .init(
+                            position: secondRoutePoint,
+                            edges: [
+                                .init(
+                                    destinationRoomSourceIndex:
+                                        roomSourceIndex,
+                                    destinationNodeIndex: 1,
+                                    flags: 0,
+                                    cost: 18,
+                                    maximumRadius: 6
+                                ),
+                            ]
+                        ),
+                        .init(
+                            position: firstRoutePoint,
+                            edges: [
+                                .init(
+                                    destinationRoomSourceIndex:
+                                        roomSourceIndex,
+                                    destinationNodeIndex: 0,
+                                    flags: 0,
+                                    cost: 18,
+                                    maximumRadius: 6
+                                ),
+                            ]
+                        ),
+                    ]
+                ),
+            ]
+        )
+    )
+    return level
+}
+
+private func guidebotRoutePointIndex(
+    in continuation: PlayerSimulationContinuation
+) throws -> Int {
+    let object = try XCTUnwrap(
+        JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(continuation)
+        ) as? [String: Any]
+    )
+    let state = try XCTUnwrap(
+        object["trainingRobotGuidebotState"] as? [String: Any]
+    )
+    let guidebot = try XCTUnwrap(state["guidebot"] as? [String: Any])
+    return try XCTUnwrap(guidebot["routePointIndex"] as? Int)
 }
 
 private func assertTrainingGalleryBarrier(

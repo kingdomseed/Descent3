@@ -368,10 +368,17 @@ final class EditorProjectTests: XCTestCase {
             at: root,
             withIntermediateDirectories: false
         )
-        try writeCanonicalPackage(
-            makeTrainingGalleryBarrierLevel(),
-            to: candidate
+        let trainingLevel = makeTrainingRobotGuidebotLevel()
+        let unverifiedNavigationLevel = replacing(
+            trainingLevel,
+            indoorNavigation: .init(
+                sourceHighestRoomPlusTerrainRegions:
+                    trainingLevel.rooms.map(\.sourceIndex).max()! + 8,
+                sourceWasVerified: false,
+                rooms: []
+            )
         )
+        try writeCanonicalPackage(unverifiedNavigationLevel, to: candidate)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
@@ -383,6 +390,28 @@ final class EditorProjectTests: XCTestCase {
             document.project.trainingGalleryBarrierSourceDiagnostic,
             "TrainingMission.cpp Script 032 / Portal2"
         )
+        XCTAssertEqual(
+            document.project.trainingRobotGuidebotSourceDiagnostic,
+            "TrainingMission.cpp Scripts 036 + 060 / DestroyBot2 + Guidebot / NODE/BOA route radius 5.5594406, unverified 0 room records"
+        )
+        let editorStatus = editorIdleStatusMessage(
+            project: document.project,
+            selection: document.editorSelection
+        )
+        XCTAssertTrue(
+            editorStatus.contains("TrainingMission.cpp Script 032 / Portal2")
+        )
+        XCTAssertTrue(
+            editorStatus.contains(
+                "TrainingMission.cpp Scripts 036 + 060 / DestroyBot2 + Guidebot"
+            )
+        )
+        XCTAssertTrue(
+            editorStatus.contains(
+                "NODE/BOA route radius 5.5594406"
+            )
+        )
+        XCTAssertTrue(editorStatus.contains("unverified 0 room records"))
         try document.selectRoom(sourceIndex: 2)
         try document.selectPortal(1)
         try document.setSelectedPortalRendersFaces(true)

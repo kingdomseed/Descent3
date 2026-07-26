@@ -309,6 +309,12 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.controllerInputChanged = {
             [weak self] in self?.playerInput.setController($0)
         }
+        metalView.guidebotDeployRequested = {
+            [weak self] in self?.playerInput.requestGuidebotDeployment()
+        }
+        metalView.primaryFireRequested = {
+            [weak self] in self?.playerInput.requestPrimaryFire()
+        }
         window.initialFirstResponder = roomNameField
         roomNameField.target = self
         roomNameField.action = #selector(commitRoomName(_:))
@@ -410,7 +416,10 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             )
         } else {
             setStatus(
-                "Editing \(level.metadata.name) — \(level.rooms.count) complete resident rooms — source room \(selection.room.sourceIndex), face \(selection.face.faceIndex) selected — \(projectDocument.project.semanticDiff.count) authored changes.",
+                editorIdleStatusMessage(
+                    project: projectDocument.project,
+                    selection: selection
+                ),
                 isError: false
             )
         }
@@ -971,6 +980,21 @@ func boundedSemanticChangesText(_ summaries: [String]) -> String {
     guard let first = summaries.first else { return "No authored changes" }
     guard summaries.count > 1 else { return first }
     return "\(first) (+\(summaries.count - 1) more)"
+}
+
+func editorIdleStatusMessage(
+    project: RevivalProject,
+    selection: RevivalEditorSelection
+) -> String {
+    let level = project.level
+    let status =
+        "Editing \(level.metadata.name) — \(level.rooms.count) complete resident rooms — source room \(selection.room.sourceIndex), face \(selection.face.faceIndex) selected — \(project.semanticDiff.count) authored changes."
+    let sourceDiagnostics = [
+        project.trainingGalleryBarrierSourceDiagnostic,
+        project.trainingRobotGuidebotSourceDiagnostic,
+    ].compactMap { $0 }
+    guard !sourceDiagnostics.isEmpty else { return status }
+    return "\(status)\nSource: \(sourceDiagnostics.joined(separator: "; "))"
 }
 
 func indoorMovementDiagnosticMessage(_ trace: IndoorMovementTrace) -> String {

@@ -279,6 +279,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             return
         }
 
+        presentation.updateWorldVertices(frameSlotIndex: slotIndex)
         presentation.updateProceduralTextures(
             frameSlotIndex: slotIndex,
             visualTick: presentation.plan.presentationVisualTick
@@ -341,7 +342,9 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
                 encodingDepthWrite = draw.writesDepth
             }
             argumentTable.setAddress(
-                presentation.vertexBuffer.gpuAddress + UInt64(draw.vertexByteOffset),
+                presentation.worldVertexBuffer(
+                    frameSlotIndex: slotIndex
+                ).gpuAddress + UInt64(draw.vertexByteOffset),
                 index: 0
             )
             argumentTable.setTexture(
@@ -549,7 +552,6 @@ private struct MetalEncodedCoronaDraw {
 private final class MetalLevelPresentation {
     private(set) var plan: MetalWorldPlan
     let residencySet: any MTLResidencySet
-    let vertexBuffer: any MTLBuffer
     let indexBuffer: any MTLBuffer
     private(set) var draws: [MetalEncodedDraw]
     private(set) var coronaDraws: [MetalEncodedCoronaDraw] = []
@@ -557,6 +559,7 @@ private final class MetalLevelPresentation {
     let whiteLightmap: any MTLTexture
 
     private let preparedDraws: [MetalEncodedDraw]
+    private let vertexBuffers: [any MTLBuffer]
     private let materials: [SourceResource: MetalMaterialResources]
     private let lightmaps: [Int: any MTLTexture]
     private let coronaVertexBuffers: [any MTLBuffer]
@@ -591,11 +594,25 @@ private final class MetalLevelPresentation {
                 )
             )
         }
-        guard let vertexBuffer = makeBuffer(device: device, values: packedVertices),
-              let indexBuffer = makeBuffer(device: device, values: packedIndices) else {
+        var vertexBuffers: [any MTLBuffer] = []
+        for _ in 0..<frameSlotCount {
+            guard let buffer = makeBuffer(
+                device: device,
+                values: packedVertices
+            ) else {
+                throw MetalWorldRendererError.allocationFailed(
+                    "world geometry"
+                )
+            }
+            vertexBuffers.append(buffer)
+        }
+        guard let indexBuffer = makeBuffer(
+            device: device,
+            values: packedIndices
+        ) else {
             throw MetalWorldRendererError.allocationFailed("world geometry")
         }
-        self.vertexBuffer = vertexBuffer
+        self.vertexBuffers = vertexBuffers
         self.indexBuffer = indexBuffer
         preparedDraws = encodedDraws
         draws = plan.activeDrawIndices.map { encodedDraws[$0] }
@@ -660,14 +677,16 @@ private final class MetalLevelPresentation {
         )
 
         let descriptor = MTLResidencySetDescriptor()
-        descriptor.initialCapacity = 3
+        descriptor.initialCapacity = 2 + vertexBuffers.count
             + materialResources.values.reduce(0) { $0 + $1.textures.count }
             + lightmapTextures.count
             + coronaVertexBuffers.count
             + coronaTextures.count
             + 1
         residencySet = try device.makeResidencySet(descriptor: descriptor)
-        residencySet.addAllocation(vertexBuffer)
+        for buffer in vertexBuffers {
+            residencySet.addAllocation(buffer)
+        }
         residencySet.addAllocation(indexBuffer)
         residencySet.addAllocation(coronaIndexBuffer)
         for buffer in coronaVertexBuffers {
@@ -690,9 +709,38 @@ private final class MetalLevelPresentation {
     }
 
     func update(_ plan: MetalWorldPlan) {
-        precondition(plan.preparedDraws == self.plan.preparedDraws)
+        precondition(
+            plan.preparedDraws.count == self.plan.preparedDraws.count
+                && zip(plan.preparedDraws, self.plan.preparedDraws)
+                    .allSatisfy {
+                        $0.vertices.count == $1.vertices.count
+                            && $0.indices == $1.indices
+                            && $0.texture == $1.texture
+                            && $0.blend == $1.blend
+                            && $0.lightmapPageIndex
+                                == $1.lightmapPageIndex
+                    }
+        )
         self.plan = plan
         draws = plan.activeDrawIndices.map { preparedDraws[$0] }
+    }
+
+    func updateWorldVertices(frameSlotIndex: Int) {
+        let vertices = plan.preparedDraws.flatMap(\.vertices)
+        let buffer = vertexBuffers[frameSlotIndex]
+        vertices.withUnsafeBytes { bytes in
+            precondition(bytes.count == buffer.length)
+            buffer.contents().copyMemory(
+                from: bytes.baseAddress!,
+                byteCount: bytes.count
+            )
+        }
+    }
+
+    func worldVertexBuffer(
+        frameSlotIndex: Int
+    ) -> any MTLBuffer {
+        vertexBuffers[frameSlotIndex]
     }
 
     func updateProceduralTextures(

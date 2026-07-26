@@ -33,7 +33,7 @@ final class D3ImportOperationTests: XCTestCase {
         XCTAssertEqual(definition.physics.turnrollRatio, 0.13)
     }
 
-    func testReachedOOFPreservesCustomAndRejectsUnreachedPresentationProperties() throws {
+    func testReachedOOFPreservesCustomFacingAndRotationAndRejectsUnreachedPresentationProperties() throws {
         let texture = SourceResource(storedIndex: 0, sourceName: "Synthetic")
         let custom = try parseReachedOutrageModel(
             makeReachedOOFFixture(properties: "$custom"),
@@ -43,7 +43,24 @@ final class D3ImportOperationTests: XCTestCase {
         )
 
         XCTAssertEqual(custom.submodels[1].presentation, .custom)
-        for properties in ["$facing", "$thruster=1, 0.5, 0.25, 2"] {
+        let facing = try parseReachedOutrageModel(
+            makeReachedOOFFixture(properties: "$facing"),
+            sourceName: "Synthetic.OOF",
+            sourceArchive: "d3.hog",
+            textureResources: [texture]
+        )
+        XCTAssertEqual(facing.submodels[1].presentation, .facing)
+        let rotating = try parseReachedOutrageModel(
+            makeReachedOOFFixture(properties: "$rotate=1"),
+            sourceName: "Synthetic.OOF",
+            sourceArchive: "d3.hog",
+            textureResources: [texture]
+        )
+        XCTAssertEqual(
+            rotating.submodels[1].presentation,
+            .rotate(rate: 1, axis: .init(x: 0, y: 1, z: 0))
+        )
+        for properties in ["$thruster=1, 0.5, 0.25, 2"] {
             XCTAssertThrowsError(
                 try parseReachedOutrageModel(
                     makeReachedOOFFixture(properties: properties),
@@ -829,6 +846,23 @@ private func makeReachedOOFFixture(
             faceVertexIndices: Array(vertices.indices)
         )
     )
+    var rotation = Data()
+    for submodelIndex in 0..<2 {
+        rotation.appendInt32(2)
+        rotation.appendInt32(0)
+        rotation.appendInt32(1)
+        rotation.appendInt32(0)
+        rotation.appendVector(.init(x: 1, y: 0, z: 0))
+        rotation.appendInt32(0)
+        rotation.appendInt32(1)
+        rotation.appendVector(
+            submodelIndex == 1
+                ? .init(x: 0, y: 2, z: 0)
+                : .init(x: 1, y: 0, z: 0)
+        )
+        rotation.appendInt32(0)
+    }
+    data.appendChunk("RANI", body: rotation)
     return data
 }
 

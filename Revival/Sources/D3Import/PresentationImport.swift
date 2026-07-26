@@ -899,6 +899,28 @@ func resolveReachedObjectModelPages(
     return .init(ship: ship, generic: generic)
 }
 
+func resolveRetailGenericModelPage(
+    table: Data,
+    overlay: Data,
+    name: String
+) throws -> RetailModelPageSelection {
+    let base = try parseRetailModelPages(table)
+    let overlayPages = try parseRetailModelPages(overlay)
+    var pages = Dictionary(
+        uniqueKeysWithValues: base.map { ($0.name.lowercased(), $0) }
+    )
+    for page in overlayPages {
+        pages[page.name.lowercased()] = page
+    }
+    guard let page = pages[name.lowercased()],
+          page.shipDefinition == nil,
+          page.dyingModelName == nil
+    else {
+        throw RetailTextureTableError.missingName(name)
+    }
+    return page
+}
+
 private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelection] {
     var offset = 0
     var pages: [RetailModelPageSelection] = []
@@ -1128,6 +1150,7 @@ func parseReachedOutrageModel(
     var collisionRadius: Float?
     var textureNames: [String]?
     var submodels: [ModelSubmodel] = []
+    var rotationAxes: [Int: Vector3] = [:]
     while !cursor.isAtEnd {
         let chunkName = try cursor.readASCII(4)
         let byteCount = try cursor.readCount(maximum: cursor.remaining, name: chunkName)
@@ -1157,6 +1180,38 @@ func parseReachedOutrageModel(
                 )
             )
             try chunk.requireEnd(chunkName)
+        case "RANI":
+            guard let declaredSubmodelCount else {
+                throw OutrageModelImportError.missingChunk("OHDR")
+            }
+            for submodelIndex in 0..<declaredSubmodelCount {
+                let keyframeCount = try chunk.readCount(
+                    maximum: 100_000,
+                    name: "rotation keyframes"
+                )
+                _ = try chunk.readInt32()
+                _ = try chunk.readInt32()
+                for keyframeIndex in 0..<keyframeCount {
+                    _ = try chunk.readInt32()
+                    let axis = try chunk.readVector()
+                    _ = try chunk.readInt32()
+                    if keyframeIndex == 1 {
+                        let magnitude = sqrt(
+                            axis.x * axis.x + axis.y * axis.y
+                                + axis.z * axis.z
+                        )
+                        guard magnitude.isFinite, magnitude > 0 else {
+                            throw OutrageModelImportError.invalidChunk("RANI")
+                        }
+                        rotationAxes[submodelIndex] = .init(
+                            x: axis.x / magnitude,
+                            y: axis.y / magnitude,
+                            z: axis.z / magnitude
+                        )
+                    }
+                }
+            }
+            try chunk.requireEnd(chunkName)
         default:
             break
         }
@@ -1173,7 +1228,29 @@ func parseReachedOutrageModel(
           Set(submodels.map(\.sourceIndex)) == Set(0..<declaredSubmodelCount) else {
         throw OutrageModelImportError.invalidCount("model closure")
     }
-    let sortedSubmodels = submodels.sorted { $0.sourceIndex < $1.sourceIndex }
+    let sortedSubmodels = try submodels.sorted {
+        $0.sourceIndex < $1.sourceIndex
+    }.map { submodel in
+        let presentation: ModelSubmodelPresentation
+        if case let .rotate(rate, _) = submodel.presentation {
+            guard let axis = rotationAxes[submodel.sourceIndex] else {
+                throw OutrageModelImportError.missingChunk(
+                    "RANI rotation axis"
+                )
+            }
+            presentation = .rotate(rate: rate, axis: axis)
+        } else {
+            presentation = submodel.presentation
+        }
+        return ModelSubmodel(
+            sourceIndex: submodel.sourceIndex,
+            parentIndex: submodel.parentIndex,
+            offset: submodel.offset,
+            vertices: submodel.vertices,
+            faces: submodel.faces,
+            presentation: presentation
+        )
+    }
     var accumulatedOffsets = [Vector3?](repeating: nil, count: sortedSubmodels.count)
     func resolvedOffset(_ index: Int, visiting: inout Set<Int>) throws -> Vector3 {
         if let resolved = accumulatedOffsets[index] { return resolved }
@@ -1298,8 +1375,14 @@ private func parseReachedSubmodel(
 private func parseSubmodelPresentation(_ properties: String) throws -> ModelSubmodelPresentation {
     let lower = properties.lowercased()
     if lower == "$custom" { return .custom }
-    if lower.hasPrefix("$facing") || lower.hasPrefix("$thruster") {
-        throw OutrageModelImportError.unsupportedPresentation(properties)
+    if lower.hasPrefix("$facing") { return .facing }
+    if lower.hasPrefix("$rotate="),
+       let rate = Float(
+           lower.dropFirst("$rotate=".count)
+               .trimmingCharacters(in: .whitespacesAndNewlines)
+       ),
+       rate.isFinite {
+        return .rotate(rate: rate, axis: .zero)
     }
     if lower.hasPrefix("$glow=") {
         let values = properties.dropFirst("$glow=".count).split(separator: ",").compactMap {

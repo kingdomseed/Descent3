@@ -250,7 +250,10 @@ final class MetalWorldPlanTests: XCTestCase {
             playerView: frame.playerView
         )
 
-        XCTAssertEqual(updated.preparedDraws, initial.preparedDraws)
+        XCTAssertEqual(
+            updated.preparedDraws.map(\.indices),
+            initial.preparedDraws.map(\.indices)
+        )
         XCTAssertNotEqual(updated.camera, initial.camera)
         XCTAssertEqual(
             updated.activeDrawIndices.map { updated.preparedDraws[$0] },
@@ -259,6 +262,84 @@ final class MetalWorldPlanTests: XCTestCase {
         XCTAssertFalse(updated.draws.contains {
             $0.objectHandle == frame.playerView.objectHandle
         })
+    }
+
+    func testUpdatesReachedRotatingSubmodelFromPreUpdateGameTime() throws {
+        let level = makeSliceSixObjectRenderLevel()
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            camera: .trainingRoom3,
+            startRoomSourceIndex: 3
+        )
+        let before = try XCTUnwrap(initial.preparedDraws.first {
+            $0.objectHandle == 6_147 && $0.submodelIndex == 4
+        })
+
+        let updated = try updateMetalWorldPlan(
+            initial,
+            camera: .trainingRoom3,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.016,
+                systemsGameTime: 0.25
+            )
+        )
+        let after = try XCTUnwrap(updated.preparedDraws.first {
+            $0.objectHandle == 6_147 && $0.submodelIndex == 4
+        })
+
+        XCTAssertNotEqual(after.vertices, before.vertices)
+        XCTAssertEqual(
+            after.vertices[0].position.x,
+            2_064.0604,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            after.vertices[0].position.z,
+            2_208.0276,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            updated.activeDrawIndices.map { updated.preparedDraws[$0] },
+            updated.draws
+        )
+    }
+
+    func testF4ActivatesReservedGuidebotDrawInTheRetainedPlan() throws {
+        let level = makeTrainingRobotGuidebotLevel()
+        let playerView = defaultPlayerView(in: level)
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            playerView: playerView
+        )
+        let guidebotHandle: UInt32 = 6_164
+        XCTAssertTrue(initial.preparedDraws.contains {
+            $0.objectHandle == guidebotHandle
+        })
+        XCTAssertFalse(initial.draws.contains {
+            $0.objectHandle == guidebotHandle
+        })
+
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        let updated = try updateMetalWorldPlan(
+            initial,
+            level: simulation.level,
+            playerView: frame.playerView
+        )
+
+        XCTAssertTrue(updated.draws.contains {
+            $0.objectHandle == guidebotHandle
+        })
+        XCTAssertEqual(
+            updated.activeDrawIndices.map { updated.preparedDraws[$0] },
+            updated.draws
+        )
     }
 
     func testDynamicPlanMatchesFreshVisibilityAdmissionBackfaceAndLODSelection() throws {
@@ -284,7 +365,10 @@ final class MetalWorldPlanTests: XCTestCase {
         )
         let fresh = try makeMetalWorldPlan(level: level, playerView: movedView)
 
-        XCTAssertEqual(updated.preparedDraws, initial.preparedDraws)
+        XCTAssertEqual(
+            updated.preparedDraws.map(\.indices),
+            initial.preparedDraws.map(\.indices)
+        )
         XCTAssertNotEqual(updated.visibleRoomSourceIndices, initial.visibleRoomSourceIndices)
         XCTAssertNotEqual(updated.activeDrawIndices, initial.activeDrawIndices)
         XCTAssertEqual(updated.visibleRoomSourceIndices, fresh.visibleRoomSourceIndices)
@@ -309,7 +393,10 @@ final class MetalWorldPlanTests: XCTestCase {
         )
 
         XCTAssertEqual(resized.camera, resizedCamera)
-        XCTAssertEqual(resized.preparedDraws, initial.preparedDraws)
+        XCTAssertEqual(
+            resized.preparedDraws.map(\.indices),
+            initial.preparedDraws.map(\.indices)
+        )
         XCTAssertEqual(
             resized.activeDrawIndices.map { resized.preparedDraws[$0] },
             resized.draws

@@ -461,6 +461,18 @@ struct RevivalProject: Equatable, Sendable {
             "TrainingMission.cpp Script 032 / \($0.triggerName)"
         }
     }
+    var trainingRobotGuidebotSourceDiagnostic: String? {
+        level.trainingRobotGuidebotChain.map { chain in
+            let robotName = level.objects.first {
+                $0.handle == chain.destroyRobotObjectHandle
+            }?.instanceName ?? "DestroyBot2"
+            let navigation = level.indoorNavigation.map {
+                "\($0.sourceWasVerified ? "verified" : "unverified") \($0.rooms.count) room records"
+            } ?? "navigation unavailable"
+            let radius = chain.guidebot.collisionRadius - 0.1
+            return "TrainingMission.cpp Scripts 036 + 060 / \(robotName) + Guidebot / NODE/BOA route radius \(radius), \(navigation)"
+        }
+    }
     var trainingGalleryBarrierIsOpen: Bool {
         guard let barrier = level.trainingGalleryBarrier,
               let room = level.rooms.first(where: {

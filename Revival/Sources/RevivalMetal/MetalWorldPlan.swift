@@ -198,7 +198,9 @@ private func updateMetalWorldPlan(
         level,
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex,
-        excludedObjectHandle: excludedObjectHandle
+        excludedObjectHandle: excludedObjectHandle,
+        presentationGameTime:
+            presentationFrame?.systemsGameTime ?? 0
     )
     let opaqueRoomDraws = extraction.opaqueDrawItems.map(makeMetalWorldDraw)
     let translucentRoomDraws = extraction.translucentDrawItems.map(makeMetalWorldDraw)
@@ -218,6 +220,10 @@ private func updateMetalWorldPlan(
     }
     let objectIndices = objectDraws.map {
         objectIndexByIdentity[MetalModelDrawIdentity($0)]!
+    }
+    var updatedPreparedDraws = prepared.preparedDraws
+    for (index, draw) in zip(objectIndices, objectDraws) {
+        updatedPreparedDraws[index] = draw
     }
     let translucentIndices = translucentRoomDraws.map {
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
@@ -244,9 +250,9 @@ private func updateMetalWorldPlan(
             ?? prepared.lightCoronaDraws,
         presentationVisualTick: presentationFrame?.visualTick
             ?? prepared.presentationVisualTick,
-        preparedDraws: prepared.preparedDraws,
+        preparedDraws: updatedPreparedDraws,
         activeDrawIndices: activeDrawIndices,
-        draws: activeDrawIndices.map { prepared.preparedDraws[$0] }
+        draws: activeDrawIndices.map { updatedPreparedDraws[$0] }
     )
 }
 

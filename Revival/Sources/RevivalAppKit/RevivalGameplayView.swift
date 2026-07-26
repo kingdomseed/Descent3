@@ -21,6 +21,8 @@ enum TrainingOpeningPresentationError: LocalizedError {
 final class RevivalGameplayView: MTKView {
     var heldInputChanged: ((InputSnapshot) -> Void)?
     var controllerInputChanged: ((InputSnapshot) -> Void)?
+    var guidebotDeployRequested: (() -> Void)?
+    var primaryFireRequested: (() -> Void)?
 
     private var heldKeys: Set<UInt16> = []
     private var pendingMouseX: Float = 0
@@ -92,6 +94,13 @@ final class RevivalGameplayView: MTKView {
             releaseMouse()
             return
         }
+        if Self.requestsGuidebotDeployment(
+            keyCode: event.keyCode,
+            gameplayIsActive: gameplayIsActive
+        ) {
+            guidebotDeployRequested?()
+            return
+        }
         guard Self.gameplayKeyCodes.contains(event.keyCode) else {
             super.keyDown(with: event)
             return
@@ -124,6 +133,7 @@ final class RevivalGameplayView: MTKView {
             return
         }
         captureMouse()
+        primaryFireRequested?()
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -163,9 +173,10 @@ final class RevivalGameplayView: MTKView {
             trainingVoicePlayer = nil
             return
         }
-        enabledControlsLabel.stringValue = Self.controlSummary(
-            frame.enabledPlayerControls
-        )
+        enabledControlsLabel.stringValue =
+            frame.showsEnabledPlayerControls
+                ? Self.controlSummary(frame.enabledPlayerControls)
+                : ""
         guard !frame.trainingOpeningFeedback.isEmpty else {
             if let expiry = trainingMessageExpiresAt,
                frame.gameTime >= expiry {
@@ -273,6 +284,13 @@ final class RevivalGameplayView: MTKView {
             roll: direction(positive: 12, negative: 14, in: keyCodes),
             afterburner: afterburner ? 1 : 0
         )
+    }
+
+    nonisolated static func requestsGuidebotDeployment(
+        keyCode: UInt16,
+        gameplayIsActive: Bool
+    ) -> Bool {
+        gameplayIsActive && keyCode == 118
     }
 
     nonisolated static func controllerInput(

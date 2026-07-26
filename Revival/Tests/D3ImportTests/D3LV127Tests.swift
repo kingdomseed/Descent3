@@ -848,7 +848,7 @@ final class D3LV127Tests: XCTestCase {
             dispositions["NLMP"],
             "canonical-metadata"
         )
-        XCTAssertEqual(dispositions["NODE"], "deferred-phase-4-training-navigation-ai-reimport")
+        XCTAssertEqual(dispositions["NODE"], "canonical-indoor-boundary-navigation")
         XCTAssertEqual(dispositions["LIFE"], "evidence-only-future-opportunity-f-001")
         XCTAssertEqual(dispositions["OHND"], "canonical-retired-handle-continuity")
         XCTAssertEqual(dispositions["INFO"], "canonical")
@@ -858,6 +858,80 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertThrowsError(try level.validate()) {
             XCTAssertEqual($0 as? LevelValidationError, .invalidSurfacePhysics)
         }
+    }
+
+    func testDecodesVerifiedIndoorBoundaryNodesWithClampedCosts() throws {
+        var nodes = Data()
+        nodes.appendLittleEndian(Int16(10))
+        for sourceIndex in 0...10 {
+            nodes.append(UInt8(sourceIndex == 2 ? 1 : 0))
+            guard sourceIndex == 2 else { continue }
+            nodes.appendLittleEndian(Int16(2))
+            nodes.appendVector(.init(x: 1, y: 2, z: 3))
+            nodes.appendLittleEndian(Int16(1))
+            nodes.appendLittleEndian(Int16(2))
+            nodes.append(UInt8(1))
+            nodes.appendLittleEndian(Int16(4))
+            nodes.appendLittleEndian(Int16(0))
+            nodes.appendFloat(6)
+            nodes.appendVector(.init(x: 4, y: 5, z: 6))
+            nodes.appendLittleEndian(Int16(1))
+            nodes.appendLittleEndian(Int16(2))
+            nodes.append(UInt8(0))
+            nodes.appendLittleEndian(Int16(4))
+            nodes.appendLittleEndian(Int16(7))
+            nodes.appendFloat(6)
+        }
+        nodes.append(UInt8(1))
+
+        let level = try parseD3LV127(
+            makeSyntheticD3LV127(navigationPayload: nodes),
+            source: syntheticSource
+        )
+
+        XCTAssertEqual(
+            level.indoorNavigation,
+            .init(
+                sourceHighestRoomPlusTerrainRegions: 10,
+                sourceWasVerified: true,
+                rooms: [
+                    .init(
+                        sourceIndex: 2,
+                        nodes: [
+                            .init(
+                                position: .init(x: 1, y: 2, z: 3),
+                                edges: [
+                                    .init(
+                                        destinationRoomSourceIndex: 2,
+                                        destinationNodeIndex: 1,
+                                        flags: 4,
+                                        cost: 1,
+                                        maximumRadius: 6
+                                    ),
+                                ]
+                            ),
+                            .init(
+                                position: .init(x: 4, y: 5, z: 6),
+                                edges: [
+                                    .init(
+                                        destinationRoomSourceIndex: 2,
+                                        destinationNodeIndex: 0,
+                                        flags: 4,
+                                        cost: 7,
+                                        maximumRadius: 6
+                                    ),
+                                ]
+                            ),
+                        ]
+                    ),
+                ]
+            )
+        )
+        XCTAssertEqual(
+            level.sourceChunks.first { $0.name == "NODE" }?.disposition,
+            "canonical-indoor-boundary-navigation"
+        )
+        XCTAssertNoThrow(try level.validateForImportStaging())
     }
 
     func testAcceptsZeroAlignmentPaddingAfterNameTables() throws {
@@ -936,7 +1010,8 @@ private func makeSyntheticD3LV127(
     doorNamesPayload: Data? = nil,
     objectLightmapFaceCount: UInt16? = nil,
     volumeLightWidth: Int32? = nil,
-    gravity: Float = -32.2
+    gravity: Float = -32.2,
+    navigationPayload: Data = Data()
 ) -> Data {
     var level = Data("D3LV".utf8)
     level.appendLittleEndian(Int32(127))
@@ -997,7 +1072,7 @@ private func makeSyntheticD3LV127(
     level.appendChunk("TRIG", payload: emptyCount)
     level.appendChunk("CNBS", payload: Data())
     level.appendChunk("CBOA", payload: Data())
-    level.appendChunk("NODE", payload: Data())
+    level.appendChunk("NODE", payload: navigationPayload)
     level.appendChunk("AABB", payload: Data())
     var movingTextures = Data()
     movingTextures.appendLittleEndian(movingTextureCount)

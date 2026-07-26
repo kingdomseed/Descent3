@@ -273,7 +273,7 @@ final class CanonicalLevelTests: XCTestCase {
         )
     }
 
-    func testSchemaEightRejectsHostileTrainingLessonAndVoiceMutations() throws {
+    func testSchemaNineRejectsHostileTrainingLessonAndVoiceMutations() throws {
         let base = makeSliceSixObjectRenderLevel()
         let archive = "missions/training.mn3"
         let stockSource = replacing(
@@ -365,7 +365,7 @@ final class CanonicalLevelTests: XCTestCase {
             voiceClips: clips
         )
         assertValidationError(
-            .invalidDependency("Training gallery package"),
+            .invalidDependency("Training opening package"),
             level
         )
         var wrongStockHash = clips
@@ -508,6 +508,283 @@ final class CanonicalLevelTests: XCTestCase {
                 )
             )
         )
+    }
+
+    func testSchemaNineRejectsHostileRobotGuidebotStockIdentities() throws {
+        let chain = TrainingRobotGuidebotChain(
+            destroyRobotObjectHandle: 4_112,
+            guidebotObjectHandle: 6_164,
+            destroyRobotRoomSourceIndex: 37,
+            destroyRobotFlags: 5_121,
+            destructionDelay: 2,
+            destructionMessage: "Excellent!",
+            exitInstruction:
+                "Now go through the open doorway, and into the next room.",
+            destructionVoiceSourceName: "proceed5.osf",
+            deployedGuidebotObjectType: 2,
+            deployedGuidebotMessage:
+                "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
+            deployedGuidebotVoiceSourceName: "guidebotb.osf",
+            combat: .stockTraining,
+            guidebot: .stockTraining
+        )
+        func clip(
+            name: String,
+            index: Int,
+            frames: Int,
+            pcmSHA256: String,
+            sourceSHA256: String
+        ) -> CanonicalVoiceClip {
+            CanonicalVoiceClip(
+                sourceName: name,
+                sourceEntryIndex: index,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: frames,
+                pcm16LittleEndian: Data(),
+                pcmSHA256: pcmSHA256,
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: sourceSHA256
+            )
+        }
+        let guidebotB = clip(
+            name: "guidebotb.osf",
+            index: 5,
+            frames: 299_701,
+            pcmSHA256:
+                "11ac67df4f4fe234104ca32b97299539e590a6e6d7a826e85d3c1a10ccc52fe4",
+            sourceSHA256:
+                "0238e793083d875d233d18eaf018aa4526d34cf0c6bed0e659e4725ff8c7ffda"
+        )
+        let proceed5 = clip(
+            name: "proceed5.osf",
+            index: 25,
+            frames: 136_341,
+            pcmSHA256:
+                "3ec85db25577616344f6289a319ad01b8fa6406e49f4452ef39f268ddf830490",
+            sourceSHA256:
+                "4bbb54d28b38ae48d665e16493c67a82c59ec213c23527a100aa67db671c477c"
+        )
+
+        XCTAssertNoThrow(
+            try validateStockTrainingRobotGuidebotPackage(
+                chain: chain,
+                guidebotB: guidebotB,
+                proceed5: proceed5
+            )
+        )
+        let buddyModel = SourceResource(
+            storedIndex: 1,
+            sourceName: "Buddybot.oof"
+        )
+        let destroyRobotModel = SourceResource(
+            storedIndex: 2,
+            sourceName: "gyro.oof"
+        )
+        let destroyRobotPresentation = ObjectPresentationReference(
+            objectHandle: 4_112,
+            primaryModel: destroyRobotModel,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil
+        )
+        let guidebotObject = PlacedObject(
+            handle: chain.guidebotObjectHandle,
+            type: 2,
+            storedID: 0,
+            definition: .init(storedIndex: 0, sourceName: "GuideBot"),
+            instanceName: "GuideBotB",
+            flags: 0x110f,
+            doorShields: nil,
+            location: .room(37),
+            position: .zero,
+            orientation: .init(
+                right: .init(x: 1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: 0),
+                forward: .init(x: 0, y: 0, z: 1)
+            ),
+            containsType: 0,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        )
+        let guidebotPresentation = ObjectPresentationReference(
+            objectHandle: chain.guidebotObjectHandle,
+            primaryModel: buddyModel,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil,
+            isVisible: false
+        )
+        XCTAssertNoThrow(
+            try validateStockTrainingRobotGuidebotPresentation(
+                chain: chain,
+                modelSources: [buddyModel, destroyRobotModel],
+                objects: [guidebotObject],
+                objectPresentations: [
+                    destroyRobotPresentation,
+                    guidebotPresentation,
+                ]
+            )
+        )
+        for (modelSources, objectPresentations) in [
+            (
+                [destroyRobotModel],
+                [destroyRobotPresentation, guidebotPresentation]
+            ),
+            (
+                [buddyModel],
+                [destroyRobotPresentation, guidebotPresentation]
+            ),
+            ([buddyModel, destroyRobotModel], []),
+        ] {
+            XCTAssertThrowsError(
+                try validateStockTrainingRobotGuidebotPresentation(
+                    chain: chain,
+                    modelSources: modelSources,
+                    objects: [guidebotObject],
+                    objectPresentations: objectPresentations
+                )
+            ) {
+                XCTAssertEqual(
+                    $0 as? LevelValidationError,
+                    .invalidDependency(
+                        "Training robot and Guidebot presentation"
+                    )
+                )
+            }
+        }
+
+        let hostileChain = TrainingRobotGuidebotChain(
+            destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
+            guidebotObjectHandle: chain.guidebotObjectHandle,
+            destroyRobotRoomSourceIndex: 38,
+            destroyRobotFlags: chain.destroyRobotFlags,
+            destructionDelay: chain.destructionDelay,
+            destructionMessage: chain.destructionMessage,
+            exitInstruction: chain.exitInstruction,
+            destructionVoiceSourceName: chain.destructionVoiceSourceName,
+            deployedGuidebotObjectType: chain.deployedGuidebotObjectType,
+            deployedGuidebotMessage: chain.deployedGuidebotMessage,
+            deployedGuidebotVoiceSourceName:
+                chain.deployedGuidebotVoiceSourceName,
+            combat: chain.combat,
+            guidebot: chain.guidebot
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingRobotGuidebotPackage(
+                chain: hostileChain,
+                guidebotB: guidebotB,
+                proceed5: proceed5
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training robot and Guidebot package")
+            )
+        }
+
+        let hostileCombatChain = TrainingRobotGuidebotChain(
+            destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
+            guidebotObjectHandle: chain.guidebotObjectHandle,
+            destroyRobotRoomSourceIndex:
+                chain.destroyRobotRoomSourceIndex,
+            destroyRobotFlags: chain.destroyRobotFlags,
+            destructionDelay: chain.destructionDelay,
+            destructionMessage: chain.destructionMessage,
+            exitInstruction: chain.exitInstruction,
+            destructionVoiceSourceName: chain.destructionVoiceSourceName,
+            deployedGuidebotObjectType: chain.deployedGuidebotObjectType,
+            deployedGuidebotMessage: chain.deployedGuidebotMessage,
+            deployedGuidebotVoiceSourceName:
+                chain.deployedGuidebotVoiceSourceName,
+            combat: .init(
+                robotShields: 55,
+                robotCollisionRadius: chain.combat.robotCollisionRadius,
+                batteryEnergyCost: chain.combat.batteryEnergyCost,
+                batteryFireWait: chain.combat.batteryFireWait,
+                gunpoints: chain.combat.gunpoints,
+                projectileSourceName:
+                    chain.combat.projectileSourceName,
+                projectileDamage: 8,
+                projectileRadius: chain.combat.projectileRadius,
+                projectileSpeed: chain.combat.projectileSpeed,
+                projectileLifetime: chain.combat.projectileLifetime
+            ),
+            guidebot: chain.guidebot
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingRobotGuidebotPackage(
+                chain: hostileCombatChain,
+                guidebotB: guidebotB,
+                proceed5: proceed5
+            )
+        )
+
+        let hostileVoicePairs = [
+            (
+                clip(
+                    name: "guidebotb.osf",
+                    index: 6,
+                    frames: 299_701,
+                    pcmSHA256: guidebotB.pcmSHA256,
+                    sourceSHA256: guidebotB.sourceSHA256
+                ),
+                proceed5
+            ),
+            (
+                clip(
+                    name: "guidebotb.osf",
+                    index: 5,
+                    frames: 299_701,
+                    pcmSHA256: String(repeating: "0", count: 64),
+                    sourceSHA256: guidebotB.sourceSHA256
+                ),
+                proceed5
+            ),
+            (
+                guidebotB,
+                clip(
+                    name: "proceed5.osf",
+                    index: 24,
+                    frames: 136_341,
+                    pcmSHA256: proceed5.pcmSHA256,
+                    sourceSHA256: proceed5.sourceSHA256
+                )
+            ),
+            (
+                guidebotB,
+                clip(
+                    name: "proceed5.osf",
+                    index: 25,
+                    frames: 136_341,
+                    pcmSHA256: proceed5.pcmSHA256,
+                    sourceSHA256: String(repeating: "0", count: 64)
+                )
+            ),
+        ]
+        for (hostileGuidebotB, hostileProceed5) in hostileVoicePairs {
+            XCTAssertThrowsError(
+                try validateStockTrainingRobotGuidebotPackage(
+                    chain: chain,
+                    guidebotB: hostileGuidebotB,
+                    proceed5: hostileProceed5
+                )
+            ) {
+                XCTAssertEqual(
+                    $0 as? LevelValidationError,
+                    .invalidDependency("Training robot and Guidebot package")
+                )
+            }
+        }
     }
 
     func testSchemaEightRejectsWrongTrainingGalleryMarkerIdentity() throws {
@@ -2812,6 +3089,7 @@ func replacing(
     goals: [LevelGoal]? = nil,
     triggers: [LevelTrigger]? = nil,
     playerStartFlags: [UInt32]? = nil,
+    indoorNavigation: IndoorNavigationGraph? = nil,
     lightmaps: LightmapCatalog? = nil,
     surfacePhysics: [SurfacePhysicsEntry]? = nil,
     presentationMaterials: [PresentationMaterial]? = nil,
@@ -2822,6 +3100,7 @@ func replacing(
     objectPresentations: [ObjectPresentationReference]? = nil,
     trainingOpeningLesson: TrainingOpeningLesson? = nil,
     trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
+    trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
     sourceChunks: [SourceChunkRecord]? = nil
@@ -2841,6 +3120,7 @@ func replacing(
         goalFlags: level.goalFlags,
         triggers: triggers ?? level.triggers,
         playerStartFlags: playerStartFlags ?? level.playerStartFlags,
+        indoorNavigation: indoorNavigation ?? level.indoorNavigation,
         lightmaps: lightmaps ?? level.lightmaps,
         surfacePhysics: surfacePhysics ?? rooms.map { candidateRooms in
             Set(candidateRooms.flatMap { $0.faces.map(\.texture) }).sorted {
@@ -2860,6 +3140,8 @@ func replacing(
             trainingOpeningLesson ?? level.trainingOpeningLesson,
         trainingGalleryBarrier:
             trainingGalleryBarrier ?? level.trainingGalleryBarrier,
+        trainingRobotGuidebotChain:
+            trainingRobotGuidebotChain ?? level.trainingRobotGuidebotChain,
         voiceClips: voiceClips ?? level.voiceClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
         sourceChunks: sourceChunks ?? level.sourceChunks

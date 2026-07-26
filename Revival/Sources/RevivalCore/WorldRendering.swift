@@ -61,6 +61,8 @@ struct InputSnapshot: Equatable, Sendable {
     let afterburner: Float
     let directLookPitchRadians: Float
     let directLookYawRadians: Float
+    let firesPrimaryWeapon: Bool
+    let deploysTrainingGuidebot: Bool
 
     static let zero = InputSnapshot()
 
@@ -73,7 +75,9 @@ struct InputSnapshot: Equatable, Sendable {
         roll: Float = 0,
         afterburner: Float = 0,
         directLookPitchRadians: Float = 0,
-        directLookYawRadians: Float = 0
+        directLookYawRadians: Float = 0,
+        firesPrimaryWeapon: Bool = false,
+        deploysTrainingGuidebot: Bool = false
     ) {
         precondition(
             directLookPitchRadians.isFinite && directLookYawRadians.isFinite
@@ -87,6 +91,8 @@ struct InputSnapshot: Equatable, Sendable {
         self.afterburner = max(0, min(1, afterburner))
         self.directLookPitchRadians = directLookPitchRadians
         self.directLookYawRadians = directLookYawRadians
+        self.firesPrimaryWeapon = firesPrimaryWeapon
+        self.deploysTrainingGuidebot = deploysTrainingGuidebot
     }
 }
 
@@ -109,6 +115,19 @@ struct PlayerControlMask: OptionSet, Codable, Equatable, Sendable {
     static let secondaryWeapon = Self(rawValue: 1 << 13)
     static let afterburner = Self(rawValue: 1 << 14)
     static let all = Self(rawValue: .max)
+}
+
+func trainingPlayerControlMask(
+    galleryWasTriggered: Bool,
+    controlsWereRestored: Bool,
+    openingControls: PlayerControlMask?
+) -> PlayerControlMask {
+    if galleryWasTriggered {
+        return controlsWereRestored
+            ? .all
+            : PlayerControlMask(rawValue: 0)
+    }
+    return openingControls ?? .all
 }
 
 private extension InputSnapshot {
@@ -140,7 +159,10 @@ private extension InputSnapshot {
             directLookYawRadians:
                 controls.contains(.headingLeft) || controls.contains(.headingRight)
                     ? directLookYawRadians
-                    : 0
+                    : 0,
+            firesPrimaryWeapon:
+                controls.contains(.primaryWeapon) && firesPrimaryWeapon,
+            deploysTrainingGuidebot: deploysTrainingGuidebot
         )
     }
 }
@@ -224,6 +246,8 @@ struct PlayerInputState: Sendable {
     private var controller = InputSnapshot.zero
     private var mouseDeltaX: Float = 0
     private var mouseDeltaY: Float = 0
+    private var guidebotDeploymentIsPending = false
+    private var primaryFireIsPending = false
     private(set) var gameplayIsActive = true
     var mouseLookEnabled = false
 
@@ -246,6 +270,16 @@ struct PlayerInputState: Sendable {
         mouseDeltaY += y
     }
 
+    mutating func requestGuidebotDeployment() {
+        guard gameplayIsActive else { return }
+        guidebotDeploymentIsPending = true
+    }
+
+    mutating func requestPrimaryFire() {
+        guard gameplayIsActive else { return }
+        primaryFireIsPending = true
+    }
+
     mutating func snapshot(frameDuration: Float) -> InputSnapshot {
         let keyboard = ramp.snapshot(
             held: held,
@@ -259,8 +293,12 @@ struct PlayerInputState: Sendable {
         }
         let deltaX = mouseDeltaX
         let deltaY = mouseDeltaY
+        let deploysTrainingGuidebot = guidebotDeploymentIsPending
+        let firesPrimaryWeapon = primaryFireIsPending
         mouseDeltaX = 0
         mouseDeltaY = 0
+        guidebotDeploymentIsPending = false
+        primaryFireIsPending = false
         let mouseNormalizer = 10_000 * max(frameDuration, 0.005)
         let mouseYaw = mouseLookEnabled ? 0 : deltaX / mouseNormalizer
         let mousePitch = mouseLookEnabled ? 0 : -deltaY / mouseNormalizer
@@ -277,7 +315,9 @@ struct PlayerInputState: Sendable {
             roll: keyboard.roll + controller.roll,
             afterburner: max(keyboard.afterburner, controller.afterburner),
             directLookPitchRadians: mouseLookEnabled ? -deltaY * directScale : 0,
-            directLookYawRadians: mouseLookEnabled ? deltaX * directScale : 0
+            directLookYawRadians: mouseLookEnabled ? deltaX * directScale : 0,
+            firesPrimaryWeapon: firesPrimaryWeapon,
+            deploysTrainingGuidebot: deploysTrainingGuidebot
         )
     }
 
@@ -292,6 +332,8 @@ struct PlayerInputState: Sendable {
             controller = .zero
             mouseDeltaX = 0
             mouseDeltaY = 0
+            guidebotDeploymentIsPending = false
+            primaryFireIsPending = false
             _ = ramp.snapshot(
                 held: .zero,
                 frameDuration: simulation?.frameDuration ?? 0,
@@ -385,14 +427,362 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let turnrollFixedAngle: Float
     let wallContact: IndoorWallContact?
     let enabledPlayerControls: PlayerControlMask
+    let showsEnabledPlayerControls: Bool
     let trainingOpeningFeedback: [TrainingOpeningFeedback]
     let trainingGalleryMarkerLightDistance: Float?
+    let trainingGuidebot: TrainingGuidebotFrame?
 }
 
 struct TrainingOpeningFeedback: Equatable, Sendable {
     let hudMessages: [String]
     let voiceSourceName: String
     let voicePrecedesHUDMessages: Bool
+}
+
+enum TrainingGuidebotRouteMode: String, Codable, Equatable, Sendable {
+    case direct
+    case boundaryNodes
+    case roomPortals
+}
+
+struct IndoorNavigationNodeReference:
+    Codable, Equatable, Hashable, Sendable
+{
+    let roomSourceIndex: Int
+    let nodeIndex: Int
+}
+
+struct TrainingGuidebotRoute: Codable, Equatable, Sendable {
+    let mode: TrainingGuidebotRouteMode
+    let points: [Vector3]
+    let roomSourceIndices: [Int]
+    let nodeReferences: [IndoorNavigationNodeReference]
+}
+
+enum TrainingGuidebotSteeringMode:
+    String, Codable, Equatable, Sendable
+{
+    case direct
+    case allocatedRoute
+    case stopped
+}
+
+struct TrainingGuidebotFrame: Equatable, Sendable {
+    let spawnPosition: Vector3
+    let position: Vector3
+    let orientation: Matrix3
+    let spawnVelocity: Vector3
+    let velocity: Vector3
+    let destination: Vector3
+    let route: TrainingGuidebotRoute
+    let routeFailure: TrainingGuidebotRouteError?
+    let activeSteeringMode: TrainingGuidebotSteeringMode
+}
+
+enum TrainingGuidebotRouteError:
+    String, Error, Codable, Equatable, Sendable
+{
+    case noBOAPath
+    case unverifiedBoundaryNodes
+    case noVisibleBoundaryNode
+    case noBoundaryNodePath
+    case noRoomPortalPath
+}
+
+func trainingGuidebotRoute(
+    in level: Level,
+    startRoomSourceIndex: Int,
+    start: Vector3,
+    startForward: Vector3,
+    destinationRoomSourceIndex: Int,
+    destination: Vector3,
+    radius: Float
+) -> Result<TrainingGuidebotRoute, TrainingGuidebotRouteError> {
+    precondition(
+        radius.isFinite && radius >= 0
+            && startForward.x.isFinite
+            && startForward.y.isFinite
+            && startForward.z.isFinite
+    )
+    let boaRooms = trainingGuidebotBOARoomRoute(
+        in: level,
+        start: startRoomSourceIndex,
+        destination: destinationRoomSourceIndex
+    )
+    guard let boaRooms else { return .failure(.noBOAPath) }
+    if trainingGuidebotProbeIsClear(
+        in: level,
+        startRoomSourceIndex: startRoomSourceIndex,
+        start: start,
+        destination: destination,
+        radius: radius
+    ) {
+        return .success(.init(
+            mode: .direct,
+            points: [destination],
+            roomSourceIndices: boaRooms,
+            nodeReferences: []
+        ))
+    }
+
+    guard let graph = level.indoorNavigation,
+          graph.sourceWasVerified else {
+        return .failure(.unverifiedBoundaryNodes)
+    }
+    let navigationByRoom = Dictionary(
+        uniqueKeysWithValues: graph.rooms.map { ($0.sourceIndex, $0) }
+    )
+    guard startRoomSourceIndex == destinationRoomSourceIndex,
+          let startNodes = navigationByRoom[startRoomSourceIndex]?.nodes,
+          let destinationNodes =
+            navigationByRoom[destinationRoomSourceIndex]?.nodes
+    else {
+        return .failure(.noVisibleBoundaryNode)
+    }
+    let probeRadius = min(radius / 4, 20)
+    let visibleStartNodes = startNodes.indices.filter {
+        trainingGuidebotDistance(start, startNodes[$0].position) < 800
+            && trainingGuidebotProbeIsClear(
+                in: level,
+                startRoomSourceIndex: startRoomSourceIndex,
+                start: start,
+                destination: startNodes[$0].position,
+                radius: probeRadius
+            )
+    }
+    let forwardStartNodes = visibleStartNodes.filter {
+        dot(
+            startForward,
+            normalized(startNodes[$0].position - start)
+        ) > 0
+    }
+    let startReference = (forwardStartNodes.last ?? visibleStartNodes.last)
+        .map {
+            IndoorNavigationNodeReference(
+                roomSourceIndex: startRoomSourceIndex,
+                nodeIndex: $0
+            )
+        }
+    let visibleDestinationNodes = destinationNodes.indices
+        .filter {
+            destinationNodes[$0].edges.contains {
+                $0.maximumRadius >= probeRadius
+            }
+                &&
+            trainingGuidebotProbeIsClear(
+                in: level,
+                startRoomSourceIndex: destinationRoomSourceIndex,
+                start: destinationNodes[$0].position,
+                destination: destination,
+                radius: probeRadius
+            )
+        }
+    let destinationReference = (
+        visibleDestinationNodes.min {
+            trainingGuidebotQuickDistance(
+                destinationNodes[$0].position,
+                destination
+            ) < trainingGuidebotQuickDistance(
+                destinationNodes[$1].position,
+                destination
+            )
+        }
+            ?? destinationNodes.indices
+                .filter {
+                    trainingGuidebotQuickDistance(
+                        destinationNodes[$0].position,
+                        destination
+                    ) < 800
+                }
+                .min {
+                    trainingGuidebotQuickDistance(
+                        destinationNodes[$0].position,
+                        destination
+                    ) < trainingGuidebotQuickDistance(
+                        destinationNodes[$1].position,
+                        destination
+                    )
+                }
+    )
+        .map {
+            IndoorNavigationNodeReference(
+                roomSourceIndex: destinationRoomSourceIndex,
+                nodeIndex: $0
+            )
+        }
+    guard let startReference, let destinationReference else {
+        return .failure(.noVisibleBoundaryNode)
+    }
+    guard let references = trainingGuidebotBoundaryNodePath(
+        room: navigationByRoom[startRoomSourceIndex]!,
+        start: startReference,
+        destination: destinationReference
+    ) else {
+        if startRoomSourceIndex == destinationRoomSourceIndex {
+            return .failure(.noBoundaryNodePath)
+        }
+        let roomBySourceIndex = Dictionary(
+            uniqueKeysWithValues: level.rooms.map { ($0.sourceIndex, $0) }
+        )
+        var portalPoints: [Vector3] = []
+        for (roomSourceIndex, nextRoomSourceIndex) in zip(
+            boaRooms,
+            boaRooms.dropFirst()
+        ) {
+            guard let portal = roomBySourceIndex[roomSourceIndex]?
+                .portals.first(where: {
+                    $0.connectedRoom == nextRoomSourceIndex
+                })
+            else {
+                return .failure(.noRoomPortalPath)
+            }
+            portalPoints.append(portal.pathPoint)
+        }
+        return .success(.init(
+            mode: .roomPortals,
+            points: portalPoints + [destination],
+            roomSourceIndices: boaRooms,
+            nodeReferences: []
+        ))
+    }
+    let points = references.map {
+        navigationByRoom[$0.roomSourceIndex]!.nodes[$0.nodeIndex].position
+    } + [destination]
+    var orderedRooms: [Int] = []
+    for reference in references
+    where orderedRooms.last != reference.roomSourceIndex {
+        orderedRooms.append(reference.roomSourceIndex)
+    }
+    return .success(.init(
+        mode: .boundaryNodes,
+        points: points,
+        roomSourceIndices: orderedRooms,
+        nodeReferences: references
+    ))
+}
+
+private func trainingGuidebotBOARoomRoute(
+    in level: Level,
+    start: Int,
+    destination: Int
+) -> [Int]? {
+    guard level.rooms.contains(where: { $0.sourceIndex == start }),
+          level.rooms.contains(where: {
+              $0.sourceIndex == destination
+          }) else {
+        return nil
+    }
+    if start == destination { return [start] }
+    let roomBySourceIndex = Dictionary(
+        uniqueKeysWithValues: level.rooms.map { ($0.sourceIndex, $0) }
+    )
+    var queue = [start]
+    var predecessor: [Int: Int] = [:]
+    var visited: Set<Int> = [start]
+    while !queue.isEmpty {
+        let roomSourceIndex = queue.removeFirst()
+        for portal in roomBySourceIndex[roomSourceIndex]!.portals {
+            let next = portal.connectedRoom
+            guard visited.insert(next).inserted else { continue }
+            predecessor[next] = roomSourceIndex
+            if next == destination {
+                var result = [destination]
+                while result.last != start {
+                    result.append(predecessor[result.last!]!)
+                }
+                return Array(result.reversed())
+            }
+            queue.append(next)
+        }
+    }
+    return nil
+}
+
+private func trainingGuidebotBoundaryNodePath(
+    room: IndoorNavigationRoom,
+    start: IndoorNavigationNodeReference,
+    destination: IndoorNavigationNodeReference
+) -> [IndoorNavigationNodeReference]? {
+    guard start.roomSourceIndex == room.sourceIndex,
+          destination.roomSourceIndex == room.sourceIndex else {
+        return nil
+    }
+    var distances = [start.nodeIndex: 0]
+    var predecessor: [Int: Int] = [:]
+    var pending = [start.nodeIndex]
+    var visited: Set<Int> = []
+    while !pending.isEmpty {
+        let current = pending.indices.min {
+            let lhs = pending[$0]
+            let rhs = pending[$1]
+            let lhsDistance = distances[lhs, default: .max]
+            let rhsDistance = distances[rhs, default: .max]
+            return lhsDistance == rhsDistance
+                ? $0 > $1
+                : lhsDistance < rhsDistance
+        }.map { pending.remove(at: $0) }!
+        guard visited.insert(current).inserted else { continue }
+        if current == destination.nodeIndex {
+            var result = [current]
+            while result.last != start.nodeIndex {
+                result.append(predecessor[result.last!]!)
+            }
+            return result.reversed().map {
+                IndoorNavigationNodeReference(
+                    roomSourceIndex: room.sourceIndex,
+                    nodeIndex: $0
+                )
+            }
+        }
+        for edge in room.nodes[current].edges
+        where edge.destinationRoomSourceIndex == room.sourceIndex
+            && room.nodes.indices.contains(edge.destinationNodeIndex) {
+            let next = edge.destinationNodeIndex
+            let candidate = distances[current]! + edge.cost
+            if candidate <= distances[next, default: .max] {
+                distances[next] = candidate
+                predecessor[next] = current
+                pending.append(next)
+            }
+        }
+    }
+    return nil
+}
+
+private func trainingGuidebotProbeIsClear(
+    in level: Level,
+    startRoomSourceIndex: Int,
+    start: Vector3,
+    destination: Vector3,
+    radius: Float
+) -> Bool {
+    if case .noHit = traceIndoorMovement(
+        in: level,
+        startRoom: startRoomSourceIndex,
+        start: start,
+        end: destination,
+        radius: radius
+    ).outcome {
+        return true
+    }
+    return false
+}
+
+private func trainingGuidebotDistance(
+    _ lhs: Vector3,
+    _ rhs: Vector3
+) -> Float {
+    let delta = lhs - rhs
+    return sqrt(dot(delta, delta))
+}
+
+private func trainingGuidebotQuickDistance(
+    _ lhs: Vector3,
+    _ rhs: Vector3
+) -> Float {
+    abs(lhs.x - rhs.x)
+        + abs(lhs.y - rhs.y)
+        + abs(lhs.z - rhs.z)
 }
 
 private struct TrainingOpeningState: Codable, Equatable, Sendable {
@@ -405,6 +795,59 @@ private struct TrainingOpeningState: Codable, Equatable, Sendable {
 private struct TrainingGalleryBarrierState: Codable, Equatable, Sendable {
     var wasTriggered = false
     var markerLightDistance: Float
+}
+
+private struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
+    var robotWasDestroyed = false
+    var robotShields: Float
+    var nextPrimaryFireTime: Float = 0
+    var projectiles: [TrainingLaserProjectileState] = []
+    var guidebotIsDeployed = false
+    var guidebot: TrainingGuidebotRuntimeState?
+    var guidebotContinuationWasPresented = false
+    var controlsWereRestored = false
+    var enabledControlHUDIsVisible = true
+    var destructionTimerRemaining: Float?
+    var destructionFeedbackWasPresented = false
+}
+
+private struct TrainingGuidebotRuntimeState:
+    Codable, Equatable, Sendable
+{
+    let spawnPosition: Vector3
+    var roomSourceIndex: Int
+    var position: Vector3
+    let orientation: Matrix3
+    let spawnVelocity: Vector3
+    var velocity: Vector3
+    let destination: Vector3
+    let route: TrainingGuidebotRoute
+    let routeFailure: TrainingGuidebotRouteError?
+    var routePointIndex: Int
+    var activeSteeringMode: TrainingGuidebotSteeringMode
+
+    var frame: TrainingGuidebotFrame {
+        .init(
+            spawnPosition: spawnPosition,
+            position: position,
+            orientation: orientation,
+            spawnVelocity: spawnVelocity,
+            velocity: velocity,
+            destination: destination,
+            route: route,
+            routeFailure: routeFailure,
+            activeSteeringMode: activeSteeringMode
+        )
+    }
+}
+
+private struct TrainingLaserProjectileState:
+    Codable, Equatable, Sendable
+{
+    var roomSourceIndex: Int
+    var position: Vector3
+    let velocity: Vector3
+    var lifeRemaining: Float
 }
 
 struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
@@ -429,6 +872,8 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     fileprivate let trainingOpeningState: TrainingOpeningState?
     fileprivate let trainingGalleryBarrierState:
         TrainingGalleryBarrierState?
+    fileprivate let trainingRobotGuidebotState:
+        TrainingRobotGuidebotState?
 }
 
 enum PlayerSimulationContinuationError: Error, Equatable {
@@ -464,6 +909,8 @@ final class PlayerSimulation {
     private var trainingOpeningState: TrainingOpeningState?
     private var trainingGalleryBarrierState:
         TrainingGalleryBarrierState?
+    private var trainingRobotGuidebotState:
+        TrainingRobotGuidebotState?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -487,6 +934,9 @@ final class PlayerSimulation {
                     : $0.openMarkerLightDistance
             )
         }
+        trainingRobotGuidebotState = level.trainingRobotGuidebotChain.map {
+            TrainingRobotGuidebotState(robotShields: $0.combat.robotShields)
+        }
     }
 
     init(
@@ -494,12 +944,24 @@ final class PlayerSimulation {
         continuation: PlayerSimulationContinuation,
         resumedAtTimestamp: Double
     ) throws {
-        guard continuation.schemaVersion == 2 else {
+        guard continuation.schemaVersion == 3 else {
             throw PlayerSimulationContinuationError.unsupportedSchema
         }
         guard continuation.levelKey == level.levelKey,
               continuation.levelSHA256 == level.source.levelSHA256 else {
             throw PlayerSimulationContinuationError.levelIdentityMismatch
+        }
+        var routeAllocationLevel = level
+        if continuation.trainingGalleryBarrierState?.wasTriggered == true {
+            closeTrainingGalleryBarrier(in: &routeAllocationLevel)
+        }
+        var continuationLevel = routeAllocationLevel
+        if continuation.trainingRobotGuidebotState?.robotWasDestroyed == true {
+            let chain = continuationLevel.trainingRobotGuidebotChain!
+            continuationLevel.objects.removeAll {
+                $0.handle == chain.destroyRobotObjectHandle
+            }
+            openTrainingGalleryBarrier(in: &continuationLevel)
         }
         guard resumedAtTimestamp.isFinite,
               continuation.frameDuration.isFinite,
@@ -537,7 +999,14 @@ final class PlayerSimulation {
                 == (continuation.trainingOpeningState == nil),
               validTrainingGalleryBarrierContinuation(
                   continuation.trainingGalleryBarrierState,
-                  level: level
+                  robotGuidebotState:
+                    continuation.trainingRobotGuidebotState,
+                  level: continuationLevel
+              ),
+              validTrainingRobotGuidebotContinuation(
+                  continuation.trainingRobotGuidebotState,
+                  galleryState: continuation.trainingGalleryBarrierState,
+                  level: routeAllocationLevel
               ),
               case .room(let restoredRoomSourceIndex)
                 = continuation.playerLocation,
@@ -551,7 +1020,7 @@ final class PlayerSimulation {
               ) == restoredRoomSourceIndex else {
             throw PlayerSimulationContinuationError.invalidState
         }
-        var restoredLevel = level
+        var restoredLevel = continuationLevel
         let binding = restoredLevel.defaultPlayerBinding!
         let objectIndex = restoredLevel.objects.firstIndex {
             $0.handle == binding.objectHandle
@@ -559,10 +1028,6 @@ final class PlayerSimulation {
         restoredLevel.objects[objectIndex].location = continuation.playerLocation
         restoredLevel.objects[objectIndex].position = continuation.playerPosition
         restoredLevel.objects[objectIndex].orientation = continuation.playerOrientation
-        if continuation.trainingGalleryBarrierState?.wasTriggered == true {
-            closeTrainingGalleryBarrier(in: &restoredLevel)
-        }
-
         self.level = restoredLevel
         frameDuration = continuation.frameDuration
         gameTime = continuation.gameTime
@@ -580,13 +1045,16 @@ final class PlayerSimulation {
         trainingOpeningState = continuation.trainingOpeningState
         trainingGalleryBarrierState =
             continuation.trainingGalleryBarrierState
+        trainingRobotGuidebotState =
+            continuation.trainingRobotGuidebotState
+        restoreTrainingGuidebotPresentation()
     }
 
     var continuation: PlayerSimulationContinuation {
         let binding = level.defaultPlayerBinding!
         let player = level.objects.first { $0.handle == binding.objectHandle }!
         return PlayerSimulationContinuation(
-            schemaVersion: 2,
+            schemaVersion: 3,
             levelKey: level.levelKey,
             levelSHA256: level.source.levelSHA256,
             playerLocation: player.location,
@@ -606,8 +1074,189 @@ final class PlayerSimulation {
             lastThrustTime: lastThrustTime,
             trainingOpeningState: trainingOpeningState,
             trainingGalleryBarrierState:
-                trainingGalleryBarrierState
+                trainingGalleryBarrierState,
+            trainingRobotGuidebotState:
+                trainingRobotGuidebotState
         )
+    }
+
+    private func deployTrainingGuidebot(
+        from player: PlacedObject,
+        playerVelocity: Vector3
+    ) {
+        guard var state = trainingRobotGuidebotState,
+              !state.guidebotIsDeployed,
+              let definition = level.trainingRobotGuidebotChain?.guidebot,
+              case let .room(roomSourceIndex) = player.location
+        else {
+            return
+        }
+        let spawnVelocity = playerVelocity
+            + player.orientation.forward * definition.birthForwardVelocity
+        let destination = player.position
+            + player.orientation.forward * definition.goalForwardDistance
+        let allocated = trainingGuidebotRoute(
+            in: level,
+            startRoomSourceIndex: roomSourceIndex,
+            start: player.position,
+            startForward: player.orientation.forward,
+            destinationRoomSourceIndex: roomSourceIndex,
+            destination: destination,
+            radius: max(0, definition.collisionRadius - 0.1)
+        )
+        let route: TrainingGuidebotRoute
+        let failure: TrainingGuidebotRouteError?
+        switch allocated {
+        case .success(let allocatedRoute):
+            route = allocatedRoute
+            failure = nil
+        case .failure(let error):
+            route = .init(
+                mode: .direct,
+                points: [destination],
+                roomSourceIndices: [roomSourceIndex],
+                nodeReferences: []
+            )
+            failure = error
+        }
+        state.guidebotIsDeployed = true
+        state.guidebot = .init(
+            spawnPosition: player.position,
+            roomSourceIndex: roomSourceIndex,
+            position: player.position,
+            orientation: player.orientation,
+            spawnVelocity: spawnVelocity,
+            velocity: spawnVelocity,
+            destination: destination,
+            route: route,
+            routeFailure: failure,
+            routePointIndex: 0,
+            activeSteeringMode: .direct
+        )
+        trainingRobotGuidebotState = state
+        restoreTrainingGuidebotPresentation()
+    }
+
+    private func restoreTrainingGuidebotPresentation() {
+        guard let guidebot =
+                trainingRobotGuidebotState?.guidebot,
+              let chain = level.trainingRobotGuidebotChain,
+              let objectIndex = level.objects.firstIndex(where: {
+                  $0.handle == chain.guidebotObjectHandle
+              }),
+              let presentationIndex =
+                level.objectPresentations.firstIndex(where: {
+                    $0.objectHandle == chain.guidebotObjectHandle
+                })
+        else {
+            return
+        }
+        level.objects[objectIndex].location =
+            .room(guidebot.roomSourceIndex)
+        level.objects[objectIndex].position = guidebot.position
+        level.objects[objectIndex].orientation = guidebot.orientation
+        let presentation = level.objectPresentations[presentationIndex]
+        level.objectPresentations[presentationIndex] = .init(
+            objectHandle: presentation.objectHandle,
+            primaryModel: presentation.primaryModel,
+            mediumModel: presentation.mediumModel,
+            lowModel: presentation.lowModel,
+            dyingModel: presentation.dyingModel,
+            mediumDistance: presentation.mediumDistance,
+            lowDistance: presentation.lowDistance,
+            isVisible: true
+        )
+    }
+
+    private func advanceTrainingGuidebot(duration: Float) {
+        guard duration > 0,
+              var state = trainingRobotGuidebotState,
+              var guidebot = state.guidebot,
+              let definition = level.trainingRobotGuidebotChain?.guidebot
+        else {
+            return
+        }
+        let followsAllocatedRoute =
+            guidebot.routeFailure == nil && guidebot.route.mode != .direct
+        func passedRoutePoint(at position: Vector3) -> Bool {
+            let index = guidebot.routePointIndex
+            guard followsAllocatedRoute,
+                  index < guidebot.route.points.count - 1 else {
+                return false
+            }
+            let point = guidebot.route.points[index]
+            let pathDirection = index == 0
+                ? guidebot.route.points[index + 1] - point
+                : point - guidebot.route.points[index - 1]
+            return dot(position - point, pathDirection) >= 0
+        }
+        while passedRoutePoint(at: guidebot.position) {
+            guidebot.routePointIndex += 1
+        }
+        let target = followsAllocatedRoute
+            ? guidebot.route.points[guidebot.routePointIndex]
+            : guidebot.destination
+        let remaining = target - guidebot.position
+        let distance = sqrt(dot(remaining, remaining))
+        let reachedGoal =
+            guidebot.routePointIndex == guidebot.route.points.count - 1
+                && distance <= definition.goalCircleDistance
+        let desiredVelocity = reachedGoal
+            ? Vector3.zero
+            : normalized(remaining) * definition.maximumVelocity
+        let velocityDelta = desiredVelocity - guidebot.velocity
+        let deltaMagnitude = sqrt(dot(velocityDelta, velocityDelta))
+        let maximumDelta = definition.maximumDeltaVelocity * duration
+        if deltaMagnitude > maximumDelta, deltaMagnitude > 0 {
+            guidebot.velocity = guidebot.velocity
+                + velocityDelta / deltaMagnitude * maximumDelta
+        } else {
+            guidebot.velocity = desiredVelocity
+        }
+        let trace = traceIndoorMovement(
+            in: level,
+            startRoom: guidebot.roomSourceIndex,
+            start: guidebot.position,
+            end: guidebot.position + guidebot.velocity * duration,
+            radius: definition.collisionRadius
+        )
+        guidebot.position = trace.finalPosition
+        guidebot.roomSourceIndex = trace.containingRoomSourceIndex
+        if case .wallHit = trace.outcome {
+            guidebot.velocity = .zero
+        }
+        while passedRoutePoint(at: guidebot.position) {
+            guidebot.routePointIndex += 1
+        }
+        guidebot.activeSteeringMode = reachedGoal
+            ? .stopped
+            : followsAllocatedRoute ? .allocatedRoute : .direct
+        state.guidebot = guidebot
+        trainingRobotGuidebotState = state
+        restoreTrainingGuidebotPresentation()
+    }
+
+    func destroyTrainingRobot(handle: UInt32) {
+        guard let chain = level.trainingRobotGuidebotChain,
+              handle == chain.destroyRobotObjectHandle,
+              var state = trainingRobotGuidebotState,
+              !state.robotWasDestroyed,
+              level.objects.contains(where: { $0.handle == handle })
+        else {
+            return
+        }
+        level.objects.removeAll { $0.handle == handle }
+        openTrainingGalleryBarrier(in: &level)
+        if var galleryState = trainingGalleryBarrierState {
+            galleryState.markerLightDistance =
+                level.trainingGalleryBarrier!.openMarkerLightDistance
+            trainingGalleryBarrierState = galleryState
+        }
+        state.robotWasDestroyed = true
+        state.robotShields = min(state.robotShields, -0.000_001)
+        state.controlsWereRestored = true
+        state.destructionTimerRemaining = chain.destructionDelay
+        trainingRobotGuidebotState = state
     }
 
     func update(at timestamp: Double, input: InputSnapshot) -> PlayerSimulationFrame {
@@ -621,15 +1270,106 @@ final class PlayerSimulation {
             $0.handle == binding.objectHandle
         }!
         var object = level.objects[objectIndex]
-        let currentEnabledControls =
-            trainingGalleryBarrierState?.wasTriggered == true
-            ? PlayerControlMask(rawValue: 0)
-            : trainingOpeningState?.enabledControls ?? .all
+        let currentEnabledControls = trainingPlayerControlMask(
+            galleryWasTriggered:
+                trainingGalleryBarrierState?.wasTriggered == true,
+            controlsWereRestored:
+                trainingRobotGuidebotState?.controlsWereRestored == true,
+            openingControls: trainingOpeningState?.enabledControls
+        )
         let input = input.applying(currentEnabledControls)
+        if input.deploysTrainingGuidebot {
+            deployTrainingGuidebot(from: object, playerVelocity: velocity)
+        }
         let ship = level.shipDefinitions.first { $0.source == binding.ship }!
         guard case let .room(startRoom) = object.location else {
             preconditionFailure("The Slice 10 player simulation is indoor.")
         }
+        if var state = trainingRobotGuidebotState,
+           let chain = level.trainingRobotGuidebotChain {
+            let combat = chain.combat
+            if input.firesPrimaryWeapon,
+               systemsGameTime >= state.nextPrimaryFireTime,
+               energy >= combat.batteryEnergyCost {
+                for gunpoint in combat.gunpoints {
+                    let position = object.position
+                        + object.orientation.right * gunpoint.x
+                        + object.orientation.up * gunpoint.y
+                        + object.orientation.forward * gunpoint.z
+                    state.projectiles.append(.init(
+                        roomSourceIndex: startRoom,
+                        position: position,
+                        velocity:
+                            object.orientation.forward
+                                * combat.projectileSpeed,
+                        lifeRemaining: combat.projectileLifetime
+                    ))
+                }
+                energy -= combat.batteryEnergyCost
+                state.nextPrimaryFireTime =
+                    systemsGameTime + combat.batteryFireWait
+            }
+
+            let robot = level.objects.first {
+                $0.handle == chain.destroyRobotObjectHandle
+            }
+            var survivingProjectiles: [TrainingLaserProjectileState] = []
+            for var projectile in state.projectiles {
+                let end = projectile.position
+                    + projectile.velocity * systemsFrameDuration
+                let trace = traceIndoorMovement(
+                    in: level,
+                    startRoom: projectile.roomSourceIndex,
+                    start: projectile.position,
+                    end: end,
+                    radius: combat.projectileRadius
+                )
+                let robotHit = robot.flatMap { robot -> Float? in
+                    guard robot.location
+                            == .room(projectile.roomSourceIndex)
+                    else {
+                        return nil
+                    }
+                    return segmentSphereHitFraction(
+                        start: projectile.position,
+                        end: end,
+                        center: robot.position,
+                        radius:
+                            combat.projectileRadius
+                                + combat.robotCollisionRadius
+                    )
+                }
+                let traceFraction = vectorDistance(
+                    projectile.position,
+                    end
+                ) > 0
+                    ? vectorDistance(
+                        projectile.position,
+                        trace.finalPosition
+                    ) / vectorDistance(projectile.position, end)
+                    : 1
+                if let robotHit, robotHit <= traceFraction + 0.000_1 {
+                    state.robotShields -= combat.projectileDamage
+                    continue
+                }
+                guard case .noHit = trace.outcome else { continue }
+                projectile.position = trace.finalPosition
+                projectile.roomSourceIndex =
+                    trace.containingRoomSourceIndex
+                projectile.lifeRemaining -= systemsFrameDuration
+                if projectile.lifeRemaining > 0 {
+                    survivingProjectiles.append(projectile)
+                }
+            }
+            state.projectiles = survivingProjectiles
+            let robotWasKilled =
+                !state.robotWasDestroyed && state.robotShields < 0
+            trainingRobotGuidebotState = state
+            if robotWasKilled {
+                destroyTrainingRobot(handle: chain.destroyRobotObjectHandle)
+            }
+        }
+        advanceTrainingGuidebot(duration: systemsFrameDuration)
         var orientation = object.orientation
         if input.directLookPitchRadians != 0 || input.directLookYawRadians != 0 {
             orientation = sourceMatrixMultiply(
@@ -938,6 +1678,42 @@ final class PlayerSimulation {
             galleryState.wasTriggered = true
             trainingGalleryBarrierState = galleryState
         }
+        if var state = trainingRobotGuidebotState,
+           let chain = level.trainingRobotGuidebotChain {
+            if !state.guidebotContinuationWasPresented,
+               state.guidebotIsDeployed,
+               trainingGalleryBarrierState?.wasTriggered == true {
+                trainingOpeningFeedback.append(.init(
+                    hudMessages: [chain.deployedGuidebotMessage],
+                    voiceSourceName:
+                        chain.deployedGuidebotVoiceSourceName,
+                    voicePrecedesHUDMessages: true
+                ))
+                state.guidebotContinuationWasPresented = true
+                state.controlsWereRestored = true
+            }
+            if var timer = state.destructionTimerRemaining,
+               !state.destructionFeedbackWasPresented {
+                timer -= systemsFrameDuration
+                if timer <= 0.000_001 {
+                    trainingOpeningFeedback.append(.init(
+                        hudMessages: [
+                            chain.destructionMessage,
+                            chain.exitInstruction,
+                        ],
+                        voiceSourceName:
+                            chain.destructionVoiceSourceName,
+                        voicePrecedesHUDMessages: false
+                    ))
+                    state.destructionFeedbackWasPresented = true
+                    state.enabledControlHUDIsVisible = false
+                    state.destructionTimerRemaining = nil
+                } else {
+                    state.destructionTimerRemaining = timer
+                }
+            }
+            trainingRobotGuidebotState = state
+        }
         if var openingState = trainingOpeningState,
            let lesson = level.trainingOpeningLesson {
             if !openingState.forwardGoalWasReached,
@@ -997,13 +1773,21 @@ final class PlayerSimulation {
             angularVelocity: angularVelocity,
             turnrollFixedAngle: turnrollFixedAngle,
             wallContact: wallContact,
-            enabledPlayerControls:
-                trainingGalleryBarrierState?.wasTriggered == true
-                ? PlayerControlMask(rawValue: 0)
-                : trainingOpeningState?.enabledControls ?? .all,
+            enabledPlayerControls: trainingPlayerControlMask(
+                galleryWasTriggered:
+                    trainingGalleryBarrierState?.wasTriggered == true,
+                controlsWereRestored:
+                    trainingRobotGuidebotState?.controlsWereRestored == true,
+                openingControls: trainingOpeningState?.enabledControls
+            ),
+            showsEnabledPlayerControls:
+                trainingRobotGuidebotState?.enabledControlHUDIsVisible
+                    ?? (trainingOpeningState != nil),
             trainingOpeningFeedback: trainingOpeningFeedback,
             trainingGalleryMarkerLightDistance:
-                trainingGalleryBarrierState?.markerLightDistance
+                trainingGalleryBarrierState?.markerLightDistance,
+            trainingGuidebot:
+                trainingRobotGuidebotState?.guidebot?.frame
         )
     }
 
@@ -1045,6 +1829,30 @@ private func trainingGalleryTriggerWasCrossed(
     }
 }
 
+private func segmentSphereHitFraction(
+    start: Vector3,
+    end: Vector3,
+    center: Vector3,
+    radius: Float
+) -> Float? {
+    let movement = end - start
+    let offset = start - center
+    let a = dot(movement, movement)
+    guard a > 0 else {
+        return dot(offset, offset) <= radius * radius ? 0 : nil
+    }
+    let b = 2 * dot(offset, movement)
+    let c = dot(offset, offset) - radius * radius
+    let discriminant = b * b - 4 * a * c
+    guard discriminant >= 0 else { return nil }
+    let root = sqrt(discriminant)
+    let first = (-b - root) / (2 * a)
+    let second = (-b + root) / (2 * a)
+    if (0...1).contains(first) { return first }
+    if (0...1).contains(second) { return second }
+    return nil
+}
+
 private func trainingGalleryBarrierRendersFaces(
     in level: Level,
     barrier: TrainingGalleryBarrier
@@ -1059,6 +1867,7 @@ private func trainingGalleryBarrierRendersFaces(
 
 private func validTrainingGalleryBarrierContinuation(
     _ state: TrainingGalleryBarrierState?,
+    robotGuidebotState: TrainingRobotGuidebotState?,
     level: Level
 ) -> Bool {
     guard let barrier = level.trainingGalleryBarrier else {
@@ -1069,7 +1878,9 @@ private func validTrainingGalleryBarrierContinuation(
         return false
     }
     let expectedDistance =
-        state.wasTriggered
+        robotGuidebotState?.robotWasDestroyed == true
+            ? barrier.openMarkerLightDistance
+            : state.wasTriggered
             || trainingGalleryBarrierRendersFaces(
                 in: level,
                 barrier: barrier
@@ -1077,6 +1888,158 @@ private func validTrainingGalleryBarrierContinuation(
         ? 0
         : barrier.openMarkerLightDistance
     return state.markerLightDistance == expectedDistance
+}
+
+private func validTrainingRobotGuidebotContinuation(
+    _ state: TrainingRobotGuidebotState?,
+    galleryState: TrainingGalleryBarrierState?,
+    level: Level
+) -> Bool {
+    guard let chain = level.trainingRobotGuidebotChain else {
+        return state == nil
+    }
+    let roomSourceIndices = Set(level.rooms.map(\.sourceIndex))
+    guard let state,
+          state.robotShields.isFinite,
+          state.robotShields <= chain.combat.robotShields,
+          state.nextPrimaryFireTime.isFinite,
+          state.nextPrimaryFireTime >= 0,
+          state.projectiles.allSatisfy({
+              roomSourceIndices.contains($0.roomSourceIndex)
+                  && $0.position.x.isFinite
+                  && $0.position.y.isFinite
+                  && $0.position.z.isFinite
+                  && containingIndoorRoomSourceIndex(
+                      in: level,
+                      position: $0.position,
+                      candidates: [$0.roomSourceIndex]
+                  ) == $0.roomSourceIndex
+                  && $0.velocity.x.isFinite
+                  && $0.velocity.y.isFinite
+                  && $0.velocity.z.isFinite
+                  && $0.lifeRemaining.isFinite
+                  && $0.lifeRemaining > 0
+                  && $0.lifeRemaining <= chain.combat.projectileLifetime
+          }),
+          state.guidebotIsDeployed == (state.guidebot != nil),
+          state.guidebot.map({
+              roomSourceIndices.contains($0.roomSourceIndex)
+                  && isCanonicalRigidTransform(
+                      position: $0.spawnPosition,
+                      orientation: $0.orientation
+                  )
+                  && $0.spawnVelocity.x.isFinite
+                  && $0.spawnVelocity.y.isFinite
+                  && $0.spawnVelocity.z.isFinite
+                  && $0.position.x.isFinite
+                  && $0.position.y.isFinite
+                  && $0.position.z.isFinite
+                  && containingIndoorRoomSourceIndex(
+                      in: level,
+                      position: $0.position,
+                      candidates: [$0.roomSourceIndex]
+                  ) == $0.roomSourceIndex
+                  && $0.velocity.x.isFinite
+                  && $0.velocity.y.isFinite
+                  && $0.velocity.z.isFinite
+                  && $0.destination.x.isFinite
+                  && $0.destination.y.isFinite
+                  && $0.destination.z.isFinite
+                  && !$0.route.points.isEmpty
+                  && $0.route.points.allSatisfy {
+                      $0.x.isFinite && $0.y.isFinite && $0.z.isFinite
+                  }
+                  && !$0.route.roomSourceIndices.isEmpty
+                  && $0.route.roomSourceIndices.allSatisfy(
+                      roomSourceIndices.contains
+                  )
+                  && $0.route.points.indices.contains($0.routePointIndex)
+                  && validTrainingGuidebotSteeringState($0)
+                  && validTrainingGuidebotRoute(
+                      guidebot: $0,
+                      level: level,
+                      collisionRadius: chain.guidebot.collisionRadius
+                  )
+          }) ?? true,
+          state.controlsWereRestored
+            == (state.robotWasDestroyed
+                || state.guidebotContinuationWasPresented),
+          state.enabledControlHUDIsVisible
+            != state.destructionFeedbackWasPresented
+    else {
+        return false
+    }
+    if state.guidebotContinuationWasPresented
+        && (!state.guidebotIsDeployed || galleryState?.wasTriggered != true) {
+        return false
+    }
+    if state.robotWasDestroyed {
+        guard state.robotShields < 0,
+              state.destructionFeedbackWasPresented
+                == (state.destructionTimerRemaining == nil)
+        else {
+            return false
+        }
+        if let timer = state.destructionTimerRemaining {
+            return timer.isFinite && timer > 0
+                && timer <= chain.destructionDelay
+        }
+    } else if state.destructionTimerRemaining != nil
+                || state.destructionFeedbackWasPresented
+                || state.robotShields < 0 {
+        return false
+    }
+    return true
+}
+
+private func validTrainingGuidebotSteeringState(
+    _ guidebot: TrainingGuidebotRuntimeState
+) -> Bool {
+    switch guidebot.activeSteeringMode {
+    case .direct:
+        return guidebot.route.mode == .direct
+    case .allocatedRoute:
+        return guidebot.routeFailure == nil
+            && guidebot.route.mode != .direct
+    case .stopped:
+        return guidebot.routePointIndex
+            == guidebot.route.points.count - 1
+    }
+}
+
+private func validTrainingGuidebotRoute(
+    guidebot: TrainingGuidebotRuntimeState,
+    level: Level,
+    collisionRadius: Float
+) -> Bool {
+    guard let startRoomSourceIndex =
+            guidebot.route.roomSourceIndices.first,
+          let destinationRoomSourceIndex =
+            guidebot.route.roomSourceIndices.last
+    else {
+        return false
+    }
+    let expected = trainingGuidebotRoute(
+        in: level,
+        startRoomSourceIndex: startRoomSourceIndex,
+        start: guidebot.spawnPosition,
+        startForward: guidebot.orientation.forward,
+        destinationRoomSourceIndex: destinationRoomSourceIndex,
+        destination: guidebot.destination,
+        radius: max(0, collisionRadius - 0.1)
+    )
+    switch expected {
+    case .success(let route):
+        return guidebot.routeFailure == nil
+            && guidebot.route == route
+    case .failure(let failure):
+        return guidebot.routeFailure == failure
+            && guidebot.route.mode == .direct
+            && guidebot.route.points == [guidebot.destination]
+            && guidebot.route.roomSourceIndices
+                == [startRoomSourceIndex]
+            && guidebot.route.nodeReferences.isEmpty
+    }
 }
 
 private func closeTrainingGalleryBarrier(in level: inout Level) {
@@ -1093,6 +2056,23 @@ private func closeTrainingGalleryBarrier(in level: inout Level) {
         }!
         level.rooms[connectedRoomIndex]
             .portals[portal.connectedPortal].flags |= 1
+    }
+}
+
+private func openTrainingGalleryBarrier(in level: inout Level) {
+    guard let barrier = level.trainingGalleryBarrier else { return }
+    let barrierRoomIndex = level.rooms.firstIndex {
+        $0.sourceIndex == barrier.barrierRoomSourceIndex
+    }!
+    for portalIndex in barrier.orderedPortalIndices {
+        let portal =
+            level.rooms[barrierRoomIndex].portals[portalIndex]
+        level.rooms[barrierRoomIndex].portals[portalIndex].flags &= ~UInt32(1)
+        let connectedRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        level.rooms[connectedRoomIndex]
+            .portals[portal.connectedPortal].flags &= ~UInt32(1)
     }
 }
 
@@ -1761,6 +2741,21 @@ func extractWorldForRendering(
 
 func extractWorldForRendering(
     _ level: Level,
+    camera: RoomCamera,
+    startRoomSourceIndex: Int,
+    presentationGameTime: Float
+) throws -> WorldRenderExtraction {
+    try extractWorldForRendering(
+        level,
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        excludedObjectHandle: nil,
+        presentationGameTime: presentationGameTime
+    )
+}
+
+func extractWorldForRendering(
+    _ level: Level,
     playerView: PlayerView
 ) throws -> WorldRenderExtraction {
     try extractWorldForRendering(
@@ -1853,7 +2848,8 @@ func extractWorldForRendering(
     _ level: Level,
     camera: RoomCamera,
     startRoomSourceIndex: Int,
-    excludedObjectHandle: UInt32?
+    excludedObjectHandle: UInt32?,
+    presentationGameTime: Float = 0
 ) throws -> WorldRenderExtraction {
     let visibility = try extractSourceVisibleWorld(
         level,
@@ -1919,7 +2915,8 @@ func extractWorldForRendering(
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex,
         visibility: visibility,
-        excludedObjectHandle: excludedObjectHandle
+        excludedObjectHandle: excludedObjectHandle,
+        presentationGameTime: presentationGameTime
     )
     return WorldRenderExtraction(
         visibleRoomSourceIndices: visibility.visibleRoomSourceIndices,
@@ -1937,7 +2934,8 @@ private func extractObjectPresentation(
     camera: RoomCamera,
     startRoomSourceIndex: Int,
     visibility: SourceVisibleWorld,
-    excludedObjectHandle: UInt32?
+    excludedObjectHandle: UInt32?,
+    presentationGameTime: Float
 ) -> (handles: [UInt32], drawItems: [ModelDrawItem]) {
     guard !level.objectPresentations.isEmpty else { return ([], []) }
     let presentationByHandle = Dictionary(
@@ -1989,7 +2987,8 @@ private func extractObjectPresentation(
                 object: $0.object,
                 model: $0.model,
                 materialByTexture: materialByTexture,
-                camera: camera
+                camera: camera,
+                presentationGameTime: presentationGameTime
             )
         }
     )
@@ -2092,25 +3091,191 @@ private func sourceLODModel(
     return presentation.primaryModel
 }
 
+private struct ModelSubmodelTransform {
+    let origin: Vector3
+    let orientation: Matrix3
+}
+
+private func modelSubmodelTransforms(
+    _ model: CanonicalModel,
+    presentationGameTime: Float
+) -> [ModelSubmodelTransform] {
+    precondition(
+        presentationGameTime.isFinite && presentationGameTime >= 0
+    )
+    let identity = Matrix3(
+        right: .init(x: 1, y: 0, z: 0),
+        up: .init(x: 0, y: 1, z: 0),
+        forward: .init(x: 0, y: 0, z: 1)
+    )
+    var resolved = [ModelSubmodelTransform?](
+        repeating: nil,
+        count: model.submodels.count
+    )
+    func resolve(_ index: Int) -> ModelSubmodelTransform {
+        if let result = resolved[index] { return result }
+        let submodel = model.submodels[index]
+        let parent = submodel.parentIndex.map(resolve)
+            ?? .init(origin: .zero, orientation: identity)
+        let localOrientation: Matrix3
+        if case let .rotate(rate, axis) = submodel.presentation {
+            let turns = presentationGameTime / rate
+            let angle = (turns - floor(turns)) * 2 * Float.pi
+            localOrientation = .init(
+                right: rotate(
+                    .init(x: 1, y: 0, z: 0),
+                    around: axis,
+                    angle: angle
+                ),
+                up: rotate(
+                    .init(x: 0, y: 1, z: 0),
+                    around: axis,
+                    angle: angle
+                ),
+                forward: rotate(
+                    .init(x: 0, y: 0, z: 1),
+                    around: axis,
+                    angle: angle
+                )
+            )
+        } else {
+            localOrientation = identity
+        }
+        let orientation = Matrix3(
+            right: transform(
+                localOrientation.right,
+                by: parent.orientation
+            ),
+            up: transform(
+                localOrientation.up,
+                by: parent.orientation
+            ),
+            forward: transform(
+                localOrientation.forward,
+                by: parent.orientation
+            )
+        )
+        let result = ModelSubmodelTransform(
+            origin: parent.origin
+                + transform(submodel.offset, by: parent.orientation),
+            orientation: orientation
+        )
+        resolved[index] = result
+        return result
+    }
+    return model.submodels.indices.map(resolve)
+}
+
+private func rotate(
+    _ value: Vector3,
+    around axis: Vector3,
+    angle: Float
+) -> Vector3 {
+    let cosine = cos(angle)
+    let sine = sin(angle)
+    return value * cosine
+        + cross(axis, value) * sine
+        + axis * (dot(axis, value) * (1 - cosine))
+}
+
 private func makeModelDrawItems(
     object: PlacedObject,
     model: CanonicalModel,
     materialByTexture: [SourceResource: PresentationMaterial],
     camera: RoomCamera,
+    presentationGameTime: Float = 0,
     cullBackfaces: Bool = true
 ) -> [ModelDrawItem] {
     guard case let .room(roomSourceIndex) = object.location else {
         preconditionFailure("model presentation is indoor in the Slice 6 island")
     }
-    let offsets = accumulatedModelOffsets(model)
+    let transforms = modelSubmodelTransforms(
+        model,
+        presentationGameTime: presentationGameTime
+    )
+    let view = CameraView(camera)
     var opaque: [ModelDrawItem] = []
     var alpha: [ModelDrawItem] = []
     for submodel in model.submodels.sorted(by: { $0.sourceIndex < $1.sourceIndex }) {
-        guard submodel.presentation == .standard else { continue }
-        let offset = offsets[submodel.sourceIndex]
+        if submodel.presentation == .facing {
+            guard let face = submodel.faces.first,
+                  case let .texture(texture) = face.material,
+                  let material = materialByTexture[texture]
+            else {
+                preconditionFailure("validated facing presentation must resolve")
+            }
+            let localPoints = face.corners.map {
+                submodel.vertices[$0.vertexIndex].position
+            }
+            let area = (1..<(localPoints.count - 1)).reduce(Float.zero) {
+                $0 + sqrt(dot(
+                    cross(
+                        localPoints[$1] - localPoints[0],
+                        localPoints[$1 + 1] - localPoints[0]
+                    ),
+                    cross(
+                        localPoints[$1] - localPoints[0],
+                        localPoints[$1 + 1] - localPoints[0]
+                    )
+                )) / 2
+            }
+            let halfWidth = sqrt(area) / 2
+            let halfHeight = halfWidth
+                * Float(material.image.height)
+                / Float(material.image.width)
+            let center = object.position
+                + transform(
+                    transforms[submodel.sourceIndex].origin,
+                    by: object.orientation
+                )
+            let vertices = [
+                (center - view.right * halfWidth + view.up * halfHeight, 0, 0),
+                (center + view.right * halfWidth + view.up * halfHeight, 1, 0),
+                (center + view.right * halfWidth - view.up * halfHeight, 1, 1),
+                (center - view.right * halfWidth - view.up * halfHeight, 0, 1),
+            ].map {
+                WorldRenderVertex(
+                    position: $0.0,
+                    u: Float($0.1),
+                    v: Float($0.2),
+                    lightmapU: 0,
+                    lightmapV: 0,
+                    alpha: 1
+                )
+            }
+            let item = ModelDrawItem(
+                objectHandle: object.handle,
+                roomSourceIndex: roomSourceIndex,
+                model: model.source,
+                submodelIndex: submodel.sourceIndex,
+                faceIndex: 0,
+                material: face.material,
+                blend: material.blend,
+                vertices: vertices,
+                triangleIndices: [0, 1, 2, 0, 2, 3]
+            )
+            switch material.blend {
+            case .opaque: opaque.append(item)
+            case .sourceAlpha, .additiveSourceAlpha: alpha.append(item)
+            }
+            continue
+        }
+        switch submodel.presentation {
+        case .standard, .rotate:
+            break
+        case .custom, .facing, .glow:
+            continue
+        }
+        let submodelTransform = transforms[submodel.sourceIndex]
         for (faceIndex, face) in submodel.faces.enumerated() {
-            let transformedNormal = transform(face.normal, by: object.orientation)
-            let firstLocal = offset + submodel.vertices[face.corners[0].vertexIndex].position
+            let transformedNormal = transform(
+                transform(face.normal, by: submodelTransform.orientation),
+                by: object.orientation
+            )
+            let firstLocal = submodelTransform.origin + transform(
+                submodel.vertices[face.corners[0].vertexIndex].position,
+                by: submodelTransform.orientation
+            )
             let firstWorld = object.position + transform(firstLocal, by: object.orientation)
             guard !cullBackfaces
                     || dot(camera.position - firstWorld, transformedNormal) >= 0 else {
@@ -2118,7 +3283,11 @@ private func makeModelDrawItems(
             }
             let vertices = face.corners.map { corner in
                 let source = submodel.vertices[corner.vertexIndex]
-                let local = offset + source.position
+                let local = submodelTransform.origin
+                    + transform(
+                        source.position,
+                        by: submodelTransform.orientation
+                    )
                 return WorldRenderVertex(
                     position: object.position + transform(local, by: object.orientation),
                     u: corner.u,
@@ -2298,6 +3467,7 @@ private func sourceCoronaRayIsOccluded(
               case let .room(roomSourceIndex) = object.location,
               visibleRooms.contains(roomSourceIndex),
               let presentation = presentationByHandle[object.handle],
+              presentation.isVisible,
               let model = modelBySource[presentation.primaryModel] else {
             continue
         }

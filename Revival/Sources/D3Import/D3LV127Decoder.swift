@@ -69,6 +69,10 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
         doorNames: doorNames,
         lightmapCount: lightmaps.infos.count
     )
+    let indoorNavigation = try parseIndoorNavigation(
+        payloads["NODE"]!,
+        rooms: rooms
+    )
     let terrain = try parseTerrain(payloads["TERR"]!, textureNames: textureNames)
     let objects = try parseObjects(
         payloads["OBJS"]!,
@@ -119,6 +123,7 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
         goalFlags: goalFlags,
         triggers: triggers,
         playerStartFlags: playerStarts,
+        indoorNavigation: indoorNavigation,
         lightmaps: lightmaps,
         surfacePhysics: [],
         dependencyManifest: manifest,
@@ -126,6 +131,67 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
     )
     try level.validateForImportStaging()
     return level
+}
+
+private func parseIndoorNavigation(
+    _ data: Data,
+    rooms: [LevelRoom]
+) throws -> IndoorNavigationGraph? {
+    guard !data.isEmpty else { return nil }
+    var cursor = LegacyCursor(data: data, section: "NODE")
+    let sourceHighestRoomPlusTerrainRegions = Int(try cursor.readInt16())
+    guard let highestRoomSourceIndex = rooms.map(\.sourceIndex).max(),
+          sourceHighestRoomPlusTerrainRegions
+            == highestRoomSourceIndex + 8
+    else {
+        throw D3LV127DecodeError.invalidReference("NODE room range")
+    }
+    var navigationRooms: [IndoorNavigationRoom] = []
+    for sourceIndex in 0...sourceHighestRoomPlusTerrainRegions {
+        guard try cursor.readUInt8() != 0 else { continue }
+        let nodeCount = Int(try cursor.readInt16())
+        try cursor.requireCount(
+            nodeCount,
+            maximum: 127,
+            minimumBytes: 14
+        )
+        var nodes: [IndoorNavigationNode] = []
+        nodes.reserveCapacity(nodeCount)
+        for _ in 0..<nodeCount {
+            let position = try cursor.readVector()
+            let edgeCount = Int(try cursor.readInt16())
+            try cursor.requireCount(
+                edgeCount,
+                maximum: 127,
+                minimumBytes: 11
+            )
+            var edges: [IndoorNavigationEdge] = []
+            edges.reserveCapacity(edgeCount)
+            for _ in 0..<edgeCount {
+                edges.append(.init(
+                    destinationRoomSourceIndex:
+                        Int(try cursor.readInt16()),
+                    destinationNodeIndex: Int(try cursor.readUInt8()),
+                    flags: Int(try cursor.readInt16()),
+                    cost: max(1, Int(try cursor.readInt16())),
+                    maximumRadius: try cursor.readFloat()
+                ))
+            }
+            nodes.append(.init(position: position, edges: edges))
+        }
+        navigationRooms.append(.init(
+            sourceIndex: sourceIndex,
+            nodes: nodes
+        ))
+    }
+    let sourceWasVerified = try cursor.readUInt8() != 0
+    try cursor.requireEnd(allowZeroPadding: true)
+    return IndoorNavigationGraph(
+        sourceHighestRoomPlusTerrainRegions:
+            sourceHighestRoomPlusTerrainRegions,
+        sourceWasVerified: sourceWasVerified,
+        rooms: navigationRooms
+    )
 }
 
 private struct LegacyCursor {
@@ -1117,7 +1183,7 @@ private func chunkDisposition(
     case "CNBS", "CBOA", "AABB":
         return "derived-cache-excluded"
     case "NODE":
-        return "deferred-phase-4-training-navigation-ai-reimport"
+        return "canonical-indoor-boundary-navigation"
     case "OHND":
         return "canonical-retired-handle-continuity"
     case "LIFE":

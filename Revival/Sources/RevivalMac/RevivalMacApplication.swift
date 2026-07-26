@@ -317,6 +317,12 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.controllerInputChanged = {
                 [weak self] in self?.playerInput.setController($0)
             }
+            gameplayView.guidebotDeployRequested = {
+                [weak self] in self?.playerInput.requestGuidebotDeployment()
+            }
+            gameplayView.primaryFireRequested = {
+                [weak self] in self?.playerInput.requestPrimaryFire()
+            }
             window.makeFirstResponder(gameplayView)
             self.gameplayView = gameplayView
         }

@@ -227,6 +227,30 @@ struct LevelPortal: Codable, Equatable, Sendable {
     }
 }
 
+struct IndoorNavigationEdge: Codable, Equatable, Sendable {
+    let destinationRoomSourceIndex: Int
+    let destinationNodeIndex: Int
+    let flags: Int
+    let cost: Int
+    let maximumRadius: Float
+}
+
+struct IndoorNavigationNode: Codable, Equatable, Sendable {
+    let position: Vector3
+    let edges: [IndoorNavigationEdge]
+}
+
+struct IndoorNavigationRoom: Codable, Equatable, Sendable {
+    let sourceIndex: Int
+    let nodes: [IndoorNavigationNode]
+}
+
+struct IndoorNavigationGraph: Codable, Equatable, Sendable {
+    let sourceHighestRoomPlusTerrainRegions: Int
+    let sourceWasVerified: Bool
+    let rooms: [IndoorNavigationRoom]
+}
+
 struct RoomDoor: Codable, Equatable, Sendable {
     let flags: UInt8
     let keysNeeded: UInt8
@@ -462,6 +486,81 @@ struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
     let voiceSourceName: String
 }
 
+struct TrainingRobotGuidebotChain: Codable, Equatable, Sendable {
+    let destroyRobotObjectHandle: UInt32
+    let guidebotObjectHandle: UInt32
+    let destroyRobotRoomSourceIndex: Int
+    let destroyRobotFlags: UInt32
+    let destructionDelay: Float
+    let destructionMessage: String
+    let exitInstruction: String
+    let destructionVoiceSourceName: String
+    let deployedGuidebotObjectType: UInt8
+    let deployedGuidebotMessage: String
+    let deployedGuidebotVoiceSourceName: String
+    let combat: TrainingRobotCombatDefinition
+    let guidebot: TrainingGuidebotDefinition
+}
+
+struct TrainingRobotCombatDefinition: Codable, Equatable, Sendable {
+    let robotShields: Float
+    let robotCollisionRadius: Float
+    let batteryEnergyCost: Float
+    let batteryFireWait: Float
+    let gunpoints: [Vector3]
+    let projectileSourceName: String
+    let projectileDamage: Float
+    let projectileRadius: Float
+    let projectileSpeed: Float
+    let projectileLifetime: Float
+}
+
+struct TrainingGuidebotDefinition: Codable, Equatable, Sendable {
+    let collisionRadius: Float
+    let maximumVelocity: Float
+    let maximumDeltaVelocity: Float
+    let birthForwardVelocity: Float
+    let goalForwardDistance: Float
+    let goalCircleDistance: Float
+}
+
+extension TrainingRobotCombatDefinition {
+    static let stockTraining = Self(
+        robotShields: 55,
+        robotCollisionRadius: 4.576_441_8,
+        batteryEnergyCost: 0.15,
+        batteryFireWait: 0.25,
+        gunpoints: [
+            .init(
+                x: 2.792_412_5,
+                y: -1.186_958_9,
+                z: 2.687_090_9
+            ),
+            .init(
+                x: -2.804_046_4,
+                y: -1.186_885,
+                z: 2.687_135_2
+            ),
+        ],
+        projectileSourceName: "Laser Level 2 - Blue",
+        projectileDamage: 7.5,
+        projectileRadius: 1.25,
+        projectileSpeed: 225,
+        projectileLifetime: 5
+    )
+}
+
+extension TrainingGuidebotDefinition {
+    static let stockTraining = Self(
+        collisionRadius: 5.659_440_5,
+        maximumVelocity: 60,
+        maximumDeltaVelocity: 199.999_98,
+        birthForwardVelocity: 40,
+        goalForwardDistance: 200,
+        goalCircleDistance: 1
+    )
+}
+
 struct CanonicalVoiceClip: Codable, Equatable, Sendable {
     let sourceName: String
     let sourceEntryIndex: Int
@@ -472,6 +571,99 @@ struct CanonicalVoiceClip: Codable, Equatable, Sendable {
     let pcmSHA256: String
     let sourceArchive: String
     let sourceSHA256: String
+}
+
+func validateStockTrainingRobotGuidebotPackage(
+    chain: TrainingRobotGuidebotChain?,
+    guidebotB: CanonicalVoiceClip?,
+    proceed5: CanonicalVoiceClip?
+) throws {
+    guard let chain,
+          chain.destroyRobotObjectHandle == 4_112,
+          chain.guidebotObjectHandle == 6_164,
+          chain.destroyRobotRoomSourceIndex == 37,
+          chain.destroyRobotFlags == 5_121,
+          chain.destructionDelay == 2,
+          chain.destructionMessage == "Excellent!",
+          chain.exitInstruction
+            == "Now go through the open doorway, and into the next room.",
+          chain.destructionVoiceSourceName == "proceed5.osf",
+          chain.deployedGuidebotObjectType == 2,
+          chain.deployedGuidebotMessage
+            == "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
+          chain.deployedGuidebotVoiceSourceName == "guidebotb.osf",
+          chain.combat == .stockTraining,
+          chain.guidebot == .stockTraining,
+          guidebotB?.sourceName.caseInsensitiveCompare("guidebotb.osf")
+            == .orderedSame,
+          guidebotB?.sourceEntryIndex == 5,
+          guidebotB?.sampleRate == 22_050,
+          guidebotB?.channelCount == 1,
+          guidebotB?.frameCount == 299_701,
+          guidebotB?.pcmSHA256
+            == "11ac67df4f4fe234104ca32b97299539e590a6e6d7a826e85d3c1a10ccc52fe4",
+          guidebotB?.sourceArchive == "missions/training.mn3",
+          guidebotB?.sourceSHA256
+            == "0238e793083d875d233d18eaf018aa4526d34cf0c6bed0e659e4725ff8c7ffda",
+          proceed5?.sourceName.caseInsensitiveCompare("proceed5.osf")
+            == .orderedSame,
+          proceed5?.sourceEntryIndex == 25,
+          proceed5?.sampleRate == 22_050,
+          proceed5?.channelCount == 1,
+          proceed5?.frameCount == 136_341,
+          proceed5?.pcmSHA256
+            == "3ec85db25577616344f6289a319ad01b8fa6406e49f4452ef39f268ddf830490",
+          proceed5?.sourceArchive == "missions/training.mn3",
+          proceed5?.sourceSHA256
+            == "4bbb54d28b38ae48d665e16493c67a82c59ec213c23527a100aa67db671c477c"
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training robot and Guidebot package"
+        )
+    }
+}
+
+func validateStockTrainingRobotGuidebotPresentation(
+    chain: TrainingRobotGuidebotChain,
+    modelSources: [SourceResource],
+    objects: [PlacedObject],
+    objectPresentations: [ObjectPresentationReference]
+) throws {
+    let buddybotModels = modelSources.filter {
+        $0.sourceName.caseInsensitiveCompare("Buddybot.oof") == .orderedSame
+    }
+    let gyroModels = modelSources.filter {
+        $0.sourceName.caseInsensitiveCompare("gyro.oof") == .orderedSame
+    }
+    guard buddybotModels.count == 1,
+          gyroModels.count == 1,
+          objects.contains(where: {
+              $0.handle == chain.guidebotObjectHandle
+                  && $0.type == 2
+                  && $0.storedID == 0
+                  && $0.definition?.sourceName == "GuideBot"
+                  && $0.instanceName == "GuideBotB"
+                  && $0.flags == 0x110f
+          }),
+          objectPresentations.contains(where: {
+              $0.objectHandle == chain.guidebotObjectHandle
+                  && $0.primaryModel == buddybotModels[0]
+                  && !$0.isVisible
+          }),
+          objectPresentations.contains(where: {
+              $0.objectHandle == 4_112
+                  && $0.primaryModel == gyroModels[0]
+                  && $0.mediumModel == nil
+                  && $0.lowModel == nil
+                  && $0.dyingModel == nil
+                  && $0.mediumDistance == nil
+                  && $0.lowDistance == nil
+                  && $0.isVisible
+          }) else {
+        throw LevelValidationError.invalidDependency(
+            "Training robot and Guidebot presentation"
+        )
+    }
 }
 
 struct LightmapPageMetadata: Codable, Equatable, Sendable {
@@ -633,6 +825,8 @@ struct ModelFace: Codable, Equatable, Sendable {
 enum ModelSubmodelPresentation: Codable, Equatable, Sendable {
     case standard
     case custom
+    case facing
+    case rotate(rate: Float, axis: Vector3)
     case glow(color: Vector3, size: Float)
 }
 
@@ -763,6 +957,7 @@ struct Level: Codable, Equatable, Sendable {
     let goalFlags: UInt32
     let triggers: [LevelTrigger]
     let playerStartFlags: [UInt32]
+    let indoorNavigation: IndoorNavigationGraph?
     let lightmaps: LightmapCatalog
     let surfacePhysics: [SurfacePhysicsEntry]
     let presentationMaterials: [PresentationMaterial]
@@ -770,15 +965,16 @@ struct Level: Codable, Equatable, Sendable {
     let models: [CanonicalModel]
     let shipDefinitions: [CanonicalShipDefinition]
     let defaultPlayerBinding: DefaultPlayerBinding?
-    let objectPresentations: [ObjectPresentationReference]
+    var objectPresentations: [ObjectPresentationReference]
     var trainingOpeningLesson: TrainingOpeningLesson?
     let trainingGalleryBarrier: TrainingGalleryBarrier?
+    let trainingRobotGuidebotChain: TrainingRobotGuidebotChain?
     let voiceClips: [CanonicalVoiceClip]
     let dependencyManifest: DependencyManifest
     let sourceChunks: [SourceChunkRecord]
 
     init(
-        schemaVersion: Int = 8,
+        schemaVersion: Int = 9,
         missionKey: String,
         levelKey: String,
         source: LevelSource,
@@ -792,6 +988,7 @@ struct Level: Codable, Equatable, Sendable {
         goalFlags: UInt32 = 0,
         triggers: [LevelTrigger],
         playerStartFlags: [UInt32],
+        indoorNavigation: IndoorNavigationGraph? = nil,
         lightmaps: LightmapCatalog,
         surfacePhysics: [SurfacePhysicsEntry]? = nil,
         presentationMaterials: [PresentationMaterial] = [],
@@ -802,6 +999,7 @@ struct Level: Codable, Equatable, Sendable {
         objectPresentations: [ObjectPresentationReference] = [],
         trainingOpeningLesson: TrainingOpeningLesson? = nil,
         trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
+        trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
         voiceClips: [CanonicalVoiceClip] = [],
         dependencyManifest: DependencyManifest,
         sourceChunks: [SourceChunkRecord]
@@ -820,6 +1018,7 @@ struct Level: Codable, Equatable, Sendable {
         self.goalFlags = goalFlags
         self.triggers = triggers
         self.playerStartFlags = playerStartFlags
+        self.indoorNavigation = indoorNavigation
         self.lightmaps = lightmaps
         self.surfacePhysics = surfacePhysics ?? Self.defaultSurfacePhysics(for: rooms)
         self.presentationMaterials = presentationMaterials
@@ -830,6 +1029,7 @@ struct Level: Codable, Equatable, Sendable {
         self.objectPresentations = objectPresentations
         self.trainingOpeningLesson = trainingOpeningLesson
         self.trainingGalleryBarrier = trainingGalleryBarrier
+        self.trainingRobotGuidebotChain = trainingRobotGuidebotChain
         self.voiceClips = voiceClips
         self.dependencyManifest = dependencyManifest
         self.sourceChunks = sourceChunks
@@ -844,7 +1044,7 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     private func validate(allowImportStagingPresentation: Bool) throws {
-        guard schemaVersion == 8, source.d3lvVersion == 127,
+        guard schemaVersion == 9, source.d3lvVersion == 127,
               !missionKey.isEmpty, !levelKey.isEmpty else {
             throw LevelValidationError.invalidIdentity
         }
@@ -860,7 +1060,11 @@ struct Level: Codable, Equatable, Sendable {
             objectPresentations: objectPresentations,
             materials: presentationMaterials,
             objects: objects,
-            source: source
+            source: source,
+            dynamicallyPresentedModelNames:
+                trainingRobotGuidebotChain == nil
+                    ? []
+                    : ["Buddybot.oof"]
         )
         guard rooms.count <= 400,
               rooms.allSatisfy({ (0..<400).contains($0.sourceIndex) }) else {
@@ -888,6 +1092,7 @@ struct Level: Codable, Equatable, Sendable {
             throw LevelValidationError.invalidCount("player start flags")
         }
         let roomMap = Dictionary(uniqueKeysWithValues: rooms.map { ($0.sourceIndex, $0) })
+        try validateIndoorNavigation(indoorNavigation, rooms: roomMap)
 
         for room in rooms {
             guard room.vertices.count <= 10_000, room.faces.count <= 3_000 else {
@@ -1231,6 +1436,43 @@ struct Level: Codable, Equatable, Sendable {
                 )
             }
         }
+        if let chain = trainingRobotGuidebotChain {
+            let clipNames = Set(voiceClips.map {
+                $0.sourceName.lowercased()
+            })
+            guard trainingGalleryBarrier != nil,
+                  chain.destructionDelay.isFinite,
+                  chain.destructionDelay > 0,
+                  isNonempty(chain.destructionMessage),
+                  isNonempty(chain.exitInstruction),
+                  isNonempty(chain.destructionVoiceSourceName),
+                  isNonempty(chain.deployedGuidebotMessage),
+                  isNonempty(chain.deployedGuidebotVoiceSourceName),
+                  chain.deployedGuidebotObjectType == 2,
+                  chain.combat == .stockTraining,
+                  chain.guidebot == .stockTraining,
+                  let robot = objects.first(where: {
+                      $0.handle == chain.destroyRobotObjectHandle
+                  }),
+                  robot.type == 2,
+                  robot.storedID == 106,
+                  robot.definition?.sourceName
+                    == "RAS1 Light Security Flyer",
+                  robot.instanceName == "DestroyBot2",
+                  robot.location
+                    == .room(chain.destroyRobotRoomSourceIndex),
+                  robot.flags == chain.destroyRobotFlags,
+                  clipNames.contains(
+                    chain.destructionVoiceSourceName.lowercased()
+                  ),
+                  clipNames.contains(
+                    chain.deployedGuidebotVoiceSourceName.lowercased()
+                  ) else {
+                throw LevelValidationError.invalidDependency(
+                    "Training robot Guidebot chain"
+                )
+            }
+        }
         var voiceNames = Set<String>()
         for clip in voiceClips {
             let voiceSource = SourceResource(
@@ -1282,6 +1524,14 @@ struct Level: Codable, Equatable, Sendable {
                 $0.sourceName.caseInsensitiveCompare("guidebota.osf")
                     == .orderedSame
             }
+            let guidebotB = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("guidebotb.osf")
+                    == .orderedSame
+            }
+            let proceed5 = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("proceed5.osf")
+                    == .orderedSame
+            }
             guard let lesson = trainingOpeningLesson,
                   missionKey == "descent3.mission.pilot-training",
                   levelKey == "descent3.level.training-mission",
@@ -1322,7 +1572,7 @@ struct Level: Codable, Equatable, Sendable {
                   barrier.guidebotInstruction
                     == "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
                   barrier.voiceSourceName == "guidebota.osf",
-                  voiceClips.count == 3,
+                  voiceClips.count == 5,
                   guidebotA?.sourceEntryIndex == 4,
                   guidebotA?.sampleRate == 22_050,
                   guidebotA?.channelCount == 1,
@@ -1337,6 +1587,17 @@ struct Level: Codable, Equatable, Sendable {
                     "Training gallery package"
                 )
             }
+            try validateStockTrainingRobotGuidebotPackage(
+                chain: trainingRobotGuidebotChain,
+                guidebotB: guidebotB,
+                proceed5: proceed5
+            )
+            try validateStockTrainingRobotGuidebotPresentation(
+                chain: trainingRobotGuidebotChain!,
+                modelSources: models.map(\.source),
+                objects: objects,
+                objectPresentations: objectPresentations
+            )
         }
         var retiredSlots = Set<Int>()
         for handle in retiredObjectHandles {
@@ -1501,6 +1762,7 @@ struct Level: Codable, Equatable, Sendable {
             goalFlags: goalFlags,
             triggers: triggers,
             playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
             lightmaps: retainedLightmaps,
             surfacePhysics: surfacePhysics,
             presentationMaterials: materials,
@@ -1511,6 +1773,7 @@ struct Level: Codable, Equatable, Sendable {
             objectPresentations: objectPresentations,
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
@@ -1584,6 +1847,7 @@ struct Level: Codable, Equatable, Sendable {
             goalFlags: goalFlags,
             triggers: triggers,
             playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
             lightmaps: lightmaps,
             surfacePhysics: surfacePhysics,
             presentationMaterials: combinedMaterials,
@@ -1594,6 +1858,7 @@ struct Level: Codable, Equatable, Sendable {
             objectPresentations: newObjectPresentations,
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
@@ -1624,6 +1889,7 @@ struct Level: Codable, Equatable, Sendable {
             goalFlags: goalFlags,
             triggers: triggers,
             playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
             lightmaps: lightmaps,
             surfacePhysics: entries,
             presentationMaterials: presentationMaterials,
@@ -1634,6 +1900,7 @@ struct Level: Codable, Equatable, Sendable {
             objectPresentations: objectPresentations,
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
@@ -1673,6 +1940,7 @@ struct Level: Codable, Equatable, Sendable {
             goalFlags: goalFlags,
             triggers: triggers,
             playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
             lightmaps: lightmaps,
             surfacePhysics: surfacePhysics,
             presentationMaterials: presentationMaterials,
@@ -1683,6 +1951,7 @@ struct Level: Codable, Equatable, Sendable {
             objectPresentations: objectPresentations,
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
@@ -1740,6 +2009,7 @@ struct Level: Codable, Equatable, Sendable {
             goalFlags: goalFlags,
             triggers: triggers,
             playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
             lightmaps: lightmaps,
             surfacePhysics: surfacePhysics,
             presentationMaterials: presentationMaterials,
@@ -1750,6 +2020,7 @@ struct Level: Codable, Equatable, Sendable {
             objectPresentations: lessonPresentations,
             trainingOpeningLesson: lesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
@@ -1788,6 +2059,7 @@ struct Level: Codable, Equatable, Sendable {
             goalFlags: goalFlags,
             triggers: triggers,
             playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
             lightmaps: lightmaps,
             surfacePhysics: surfacePhysics,
             presentationMaterials: presentationMaterials,
@@ -1798,9 +2070,116 @@ struct Level: Codable, Equatable, Sendable {
             objectPresentations: objectPresentations,
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: barrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips + [voiceClip],
             dependencyManifest: .init(
                 current: dependencyManifest.current + [dependency],
+                historicalEagerBaseline:
+                    dependencyManifest.historicalEagerBaseline
+            ),
+            sourceChunks: sourceChunks
+        )
+    }
+
+    func addingTrainingRobotGuidebotChain(
+        _ chain: TrainingRobotGuidebotChain,
+        voiceClips addedVoiceClips: [CanonicalVoiceClip]
+    ) -> Level {
+        var dependencies = addedVoiceClips.map { clip in
+            DependencyRecord(
+                category: "voice",
+                source: .init(
+                    storedIndex: clip.sourceEntryIndex,
+                    sourceName: clip.sourceName
+                ),
+                state: "canonical-pcm-imported",
+                provenance:
+                    "\(clip.sourceArchive) \(clip.sourceSHA256)"
+            )
+        }
+        if !dependencyManifest.current.contains(where: {
+            $0.category.caseInsensitiveCompare("object-definition")
+                == .orderedSame
+                && $0.source.sourceName.caseInsensitiveCompare("GuideBot")
+                    == .orderedSame
+        }) {
+            dependencies.append(.init(
+                category: "object-definition",
+                source: .init(storedIndex: 0, sourceName: "GuideBot"),
+                state: "canonical-reserved-object",
+                provenance: "scripts/AIGame.cpp:4668-4728"
+            ))
+        }
+        let player = objects.first {
+            $0.handle == defaultPlayerBinding?.objectHandle
+        }!
+        let guidebotModel = models.first {
+            $0.source.sourceName.caseInsensitiveCompare("Buddybot.oof")
+                == .orderedSame
+        }!
+        let guidebotObject = PlacedObject(
+            handle: chain.guidebotObjectHandle,
+            type: 2,
+            storedID: 0,
+            definition: .init(storedIndex: 0, sourceName: "GuideBot"),
+            instanceName: "GuideBotB",
+            flags: 0x110f,
+            doorShields: nil,
+            location: player.location,
+            position: player.position,
+            orientation: player.orientation,
+            containsType: 0,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        )
+        let guidebotPresentation = ObjectPresentationReference(
+            objectHandle: chain.guidebotObjectHandle,
+            primaryModel: guidebotModel.source,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil,
+            isVisible: false
+        )
+        return Level(
+            schemaVersion: schemaVersion,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects + [guidebotObject],
+            retiredObjectHandles: retiredObjectHandles.filter {
+                $0 != chain.guidebotObjectHandle
+            },
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
+            lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
+            objectPresentations:
+                objectPresentations + [guidebotPresentation],
+            trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: chain,
+            voiceClips: voiceClips + addedVoiceClips,
+            dependencyManifest: .init(
+                current: dependencyManifest.current + dependencies,
                 historicalEagerBaseline:
                     dependencyManifest.historicalEagerBaseline
             ),
@@ -2433,6 +2812,83 @@ private func normalized(_ vector: Vector3) -> Vector3? {
     return scaled(vector, 1 / magnitude)
 }
 
+private func validateIndoorNavigation(
+    _ graph: IndoorNavigationGraph?,
+    rooms: [Int: LevelRoom]
+) throws {
+    guard let graph else { return }
+    guard let highestRoomSourceIndex = rooms.keys.max(),
+          graph.sourceHighestRoomPlusTerrainRegions
+            == highestRoomSourceIndex + 8,
+          Set(graph.rooms.map(\.sourceIndex)).count == graph.rooms.count
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Indoor navigation graph"
+        )
+    }
+    let navigationByRoom = Dictionary(
+        uniqueKeysWithValues: graph.rooms.map { ($0.sourceIndex, $0) }
+    )
+    for navigationRoom in graph.rooms {
+        if navigationRoom.sourceIndex > highestRoomSourceIndex {
+            guard navigationRoom.nodes.isEmpty else {
+                throw LevelValidationError.invalidDependency(
+                    "Indoor navigation graph"
+                )
+            }
+            continue
+        }
+        guard let room = rooms[navigationRoom.sourceIndex],
+              room.flags & 0x0000_0004 == 0,
+              navigationRoom.nodes.count <= 127
+        else {
+            throw LevelValidationError.invalidDependency(
+                "Indoor navigation graph"
+            )
+        }
+        for (nodeIndex, node) in navigationRoom.nodes.enumerated() {
+            guard isFinite(node.position), node.edges.count <= 127 else {
+                throw LevelValidationError.invalidDependency(
+                    "Indoor navigation graph"
+                )
+            }
+            for edge in node.edges {
+                guard edge.cost >= 1,
+                      edge.maximumRadius.isFinite,
+                      edge.maximumRadius >= 0,
+                      let destinationRoom =
+                        navigationByRoom[
+                            edge.destinationRoomSourceIndex
+                        ],
+                      destinationRoom.nodes.indices.contains(
+                          edge.destinationNodeIndex
+                      ),
+                      destinationRoom.nodes[
+                          edge.destinationNodeIndex
+                      ].edges.contains(where: {
+                          $0.destinationRoomSourceIndex
+                                == navigationRoom.sourceIndex
+                              && $0.destinationNodeIndex == nodeIndex
+                      })
+                else {
+                    throw LevelValidationError.invalidDependency(
+                        "Indoor navigation graph"
+                    )
+                }
+            }
+        }
+        for portal in room.portals where portal.boundaryNodeIndex >= 0 {
+            guard navigationRoom.nodes.indices.contains(
+                portal.boundaryNodeIndex
+            ) else {
+                throw LevelValidationError.invalidDependency(
+                    "Indoor navigation graph"
+                )
+            }
+        }
+    }
+}
+
 enum LevelValidationError: Error, Equatable {
     case invalidIdentity
     case duplicateRoom
@@ -2709,7 +3165,8 @@ private func validateModels(
     objectPresentations: [ObjectPresentationReference],
     materials: [PresentationMaterial],
     objects: [PlacedObject],
-    source: LevelSource
+    source: LevelSource,
+    dynamicallyPresentedModelNames: [String]
 ) throws {
     let acceptedSourcePaths = Set(source.profileFiles.map(\.relativePath))
     guard models.count <= 256,
@@ -2808,7 +3265,15 @@ private func validateModels(
                 guard isFinite(color), size.isFinite, size > 0 else {
                     throw LevelValidationError.invalidModel("\(model.source.sourceName): presentation")
                 }
-            case .standard, .custom:
+            case .rotate(let rate, let axis):
+                let magnitudeSquared = dot(axis, axis)
+                guard rate.isFinite,
+                      rate > 0,
+                      magnitudeSquared.isFinite,
+                      abs(magnitudeSquared - 1) <= 0.000_1 else {
+                    throw LevelValidationError.invalidModel("\(model.source.sourceName): presentation")
+                }
+            case .standard, .custom, .facing:
                 break
             }
         }
@@ -2852,6 +3317,14 @@ private func validateModels(
                   low > (presentation.mediumDistance ?? 0) else {
                 throw LevelValidationError.invalidObjectPresentation(presentation.objectHandle)
             }
+        }
+    }
+    for name in dynamicallyPresentedModelNames {
+        if let source = models.first(where: {
+            $0.source.sourceName.caseInsensitiveCompare(name)
+                == .orderedSame
+        })?.source {
+            referencedModels.insert(source)
         }
     }
     guard referencedModels == Set(models.map(\.source)) else {
