@@ -579,7 +579,7 @@ func runD3Import(
                 return nil
             }
             page = generic
-        } else if object.handle == 4_112,
+        } else if object.handle == 4_112 || object.handle == 2_074,
                   object.definition?.sourceName.caseInsensitiveCompare(
                       destroyRobotPage.name
                   ) == .orderedSame {
@@ -602,13 +602,13 @@ func runD3Import(
             lowDistance: page.lowDistance
         )
     }
-    precondition(reachedObjectPresentations.count == 9)
+    precondition(reachedObjectPresentations.count == 10)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 30)
+    precondition(deferredRoomObjects.count == 29)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -793,6 +793,10 @@ func runD3Import(
     let killbotEntryTrigger = robotGuidebotLevel.triggers.first {
         $0.name.caseInsensitiveCompare("Portal3") == .orderedSame
     }!
+    let rasBot1 = robotGuidebotLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("RASBot1")
+            == .orderedSame
+    }!
     let cameraMonitorModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare(
             cameraMonitorPage.primaryModelName
@@ -959,7 +963,23 @@ func runD3Import(
             && killbotEntryTrigger.flags == 8
             && killbotEntryTrigger.activator == 1
     )
-    let level = cameraMonitorLevel
+    precondition(
+        rasBot1.handle == 2_074
+            && rasBot1.type == 2
+            && rasBot1.storedID == 106
+            && rasBot1.definition?.sourceName
+                == "RAS1 Light Security Flyer"
+            && rasBot1.flags == 5_121
+            && rasBot1.location == .room(11)
+    )
+    let level = cameraMonitorLevel.addingTrainingRASBot1DeathChain(
+        .init(
+            robotObjectHandle: rasBot1.handle,
+            robotRoomSourceIndex: 11,
+            robotFlags: rasBot1.flags,
+            combat: .stockTraining
+        )
+    )
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
     precondition(

@@ -1242,6 +1242,32 @@ final class CanonicalLevelTests: XCTestCase {
         }
     }
 
+    func testSchemaElevenRequiresExactRASBot1DeathProducer() throws {
+        let level = makeTrainingRASBot1DeathLevel()
+        try level.validate()
+        XCTAssertEqual(level.schemaVersion, 11)
+
+        let chain = try XCTUnwrap(level.trainingRASBot1DeathChain)
+        XCTAssertEqual(chain.robotObjectHandle, 2_074)
+        XCTAssertEqual(chain.robotRoomSourceIndex, 2)
+        XCTAssertEqual(chain.robotFlags, 5_121)
+        XCTAssertEqual(chain.combat, .stockTraining)
+
+        let wrongHandle = TrainingRASBot1DeathChain(
+            robotObjectHandle: 2_075,
+            robotRoomSourceIndex: chain.robotRoomSourceIndex,
+            robotFlags: chain.robotFlags,
+            combat: chain.combat
+        )
+        assertValidationError(
+            .invalidDependency("Training RASBot1 death chain"),
+            replacing(
+                level,
+                trainingRASBot1DeathChain: wrongHandle
+            )
+        )
+    }
+
     func testSchemaEightRejectsWrongTrainingGalleryMarkerIdentity() throws {
         let level = makeTrainingGalleryBarrierLevel()
         try level.validate()
@@ -3647,6 +3673,7 @@ func replacing(
     trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
     trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
     trainingCameraMonitorChain: TrainingCameraMonitorChain? = nil,
+    trainingRASBot1DeathChain: TrainingRASBot1DeathChain? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
     soundClips: [CanonicalSoundClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
@@ -3691,6 +3718,8 @@ func replacing(
             trainingRobotGuidebotChain ?? level.trainingRobotGuidebotChain,
         trainingCameraMonitorChain:
             trainingCameraMonitorChain ?? level.trainingCameraMonitorChain,
+        trainingRASBot1DeathChain:
+            trainingRASBot1DeathChain ?? level.trainingRASBot1DeathChain,
         voiceClips: voiceClips ?? level.voiceClips,
         soundClips: soundClips ?? level.soundClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
