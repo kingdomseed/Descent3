@@ -848,6 +848,106 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testRASBot2DeathChainHasDiagnosticUndoAndDisposablePlayReturn()
+        throws
+    {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(
+            path: "candidate.revival",
+            directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(
+                path: "library",
+                directoryHint: .isDirectory
+            )
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false
+        )
+        try writeCanonicalPackage(
+            makeTrainingRASBot2DeathLevel(),
+            to: candidate
+        )
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        document.undoManager?.groupsByEvent = false
+
+        XCTAssertEqual(
+            document.project.trainingRASBot2DeathSourceDiagnostic,
+            "TrainingMission.cpp Script 044 / RASBot2 death"
+        )
+        let robot = try XCTUnwrap(document.project.level.objects.first {
+            $0.handle == 2_075
+        })
+        document.undoManager?.beginUndoGrouping()
+        let movedPosition = Vector3(
+            x: robot.position.x + 1,
+            y: robot.position.y,
+            z: robot.position.z
+        )
+        try document.moveObject(
+            handle: robot.handle,
+            to: movedPosition
+        )
+        document.undoManager?.endUndoGrouping()
+        XCTAssertEqual(document.undoManager?.undoActionName, "Move Object")
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == robot.handle
+            }?.position,
+            robot.position
+        )
+
+        let first = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        let second = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(
+            first.fileWrappers?["project.json"]?.regularFileContents,
+            second.fileWrappers?["project.json"]?.regularFileContents
+        )
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(
+            from: first,
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertNotNil(
+            reopened.project.level.trainingRASBot2DeathChain
+        )
+
+        let session = reopened.makePlaySession()
+        reopened.commitPlaySession(session, renderingWorld: false)
+        let simulation = session.makePlayerSimulation(
+            presentationReadyTimestamp: 0
+        )
+        simulation.destroyTrainingRASBot2(handle: robot.handle)
+        XCTAssertFalse(simulation.level.objects.contains {
+            $0.handle == robot.handle
+        })
+        XCTAssertTrue(reopened.project.level.objects.contains {
+            $0.handle == robot.handle
+        })
+        reopened.returnToEditor(renderingWorld: false)
+        XCTAssertNil(reopened.playSession)
+        XCTAssertTrue(reopened.project.level.objects.contains {
+            $0.handle == robot.handle
+        })
+    }
+
+    @MainActor
     func testObjectAndPlayerStartTransformsUseStableIdentitiesAndNamedUndo() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())

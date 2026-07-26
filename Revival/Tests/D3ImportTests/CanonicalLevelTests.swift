@@ -1268,6 +1268,28 @@ final class CanonicalLevelTests: XCTestCase {
         )
     }
 
+    func testSchemaElevenRequiresExactRASBot2DeathProducer() throws {
+        let level = makeTrainingRASBot2DeathLevel()
+        try level.validate()
+        XCTAssertEqual(level.schemaVersion, 11)
+        let chain = try XCTUnwrap(level.trainingRASBot2DeathChain)
+        XCTAssertEqual(chain.robotObjectHandle, 2_075)
+        XCTAssertEqual(chain.robotRoomSourceIndex, 2)
+        XCTAssertEqual(chain.robotFlags, 5_121)
+        XCTAssertEqual(chain.combat, .stockTraining)
+
+        let wrongHandle = TrainingRASBot2DeathChain(
+            robotObjectHandle: 2_077,
+            robotRoomSourceIndex: chain.robotRoomSourceIndex,
+            robotFlags: chain.robotFlags,
+            combat: chain.combat
+        )
+        assertValidationError(
+            .invalidDependency("Training RASBot2 death chain"),
+            level.addingTrainingRASBot2DeathChain(wrongHandle)
+        )
+    }
+
     func testSchemaEightRejectsWrongTrainingGalleryMarkerIdentity() throws {
         let level = makeTrainingGalleryBarrierLevel()
         try level.validate()

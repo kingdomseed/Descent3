@@ -870,12 +870,15 @@ private struct TrainingKillbotEntryState:
     var followupWasPresented = false
 }
 
-private struct TrainingRASBot1DeathState:
+private struct TrainingRobotDeathState:
     Codable, Equatable, Sendable
 {
     var wasDestroyed = false
     var shields: Float
 }
+
+private typealias TrainingRASBot1DeathState = TrainingRobotDeathState
+private typealias TrainingRASBot2DeathState = TrainingRobotDeathState
 
 private enum TrainingGuidebotTask: String, Codable, Equatable, Sendable {
     case outbound
@@ -956,6 +959,8 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
         TrainingKillbotEntryState?
     fileprivate let trainingRASBot1DeathState:
         TrainingRASBot1DeathState?
+    fileprivate let trainingRASBot2DeathState:
+        TrainingRASBot2DeathState?
 }
 
 enum PlayerSimulationContinuationError: Error, Equatable {
@@ -1013,6 +1018,8 @@ final class PlayerSimulation {
         TrainingKillbotEntryState?
     private var trainingRASBot1DeathState:
         TrainingRASBot1DeathState?
+    private var trainingRASBot2DeathState:
+        TrainingRASBot2DeathState?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -1048,6 +1055,9 @@ final class PlayerSimulation {
             }
         trainingRASBot1DeathState = level.trainingRASBot1DeathChain.map {
             TrainingRASBot1DeathState(shields: $0.combat.robotShields)
+        }
+        trainingRASBot2DeathState = level.trainingRASBot2DeathChain.map {
+            TrainingRASBot2DeathState(shields: $0.combat.robotShields)
         }
     }
 
@@ -1109,6 +1119,12 @@ final class PlayerSimulation {
                 $0.handle == chain.robotObjectHandle
             }
         }
+        if continuation.trainingRASBot2DeathState?.wasDestroyed == true {
+            let chain = continuationLevel.trainingRASBot2DeathChain!
+            continuationLevel.objects.removeAll {
+                $0.handle == chain.robotObjectHandle
+            }
+        }
         guard validTrainingCameraMonitorContinuation(
             continuation.trainingCameraMonitorState,
             level: continuationLevel
@@ -1123,6 +1139,12 @@ final class PlayerSimulation {
         }
         guard validTrainingRASBot1DeathContinuation(
             continuation.trainingRASBot1DeathState,
+            level: continuationLevel
+        ) else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
+        guard validTrainingRASBot2DeathContinuation(
+            continuation.trainingRASBot2DeathState,
             level: continuationLevel
         ) else {
             throw PlayerSimulationContinuationError.invalidState
@@ -1222,6 +1244,8 @@ final class PlayerSimulation {
             continuation.trainingKillbotEntryState
         trainingRASBot1DeathState =
             continuation.trainingRASBot1DeathState
+        trainingRASBot2DeathState =
+            continuation.trainingRASBot2DeathState
         restoreTrainingGuidebotPresentation()
         if trainingRobotGuidebotState?.guidebotEnteredShip == true,
            let handle =
@@ -1266,7 +1290,9 @@ final class PlayerSimulation {
             trainingKillbotEntryState:
                 trainingKillbotEntryState,
             trainingRASBot1DeathState:
-                trainingRASBot1DeathState
+                trainingRASBot1DeathState,
+            trainingRASBot2DeathState:
+                trainingRASBot2DeathState
         )
     }
 
@@ -1602,6 +1628,21 @@ final class PlayerSimulation {
         trainingRASBot1DeathState = state
     }
 
+    func destroyTrainingRASBot2(handle: UInt32) {
+        guard let chain = level.trainingRASBot2DeathChain,
+              handle == chain.robotObjectHandle,
+              var state = trainingRASBot2DeathState,
+              !state.wasDestroyed,
+              level.objects.contains(where: { $0.handle == handle })
+        else {
+            return
+        }
+        level.objects.removeAll { $0.handle == handle }
+        state.wasDestroyed = true
+        state.shields = min(state.shields, -0.000_001)
+        trainingRASBot2DeathState = state
+    }
+
     func update(at timestamp: Double, input: InputSnapshot) -> PlayerSimulationFrame {
         precondition(timestamp.isFinite && timestamp >= lastTimestamp)
         precondition(pauseDepth == 0)
@@ -1695,7 +1736,14 @@ final class PlayerSimulation {
                     $0.handle == rasBot1Chain.robotObjectHandle
                 }
             }
+            let rasBot2Chain = level.trainingRASBot2DeathChain
+            let rasBot2 = rasBot2Chain.flatMap { rasBot2Chain in
+                level.objects.first {
+                    $0.handle == rasBot2Chain.robotObjectHandle
+                }
+            }
             var rasBot1State = trainingRASBot1DeathState
+            var rasBot2State = trainingRASBot2DeathState
             var survivingProjectiles: [TrainingLaserProjectileState] = []
             for var projectile in state.projectiles {
                 let end = projectile.position
@@ -1738,6 +1786,22 @@ final class PlayerSimulation {
                                     .robotCollisionRadius
                     )
                 }
+                let rasBot2Hit = rasBot2.flatMap { robot -> Float? in
+                    guard robot.location
+                            == .room(projectile.roomSourceIndex),
+                          let rasBot2Chain else {
+                        return nil
+                    }
+                    return segmentSphereHitFraction(
+                        start: projectile.position,
+                        end: end,
+                        center: robot.position,
+                        radius:
+                            rasBot2Chain.combat.projectileRadius
+                                + rasBot2Chain.combat
+                                    .robotCollisionRadius
+                    )
+                }
                 let traceFraction = vectorDistance(
                     projectile.position,
                     end
@@ -1747,11 +1811,34 @@ final class PlayerSimulation {
                         trace.finalPosition
                     ) / vectorDistance(projectile.position, end)
                     : 1
-                if let rasBot1Hit,
-                   rasBot1Hit <= traceFraction + 0.000_1,
-                   robotHit.map({ rasBot1Hit < $0 }) ?? true {
-                    rasBot1State?.shields -=
-                        rasBot1Chain!.combat.projectileDamage
+                var nearestRASBotHit: (handle: UInt32, fraction: Float)?
+                if let rasBot1Hit {
+                    nearestRASBotHit = (
+                        rasBot1Chain!.robotObjectHandle,
+                        rasBot1Hit
+                    )
+                }
+                if let rasBot2Hit,
+                   rasBot2Hit < (nearestRASBotHit?.fraction ?? .infinity) {
+                    nearestRASBotHit = (
+                        rasBot2Chain!.robotObjectHandle,
+                        rasBot2Hit
+                    )
+                }
+                if let nearestRASBotHit,
+                   nearestRASBotHit.fraction
+                    <= traceFraction + 0.000_1,
+                   robotHit.map({
+                       nearestRASBotHit.fraction < $0
+                   }) ?? true {
+                    if nearestRASBotHit.handle
+                        == rasBot1Chain?.robotObjectHandle {
+                        rasBot1State?.shields -=
+                            rasBot1Chain!.combat.projectileDamage
+                    } else {
+                        rasBot2State?.shields -=
+                            rasBot2Chain!.combat.projectileDamage
+                    }
                     continue
                 }
                 if let robotHit, robotHit <= traceFraction + 0.000_1 {
@@ -1774,14 +1861,24 @@ final class PlayerSimulation {
                 rasBot1State.map {
                     !$0.wasDestroyed && $0.shields < 0
                 } ?? false
+            let rasBot2WasKilled =
+                rasBot2State.map {
+                    !$0.wasDestroyed && $0.shields < 0
+                } ?? false
             trainingRobotGuidebotState = state
             trainingRASBot1DeathState = rasBot1State
+            trainingRASBot2DeathState = rasBot2State
             if robotWasKilled {
                 destroyTrainingRobot(handle: chain.destroyRobotObjectHandle)
             }
             if rasBot1WasKilled {
                 destroyTrainingRASBot1(
                     handle: rasBot1Chain!.robotObjectHandle
+                )
+            }
+            if rasBot2WasKilled {
+                destroyTrainingRASBot2(
+                    handle: rasBot2Chain!.robotObjectHandle
                 )
             }
         }
@@ -2753,6 +2850,26 @@ private func validTrainingRASBot1DeathContinuation(
     level: Level
 ) -> Bool {
     guard let chain = level.trainingRASBot1DeathChain else {
+        return state == nil
+    }
+    guard let state,
+          state.shields.isFinite,
+          state.shields <= chain.combat.robotShields else {
+        return false
+    }
+    let robotIsPresent = level.objects.contains {
+        $0.handle == chain.robotObjectHandle
+    }
+    return state.wasDestroyed
+        ? state.shields < 0 && !robotIsPresent
+        : state.shields >= 0 && robotIsPresent
+}
+
+private func validTrainingRASBot2DeathContinuation(
+    _ state: TrainingRASBot2DeathState?,
+    level: Level
+) -> Bool {
+    guard let chain = level.trainingRASBot2DeathChain else {
         return state == nil
     }
     guard let state,

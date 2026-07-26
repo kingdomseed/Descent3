@@ -1312,6 +1312,78 @@ final class WorldRenderingTests: XCTestCase {
         })
     }
 
+    func testRASBot2DeathUsesNearestPrimaryLaserOnceAndSurvivesReload()
+        throws
+    {
+        let level = makeTrainingRASBot2DeathLevel()
+        try level.validate()
+        let chain = try XCTUnwrap(level.trainingRASBot2DeathChain)
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        var timestamp = 0.0
+        for _ in 1...4 {
+            timestamp += 0.25
+            _ = simulation.update(
+                at: timestamp,
+                input: .init(firesPrimaryWeapon: true)
+            )
+        }
+
+        XCTAssertFalse(simulation.level.objects.contains {
+            $0.handle == chain.robotObjectHandle
+        })
+        XCTAssertTrue(simulation.level.objects.contains {
+            $0.handle == 2_074
+        })
+        let continuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: continuationData)
+                as? [String: Any]
+        )
+        XCTAssertEqual(continuationObject["schemaVersion"] as? Int, 7)
+        let deathState = try XCTUnwrap(
+            continuationObject["trainingRASBot2DeathState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(deathState["wasDestroyed"] as? Bool, true)
+
+        timestamp += 0.25
+        _ = simulation.update(
+            at: timestamp,
+            input: .init(firesPrimaryWeapon: true)
+        )
+        let repeatedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            (repeatedObject["trainingRASBot2DeathState"]
+                as? [String: Any])?["shields"] as? Double,
+            deathState["shields"] as? Double
+        )
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: continuationData
+            ),
+            resumedAtTimestamp: 100
+        )
+        XCTAssertFalse(restored.level.objects.contains {
+            $0.handle == chain.robotObjectHandle
+        })
+        XCTAssertTrue(restored.level.objects.contains {
+            $0.handle == 2_074
+        })
+    }
+
     func testGuidebotReturnTracksLivePlayerMovementInSameFrame()
         throws
     {
@@ -6349,6 +6421,68 @@ func makeTrainingRASBot1DeathLevel() -> Level {
     ))
     return level.addingTrainingRASBot1DeathChain(.init(
         robotObjectHandle: 2_074,
+        robotRoomSourceIndex: {
+            guard case let .room(roomSourceIndex) = player.location else {
+                preconditionFailure("Synthetic Training player is indoor")
+            }
+            return roomSourceIndex
+        }(),
+        robotFlags: 5_121,
+        combat: .stockTraining
+    ))
+}
+
+func makeTrainingRASBot2DeathLevel() -> Level {
+    var level = makeTrainingRASBot1DeathLevel()
+    let player = level.objects.first { $0.handle == 2_048 }!
+    let rasBot1Index = level.objects.firstIndex { $0.handle == 2_074 }!
+    level.objects[rasBot1Index].position = .init(
+        x: player.position.x + player.orientation.right.x * 20,
+        y: player.position.y + player.orientation.right.y * 20,
+        z: player.position.z + player.orientation.right.z * 20
+    )
+    let robotModel = level.objectPresentations.first {
+        $0.objectHandle == 2_074
+    }!.primaryModel
+    let robotPosition = Vector3(
+        x: player.position.x + player.orientation.forward.x * 20,
+        y: player.position.y + player.orientation.forward.y * 20,
+        z: player.position.z + player.orientation.forward.z * 20
+    )
+    level.objects.append(.init(
+        handle: 2_075,
+        type: 2,
+        storedID: 106,
+        definition: .init(
+            storedIndex: 106,
+            sourceName: "RAS1 Light Security Flyer"
+        ),
+        instanceName: "RASBot2",
+        flags: 5_121,
+        doorShields: nil,
+        location: player.location,
+        position: robotPosition,
+        orientation: player.orientation,
+        containsType: 0,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    ))
+    level.objectPresentations.append(.init(
+        objectHandle: 2_075,
+        primaryModel: robotModel,
+        mediumModel: nil,
+        lowModel: nil,
+        dyingModel: nil,
+        mediumDistance: nil,
+        lowDistance: nil
+    ))
+    return level.addingTrainingRASBot2DeathChain(.init(
+        robotObjectHandle: 2_075,
         robotRoomSourceIndex: {
             guard case let .room(roomSourceIndex) = player.location else {
                 preconditionFailure("Synthetic Training player is indoor")
