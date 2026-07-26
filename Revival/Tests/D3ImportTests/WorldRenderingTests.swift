@@ -89,7 +89,8 @@ final class WorldRenderingTests: XCTestCase {
                     "Welcome to the Descent 3 Training session.",
                     "Move forward until you stop.",
                 ],
-                voiceSourceName: "welcome.osf"
+                voiceSourceName: "welcome.osf",
+                voicePrecedesHUDMessages: false
             )]
         )
         XCTAssertEqual(welcome.enabledPlayerControls, [.forward])
@@ -119,7 +120,8 @@ final class WorldRenderingTests: XCTestCase {
                     "Excellent!",
                     "Now use the reverse Key to return to where you started!",
                 ],
-                voiceSourceName: "return1.osf"
+                voiceSourceName: "return1.osf",
+                voicePrecedesHUDMessages: false
             )]
         )
         XCTAssertEqual(firstGoal.enabledPlayerControls, [.reverse])
@@ -340,6 +342,243 @@ final class WorldRenderingTests: XCTestCase {
             frame.trainingOpeningFeedback.contains {
                 $0.voiceSourceName == "return1.osf"
             }
+        )
+    }
+
+    func testTrainingGalleryTriggerClosesAnimatedBarrierOnceAndRestores() throws {
+        let level = makeTrainingGalleryBarrierLevel()
+        try level.validate()
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        var triggerFrame: PlayerSimulationFrame?
+        for frameIndex in 1...20 {
+            let frame = simulation.update(
+                at: Double(frameIndex) * 0.1,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebota.osf"
+            }) {
+                triggerFrame = frame
+                break
+            }
+        }
+
+        let triggered = try XCTUnwrap(triggerFrame)
+        XCTAssertEqual(
+            triggered.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Excellent!",
+                    "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
+                ],
+                voiceSourceName: "guidebota.osf",
+                voicePrecedesHUDMessages: true
+            )]
+        )
+        XCTAssertEqual(
+            triggered.enabledPlayerControls,
+            PlayerControlMask(rawValue: 0)
+        )
+        XCTAssertEqual(triggered.trainingGalleryMarkerLightDistance, 0)
+        XCTAssertEqual(triggered.playerView.roomSourceIndex, 3)
+        assertTrainingGalleryBarrier(level: simulation.level, rendersFaces: true)
+        let playerStart = level.objects.first { $0.handle == 2_048 }!
+        let blockedReturn = traceIndoorMovement(
+            in: simulation.level,
+            startRoom: triggered.playerView.roomSourceIndex,
+            start: triggered.playerView.camera.position,
+            end: playerStart.position,
+            radius: triggered.playerView.collisionRadius
+        )
+        guard case .wallHit = blockedReturn.outcome else {
+            return XCTFail("The closed force-field barrier must block the player")
+        }
+
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(simulation.continuation)
+        )
+        let repeated = simulation.update(
+            at: Double(triggered.gameTime) + 0.1,
+            input: .init(forward: -1)
+        )
+        XCTAssertTrue(repeated.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(
+            repeated.enabledPlayerControls,
+            PlayerControlMask(rawValue: 0)
+        )
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 100
+        )
+        assertTrainingGalleryBarrier(level: restored.level, rendersFaces: true)
+        let afterRestore = restored.update(at: 100.1, input: .zero)
+        XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(
+            afterRestore.enabledPlayerControls,
+            PlayerControlMask(rawValue: 0)
+        )
+        XCTAssertEqual(afterRestore.trainingGalleryMarkerLightDistance, 0)
+    }
+
+    func testTrainingGalleryTriggerRequiresPlayerCenterPassThrough() {
+        let level = makeTrainingGalleryBarrierLevel()
+        let barrier = level.trainingGalleryBarrier!
+        let room = level.rooms.first {
+            $0.sourceIndex == barrier.triggerRoomSourceIndex
+        }!
+        let face = room.faces[barrier.triggerFaceIndex]
+        let faceCenter = face.corners.reduce(Vector3.zero) {
+            let vertex = room.vertices[$1.vertexIndex]
+            return Vector3(
+                x: $0.x + vertex.x,
+                y: $0.y + vertex.y,
+                z: $0.z + vertex.z
+            )
+        }
+        let divisor = Float(face.corners.count)
+        let center = Vector3(
+            x: faceCenter.x / divisor,
+            y: faceCenter.y / divisor,
+            z: faceCenter.z / divisor
+        )
+        let normal = canonicalFaceNormal(room: room, face: face)!
+        let radius: Float = 1
+        let start = Vector3(
+            x: center.x + normal.x * 2,
+            y: center.y + normal.y * 2,
+            z: center.z + normal.z * 2
+        )
+        let sphereOverlap = traceIndoorMovement(
+            in: level,
+            startRoom: room.sourceIndex,
+            start: start,
+            end: .init(
+                x: center.x + normal.x * 0.5,
+                y: center.y + normal.y * 0.5,
+                z: center.z + normal.z * 0.5
+            ),
+            radius: radius
+        )
+        XCTAssertFalse(sphereOverlap.passedPortalFaces.contains {
+            $0.roomSourceIndex == barrier.triggerRoomSourceIndex
+                && $0.faceIndex == barrier.triggerFaceIndex
+        })
+
+        let centerCrossing = traceIndoorMovement(
+            in: level,
+            startRoom: room.sourceIndex,
+            start: start,
+            end: .init(
+                x: center.x - normal.x * 0.5,
+                y: center.y - normal.y * 0.5,
+                z: center.z - normal.z * 0.5
+            ),
+            radius: radius
+        )
+        XCTAssertTrue(centerCrossing.passedPortalFaces.contains {
+            $0.roomSourceIndex == barrier.triggerRoomSourceIndex
+                && $0.faceIndex == barrier.triggerFaceIndex
+        })
+    }
+
+    @MainActor
+    func testTrainingGalleryAudioFailureStillPresentsHUD() {
+        var presentedActions: [String] = []
+        RevivalGameplayView.presentTrainingFeedback(
+            voicePrecedesHUDMessages: true,
+            attemptVoice: {
+                presentedActions.append("voice")
+                throw NSError(domain: "TrainingVoiceTest", code: 1)
+            },
+            presentHUDMessages: {
+                presentedActions.append("hud")
+            }
+        )
+        XCTAssertEqual(presentedActions, ["voice", "hud"])
+    }
+
+    func testIndoorTracePreservesPortalIndexTraversalOrder() {
+        let base = makeSelectedRoomRenderLevel()
+        let texture = base.surfacePhysics[0].texture
+        let vertices = [
+            Vector3(x: -10, y: 1, z: -10),
+            Vector3(x: 10, y: 1, z: -10),
+            Vector3(x: 10, y: 1, z: 10),
+            Vector3(x: -10, y: 1, z: 10),
+            Vector3(x: 1, y: -10, z: -10),
+            Vector3(x: 1, y: -10, z: 10),
+            Vector3(x: 1, y: 10, z: 10),
+            Vector3(x: 1, y: 10, z: -10),
+        ]
+        func portalFace(
+            vertexIndices: [Int],
+            portalIndex: Int
+        ) -> LevelFace {
+            .init(
+                corners: vertexIndices.map {
+                    .init(vertexIndex: $0, u: 0, v: 0, alpha: 255)
+                },
+                flags: 0,
+                portalIndex: portalIndex,
+                texture: texture
+            )
+        }
+        let sourceRoom = LevelRoom(
+            sourceIndex: 100,
+            vertices: vertices,
+            faces: [
+                portalFace(vertexIndices: [0, 1, 2, 3], portalIndex: 0),
+                portalFace(vertexIndices: [4, 5, 6, 7], portalIndex: 1),
+            ],
+            portals: [
+                .init(
+                    faceIndex: 0,
+                    connectedRoom: 101,
+                    connectedPortal: 0
+                ),
+                .init(
+                    faceIndex: 1,
+                    connectedRoom: 102,
+                    connectedPortal: 0
+                ),
+            ]
+        )
+        let tracedLevel = replacing(
+            base,
+            rooms: [
+                sourceRoom,
+                LevelRoom(
+                    sourceIndex: 101,
+                    vertices: [],
+                    faces: [],
+                    portals: []
+                ),
+                LevelRoom(
+                    sourceIndex: 102,
+                    vertices: [],
+                    faces: [],
+                    portals: []
+                ),
+            ]
+        )
+        let trace = traceIndoorMovement(
+            in: tracedLevel,
+            startRoom: sourceRoom.sourceIndex,
+            start: .zero,
+            end: .init(x: 4, y: 2, z: 0),
+            radius: 0
+        )
+
+        XCTAssertEqual(
+            Array(trace.visitedRoomSourceIndices.prefix(3)),
+            [100, 101, 102]
         )
     }
 
@@ -2207,18 +2446,22 @@ func makeSelectedRoomRenderLevel() -> Level {
         triggers: [],
         playerStartFlags: [],
         lightmaps: .init(pages: [], infos: []),
+        surfacePhysics: [
+            .init(texture: wall, behavior: .blocking),
+            .init(texture: forceField, behavior: .forceField),
+        ],
         presentationMaterials: [
             .init(
                 texture: forceField,
                 bitmapSourceName: "force-field.ogf",
                 image: .init(
-                    width: 2,
-                    height: 2,
-                    rgba8: Data(repeating: 255, count: 16)
+                    width: 128,
+                    height: 128,
+                    rgba8: Data(repeating: 255, count: 128 * 128 * 4)
                 ),
                 blend: .additiveSourceAlpha(opacity: 178),
                 lightmapBlend: .none,
-                waterProcedural: nil,
+                waterProcedural: alienForceFieldWaterDefinition(),
                 sourceArchive: "missions/training.mn3",
                 sourceSHA256: String(repeating: "a", count: 64)
             ),
@@ -2526,6 +2769,7 @@ func makeSliceSixObjectRenderLevel() -> Level {
         triggers: base.triggers,
         playerStartFlags: [0, 0],
         lightmaps: base.lightmaps,
+        surfacePhysics: base.surfacePhysics,
         presentationMaterials: base.presentationMaterials + [modelMaterial],
         models: models,
         shipDefinitions: [ship],
@@ -2541,6 +2785,130 @@ func makeSliceSixObjectRenderLevel() -> Level {
         ),
         sourceChunks: base.sourceChunks
     )
+}
+
+func makeTrainingGalleryBarrierLevel() -> Level {
+    var level = makeSliceSixObjectRenderLevel()
+    let cameraOrigin = RoomCamera.trainingRoom3.position
+    let barrierRoomIndex = level.rooms.firstIndex {
+        $0.sourceIndex == 2
+    }!
+    for portalIndex in level.rooms[barrierRoomIndex].portals.indices {
+        level.rooms[barrierRoomIndex].portals[portalIndex].flags &= ~UInt32(1)
+        let portal = level.rooms[barrierRoomIndex].portals[portalIndex]
+        let connectedRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        level.rooms[connectedRoomIndex].portals[portal.connectedPortal].flags
+            &= ~UInt32(1)
+    }
+    let playerIndex = level.objects.firstIndex { $0.handle == 2_048 }!
+    level.objects[playerIndex].location = .room(2)
+    level.objects[playerIndex].position = .init(
+        x: cameraOrigin.x,
+        y: cameraOrigin.y + 2.5,
+        z: cameraOrigin.z
+    )
+    level.objects[playerIndex].orientation = .init(
+        right: .init(x: 1, y: 0, z: 0),
+        up: .init(x: 0, y: 0, z: 1),
+        forward: .init(x: 0, y: -1, z: 0)
+    )
+    level.objects.append(.init(
+        handle: 6_163,
+        type: 11,
+        storedID: 67,
+        definition: level.objects.first { $0.handle == 12_301 }!.definition,
+        instanceName: "FlashLight-2",
+        flags: 0,
+        doorShields: nil,
+        location: .room(2),
+        position: cameraOrigin,
+        orientation: .init(
+            right: .init(x: 1, y: 0, z: 0),
+            up: .init(x: 0, y: 1, z: 0),
+            forward: .init(x: 0, y: 0, z: 1)
+        ),
+        containsType: 0,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    ))
+    let trigger = LevelTrigger(
+        name: "Portal2",
+        roomIndex: 2,
+        faceIndex: 1,
+        flags: 8,
+        activator: 1
+    )
+    let triggerFace = level.rooms[barrierRoomIndex].faces[trigger.faceIndex]
+    level.rooms[barrierRoomIndex].faces[trigger.faceIndex] = .init(
+        corners: triggerFace.corners,
+        flags: triggerFace.flags | 0x0010,
+        portalIndex: triggerFace.portalIndex,
+        texture: triggerFace.texture,
+        lightmapInfoIndex: triggerFace.lightmapInfoIndex,
+        allowsLightCorona: triggerFace.allowsLightCorona,
+        lightMultiple: triggerFace.lightMultiple,
+        special: triggerFace.special
+    )
+    level = replacing(level, triggers: [trigger])
+    return level.addingTrainingGalleryBarrier(
+        .init(
+            triggerName: trigger.name,
+            triggerRoomSourceIndex: trigger.roomIndex,
+            triggerFaceIndex: trigger.faceIndex,
+            barrierRoomSourceIndex: 2,
+            orderedPortalIndices: [1, 0],
+            markerLightObjectHandle: 6_163,
+            openMarkerLightDistance: 50,
+            successMessage: "Excellent!",
+            guidebotInstruction:
+                "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
+            voiceSourceName: "guidebota.osf"
+        ),
+        voiceClip: .init(
+            sourceName: "guidebota.osf",
+            sourceEntryIndex: 0,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 1,
+            pcm16LittleEndian: Data(repeating: 0, count: 2),
+            pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+            sourceArchive: "missions/training.mn3",
+            sourceSHA256: String(repeating: "a", count: 64)
+        )
+    )
+}
+
+private func assertTrainingGalleryBarrier(
+    level: Level,
+    rendersFaces: Bool,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    let room = level.rooms.first { $0.sourceIndex == 2 }!
+    for portal in room.portals {
+        XCTAssertEqual(
+            portal.flags & 1 != 0,
+            rendersFaces,
+            file: file,
+            line: line
+        )
+        let connectedRoom = level.rooms.first {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        XCTAssertEqual(
+            connectedRoom.portals[portal.connectedPortal].flags & 1 != 0,
+            rendersFaces,
+            file: file,
+            line: line
+        )
+    }
 }
 
 func makeSliceTenContactLevel(clearance: Float = 20) -> Level {

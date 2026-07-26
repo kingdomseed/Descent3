@@ -590,7 +590,7 @@ func runD3Import(
         $0.instanceName?.caseInsensitiveCompare("ForwardGoal") == .orderedSame
     }!
     precondition(forwardGoal.handle == 12_301 && forwardGoal.type == 7)
-    let voiceNames = ["Welcome.osf", "Return1.osf"]
+    let voiceNames = ["Welcome.osf", "Return1.osf", "GuideBotA.osf"]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
         let entryIndex = trainingArchive.entries.firstIndex(of: entry)!
@@ -603,11 +603,12 @@ func runD3Import(
             channelCount: decoded.channelCount,
             frameCount: decoded.frameCount,
             pcm16LittleEndian: decoded.pcm16LittleEndian,
+            pcmSHA256: canonicalSHA256(decoded.pcm16LittleEndian),
             sourceArchive: trainingFile.relativePath,
             sourceSHA256: canonicalSHA256(payload)
         )
     }
-    let level = playerLevel.addingTrainingOpeningLesson(
+    let openingLevel = playerLevel.addingTrainingOpeningLesson(
         .init(
             forwardGoalObjectHandle: forwardGoal.handle,
             welcomeDelay: 1,
@@ -618,7 +619,48 @@ func runD3Import(
             reverseInstruction: messages["GoBackwards"]!,
             successVoiceSourceName: "return1.osf"
         ),
-        voiceClips: voiceClips
+        voiceClips: Array(voiceClips.prefix(2))
+    )
+    let galleryTrigger = openingLevel.triggers.first {
+        $0.name.caseInsensitiveCompare("Portal2") == .orderedSame
+    }!
+    let galleryRoom = openingLevel.rooms.first {
+        $0.name?.caseInsensitiveCompare("PortalRoom4") == .orderedSame
+    }!
+    let markerLight = openingLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("FlashLight-2")
+            == .orderedSame
+    }!
+    precondition(
+        galleryTrigger.roomIndex == galleryRoom.sourceIndex
+            && galleryTrigger.faceIndex == 1
+            && galleryTrigger.flags == 8
+            && galleryTrigger.activator == 1
+            && galleryRoom.sourceIndex == 38
+            && galleryRoom.portals.count == 2
+            && galleryRoom.portals[0].faceIndex == 0
+            && galleryRoom.portals[1].faceIndex == 1
+            && galleryRoom.faces[0].texture.sourceName
+                == "Alien Force Field_1"
+            && galleryRoom.faces[1].texture.sourceName
+                == "Alien Force Field_1"
+            && markerLight.handle == 6_163
+            && markerLight.type == 11
+    )
+    let level = openingLevel.addingTrainingGalleryBarrier(
+        .init(
+            triggerName: galleryTrigger.name,
+            triggerRoomSourceIndex: galleryTrigger.roomIndex,
+            triggerFaceIndex: galleryTrigger.faceIndex,
+            barrierRoomSourceIndex: galleryRoom.sourceIndex,
+            orderedPortalIndices: [1, 0],
+            markerLightObjectHandle: markerLight.handle,
+            openMarkerLightDistance: 50,
+            successMessage: messages["GoodJob"]!,
+            guidebotInstruction: messages["GBIntro"]!,
+            voiceSourceName: "guidebota.osf"
+        ),
+        voiceClip: voiceClips[2]
     )
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)

@@ -3,7 +3,7 @@ import XCTest
 
 final class D3LV127Tests: XCTestCase {
     func testDecodesOSFACMToCanonicalMonoPCMWithoutForcingStereo() throws {
-        var bits: [(UInt32, Int)] = [
+        let bits: [(UInt32, Int)] = [
             (0x03_28_97, 24),
             (1, 8),
             (5, 16),
@@ -57,6 +57,7 @@ final class D3LV127Tests: XCTestCase {
                 channelCount: voice.channelCount,
                 frameCount: voice.frameCount,
                 pcm16LittleEndian: voice.pcm16LittleEndian,
+                pcmSHA256: canonicalSHA256(voice.pcm16LittleEndian),
                 sourceArchive: "missions/training.mn3",
                 sourceSHA256: String(repeating: "a", count: 64)
             )
@@ -64,6 +65,47 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertEqual(String(decoding: wave.prefix(4), as: UTF8.self), "RIFF")
         XCTAssertEqual(String(decoding: wave[8..<12], as: UTF8.self), "WAVE")
         XCTAssertEqual(wave.count, 52)
+
+        let paddedSource: [(UInt32, Int)] = [
+            (0x03_28_97, 24),
+            (1, 8),
+            (16, 16),
+            (0, 16),
+            (1, 16),
+            (22_050, 16),
+            (0, 4),
+            (16, 12),
+            (1, 4),
+            (1, 16),
+            (17, 5),
+        ]
+        var paddedCompressed = Data()
+        accumulator = 0
+        available = 0
+        for (value, count) in paddedSource {
+            accumulator |= UInt64(value) << available
+            available += count
+            while available >= 8 {
+                paddedCompressed.append(
+                    UInt8(truncatingIfNeeded: accumulator)
+                )
+                accumulator >>= 8
+                available -= 8
+            }
+        }
+        if available > 0 {
+            paddedCompressed.append(
+                UInt8(truncatingIfNeeded: accumulator)
+            )
+        }
+        let paddedVoice = try decodeOSFACMVoice(
+            paddedCompressed + header
+        )
+        XCTAssertEqual(paddedVoice.frameCount, 16)
+        XCTAssertEqual(
+            paddedVoice.pcm16LittleEndian,
+            Data(repeating: 0, count: 32)
+        )
 
         XCTAssertThrowsError(try decodeOSFACMVoice(Data("OSF1".utf8))) {
             XCTAssertEqual($0 as? OSFACMDecodeError, .truncated)

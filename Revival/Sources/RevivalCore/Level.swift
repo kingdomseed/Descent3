@@ -449,6 +449,19 @@ struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     let successVoiceSourceName: String
 }
 
+struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
+    let triggerName: String
+    let triggerRoomSourceIndex: Int
+    let triggerFaceIndex: Int
+    let barrierRoomSourceIndex: Int
+    let orderedPortalIndices: [Int]
+    let markerLightObjectHandle: UInt32
+    let openMarkerLightDistance: Float
+    let successMessage: String
+    let guidebotInstruction: String
+    let voiceSourceName: String
+}
+
 struct CanonicalVoiceClip: Codable, Equatable, Sendable {
     let sourceName: String
     let sourceEntryIndex: Int
@@ -456,6 +469,7 @@ struct CanonicalVoiceClip: Codable, Equatable, Sendable {
     let channelCount: Int
     let frameCount: Int
     let pcm16LittleEndian: Data
+    let pcmSHA256: String
     let sourceArchive: String
     let sourceSHA256: String
 }
@@ -758,12 +772,13 @@ struct Level: Codable, Equatable, Sendable {
     let defaultPlayerBinding: DefaultPlayerBinding?
     let objectPresentations: [ObjectPresentationReference]
     var trainingOpeningLesson: TrainingOpeningLesson?
+    let trainingGalleryBarrier: TrainingGalleryBarrier?
     let voiceClips: [CanonicalVoiceClip]
     let dependencyManifest: DependencyManifest
     let sourceChunks: [SourceChunkRecord]
 
     init(
-        schemaVersion: Int = 7,
+        schemaVersion: Int = 8,
         missionKey: String,
         levelKey: String,
         source: LevelSource,
@@ -786,6 +801,7 @@ struct Level: Codable, Equatable, Sendable {
         defaultPlayerBinding: DefaultPlayerBinding? = nil,
         objectPresentations: [ObjectPresentationReference] = [],
         trainingOpeningLesson: TrainingOpeningLesson? = nil,
+        trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
         voiceClips: [CanonicalVoiceClip] = [],
         dependencyManifest: DependencyManifest,
         sourceChunks: [SourceChunkRecord]
@@ -813,6 +829,7 @@ struct Level: Codable, Equatable, Sendable {
         self.defaultPlayerBinding = defaultPlayerBinding
         self.objectPresentations = objectPresentations
         self.trainingOpeningLesson = trainingOpeningLesson
+        self.trainingGalleryBarrier = trainingGalleryBarrier
         self.voiceClips = voiceClips
         self.dependencyManifest = dependencyManifest
         self.sourceChunks = sourceChunks
@@ -827,7 +844,7 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     private func validate(allowImportStagingPresentation: Bool) throws {
-        guard schemaVersion == 7, source.d3lvVersion == 127,
+        guard schemaVersion == 8, source.d3lvVersion == 127,
               !missionKey.isEmpty, !levelKey.isEmpty else {
             throw LevelValidationError.invalidIdentity
         }
@@ -1098,6 +1115,122 @@ struct Level: Codable, Equatable, Sendable {
                 )
             }
         }
+        if let barrier = trainingGalleryBarrier {
+            let oneShotFlag: UInt16 = 8
+            let playerActivator: UInt16 = 1
+            let rendersFaces: UInt32 = 1
+            let clipNames = Set(voiceClips.map {
+                $0.sourceName.lowercased()
+            })
+            guard isNonempty(barrier.triggerName),
+                  isNonempty(barrier.successMessage),
+                  isNonempty(barrier.guidebotInstruction),
+                  isNonempty(barrier.voiceSourceName),
+                  barrier.openMarkerLightDistance.isFinite,
+                  barrier.openMarkerLightDistance > 0,
+                  barrier.orderedPortalIndices.count == 2,
+                  Set(barrier.orderedPortalIndices).count == 2,
+                  let markerLight = objects.first(where: {
+                      $0.handle == barrier.markerLightObjectHandle
+                  }),
+                  markerLight.type == 11,
+                  markerLight.instanceName == "FlashLight-2",
+                  clipNames.contains(barrier.voiceSourceName.lowercased()),
+                  triggers.contains(where: {
+                      $0.name == barrier.triggerName
+                          && $0.roomIndex
+                              == barrier.triggerRoomSourceIndex
+                          && $0.faceIndex == barrier.triggerFaceIndex
+                          && $0.flags == oneShotFlag
+                          && $0.activator == playerActivator
+                  }),
+                  let triggerRoom =
+                    roomMap[barrier.triggerRoomSourceIndex],
+                  triggerRoom.faces.indices.contains(
+                      barrier.triggerFaceIndex
+                  ),
+                  let barrierRoom =
+                    roomMap[barrier.barrierRoomSourceIndex]
+            else {
+                throw LevelValidationError.invalidDependency(
+                    "Training gallery barrier"
+                )
+            }
+            var portalRenderingStates: [Bool] = []
+            for portalIndex in barrier.orderedPortalIndices {
+                guard barrierRoom.portals.indices.contains(portalIndex)
+                else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training gallery barrier"
+                    )
+                }
+                let portal = barrierRoom.portals[portalIndex]
+                guard barrierRoom.faces.indices.contains(portal.faceIndex),
+                      barrierRoom.faces[portal.faceIndex].portalIndex
+                          == portalIndex,
+                      let physics = surfacePhysics.first(where: {
+                          $0.texture
+                              == barrierRoom.faces[portal.faceIndex].texture
+                      }),
+                      physics.behavior == .forceField,
+                      presentationMaterials.contains(where: {
+                          $0.texture
+                              == barrierRoom.faces[portal.faceIndex].texture
+                              && $0.waterProcedural != nil
+                      }),
+                      let connectedRoom = roomMap[portal.connectedRoom],
+                      connectedRoom.portals.indices.contains(
+                          portal.connectedPortal
+                      )
+                else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training gallery barrier"
+                    )
+                }
+                let reciprocal =
+                    connectedRoom.portals[portal.connectedPortal]
+                guard reciprocal.connectedRoom
+                        == barrier.barrierRoomSourceIndex,
+                      reciprocal.connectedPortal == portalIndex,
+                      connectedRoom.faces.indices.contains(
+                          reciprocal.faceIndex
+                      ),
+                      connectedRoom.faces[reciprocal.faceIndex].portalIndex
+                          == portal.connectedPortal,
+                      let reciprocalPhysics =
+                        surfacePhysics.first(where: {
+                            $0.texture
+                                == connectedRoom.faces[
+                                    reciprocal.faceIndex
+                                ].texture
+                        }),
+                      reciprocalPhysics.behavior == .forceField,
+                      presentationMaterials.contains(where: {
+                          $0.texture
+                              == connectedRoom.faces[
+                                  reciprocal.faceIndex
+                              ].texture
+                              && $0.waterProcedural != nil
+                      })
+                else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training gallery barrier"
+                    )
+                }
+                portalRenderingStates.append(
+                    barrierRoom.portals[portalIndex].flags
+                        & rendersFaces != 0
+                )
+                portalRenderingStates.append(
+                    reciprocal.flags & rendersFaces != 0
+                )
+            }
+            guard Set(portalRenderingStates).count == 1 else {
+                throw LevelValidationError.invalidDependency(
+                    "Training gallery barrier"
+                )
+            }
+        }
         var voiceNames = Set<String>()
         for clip in voiceClips {
             let voiceSource = SourceResource(
@@ -1115,6 +1248,9 @@ struct Level: Codable, Equatable, Sendable {
                   clip.frameCount <= Int.max / clip.channelCount,
                   clip.pcm16LittleEndian.count
                     == clip.frameCount * clip.channelCount * 2,
+                  isSHA256(clip.pcmSHA256),
+                  canonicalSHA256(clip.pcm16LittleEndian)
+                    == clip.pcmSHA256,
                   isSafeRelativePath(clip.sourceArchive),
                   source.profileFiles.contains(where: {
                       $0.relativePath == clip.sourceArchive
@@ -1142,27 +1278,63 @@ struct Level: Codable, Equatable, Sendable {
                 $0.sourceName.caseInsensitiveCompare("return1.osf")
                     == .orderedSame
             }
+            let guidebotA = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("guidebota.osf")
+                    == .orderedSame
+            }
             guard let lesson = trainingOpeningLesson,
                   missionKey == "descent3.mission.pilot-training",
                   levelKey == "descent3.level.training-mission",
                   lesson.forwardGoalObjectHandle == 12_301,
                   lesson.welcomeDelay == 1,
-                  voiceClips.count == 2,
                   welcome?.sourceEntryIndex == 38,
                   welcome?.sampleRate == 22_050,
                   welcome?.channelCount == 1,
+                  welcome?.frameCount == 417_957,
+                  welcome?.pcmSHA256
+                    == "116eda34ab4af47c9a59e514af6ba111ef41e344fadeadb8120ad76728b81fe9",
                   welcome?.sourceArchive == "missions/training.mn3",
                   welcome?.sourceSHA256
                     == "35e31517adb824f3637b877d500e12625b99d1a7044a2ce743087505c88ece36",
                   return1?.sourceEntryIndex == 28,
                   return1?.sampleRate == 22_050,
                   return1?.channelCount == 1,
+                  return1?.frameCount == 83_929,
+                  return1?.pcmSHA256
+                    == "95ffd4396b10462438ed10fb9ed9f7e5ff01a37ff1ad93481c989b047dae9dc3",
                   return1?.sourceArchive == "missions/training.mn3",
                   return1?.sourceSHA256
                     == "048067398846141f61a2d503f6ec582f0dbbc5f3bf3feead48047eab808e540f"
             else {
                 throw LevelValidationError.invalidDependency(
                     "Training opening package"
+                )
+            }
+            guard let barrier = trainingGalleryBarrier,
+                  barrier.triggerName == "Portal2",
+                  barrier.triggerRoomSourceIndex == 38,
+                  barrier.triggerFaceIndex == 1,
+                  barrier.barrierRoomSourceIndex == 38,
+                  barrier.orderedPortalIndices == [1, 0],
+                  barrier.markerLightObjectHandle == 6_163,
+                  barrier.openMarkerLightDistance == 50,
+                  barrier.successMessage == "Excellent!",
+                  barrier.guidebotInstruction
+                    == "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
+                  barrier.voiceSourceName == "guidebota.osf",
+                  voiceClips.count == 3,
+                  guidebotA?.sourceEntryIndex == 4,
+                  guidebotA?.sampleRate == 22_050,
+                  guidebotA?.channelCount == 1,
+                  guidebotA?.frameCount == 354_793,
+                  guidebotA?.pcmSHA256
+                    == "c806147adb0ceb7c2bd8eac0853ba107da49012f5de8685f915d3e3a80f51b4f",
+                  guidebotA?.sourceArchive == "missions/training.mn3",
+                  guidebotA?.sourceSHA256
+                    == "dde58be4bd488cc7a009068afd15ddb18f8cf64dd1ff44fd5a3f8ae816277cad"
+            else {
+                throw LevelValidationError.invalidDependency(
+                    "Training gallery package"
                 )
             }
         }
@@ -1338,6 +1510,7 @@ struct Level: Codable, Equatable, Sendable {
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
             trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
             voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
@@ -1420,6 +1593,7 @@ struct Level: Codable, Equatable, Sendable {
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: newObjectPresentations,
             trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
             voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
@@ -1459,6 +1633,7 @@ struct Level: Codable, Equatable, Sendable {
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
             trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
             voiceClips: voiceClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
@@ -1507,6 +1682,7 @@ struct Level: Codable, Equatable, Sendable {
             defaultPlayerBinding: binding,
             objectPresentations: objectPresentations,
             trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
             voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
@@ -1573,10 +1749,60 @@ struct Level: Codable, Equatable, Sendable {
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: lessonPresentations,
             trainingOpeningLesson: lesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
             voiceClips: voiceClips,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
+            ),
+            sourceChunks: sourceChunks
+        )
+    }
+
+    func addingTrainingGalleryBarrier(
+        _ barrier: TrainingGalleryBarrier,
+        voiceClip: CanonicalVoiceClip
+    ) -> Level {
+        let dependency = DependencyRecord(
+            category: "voice",
+            source: .init(
+                storedIndex: voiceClip.sourceEntryIndex,
+                sourceName: voiceClip.sourceName
+            ),
+            state: "canonical-pcm-imported",
+            provenance:
+                "\(voiceClip.sourceArchive) \(voiceClip.sourceSHA256)"
+        )
+        return Level(
+            schemaVersion: schemaVersion,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
+            objectPresentations: objectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: barrier,
+            voiceClips: voiceClips + [voiceClip],
+            dependencyManifest: .init(
+                current: dependencyManifest.current + [dependency],
+                historicalEagerBaseline:
+                    dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
         )
@@ -1806,11 +2032,17 @@ enum IndoorMovementTraceOutcome: Equatable, Sendable {
     case wallHit(IndoorWallContact)
 }
 
+struct IndoorPortalCrossing: Equatable, Sendable {
+    let roomSourceIndex: Int
+    let faceIndex: Int
+}
+
 struct IndoorMovementTrace: Equatable, Sendable {
     let outcome: IndoorMovementTraceOutcome
     let finalPosition: Vector3
     let containingRoomSourceIndex: Int
     let visitedRoomSourceIndices: [Int]
+    let passedPortalFaces: [IndoorPortalCrossing]
 }
 
 func traceIndoorMovement(
@@ -1833,6 +2065,7 @@ func traceIndoorMovement(
     let movementLength = sqrt(dot(movement, movement))
     var visited: [Int] = []
     var visitedSet: Set<Int> = []
+    var passedPortalFaces: [IndoorPortalCrossing] = []
     var nearest: IndoorWallContact?
     var nearestNormalCount = 0
 
@@ -1892,10 +2125,26 @@ func traceIndoorMovement(
             }
         }
 
-        for (portalIndex, portal) in room.portals.enumerated()
-        where reachedPortals[portalIndex].map({
-            movementLength * $0 <= (nearest?.distance ?? movementLength)
-        }) == true {
+        for (portalIndex, portal) in room.portals.enumerated() {
+            guard let fraction = reachedPortals[portalIndex],
+                  movementLength * fraction
+                    <= (nearest?.distance ?? movementLength)
+            else {
+                continue
+            }
+            if let centerHit = sweptSphereFaceHit(
+                room: room,
+                face: room.faces[portal.faceIndex],
+                start: start,
+                movement: movement,
+                radius: 0
+            ), movementLength * centerHit.fraction
+                <= (nearest?.distance ?? movementLength) {
+                passedPortalFaces.append(.init(
+                    roomSourceIndex: roomIndex,
+                    faceIndex: portal.faceIndex
+                ))
+            }
             visit(portal.connectedRoom)
         }
     }
@@ -1914,7 +2163,8 @@ func traceIndoorMovement(
             outcome: .wallHit(nearest),
             finalPosition: finalPosition,
             containingRoomSourceIndex: containingRoom,
-            visitedRoomSourceIndices: visited
+            visitedRoomSourceIndices: visited,
+            passedPortalFaces: passedPortalFaces
         )
     }
 
@@ -1925,7 +2175,8 @@ func traceIndoorMovement(
         outcome: .noHit,
         finalPosition: end,
         containingRoomSourceIndex: containingRoom,
-        visitedRoomSourceIndices: visited
+        visitedRoomSourceIndices: visited,
+        passedPortalFaces: passedPortalFaces
     )
 }
 

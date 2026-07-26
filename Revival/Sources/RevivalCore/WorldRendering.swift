@@ -386,11 +386,13 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let wallContact: IndoorWallContact?
     let enabledPlayerControls: PlayerControlMask
     let trainingOpeningFeedback: [TrainingOpeningFeedback]
+    let trainingGalleryMarkerLightDistance: Float?
 }
 
 struct TrainingOpeningFeedback: Equatable, Sendable {
     let hudMessages: [String]
     let voiceSourceName: String
+    let voicePrecedesHUDMessages: Bool
 }
 
 private struct TrainingOpeningState: Codable, Equatable, Sendable {
@@ -398,6 +400,11 @@ private struct TrainingOpeningState: Codable, Equatable, Sendable {
     var welcomeWasPresented = false
     var forwardGoalWasReached = false
     var enabledControls: PlayerControlMask = [.forward]
+}
+
+private struct TrainingGalleryBarrierState: Codable, Equatable, Sendable {
+    var wasTriggered = false
+    var markerLightDistance: Float
 }
 
 struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
@@ -420,6 +427,8 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     let wiggleFalloff: Float
     let lastThrustTime: Float
     fileprivate let trainingOpeningState: TrainingOpeningState?
+    fileprivate let trainingGalleryBarrierState:
+        TrainingGalleryBarrierState?
 }
 
 enum PlayerSimulationContinuationError: Error, Equatable {
@@ -453,6 +462,8 @@ final class PlayerSimulation {
     private var pauseDepth = 0
     private var pauseTimestamp: Double?
     private var trainingOpeningState: TrainingOpeningState?
+    private var trainingGalleryBarrierState:
+        TrainingGalleryBarrierState?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -465,6 +476,17 @@ final class PlayerSimulation {
         trainingOpeningState = level.trainingOpeningLesson.map {
             TrainingOpeningState(timerRemaining: $0.welcomeDelay)
         }
+        trainingGalleryBarrierState = level.trainingGalleryBarrier.map {
+            TrainingGalleryBarrierState(
+                markerLightDistance:
+                    trainingGalleryBarrierRendersFaces(
+                        in: level,
+                        barrier: $0
+                    )
+                    ? 0
+                    : $0.openMarkerLightDistance
+            )
+        }
     }
 
     init(
@@ -472,7 +494,7 @@ final class PlayerSimulation {
         continuation: PlayerSimulationContinuation,
         resumedAtTimestamp: Double
     ) throws {
-        guard continuation.schemaVersion == 1 else {
+        guard continuation.schemaVersion == 2 else {
             throw PlayerSimulationContinuationError.unsupportedSchema
         }
         guard continuation.levelKey == level.levelKey,
@@ -513,6 +535,10 @@ final class PlayerSimulation {
               }) ?? true,
               (level.trainingOpeningLesson == nil)
                 == (continuation.trainingOpeningState == nil),
+              validTrainingGalleryBarrierContinuation(
+                  continuation.trainingGalleryBarrierState,
+                  level: level
+              ),
               case .room(let restoredRoomSourceIndex)
                 = continuation.playerLocation,
               level.rooms.contains(where: {
@@ -533,6 +559,9 @@ final class PlayerSimulation {
         restoredLevel.objects[objectIndex].location = continuation.playerLocation
         restoredLevel.objects[objectIndex].position = continuation.playerPosition
         restoredLevel.objects[objectIndex].orientation = continuation.playerOrientation
+        if continuation.trainingGalleryBarrierState?.wasTriggered == true {
+            closeTrainingGalleryBarrier(in: &restoredLevel)
+        }
 
         self.level = restoredLevel
         frameDuration = continuation.frameDuration
@@ -549,13 +578,15 @@ final class PlayerSimulation {
         lastThrustTime = continuation.lastThrustTime
         lastTimestamp = resumedAtTimestamp
         trainingOpeningState = continuation.trainingOpeningState
+        trainingGalleryBarrierState =
+            continuation.trainingGalleryBarrierState
     }
 
     var continuation: PlayerSimulationContinuation {
         let binding = level.defaultPlayerBinding!
         let player = level.objects.first { $0.handle == binding.objectHandle }!
         return PlayerSimulationContinuation(
-            schemaVersion: 1,
+            schemaVersion: 2,
             levelKey: level.levelKey,
             levelSHA256: level.source.levelSHA256,
             playerLocation: player.location,
@@ -573,7 +604,9 @@ final class PlayerSimulation {
             afterburnerMagnitude: afterburnerMagnitude,
             wiggleFalloff: wiggleFalloff,
             lastThrustTime: lastThrustTime,
-            trainingOpeningState: trainingOpeningState
+            trainingOpeningState: trainingOpeningState,
+            trainingGalleryBarrierState:
+                trainingGalleryBarrierState
         )
     }
 
@@ -588,9 +621,11 @@ final class PlayerSimulation {
             $0.handle == binding.objectHandle
         }!
         var object = level.objects[objectIndex]
-        let input = input.applying(
-            trainingOpeningState?.enabledControls ?? .all
-        )
+        let currentEnabledControls =
+            trainingGalleryBarrierState?.wasTriggered == true
+            ? PlayerControlMask(rawValue: 0)
+            : trainingOpeningState?.enabledControls ?? .all
+        let input = input.applying(currentEnabledControls)
         let ship = level.shipDefinitions.first { $0.source == binding.ship }!
         guard case let .room(startRoom) = object.location else {
             preconditionFailure("The Slice 10 player simulation is indoor.")
@@ -657,6 +692,7 @@ final class PlayerSimulation {
         var position = object.position
         var roomSourceIndex = startRoom
         var trainingForwardGoalWasReachedThisFrame = false
+        var trainingGalleryWasCrossedThisFrame = false
         if ship.physics.behaviors.contains(.wiggle) {
             if sqrt(dot(force, force)) < 0.1 {
                 wiggleFalloff -= systemsFrameDuration / 2
@@ -683,6 +719,12 @@ final class PlayerSimulation {
                 end: position + linearThrustOrientation.up * wiggle,
                 radius: view.collisionRadius
             )
+            trainingGalleryWasCrossedThisFrame =
+                trainingGalleryWasCrossedThisFrame
+                || trainingGalleryTriggerWasCrossed(
+                    in: level,
+                    passedPortalFaces: trace.passedPortalFaces
+                )
             if let lesson = level.trainingOpeningLesson {
                 trainingForwardGoalWasReachedThisFrame =
                     trainingForwardGoalWasReached(
@@ -806,6 +848,12 @@ final class PlayerSimulation {
                 end: integrated.position,
                 radius: view.collisionRadius
             )
+            trainingGalleryWasCrossedThisFrame =
+                trainingGalleryWasCrossedThisFrame
+                || trainingGalleryTriggerWasCrossed(
+                    in: level,
+                    passedPortalFaces: trace.passedPortalFaces
+                )
             if !trainingForwardGoalWasReachedThisFrame,
                let lesson = level.trainingOpeningLesson {
                 trainingForwardGoalWasReachedThisFrame =
@@ -873,6 +921,23 @@ final class PlayerSimulation {
         level.objects[objectIndex].location = .room(roomSourceIndex)
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
+        if var galleryState = trainingGalleryBarrierState,
+           !galleryState.wasTriggered,
+           trainingGalleryWasCrossedThisFrame,
+           let barrier = level.trainingGalleryBarrier {
+            trainingOpeningFeedback.append(.init(
+                hudMessages: [
+                    barrier.successMessage,
+                    barrier.guidebotInstruction,
+                ],
+                voiceSourceName: barrier.voiceSourceName,
+                voicePrecedesHUDMessages: true
+            ))
+            galleryState.markerLightDistance = 0
+            closeTrainingGalleryBarrier(in: &level)
+            galleryState.wasTriggered = true
+            trainingGalleryBarrierState = galleryState
+        }
         if var openingState = trainingOpeningState,
            let lesson = level.trainingOpeningLesson {
             if !openingState.forwardGoalWasReached,
@@ -884,7 +949,8 @@ final class PlayerSimulation {
                         lesson.successMessage,
                         lesson.reverseInstruction,
                     ],
-                    voiceSourceName: lesson.successVoiceSourceName
+                    voiceSourceName: lesson.successVoiceSourceName,
+                    voicePrecedesHUDMessages: false
                 ))
             }
             if !openingState.welcomeWasPresented {
@@ -896,7 +962,8 @@ final class PlayerSimulation {
                             lesson.welcomeMessage,
                             lesson.forwardInstruction,
                         ],
-                        voiceSourceName: lesson.welcomeVoiceSourceName
+                        voiceSourceName: lesson.welcomeVoiceSourceName,
+                        voicePrecedesHUDMessages: false
                     ))
                 }
             }
@@ -931,8 +998,12 @@ final class PlayerSimulation {
             turnrollFixedAngle: turnrollFixedAngle,
             wallContact: wallContact,
             enabledPlayerControls:
-                trainingOpeningState?.enabledControls ?? .all,
-            trainingOpeningFeedback: trainingOpeningFeedback
+                trainingGalleryBarrierState?.wasTriggered == true
+                ? PlayerControlMask(rawValue: 0)
+                : trainingOpeningState?.enabledControls ?? .all,
+            trainingOpeningFeedback: trainingOpeningFeedback,
+            trainingGalleryMarkerLightDistance:
+                trainingGalleryBarrierState?.markerLightDistance
         )
     }
 
@@ -958,6 +1029,70 @@ final class PlayerSimulation {
             lastTimestamp += timestamp - pausedAt
             pauseTimestamp = nil
         }
+    }
+}
+
+private func trainingGalleryTriggerWasCrossed(
+    in level: Level,
+    passedPortalFaces: [IndoorPortalCrossing]
+) -> Bool {
+    guard let barrier = level.trainingGalleryBarrier else {
+        return false
+    }
+    return passedPortalFaces.contains {
+        $0.roomSourceIndex == barrier.triggerRoomSourceIndex
+            && $0.faceIndex == barrier.triggerFaceIndex
+    }
+}
+
+private func trainingGalleryBarrierRendersFaces(
+    in level: Level,
+    barrier: TrainingGalleryBarrier
+) -> Bool {
+    let room = level.rooms.first {
+        $0.sourceIndex == barrier.barrierRoomSourceIndex
+    }!
+    return barrier.orderedPortalIndices.allSatisfy {
+        room.portals[$0].flags & 1 != 0
+    }
+}
+
+private func validTrainingGalleryBarrierContinuation(
+    _ state: TrainingGalleryBarrierState?,
+    level: Level
+) -> Bool {
+    guard let barrier = level.trainingGalleryBarrier else {
+        return state == nil
+    }
+    guard let state,
+          state.markerLightDistance.isFinite else {
+        return false
+    }
+    let expectedDistance =
+        state.wasTriggered
+            || trainingGalleryBarrierRendersFaces(
+                in: level,
+                barrier: barrier
+            )
+        ? 0
+        : barrier.openMarkerLightDistance
+    return state.markerLightDistance == expectedDistance
+}
+
+private func closeTrainingGalleryBarrier(in level: inout Level) {
+    guard let barrier = level.trainingGalleryBarrier else { return }
+    let barrierRoomIndex = level.rooms.firstIndex {
+        $0.sourceIndex == barrier.barrierRoomSourceIndex
+    }!
+    for portalIndex in barrier.orderedPortalIndices {
+        let portal =
+            level.rooms[barrierRoomIndex].portals[portalIndex]
+        level.rooms[barrierRoomIndex].portals[portalIndex].flags |= 1
+        let connectedRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        level.rooms[connectedRoomIndex]
+            .portals[portal.connectedPortal].flags |= 1
     }
 }
 

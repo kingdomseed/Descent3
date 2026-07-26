@@ -61,16 +61,21 @@ func decodeOSFACMVoice(_ data: Data) throws -> DecodedOSFVoice {
 private struct ACMBitReader {
     let data: Data
     var bitOffset = 0
+    private let sourceEOFZeroPaddingBits = 8
 
     mutating func read(_ count: Int) throws -> UInt32 {
         guard (0...31).contains(count),
-              bitOffset <= data.count * 8 - count else {
+              bitOffset <= data.count * 8 + sourceEOFZeroPaddingBits
+                - count else {
             throw OSFACMDecodeError.truncated
         }
         var value: UInt32 = 0
         for bit in 0..<count {
-            let byte = data[(bitOffset + bit) >> 3]
-            value |= UInt32((byte >> ((bitOffset + bit) & 7)) & 1) << bit
+            let sourceBit = bitOffset + bit
+            if sourceBit < data.count * 8 {
+                let byte = data[sourceBit >> 3]
+                value |= UInt32((byte >> (sourceBit & 7)) & 1) << bit
+            }
         }
         bitOffset += count
         return value

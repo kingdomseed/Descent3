@@ -21,6 +21,8 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
     case invalidFaceMaterialEdit(roomSourceIndex: Int, faceIndex: Int)
     case invalidPortalRenderingEdit(roomSourceIndex: Int, portalIndex: Int)
     case combinedPortalRenderingEditDeferred(roomSourceIndex: Int, portalIndex: Int)
+    case trainingGalleryBarrierUnavailable
+    case trainingGalleryBarrierEditRejected
     case invalidObjectTransformEdit(UInt32)
     case invalidPlayerStartTransformEdit(playerID: Int, handle: UInt32)
     case faceEditRejected(roomSourceIndex: Int, faceIndex: Int)
@@ -75,6 +77,10 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
             "The project contains an invalid or redundant rendering edit for source room \(roomSourceIndex) portal \(portalIndex)."
         case let .combinedPortalRenderingEditDeferred(roomSourceIndex, portalIndex):
             "Source room \(roomSourceIndex) portal \(portalIndex) belongs to a combined portal group; group-wide portal authoring is deferred."
+        case .trainingGalleryBarrierUnavailable:
+            "TrainingMission.cpp Script 032 / Portal2 is not bound to this canonical level."
+        case .trainingGalleryBarrierEditRejected:
+            "TrainingMission.cpp Script 032 / Portal2 could not update its two-sided barrier without breaking the canonical trigger, portal, collision, or presentation contract."
         case let .invalidObjectTransformEdit(handle):
             "The project contains an invalid or redundant transform edit for object handle \(handle)."
         case let .invalidPlayerStartTransformEdit(playerID, handle):
@@ -450,6 +456,21 @@ struct RevivalProject: Equatable, Sendable {
 
     var baseReference: CanonicalPackageReference { source.base }
     var persistedSource: RevivalProjectSource { source }
+    var trainingGalleryBarrierSourceDiagnostic: String? {
+        level.trainingGalleryBarrier.map {
+            "TrainingMission.cpp Script 032 / \($0.triggerName)"
+        }
+    }
+    var trainingGalleryBarrierIsOpen: Bool {
+        guard let barrier = level.trainingGalleryBarrier,
+              let room = level.rooms.first(where: {
+                  $0.sourceIndex == barrier.barrierRoomSourceIndex
+              }),
+              let portalIndex = barrier.orderedPortalIndices.first else {
+            return false
+        }
+        return room.portals[portalIndex].flags & 1 == 0
+    }
     var semanticDiff: [RevivalProjectDifference] {
         var differences = source.roomNameEdits.map { edit in
             RevivalProjectDifference.roomName(
@@ -803,6 +824,86 @@ struct RevivalProject: Equatable, Sendable {
         }
         level = candidate
         updatePortalRenderingEdit(roomSourceIndex: roomSourceIndex, portalIndex: portalIndex)
+        return previous
+    }
+
+    func isTrainingGalleryBarrierPortal(
+        roomSourceIndex: Int,
+        portalIndex: Int
+    ) -> Bool {
+        guard let barrier = level.trainingGalleryBarrier,
+              let room = level.rooms.first(where: {
+                  $0.sourceIndex == barrier.barrierRoomSourceIndex
+              }) else {
+            return false
+        }
+        for barrierPortalIndex in barrier.orderedPortalIndices {
+            if roomSourceIndex == room.sourceIndex,
+               portalIndex == barrierPortalIndex {
+                return true
+            }
+            let portal = room.portals[barrierPortalIndex]
+            if roomSourceIndex == portal.connectedRoom,
+               portalIndex == portal.connectedPortal {
+                return true
+            }
+        }
+        return false
+    }
+
+    @discardableResult
+    mutating func setTrainingGalleryBarrierOpen(
+        _ isOpen: Bool
+    ) throws -> Bool {
+        guard let barrier = level.trainingGalleryBarrier,
+              let barrierRoomIndex = level.rooms.firstIndex(where: {
+                  $0.sourceIndex == barrier.barrierRoomSourceIndex
+              }) else {
+            throw RevivalProjectError.trainingGalleryBarrierUnavailable
+        }
+        let previous = trainingGalleryBarrierIsOpen
+        guard previous != isOpen else {
+            throw RevivalProjectError.unchangedProperty
+        }
+
+        var candidate = level
+        var editedPortals: [(roomSourceIndex: Int, portalIndex: Int)] = []
+        for portalIndex in barrier.orderedPortalIndices {
+            let portal = candidate.rooms[barrierRoomIndex].portals[portalIndex]
+            candidate.rooms[barrierRoomIndex].portals[portalIndex].flags =
+                portalFlags(portal.flags, rendersFace: !isOpen)
+            editedPortals.append((
+                roomSourceIndex: barrier.barrierRoomSourceIndex,
+                portalIndex: portalIndex
+            ))
+
+            let connectedRoomIndex = candidate.rooms.firstIndex {
+                $0.sourceIndex == portal.connectedRoom
+            }!
+            let reciprocal = candidate.rooms[connectedRoomIndex]
+                .portals[portal.connectedPortal]
+            candidate.rooms[connectedRoomIndex]
+                .portals[portal.connectedPortal].flags = portalFlags(
+                    reciprocal.flags,
+                    rendersFace: !isOpen
+                )
+            editedPortals.append((
+                roomSourceIndex: portal.connectedRoom,
+                portalIndex: portal.connectedPortal
+            ))
+        }
+        do {
+            try candidate.validate()
+        } catch {
+            throw RevivalProjectError.trainingGalleryBarrierEditRejected
+        }
+        level = candidate
+        for portal in editedPortals {
+            updatePortalRenderingEdit(
+                roomSourceIndex: portal.roomSourceIndex,
+                portalIndex: portal.portalIndex
+            )
+        }
         return previous
     }
 

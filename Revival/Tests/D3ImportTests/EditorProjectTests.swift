@@ -352,6 +352,125 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testTrainingGalleryBarrierEditsAtomicallyPersistUndoAndStayOutOfPlayReturn() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(
+            path: "candidate.revival",
+            directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false
+        )
+        try writeCanonicalPackage(
+            makeTrainingGalleryBarrierLevel(),
+            to: candidate
+        )
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+
+        XCTAssertTrue(document.project.trainingGalleryBarrierIsOpen)
+        XCTAssertEqual(
+            document.project.trainingGalleryBarrierSourceDiagnostic,
+            "TrainingMission.cpp Script 032 / Portal2"
+        )
+        try document.selectRoom(sourceIndex: 2)
+        try document.selectPortal(1)
+        try document.setSelectedPortalRendersFaces(true)
+        assertTrainingGalleryBarrierRendering(
+            in: document.project.level,
+            rendersFaces: true
+        )
+        XCTAssertEqual(
+            document.undoManager?.undoActionName,
+            "Set Training Gallery Barrier"
+        )
+
+        document.undoManager?.undo()
+        assertTrainingGalleryBarrierRendering(
+            in: document.project.level,
+            rendersFaces: false
+        )
+        XCTAssertEqual(
+            document.undoManager?.redoActionName,
+            "Set Training Gallery Barrier"
+        )
+        document.undoManager?.redo()
+        assertTrainingGalleryBarrierRendering(
+            in: document.project.level,
+            rendersFaces: true
+        )
+
+        let firstWrapper = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        let secondWrapper = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(
+            firstWrapper.fileWrappers?["project.json"]?.regularFileContents,
+            secondWrapper.fileWrappers?["project.json"]?.regularFileContents
+        )
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(
+            from: firstWrapper,
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(reopened.project, document.project)
+        assertTrainingGalleryBarrierRendering(
+            in: reopened.project.level,
+            rendersFaces: true
+        )
+
+        try reopened.setTrainingGalleryBarrierOpen(true)
+        let playSession = reopened.makePlaySession()
+        reopened.commitPlaySession(playSession, renderingWorld: false)
+        let simulation = playSession.makePlayerSimulation(
+            presentationReadyTimestamp: 0
+        )
+        var didTrigger = false
+        for frameIndex in 1...20 {
+            let frame = simulation.update(
+                at: Double(frameIndex) * 0.1,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebota.osf"
+            }) {
+                didTrigger = true
+                break
+            }
+        }
+        XCTAssertTrue(didTrigger)
+        assertTrainingGalleryBarrierRendering(
+            in: simulation.level,
+            rendersFaces: true
+        )
+        assertTrainingGalleryBarrierRendering(
+            in: reopened.project.level,
+            rendersFaces: false
+        )
+        reopened.returnToEditor(renderingWorld: false)
+        XCTAssertNil(reopened.playSession)
+        assertTrainingGalleryBarrierRendering(
+            in: reopened.project.level,
+            rendersFaces: false
+        )
+    }
+
+    @MainActor
     func testObjectAndPlayerStartTransformsUseStableIdentitiesAndNamedUndo() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())
@@ -1726,6 +1845,36 @@ final class EditorProjectTests: XCTestCase {
                 return XCTFail("Expected the canonical object radius to refuse a near-wall move")
             }
         }
+    }
+}
+
+private func assertTrainingGalleryBarrierRendering(
+    in level: Level,
+    rendersFaces: Bool,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    let barrier = level.trainingGalleryBarrier!
+    let room = level.rooms.first {
+        $0.sourceIndex == barrier.barrierRoomSourceIndex
+    }!
+    for portalIndex in barrier.orderedPortalIndices {
+        let portal = room.portals[portalIndex]
+        XCTAssertEqual(
+            portal.flags & 1 != 0,
+            rendersFaces,
+            file: file,
+            line: line
+        )
+        let reciprocalRoom = level.rooms.first {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        XCTAssertEqual(
+            reciprocalRoom.portals[portal.connectedPortal].flags & 1 != 0,
+            rendersFaces,
+            file: file,
+            line: line
+        )
     }
 }
 

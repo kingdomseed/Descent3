@@ -273,7 +273,7 @@ final class CanonicalLevelTests: XCTestCase {
         )
     }
 
-    func testSchemaSevenRejectsHostileTrainingLessonAndVoiceMutations() throws {
+    func testSchemaEightRejectsHostileTrainingLessonAndVoiceMutations() throws {
         let base = makeSliceSixObjectRenderLevel()
         let archive = "missions/training.mn3"
         let stockSource = replacing(
@@ -309,6 +309,7 @@ final class CanonicalLevelTests: XCTestCase {
                 channelCount: 1,
                 frameCount: 1,
                 pcm16LittleEndian: Data(repeating: 0, count: 2),
+                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
                 sourceArchive: archive,
                 sourceSHA256:
                     "35e31517adb824f3637b877d500e12625b99d1a7044a2ce743087505c88ece36"
@@ -320,6 +321,7 @@ final class CanonicalLevelTests: XCTestCase {
                 channelCount: 1,
                 frameCount: 1,
                 pcm16LittleEndian: Data(repeating: 0, count: 2),
+                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
                 sourceArchive: archive,
                 sourceSHA256:
                     "048067398846141f61a2d503f6ec582f0dbbc5f3bf3feead48047eab808e540f"
@@ -362,7 +364,10 @@ final class CanonicalLevelTests: XCTestCase {
             lesson,
             voiceClips: clips
         )
-        XCTAssertNoThrow(try level.validate())
+        assertValidationError(
+            .invalidDependency("Training gallery package"),
+            level
+        )
         var wrongStockHash = clips
         wrongStockHash[0] = CanonicalVoiceClip(
             sourceName: clips[0].sourceName,
@@ -371,6 +376,7 @@ final class CanonicalLevelTests: XCTestCase {
             channelCount: clips[0].channelCount,
             frameCount: clips[0].frameCount,
             pcm16LittleEndian: clips[0].pcm16LittleEndian,
+            pcmSHA256: clips[0].pcmSHA256,
             sourceArchive: clips[0].sourceArchive,
             sourceSHA256: String(repeating: "d", count: 64)
         )
@@ -386,6 +392,7 @@ final class CanonicalLevelTests: XCTestCase {
             channelCount: clips[0].channelCount,
             frameCount: clips[0].frameCount,
             pcm16LittleEndian: clips[0].pcm16LittleEndian,
+            pcmSHA256: clips[0].pcmSHA256,
             sourceArchive: clips[0].sourceArchive,
             sourceSHA256: clips[0].sourceSHA256
         )
@@ -465,6 +472,7 @@ final class CanonicalLevelTests: XCTestCase {
             channelCount: clips[0].channelCount,
             frameCount: 2,
             pcm16LittleEndian: clips[0].pcm16LittleEndian,
+            pcmSHA256: clips[0].pcmSHA256,
             sourceArchive: clips[0].sourceArchive,
             sourceSHA256: clips[0].sourceSHA256
         )
@@ -480,6 +488,7 @@ final class CanonicalLevelTests: XCTestCase {
             channelCount: clips[0].channelCount,
             frameCount: clips[0].frameCount,
             pcm16LittleEndian: clips[0].pcm16LittleEndian,
+            pcmSHA256: clips[0].pcmSHA256,
             sourceArchive: clips[0].sourceArchive,
             sourceSHA256: "invalid"
         )
@@ -497,6 +506,150 @@ final class CanonicalLevelTests: XCTestCase {
                     historicalEagerBaseline:
                         base.dependencyManifest.historicalEagerBaseline
                 )
+            )
+        )
+    }
+
+    func testSchemaEightRejectsWrongTrainingGalleryMarkerIdentity() throws {
+        let level = makeTrainingGalleryBarrierLevel()
+        try level.validate()
+        let markerIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == 6_163
+        })
+        let marker = level.objects[markerIndex]
+
+        func replacingMarker(
+            type: UInt8,
+            instanceName: String
+        ) -> PlacedObject {
+            PlacedObject(
+                handle: marker.handle,
+                type: type,
+                storedID: marker.storedID,
+                definition: marker.definition,
+                instanceName: instanceName,
+                flags: marker.flags,
+                doorShields: marker.doorShields,
+                location: marker.location,
+                position: marker.position,
+                orientation: marker.orientation,
+                containsType: marker.containsType,
+                containsID: marker.containsID,
+                containsCount: marker.containsCount,
+                lifeLeft: marker.lifeLeft,
+                soundSource: marker.soundSource,
+                inertScriptName: marker.inertScriptName,
+                inertModuleName: marker.inertModuleName,
+                lightmapSubmodels: marker.lightmapSubmodels
+            )
+        }
+
+        var wrongTypeObjects = level.objects
+        wrongTypeObjects[markerIndex] = replacingMarker(
+            type: 7,
+            instanceName: "FlashLight-2"
+        )
+        assertValidationError(
+            .invalidDependency("Training gallery barrier"),
+            replacing(level, objects: wrongTypeObjects)
+        )
+
+        var wrongNameObjects = level.objects
+        wrongNameObjects[markerIndex] = replacingMarker(
+            type: 11,
+            instanceName: "Not-FlashLight-2"
+        )
+        assertValidationError(
+            .invalidDependency("Training gallery barrier"),
+            replacing(level, objects: wrongNameObjects)
+        )
+    }
+
+    func testCanonicalVoiceClipRejectsSameLengthPCMMutation() throws {
+        let level = makeTrainingGalleryBarrierLevel()
+        try level.validate()
+        var clips = level.voiceClips
+        let clip = try XCTUnwrap(clips.last)
+        clips[clips.count - 1] = CanonicalVoiceClip(
+            sourceName: clip.sourceName,
+            sourceEntryIndex: clip.sourceEntryIndex,
+            sampleRate: clip.sampleRate,
+            channelCount: clip.channelCount,
+            frameCount: clip.frameCount,
+            pcm16LittleEndian: Data([1, 0]),
+            pcmSHA256: clip.pcmSHA256,
+            sourceArchive: clip.sourceArchive,
+            sourceSHA256: clip.sourceSHA256
+        )
+
+        assertValidationError(
+            .invalidDependency("Canonical voice clip"),
+            replacing(level, voiceClips: clips)
+        )
+    }
+
+    func testSchemaEightRejectsWrongReciprocalGallerySurface() throws {
+        let level = makeTrainingGalleryBarrierLevel()
+        try level.validate()
+        let barrier = level.trainingGalleryBarrier!
+        let barrierRoom = level.rooms.first {
+            $0.sourceIndex == barrier.barrierRoomSourceIndex
+        }!
+        let primaryPortal = barrierRoom.portals[
+            barrier.orderedPortalIndices[0]
+        ]
+        let primaryTexture =
+            barrierRoom.faces[primaryPortal.faceIndex].texture
+        let alternateMaterial = try XCTUnwrap(
+            level.presentationMaterials.first {
+                $0.texture != primaryTexture && $0.waterProcedural == nil
+            }
+        )
+        let reciprocalRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex {
+                $0.sourceIndex == primaryPortal.connectedRoom
+            }
+        )
+        let reciprocalPortal = level.rooms[reciprocalRoomIndex]
+            .portals[primaryPortal.connectedPortal]
+        let reciprocalFaceIndex = reciprocalPortal.faceIndex
+        let reciprocalFace =
+            level.rooms[reciprocalRoomIndex].faces[reciprocalFaceIndex]
+        var rooms = level.rooms
+        rooms[reciprocalRoomIndex].faces[reciprocalFaceIndex] = .init(
+            corners: reciprocalFace.corners,
+            flags: reciprocalFace.flags,
+            portalIndex: reciprocalFace.portalIndex,
+            texture: alternateMaterial.texture,
+            lightmapInfoIndex: reciprocalFace.lightmapInfoIndex,
+            allowsLightCorona: reciprocalFace.allowsLightCorona,
+            lightMultiple: reciprocalFace.lightMultiple,
+            special: reciprocalFace.special
+        )
+
+        assertValidationError(
+            .invalidDependency("Training gallery barrier"),
+            replacing(
+                level,
+                rooms: rooms,
+                surfacePhysics: level.surfacePhysics
+            )
+        )
+
+        let forceFieldAlternatePhysics = level.surfacePhysics.map {
+            $0.texture == alternateMaterial.texture
+                ? SurfacePhysicsEntry(
+                    texture: $0.texture,
+                    behavior: .forceField
+                )
+                : $0
+        }
+        assertValidationError(
+            .invalidDependency("Training gallery barrier"),
+            replacing(
+                level,
+                rooms: rooms,
+                surfacePhysics: forceFieldAlternatePhysics
             )
         )
     }
@@ -2668,6 +2821,7 @@ func replacing(
     defaultPlayerBinding: DefaultPlayerBinding? = nil,
     objectPresentations: [ObjectPresentationReference]? = nil,
     trainingOpeningLesson: TrainingOpeningLesson? = nil,
+    trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
     sourceChunks: [SourceChunkRecord]? = nil
@@ -2704,6 +2858,8 @@ func replacing(
         objectPresentations: objectPresentations ?? level.objectPresentations,
         trainingOpeningLesson:
             trainingOpeningLesson ?? level.trainingOpeningLesson,
+        trainingGalleryBarrier:
+            trainingGalleryBarrier ?? level.trainingGalleryBarrier,
         voiceClips: voiceClips ?? level.voiceClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
         sourceChunks: sourceChunks ?? level.sourceChunks

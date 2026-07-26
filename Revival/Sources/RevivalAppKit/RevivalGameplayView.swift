@@ -174,17 +174,52 @@ final class RevivalGameplayView: MTKView {
             }
             return
         }
-        trainingMessageLabel.maximumNumberOfLines =
-            Self.trainingMessageLineCount(for: frame.trainingOpeningFeedback)
-        needsLayout = true
-        trainingMessageLabel.stringValue = frame.trainingOpeningFeedback
-            .flatMap(\.hudMessages).joined(
-            separator: "\n"
-        )
-        trainingMessageExpiresAt = frame.gameTime + 5
         let voiceSourceName = Self.sourceStreamingVoiceName(
             for: frame.trainingOpeningFeedback
         )!
+        let voicePrecedesHUDMessages =
+            frame.trainingOpeningFeedback.last!
+                .voicePrecedesHUDMessages
+        Self.presentTrainingFeedback(
+            voicePrecedesHUDMessages: voicePrecedesHUDMessages,
+            attemptVoice: {
+                try self.playTrainingVoice(
+                    named: voiceSourceName,
+                    from: voiceClips
+                )
+            },
+            presentHUDMessages: {
+                self.trainingMessageLabel.maximumNumberOfLines =
+                    Self.trainingMessageLineCount(
+                        for: frame.trainingOpeningFeedback
+                    )
+                self.needsLayout = true
+                self.trainingMessageLabel.stringValue =
+                    frame.trainingOpeningFeedback.flatMap(\.hudMessages)
+                        .joined(separator: "\n")
+                self.trainingMessageExpiresAt = frame.gameTime + 5
+            }
+        )
+    }
+
+    static func presentTrainingFeedback(
+        voicePrecedesHUDMessages: Bool,
+        attemptVoice: () throws -> Void,
+        presentHUDMessages: () -> Void
+    ) {
+        if voicePrecedesHUDMessages {
+            try? attemptVoice()
+        }
+        presentHUDMessages()
+        if !voicePrecedesHUDMessages {
+            try? attemptVoice()
+        }
+    }
+
+    private func playTrainingVoice(
+        named voiceSourceName: String,
+        from voiceClips: [CanonicalVoiceClip]
+    ) throws {
         do {
             trainingVoicePlayer?.stop()
             let clip = voiceClips.first(where: {

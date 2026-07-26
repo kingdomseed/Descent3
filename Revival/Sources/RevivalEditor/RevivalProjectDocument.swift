@@ -270,6 +270,13 @@ final class RevivalProjectDocument: NSDocument {
         guard let selection = editorSelection.portal else {
             preconditionFailure("A portal must be selected before editing its rendering state")
         }
+        if project.isTrainingGalleryBarrierPortal(
+            roomSourceIndex: selection.roomSourceIndex,
+            portalIndex: selection.portalIndex
+        ) {
+            try setTrainingGalleryBarrierOpen(!rendersFace)
+            return
+        }
         var previous = false
         try projectStorage.withLock { storedProject in
             guard var project = storedProject else {
@@ -284,6 +291,20 @@ final class RevivalProjectDocument: NSDocument {
         }
         registerPortalRenderingUndo(selection: selection, rendersFace: previous)
         undoManager?.setActionName("Set Portal Rendering")
+        refreshWindowControllers()
+    }
+
+    func setTrainingGalleryBarrierOpen(_ isOpen: Bool) throws {
+        var previous = false
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            previous = try project.setTrainingGalleryBarrierOpen(isOpen)
+            storedProject = project
+        }
+        registerTrainingGalleryBarrierUndo(isOpen: previous)
+        undoManager?.setActionName("Set Training Gallery Barrier")
         refreshWindowControllers()
     }
 
@@ -627,6 +648,18 @@ final class RevivalProjectDocument: NSDocument {
                 try document.setSelectedPortalRendersFaces(rendersFace)
             } catch {
                 preconditionFailure("Portal-rendering undo invariant failed: \(error)")
+            }
+        }
+    }
+
+    private func registerTrainingGalleryBarrierUndo(isOpen: Bool) {
+        undoManager?.registerUndo(withTarget: self) { document in
+            do {
+                try document.setTrainingGalleryBarrierOpen(isOpen)
+            } catch {
+                preconditionFailure(
+                    "Training-gallery barrier undo invariant failed: \(error)"
+                )
             }
         }
     }
