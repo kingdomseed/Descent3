@@ -582,7 +582,8 @@ func runD3Import(
         } else if object.handle == 4_112
                     || object.handle == 2_074
                     || object.handle == 2_075
-                    || object.handle == 2_077,
+                    || object.handle == 2_077
+                    || object.handle == 2_078,
                   object.definition?.sourceName.caseInsensitiveCompare(
                       destroyRobotPage.name
                   ) == .orderedSame {
@@ -605,13 +606,13 @@ func runD3Import(
             lowDistance: page.lowDistance
         )
     }
-    precondition(reachedObjectPresentations.count == 12)
+    precondition(reachedObjectPresentations.count == 13)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 27)
+    precondition(deferredRoomObjects.count == 26)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -808,6 +809,10 @@ func runD3Import(
         $0.instanceName?.caseInsensitiveCompare("RASBot3")
             == .orderedSame
     }!
+    let rasBot4 = robotGuidebotLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("RASBot4")
+            == .orderedSame
+    }!
     let cameraMonitorModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare(
             cameraMonitorPage.primaryModelName
@@ -1001,6 +1006,15 @@ func runD3Import(
             && rasBot3.flags == 5_121
             && rasBot3.location == .room(42)
     )
+    precondition(
+        rasBot4.handle == 2_078
+            && rasBot4.type == 2
+            && rasBot4.storedID == 106
+            && rasBot4.definition?.sourceName
+                == "RAS1 Light Security Flyer"
+            && rasBot4.flags == 5_121
+            && rasBot4.location == .room(0)
+    )
     let rasBot1Level = cameraMonitorLevel.addingTrainingRASBot1DeathChain(
         .init(
             robotObjectHandle: rasBot1.handle,
@@ -1017,11 +1031,19 @@ func runD3Import(
             combat: .stockTraining
         )
     )
-    let level = rasBot2Level.addingTrainingRASBot3DeathChain(
+    let rasBot3Level = rasBot2Level.addingTrainingRASBot3DeathChain(
         .init(
             robotObjectHandle: rasBot3.handle,
             robotRoomSourceIndex: 42,
             robotFlags: rasBot3.flags,
+            combat: .stockTraining
+        )
+    )
+    let level = rasBot3Level.addingTrainingRASBot4DeathChain(
+        .init(
+            robotObjectHandle: rasBot4.handle,
+            robotRoomSourceIndex: 0,
+            robotFlags: rasBot4.flags,
             combat: .stockTraining
         )
     )

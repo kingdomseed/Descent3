@@ -617,6 +617,7 @@ struct TrainingRobotDeathChain: Codable, Equatable, Sendable {
 typealias TrainingRASBot1DeathChain = TrainingRobotDeathChain
 typealias TrainingRASBot2DeathChain = TrainingRobotDeathChain
 typealias TrainingRASBot3DeathChain = TrainingRobotDeathChain
+typealias TrainingRASBot4DeathChain = TrainingRobotDeathChain
 
 struct TrainingMarkerLightPresentation:
     Codable, Equatable, Sendable
@@ -1045,6 +1046,22 @@ func validateStockTrainingRASBot3DeathPackage(
         expectedRoomSourceIndex: 42,
         expectedInstanceName: "RASBot3",
         dependencyName: "Training RASBot3 package",
+        objects: objects,
+        objectPresentations: objectPresentations
+    )
+}
+
+func validateStockTrainingRASBot4DeathPackage(
+    chain: TrainingRASBot4DeathChain?,
+    objects: [PlacedObject],
+    objectPresentations: [ObjectPresentationReference]
+) throws {
+    try validateStockTrainingRASBotDeathPackage(
+        chain: chain,
+        expectedHandle: 2_078,
+        expectedRoomSourceIndex: 0,
+        expectedInstanceName: "RASBot4",
+        dependencyName: "Training RASBot4 package",
         objects: objects,
         objectPresentations: objectPresentations
     )
@@ -1552,6 +1569,7 @@ struct Level: Codable, Equatable, Sendable {
     let trainingRASBot1DeathChain: TrainingRASBot1DeathChain?
     let trainingRASBot2DeathChain: TrainingRASBot2DeathChain?
     let trainingRASBot3DeathChain: TrainingRASBot3DeathChain?
+    let trainingRASBot4DeathChain: TrainingRASBot4DeathChain?
     let voiceClips: [CanonicalVoiceClip]
     @SchemaCompatibleSoundClips
     private(set) var soundClips: [CanonicalSoundClip]
@@ -1589,6 +1607,7 @@ struct Level: Codable, Equatable, Sendable {
         trainingRASBot1DeathChain: TrainingRASBot1DeathChain? = nil,
         trainingRASBot2DeathChain: TrainingRASBot2DeathChain? = nil,
         trainingRASBot3DeathChain: TrainingRASBot3DeathChain? = nil,
+        trainingRASBot4DeathChain: TrainingRASBot4DeathChain? = nil,
         voiceClips: [CanonicalVoiceClip] = [],
         soundClips: [CanonicalSoundClip] = [],
         dependencyManifest: DependencyManifest,
@@ -1624,6 +1643,7 @@ struct Level: Codable, Equatable, Sendable {
         self.trainingRASBot1DeathChain = trainingRASBot1DeathChain
         self.trainingRASBot2DeathChain = trainingRASBot2DeathChain
         self.trainingRASBot3DeathChain = trainingRASBot3DeathChain
+        self.trainingRASBot4DeathChain = trainingRASBot4DeathChain
         self.voiceClips = voiceClips
         self.soundClips = soundClips
         self.dependencyManifest = dependencyManifest
@@ -1645,11 +1665,13 @@ struct Level: Codable, Equatable, Sendable {
                 && trainingRASBot1DeathChain == nil
                 && trainingRASBot2DeathChain == nil
                 && trainingRASBot3DeathChain == nil
+                && trainingRASBot4DeathChain == nil
             || schemaVersion == 10
                 && trainingCameraMonitorChain != nil
                 && trainingRASBot1DeathChain == nil
                 && trainingRASBot2DeathChain == nil
                 && trainingRASBot3DeathChain == nil
+                && trainingRASBot4DeathChain == nil
                 && _soundClips.wasPresent
             || schemaVersion == 11
                 && trainingCameraMonitorChain != nil
@@ -2279,6 +2301,28 @@ struct Level: Codable, Equatable, Sendable {
                 )
             }
         }
+        if let chain = trainingRASBot4DeathChain {
+            guard trainingRASBot3DeathChain != nil,
+                  chain.combat == .stockTraining,
+                  let robot = objects.first(where: {
+                      $0.handle == chain.robotObjectHandle
+                  }),
+                  robot.type == 2,
+                  robot.storedID == 106,
+                  robot.definition?.sourceName
+                    == "RAS1 Light Security Flyer",
+                  robot.instanceName == "RASBot4",
+                  robot.location == .room(chain.robotRoomSourceIndex),
+                  robot.flags == chain.robotFlags,
+                  objectPresentations.contains(where: {
+                      $0.objectHandle == chain.robotObjectHandle
+                          && $0.isVisible
+                  }) else {
+                throw LevelValidationError.invalidDependency(
+                    "Training RASBot4 death chain"
+                )
+            }
+        }
         var voiceNames = Set<String>()
         for clip in voiceClips {
             let voiceSource = SourceResource(
@@ -2502,6 +2546,13 @@ struct Level: Codable, Equatable, Sendable {
                     objectPresentations: objectPresentations
                 )
             }
+            if trainingRASBot4DeathChain != nil {
+                try validateStockTrainingRASBot4DeathPackage(
+                    chain: trainingRASBot4DeathChain,
+                    objects: objects,
+                    objectPresentations: objectPresentations
+                )
+            }
         }
         var retiredSlots = Set<Int>()
         for handle in retiredObjectHandles {
@@ -2682,6 +2733,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: trainingRASBot1DeathChain,
             trainingRASBot2DeathChain: trainingRASBot2DeathChain,
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -2772,6 +2824,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: trainingRASBot1DeathChain,
             trainingRASBot2DeathChain: trainingRASBot2DeathChain,
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -2819,6 +2872,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: trainingRASBot1DeathChain,
             trainingRASBot2DeathChain: trainingRASBot2DeathChain,
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
@@ -2875,6 +2929,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: trainingRASBot1DeathChain,
             trainingRASBot2DeathChain: trainingRASBot2DeathChain,
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -2949,6 +3004,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: trainingRASBot1DeathChain,
             trainingRASBot2DeathChain: trainingRASBot2DeathChain,
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -3004,6 +3060,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: trainingRASBot1DeathChain,
             trainingRASBot2DeathChain: trainingRASBot2DeathChain,
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             voiceClips: voiceClips + [voiceClip],
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -3115,6 +3172,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: trainingRASBot1DeathChain,
             trainingRASBot2DeathChain: trainingRASBot2DeathChain,
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             voiceClips: voiceClips + addedVoiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -3194,6 +3252,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: trainingRASBot1DeathChain,
             trainingRASBot2DeathChain: trainingRASBot2DeathChain,
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             voiceClips: voiceClips + addedVoiceClips,
             soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
@@ -3239,6 +3298,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: chain,
             trainingRASBot2DeathChain: trainingRASBot2DeathChain,
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
@@ -3280,6 +3340,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: trainingRASBot1DeathChain,
             trainingRASBot2DeathChain: chain,
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
@@ -3321,6 +3382,49 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot1DeathChain: trainingRASBot1DeathChain,
             trainingRASBot2DeathChain: trainingRASBot2DeathChain,
             trainingRASBot3DeathChain: chain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
+            voiceClips: voiceClips,
+            soundClips: soundClips,
+            dependencyManifest: dependencyManifest,
+            sourceChunks: sourceChunks
+        )
+    }
+
+    func addingTrainingRASBot4DeathChain(
+        _ chain: TrainingRASBot4DeathChain
+    ) -> Level {
+        Level(
+            schemaVersion: 11,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
+            lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
+            objectPresentations: objectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
+            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
+            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
+            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: chain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
