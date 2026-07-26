@@ -500,6 +500,111 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testCameraMonitorSecurityCameraEditRoundTripsIntoDisposablePlay() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(
+            path: "candidate.revival",
+            directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false
+        )
+        let base = makeTrainingCameraMonitorLevel()
+        try writeCanonicalPackage(base, to: candidate)
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        document.undoManager?.groupsByEvent = false
+        let chain = try XCTUnwrap(
+            document.project.level.trainingCameraMonitorChain
+        )
+        let camera = try XCTUnwrap(
+            document.project.level.objects.first {
+                $0.handle == chain.securityCameraObjectHandle
+            }
+        )
+        let movedPosition = Vector3(
+            x: camera.position.x + 0.05,
+            y: camera.position.y,
+            z: camera.position.z
+        )
+
+        document.undoManager?.beginUndoGrouping()
+        let result = try document.moveObject(
+            handle: camera.handle,
+            to: movedPosition
+        )
+        document.undoManager?.endUndoGrouping()
+
+        XCTAssertEqual(
+            result.diagnostic,
+            "Moved TrainingMission.cpp Script 059 SecurityCamera handle \(camera.handle) for the Camera Monitor popup. Undo action: Move Object."
+        )
+        XCTAssertEqual(document.undoManager?.undoActionName, "Move Object")
+        XCTAssertEqual(
+            activation.level.objects.first {
+                $0.handle == camera.handle
+            }?.position,
+            camera.position
+        )
+
+        let first = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        let second = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(
+            first.fileWrappers?["project.json"]?.regularFileContents,
+            second.fileWrappers?["project.json"]?.regularFileContents
+        )
+
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(
+            from: first,
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(
+            reopened.project.level.objects.first {
+                $0.handle == camera.handle
+            }?.position,
+            result.committedPosition
+        )
+
+        let session = reopened.makePlaySession()
+        reopened.commitPlaySession(session, renderingWorld: false)
+        let simulation = session.makePlayerSimulation(
+            presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(at: 0.1, input: .zero)
+        let used = simulation.update(
+            at: 0.2,
+            input: .init(usesInventory: true)
+        )
+        XCTAssertNotNil(used.trainingCameraMonitor)
+        XCTAssertNotEqual(simulation.level, reopened.project.level)
+        reopened.returnToEditor(renderingWorld: false)
+        XCTAssertNil(reopened.playSession)
+        XCTAssertEqual(
+            reopened.project.level.objects.first {
+                $0.handle == camera.handle
+            }?.position,
+            result.committedPosition
+        )
+    }
+
+    @MainActor
     func testObjectAndPlayerStartTransformsUseStableIdentitiesAndNamedUndo() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())

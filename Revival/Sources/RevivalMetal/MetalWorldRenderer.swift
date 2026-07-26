@@ -41,6 +41,25 @@ func fullDrawableMetalViewport(
     )
 }
 
+func cameraMonitorMetalViewport(
+    drawableWidth: Double,
+    drawableHeight: Double
+) -> MTLViewport {
+    let normalSize = drawableHeight / 4
+    let spacing = (drawableWidth - 3 * normalSize) / 3
+    let centerX = (spacing + normalSize) / 2
+    let centerY = drawableHeight - normalSize / 2 - drawableHeight / 24
+    let popupSize = normalSize + normalSize / 4
+    return MTLViewport(
+        originX: centerX - popupSize / 2,
+        originY: centerY - popupSize / 2,
+        width: popupSize,
+        height: popupSize,
+        znear: 0,
+        zfar: 1
+    )
+}
+
 @MainActor
 final class MetalWorldRenderer: NSObject, MTKViewDelegate {
     private let view: MTKView
@@ -143,7 +162,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             guard let allocator = device.makeCommandAllocator(),
                   let commandBuffer = device.makeCommandBuffer(),
                   let uniformBuffer = device.makeBuffer(
-                    length: MemoryLayout<MetalWorldUniforms>.stride,
+                    length: 2 * metalWorldUniformStride,
                     options: .storageModeShared
                   ) else {
                 throw MetalWorldRendererError.allocationFailed("frame resources")
@@ -226,7 +245,8 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
                 presentationFrame: .init(
                     systemsFrameDuration: frame.systemsFrameDuration,
                     systemsGameTime: frame.systemsGameTime
-                )
+                ),
+                trainingCameraMonitor: frame.trainingCameraMonitor
             )
         )
     }
@@ -287,7 +307,8 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
         presentation.updateCoronaDraws(frameSlotIndex: slotIndex)
         writeWorldUniforms(
             camera: presentation.plan.camera,
-            to: slot.uniformBuffer
+            to: slot.uniformBuffer,
+            offset: 0
         )
 
         renderPass.depthAttachment.texture = depthTexture
@@ -400,6 +421,110 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             }
         }
         encoder.endEncoding()
+
+        if let auxiliaryCamera = presentation.plan.auxiliaryCamera,
+           !presentation.auxiliaryDraws.isEmpty {
+            let viewport = cameraMonitorMetalViewport(
+                drawableWidth: Double(view.drawableSize.width),
+                drawableHeight: Double(view.drawableSize.height)
+            )
+            writeWorldUniforms(
+                camera: RoomCamera(
+                    position: auxiliaryCamera.position,
+                    target: auxiliaryCamera.target,
+                    up: auxiliaryCamera.up,
+                    projection: auxiliaryCamera.projection.withAspectRatio(
+                        Float(viewport.width / viewport.height)
+                    )
+                ),
+                to: slot.uniformBuffer,
+                offset: metalWorldUniformStride
+            )
+            renderPass.colorAttachments[0]?.loadAction = .load
+            renderPass.depthAttachment.loadAction = .clear
+            renderPass.depthAttachment.clearDepth = 1
+            guard let auxiliaryEncoder =
+                    slot.commandBuffer.makeRenderCommandEncoder(
+                        descriptor: renderPass
+                    ) else {
+                slot.commandBuffer.endCommandBuffer()
+                return
+            }
+            auxiliaryEncoder.setViewport(viewport)
+            auxiliaryEncoder.setCullMode(.none)
+            argumentTable.setAddress(
+                slot.uniformBuffer.gpuAddress
+                    + UInt64(metalWorldUniformStride),
+                index: 1
+            )
+            auxiliaryEncoder.setArgumentTable(
+                argumentTable,
+                stages: [.vertex, .fragment]
+            )
+            var auxiliaryBlend: MetalWorldBlendMode?
+            var auxiliaryDepthWrite: Bool?
+            for draw in presentation.auxiliaryDraws {
+                let blend: MetalWorldBlendMode
+                switch draw.blend {
+                case .opaque: blend = .opaque
+                case .sourceAlpha: blend = .sourceAlpha
+                case .additiveSourceAlpha:
+                    blend = .additiveSourceAlpha
+                }
+                if auxiliaryBlend != blend {
+                    switch blend {
+                    case .opaque:
+                        auxiliaryEncoder.setRenderPipelineState(
+                            opaquePipeline
+                        )
+                    case .sourceAlpha:
+                        auxiliaryEncoder.setRenderPipelineState(
+                            sourceAlphaPipeline
+                        )
+                    case .additiveSourceAlpha:
+                        auxiliaryEncoder.setRenderPipelineState(
+                            additivePipeline
+                        )
+                    }
+                    auxiliaryBlend = blend
+                }
+                if auxiliaryDepthWrite != draw.writesDepth {
+                    auxiliaryEncoder.setDepthStencilState(
+                        draw.writesDepth
+                            ? opaqueDepthState
+                            : translucentDepthState
+                    )
+                    auxiliaryDepthWrite = draw.writesDepth
+                }
+                argumentTable.setAddress(
+                    presentation.worldVertexBuffer(
+                        frameSlotIndex: slotIndex
+                    ).gpuAddress + UInt64(draw.vertexByteOffset),
+                    index: 0
+                )
+                argumentTable.setTexture(
+                    presentation.baseTexture(
+                        for: draw,
+                        frameSlotIndex: slotIndex
+                    ).gpuResourceID,
+                    index: 0
+                )
+                argumentTable.setTexture(
+                    presentation.lightmapTexture(for: draw).gpuResourceID,
+                    index: 1
+                )
+                auxiliaryEncoder.drawIndexedPrimitives(
+                    primitiveType: .triangle,
+                    indexCount: draw.indexCount,
+                    indexType: .uint32,
+                    indexBuffer: presentation.indexBuffer.gpuAddress
+                        + UInt64(draw.indexByteOffset),
+                    indexBufferLength: presentation.indexBuffer.length
+                        - draw.indexByteOffset
+                )
+            }
+            auxiliaryEncoder.endEncoding()
+        }
         slot.commandBuffer.endCommandBuffer()
 
         submittedValue += 1
@@ -530,6 +655,8 @@ private struct MetalWorldUniforms {
     var worldToClip: simd_float4x4
 }
 
+private let metalWorldUniformStride = 256
+
 private struct MetalEncodedDraw {
     let texture: SourceResource?
     let blend: PresentationBlend
@@ -554,6 +681,7 @@ private final class MetalLevelPresentation {
     let residencySet: any MTLResidencySet
     let indexBuffer: any MTLBuffer
     private(set) var draws: [MetalEncodedDraw]
+    private(set) var auxiliaryDraws: [MetalEncodedDraw]
     private(set) var coronaDraws: [MetalEncodedCoronaDraw] = []
     let coronaIndexBuffer: any MTLBuffer
     let whiteLightmap: any MTLTexture
@@ -616,6 +744,9 @@ private final class MetalLevelPresentation {
         self.indexBuffer = indexBuffer
         preparedDraws = encodedDraws
         draws = plan.activeDrawIndices.map { encodedDraws[$0] }
+        auxiliaryDraws = plan.auxiliaryActiveDrawIndices.map {
+            encodedDraws[$0]
+        }
 
         let coronaCapacity = max(
             1,
@@ -723,6 +854,9 @@ private final class MetalLevelPresentation {
         )
         self.plan = plan
         draws = plan.activeDrawIndices.map { preparedDraws[$0] }
+        auxiliaryDraws = plan.auxiliaryActiveDrawIndices.map {
+            preparedDraws[$0]
+        }
     }
 
     func updateWorldVertices(frameSlotIndex: Int) {
@@ -1001,11 +1135,12 @@ private func replaceRGBA8(
 
 private func writeWorldUniforms(
     camera: RoomCamera,
-    to buffer: any MTLBuffer
+    to buffer: any MTLBuffer,
+    offset: Int
 ) {
     var uniforms = MetalWorldUniforms(worldToClip: worldToClip(camera))
     withUnsafeBytes(of: &uniforms) { bytes in
-        buffer.contents().copyMemory(
+        buffer.contents().advanced(by: offset).copyMemory(
             from: bytes.baseAddress!,
             byteCount: bytes.count
         )

@@ -420,6 +420,16 @@ func runD3Import(
         overlay: overlayData,
         name: "RAS1 Light Security Flyer"
     )
+    let cameraMonitorPage = try resolveRetailGenericModelPage(
+        table: tableData,
+        overlay: overlayData,
+        name: "Camera Monitor"
+    )
+    let securityCameraPage = try resolveRetailGenericModelPage(
+        table: tableData,
+        overlay: overlayData,
+        name: "new wall cam"
+    )
     let reachedModelNames = Set([
         reachedPages.ship.primaryModelName,
         reachedPages.ship.mediumModelName,
@@ -434,11 +444,10 @@ func runD3Import(
         destroyRobotPage.primaryModelName,
         destroyRobotPage.mediumModelName,
         destroyRobotPage.lowModelName,
+        cameraMonitorPage.primaryModelName,
+        cameraMonitorPage.mediumModelName,
+        cameraMonitorPage.lowModelName,
     ].compactMap { $0 })
-    precondition(Set(reachedModelNames.map { $0.lowercased() }) == Set([
-        "pyrogl.oof", "pyroglmed.oof", "pyrogllo.oof", "pyrodeath.oof",
-        "invisiblepowerup.oof", "buddybot.oof", "gyro.oof",
-    ]))
     let sortedModelNames = reachedModelNames.sorted {
         $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
     }
@@ -568,6 +577,11 @@ func runD3Import(
                       destroyRobotPage.name
                   ) == .orderedSame {
             page = destroyRobotPage
+        } else if object.handle == 6_167,
+                  object.definition?.sourceName.caseInsensitiveCompare(
+                      cameraMonitorPage.name
+                  ) == .orderedSame {
+            page = cameraMonitorPage
         } else {
             return nil
         }
@@ -581,13 +595,13 @@ func runD3Import(
             lowDistance: page.lowDistance
         )
     }
-    precondition(reachedObjectPresentations.count == 8)
+    precondition(reachedObjectPresentations.count == 9)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 31)
+    precondition(deferredRoomObjects.count == 30)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -646,6 +660,8 @@ func runD3Import(
         "GuideBotA.osf",
         "GuideBotB.osf",
         "proceed5.osf",
+        "GuideBotC.osf",
+        "GuideBotD.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -731,7 +747,7 @@ func runD3Import(
             && destroyRobot.flags == 5_121
             && destroyRobot.location == .room(37)
     )
-    let level = galleryLevel.addingTrainingRobotGuidebotChain(
+    let robotGuidebotLevel = galleryLevel.addingTrainingRobotGuidebotChain(
         .init(
             destroyRobotObjectHandle: destroyRobot.handle,
             guidebotObjectHandle: 6_164,
@@ -747,8 +763,100 @@ func runD3Import(
             combat: .stockTraining,
             guidebot: .stockTraining
         ),
-        voiceClips: Array(voiceClips.suffix(2))
+        voiceClips: [voiceClips[3], voiceClips[4]]
     )
+    let cameraMonitor = robotGuidebotLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("CameraMonitor")
+            == .orderedSame
+    }!
+    let securityCamera = robotGuidebotLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("SecurityCamera")
+            == .orderedSame
+    }!
+    let cameraMonitorModel = reachedModels.first {
+        $0.source.sourceName.caseInsensitiveCompare(
+            cameraMonitorPage.primaryModelName
+        ) == .orderedSame
+    }!
+    guard let securityCameraArchive = presentationArchives.first(
+        where: {
+            $0.archive.entry(
+                named: securityCameraPage.primaryModelName
+            ) != nil
+        }
+    ), let securityCameraEntry = securityCameraArchive.archive.entry(
+        named: securityCameraPage.primaryModelName
+    ) else {
+        throw D3ImportOperationError.missingPresentationAsset(
+            securityCameraPage.primaryModelName
+        )
+    }
+    let securityCameraPayload =
+        securityCameraArchive.validated.data.subdata(
+            in: securityCameraEntry.payloadRange
+        )
+    let securityCameraGunpoint = try reachedOutrageModelGunpoint(
+        securityCameraPayload,
+        index: 0
+    )
+    let pickupSoundPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "PupC1"
+    )
+    let pickupSoundEntry = d3Archive.uniqueEntry(
+        named: pickupSoundPage.sourceName
+    )
+    let pickupSoundPayload = d3.data.subdata(
+        in: pickupSoundEntry.payloadRange
+    )
+    let pickupSound = try decodeReachedPCM16WAV(pickupSoundPayload)
+    let cameraMonitorLevel = robotGuidebotLevel
+        .addingTrainingCameraMonitorChain(
+        .init(
+            pickupObjectHandle: cameraMonitor.handle,
+            securityCameraObjectHandle: securityCamera.handle,
+            pickupCollisionRadius: cameraMonitorModel.collisionRadius,
+            pickupMessage: messages["UseCameraMonitor"]!,
+            pickupVoiceSourceName: "guidebotc.osf",
+            pickupSoundSourceName: pickupSoundPage.sourceName,
+            useMessage: messages["GBExtra"]!,
+            useVoiceSourceName: "guidebotd.osf",
+            popupDuration: 10,
+            popupZoom: 1,
+            cameraGunpointIndex: 0,
+            cameraLocalPosition: securityCameraGunpoint.position,
+            cameraLocalForward: securityCameraGunpoint.forward,
+            completionTimerDuration: 2
+        ),
+        voiceClips: Array(voiceClips.suffix(2)),
+        soundClip: .init(
+            logicalName: pickupSoundPage.logicalName,
+            sourceName: pickupSoundPage.sourceName,
+            sourceEntryIndex: pickupSoundPage.storedIndex,
+            sampleRate: pickupSound.sampleRate,
+            channelCount: pickupSound.channelCount,
+            frameCount: pickupSound.frameCount,
+            pcm16LittleEndian: pickupSound.pcm16LittleEndian,
+            pcmSHA256: canonicalSHA256(
+                pickupSound.pcm16LittleEndian
+            ),
+            sourceArchive: d3File.relativePath,
+            sourceSHA256: canonicalSHA256(pickupSoundPayload),
+            importVolume: pickupSoundPage.importVolume
+        )
+        )
+    precondition(
+        cameraMonitor.handle == 6_167
+            && cameraMonitor.type == 7
+            && cameraMonitor.storedID == 91
+            && cameraMonitor.flags == 4_096
+            && securityCamera.handle == 6_183
+            && securityCamera.type == 2
+            && securityCamera.storedID == 114
+            && securityCamera.flags == 5_120
+    )
+    let level = cameraMonitorLevel
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
     precondition(

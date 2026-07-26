@@ -143,6 +143,96 @@ final class D3ImportOperationTests: XCTestCase {
         }
     }
 
+    func testReachedOOFResolvesSecurityCameraGunpointThroughItsParentChain() throws {
+        let data = makeReachedOOFFixture(
+            gunpoint: .init(
+                parentSubmodelIndex: 1,
+                position: .init(x: 1, y: 2, z: 3),
+                forward: .init(x: 0, y: 0, z: -1)
+            )
+        )
+        let gunpoint = try reachedOutrageModelGunpoint(
+            data,
+            index: 0
+        )
+
+        XCTAssertEqual(gunpoint.position, .init(x: 101, y: 2, z: 3))
+        XCTAssertEqual(gunpoint.forward, .init(x: 0, y: 0, z: -1))
+    }
+
+    func testReachedOOFGunpointRejectsUnsupportedContainerBeforeChunks() {
+        let data = makeReachedOOFFixture(
+            gunpoint: .init(
+                parentSubmodelIndex: 1,
+                position: .init(x: 1, y: 2, z: 3),
+                forward: .init(x: 0, y: 0, z: -1)
+            )
+        )
+        var badMagic = data
+        badMagic[0] = Array("X".utf8)[0]
+        XCTAssertThrowsError(
+            try reachedOutrageModelGunpoint(badMagic, index: 0)
+        ) {
+            XCTAssertEqual(
+                $0 as? OutrageModelImportError,
+                .invalidHeader
+            )
+        }
+        var badVersion = data
+        badVersion[4] = 0
+        badVersion[5] = 0
+        badVersion[6] = 0
+        badVersion[7] = 0
+        XCTAssertThrowsError(
+            try reachedOutrageModelGunpoint(badVersion, index: 0)
+        ) {
+            XCTAssertEqual(
+                $0 as? OutrageModelImportError,
+                .unsupportedVersion(0)
+            )
+        }
+    }
+
+    func testRetailSoundPageResolvesPupCAndCanonicalizesPCM16WAV() throws {
+        let page = makeRetailSoundTablePage(
+            logicalName: "PupC1",
+            sourceName: "PupC.wav",
+            importVolume: 0.75
+        )
+        let resolved = try resolveRetailSoundPage(
+            table: page,
+            overlay: Data(),
+            named: "PupC1"
+        )
+        XCTAssertEqual(resolved.logicalName, "PupC1")
+        XCTAssertEqual(resolved.sourceName, "PupC.wav")
+        XCTAssertEqual(resolved.importVolume, 0.75)
+
+        let decoded = try decodeReachedPCM16WAV(
+            makePCM16WAV(samples: [-32_768, 0, 32_767])
+        )
+        XCTAssertEqual(decoded.sampleRate, 22_050)
+        XCTAssertEqual(decoded.channelCount, 1)
+        XCTAssertEqual(decoded.frameCount, 3)
+        XCTAssertEqual(
+            decoded.pcm16LittleEndian,
+            Data([0x00, 0x80, 0x00, 0x00, 0xff, 0x7f])
+        )
+    }
+
+    func testReachedWAVRejectsTruncatedRIFFDeclaration() {
+        var data = makePCM16WAV(samples: [-1, 0, 1])
+        let declaredSize = UInt32(data.count - 8 + 4)
+        data[4] = UInt8(declaredSize & 0xff)
+        data[5] = UInt8((declaredSize >> 8) & 0xff)
+        data[6] = UInt8((declaredSize >> 16) & 0xff)
+        data[7] = UInt8((declaredSize >> 24) & 0xff)
+
+        XCTAssertThrowsError(try decodeReachedPCM16WAV(data)) {
+            XCTAssertEqual($0 as? ReachedWAVDecodeError, .truncated)
+        }
+    }
+
     func testBlockedTerminationSignalBecomesACancellationRequest() throws {
         var originalMask = sigset_t()
         XCTAssertEqual(pthread_sigmask(SIG_SETMASK, nil, &originalMask), 0)
@@ -802,7 +892,8 @@ final class D3ImportOperationTests: XCTestCase {
 
 private func makeReachedOOFFixture(
     properties: String = "$glow=1, 0.5, 0.25, 2",
-    collisionRadius: Float = 200
+    collisionRadius: Float = 200,
+    gunpoint: ReachedModelGunpoint? = nil
 ) -> Data {
     var data = Data("PSPO".utf8)
     data.appendInt32(2_300)
@@ -863,6 +954,60 @@ private func makeReachedOOFFixture(
         rotation.appendInt32(0)
     }
     data.appendChunk("RANI", body: rotation)
+    if let gunpoint {
+        var body = Data()
+        body.appendInt32(1)
+        body.appendInt32(Int32(gunpoint.parentSubmodelIndex))
+        body.appendVector(gunpoint.position)
+        body.appendVector(gunpoint.forward)
+        data.appendChunk("GPNT", body: body)
+    }
+    return data
+}
+
+private func makeRetailSoundTablePage(
+    logicalName: String,
+    sourceName: String,
+    importVolume: Float
+) -> Data {
+    var body = Data()
+    body.appendUInt16(1)
+    body.appendCString(logicalName)
+    body.appendCString(sourceName)
+    body.appendInt32(0)
+    body.appendInt32(0)
+    body.appendInt32(0)
+    body.appendFloat(360)
+    body.appendInt32(360)
+    body.appendInt32(360)
+    body.appendFloat(1_000)
+    body.appendFloat(0)
+    body.appendFloat(importVolume)
+    var table = Data([7])
+    table.appendUInt32(UInt32(body.count + 4))
+    table.append(body)
+    return table
+}
+
+private func makePCM16WAV(samples: [Int16]) -> Data {
+    var pcm = Data()
+    for sample in samples {
+        pcm.append(UInt8(truncatingIfNeeded: sample))
+        pcm.append(UInt8(truncatingIfNeeded: sample >> 8))
+    }
+    var data = Data("RIFF".utf8)
+    data.appendUInt32(UInt32(36 + pcm.count))
+    data.append(Data("WAVEfmt ".utf8))
+    data.appendUInt32(16)
+    data.appendUInt16(1)
+    data.appendUInt16(1)
+    data.appendUInt32(22_050)
+    data.appendUInt32(44_100)
+    data.appendUInt16(2)
+    data.appendUInt16(16)
+    data.append(Data("data".utf8))
+    data.appendUInt32(UInt32(pcm.count))
+    data.append(pcm)
     return data
 }
 

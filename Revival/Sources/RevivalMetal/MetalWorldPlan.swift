@@ -57,6 +57,10 @@ struct MetalWorldPlan: Equatable, Sendable {
     let preparedDraws: [MetalWorldDraw]
     let activeDrawIndices: [Int]
     let draws: [MetalWorldDraw]
+    let auxiliaryCamera: RoomCamera?
+    let auxiliaryStartRoomSourceIndex: Int?
+    let auxiliaryActiveDrawIndices: [Int]
+    let auxiliaryDraws: [MetalWorldDraw]
 }
 
 func makeMetalWorldPlan(
@@ -109,7 +113,7 @@ private func makeMetalWorldPlan(
     let preparedObjectDraws = extractPreparedModelDrawItems(
         level,
         startRoomSourceIndex: startRoomSourceIndex,
-        excludedObjectHandle: excludedObjectHandle
+        excludedObjectHandle: nil
     ).map(makeMetalWorldDraw)
     let preparedRoomIndexByIdentity = Dictionary(
         uniqueKeysWithValues: preparedRoomDraws.enumerated().map {
@@ -132,7 +136,10 @@ private func makeMetalWorldPlan(
             objectOffset + preparedObjectIndexByIdentity[MetalModelDrawIdentity($0)]!
         }
         + Array(initialRoomIndices.dropFirst(opaqueRoomDraws.count))
-    let preparedDraws = preparedRoomDraws + preparedObjectDraws
+    let preparedDraws =
+        preparedRoomDraws
+        + preparedObjectDraws
+        + preparedObjectDraws
     let draws = activeDrawIndices.map { preparedDraws[$0] }
     let lightCoronaStates = extraction.lightCoronas.map {
         MetalLightCoronaState(corona: $0, scalar: 0)
@@ -151,7 +158,11 @@ private func makeMetalWorldPlan(
         presentationVisualTick: 0,
         preparedDraws: preparedDraws,
         activeDrawIndices: Array(activeDrawIndices),
-        draws: draws
+        draws: draws,
+        auxiliaryCamera: nil,
+        auxiliaryStartRoomSourceIndex: nil,
+        auxiliaryActiveDrawIndices: [],
+        auxiliaryDraws: []
     )
 }
 
@@ -159,7 +170,8 @@ func updateMetalWorldPlan(
     _ prepared: MetalWorldPlan,
     level: Level,
     playerView: PlayerView,
-    presentationFrame: MetalPresentationFrame? = nil
+    presentationFrame: MetalPresentationFrame? = nil,
+    trainingCameraMonitor: TrainingCameraMonitorFrame? = nil
 ) throws -> MetalWorldPlan {
     try updateMetalWorldPlan(
         prepared,
@@ -167,7 +179,8 @@ func updateMetalWorldPlan(
         camera: playerView.camera,
         startRoomSourceIndex: playerView.roomSourceIndex,
         excludedObjectHandle: playerView.objectHandle,
-        presentationFrame: presentationFrame
+        presentationFrame: presentationFrame,
+        trainingCameraMonitor: trainingCameraMonitor
     )
 }
 
@@ -182,7 +195,8 @@ func updateMetalWorldPlan(
         camera: camera,
         startRoomSourceIndex: prepared.startRoomSourceIndex,
         excludedObjectHandle: prepared.excludedObjectHandle,
-        presentationFrame: presentationFrame
+        presentationFrame: presentationFrame,
+        trainingCameraMonitor: nil
     )
 }
 
@@ -192,7 +206,8 @@ private func updateMetalWorldPlan(
     camera: RoomCamera,
     startRoomSourceIndex: Int,
     excludedObjectHandle: UInt32?,
-    presentationFrame: MetalPresentationFrame?
+    presentationFrame: MetalPresentationFrame?,
+    trainingCameraMonitor: TrainingCameraMonitorFrame?
 ) throws -> MetalWorldPlan {
     let extraction = try extractWorldForRendering(
         level,
@@ -210,25 +225,58 @@ private func updateMetalWorldPlan(
             .filter { $0.element.objectHandle == nil }
             .map { (MetalRoomDrawIdentity($0.element), $0.offset) }
     )
-    let objectIndexByIdentity = Dictionary(
-        uniqueKeysWithValues: prepared.preparedDraws.enumerated()
-            .filter { $0.element.objectHandle != nil }
-            .map { (MetalModelDrawIdentity($0.element), $0.offset) }
+    let objectIndicesByIdentity = Dictionary(
+        grouping: prepared.preparedDraws.enumerated()
+            .filter { $0.element.objectHandle != nil },
+        by: { MetalModelDrawIdentity($0.element) }
     )
     let opaqueIndices = opaqueRoomDraws.map {
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
     let objectIndices = objectDraws.map {
-        objectIndexByIdentity[MetalModelDrawIdentity($0)]!
+        objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
     }
     var updatedPreparedDraws = prepared.preparedDraws
-    for (index, draw) in zip(objectIndices, objectDraws) {
-        updatedPreparedDraws[index] = draw
-    }
     let translucentIndices = translucentRoomDraws.map {
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
     let activeDrawIndices = opaqueIndices + objectIndices + translucentIndices
+    let auxiliaryExtraction = try trainingCameraMonitor.map {
+        try extractWorldForRendering(
+            level,
+            camera: $0.camera,
+            startRoomSourceIndex: $0.roomSourceIndex,
+            excludedObjectHandle:
+                level.trainingCameraMonitorChain?
+                    .securityCameraObjectHandle,
+            presentationGameTime:
+                presentationFrame?.systemsGameTime ?? 0
+        )
+    }
+    let auxiliaryOpaque = auxiliaryExtraction?.opaqueDrawItems
+        .map(makeMetalWorldDraw) ?? []
+    let auxiliaryObjects = auxiliaryExtraction?.modelDrawItems
+        .map(makeMetalWorldDraw) ?? []
+    let auxiliaryTranslucent =
+        auxiliaryExtraction?.translucentDrawItems
+            .map(makeMetalWorldDraw) ?? []
+    let auxiliaryObjectIndices = auxiliaryObjects.map {
+        objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.last!.offset
+    }
+    let auxiliaryActiveDrawIndices =
+        auxiliaryOpaque.map {
+            roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
+        }
+        + auxiliaryObjectIndices
+        + auxiliaryTranslucent.map {
+            roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
+        }
+    for (index, draw) in zip(objectIndices, objectDraws) {
+        updatedPreparedDraws[index] = draw
+    }
+    for (index, draw) in zip(auxiliaryObjectIndices, auxiliaryObjects) {
+        updatedPreparedDraws[index] = draw
+    }
     let coronaPresentation = presentationFrame.map {
         advanceLightCoronas(
             prepared.lightCoronaStates,
@@ -252,7 +300,14 @@ private func updateMetalWorldPlan(
             ?? prepared.presentationVisualTick,
         preparedDraws: updatedPreparedDraws,
         activeDrawIndices: activeDrawIndices,
-        draws: activeDrawIndices.map { updatedPreparedDraws[$0] }
+        draws: activeDrawIndices.map { updatedPreparedDraws[$0] },
+        auxiliaryCamera: trainingCameraMonitor?.camera,
+        auxiliaryStartRoomSourceIndex:
+            trainingCameraMonitor?.roomSourceIndex,
+        auxiliaryActiveDrawIndices: auxiliaryActiveDrawIndices,
+        auxiliaryDraws: auxiliaryActiveDrawIndices.map {
+            updatedPreparedDraws[$0]
+        }
     )
 }
 

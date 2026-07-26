@@ -786,6 +786,458 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(deployed.enabledPlayerControls, .all)
     }
 
+    func testCameraMonitorPickupUseAndTimedViewContinueOnceAcrossReload() throws {
+        let level = makeTrainingCameraMonitorLevel()
+        try level.validate()
+        let chain = try XCTUnwrap(level.trainingCameraMonitorChain)
+        let securityCamera = try XCTUnwrap(level.objects.first {
+            $0.handle == chain.securityCameraObjectHandle
+        })
+        let securityCameraRoom = try XCTUnwrap({
+            if case let .room(room) = securityCamera.location { return room }
+            return nil
+        }())
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        let pickup = simulation.update(
+            at: 0.1,
+            input: .init(usesInventory: true)
+        )
+        XCTAssertEqual(
+            pickup.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Excellent.  You now have the Camera Monitor.  Press the Use Inventory key to activate it!",
+                ],
+                voiceSourceName: "guidebotc.osf",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "PupC.wav"
+            )]
+        )
+        XCTAssertNil(pickup.trainingCameraMonitor)
+        XCTAssertFalse(
+            simulation.level.objectPresentations.contains {
+                $0.objectHandle == chain.pickupObjectHandle
+                    && $0.isVisible
+            }
+        )
+        XCTAssertTrue(
+            simulation.level.objects.contains {
+                $0.handle == chain.pickupObjectHandle
+            }
+        )
+
+        let heldContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(simulation.continuation)
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: heldContinuation,
+            resumedAtTimestamp: 100
+        )
+        XCTAssertFalse(
+            restored.level.objectPresentations.contains {
+                $0.objectHandle == chain.pickupObjectHandle
+                    && $0.isVisible
+            }
+        )
+
+        let used = restored.update(
+            at: 100.1,
+            input: .init(usesInventory: true)
+        )
+        XCTAssertEqual(
+            used.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
+                ],
+                voiceSourceName: "guidebotd.osf",
+                voicePrecedesHUDMessages: true
+            )]
+        )
+        let popup = try XCTUnwrap(used.trainingCameraMonitor)
+        XCTAssertEqual(popup.remainingDuration, 10, accuracy: 0.000_1)
+        XCTAssertEqual(popup.roomSourceIndex, securityCameraRoom)
+        XCTAssertEqual(
+            popup.camera.position,
+            securityCamera.position
+        )
+        XCTAssertEqual(
+            popup.camera.target,
+            .init(
+                x: securityCamera.position.x
+                    - securityCamera.orientation.forward.x,
+                y: securityCamera.position.y
+                    - securityCamera.orientation.forward.y,
+                z: securityCamera.position.z
+                    - securityCamera.orientation.forward.z
+            )
+        )
+        XCTAssertFalse(restored.level.objects.contains {
+            $0.handle == chain.pickupObjectHandle
+        })
+
+        let usedContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(restored.continuation)
+        )
+        let resumedPopup = try PlayerSimulation(
+            level: level,
+            continuation: usedContinuation,
+            resumedAtTimestamp: 200
+        )
+        let afterReload = resumedPopup.update(at: 200.1, input: .zero)
+        XCTAssertTrue(afterReload.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(
+            try XCTUnwrap(afterReload.trainingCameraMonitor)
+                .remainingDuration,
+            9.9,
+            accuracy: 0.000_1
+        )
+
+        var lastFrame = afterReload
+        for frameIndex in 2...99 {
+            lastFrame = resumedPopup.update(
+                at: 200 + Double(frameIndex) * 0.1,
+                input: .zero
+            )
+        }
+        XCTAssertNotNil(lastFrame.trainingCameraMonitor)
+        _ = resumedPopup.update(at: 210, input: .zero)
+        let closed = resumedPopup.update(at: 210.1, input: .zero)
+        XCTAssertNil(closed.trainingCameraMonitor)
+        XCTAssertTrue(closed.trainingOpeningFeedback.isEmpty)
+        XCTAssertTrue(
+            resumedPopup.update(at: 212.2, input: .zero)
+                .trainingOpeningFeedback.isEmpty
+        )
+    }
+
+    func testCameraMonitorPickupCompletesLocateGoalAcrossReload() throws {
+        let level = makeTrainingCameraMonitorLevel()
+        let locateGoal = try XCTUnwrap(level.goals.first {
+            $0.name == "Locate the Camera Monitor"
+        })
+        XCTAssertEqual(locateGoal.status, 1_028)
+        XCTAssertEqual(locateGoal.items, [
+            .init(
+                type: 2,
+                sourceHandle: 6_167,
+                objectHandle: 6_167,
+                done: false
+            ),
+        ])
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        _ = simulation.update(at: 0.1, input: .zero)
+
+        let completedGoal = try XCTUnwrap(simulation.level.goals.first {
+            $0.name == "Locate the Camera Monitor"
+        })
+        XCTAssertEqual(completedGoal.status, 1_036)
+        XCTAssertEqual(completedGoal.items.map(\.done), [true])
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: simulation.continuation,
+            resumedAtTimestamp: 100
+        )
+        let restoredGoal = try XCTUnwrap(restored.level.goals.first {
+            $0.name == "Locate the Camera Monitor"
+        })
+        XCTAssertEqual(restoredGoal.status, 1_036)
+        XCTAssertEqual(restoredGoal.items.map(\.done), [true])
+    }
+
+    func testCameraMonitorPopupStartsInTracedGunpointRoom() throws {
+        var level = makeTrainingCameraMonitorLevel()
+        let chain = try XCTUnwrap(level.trainingCameraMonitorChain)
+        let cameraIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == chain.securityCameraObjectHandle
+        })
+        var reachedPortal: (
+            startRoom: Int,
+            connectedRoom: Int,
+            cameraCenter: Vector3,
+            gunpoint: Vector3
+        )?
+        for candidateRoom in level.rooms {
+            for portal in candidateRoom.portals {
+                let face = candidateRoom.faces[portal.faceIndex]
+                let vertices = face.corners.map {
+                    candidateRoom.vertices[$0.vertexIndex]
+                }
+                var center = Vector3.zero
+                for vertex in vertices {
+                    center = .init(
+                        x: center.x + vertex.x,
+                        y: center.y + vertex.y,
+                        z: center.z + vertex.z
+                    )
+                }
+                let count = Float(vertices.count)
+                center = .init(
+                    x: center.x / count,
+                    y: center.y / count,
+                    z: center.z / count
+                )
+                guard let normal = canonicalFaceNormal(
+                    room: candidateRoom,
+                    face: face
+                ) else {
+                    continue
+                }
+                let positive = Vector3(
+                    x: center.x + normal.x * 0.01,
+                    y: center.y + normal.y * 0.01,
+                    z: center.z + normal.z * 0.01
+                )
+                let negative = Vector3(
+                    x: center.x - normal.x * 0.01,
+                    y: center.y - normal.y * 0.01,
+                    z: center.z - normal.z * 0.01
+                )
+                let positiveIsInside =
+                    containingIndoorRoomSourceIndex(
+                        in: level,
+                        position: positive,
+                        candidates: [candidateRoom.sourceIndex]
+                    ) == candidateRoom.sourceIndex
+                let candidateCenter =
+                    positiveIsInside ? positive : negative
+                let candidateGunpoint =
+                    positiveIsInside ? negative : positive
+                let trace = traceIndoorMovement(
+                    in: level,
+                    startRoom: candidateRoom.sourceIndex,
+                    start: candidateCenter,
+                    end: candidateGunpoint,
+                    radius: 0
+                )
+                if trace.containingRoomSourceIndex
+                    == portal.connectedRoom {
+                    reachedPortal = (
+                        candidateRoom.sourceIndex,
+                        portal.connectedRoom,
+                        candidateCenter,
+                        candidateGunpoint
+                    )
+                    break
+                }
+            }
+            if reachedPortal != nil { break }
+        }
+        let portalFixture = try XCTUnwrap(reachedPortal)
+        let connectedRoomSourceIndex = portalFixture.connectedRoom
+        let cameraCenter = portalFixture.cameraCenter
+        let gunpoint = portalFixture.gunpoint
+        level.objects[cameraIndex].location =
+            .room(portalFixture.startRoom)
+        level.objects[cameraIndex].position = cameraCenter
+        level.objects[cameraIndex].orientation = .init(
+            right: .init(x: 1, y: 0, z: 0),
+            up: .init(x: 0, y: 1, z: 0),
+            forward: .init(x: 0, y: 0, z: 1)
+        )
+        let movedChain = TrainingCameraMonitorChain(
+            pickupObjectHandle: chain.pickupObjectHandle,
+            securityCameraObjectHandle:
+                chain.securityCameraObjectHandle,
+            pickupCollisionRadius: chain.pickupCollisionRadius,
+            pickupMessage: chain.pickupMessage,
+            pickupVoiceSourceName: chain.pickupVoiceSourceName,
+            pickupSoundSourceName: chain.pickupSoundSourceName,
+            useMessage: chain.useMessage,
+            useVoiceSourceName: chain.useVoiceSourceName,
+            popupDuration: chain.popupDuration,
+            popupZoom: chain.popupZoom,
+            cameraGunpointIndex: chain.cameraGunpointIndex,
+            cameraLocalPosition: .init(
+                x: gunpoint.x - cameraCenter.x,
+                y: gunpoint.y - cameraCenter.y,
+                z: gunpoint.z - cameraCenter.z
+            ),
+            cameraLocalForward: .init(x: 0, y: 1, z: 0),
+            completionTimerDuration: chain.completionTimerDuration
+        )
+        level = replacing(
+            level,
+            objects: level.objects,
+            trainingCameraMonitorChain: movedChain
+        )
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(at: 0.1, input: .zero)
+
+        let used = simulation.update(
+            at: 0.2,
+            input: .init(usesInventory: true)
+        )
+
+        XCTAssertEqual(
+            used.trainingCameraMonitor?.roomSourceIndex,
+            connectedRoomSourceIndex
+        )
+    }
+
+    func testCameraMonitorPickupUsesAcceptedWallResponseSegments() throws {
+        func missesSphere(
+            start: Vector3,
+            end: Vector3,
+            center: Vector3,
+            radius: Float
+        ) -> Bool {
+            let movement = Vector3(
+                x: end.x - start.x,
+                y: end.y - start.y,
+                z: end.z - start.z
+            )
+            let toCenter = Vector3(
+                x: center.x - start.x,
+                y: center.y - start.y,
+                z: center.z - start.z
+            )
+            let lengthSquared =
+                movement.x * movement.x
+                + movement.y * movement.y
+                + movement.z * movement.z
+            let fraction = lengthSquared > 0
+                ? max(0, min(
+                    1,
+                    (
+                        toCenter.x * movement.x
+                        + toCenter.y * movement.y
+                        + toCenter.z * movement.z
+                    ) / lengthSquared
+                ))
+                : 0
+            let closest = Vector3(
+                x: start.x + movement.x * fraction,
+                y: start.y + movement.y * fraction,
+                z: start.z + movement.z * fraction
+            )
+            let distance = Vector3(
+                x: center.x - closest.x,
+                y: center.y - closest.y,
+                z: center.z - closest.z
+            )
+            return distance.x * distance.x
+                + distance.y * distance.y
+                + distance.z * distance.z
+                > radius * radius
+        }
+        let contactLevel = makeSliceTenContactLevel(clearance: 20)
+        let baseline = PlayerSimulation(
+            level: contactLevel,
+            presentationReadyTimestamp: 0
+        )
+        _ = baseline.update(at: 2, input: .zero)
+        let start = defaultPlayerView(in: baseline.level).camera.position
+        let baselineFrame = baseline.update(
+            at: 4,
+            input: .init(forward: 1, sideways: 1)
+        )
+        let contact = try XCTUnwrap(baselineFrame.wallContact)
+        let final = baselineFrame.playerView.camera.position
+        let contactCenter = Vector3(
+            x:
+                contact.contactPoint.x
+                + contact.normal.x
+                    * baselineFrame.playerView.collisionRadius,
+            y:
+                contact.contactPoint.y
+                + contact.normal.y
+                    * baselineFrame.playerView.collisionRadius,
+            z:
+                contact.contactPoint.z
+                + contact.normal.z
+                    * baselineFrame.playerView.collisionRadius
+        )
+        let pickupRadius =
+            baselineFrame.playerView.collisionRadius + 0.01
+        var falseChordPoint: Vector3?
+        for tenth in 1..<10 {
+            let fraction = Float(tenth) / 10
+            let candidate = Vector3(
+                x: start.x + (final.x - start.x) * fraction,
+                y: start.y + (final.y - start.y) * fraction,
+                z: start.z + (final.z - start.z) * fraction
+            )
+            if missesSphere(
+                start: start,
+                end: contactCenter,
+                center: candidate,
+                radius: pickupRadius
+            ),
+            missesSphere(
+                start: contactCenter,
+                end: final,
+                center: candidate,
+                radius: pickupRadius
+            ) {
+                falseChordPoint = candidate
+                break
+            }
+        }
+        let pickupPosition = try XCTUnwrap(falseChordPoint)
+        let cameraFixture = makeTrainingCameraMonitorLevel()
+        let sourceChain = try XCTUnwrap(
+            cameraFixture.trainingCameraMonitorChain
+        )
+        var pickup = try XCTUnwrap(cameraFixture.objects.first {
+            $0.handle == sourceChain.pickupObjectHandle
+        })
+        pickup.location = .room(
+            baselineFrame.playerView.roomSourceIndex
+        )
+        pickup.position = pickupPosition
+        let chain = TrainingCameraMonitorChain(
+            pickupObjectHandle: sourceChain.pickupObjectHandle,
+            securityCameraObjectHandle:
+                sourceChain.securityCameraObjectHandle,
+            pickupCollisionRadius: 0.01,
+            pickupMessage: sourceChain.pickupMessage,
+            pickupVoiceSourceName: sourceChain.pickupVoiceSourceName,
+            pickupSoundSourceName: sourceChain.pickupSoundSourceName,
+            useMessage: sourceChain.useMessage,
+            useVoiceSourceName: sourceChain.useVoiceSourceName,
+            popupDuration: sourceChain.popupDuration,
+            popupZoom: sourceChain.popupZoom,
+            cameraGunpointIndex: sourceChain.cameraGunpointIndex,
+            cameraLocalPosition: sourceChain.cameraLocalPosition,
+            cameraLocalForward: sourceChain.cameraLocalForward,
+            completionTimerDuration:
+                sourceChain.completionTimerDuration
+        )
+        let level = replacing(
+            contactLevel,
+            schemaVersion: 10,
+            objects: contactLevel.objects + [pickup],
+            trainingCameraMonitorChain: chain
+        )
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(at: 2, input: .zero)
+
+        let frame = simulation.update(
+            at: 4,
+            input: .init(forward: 1, sideways: 1)
+        )
+
+        XCTAssertTrue(frame.trainingOpeningFeedback.isEmpty)
+    }
+
     func testTrainingGuidebotUsesVerifiedBoundaryNodesAroundBlockedDirectLine() throws {
         var level = makeSliceTenContactLevel(clearance: 20)
         let player = level.objects.first { $0.handle == 2_048 }!
@@ -2014,6 +2466,66 @@ final class WorldRenderingTests: XCTestCase {
             playerInput.snapshot(frameDuration: 0.1)
                 .deploysTrainingGuidebot
         )
+    }
+
+    func testBackslashRequestsOneInventoryUseOnlyDuringGameplay() {
+        XCTAssertTrue(
+            RevivalGameplayView.requestsInventoryUse(
+                keyCode: 42,
+                isRepeat: false,
+                gameplayIsActive: true
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsInventoryUse(
+                keyCode: 42,
+                isRepeat: true,
+                gameplayIsActive: true
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsInventoryUse(
+                keyCode: 42,
+                isRepeat: false,
+                gameplayIsActive: false
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsInventoryUse(
+                keyCode: 43,
+                isRepeat: false,
+                gameplayIsActive: true
+            )
+        )
+    }
+
+    func testCameraMonitorPopupBorderAndReachedSoundUseAppKitOwner() throws {
+        let frame = RevivalGameplayView.cameraMonitorFrame(
+            drawableWidth: 1_200,
+            drawableHeight: 900
+        )
+        XCTAssertEqual(frame.origin.x, 59.375)
+        XCTAssertEqual(frame.origin.y, 9.375)
+        XCTAssertEqual(frame.width, 281.25)
+        XCTAssertEqual(frame.height, 281.25)
+
+        let clip = try XCTUnwrap(
+            makeTrainingCameraMonitorLevel().soundClips.first
+        )
+        let wave = RevivalGameplayView.waveData(for: clip)
+        XCTAssertEqual(String(data: wave.prefix(4), encoding: .utf8), "RIFF")
+        XCTAssertEqual(wave.count, clip.pcm16LittleEndian.count + 44)
+    }
+
+    func testInventoryUseRequestIsOneShotAndClearsWhileGameplayIsInactive() {
+        var input = PlayerInputState(rampDuration: 0)
+        input.requestInventoryUse()
+        XCTAssertTrue(input.snapshot(frameDuration: 0.1).usesInventory)
+        XCTAssertFalse(input.snapshot(frameDuration: 0.1).usesInventory)
+
+        input.setGameplayActive(false, simulation: nil, at: 1)
+        input.requestInventoryUse()
+        XCTAssertFalse(input.snapshot(frameDuration: 0.1).usesInventory)
     }
 
     func testPrimaryFireRequestIsOneShotAndClearsOutsideGameplay() {
@@ -4407,6 +4919,261 @@ func makeTrainingRobotGuidebotLevel() -> Level {
                 sourceSHA256: String(repeating: "c", count: 64)
             ),
         ]
+    )
+}
+
+func makeTrainingCameraMonitorLevel() -> Level {
+    var level = makeTrainingRobotGuidebotLevel()
+    let player = level.objects.first { $0.handle == 2_048 }!
+    let cameraMonitorSource = SourceResource(
+        storedIndex: 9_000,
+        sourceName: "monitor.OOF"
+    )
+    let modelTemplate = level.models[0]
+    let cameraMonitorModels = level.models.contains {
+        $0.source == cameraMonitorSource
+    }
+        ? level.models
+        : level.models + [
+            .init(
+                source: cameraMonitorSource,
+                collisionRadius: 2,
+                submodels: modelTemplate.submodels,
+                bounds: modelTemplate.bounds,
+                sourceArchive: modelTemplate.sourceArchive,
+                sourceSHA256: String(repeating: "f", count: 64)
+            ),
+        ]
+    level = replacing(
+        level,
+        models: cameraMonitorModels,
+        objectPresentations: level.objectPresentations + [
+            .init(
+                objectHandle: 6_167,
+                primaryModel: cameraMonitorSource,
+                mediumModel: nil,
+                lowModel: nil,
+                dyingModel: nil,
+                mediumDistance: nil,
+                lowDistance: nil
+            ),
+        ],
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current.map { dependency in
+                guard dependency.category == "model",
+                      dependency.source == cameraMonitorSource else {
+                    return dependency
+                }
+                return .init(
+                    category: dependency.category,
+                    source: dependency.source,
+                    state: "presentation-payload-imported",
+                    provenance: dependency.provenance
+                )
+            } + (level.dependencyManifest.current.contains {
+                $0.category == "model"
+                    && $0.source == cameraMonitorSource
+            } ? [] : [
+                .init(
+                    category: "model",
+                    source: cameraMonitorSource,
+                    state: "presentation-payload-imported",
+                    provenance: "synthetic canonical fixture"
+                ),
+            ]),
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
+    if let pickupIndex = level.objects.firstIndex(where: {
+        $0.handle == 6_167
+    }) {
+        level.objects[pickupIndex].location = player.location
+        level.objects[pickupIndex].position = player.position
+        level.objects[pickupIndex].orientation = player.orientation
+    } else {
+        level.objects.append(.init(
+            handle: 6_167,
+            type: 7,
+            storedID: 91,
+            definition: .init(
+                storedIndex: 91,
+                sourceName: "Camera Monitor"
+            ),
+            instanceName: "CameraMonitor",
+            flags: 4_096,
+            doorShields: nil,
+            location: player.location,
+            position: player.position,
+            orientation: player.orientation,
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        ))
+    }
+    if let cameraIndex = level.objects.firstIndex(where: {
+        $0.handle == 6_183
+    }) {
+        level.objects[cameraIndex].location = player.location
+        level.objects[cameraIndex].position = player.position
+        level.objects[cameraIndex].orientation = player.orientation
+    } else {
+        level.objects.append(.init(
+            handle: 6_183,
+            type: 2,
+            storedID: 114,
+            definition: .init(
+                storedIndex: 114,
+                sourceName: "new wall cam"
+            ),
+            instanceName: "SecurityCamera",
+            flags: 5_120,
+            doorShields: nil,
+            location: player.location,
+            position: player.position,
+            orientation: player.orientation,
+            containsType: 0,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        ))
+    }
+    level = replacing(
+        level,
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current + [
+                .init(
+                    category: "object-definition",
+                    source: .init(
+                        storedIndex: 91,
+                        sourceName: "Camera Monitor"
+                    ),
+                    state: "identity-recorded",
+                    provenance: "synthetic canonical fixture"
+                ),
+                .init(
+                    category: "object-definition",
+                    source: .init(
+                        storedIndex: 114,
+                        sourceName: "new wall cam"
+                    ),
+                    state: "identity-recorded",
+                    provenance: "synthetic canonical fixture"
+                ),
+            ].filter { candidate in
+                !level.dependencyManifest.current.contains {
+                    $0.category == candidate.category
+                        && $0.source == candidate.source
+                }
+            },
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
+    if case let .room(playerRoomSourceIndex) = player.location,
+       let playerRoomIndex = level.rooms.firstIndex(where: {
+           $0.sourceIndex == playerRoomSourceIndex
+       }) {
+        level.rooms[playerRoomIndex] = addingSourceContainmentShell(
+            to: level.rooms[playerRoomIndex],
+            center: player.position,
+            texture: level.surfacePhysics[0].texture,
+            halfExtent: 500
+        )
+    }
+    level = replacing(
+        level,
+        goals: level.goals + [
+            .init(
+                status: 1_028,
+                priority: 0,
+                list: 0,
+                name: "Locate the Camera Monitor",
+                itemName: "Camera Monitor",
+                description: "Find and pickup the Camera Monitor",
+                completionMessage: "",
+                items: [
+                    .init(
+                        type: 2,
+                        sourceHandle: 6_167,
+                        objectHandle: 6_167,
+                        done: false
+                    ),
+                ]
+            ),
+        ]
+    )
+    return level.addingTrainingCameraMonitorChain(
+        .init(
+            pickupObjectHandle: 6_167,
+            securityCameraObjectHandle: 6_183,
+            pickupCollisionRadius: 2,
+            pickupMessage:
+                "Excellent.  You now have the Camera Monitor.  Press the Use Inventory key to activate it!",
+            pickupVoiceSourceName: "guidebotc.osf",
+            pickupSoundSourceName: "PupC.wav",
+            useMessage:
+                "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
+            useVoiceSourceName: "guidebotd.osf",
+            popupDuration: 10,
+            popupZoom: 1,
+            cameraGunpointIndex: 0,
+            cameraLocalPosition: .zero,
+            cameraLocalForward: .init(x: 0, y: 0, z: -1),
+            completionTimerDuration: 2
+        ),
+        voiceClips: [
+            syntheticVoiceClip(
+                name: "guidebotc.osf",
+                sourceEntryIndex: 6,
+                sourceHash: "1"
+            ),
+            syntheticVoiceClip(
+                name: "guidebotd.osf",
+                sourceEntryIndex: 7,
+                sourceHash: "2"
+            ),
+        ],
+        soundClip: .init(
+            logicalName: "PupC1",
+            sourceName: "PupC.wav",
+            sourceEntryIndex: 3,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 1,
+            pcm16LittleEndian: Data(repeating: 0, count: 2),
+            pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+            sourceArchive: "missions/training.mn3",
+            sourceSHA256: String(repeating: "3", count: 64),
+            importVolume: 1
+        )
+    )
+}
+
+private func syntheticVoiceClip(
+    name: String,
+    sourceEntryIndex: Int,
+    sourceHash: Character
+) -> CanonicalVoiceClip {
+    .init(
+        sourceName: name,
+        sourceEntryIndex: sourceEntryIndex,
+        sampleRate: 22_050,
+        channelCount: 1,
+        frameCount: 1,
+        pcm16LittleEndian: Data(repeating: 0, count: 2),
+        pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+        sourceArchive: "missions/training.mn3",
+        sourceSHA256: String(repeating: sourceHash, count: 64)
     )
 }
 

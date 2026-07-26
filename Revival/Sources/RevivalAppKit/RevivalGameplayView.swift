@@ -8,12 +8,22 @@ import MetalKit
 
 enum TrainingOpeningPresentationError: LocalizedError {
     case voicePlaybackFailed(String)
+    case soundPlaybackFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .voicePlaybackFailed(let sourceName):
             "Training voice playback failed for \(sourceName)"
+        case .soundPlaybackFailed(let sourceName):
+            "Training sound playback failed for \(sourceName)"
         }
+    }
+}
+
+@MainActor
+private final class NoninteractiveTrainingOverlay: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
     }
 }
 
@@ -23,6 +33,7 @@ final class RevivalGameplayView: MTKView {
     var controllerInputChanged: ((InputSnapshot) -> Void)?
     var guidebotDeployRequested: (() -> Void)?
     var primaryFireRequested: (() -> Void)?
+    var inventoryUseRequested: (() -> Void)?
 
     private var heldKeys: Set<UInt16> = []
     private var pendingMouseX: Float = 0
@@ -33,7 +44,9 @@ final class RevivalGameplayView: MTKView {
     private var afterburnerIsHeld = false
     private let trainingMessageLabel = NSTextField(labelWithString: "")
     private let enabledControlsLabel = NSTextField(labelWithString: "")
+    private let cameraMonitorBorder = NoninteractiveTrainingOverlay()
     private var trainingVoicePlayer: AVAudioPlayer?
+    private var trainingSoundPlayer: AVAudioPlayer?
     private var trainingMessageExpiresAt: Float?
 
     override var acceptsFirstResponder: Bool { true }
@@ -87,6 +100,10 @@ final class RevivalGameplayView: MTKView {
             width: width,
             height: CGFloat(trainingMessageLabel.maximumNumberOfLines) * 28
         )
+        cameraMonitorBorder.frame = Self.cameraMonitorFrame(
+            drawableWidth: bounds.width,
+            drawableHeight: bounds.height
+        )
     }
 
     override func keyDown(with event: NSEvent) {
@@ -99,6 +116,14 @@ final class RevivalGameplayView: MTKView {
             gameplayIsActive: gameplayIsActive
         ) {
             guidebotDeployRequested?()
+            return
+        }
+        if Self.requestsInventoryUse(
+            keyCode: event.keyCode,
+            isRepeat: event.isARepeat,
+            gameplayIsActive: gameplayIsActive
+        ) {
+            inventoryUseRequested?()
             return
         }
         guard Self.gameplayKeyCodes.contains(event.keyCode) else {
@@ -158,13 +183,18 @@ final class RevivalGameplayView: MTKView {
             trainingMessageExpiresAt = nil
             trainingVoicePlayer?.stop()
             trainingVoicePlayer = nil
+            trainingSoundPlayer?.stop()
+            trainingSoundPlayer = nil
+            cameraMonitorBorder.isHidden = true
         }
     }
 
     func presentTrainingOpening(
         frame: PlayerSimulationFrame,
-        voiceClips: [CanonicalVoiceClip]
+        voiceClips: [CanonicalVoiceClip],
+        soundClips: [CanonicalSoundClip] = []
     ) throws {
+        cameraMonitorBorder.isHidden = frame.trainingCameraMonitor == nil
         guard !voiceClips.isEmpty else {
             trainingMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
@@ -191,12 +221,21 @@ final class RevivalGameplayView: MTKView {
         let voicePrecedesHUDMessages =
             frame.trainingOpeningFeedback.last!
                 .voicePrecedesHUDMessages
+        let soundSourceName =
+            frame.trainingOpeningFeedback.last?.soundSourceName
         Self.presentTrainingFeedback(
             voicePrecedesHUDMessages: voicePrecedesHUDMessages,
             attemptVoice: {
                 try self.playTrainingVoice(
                     named: voiceSourceName,
                     from: voiceClips
+                )
+            },
+            attemptSound: {
+                guard let soundSourceName else { return }
+                try self.playTrainingSound(
+                    named: soundSourceName,
+                    from: soundClips
                 )
             },
             presentHUDMessages: {
@@ -216,14 +255,50 @@ final class RevivalGameplayView: MTKView {
     static func presentTrainingFeedback(
         voicePrecedesHUDMessages: Bool,
         attemptVoice: () throws -> Void,
+        attemptSound: () throws -> Void = {},
         presentHUDMessages: () -> Void
     ) {
         if voicePrecedesHUDMessages {
             try? attemptVoice()
         }
+        try? attemptSound()
         presentHUDMessages()
         if !voicePrecedesHUDMessages {
             try? attemptVoice()
+        }
+    }
+
+    private func playTrainingSound(
+        named soundSourceName: String,
+        from soundClips: [CanonicalSoundClip]
+    ) throws {
+        do {
+            trainingSoundPlayer?.stop()
+            guard let clip = soundClips.first(where: {
+                $0.sourceName.caseInsensitiveCompare(soundSourceName)
+                    == .orderedSame
+                    || $0.logicalName.caseInsensitiveCompare(soundSourceName)
+                        == .orderedSame
+            }) else {
+                throw TrainingOpeningPresentationError.soundPlaybackFailed(
+                    soundSourceName
+                )
+            }
+            let player = try AVAudioPlayer(data: Self.waveData(for: clip))
+            trainingSoundPlayer = player
+            player.volume = clip.importVolume
+            player.prepareToPlay()
+            guard player.play() else {
+                throw TrainingOpeningPresentationError.soundPlaybackFailed(
+                    soundSourceName
+                )
+            }
+        } catch {
+            trainingSoundPlayer?.stop()
+            trainingSoundPlayer = nil
+            throw TrainingOpeningPresentationError.soundPlaybackFailed(
+                soundSourceName
+            )
         }
     }
 
@@ -293,6 +368,30 @@ final class RevivalGameplayView: MTKView {
         gameplayIsActive && keyCode == 118
     }
 
+    nonisolated static func requestsInventoryUse(
+        keyCode: UInt16,
+        isRepeat: Bool,
+        gameplayIsActive: Bool
+    ) -> Bool {
+        gameplayIsActive && !isRepeat && keyCode == 42
+    }
+
+    nonisolated static func cameraMonitorFrame(
+        drawableWidth: CGFloat,
+        drawableHeight: CGFloat
+    ) -> CGRect {
+        let viewport = cameraMonitorMetalViewport(
+            drawableWidth: Double(drawableWidth),
+            drawableHeight: Double(drawableHeight)
+        )
+        return CGRect(
+            x: viewport.originX,
+            y: Double(drawableHeight) - viewport.originY - viewport.height,
+            width: viewport.width,
+            height: viewport.height
+        )
+    }
+
     nonisolated static func controllerInput(
         leftX: Float,
         leftY: Float,
@@ -322,6 +421,14 @@ final class RevivalGameplayView: MTKView {
     }
 
     private func configureTrainingOverlay() {
+        cameraMonitorBorder.wantsLayer = true
+        cameraMonitorBorder.layer?.borderColor = NSColor.systemRed.cgColor
+        cameraMonitorBorder.layer?.borderWidth = 2
+        cameraMonitorBorder.isHidden = true
+        cameraMonitorBorder.setAccessibilityLabel(
+            "Training Camera Monitor view"
+        )
+        addSubview(cameraMonitorBorder)
         for label in [enabledControlsLabel, trainingMessageLabel] {
             label.isHidden = false
             label.isEditable = false
@@ -378,22 +485,42 @@ final class RevivalGameplayView: MTKView {
     }
 
     nonisolated static func waveData(for clip: CanonicalVoiceClip) -> Data {
+        waveData(
+            sampleRate: clip.sampleRate,
+            channelCount: clip.channelCount,
+            pcm16LittleEndian: clip.pcm16LittleEndian
+        )
+    }
+
+    nonisolated static func waveData(for clip: CanonicalSoundClip) -> Data {
+        waveData(
+            sampleRate: clip.sampleRate,
+            channelCount: clip.channelCount,
+            pcm16LittleEndian: clip.pcm16LittleEndian
+        )
+    }
+
+    nonisolated private static func waveData(
+        sampleRate: Int,
+        channelCount: Int,
+        pcm16LittleEndian: Data
+    ) -> Data {
         var result = Data()
-        let dataSize = UInt32(clip.pcm16LittleEndian.count)
+        let dataSize = UInt32(pcm16LittleEndian.count)
         result.append(contentsOf: "RIFF".utf8)
         result.append(contentsOf: littleEndian(dataSize + 36))
         result.append(contentsOf: "WAVEfmt ".utf8)
         result.append(contentsOf: littleEndian(UInt32(16)))
         result.append(contentsOf: littleEndian(UInt16(1)))
-        result.append(contentsOf: littleEndian(UInt16(clip.channelCount)))
-        result.append(contentsOf: littleEndian(UInt32(clip.sampleRate)))
-        let byteRate = UInt32(clip.sampleRate * clip.channelCount * 2)
+        result.append(contentsOf: littleEndian(UInt16(channelCount)))
+        result.append(contentsOf: littleEndian(UInt32(sampleRate)))
+        let byteRate = UInt32(sampleRate * channelCount * 2)
         result.append(contentsOf: littleEndian(byteRate))
-        result.append(contentsOf: littleEndian(UInt16(clip.channelCount * 2)))
+        result.append(contentsOf: littleEndian(UInt16(channelCount * 2)))
         result.append(contentsOf: littleEndian(UInt16(16)))
         result.append(contentsOf: "data".utf8)
         result.append(contentsOf: littleEndian(dataSize))
-        result.append(clip.pcm16LittleEndian)
+        result.append(pcm16LittleEndian)
         return result
     }
 

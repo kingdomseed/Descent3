@@ -1404,6 +1404,11 @@ struct RevivalProject: Equatable, Sendable {
         let diagnostic: String?
         if case let .wallHit(contact) = trace.outcome {
             diagnostic = "\(owner) stopped at source room \(contact.roomSourceIndex) face \(contact.faceIndex) and remains owned by source room \(containingRoom)."
+        } else if object.handle
+                    == level.trainingCameraMonitorChain?
+                        .securityCameraObjectHandle {
+            diagnostic =
+                "Moved TrainingMission.cpp Script 059 SecurityCamera handle \(object.handle) for the Camera Monitor popup. Undo action: Move Object."
         } else {
             diagnostic = nil
         }

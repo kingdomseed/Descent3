@@ -14,6 +14,96 @@ struct DecodedOSFVoice: Equatable, Sendable {
     let pcm16LittleEndian: Data
 }
 
+struct ReachedPCM16Audio: Equatable, Sendable {
+    let sampleRate: Int
+    let channelCount: Int
+    let frameCount: Int
+    let pcm16LittleEndian: Data
+}
+
+enum ReachedWAVDecodeError: Error, Equatable {
+    case truncated
+    case invalidHeader
+    case unsupportedFormat
+    case missingData
+}
+
+func decodeReachedPCM16WAV(_ data: Data) throws -> ReachedPCM16Audio {
+    guard data.count >= 12,
+          data[0..<4].elementsEqual("RIFF".utf8),
+          data[8..<12].elementsEqual("WAVE".utf8) else {
+        throw ReachedWAVDecodeError.invalidHeader
+    }
+    let declaredBodyCount = Int(readTableUInt32(data, at: 4))
+    guard declaredBodyCount == data.count - 8 else {
+        throw ReachedWAVDecodeError.truncated
+    }
+    let riffEnd = data.count
+    var offset = 12
+    var format: (
+        sampleRate: Int,
+        channelCount: Int,
+        blockAlign: Int
+    )?
+    var pcm: Data?
+    while offset <= riffEnd - 8 {
+        let name = String(decoding: data[offset..<(offset + 4)], as: UTF8.self)
+        let count = Int(readTableUInt32(data, at: offset + 4))
+        let bodyStart = offset + 8
+        guard count >= 0, count <= riffEnd - bodyStart else {
+            throw ReachedWAVDecodeError.truncated
+        }
+        if name == "fmt " {
+            guard count >= 16 else {
+                throw ReachedWAVDecodeError.truncated
+            }
+            let audioFormat =
+                UInt16(data[bodyStart])
+                    | UInt16(data[bodyStart + 1]) << 8
+            let channels =
+                Int(UInt16(data[bodyStart + 2])
+                    | UInt16(data[bodyStart + 3]) << 8)
+            let rate = Int(readTableUInt32(data, at: bodyStart + 4))
+            let blockAlign =
+                Int(UInt16(data[bodyStart + 12])
+                    | UInt16(data[bodyStart + 13]) << 8)
+            let bits =
+                Int(UInt16(data[bodyStart + 14])
+                    | UInt16(data[bodyStart + 15]) << 8)
+            guard audioFormat == 1,
+                  (1...2).contains(channels),
+                  (4_096...192_000).contains(rate),
+                  bits == 16,
+                  blockAlign == channels * 2 else {
+                throw ReachedWAVDecodeError.unsupportedFormat
+            }
+            format = (rate, channels, blockAlign)
+        } else if name == "data" {
+            pcm = Data(data[bodyStart..<(bodyStart + count)])
+        }
+        let paddedEnd = bodyStart + count + (count & 1)
+        guard paddedEnd <= riffEnd else {
+            throw ReachedWAVDecodeError.truncated
+        }
+        offset = paddedEnd
+    }
+    guard offset == riffEnd else {
+        throw ReachedWAVDecodeError.truncated
+    }
+    guard let format, let pcm else {
+        throw ReachedWAVDecodeError.missingData
+    }
+    guard !pcm.isEmpty, pcm.count % format.blockAlign == 0 else {
+        throw ReachedWAVDecodeError.unsupportedFormat
+    }
+    return .init(
+        sampleRate: format.sampleRate,
+        channelCount: format.channelCount,
+        frameCount: pcm.count / format.blockAlign,
+        pcm16LittleEndian: pcm
+    )
+}
+
 enum OSFACMDecodeError: Error, Equatable {
     case truncated
     case invalidOSF
@@ -788,6 +878,94 @@ private func canonicalLightCorona(
     )
 }
 
+struct RetailSoundPageSelection: Equatable, Sendable {
+    let storedIndex: Int
+    let logicalName: String
+    let sourceName: String
+    let importVolume: Float
+}
+
+func resolveRetailSoundPage(
+    table: Data,
+    overlay: Data,
+    named name: String
+) throws -> RetailSoundPageSelection {
+    let base = try parseRetailSoundPages(table)
+    let replacements = try parseRetailSoundPages(overlay)
+    var byName = Dictionary(
+        uniqueKeysWithValues: base.map {
+            ($0.logicalName.lowercased(), $0)
+        }
+    )
+    var nextIndex = (base.map(\.storedIndex).max() ?? -1) + 1
+    for replacement in replacements {
+        let key = replacement.logicalName.lowercased()
+        let storedIndex = byName[key]?.storedIndex ?? nextIndex
+        if byName[key] == nil { nextIndex += 1 }
+        byName[key] = .init(
+            storedIndex: storedIndex,
+            logicalName: replacement.logicalName,
+            sourceName: replacement.sourceName,
+            importVolume: replacement.importVolume
+        )
+    }
+    guard let selected = byName[name.lowercased()] else {
+        throw RetailTextureTableError.missingName(name)
+    }
+    return selected
+}
+
+private func parseRetailSoundPages(
+    _ data: Data
+) throws -> [RetailSoundPageSelection] {
+    var offset = 0
+    var pages: [RetailSoundPageSelection] = []
+    var soundIndex = 0
+    while offset < data.count {
+        guard data.count - offset >= 5 else {
+            throw RetailTextureTableError.truncated
+        }
+        let type = data[offset]
+        let length = Int(readTableUInt32(data, at: offset + 1))
+        guard length >= 4,
+              length - 4 <= data.count - offset - 5 else {
+            throw RetailTextureTableError.invalidPageLength
+        }
+        if type == 7 {
+            var cursor = RetailPageCursor(
+                Data(data[(offset + 5)..<(offset + 1 + length)])
+            )
+            guard try cursor.readUInt16() == 1 else {
+                throw RetailTextureTableError.invalidPageLength
+            }
+            let logicalName = try cursor.readCString()
+            let sourceName = try cursor.readCString()
+            _ = try cursor.readInt32()
+            _ = try cursor.readInt32()
+            _ = try cursor.readInt32()
+            _ = try cursor.readFloat()
+            _ = try cursor.readInt32()
+            _ = try cursor.readInt32()
+            _ = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            let importVolume = try cursor.readFloat()
+            try cursor.requireEnd()
+            guard importVolume.isFinite, importVolume >= 0 else {
+                throw RetailTextureTableError.invalidPageLength
+            }
+            pages.append(.init(
+                storedIndex: soundIndex,
+                logicalName: logicalName,
+                sourceName: sourceName,
+                importVolume: importVolume
+            ))
+            soundIndex += 1
+        }
+        offset += 1 + length
+    }
+    return pages
+}
+
 private func readTableUInt32(_ data: Data, at offset: Int) -> UInt32 {
     UInt32(data[offset])
         | UInt32(data[offset + 1]) << 8
@@ -1128,6 +1306,107 @@ func reachedOutrageModelReferencedTextureSlotIndices(_ data: Data) throws -> Set
             return nil
         }
     })
+}
+
+struct ReachedModelGunpoint: Equatable, Sendable {
+    let parentSubmodelIndex: Int
+    let position: Vector3
+    let forward: Vector3
+}
+
+func reachedOutrageModelGunpoint(
+    _ data: Data,
+    index: Int
+) throws -> ReachedModelGunpoint {
+    var cursor = OutrageModelCursor(data)
+    guard try cursor.readASCII(4) == "PSPO" else {
+        throw OutrageModelImportError.invalidHeader
+    }
+    var version = Int(try cursor.readInt32())
+    if version < 18 { version *= 100 }
+    guard version == 2_300 else {
+        throw OutrageModelImportError.unsupportedVersion(version)
+    }
+    var rawGunpoint: ReachedModelGunpoint?
+    var submodelOffsets: [Int: (
+        parent: Int?,
+        offset: Vector3
+    )] = [:]
+    while !cursor.isAtEnd {
+        let name = try cursor.readASCII(4)
+        let count = try cursor.readCount(
+            maximum: cursor.remaining,
+            name: name
+        )
+        var chunk = try cursor.readSubcursor(count)
+        if name == "SOBJ" {
+            let sourceIndex = Int(try chunk.readInt32())
+            let rawParent = Int(try chunk.readInt32())
+            _ = try chunk.readVector()
+            _ = try chunk.readFloat()
+            _ = try chunk.readVector()
+            let offset = try chunk.readVector()
+            submodelOffsets[sourceIndex] = (
+                rawParent < 0 ? nil : rawParent,
+                offset
+            )
+        } else if name == "GPNT" {
+            let gunpointCount = try chunk.readCount(
+                maximum: 1_000,
+                name: "gunpoints"
+            )
+            guard (0..<gunpointCount).contains(index) else {
+                throw OutrageModelImportError.invalidIndex("gunpoint")
+            }
+            for gunpointIndex in 0..<gunpointCount {
+                let parent = Int(try chunk.readInt32())
+                let position = try chunk.readVector()
+                let forward = try chunk.readVector()
+                if gunpointIndex == index {
+                    rawGunpoint = .init(
+                        parentSubmodelIndex: parent,
+                        position: position,
+                        forward: forward
+                    )
+                }
+            }
+            try chunk.requireEnd(name)
+        }
+    }
+    guard let rawGunpoint,
+          submodelOffsets[rawGunpoint.parentSubmodelIndex] != nil else {
+        throw OutrageModelImportError.missingChunk("GPNT")
+    }
+    var accumulated = Vector3.zero
+    var current: Int? = rawGunpoint.parentSubmodelIndex
+    var visited = Set<Int>()
+    while let index = current {
+        guard let submodel = submodelOffsets[index],
+              visited.insert(index).inserted else {
+            throw OutrageModelImportError.invalidIndex(
+                "gunpoint parent"
+            )
+        }
+        accumulated = addModelVectors(accumulated, submodel.offset)
+        current = submodel.parent
+    }
+    let magnitude = sqrt(
+        rawGunpoint.forward.x * rawGunpoint.forward.x
+            + rawGunpoint.forward.y * rawGunpoint.forward.y
+            + rawGunpoint.forward.z * rawGunpoint.forward.z
+    )
+    guard magnitude.isFinite, magnitude > 0 else {
+        throw OutrageModelImportError.invalidChunk("GPNT")
+    }
+    return .init(
+        parentSubmodelIndex: rawGunpoint.parentSubmodelIndex,
+        position: addModelVectors(accumulated, rawGunpoint.position),
+        forward: .init(
+            x: rawGunpoint.forward.x / magnitude,
+            y: rawGunpoint.forward.y / magnitude,
+            z: rawGunpoint.forward.z / magnitude
+        )
+    )
 }
 
 func parseReachedOutrageModel(

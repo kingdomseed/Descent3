@@ -787,6 +787,168 @@ final class CanonicalLevelTests: XCTestCase {
         }
     }
 
+    func testSchemaTenRejectsHostileCameraMonitorVoiceFormatAndArchive() throws {
+        let fixture = makeTrainingCameraMonitorLevel()
+        let chain = TrainingCameraMonitorChain(
+            pickupObjectHandle: 6_167,
+            securityCameraObjectHandle: 6_183,
+            pickupCollisionRadius: 3.682_004,
+            pickupMessage:
+                "Excellent.  You now have the Camera Monitor.  Press the Use Inventory key to activate it!",
+            pickupVoiceSourceName: "guidebotc.osf",
+            pickupSoundSourceName: "PupC.wav",
+            useMessage:
+                "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
+            useVoiceSourceName: "guidebotd.osf",
+            popupDuration: 10,
+            popupZoom: 1,
+            cameraGunpointIndex: 0,
+            cameraLocalPosition: .init(
+                x: -0.092_777_25,
+                y: 0.791_976,
+                z: 5.571_280_5
+            ),
+            cameraLocalForward: .init(
+                x: -2.880_202e-7,
+                y: -0.017_452_003,
+                z: 0.999_847_7
+            ),
+            completionTimerDuration: 2
+        )
+        func voice(
+            name: String,
+            index: Int,
+            frames: Int,
+            pcmSHA256: String,
+            sourceSHA256: String,
+            sampleRate: Int = 22_050,
+            channelCount: Int = 1,
+            sourceArchive: String = "missions/training.mn3"
+        ) -> CanonicalVoiceClip {
+            CanonicalVoiceClip(
+                sourceName: name,
+                sourceEntryIndex: index,
+                sampleRate: sampleRate,
+                channelCount: channelCount,
+                frameCount: frames,
+                pcm16LittleEndian: Data(),
+                pcmSHA256: pcmSHA256,
+                sourceArchive: sourceArchive,
+                sourceSHA256: sourceSHA256
+            )
+        }
+        let guidebotC = voice(
+            name: "guidebotc.osf",
+            index: 6,
+            frames: 273_181,
+            pcmSHA256:
+                "b5d968ac310d7d95780f2abd58933e7fdce20d284a9ef614e18e9f8eea3e18de",
+            sourceSHA256:
+                "20d0d1e82f56c7c4d326788ac9caa1dc39ec81d4a022be52967776ec5fa85dc1"
+        )
+        let guidebotD = voice(
+            name: "guidebotd.osf",
+            index: 7,
+            frames: 149_653,
+            pcmSHA256:
+                "d97e6efaa106fbe9c4dff0affe155e04db18938e842be494292d0008b10f2a71",
+            sourceSHA256:
+                "afffa8e1a39b1c6e8956105c52db8fa372a33b763aa44e18980f2e22884795d1"
+        )
+        let pickupSound = CanonicalSoundClip(
+            logicalName: "PupC1",
+            sourceName: "PupC.wav",
+            sourceEntryIndex: 130,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 16_759,
+            pcm16LittleEndian: Data(),
+            pcmSHA256:
+                "6cc9a2c4853f3575838d8ef16f51847e4c990140d5206158a582abddf130f099",
+            sourceArchive: "d3.hog",
+            sourceSHA256:
+                "d3e8e7515facfd6c1b540e70cf7f1019c3d1f13f24140bee76337e5bb37de7d0",
+            importVolume: 1
+        )
+        let presentation = ObjectPresentationReference(
+            objectHandle: 6_167,
+            primaryModel: .init(
+                storedIndex: 0,
+                sourceName: "camerapowerup.OOF"
+            ),
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil
+        )
+        func validate(
+            guidebotC: CanonicalVoiceClip,
+            guidebotD: CanonicalVoiceClip
+        ) throws {
+            try validateStockTrainingCameraMonitorPackage(
+                chain: chain,
+                guidebotC: guidebotC,
+                guidebotD: guidebotD,
+                pickupSound: pickupSound,
+                objects: fixture.objects,
+                objectPresentations: [presentation]
+            )
+        }
+
+        XCTAssertNoThrow(
+            try validate(guidebotC: guidebotC, guidebotD: guidebotD)
+        )
+        let hostilePairs = [
+            (
+                voice(
+                    name: "guidebotc.osf",
+                    index: 6,
+                    frames: 273_181,
+                    pcmSHA256: guidebotC.pcmSHA256,
+                    sourceSHA256: guidebotC.sourceSHA256,
+                    sampleRate: 44_100
+                ),
+                guidebotD
+            ),
+            (
+                voice(
+                    name: "guidebotc.osf",
+                    index: 6,
+                    frames: 273_181,
+                    pcmSHA256: guidebotC.pcmSHA256,
+                    sourceSHA256: guidebotC.sourceSHA256,
+                    channelCount: 2
+                ),
+                guidebotD
+            ),
+            (
+                guidebotC,
+                voice(
+                    name: "guidebotd.osf",
+                    index: 7,
+                    frames: 149_653,
+                    pcmSHA256: guidebotD.pcmSHA256,
+                    sourceSHA256: guidebotD.sourceSHA256,
+                    sourceArchive: "hostile/training.mn3"
+                )
+            ),
+        ]
+        for (hostileGuidebotC, hostileGuidebotD) in hostilePairs {
+            XCTAssertThrowsError(
+                try validate(
+                    guidebotC: hostileGuidebotC,
+                    guidebotD: hostileGuidebotD
+                )
+            ) {
+                XCTAssertEqual(
+                    $0 as? LevelValidationError,
+                    .invalidDependency("Training Camera Monitor package")
+                )
+            }
+        }
+    }
+
     func testSchemaEightRejectsWrongTrainingGalleryMarkerIdentity() throws {
         let level = makeTrainingGalleryBarrierLevel()
         try level.validate()
@@ -1381,6 +1543,84 @@ final class CanonicalLevelTests: XCTestCase {
             try Data(contentsOf: secondPackage.appending(path: "content.json"))
         )
         XCTAssertEqual(try loadCanonicalLevel(from: firstPackage), level)
+    }
+
+    func testSchemaNineLoaderDefaultsAbsentSoundClipsToEmpty() throws {
+        let level = makeMinimalCanonicalPackageLevel()
+        XCTAssertEqual(level.schemaVersion, 9)
+        let package = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: package) }
+        try writeCanonicalPackage(level, to: package)
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: canonicalJSONData(level)
+            ) as? [String: Any]
+        )
+        object.removeValue(forKey: "soundClips")
+        let legacyLevelData = try JSONSerialization.data(
+            withJSONObject: object,
+            options: [.sortedKeys]
+        )
+        try overwriteCanonicalPackageLevelData(
+            legacyLevelData,
+            identity: level,
+            at: package
+        )
+
+        let loaded = try loadCanonicalLevel(from: package)
+
+        XCTAssertEqual(loaded.schemaVersion, 9)
+        XCTAssertEqual(loaded.soundClips, [])
+    }
+
+    func testCanonicalLoaderRejectsOverflowingPCMMetadata() throws {
+        let base = makeMinimalCanonicalPackageLevel()
+        let archive = try XCTUnwrap(
+            base.source.profileFiles.first?.relativePath
+        )
+        let voice = CanonicalVoiceClip(
+            sourceName: "overflow.osf",
+            sourceEntryIndex: 999,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: Int.max / 2 + 1,
+            pcm16LittleEndian: Data([0, 0]),
+            pcmSHA256: canonicalSHA256(Data([0, 0])),
+            sourceArchive: archive,
+            sourceSHA256: String(repeating: "a", count: 64)
+        )
+        let hostile = replacing(
+            base,
+            voiceClips: [voice],
+            dependencyManifest: .init(
+                current: base.dependencyManifest.current + [
+                    .init(
+                        category: "voice",
+                        source: .init(
+                            storedIndex: voice.sourceEntryIndex,
+                            sourceName: voice.sourceName
+                        ),
+                        state: "canonical-pcm-imported",
+                        provenance: "overflow fixture"
+                    ),
+                ],
+                historicalEagerBaseline:
+                    base.dependencyManifest.historicalEagerBaseline
+            )
+        )
+        let package = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: package) }
+        try writeCanonicalPackage(base, to: package)
+        try overwriteCanonicalPackageLevel(hostile, at: package)
+
+        XCTAssertThrowsError(try loadCanonicalLevel(from: package)) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Canonical voice clip")
+            )
+        }
     }
 
     func testContentManifestCarriesTheCanonicalContractProvenanceCoverageAndRights() throws {
@@ -3041,6 +3281,18 @@ private func assertValidationError(
 
 private func overwriteCanonicalPackageLevel(_ level: Level, at packageURL: URL) throws {
     let levelData = try canonicalJSONData(level)
+    try overwriteCanonicalPackageLevelData(
+        levelData,
+        identity: level,
+        at: packageURL
+    )
+}
+
+private func overwriteCanonicalPackageLevelData(
+    _ levelData: Data,
+    identity level: Level,
+    at packageURL: URL
+) throws {
     let manifestURL = packageURL.appending(path: "content.json")
     let currentManifest = try JSONDecoder().decode(
         CanonicalPackageManifest.self,
@@ -3101,7 +3353,9 @@ func replacing(
     trainingOpeningLesson: TrainingOpeningLesson? = nil,
     trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
     trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
+    trainingCameraMonitorChain: TrainingCameraMonitorChain? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
+    soundClips: [CanonicalSoundClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
     sourceChunks: [SourceChunkRecord]? = nil
 ) -> Level {
@@ -3142,7 +3396,10 @@ func replacing(
             trainingGalleryBarrier ?? level.trainingGalleryBarrier,
         trainingRobotGuidebotChain:
             trainingRobotGuidebotChain ?? level.trainingRobotGuidebotChain,
+        trainingCameraMonitorChain:
+            trainingCameraMonitorChain ?? level.trainingCameraMonitorChain,
         voiceClips: voiceClips ?? level.voiceClips,
+        soundClips: soundClips ?? level.soundClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
         sourceChunks: sourceChunks ?? level.sourceChunks
     )

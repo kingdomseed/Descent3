@@ -63,6 +63,7 @@ struct InputSnapshot: Equatable, Sendable {
     let directLookYawRadians: Float
     let firesPrimaryWeapon: Bool
     let deploysTrainingGuidebot: Bool
+    let usesInventory: Bool
 
     static let zero = InputSnapshot()
 
@@ -77,7 +78,8 @@ struct InputSnapshot: Equatable, Sendable {
         directLookPitchRadians: Float = 0,
         directLookYawRadians: Float = 0,
         firesPrimaryWeapon: Bool = false,
-        deploysTrainingGuidebot: Bool = false
+        deploysTrainingGuidebot: Bool = false,
+        usesInventory: Bool = false
     ) {
         precondition(
             directLookPitchRadians.isFinite && directLookYawRadians.isFinite
@@ -93,6 +95,7 @@ struct InputSnapshot: Equatable, Sendable {
         self.directLookYawRadians = directLookYawRadians
         self.firesPrimaryWeapon = firesPrimaryWeapon
         self.deploysTrainingGuidebot = deploysTrainingGuidebot
+        self.usesInventory = usesInventory
     }
 }
 
@@ -162,7 +165,8 @@ private extension InputSnapshot {
                     : 0,
             firesPrimaryWeapon:
                 controls.contains(.primaryWeapon) && firesPrimaryWeapon,
-            deploysTrainingGuidebot: deploysTrainingGuidebot
+            deploysTrainingGuidebot: deploysTrainingGuidebot,
+            usesInventory: usesInventory
         )
     }
 }
@@ -248,6 +252,7 @@ struct PlayerInputState: Sendable {
     private var mouseDeltaY: Float = 0
     private var guidebotDeploymentIsPending = false
     private var primaryFireIsPending = false
+    private var inventoryUseIsPending = false
     private(set) var gameplayIsActive = true
     var mouseLookEnabled = false
 
@@ -280,6 +285,11 @@ struct PlayerInputState: Sendable {
         primaryFireIsPending = true
     }
 
+    mutating func requestInventoryUse() {
+        guard gameplayIsActive else { return }
+        inventoryUseIsPending = true
+    }
+
     mutating func snapshot(frameDuration: Float) -> InputSnapshot {
         let keyboard = ramp.snapshot(
             held: held,
@@ -295,10 +305,12 @@ struct PlayerInputState: Sendable {
         let deltaY = mouseDeltaY
         let deploysTrainingGuidebot = guidebotDeploymentIsPending
         let firesPrimaryWeapon = primaryFireIsPending
+        let usesInventory = inventoryUseIsPending
         mouseDeltaX = 0
         mouseDeltaY = 0
         guidebotDeploymentIsPending = false
         primaryFireIsPending = false
+        inventoryUseIsPending = false
         let mouseNormalizer = 10_000 * max(frameDuration, 0.005)
         let mouseYaw = mouseLookEnabled ? 0 : deltaX / mouseNormalizer
         let mousePitch = mouseLookEnabled ? 0 : -deltaY / mouseNormalizer
@@ -317,7 +329,8 @@ struct PlayerInputState: Sendable {
             directLookPitchRadians: mouseLookEnabled ? -deltaY * directScale : 0,
             directLookYawRadians: mouseLookEnabled ? deltaX * directScale : 0,
             firesPrimaryWeapon: firesPrimaryWeapon,
-            deploysTrainingGuidebot: deploysTrainingGuidebot
+            deploysTrainingGuidebot: deploysTrainingGuidebot,
+            usesInventory: usesInventory
         )
     }
 
@@ -334,6 +347,7 @@ struct PlayerInputState: Sendable {
             mouseDeltaY = 0
             guidebotDeploymentIsPending = false
             primaryFireIsPending = false
+            inventoryUseIsPending = false
             _ = ramp.snapshot(
                 held: .zero,
                 frameDuration: simulation?.frameDuration ?? 0,
@@ -431,12 +445,32 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingOpeningFeedback: [TrainingOpeningFeedback]
     let trainingGalleryMarkerLightDistance: Float?
     let trainingGuidebot: TrainingGuidebotFrame?
+    let trainingCameraMonitor: TrainingCameraMonitorFrame?
 }
 
 struct TrainingOpeningFeedback: Equatable, Sendable {
     let hudMessages: [String]
     let voiceSourceName: String
     let voicePrecedesHUDMessages: Bool
+    let soundSourceName: String?
+
+    init(
+        hudMessages: [String],
+        voiceSourceName: String,
+        voicePrecedesHUDMessages: Bool,
+        soundSourceName: String? = nil
+    ) {
+        self.hudMessages = hudMessages
+        self.voiceSourceName = voiceSourceName
+        self.voicePrecedesHUDMessages = voicePrecedesHUDMessages
+        self.soundSourceName = soundSourceName
+    }
+}
+
+struct TrainingCameraMonitorFrame: Equatable, Sendable {
+    let camera: RoomCamera
+    let roomSourceIndex: Int
+    let remainingDuration: Float
 }
 
 enum TrainingGuidebotRouteMode: String, Codable, Equatable, Sendable {
@@ -811,6 +845,16 @@ private struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
     var destructionFeedbackWasPresented = false
 }
 
+private struct TrainingCameraMonitorState:
+    Codable, Equatable, Sendable
+{
+    var isHeld = false
+    var wasUsed = false
+    var popupRemaining: Float?
+    var completionTimerRemaining: Float?
+    var completionTimerWasConsumed = false
+}
+
 private struct TrainingGuidebotRuntimeState:
     Codable, Equatable, Sendable
 {
@@ -874,6 +918,8 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
         TrainingGalleryBarrierState?
     fileprivate let trainingRobotGuidebotState:
         TrainingRobotGuidebotState?
+    fileprivate let trainingCameraMonitorState:
+        TrainingCameraMonitorState?
 }
 
 enum PlayerSimulationContinuationError: Error, Equatable {
@@ -911,6 +957,8 @@ final class PlayerSimulation {
         TrainingGalleryBarrierState?
     private var trainingRobotGuidebotState:
         TrainingRobotGuidebotState?
+    private var trainingCameraMonitorState:
+        TrainingCameraMonitorState?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -937,6 +985,9 @@ final class PlayerSimulation {
         trainingRobotGuidebotState = level.trainingRobotGuidebotChain.map {
             TrainingRobotGuidebotState(robotShields: $0.combat.robotShields)
         }
+        trainingCameraMonitorState = level.trainingCameraMonitorChain.map {
+            _ in TrainingCameraMonitorState()
+        }
     }
 
     init(
@@ -944,7 +995,8 @@ final class PlayerSimulation {
         continuation: PlayerSimulationContinuation,
         resumedAtTimestamp: Double
     ) throws {
-        guard continuation.schemaVersion == 3 else {
+        guard continuation.schemaVersion
+                == (level.trainingCameraMonitorChain == nil ? 3 : 4) else {
             throw PlayerSimulationContinuationError.unsupportedSchema
         }
         guard continuation.levelKey == level.levelKey,
@@ -962,6 +1014,58 @@ final class PlayerSimulation {
                 $0.handle == chain.destroyRobotObjectHandle
             }
             openTrainingGalleryBarrier(in: &continuationLevel)
+        }
+        if let cameraState = continuation.trainingCameraMonitorState,
+           let chain = continuationLevel.trainingCameraMonitorChain {
+            if cameraState.isHeld || cameraState.wasUsed {
+                completeTrainingCameraMonitorLocateGoal(
+                    in: &continuationLevel,
+                    pickupObjectHandle: chain.pickupObjectHandle
+                )
+            }
+            if cameraState.wasUsed {
+                continuationLevel.objects.removeAll {
+                    $0.handle == chain.pickupObjectHandle
+                }
+            }
+            if cameraState.isHeld || cameraState.wasUsed {
+                setObjectPresentationVisibility(
+                    in: &continuationLevel,
+                    handle: chain.pickupObjectHandle,
+                    isVisible: false
+                )
+            }
+        }
+        guard validTrainingCameraMonitorContinuation(
+            continuation.trainingCameraMonitorState,
+            level: continuationLevel
+        ) else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
+        guard validTrainingGalleryBarrierContinuation(
+            continuation.trainingGalleryBarrierState,
+            robotGuidebotState:
+                continuation.trainingRobotGuidebotState,
+            level: continuationLevel
+        ),
+        validTrainingRobotGuidebotContinuation(
+            continuation.trainingRobotGuidebotState,
+            galleryState: continuation.trainingGalleryBarrierState,
+            level: routeAllocationLevel
+        ) else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
+        guard case .room(let restoredRoomSourceIndex)
+                = continuation.playerLocation,
+              level.rooms.contains(where: {
+                  $0.sourceIndex == restoredRoomSourceIndex
+              }),
+              containingIndoorRoomSourceIndex(
+                  in: level,
+                  position: continuation.playerPosition,
+                  candidates: [restoredRoomSourceIndex]
+              ) == restoredRoomSourceIndex else {
+            throw PlayerSimulationContinuationError.invalidState
         }
         guard resumedAtTimestamp.isFinite,
               continuation.frameDuration.isFinite,
@@ -996,28 +1100,7 @@ final class PlayerSimulation {
                           : $0.enabledControls == [.forward])
               }) ?? true,
               (level.trainingOpeningLesson == nil)
-                == (continuation.trainingOpeningState == nil),
-              validTrainingGalleryBarrierContinuation(
-                  continuation.trainingGalleryBarrierState,
-                  robotGuidebotState:
-                    continuation.trainingRobotGuidebotState,
-                  level: continuationLevel
-              ),
-              validTrainingRobotGuidebotContinuation(
-                  continuation.trainingRobotGuidebotState,
-                  galleryState: continuation.trainingGalleryBarrierState,
-                  level: routeAllocationLevel
-              ),
-              case .room(let restoredRoomSourceIndex)
-                = continuation.playerLocation,
-              level.rooms.contains(where: {
-                  $0.sourceIndex == restoredRoomSourceIndex
-              }),
-              containingIndoorRoomSourceIndex(
-                  in: level,
-                  position: continuation.playerPosition,
-                  candidates: [restoredRoomSourceIndex]
-              ) == restoredRoomSourceIndex else {
+                == (continuation.trainingOpeningState == nil) else {
             throw PlayerSimulationContinuationError.invalidState
         }
         var restoredLevel = continuationLevel
@@ -1047,6 +1130,8 @@ final class PlayerSimulation {
             continuation.trainingGalleryBarrierState
         trainingRobotGuidebotState =
             continuation.trainingRobotGuidebotState
+        trainingCameraMonitorState =
+            continuation.trainingCameraMonitorState
         restoreTrainingGuidebotPresentation()
     }
 
@@ -1054,7 +1139,8 @@ final class PlayerSimulation {
         let binding = level.defaultPlayerBinding!
         let player = level.objects.first { $0.handle == binding.objectHandle }!
         return PlayerSimulationContinuation(
-            schemaVersion: 3,
+            schemaVersion:
+                level.trainingCameraMonitorChain == nil ? 3 : 4,
             levelKey: level.levelKey,
             levelSHA256: level.source.levelSHA256,
             playerLocation: player.location,
@@ -1076,7 +1162,9 @@ final class PlayerSimulation {
             trainingGalleryBarrierState:
                 trainingGalleryBarrierState,
             trainingRobotGuidebotState:
-                trainingRobotGuidebotState
+                trainingRobotGuidebotState,
+            trainingCameraMonitorState:
+                trainingCameraMonitorState
         )
     }
 
@@ -1278,6 +1366,30 @@ final class PlayerSimulation {
             openingControls: trainingOpeningState?.enabledControls
         )
         let input = input.applying(currentEnabledControls)
+        var cameraMonitorWasUsedThisFrame = false
+        if input.usesInventory,
+           var state = trainingCameraMonitorState,
+           state.isHeld,
+           !state.wasUsed,
+           let chain = level.trainingCameraMonitorChain {
+            // Preserve the reached inventory item's typed effect before the
+            // one-use callback removes its backing object.
+            state.isHeld = false
+            state.wasUsed = true
+            state.popupRemaining = chain.popupDuration
+            state.completionTimerRemaining =
+                chain.completionTimerDuration
+            trainingCameraMonitorState = state
+            cameraMonitorWasUsedThisFrame = true
+            level.objects.removeAll {
+                $0.handle == chain.pickupObjectHandle
+            }
+            setObjectPresentationVisibility(
+                in: &level,
+                handle: chain.pickupObjectHandle,
+                isVisible: false
+            )
+        }
         if input.deploysTrainingGuidebot {
             deployTrainingGuidebot(from: object, playerVelocity: velocity)
         }
@@ -1433,6 +1545,7 @@ final class PlayerSimulation {
         var roomSourceIndex = startRoom
         var trainingForwardGoalWasReachedThisFrame = false
         var trainingGalleryWasCrossedThisFrame = false
+        var trainingCameraMonitorWasHitThisFrame = false
         if ship.physics.behaviors.contains(.wiggle) {
             if sqrt(dot(force, force)) < 0.1 {
                 wiggleFalloff -= systemsFrameDuration / 2
@@ -1459,6 +1572,17 @@ final class PlayerSimulation {
                 end: position + linearThrustOrientation.up * wiggle,
                 radius: view.collisionRadius
             )
+            trainingCameraMonitorWasHitThisFrame =
+                trainingCameraMonitorWasHitThisFrame
+                || trainingCameraMonitorPickupWasHit(
+                    in: level,
+                    state: trainingCameraMonitorState,
+                    playerStart: traceStart,
+                    playerEnd: trace.finalPosition,
+                    playerRadius: view.collisionRadius,
+                    visitedRoomSourceIndices:
+                        trace.visitedRoomSourceIndices
+                )
             trainingGalleryWasCrossedThisFrame =
                 trainingGalleryWasCrossedThisFrame
                 || trainingGalleryTriggerWasCrossed(
@@ -1565,7 +1689,10 @@ final class PlayerSimulation {
         }
         orientation = sourceOrthogonalized(orientation)
         object.orientation = orientation
-        level.objects[objectIndex].orientation = orientation
+        let orientedPlayerIndex = level.objects.firstIndex {
+            $0.handle == binding.objectHandle
+        }!
+        level.objects[orientedPlayerIndex].orientation = orientation
 
         var remainingDuration = systemsFrameDuration
         var responseForce = force
@@ -1588,6 +1715,17 @@ final class PlayerSimulation {
                 end: integrated.position,
                 radius: view.collisionRadius
             )
+            trainingCameraMonitorWasHitThisFrame =
+                trainingCameraMonitorWasHitThisFrame
+                || trainingCameraMonitorPickupWasHit(
+                    in: level,
+                    state: trainingCameraMonitorState,
+                    playerStart: traceStart,
+                    playerEnd: trace.finalPosition,
+                    playerRadius: view.collisionRadius,
+                    visitedRoomSourceIndices:
+                        trace.visitedRoomSourceIndices
+                )
             trainingGalleryWasCrossedThisFrame =
                 trainingGalleryWasCrossedThisFrame
                 || trainingGalleryTriggerWasCrossed(
@@ -1657,10 +1795,44 @@ final class PlayerSimulation {
         if remainingDuration > 0 {
             velocity = .zero
         }
-        level.objects[objectIndex].position = position
-        level.objects[objectIndex].location = .room(roomSourceIndex)
+        let movedPlayerIndex = level.objects.firstIndex {
+            $0.handle == binding.objectHandle
+        }!
+        level.objects[movedPlayerIndex].position = position
+        level.objects[movedPlayerIndex].location = .room(roomSourceIndex)
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
+        if var state = trainingCameraMonitorState,
+           !state.isHeld,
+           !state.wasUsed,
+           let chain = level.trainingCameraMonitorChain,
+           trainingCameraMonitorWasHitThisFrame {
+            state.isHeld = true
+            trainingCameraMonitorState = state
+            completeTrainingCameraMonitorLocateGoal(
+                in: &level,
+                pickupObjectHandle: chain.pickupObjectHandle
+            )
+            setObjectPresentationVisibility(
+                in: &level,
+                handle: chain.pickupObjectHandle,
+                isVisible: false
+            )
+            trainingOpeningFeedback.append(.init(
+                hudMessages: [chain.pickupMessage],
+                voiceSourceName: chain.pickupVoiceSourceName,
+                voicePrecedesHUDMessages: true,
+                soundSourceName: chain.pickupSoundSourceName
+            ))
+        }
+        if cameraMonitorWasUsedThisFrame,
+           let chain = level.trainingCameraMonitorChain {
+            trainingOpeningFeedback.append(.init(
+                hudMessages: [chain.useMessage],
+                voiceSourceName: chain.useVoiceSourceName,
+                voicePrecedesHUDMessages: true
+            ))
+        }
         if var galleryState = trainingGalleryBarrierState,
            !galleryState.wasTriggered,
            trainingGalleryWasCrossedThisFrame,
@@ -1759,6 +1931,27 @@ final class PlayerSimulation {
             aspectRatio: PerspectiveProjection.sourceDefault.aspectRatio
         )
 
+        let cameraMonitorFrame = trainingCameraMonitorFrame(
+            level: level,
+            state: trainingCameraMonitorState
+        )
+        if var state = trainingCameraMonitorState {
+            if var remaining = state.popupRemaining {
+                remaining -= systemsFrameDuration
+                state.popupRemaining = remaining < 0 ? nil : remaining
+            }
+            if var timer = state.completionTimerRemaining {
+                timer -= systemsFrameDuration
+                if timer <= 0.000_001 {
+                    state.completionTimerRemaining = nil
+                    state.completionTimerWasConsumed = true
+                } else {
+                    state.completionTimerRemaining = timer
+                }
+            }
+            trainingCameraMonitorState = state
+        }
+
         frameDuration = Float(timestamp - lastTimestamp)
         lastTimestamp = timestamp
         gameTime += frameDuration
@@ -1787,7 +1980,8 @@ final class PlayerSimulation {
             trainingGalleryMarkerLightDistance:
                 trainingGalleryBarrierState?.markerLightDistance,
             trainingGuidebot:
-                trainingRobotGuidebotState?.guidebot?.frame
+                trainingRobotGuidebotState?.guidebot?.frame,
+            trainingCameraMonitor: cameraMonitorFrame
         )
     }
 
@@ -1843,6 +2037,7 @@ private func segmentSphereHitFraction(
     }
     let b = 2 * dot(offset, movement)
     let c = dot(offset, offset) - radius * radius
+    if c <= 0 { return 0 }
     let discriminant = b * b - 4 * a * c
     guard discriminant >= 0 else { return nil }
     let root = sqrt(discriminant)
@@ -1851,6 +2046,33 @@ private func segmentSphereHitFraction(
     if (0...1).contains(first) { return first }
     if (0...1).contains(second) { return second }
     return nil
+}
+
+private func trainingCameraMonitorPickupWasHit(
+    in level: Level,
+    state: TrainingCameraMonitorState?,
+    playerStart: Vector3,
+    playerEnd: Vector3,
+    playerRadius: Float,
+    visitedRoomSourceIndices: [Int]
+) -> Bool {
+    guard let state,
+          !state.isHeld,
+          !state.wasUsed,
+          let chain = level.trainingCameraMonitorChain,
+          let pickup = level.objects.first(where: {
+              $0.handle == chain.pickupObjectHandle
+          }),
+          case let .room(pickupRoomSourceIndex) = pickup.location,
+          visitedRoomSourceIndices.contains(pickupRoomSourceIndex) else {
+        return false
+    }
+    return segmentSphereHitFraction(
+        start: playerStart,
+        end: playerEnd,
+        center: pickup.position,
+        radius: playerRadius + chain.pickupCollisionRadius
+    ) != nil
 }
 
 private func trainingGalleryBarrierRendersFaces(
@@ -1990,6 +2212,156 @@ private func validTrainingRobotGuidebotContinuation(
         return false
     }
     return true
+}
+
+private func validTrainingCameraMonitorContinuation(
+    _ state: TrainingCameraMonitorState?,
+    level: Level
+) -> Bool {
+    guard let chain = level.trainingCameraMonitorChain else {
+        return state == nil
+    }
+    guard let state,
+          !(state.isHeld && state.wasUsed),
+          state.popupRemaining.map({
+              $0.isFinite && $0 >= 0 && $0 <= chain.popupDuration
+          }) ?? true,
+          state.completionTimerRemaining.map({
+              $0.isFinite
+                  && $0 > 0
+                  && $0 <= chain.completionTimerDuration
+          }) ?? true else {
+        return false
+    }
+    if state.wasUsed {
+        return !state.isHeld
+            && !level.objects.contains {
+                $0.handle == chain.pickupObjectHandle
+            }
+            && (
+                state.completionTimerRemaining != nil
+                    || state.completionTimerWasConsumed
+            )
+    }
+    return state.popupRemaining == nil
+        && state.completionTimerRemaining == nil
+        && !state.completionTimerWasConsumed
+        && level.objects.contains {
+            $0.handle == chain.pickupObjectHandle
+        }
+}
+
+private func setObjectPresentationVisibility(
+    in level: inout Level,
+    handle: UInt32,
+    isVisible: Bool
+) {
+    guard let index = level.objectPresentations.firstIndex(where: {
+        $0.objectHandle == handle
+    }) else {
+        return
+    }
+    let presentation = level.objectPresentations[index]
+    level.objectPresentations[index] = .init(
+        objectHandle: presentation.objectHandle,
+        primaryModel: presentation.primaryModel,
+        mediumModel: presentation.mediumModel,
+        lowModel: presentation.lowModel,
+        dyingModel: presentation.dyingModel,
+        mediumDistance: presentation.mediumDistance,
+        lowDistance: presentation.lowDistance,
+        isVisible: isVisible
+    )
+}
+
+private func completeTrainingCameraMonitorLocateGoal(
+    in level: inout Level,
+    pickupObjectHandle: UInt32
+) {
+    guard let goalIndex = level.goals.firstIndex(where: { goal in
+        goal.status & 0x0000_0400 != 0
+            && goal.items.contains {
+                $0.type == 2
+                    && $0.objectHandle == pickupObjectHandle
+            }
+    }) else {
+        return
+    }
+    let goal = level.goals[goalIndex]
+    level.goals[goalIndex] = .init(
+        status: goal.status | 0x0000_0008,
+        priority: goal.priority,
+        list: goal.list,
+        name: goal.name,
+        itemName: goal.itemName,
+        description: goal.description,
+        completionMessage: goal.completionMessage,
+        items: goal.items.map { item in
+            guard item.type == 2,
+                  item.objectHandle == pickupObjectHandle else {
+                return item
+            }
+            return .init(
+                type: item.type,
+                sourceHandle: item.sourceHandle,
+                objectHandle: item.objectHandle,
+                done: true
+            )
+        }
+    )
+}
+
+private func trainingCameraMonitorFrame(
+    level: Level,
+    state: TrainingCameraMonitorState?
+) -> TrainingCameraMonitorFrame? {
+    guard let chain = level.trainingCameraMonitorChain,
+          let remainingDuration = state?.popupRemaining,
+          let cameraObject = level.objects.first(where: {
+              $0.handle == chain.securityCameraObjectHandle
+          }),
+          case let .room(roomSourceIndex) = cameraObject.location else {
+        return nil
+    }
+    let localPosition = chain.cameraLocalPosition
+    let position = cameraObject.position
+        + cameraObject.orientation.right * localPosition.x
+        + cameraObject.orientation.up * localPosition.y
+        + cameraObject.orientation.forward * localPosition.z
+    let gunpointRoomSourceIndex = traceIndoorMovement(
+        in: level,
+        startRoom: roomSourceIndex,
+        start: cameraObject.position,
+        end: position,
+        radius: 0
+    ).containingRoomSourceIndex
+    let localForward = chain.cameraLocalForward
+    let forward = normalized(
+        cameraObject.orientation.right * localForward.x
+            + cameraObject.orientation.up * localForward.y
+            + cameraObject.orientation.forward * localForward.z
+    )
+    let up: Vector3
+    if forward.x == 0 && forward.z == 0 {
+        up = .init(x: 0, y: 0, z: forward.y < 0 ? 1 : -1)
+    } else {
+        let right = normalized(.init(
+            x: forward.z,
+            y: 0,
+            z: -forward.x
+        ))
+        up = cross(forward, right)
+    }
+    return .init(
+        camera: .init(
+            position: position,
+            target: position + forward,
+            up: up,
+            projection: .sourceDefault
+        ),
+        roomSourceIndex: gunpointRoomSourceIndex,
+        remainingDuration: remainingDuration
+    )
 }
 
 private func validTrainingGuidebotSteeringState(

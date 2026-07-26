@@ -245,7 +245,8 @@ private final class RevivalMacApplicationDelegate: NSObject,
             do {
                 try self.gameplayView?.presentTrainingOpening(
                     frame: frame,
-                    voiceClips: simulation.level.voiceClips
+                    voiceClips: simulation.level.voiceClips,
+                    soundClips: simulation.level.soundClips
                 )
                 try renderer.update(level: simulation.level, frame: frame)
             } catch {
@@ -322,6 +323,9 @@ private final class RevivalMacApplicationDelegate: NSObject,
             }
             gameplayView.primaryFireRequested = {
                 [weak self] in self?.playerInput.requestPrimaryFire()
+            }
+            gameplayView.inventoryUseRequested = {
+                [weak self] in self?.playerInput.requestInventoryUse()
             }
             window.makeFirstResponder(gameplayView)
             self.gameplayView = gameplayView

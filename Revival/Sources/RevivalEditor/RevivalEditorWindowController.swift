@@ -315,6 +315,9 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.primaryFireRequested = {
             [weak self] in self?.playerInput.requestPrimaryFire()
         }
+        metalView.inventoryUseRequested = {
+            [weak self] in self?.playerInput.requestInventoryUse()
+        }
         window.initialFirstResponder = roomNameField
         roomNameField.target = self
         roomNameField.action = #selector(commitRoomName(_:))
@@ -700,7 +703,8 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                     do {
                         try self.gameplayView.presentTrainingOpening(
                             frame: frame,
-                            voiceClips: simulation.level.voiceClips
+                            voiceClips: simulation.level.voiceClips,
+                            soundClips: simulation.level.soundClips
                         )
                         try renderer.update(
                             level: simulation.level,

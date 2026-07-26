@@ -37,7 +37,7 @@ enum D3SourceIdentity {
         case "door-definition": return 60
         case "lightmap-page", "lightmap-info": return 65_534
         case "presentation-effect": return 256
-        case "voice": return 65_534
+        case "voice", "sound": return 65_534
         default: return nil
         }
     }
@@ -502,6 +502,23 @@ struct TrainingRobotGuidebotChain: Codable, Equatable, Sendable {
     let guidebot: TrainingGuidebotDefinition
 }
 
+struct TrainingCameraMonitorChain: Codable, Equatable, Sendable {
+    let pickupObjectHandle: UInt32
+    let securityCameraObjectHandle: UInt32
+    let pickupCollisionRadius: Float
+    let pickupMessage: String
+    let pickupVoiceSourceName: String
+    let pickupSoundSourceName: String
+    let useMessage: String
+    let useVoiceSourceName: String
+    let popupDuration: Float
+    let popupZoom: Float
+    let cameraGunpointIndex: Int
+    let cameraLocalPosition: Vector3
+    let cameraLocalForward: Vector3
+    let completionTimerDuration: Float
+}
+
 struct TrainingRobotCombatDefinition: Codable, Equatable, Sendable {
     let robotShields: Float
     let robotCollisionRadius: Float
@@ -571,6 +588,59 @@ struct CanonicalVoiceClip: Codable, Equatable, Sendable {
     let pcmSHA256: String
     let sourceArchive: String
     let sourceSHA256: String
+}
+
+struct CanonicalSoundClip: Codable, Equatable, Sendable {
+    let logicalName: String
+    let sourceName: String
+    let sourceEntryIndex: Int
+    let sampleRate: Int
+    let channelCount: Int
+    let frameCount: Int
+    let pcm16LittleEndian: Data
+    let pcmSHA256: String
+    let sourceArchive: String
+    let sourceSHA256: String
+    let importVolume: Float
+}
+
+@propertyWrapper
+struct SchemaCompatibleSoundClips:
+    Codable, Equatable, Sendable
+{
+    var wrappedValue: [CanonicalSoundClip]
+    let wasPresent: Bool
+
+    init(wrappedValue: [CanonicalSoundClip]) {
+        self.wrappedValue = wrappedValue
+        wasPresent = true
+    }
+
+    fileprivate init(missing: Void) {
+        wrappedValue = []
+        wasPresent = false
+    }
+
+    init(from decoder: Decoder) throws {
+        wrappedValue = try decoder.singleValueContainer()
+            .decode([CanonicalSoundClip].self)
+        wasPresent = true
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(wrappedValue)
+    }
+}
+
+extension KeyedDecodingContainer {
+    func decode(
+        _ type: SchemaCompatibleSoundClips.Type,
+        forKey key: Key
+    ) throws -> SchemaCompatibleSoundClips {
+        try decodeIfPresent(type, forKey: key)
+            ?? SchemaCompatibleSoundClips(missing: ())
+    }
 }
 
 func validateStockTrainingRobotGuidebotPackage(
@@ -662,6 +732,112 @@ func validateStockTrainingRobotGuidebotPresentation(
           }) else {
         throw LevelValidationError.invalidDependency(
             "Training robot and Guidebot presentation"
+        )
+    }
+}
+
+private func canonicalPCM16ByteCount(
+    frameCount: Int,
+    channelCount: Int
+) -> Int? {
+    let (sampleCount, sampleOverflow) =
+        frameCount.multipliedReportingOverflow(by: channelCount)
+    guard !sampleOverflow else { return nil }
+    let (byteCount, byteOverflow) =
+        sampleCount.multipliedReportingOverflow(by: 2)
+    return byteOverflow ? nil : byteCount
+}
+
+func validateStockTrainingCameraMonitorPackage(
+    chain: TrainingCameraMonitorChain?,
+    guidebotC: CanonicalVoiceClip?,
+    guidebotD: CanonicalVoiceClip?,
+    pickupSound: CanonicalSoundClip?,
+    objects: [PlacedObject],
+    objectPresentations: [ObjectPresentationReference]
+) throws {
+    guard let chain,
+          chain == .init(
+            pickupObjectHandle: 6_167,
+            securityCameraObjectHandle: 6_183,
+            pickupCollisionRadius: 3.682_004,
+            pickupMessage:
+                "Excellent.  You now have the Camera Monitor.  Press the Use Inventory key to activate it!",
+            pickupVoiceSourceName: "guidebotc.osf",
+            pickupSoundSourceName: "PupC.wav",
+            useMessage:
+                "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
+            useVoiceSourceName: "guidebotd.osf",
+            popupDuration: 10,
+            popupZoom: 1,
+            cameraGunpointIndex: 0,
+            cameraLocalPosition: .init(
+                x: -0.092_777_25,
+                y: 0.791_976,
+                z: 5.571_280_5
+            ),
+            cameraLocalForward: .init(
+                x: -2.880_202e-7,
+                y: -0.017_452_003,
+                z: 0.999_847_7
+            ),
+            completionTimerDuration: 2
+          ),
+          guidebotC?.sourceEntryIndex == 6,
+          guidebotC?.sampleRate == 22_050,
+          guidebotC?.channelCount == 1,
+          guidebotC?.frameCount == 273_181,
+          guidebotC?.pcmSHA256
+            == "b5d968ac310d7d95780f2abd58933e7fdce20d284a9ef614e18e9f8eea3e18de",
+          guidebotC?.sourceArchive == "missions/training.mn3",
+          guidebotC?.sourceSHA256
+            == "20d0d1e82f56c7c4d326788ac9caa1dc39ec81d4a022be52967776ec5fa85dc1",
+          guidebotD?.sourceEntryIndex == 7,
+          guidebotD?.sampleRate == 22_050,
+          guidebotD?.channelCount == 1,
+          guidebotD?.frameCount == 149_653,
+          guidebotD?.pcmSHA256
+            == "d97e6efaa106fbe9c4dff0affe155e04db18938e842be494292d0008b10f2a71",
+          guidebotD?.sourceArchive == "missions/training.mn3",
+          guidebotD?.sourceSHA256
+            == "afffa8e1a39b1c6e8956105c52db8fa372a33b763aa44e18980f2e22884795d1",
+          pickupSound?.logicalName == "PupC1",
+          pickupSound?.sourceName == "PupC.wav",
+          pickupSound?.sourceEntryIndex == 130,
+          pickupSound?.sampleRate == 22_050,
+          pickupSound?.channelCount == 1,
+          pickupSound?.frameCount == 16_759,
+          pickupSound?.pcmSHA256
+            == "6cc9a2c4853f3575838d8ef16f51847e4c990140d5206158a582abddf130f099",
+          pickupSound?.sourceArchive == "d3.hog",
+          pickupSound?.sourceSHA256
+            == "d3e8e7515facfd6c1b540e70cf7f1019c3d1f13f24140bee76337e5bb37de7d0",
+          pickupSound?.importVolume == 1,
+          objects.contains(where: {
+              $0.handle == 6_167
+                  && $0.type == 7
+                  && $0.storedID == 91
+                  && $0.definition?.sourceName == "Camera Monitor"
+                  && $0.instanceName == "CameraMonitor"
+                  && $0.flags == 4_096
+          }),
+          objects.contains(where: {
+              $0.handle == 6_183
+                  && $0.type == 2
+                  && $0.storedID == 114
+                  && $0.definition?.sourceName == "new wall cam"
+                  && $0.instanceName == "SecurityCamera"
+                  && $0.flags == 5_120
+          }),
+          objectPresentations.contains(where: {
+              $0.objectHandle == 6_167
+                  && $0.primaryModel.sourceName
+                    .caseInsensitiveCompare("camerapowerup.OOF")
+                    == .orderedSame
+                  && $0.isVisible
+          }) else {
+        throw LevelValidationError.invalidDependency(
+            "Training Camera Monitor package"
         )
     }
 }
@@ -953,7 +1129,7 @@ struct Level: Codable, Equatable, Sendable {
     var objects: [PlacedObject]
     let retiredObjectHandles: [UInt32]
     let paths: [GamePath]
-    let goals: [LevelGoal]
+    var goals: [LevelGoal]
     let goalFlags: UInt32
     let triggers: [LevelTrigger]
     let playerStartFlags: [UInt32]
@@ -969,7 +1145,10 @@ struct Level: Codable, Equatable, Sendable {
     var trainingOpeningLesson: TrainingOpeningLesson?
     let trainingGalleryBarrier: TrainingGalleryBarrier?
     let trainingRobotGuidebotChain: TrainingRobotGuidebotChain?
+    let trainingCameraMonitorChain: TrainingCameraMonitorChain?
     let voiceClips: [CanonicalVoiceClip]
+    @SchemaCompatibleSoundClips
+    private(set) var soundClips: [CanonicalSoundClip]
     let dependencyManifest: DependencyManifest
     let sourceChunks: [SourceChunkRecord]
 
@@ -1000,7 +1179,9 @@ struct Level: Codable, Equatable, Sendable {
         trainingOpeningLesson: TrainingOpeningLesson? = nil,
         trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
         trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
+        trainingCameraMonitorChain: TrainingCameraMonitorChain? = nil,
         voiceClips: [CanonicalVoiceClip] = [],
+        soundClips: [CanonicalSoundClip] = [],
         dependencyManifest: DependencyManifest,
         sourceChunks: [SourceChunkRecord]
     ) {
@@ -1030,7 +1211,9 @@ struct Level: Codable, Equatable, Sendable {
         self.trainingOpeningLesson = trainingOpeningLesson
         self.trainingGalleryBarrier = trainingGalleryBarrier
         self.trainingRobotGuidebotChain = trainingRobotGuidebotChain
+        self.trainingCameraMonitorChain = trainingCameraMonitorChain
         self.voiceClips = voiceClips
+        self.soundClips = soundClips
         self.dependencyManifest = dependencyManifest
         self.sourceChunks = sourceChunks
     }
@@ -1044,7 +1227,11 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     private func validate(allowImportStagingPresentation: Bool) throws {
-        guard schemaVersion == 9, source.d3lvVersion == 127,
+        guard (schemaVersion == 9 && trainingCameraMonitorChain == nil
+                || schemaVersion == 10
+                    && trainingCameraMonitorChain != nil
+                    && _soundClips.wasPresent),
+              source.d3lvVersion == 127,
               !missionKey.isEmpty, !levelKey.isEmpty else {
             throw LevelValidationError.invalidIdentity
         }
@@ -1473,6 +1660,67 @@ struct Level: Codable, Equatable, Sendable {
                 )
             }
         }
+        if let chain = trainingCameraMonitorChain {
+            let clipNames = Set(voiceClips.map {
+                $0.sourceName.lowercased()
+            })
+            let soundNames = Set(soundClips.map {
+                $0.sourceName.lowercased()
+            })
+            guard trainingRobotGuidebotChain != nil,
+                  chain.pickupObjectHandle
+                    != chain.securityCameraObjectHandle,
+                  chain.pickupCollisionRadius.isFinite,
+                  chain.pickupCollisionRadius > 0,
+                  chain.popupDuration.isFinite,
+                  chain.popupDuration > 0,
+                  chain.popupZoom.isFinite,
+                  chain.popupZoom > 0,
+                  chain.cameraGunpointIndex >= 0,
+                  isFinite(chain.cameraLocalPosition),
+                  abs(
+                    dot(
+                        chain.cameraLocalForward,
+                        chain.cameraLocalForward
+                    ) - 1
+                  ) < 0.000_1,
+                  chain.completionTimerDuration.isFinite,
+                  chain.completionTimerDuration > 0,
+                  isNonempty(chain.pickupMessage),
+                  isNonempty(chain.useMessage),
+                  let pickup = objects.first(where: {
+                      $0.handle == chain.pickupObjectHandle
+                  }),
+                  pickup.type == 7,
+                  pickup.storedID == 91,
+                  pickup.definition?.sourceName == "Camera Monitor",
+                  pickup.instanceName == "CameraMonitor",
+                  pickup.flags == 4_096,
+                  let camera = objects.first(where: {
+                      $0.handle == chain.securityCameraObjectHandle
+                  }),
+                  camera.type == 2,
+                  camera.storedID == 114,
+                  camera.definition?.sourceName == "new wall cam",
+                  camera.instanceName == "SecurityCamera",
+                  camera.flags == 5_120,
+                  clipNames.contains(
+                    chain.pickupVoiceSourceName.lowercased()
+                  ),
+                  clipNames.contains(
+                    chain.useVoiceSourceName.lowercased()
+                  ),
+                  soundNames.contains(
+                    chain.pickupSoundSourceName.lowercased()
+                  ),
+                  objectPresentations.contains(where: {
+                      $0.objectHandle == chain.pickupObjectHandle
+                  }) else {
+                throw LevelValidationError.invalidDependency(
+                    "Training Camera Monitor chain"
+                )
+            }
+        }
         var voiceNames = Set<String>()
         for clip in voiceClips {
             let voiceSource = SourceResource(
@@ -1487,9 +1735,10 @@ struct Level: Codable, Equatable, Sendable {
                   (4_096...192_000).contains(clip.sampleRate),
                   (1...2).contains(clip.channelCount),
                   clip.frameCount > 0,
-                  clip.frameCount <= Int.max / clip.channelCount,
-                  clip.pcm16LittleEndian.count
-                    == clip.frameCount * clip.channelCount * 2,
+                  canonicalPCM16ByteCount(
+                    frameCount: clip.frameCount,
+                    channelCount: clip.channelCount
+                  ) == clip.pcm16LittleEndian.count,
                   isSHA256(clip.pcmSHA256),
                   canonicalSHA256(clip.pcm16LittleEndian)
                     == clip.pcmSHA256,
@@ -1503,6 +1752,43 @@ struct Level: Codable, Equatable, Sendable {
                   }) else {
                 throw LevelValidationError.invalidDependency(
                     "Canonical voice clip"
+                )
+            }
+        }
+        var soundNames = Set<String>()
+        for clip in soundClips {
+            let soundSource = SourceResource(
+                storedIndex: clip.sourceEntryIndex,
+                sourceName: clip.sourceName
+            )
+            guard D3SourceIdentity.isValidSourceResource(
+                    soundSource,
+                    category: "sound"
+                  ),
+                  soundNames.insert(clip.sourceName.lowercased()).inserted,
+                  isNonempty(clip.logicalName),
+                  (4_096...192_000).contains(clip.sampleRate),
+                  (1...2).contains(clip.channelCount),
+                  clip.frameCount > 0,
+                  canonicalPCM16ByteCount(
+                    frameCount: clip.frameCount,
+                    channelCount: clip.channelCount
+                  ) == clip.pcm16LittleEndian.count,
+                  isSHA256(clip.pcmSHA256),
+                  canonicalSHA256(clip.pcm16LittleEndian)
+                    == clip.pcmSHA256,
+                  isSafeRelativePath(clip.sourceArchive),
+                  source.profileFiles.contains(where: {
+                      $0.relativePath == clip.sourceArchive
+                  }),
+                  isSHA256(clip.sourceSHA256),
+                  clip.importVolume.isFinite,
+                  clip.importVolume >= 0,
+                  dependencyManifest.current.contains(where: {
+                      $0.category == "sound" && $0.source == soundSource
+                  }) else {
+                throw LevelValidationError.invalidDependency(
+                    "Canonical sound clip"
                 )
             }
         }
@@ -1530,6 +1816,14 @@ struct Level: Codable, Equatable, Sendable {
             }
             let proceed5 = voiceClips.first {
                 $0.sourceName.caseInsensitiveCompare("proceed5.osf")
+                    == .orderedSame
+            }
+            let guidebotC = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("guidebotc.osf")
+                    == .orderedSame
+            }
+            let guidebotD = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("guidebotd.osf")
                     == .orderedSame
             }
             guard let lesson = trainingOpeningLesson,
@@ -1572,7 +1866,8 @@ struct Level: Codable, Equatable, Sendable {
                   barrier.guidebotInstruction
                     == "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
                   barrier.voiceSourceName == "guidebota.osf",
-                  voiceClips.count == 5,
+                  voiceClips.count
+                    == (trainingCameraMonitorChain == nil ? 5 : 7),
                   guidebotA?.sourceEntryIndex == 4,
                   guidebotA?.sampleRate == 22_050,
                   guidebotA?.channelCount == 1,
@@ -1598,6 +1893,18 @@ struct Level: Codable, Equatable, Sendable {
                 objects: objects,
                 objectPresentations: objectPresentations
             )
+            if trainingCameraMonitorChain != nil {
+                try validateStockTrainingCameraMonitorPackage(
+                    chain: trainingCameraMonitorChain,
+                    guidebotC: guidebotC,
+                    guidebotD: guidebotD,
+                    pickupSound: soundClips.first {
+                        $0.logicalName == "PupC1"
+                    },
+                    objects: objects,
+                    objectPresentations: objectPresentations
+                )
+            }
         }
         var retiredSlots = Set<Int>()
         for handle in retiredObjectHandles {
@@ -1774,7 +2081,9 @@ struct Level: Codable, Equatable, Sendable {
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips,
+            soundClips: soundClips,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
@@ -1859,7 +2168,9 @@ struct Level: Codable, Equatable, Sendable {
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips,
+            soundClips: soundClips,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
@@ -1901,7 +2212,9 @@ struct Level: Codable, Equatable, Sendable {
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips,
+            soundClips: soundClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
         )
@@ -1952,7 +2265,9 @@ struct Level: Codable, Equatable, Sendable {
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips,
+            soundClips: soundClips,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
@@ -2021,7 +2336,9 @@ struct Level: Codable, Equatable, Sendable {
             trainingOpeningLesson: lesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips,
+            soundClips: soundClips,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
@@ -2071,7 +2388,9 @@ struct Level: Codable, Equatable, Sendable {
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: barrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips + [voiceClip],
+            soundClips: soundClips,
             dependencyManifest: .init(
                 current: dependencyManifest.current + [dependency],
                 historicalEagerBaseline:
@@ -2177,9 +2496,87 @@ struct Level: Codable, Equatable, Sendable {
             trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: chain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips + addedVoiceClips,
+            soundClips: soundClips,
             dependencyManifest: .init(
                 current: dependencyManifest.current + dependencies,
+                historicalEagerBaseline:
+                    dependencyManifest.historicalEagerBaseline
+            ),
+            sourceChunks: sourceChunks
+        )
+    }
+
+    func addingTrainingCameraMonitorChain(
+        _ chain: TrainingCameraMonitorChain,
+        voiceClips addedVoiceClips: [CanonicalVoiceClip],
+        soundClip: CanonicalSoundClip
+    ) -> Level {
+        var dependencies = dependencyManifest.current
+        let reachedDependencies = addedVoiceClips.map { clip in
+            DependencyRecord(
+                category: "voice",
+                source: .init(
+                    storedIndex: clip.sourceEntryIndex,
+                    sourceName: clip.sourceName
+                ),
+                state: "canonical-pcm-imported",
+                provenance:
+                    "\(clip.sourceArchive) \(clip.sourceSHA256)"
+            )
+        } + [DependencyRecord(
+            category: "sound",
+            source: .init(
+                storedIndex: soundClip.sourceEntryIndex,
+                sourceName: soundClip.sourceName
+            ),
+            state: "canonical-pcm-imported",
+            provenance:
+                "\(soundClip.sourceArchive) \(soundClip.sourceSHA256)"
+        )]
+        for reached in reachedDependencies {
+            if let index = dependencies.firstIndex(where: {
+                $0.category == reached.category
+                    && $0.source == reached.source
+            }) {
+                dependencies[index] = reached
+            } else {
+                dependencies.append(reached)
+            }
+        }
+        return Level(
+            schemaVersion: 10,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
+            lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
+            objectPresentations: objectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: chain,
+            voiceClips: voiceClips + addedVoiceClips,
+            soundClips: soundClips + [soundClip],
+            dependencyManifest: .init(
+                current: dependencies,
                 historicalEagerBaseline:
                     dependencyManifest.historicalEagerBaseline
             ),
