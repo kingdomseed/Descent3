@@ -996,6 +996,7 @@ func editorIdleStatusMessage(
     let sourceDiagnostics = [
         project.trainingGalleryBarrierSourceDiagnostic,
         project.trainingRobotGuidebotSourceDiagnostic,
+        project.trainingGuidebotReturnSourceDiagnostic,
     ].compactMap { $0 }
     guard !sourceDiagnostics.isEmpty else { return status }
     return "\(status)\nSource: \(sourceDiagnostics.joined(separator: "; "))"

@@ -1045,12 +1045,25 @@ struct RetailModelPageSelection: Equatable, Sendable {
     let mediumDistance: Float?
     let lowDistance: Float?
     let shipDefinition: RetailShipDefinition?
+    let genericLight: RetailGenericLightDefinition?
 }
 
 struct RetailShipDefinition: Equatable, Sendable {
     let name: String
     let presentationSize: Float
     let physics: CanonicalShipPhysics
+}
+
+struct RetailGenericLightDefinition: Equatable, Sendable {
+    let primaryColor: Vector3
+    let secondaryColor: Vector3
+    let timeInterval: Float
+    let flickerDistance: Float
+    let directionalDot: Float
+    let flags: UInt32
+    let timebits: UInt32
+    let angle: UInt8
+    let lightingRenderType: UInt8
 }
 
 struct ReachedObjectModelPages: Equatable, Sendable {
@@ -1149,7 +1162,8 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                             name: name,
                             presentationSize: presentationSize,
                             physics: physics
-                        )
+                        ),
+                        genericLight: nil
                     )
                 )
             } else {
@@ -1170,9 +1184,38 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                 _ = try cursor.readCString(allowEmpty: true)
                 let mediumDistance = try cursor.readFloat()
                 let lowDistance = try cursor.readFloat()
+                try cursor.skip(68)
+                _ = try cursor.readFloat()
+                _ = try cursor.readFloat()
+                let primaryColor = Vector3(
+                    x: try cursor.readFloat(),
+                    y: try cursor.readFloat(),
+                    z: try cursor.readFloat()
+                )
+                let timeInterval = try cursor.readFloat()
+                let flickerDistance = try cursor.readFloat()
+                let directionalDot = try cursor.readFloat()
+                let secondaryColor = Vector3(
+                    x: try cursor.readFloat(),
+                    y: try cursor.readFloat(),
+                    z: try cursor.readFloat()
+                )
+                let flags = try cursor.readUInt32()
+                let timebits = try cursor.readUInt32()
+                let angle = try cursor.readUInt8()
+                let lightingRenderType = try cursor.readUInt8()
                 guard version >= 1,
                       mediumDistance.isFinite,
-                      lowDistance.isFinite else {
+                      lowDistance.isFinite,
+                      primaryColor.x.isFinite,
+                      primaryColor.y.isFinite,
+                      primaryColor.z.isFinite,
+                      secondaryColor.x.isFinite,
+                      secondaryColor.y.isFinite,
+                      secondaryColor.z.isFinite,
+                      timeInterval.isFinite,
+                      flickerDistance.isFinite,
+                      directionalDot.isFinite else {
                     throw RetailTextureTableError.unsupportedPresentation(name)
                 }
                 pages.append(
@@ -1184,7 +1227,18 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                         dyingModelName: nil,
                         mediumDistance: medium.isEmpty ? nil : mediumDistance,
                         lowDistance: low.isEmpty ? nil : lowDistance,
-                        shipDefinition: nil
+                        shipDefinition: nil,
+                        genericLight: .init(
+                            primaryColor: primaryColor,
+                            secondaryColor: secondaryColor,
+                            timeInterval: timeInterval,
+                            flickerDistance: flickerDistance,
+                            directionalDot: directionalDot,
+                            flags: flags,
+                            timebits: timebits,
+                            angle: angle,
+                            lightingRenderType: lightingRenderType
+                        )
                     )
                 )
             }

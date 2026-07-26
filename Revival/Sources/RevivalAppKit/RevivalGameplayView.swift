@@ -215,38 +215,24 @@ final class RevivalGameplayView: MTKView {
             }
             return
         }
-        let voiceSourceName = Self.sourceStreamingVoiceName(
-            for: frame.trainingOpeningFeedback
-        )!
-        let voicePrecedesHUDMessages =
-            frame.trainingOpeningFeedback.last!
-                .voicePrecedesHUDMessages
-        let soundSourceName =
-            frame.trainingOpeningFeedback.last?.soundSourceName
-        Self.presentTrainingFeedback(
-            voicePrecedesHUDMessages: voicePrecedesHUDMessages,
+        var presentedHUDMessages: [String] = []
+        Self.presentTrainingFeedbackSequence(
+            frame.trainingOpeningFeedback,
             attemptVoice: {
-                try self.playTrainingVoice(
-                    named: voiceSourceName,
-                    from: voiceClips
-                )
+                try self.playTrainingVoice(named: $0, from: voiceClips)
             },
             attemptSound: {
-                guard let soundSourceName else { return }
-                try self.playTrainingSound(
-                    named: soundSourceName,
-                    from: soundClips
-                )
+                try self.playTrainingSound(named: $0, from: soundClips)
             },
-            presentHUDMessages: {
+            presentHUDMessages: { messages in
+                presentedHUDMessages.append(contentsOf: messages)
                 self.trainingMessageLabel.maximumNumberOfLines =
                     Self.trainingMessageLineCount(
                         for: frame.trainingOpeningFeedback
                     )
                 self.needsLayout = true
                 self.trainingMessageLabel.stringValue =
-                    frame.trainingOpeningFeedback.flatMap(\.hudMessages)
-                        .joined(separator: "\n")
+                    presentedHUDMessages.joined(separator: "\n")
                 self.trainingMessageExpiresAt = frame.gameTime + 5
             }
         )
@@ -265,6 +251,38 @@ final class RevivalGameplayView: MTKView {
         presentHUDMessages()
         if !voicePrecedesHUDMessages {
             try? attemptVoice()
+        }
+    }
+
+    static func presentTrainingFeedbackSequence(
+        _ feedback: [TrainingOpeningFeedback],
+        attemptVoice: (String) throws -> Void,
+        attemptSound: (String) throws -> Void,
+        presentHUDMessages: ([String]) -> Void
+    ) {
+        let selectedVoiceIndex = feedback.indices.last
+        for (index, event) in feedback.enumerated() {
+            presentTrainingFeedback(
+                voicePrecedesHUDMessages:
+                    event.voicePrecedesHUDMessages,
+                attemptVoice: {
+                    guard index == selectedVoiceIndex,
+                          !event.voiceSourceName.isEmpty else {
+                        return
+                    }
+                    try attemptVoice(event.voiceSourceName)
+                },
+                attemptSound: {
+                    guard let soundSourceName =
+                            event.soundSourceName else {
+                        return
+                    }
+                    try attemptSound(soundSourceName)
+                },
+                presentHUDMessages: {
+                    presentHUDMessages(event.hudMessages)
+                }
+            )
         }
     }
 
@@ -476,12 +494,6 @@ final class RevivalGameplayView: MTKView {
         for feedback: [TrainingOpeningFeedback]
     ) -> Int {
         min(4, max(2, feedback.reduce(0) { $0 + $1.hudMessages.count }))
-    }
-
-    nonisolated static func sourceStreamingVoiceName(
-        for feedback: [TrainingOpeningFeedback]
-    ) -> String? {
-        feedback.last?.voiceSourceName
     }
 
     nonisolated static func waveData(for clip: CanonicalVoiceClip) -> Data {

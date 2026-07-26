@@ -7,6 +7,7 @@ struct MetalWorldVertex: Equatable, Sendable {
     let textureAndLightmapUV: SIMD4<Float>
     let presentation: SIMD4<Float>
     let surfaceColor: SIMD4<Float>
+    let dynamicLight: SIMD4<Float>
 }
 
 struct MetalWorldDraw: Equatable, Sendable {
@@ -171,7 +172,8 @@ func updateMetalWorldPlan(
     level: Level,
     playerView: PlayerView,
     presentationFrame: MetalPresentationFrame? = nil,
-    trainingCameraMonitor: TrainingCameraMonitorFrame? = nil
+    trainingCameraMonitor: TrainingCameraMonitorFrame? = nil,
+    trainingGuidebotReturnMarkerLightDistance: Float? = nil
 ) throws -> MetalWorldPlan {
     try updateMetalWorldPlan(
         prepared,
@@ -180,7 +182,9 @@ func updateMetalWorldPlan(
         startRoomSourceIndex: playerView.roomSourceIndex,
         excludedObjectHandle: playerView.objectHandle,
         presentationFrame: presentationFrame,
-        trainingCameraMonitor: trainingCameraMonitor
+        trainingCameraMonitor: trainingCameraMonitor,
+        trainingGuidebotReturnMarkerLightDistance:
+            trainingGuidebotReturnMarkerLightDistance
     )
 }
 
@@ -196,7 +200,8 @@ func updateMetalWorldPlan(
         startRoomSourceIndex: prepared.startRoomSourceIndex,
         excludedObjectHandle: prepared.excludedObjectHandle,
         presentationFrame: presentationFrame,
-        trainingCameraMonitor: nil
+        trainingCameraMonitor: nil,
+        trainingGuidebotReturnMarkerLightDistance: nil
     )
 }
 
@@ -207,7 +212,8 @@ private func updateMetalWorldPlan(
     startRoomSourceIndex: Int,
     excludedObjectHandle: UInt32?,
     presentationFrame: MetalPresentationFrame?,
-    trainingCameraMonitor: TrainingCameraMonitorFrame?
+    trainingCameraMonitor: TrainingCameraMonitorFrame?,
+    trainingGuidebotReturnMarkerLightDistance: Float?
 ) throws -> MetalWorldPlan {
     let extraction = try extractWorldForRendering(
         level,
@@ -263,19 +269,63 @@ private func updateMetalWorldPlan(
     let auxiliaryObjectIndices = auxiliaryObjects.map {
         objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.last!.offset
     }
+    let auxiliaryOpaqueIndices = auxiliaryOpaque.map {
+        roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
+    }
+    let auxiliaryTranslucentIndices = auxiliaryTranslucent.map {
+        roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
+    }
     let auxiliaryActiveDrawIndices =
-        auxiliaryOpaque.map {
-            roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
-        }
+        auxiliaryOpaqueIndices
         + auxiliaryObjectIndices
-        + auxiliaryTranslucent.map {
-            roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
-        }
+        + auxiliaryTranslucentIndices
     for (index, draw) in zip(objectIndices, objectDraws) {
+        updatedPreparedDraws[index] = draw
+    }
+    for (index, draw) in zip(opaqueIndices, opaqueRoomDraws) {
+        updatedPreparedDraws[index] = draw
+    }
+    for (index, draw) in zip(translucentIndices, translucentRoomDraws) {
         updatedPreparedDraws[index] = draw
     }
     for (index, draw) in zip(auxiliaryObjectIndices, auxiliaryObjects) {
         updatedPreparedDraws[index] = draw
+    }
+    for (index, draw) in zip(auxiliaryOpaqueIndices, auxiliaryOpaque) {
+        updatedPreparedDraws[index] = draw
+    }
+    for (index, draw) in zip(
+        auxiliaryTranslucentIndices,
+        auxiliaryTranslucent
+    ) {
+        updatedPreparedDraws[index] = draw
+    }
+    if let distance = trainingGuidebotReturnMarkerLightDistance,
+       distance > 0,
+       let returnChain =
+            level.trainingCameraMonitorChain?.returnToShip,
+       let presentation = returnChain.markerLightPresentation,
+       let marker = level.objects.first(where: {
+           $0.handle == returnChain.markerLightObjectHandle
+       }),
+       let gameTime = presentationFrame?.systemsGameTime {
+        let light = sourceTrainingMarkerLight(
+            presentation,
+            gameTime: gameTime
+        )
+        if light.distanceScale > 0 {
+            for index in Set(
+                activeDrawIndices + auxiliaryActiveDrawIndices
+            ) {
+                updatedPreparedDraws[index] =
+                    applyingTrainingMarkerLight(
+                        to: updatedPreparedDraws[index],
+                        position: marker.position,
+                        distance: distance * light.distanceScale,
+                        color: light.color
+                    )
+            }
+        }
     }
     let coronaPresentation = presentationFrame.map {
         advanceLightCoronas(
@@ -308,6 +358,112 @@ private func updateMetalWorldPlan(
         auxiliaryDraws: auxiliaryActiveDrawIndices.map {
             updatedPreparedDraws[$0]
         }
+    )
+}
+
+private func sourceTrainingMarkerLight(
+    _ presentation: TrainingMarkerLightPresentation,
+    gameTime: Float
+) -> (color: SIMD3<Float>, distanceScale: Float) {
+    let primary = SIMD3<Float>(
+        presentation.primaryColor.x,
+        presentation.primaryColor.y,
+        presentation.primaryColor.z
+    )
+    let secondary = SIMD3<Float>(
+        presentation.secondaryColor.x,
+        presentation.secondaryColor.y,
+        presentation.secondaryColor.z
+    )
+    guard presentation.timeInterval > 0 else {
+        return (primary, 1)
+    }
+    let period = presentation.timeInterval
+    let cycle = Int(gameTime / (period * 2))
+    let elapsed = gameTime - Float(cycle) * period * 2
+    var normalizedTime = elapsed / period
+    if presentation.flags & 0x02 != 0 {
+        let slice = min(7, max(0, Int(elapsed / (period / 8))))
+        guard presentation.timebits & (1 << UInt32(slice)) != 0
+        else {
+            return (.zero, 0)
+        }
+    }
+    if presentation.flags & 0x08 != 0 {
+        if normalizedTime > 1 {
+            normalizedTime -= 1
+            return (
+                secondary * (1 - normalizedTime)
+                    + primary * normalizedTime,
+                1
+            )
+        }
+        return (
+            primary * (1 - normalizedTime)
+                + secondary * normalizedTime,
+            1
+        )
+    }
+    if presentation.flags & 0x04 != 0 {
+        let scalar = normalizedTime > 1
+            ? 1 - (normalizedTime - 1)
+            : normalizedTime
+        return (primary, max(
+            0,
+            presentation.flickerDistance
+                + scalar * (1 - presentation.flickerDistance)
+        ))
+    }
+    return (primary, 1)
+}
+
+private func applyingTrainingMarkerLight(
+    to draw: MetalWorldDraw,
+    position: Vector3,
+    distance: Float,
+    color: SIMD3<Float>
+) -> MetalWorldDraw {
+    let vertices = draw.vertices.map { vertex in
+        let delta = SIMD3<Float>(
+            vertex.position.x - position.x,
+            vertex.position.y - position.y,
+            vertex.position.z - position.z
+        )
+        let vertexDistance = sqrt(
+            delta.x * delta.x
+                + delta.y * delta.y
+                + delta.z * delta.z
+        )
+        let scalar = max(0, 1 - vertexDistance / distance)
+        return MetalWorldVertex(
+            position: vertex.position,
+            textureAndLightmapUV: vertex.textureAndLightmapUV,
+            presentation: vertex.presentation,
+            surfaceColor: vertex.surfaceColor,
+            dynamicLight: SIMD4<Float>(
+                SIMD3<Float>(
+                    vertex.dynamicLight.x,
+                    vertex.dynamicLight.y,
+                    vertex.dynamicLight.z
+                ) + color * scalar,
+                0
+            )
+        )
+    }
+    return MetalWorldDraw(
+        roomSourceIndex: draw.roomSourceIndex,
+        faceIndex: draw.faceIndex,
+        objectHandle: draw.objectHandle,
+        model: draw.model,
+        submodelIndex: draw.submodelIndex,
+        texture: draw.texture,
+        sourceColor: draw.sourceColor,
+        blend: draw.blend,
+        writesDepth: draw.writesDepth,
+        lightmapBlend: draw.lightmapBlend,
+        lightmapPageIndex: draw.lightmapPageIndex,
+        vertices: vertices,
+        indices: draw.indices
     )
 }
 
@@ -470,7 +626,8 @@ func makeMetalLightCoronaVertices(
             ),
             textureAndLightmapUV: uvs[index],
             presentation: SIMD4<Float>(opacity, 0, 1, 0),
-            surfaceColor: tint
+            surfaceColor: tint,
+            dynamicLight: .zero
         )
     }
 }
@@ -565,7 +722,8 @@ private func makeMetalWorldDraw(_ item: RoomDrawItem) -> MetalWorldDraw {
                     0,
                     0
                 ),
-                surfaceColor: SIMD4<Float>(1, 1, 1, 0)
+                surfaceColor: SIMD4<Float>(1, 1, 1, 0),
+                dynamicLight: .zero
             )
         },
         indices: item.triangleIndices
@@ -613,7 +771,8 @@ private func makeMetalWorldDraw(_ item: ModelDrawItem) -> MetalWorldDraw {
                 presentation: SIMD4<Float>(blendOpacity, $0.alpha, 0, 0),
                 surfaceColor: sourceColor.map {
                     SIMD4<Float>($0.x, $0.y, $0.z, 1)
-                } ?? SIMD4<Float>(1, 1, 1, 0)
+                } ?? SIMD4<Float>(1, 1, 1, 0),
+                dynamicLight: .zero
             )
         },
         indices: item.triangleIndices

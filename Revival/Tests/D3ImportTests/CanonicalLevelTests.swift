@@ -813,7 +813,29 @@ final class CanonicalLevelTests: XCTestCase {
                 y: -0.017_452_003,
                 z: 0.999_847_7
             ),
-            completionTimerDuration: 2
+            completionTimerDuration: 2,
+            returnToShip: .init(
+                markerLightObjectHandle: 10_245,
+                markerLightPresentation: .init(
+                    primaryColor: .init(x: 1, y: 0.25, z: 0),
+                    secondaryColor: .zero,
+                    timeInterval: 0.5,
+                    flickerDistance: 0.2,
+                    directionalDot: 0,
+                    flags: 4,
+                    timebits: .max,
+                    angle: 0,
+                    lightingRenderType: 2
+                ),
+                barrierRoomSourceIndex: 40,
+                orderedPortalIndices: [0, 1],
+                openMarkerLightDistance: 50,
+                returnMessage: "GB: Returning to ship.",
+                returnSoundSourceName: "GBotAcceptOrder.wav",
+                arrivalMessage: "GB: Entering ship!",
+                successMessage: "Excellent!",
+                successVoiceSourceName: "proceed6.osf"
+            )
         )
         func voice(
             name: String,
@@ -855,6 +877,15 @@ final class CanonicalLevelTests: XCTestCase {
             sourceSHA256:
                 "afffa8e1a39b1c6e8956105c52db8fa372a33b763aa44e18980f2e22884795d1"
         )
+        let proceed6 = voice(
+            name: "proceed6.osf",
+            index: 26,
+            frames: 141_237,
+            pcmSHA256:
+                "ccc21ee44f4e965806904dfbd4aa95be1510e8cbe633ab43f0808b7f3026b06d",
+            sourceSHA256:
+                "b3cd5455401af0f387d8cde20c3c869897aef55070cf8cfadd141c0f291bc403"
+        )
         let pickupSound = CanonicalSoundClip(
             logicalName: "PupC1",
             sourceName: "PupC.wav",
@@ -870,6 +901,21 @@ final class CanonicalLevelTests: XCTestCase {
                 "d3e8e7515facfd6c1b540e70cf7f1019c3d1f13f24140bee76337e5bb37de7d0",
             importVolume: 1
         )
+        let returnSound = CanonicalSoundClip(
+            logicalName: "GBotAcceptOrder1",
+            sourceName: "GBotAcceptOrder.wav",
+            sourceEntryIndex: 1_257,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 21_652,
+            pcm16LittleEndian: Data(),
+            pcmSHA256:
+                "d1d068fbd7950adeaffe5a2cf3c6c56b59d488f9c53b3460f88adfb7178183b1",
+            sourceArchive: "d3.hog",
+            sourceSHA256:
+                "47e38dfcb285be1b8d19d59929fef1b1122c1772a0cca2e6fe2b1721e5876b17",
+            importVolume: 0.45
+        )
         let presentation = ObjectPresentationReference(
             objectHandle: 6_167,
             primaryModel: .init(
@@ -882,6 +928,12 @@ final class CanonicalLevelTests: XCTestCase {
             mediumDistance: nil,
             lowDistance: nil
         )
+        let stockObjects = fixture.objects.map { object in
+            guard object.handle == 10_245 else { return object }
+            var marker = object
+            marker.location = .room(40)
+            return marker
+        }
         func validate(
             guidebotC: CanonicalVoiceClip,
             guidebotD: CanonicalVoiceClip
@@ -890,8 +942,10 @@ final class CanonicalLevelTests: XCTestCase {
                 chain: chain,
                 guidebotC: guidebotC,
                 guidebotD: guidebotD,
+                proceed6: proceed6,
                 pickupSound: pickupSound,
-                objects: fixture.objects,
+                returnSound: returnSound,
+                objects: stockObjects,
                 objectPresentations: [presentation]
             )
         }
@@ -899,6 +953,36 @@ final class CanonicalLevelTests: XCTestCase {
         XCTAssertNoThrow(
             try validate(guidebotC: guidebotC, guidebotD: guidebotD)
         )
+        let hostileReturnSound = CanonicalSoundClip(
+            logicalName: returnSound.logicalName,
+            sourceName: returnSound.sourceName,
+            sourceEntryIndex: 180,
+            sampleRate: returnSound.sampleRate,
+            channelCount: returnSound.channelCount,
+            frameCount: returnSound.frameCount,
+            pcm16LittleEndian: returnSound.pcm16LittleEndian,
+            pcmSHA256: returnSound.pcmSHA256,
+            sourceArchive: returnSound.sourceArchive,
+            sourceSHA256: returnSound.sourceSHA256,
+            importVolume: returnSound.importVolume
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingCameraMonitorPackage(
+                chain: chain,
+                guidebotC: guidebotC,
+                guidebotD: guidebotD,
+                proceed6: proceed6,
+                pickupSound: pickupSound,
+                returnSound: hostileReturnSound,
+                objects: stockObjects,
+                objectPresentations: [presentation]
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Camera Monitor package")
+            )
+        }
         let hostilePairs = [
             (
                 voice(
@@ -946,6 +1030,150 @@ final class CanonicalLevelTests: XCTestCase {
                     .invalidDependency("Training Camera Monitor package")
                 )
             }
+        }
+    }
+
+    func testSchemaTenRejectsPartialGuidebotReturnBarrierState() throws {
+        var level = makeTrainingCameraMonitorLevel()
+        try level.validate()
+        let barrier = try XCTUnwrap(
+            level.trainingCameraMonitorChain?.returnToShip
+        )
+        let roomIndex = try XCTUnwrap(level.rooms.firstIndex {
+            $0.sourceIndex == barrier.barrierRoomSourceIndex
+        })
+        let portalIndex = barrier.orderedPortalIndices[0]
+        level.rooms[roomIndex].portals[portalIndex].flags ^= 1
+
+        XCTAssertFalse(
+            validTrainingGuidebotReturnBarrier(barrier, in: level)
+        )
+        XCTAssertThrowsError(try level.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training gallery barrier")
+            )
+        }
+    }
+
+    func testSchemaTenRejectsNonForceFieldGuidebotReturnBarrierFace()
+        throws
+    {
+        var level = makeTrainingCameraMonitorLevel()
+        try level.validate()
+        let barrier = try XCTUnwrap(
+            level.trainingCameraMonitorChain?.returnToShip
+        )
+        let roomIndex = try XCTUnwrap(level.rooms.firstIndex {
+            $0.sourceIndex == barrier.barrierRoomSourceIndex
+        })
+        let portalIndex = barrier.orderedPortalIndices[0]
+        let faceIndex = level.rooms[roomIndex]
+            .portals[portalIndex].faceIndex
+        let presentedTextures = Set(
+            level.presentationMaterials.map(\.texture)
+        )
+        let ordinaryTexture = try XCTUnwrap(
+            level.surfacePhysics.first {
+                $0.behavior != .forceField
+                    && presentedTextures.contains($0.texture)
+            }?.texture
+        )
+        level.rooms[roomIndex].faces[faceIndex].texture =
+            ordinaryTexture
+
+        XCTAssertFalse(
+            validTrainingGuidebotReturnBarrier(barrier, in: level)
+        )
+        XCTAssertThrowsError(try level.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training gallery barrier")
+            )
+        }
+    }
+
+    func testSchemaTenRejectsAlternateForceFieldGuidebotReturnBarrier()
+        throws
+    {
+        var level = makeTrainingCameraMonitorLevel()
+        try level.validate()
+        let barrier = try XCTUnwrap(
+            level.trainingCameraMonitorChain?.returnToShip
+        )
+        let sourceMaterial = try XCTUnwrap(
+            level.presentationMaterials.first {
+                $0.texture
+                    == SourceResource(
+                        storedIndex: 908,
+                        sourceName: "Alien Force Field_1"
+                    )
+            }
+        )
+        let alternateTexture = SourceResource(
+            storedIndex: 909,
+            sourceName: "Alien Force Field Alternate"
+        )
+        let surfacePhysics = level.surfacePhysics + [.init(
+            texture: alternateTexture,
+            behavior: .forceField
+        )]
+        let presentationMaterials = level.presentationMaterials + [.init(
+            texture: alternateTexture,
+            bitmapSourceName: "alternate-force-field.ogf",
+            image: sourceMaterial.image,
+            blend: sourceMaterial.blend,
+            lightmapBlend: sourceMaterial.lightmapBlend,
+            waterProcedural: sourceMaterial.waterProcedural,
+            sourceArchive: sourceMaterial.sourceArchive,
+            sourceSHA256: String(repeating: "9", count: 64)
+        )]
+        let dependencyManifest = DependencyManifest(
+            current: level.dependencyManifest.current + [
+                .init(
+                    category: "texture",
+                    source: alternateTexture,
+                    state: "presentation-payload-imported",
+                    provenance: "hostile alternate force-field fixture"
+                ),
+            ],
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+        let roomIndex = try XCTUnwrap(level.rooms.firstIndex {
+            $0.sourceIndex == barrier.barrierRoomSourceIndex
+        })
+        for portalIndex in barrier.orderedPortalIndices.prefix(1) {
+            let portal = level.rooms[roomIndex].portals[portalIndex]
+            level.rooms[roomIndex].faces[portal.faceIndex].texture =
+                alternateTexture
+            let reciprocalRoomIndex = try XCTUnwrap(
+                level.rooms.firstIndex {
+                    $0.sourceIndex == portal.connectedRoom
+                }
+            )
+            let reciprocal = level.rooms[reciprocalRoomIndex]
+                .portals[portal.connectedPortal]
+            level.rooms[reciprocalRoomIndex]
+                .faces[reciprocal.faceIndex].texture =
+                alternateTexture
+        }
+        level = replacing(
+            level,
+            rooms: level.rooms,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            dependencyManifest: dependencyManifest
+        )
+
+        XCTAssertFalse(
+            validTrainingGuidebotReturnBarrier(barrier, in: level)
+        )
+        XCTAssertThrowsError(try level.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Camera Monitor chain")
+            )
         }
     }
 

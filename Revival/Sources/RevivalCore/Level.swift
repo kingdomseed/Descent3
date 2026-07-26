@@ -517,6 +517,197 @@ struct TrainingCameraMonitorChain: Codable, Equatable, Sendable {
     let cameraLocalPosition: Vector3
     let cameraLocalForward: Vector3
     let completionTimerDuration: Float
+    let returnToShip: TrainingGuidebotReturnChain?
+
+    init(
+        pickupObjectHandle: UInt32,
+        securityCameraObjectHandle: UInt32,
+        pickupCollisionRadius: Float,
+        pickupMessage: String,
+        pickupVoiceSourceName: String,
+        pickupSoundSourceName: String,
+        useMessage: String,
+        useVoiceSourceName: String,
+        popupDuration: Float,
+        popupZoom: Float,
+        cameraGunpointIndex: Int,
+        cameraLocalPosition: Vector3,
+        cameraLocalForward: Vector3,
+        completionTimerDuration: Float,
+        returnToShip: TrainingGuidebotReturnChain? = nil
+    ) {
+        self.pickupObjectHandle = pickupObjectHandle
+        self.securityCameraObjectHandle = securityCameraObjectHandle
+        self.pickupCollisionRadius = pickupCollisionRadius
+        self.pickupMessage = pickupMessage
+        self.pickupVoiceSourceName = pickupVoiceSourceName
+        self.pickupSoundSourceName = pickupSoundSourceName
+        self.useMessage = useMessage
+        self.useVoiceSourceName = useVoiceSourceName
+        self.popupDuration = popupDuration
+        self.popupZoom = popupZoom
+        self.cameraGunpointIndex = cameraGunpointIndex
+        self.cameraLocalPosition = cameraLocalPosition
+        self.cameraLocalForward = cameraLocalForward
+        self.completionTimerDuration = completionTimerDuration
+        self.returnToShip = returnToShip
+    }
+}
+
+struct TrainingGuidebotReturnChain: Codable, Equatable, Sendable {
+    let markerLightObjectHandle: UInt32
+    let markerLightPresentation: TrainingMarkerLightPresentation?
+    let barrierRoomSourceIndex: Int
+    let orderedPortalIndices: [Int]
+    let openMarkerLightDistance: Float
+    let returnMessage: String
+    let returnSoundSourceName: String
+    let arrivalMessage: String
+    let successMessage: String
+    let successVoiceSourceName: String
+
+    init(
+        markerLightObjectHandle: UInt32,
+        markerLightPresentation: TrainingMarkerLightPresentation? = nil,
+        barrierRoomSourceIndex: Int,
+        orderedPortalIndices: [Int],
+        openMarkerLightDistance: Float,
+        returnMessage: String,
+        returnSoundSourceName: String,
+        arrivalMessage: String,
+        successMessage: String,
+        successVoiceSourceName: String
+    ) {
+        self.markerLightObjectHandle = markerLightObjectHandle
+        self.markerLightPresentation = markerLightPresentation
+        self.barrierRoomSourceIndex = barrierRoomSourceIndex
+        self.orderedPortalIndices = orderedPortalIndices
+        self.openMarkerLightDistance = openMarkerLightDistance
+        self.returnMessage = returnMessage
+        self.returnSoundSourceName = returnSoundSourceName
+        self.arrivalMessage = arrivalMessage
+        self.successMessage = successMessage
+        self.successVoiceSourceName = successVoiceSourceName
+    }
+}
+
+struct TrainingMarkerLightPresentation:
+    Codable, Equatable, Sendable
+{
+    let primaryColor: Vector3
+    let secondaryColor: Vector3
+    let timeInterval: Float
+    let flickerDistance: Float
+    let directionalDot: Float
+    let flags: UInt32
+    let timebits: UInt32
+    let angle: UInt8
+    let lightingRenderType: UInt8
+}
+
+func validTrainingGuidebotReturnBarrier(
+    _ chain: TrainingGuidebotReturnChain,
+    in level: Level
+) -> Bool {
+    let stockSurface = SourceResource(
+        storedIndex: 908,
+        sourceName: "Alien Force Field_1"
+    )
+    guard chain.orderedPortalIndices == [0, 1],
+          let room = level.rooms.first(where: {
+              $0.sourceIndex == chain.barrierRoomSourceIndex
+          }),
+          let markerLight = level.objects.first(where: {
+              $0.handle == chain.markerLightObjectHandle
+          }),
+          markerLight.type == 11,
+          markerLight.instanceName == "FlashLight-3",
+          chain.orderedPortalIndices.allSatisfy(
+            room.portals.indices.contains
+          ) else {
+        return false
+    }
+    let rendersFaces =
+        room.portals[chain.orderedPortalIndices[0]].flags & 1
+    let portalsAreAtomic =
+        chain.orderedPortalIndices.allSatisfy { portalIndex in
+            let portal = room.portals[portalIndex]
+            guard room.faces.indices.contains(portal.faceIndex),
+                  room.faces[portal.faceIndex].portalIndex
+                    == portalIndex,
+                  room.faces[portal.faceIndex].texture
+                    == stockSurface,
+                  let physics = level.surfacePhysics.first(where: {
+                      $0.texture
+                        == room.faces[portal.faceIndex].texture
+                  }),
+                  physics.behavior == .forceField,
+                  level.presentationMaterials.contains(where: {
+                      $0.texture
+                        == room.faces[portal.faceIndex].texture
+                        && $0.waterProcedural != nil
+                  }),
+                  portal.flags & 1 == rendersFaces,
+                  let reciprocalRoom = level.rooms.first(where: {
+                      $0.sourceIndex == portal.connectedRoom
+                  }),
+                  reciprocalRoom.portals.indices.contains(
+                    portal.connectedPortal
+                  ) else {
+                return false
+            }
+            let reciprocal =
+                reciprocalRoom.portals[portal.connectedPortal]
+            guard reciprocal.connectedRoom
+                    == chain.barrierRoomSourceIndex,
+                  reciprocal.connectedPortal == portalIndex,
+                  reciprocalRoom.faces.indices.contains(
+                    reciprocal.faceIndex
+                  ),
+                  reciprocalRoom.faces[
+                    reciprocal.faceIndex
+                  ].portalIndex == portal.connectedPortal,
+                  reciprocalRoom.faces[
+                    reciprocal.faceIndex
+                  ].texture == stockSurface,
+                  let reciprocalPhysics =
+                    level.surfacePhysics.first(where: {
+                        $0.texture
+                          == reciprocalRoom.faces[
+                            reciprocal.faceIndex
+                          ].texture
+                    }),
+                  reciprocalPhysics.behavior == .forceField,
+                  level.presentationMaterials.contains(where: {
+                      $0.texture
+                        == reciprocalRoom.faces[
+                          reciprocal.faceIndex
+                        ].texture
+                        && $0.waterProcedural != nil
+                  }) else {
+                return false
+            }
+            return reciprocal.flags & 1 == rendersFaces
+        }
+    return chain.openMarkerLightDistance.isFinite
+        && chain.openMarkerLightDistance >= 0
+        && chain.markerLightPresentation.map { presentation in
+            isFinite(presentation.primaryColor)
+                && isFinite(presentation.secondaryColor)
+                && presentation.primaryColor.x >= 0
+                && presentation.primaryColor.y >= 0
+                && presentation.primaryColor.z >= 0
+                && presentation.secondaryColor.x >= 0
+                && presentation.secondaryColor.y >= 0
+                && presentation.secondaryColor.z >= 0
+                && presentation.timeInterval.isFinite
+                && presentation.timeInterval >= 0
+                && presentation.flickerDistance.isFinite
+                && presentation.flickerDistance >= 0
+                && presentation.directionalDot.isFinite
+                && presentation.flags & ~UInt32(0x3f) == 0
+        } == true
+        && portalsAreAtomic
 }
 
 struct TrainingRobotCombatDefinition: Codable, Equatable, Sendable {
@@ -752,7 +943,9 @@ func validateStockTrainingCameraMonitorPackage(
     chain: TrainingCameraMonitorChain?,
     guidebotC: CanonicalVoiceClip?,
     guidebotD: CanonicalVoiceClip?,
+    proceed6: CanonicalVoiceClip? = nil,
     pickupSound: CanonicalSoundClip?,
+    returnSound: CanonicalSoundClip? = nil,
     objects: [PlacedObject],
     objectPresentations: [ObjectPresentationReference]
 ) throws {
@@ -781,7 +974,29 @@ func validateStockTrainingCameraMonitorPackage(
                 y: -0.017_452_003,
                 z: 0.999_847_7
             ),
-            completionTimerDuration: 2
+            completionTimerDuration: 2,
+            returnToShip: .init(
+                markerLightObjectHandle: 10_245,
+                markerLightPresentation: .init(
+                    primaryColor: .init(x: 1, y: 0.25, z: 0),
+                    secondaryColor: .zero,
+                    timeInterval: 0.5,
+                    flickerDistance: 0.2,
+                    directionalDot: 0,
+                    flags: 4,
+                    timebits: .max,
+                    angle: 0,
+                    lightingRenderType: 2
+                ),
+                barrierRoomSourceIndex: 40,
+                orderedPortalIndices: [0, 1],
+                openMarkerLightDistance: 50,
+                returnMessage: "GB: Returning to ship.",
+                returnSoundSourceName: "GBotAcceptOrder.wav",
+                arrivalMessage: "GB: Entering ship!",
+                successMessage: "Excellent!",
+                successVoiceSourceName: "proceed6.osf"
+            )
           ),
           guidebotC?.sourceEntryIndex == 6,
           guidebotC?.sampleRate == 22_050,
@@ -801,6 +1016,15 @@ func validateStockTrainingCameraMonitorPackage(
           guidebotD?.sourceArchive == "missions/training.mn3",
           guidebotD?.sourceSHA256
             == "afffa8e1a39b1c6e8956105c52db8fa372a33b763aa44e18980f2e22884795d1",
+          proceed6?.sourceEntryIndex == 26,
+          proceed6?.sampleRate == 22_050,
+          proceed6?.channelCount == 1,
+          proceed6?.frameCount == 141_237,
+          proceed6?.pcmSHA256
+            == "ccc21ee44f4e965806904dfbd4aa95be1510e8cbe633ab43f0808b7f3026b06d",
+          proceed6?.sourceArchive == "missions/training.mn3",
+          proceed6?.sourceSHA256
+            == "b3cd5455401af0f387d8cde20c3c869897aef55070cf8cfadd141c0f291bc403",
           pickupSound?.logicalName == "PupC1",
           pickupSound?.sourceName == "PupC.wav",
           pickupSound?.sourceEntryIndex == 130,
@@ -813,6 +1037,18 @@ func validateStockTrainingCameraMonitorPackage(
           pickupSound?.sourceSHA256
             == "d3e8e7515facfd6c1b540e70cf7f1019c3d1f13f24140bee76337e5bb37de7d0",
           pickupSound?.importVolume == 1,
+          returnSound?.logicalName == "GBotAcceptOrder1",
+          returnSound?.sourceName == "GBotAcceptOrder.wav",
+          returnSound?.sourceEntryIndex == 1_257,
+          returnSound?.sampleRate == 22_050,
+          returnSound?.channelCount == 1,
+          returnSound?.frameCount == 21_652,
+          returnSound?.pcmSHA256
+            == "d1d068fbd7950adeaffe5a2cf3c6c56b59d488f9c53b3460f88adfb7178183b1",
+          returnSound?.sourceArchive == "d3.hog",
+          returnSound?.sourceSHA256
+            == "47e38dfcb285be1b8d19d59929fef1b1122c1772a0cca2e6fe2b1721e5876b17",
+          returnSound?.importVolume == 0.45,
           objects.contains(where: {
               $0.handle == 6_167
                   && $0.type == 7
@@ -828,6 +1064,14 @@ func validateStockTrainingCameraMonitorPackage(
                   && $0.definition?.sourceName == "new wall cam"
                   && $0.instanceName == "SecurityCamera"
                   && $0.flags == 5_120
+          }),
+          objects.contains(where: {
+              $0.handle == 10_245
+                  && $0.type == 11
+                  && $0.storedID == 205
+                  && $0.definition?.sourceName == "Blinking Red Light-DM"
+                  && $0.instanceName == "FlashLight-3"
+                  && $0.location == .room(40)
           }),
           objectPresentations.contains(where: {
               $0.objectHandle == 6_167
@@ -1667,6 +1911,22 @@ struct Level: Codable, Equatable, Sendable {
             let soundNames = Set(soundClips.map {
                 $0.sourceName.lowercased()
             })
+            let returnToShipIsValid = chain.returnToShip.map({
+                returnChain in
+                validTrainingGuidebotReturnBarrier(
+                    returnChain,
+                    in: self
+                )
+                    && clipNames.contains(
+                        returnChain.successVoiceSourceName.lowercased()
+                    )
+                    && soundNames.contains(
+                        returnChain.returnSoundSourceName.lowercased()
+                    )
+                    && isNonempty(returnChain.returnMessage)
+                    && isNonempty(returnChain.arrivalMessage)
+                    && isNonempty(returnChain.successMessage)
+            }) ?? true
             guard trainingRobotGuidebotChain != nil,
                   chain.pickupObjectHandle
                     != chain.securityCameraObjectHandle,
@@ -1713,6 +1973,7 @@ struct Level: Codable, Equatable, Sendable {
                   soundNames.contains(
                     chain.pickupSoundSourceName.lowercased()
                   ),
+                  returnToShipIsValid,
                   objectPresentations.contains(where: {
                       $0.objectHandle == chain.pickupObjectHandle
                   }) else {
@@ -1826,6 +2087,10 @@ struct Level: Codable, Equatable, Sendable {
                 $0.sourceName.caseInsensitiveCompare("guidebotd.osf")
                     == .orderedSame
             }
+            let proceed6 = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("proceed6.osf")
+                    == .orderedSame
+            }
             guard let lesson = trainingOpeningLesson,
                   missionKey == "descent3.mission.pilot-training",
                   levelKey == "descent3.level.training-mission",
@@ -1867,7 +2132,7 @@ struct Level: Codable, Equatable, Sendable {
                     == "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
                   barrier.voiceSourceName == "guidebota.osf",
                   voiceClips.count
-                    == (trainingCameraMonitorChain == nil ? 5 : 7),
+                    == (trainingCameraMonitorChain == nil ? 5 : 8),
                   guidebotA?.sourceEntryIndex == 4,
                   guidebotA?.sampleRate == 22_050,
                   guidebotA?.channelCount == 1,
@@ -1898,8 +2163,12 @@ struct Level: Codable, Equatable, Sendable {
                     chain: trainingCameraMonitorChain,
                     guidebotC: guidebotC,
                     guidebotD: guidebotD,
+                    proceed6: proceed6,
                     pickupSound: soundClips.first {
                         $0.logicalName == "PupC1"
+                    },
+                    returnSound: soundClips.first {
+                        $0.logicalName == "GBotAcceptOrder1"
                     },
                     objects: objects,
                     objectPresentations: objectPresentations
@@ -2511,7 +2780,7 @@ struct Level: Codable, Equatable, Sendable {
     func addingTrainingCameraMonitorChain(
         _ chain: TrainingCameraMonitorChain,
         voiceClips addedVoiceClips: [CanonicalVoiceClip],
-        soundClip: CanonicalSoundClip
+        soundClips addedSoundClips: [CanonicalSoundClip]
     ) -> Level {
         var dependencies = dependencyManifest.current
         let reachedDependencies = addedVoiceClips.map { clip in
@@ -2525,7 +2794,7 @@ struct Level: Codable, Equatable, Sendable {
                 provenance:
                     "\(clip.sourceArchive) \(clip.sourceSHA256)"
             )
-        } + [DependencyRecord(
+        } + addedSoundClips.map { soundClip in DependencyRecord(
             category: "sound",
             source: .init(
                 storedIndex: soundClip.sourceEntryIndex,
@@ -2534,7 +2803,7 @@ struct Level: Codable, Equatable, Sendable {
             state: "canonical-pcm-imported",
             provenance:
                 "\(soundClip.sourceArchive) \(soundClip.sourceSHA256)"
-        )]
+        )}
         for reached in reachedDependencies {
             if let index = dependencies.firstIndex(where: {
                 $0.category == reached.category
@@ -2574,7 +2843,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: chain,
             voiceClips: voiceClips + addedVoiceClips,
-            soundClips: soundClips + [soundClip],
+            soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline:

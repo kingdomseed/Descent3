@@ -23,6 +23,8 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
     case combinedPortalRenderingEditDeferred(roomSourceIndex: Int, portalIndex: Int)
     case trainingGalleryBarrierUnavailable
     case trainingGalleryBarrierEditRejected
+    case trainingGuidebotReturnBarrierUnavailable
+    case trainingGuidebotReturnBarrierEditRejected
     case invalidObjectTransformEdit(UInt32)
     case invalidPlayerStartTransformEdit(playerID: Int, handle: UInt32)
     case faceEditRejected(roomSourceIndex: Int, faceIndex: Int)
@@ -81,6 +83,10 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
             "TrainingMission.cpp Script 032 / Portal2 is not bound to this canonical level."
         case .trainingGalleryBarrierEditRejected:
             "TrainingMission.cpp Script 032 / Portal2 could not update its two-sided barrier without breaking the canonical trigger, portal, collision, or presentation contract."
+        case .trainingGuidebotReturnBarrierUnavailable:
+            "TrainingMission.cpp Script 058 / PortalRoom5 is not bound to this canonical level."
+        case .trainingGuidebotReturnBarrierEditRejected:
+            "TrainingMission.cpp Script 058 / PortalRoom5 could not update its two-sided barrier without breaking the canonical portal, collision, or presentation contract."
         case let .invalidObjectTransformEdit(handle):
             "The project contains an invalid or redundant transform edit for object handle \(handle)."
         case let .invalidPlayerStartTransformEdit(playerID, handle):
@@ -473,8 +479,31 @@ struct RevivalProject: Equatable, Sendable {
             return "TrainingMission.cpp Scripts 036 + 060 / \(robotName) + Guidebot / NODE/BOA route radius \(radius), \(navigation)"
         }
     }
+    var trainingGuidebotReturnSourceDiagnostic: String? {
+        guard let chain = level.trainingCameraMonitorChain?.returnToShip,
+              let marker = level.objects.first(where: {
+                  $0.handle == chain.markerLightObjectHandle
+              }),
+              let room = level.rooms.first(where: {
+                  $0.sourceIndex == chain.barrierRoomSourceIndex
+              }) else {
+            return nil
+        }
+        return "TrainingMission.cpp Script 058 / \(marker.instanceName ?? "FlashLight-3") + \(room.name ?? "PortalRoom5")"
+    }
     var trainingGalleryBarrierIsOpen: Bool {
         guard let barrier = level.trainingGalleryBarrier,
+              let room = level.rooms.first(where: {
+                  $0.sourceIndex == barrier.barrierRoomSourceIndex
+              }),
+              let portalIndex = barrier.orderedPortalIndices.first else {
+            return false
+        }
+        return room.portals[portalIndex].flags & 1 == 0
+    }
+    var trainingGuidebotReturnBarrierIsOpen: Bool {
+        guard let barrier =
+                level.trainingCameraMonitorChain?.returnToShip,
               let room = level.rooms.first(where: {
                   $0.sourceIndex == barrier.barrierRoomSourceIndex
               }),
@@ -863,6 +892,31 @@ struct RevivalProject: Equatable, Sendable {
         return false
     }
 
+    func isTrainingGuidebotReturnBarrierPortal(
+        roomSourceIndex: Int,
+        portalIndex: Int
+    ) -> Bool {
+        guard let barrier =
+                level.trainingCameraMonitorChain?.returnToShip,
+              let room = level.rooms.first(where: {
+                  $0.sourceIndex == barrier.barrierRoomSourceIndex
+              }) else {
+            return false
+        }
+        for barrierPortalIndex in barrier.orderedPortalIndices {
+            if roomSourceIndex == room.sourceIndex,
+               portalIndex == barrierPortalIndex {
+                return true
+            }
+            let portal = room.portals[barrierPortalIndex]
+            if roomSourceIndex == portal.connectedRoom,
+               portalIndex == portal.connectedPortal {
+                return true
+            }
+        }
+        return false
+    }
+
     @discardableResult
     mutating func setTrainingGalleryBarrierOpen(
         _ isOpen: Bool
@@ -914,6 +968,64 @@ struct RevivalProject: Equatable, Sendable {
             updatePortalRenderingEdit(
                 roomSourceIndex: portal.roomSourceIndex,
                 portalIndex: portal.portalIndex
+            )
+        }
+        return previous
+    }
+
+    @discardableResult
+    mutating func setTrainingGuidebotReturnBarrierOpen(
+        _ isOpen: Bool
+    ) throws -> Bool {
+        guard let barrier =
+                level.trainingCameraMonitorChain?.returnToShip,
+              let barrierRoomIndex = level.rooms.firstIndex(where: {
+                  $0.sourceIndex == barrier.barrierRoomSourceIndex
+              }) else {
+            throw RevivalProjectError
+                .trainingGuidebotReturnBarrierUnavailable
+        }
+        let previous = trainingGuidebotReturnBarrierIsOpen
+        guard previous != isOpen else {
+            throw RevivalProjectError.unchangedProperty
+        }
+        var candidate = level
+        var editedPortals: [(Int, Int)] = []
+        for portalIndex in barrier.orderedPortalIndices {
+            let portal =
+                candidate.rooms[barrierRoomIndex].portals[portalIndex]
+            candidate.rooms[barrierRoomIndex].portals[portalIndex].flags =
+                portalFlags(portal.flags, rendersFace: !isOpen)
+            editedPortals.append((
+                barrier.barrierRoomSourceIndex,
+                portalIndex
+            ))
+            let connectedRoomIndex = candidate.rooms.firstIndex {
+                $0.sourceIndex == portal.connectedRoom
+            }!
+            let reciprocal = candidate.rooms[connectedRoomIndex]
+                .portals[portal.connectedPortal]
+            candidate.rooms[connectedRoomIndex]
+                .portals[portal.connectedPortal].flags = portalFlags(
+                    reciprocal.flags,
+                    rendersFace: !isOpen
+                )
+            editedPortals.append((
+                portal.connectedRoom,
+                portal.connectedPortal
+            ))
+        }
+        do {
+            try candidate.validate()
+        } catch {
+            throw RevivalProjectError
+                .trainingGuidebotReturnBarrierEditRejected
+        }
+        level = candidate
+        for portal in editedPortals {
+            updatePortalRenderingEdit(
+                roomSourceIndex: portal.0,
+                portalIndex: portal.1
             )
         }
         return previous

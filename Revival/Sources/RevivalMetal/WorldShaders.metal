@@ -8,6 +8,7 @@ struct RevivalWorldVertex {
     float4 textureAndLightmapUV;
     float4 presentation;
     float4 surfaceColor;
+    float4 dynamicLight;
 };
 
 struct RevivalWorldUniforms {
@@ -21,6 +22,7 @@ struct RevivalWorldRaster {
     float opacity;
     float tintMode;
     float4 surfaceColor;
+    float3 dynamicLight;
 };
 
 vertex RevivalWorldRaster revivalWorldVertex(
@@ -42,6 +44,7 @@ vertex RevivalWorldRaster revivalWorldVertex(
     output.opacity = sourceVertex.presentation.x;
     output.tintMode = sourceVertex.presentation.z;
     output.surfaceColor = sourceVertex.surfaceColor;
+    output.dynamicLight = sourceVertex.dynamicLight.rgb;
     return output;
 }
 
@@ -65,5 +68,8 @@ fragment float4 revivalWorldFragment(
         lightmapSampler,
         input.lightmapUV
     ).rgb;
-    return float4(base.rgb * lightmap, base.a * input.opacity);
+    return float4(
+        base.rgb * clamp(lightmap + input.dynamicLight, 0.0, 1.0),
+        base.a * input.opacity
+    );
 }

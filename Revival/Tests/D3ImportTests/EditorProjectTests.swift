@@ -526,6 +526,29 @@ final class EditorProjectTests: XCTestCase {
         let chain = try XCTUnwrap(
             document.project.level.trainingCameraMonitorChain
         )
+        XCTAssertEqual(
+            document.project.trainingGuidebotReturnSourceDiagnostic,
+            "TrainingMission.cpp Script 058 / FlashLight-3 + PortalRoom5"
+        )
+        try document.selectRoom(sourceIndex: 2)
+        try document.selectPortal(0)
+        document.undoManager?.beginUndoGrouping()
+        try document.setSelectedPortalRendersFaces(true)
+        document.undoManager?.endUndoGrouping()
+        assertTrainingGuidebotReturnBarrierRendering(
+            in: document.project.level,
+            rendersFaces: true
+        )
+        XCTAssertEqual(
+            document.undoManager?.undoActionName,
+            "Set Training Guidebot Return Barrier"
+        )
+        document.undoManager?.undo()
+        assertTrainingGuidebotReturnBarrierRendering(
+            in: document.project.level,
+            rendersFaces: false
+        )
+        document.undoManager?.redo()
         let camera = try XCTUnwrap(
             document.project.level.objects.first {
                 $0.handle == chain.securityCameraObjectHandle
@@ -1989,6 +2012,36 @@ private func assertTrainingGalleryBarrierRendering(
     line: UInt = #line
 ) {
     let barrier = level.trainingGalleryBarrier!
+    let room = level.rooms.first {
+        $0.sourceIndex == barrier.barrierRoomSourceIndex
+    }!
+    for portalIndex in barrier.orderedPortalIndices {
+        let portal = room.portals[portalIndex]
+        XCTAssertEqual(
+            portal.flags & 1 != 0,
+            rendersFaces,
+            file: file,
+            line: line
+        )
+        let reciprocalRoom = level.rooms.first {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        XCTAssertEqual(
+            reciprocalRoom.portals[portal.connectedPortal].flags & 1 != 0,
+            rendersFaces,
+            file: file,
+            line: line
+        )
+    }
+}
+
+private func assertTrainingGuidebotReturnBarrierRendering(
+    in level: Level,
+    rendersFaces: Bool,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    let barrier = level.trainingCameraMonitorChain!.returnToShip!
     let room = level.rooms.first {
         $0.sourceIndex == barrier.barrierRoomSourceIndex
     }!

@@ -430,6 +430,13 @@ func runD3Import(
         overlay: overlayData,
         name: "new wall cam"
     )
+    let returnMarkerLightPage = try resolveRetailGenericModelPage(
+        table: tableData,
+        overlay: overlayData,
+        name: "Blinking Red Light-DM"
+    )
+    let returnMarkerLightPresentation =
+        returnMarkerLightPage.genericLight!
     let reachedModelNames = Set([
         reachedPages.ship.primaryModelName,
         reachedPages.ship.mediumModelName,
@@ -662,6 +669,7 @@ func runD3Import(
         "proceed5.osf",
         "GuideBotC.osf",
         "GuideBotD.osf",
+        "proceed6.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -773,6 +781,13 @@ func runD3Import(
         $0.instanceName?.caseInsensitiveCompare("SecurityCamera")
             == .orderedSame
     }!
+    let returnMarkerLight = robotGuidebotLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("FlashLight-3")
+            == .orderedSame
+    }!
+    let returnBarrierRoom = robotGuidebotLevel.rooms.first {
+        $0.name?.caseInsensitiveCompare("PortalRoom5") == .orderedSame
+    }!
     let cameraMonitorModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare(
             cameraMonitorPage.primaryModelName
@@ -811,6 +826,20 @@ func runD3Import(
         in: pickupSoundEntry.payloadRange
     )
     let pickupSound = try decodeReachedPCM16WAV(pickupSoundPayload)
+    let returnSoundPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "GBotAcceptOrder1"
+    )
+    let returnSoundEntry = d3Archive.uniqueEntry(
+        named: returnSoundPage.sourceName
+    )
+    let returnSoundEntryIndex =
+        d3Archive.entries.firstIndex(of: returnSoundEntry)!
+    let returnSoundPayload = d3.data.subdata(
+        in: returnSoundEntry.payloadRange
+    )
+    let returnSound = try decodeReachedPCM16WAV(returnSoundPayload)
     let cameraMonitorLevel = robotGuidebotLevel
         .addingTrainingCameraMonitorChain(
         .init(
@@ -827,24 +856,69 @@ func runD3Import(
             cameraGunpointIndex: 0,
             cameraLocalPosition: securityCameraGunpoint.position,
             cameraLocalForward: securityCameraGunpoint.forward,
-            completionTimerDuration: 2
+            completionTimerDuration: 2,
+            returnToShip: .init(
+                markerLightObjectHandle: returnMarkerLight.handle,
+                markerLightPresentation: .init(
+                    primaryColor:
+                        returnMarkerLightPresentation.primaryColor,
+                    secondaryColor:
+                        returnMarkerLightPresentation.secondaryColor,
+                    timeInterval:
+                        returnMarkerLightPresentation.timeInterval,
+                    flickerDistance:
+                        returnMarkerLightPresentation.flickerDistance,
+                    directionalDot:
+                        returnMarkerLightPresentation.directionalDot,
+                    flags: returnMarkerLightPresentation.flags,
+                    timebits: returnMarkerLightPresentation.timebits,
+                    angle: returnMarkerLightPresentation.angle,
+                    lightingRenderType:
+                        returnMarkerLightPresentation.lightingRenderType
+                ),
+                barrierRoomSourceIndex: returnBarrierRoom.sourceIndex,
+                orderedPortalIndices: [0, 1],
+                openMarkerLightDistance: 50,
+                returnMessage: "GB: Returning to ship.",
+                returnSoundSourceName: returnSoundPage.sourceName,
+                arrivalMessage: "GB: Entering ship!",
+                successMessage: messages["GoodJob"]!,
+                successVoiceSourceName: "proceed6.osf"
+            )
         ),
-        voiceClips: Array(voiceClips.suffix(2)),
-        soundClip: .init(
-            logicalName: pickupSoundPage.logicalName,
-            sourceName: pickupSoundPage.sourceName,
-            sourceEntryIndex: pickupSoundPage.storedIndex,
-            sampleRate: pickupSound.sampleRate,
-            channelCount: pickupSound.channelCount,
-            frameCount: pickupSound.frameCount,
-            pcm16LittleEndian: pickupSound.pcm16LittleEndian,
-            pcmSHA256: canonicalSHA256(
-                pickupSound.pcm16LittleEndian
+        voiceClips: Array(voiceClips.suffix(3)),
+        soundClips: [
+            .init(
+                logicalName: pickupSoundPage.logicalName,
+                sourceName: pickupSoundPage.sourceName,
+                sourceEntryIndex: pickupSoundPage.storedIndex,
+                sampleRate: pickupSound.sampleRate,
+                channelCount: pickupSound.channelCount,
+                frameCount: pickupSound.frameCount,
+                pcm16LittleEndian: pickupSound.pcm16LittleEndian,
+                pcmSHA256: canonicalSHA256(
+                    pickupSound.pcm16LittleEndian
+                ),
+                sourceArchive: d3File.relativePath,
+                sourceSHA256: canonicalSHA256(pickupSoundPayload),
+                importVolume: pickupSoundPage.importVolume
             ),
-            sourceArchive: d3File.relativePath,
-            sourceSHA256: canonicalSHA256(pickupSoundPayload),
-            importVolume: pickupSoundPage.importVolume
-        )
+            .init(
+                logicalName: returnSoundPage.logicalName,
+                sourceName: returnSoundPage.sourceName,
+                sourceEntryIndex: returnSoundEntryIndex,
+                sampleRate: returnSound.sampleRate,
+                channelCount: returnSound.channelCount,
+                frameCount: returnSound.frameCount,
+                pcm16LittleEndian: returnSound.pcm16LittleEndian,
+                pcmSHA256: canonicalSHA256(
+                    returnSound.pcm16LittleEndian
+                ),
+                sourceArchive: d3File.relativePath,
+                sourceSHA256: canonicalSHA256(returnSoundPayload),
+                importVolume: returnSoundPage.importVolume
+            ),
+        ]
         )
     precondition(
         cameraMonitor.handle == 6_167
@@ -855,6 +929,12 @@ func runD3Import(
             && securityCamera.type == 2
             && securityCamera.storedID == 114
             && securityCamera.flags == 5_120
+            && returnMarkerLight.handle == 10_245
+            && returnMarkerLight.type == 11
+            && returnMarkerLight.storedID == 205
+            && returnMarkerLight.location == .room(40)
+            && returnBarrierRoom.sourceIndex == 40
+            && returnBarrierRoom.portals.count == 2
     )
     let level = cameraMonitorLevel
     let playerView = defaultPlayerView(in: level)

@@ -1,6 +1,144 @@
 import XCTest
 
 final class MetalWorldPlanTests: XCTestCase {
+    func testScript058MarkerDistanceLightsReachedMetalWorld() throws {
+        var level = makeTrainingCameraMonitorLevel()
+        let playerView = defaultPlayerView(in: level)
+        let markerHandle = try XCTUnwrap(
+            level.trainingCameraMonitorChain?.returnToShip?
+                .markerLightObjectHandle
+        )
+        let markerIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == markerHandle
+        })
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            playerView: playerView
+        )
+        let target = try XCTUnwrap(
+            initial.draws.first?.vertices.first?.position
+        )
+        level.objects[markerIndex].location =
+            .room(playerView.roomSourceIndex)
+        level.objects[markerIndex].position = .init(
+            x: target.x + 20,
+            y: target.y,
+            z: target.z
+        )
+        let fullyLit = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            playerView: playerView,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1,
+                systemsGameTime: 0.5
+            ),
+            trainingGuidebotReturnMarkerLightDistance: 50
+        )
+        let pulseFloor = try updateMetalWorldPlan(
+            fullyLit,
+            level: level,
+            playerView: playerView,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1,
+                systemsGameTime: 1
+            ),
+            trainingGuidebotReturnMarkerLightDistance: 50
+        )
+
+        XCTAssertGreaterThan(
+            fullyLit.draws[0].vertices[0].dynamicLight.x,
+            0
+        )
+        XCTAssertEqual(
+            pulseFloor.draws[0].vertices[0].dynamicLight,
+            .zero
+        )
+    }
+
+    func testScript058MarkerPulseRefreshesAuxiliaryOnlyRoomDraws()
+        throws
+    {
+        var level = makeTrainingCameraMonitorLevel()
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(at: 0.1, input: .zero)
+        let used = simulation.update(
+            at: 0.2,
+            input: .init(usesInventory: true)
+        )
+        let playerView = used.playerView
+        let monitor = try XCTUnwrap(used.trainingCameraMonitor)
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            playerView: playerView
+        )
+        let auxiliaryBaseline = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            playerView: playerView,
+            trainingCameraMonitor: monitor
+        )
+        let auxiliaryOnlyIndex = try XCTUnwrap(
+            auxiliaryBaseline.auxiliaryActiveDrawIndices.first {
+                !auxiliaryBaseline.activeDrawIndices.contains($0)
+                    && auxiliaryBaseline.preparedDraws[$0]
+                        .objectHandle == nil
+            }
+        )
+        let target = try XCTUnwrap(
+            auxiliaryBaseline.preparedDraws[auxiliaryOnlyIndex]
+                .vertices.first?.position
+        )
+        let markerHandle = try XCTUnwrap(
+            level.trainingCameraMonitorChain?.returnToShip?
+                .markerLightObjectHandle
+        )
+        let markerIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == markerHandle
+        })
+        level.objects[markerIndex].position = .init(
+            x: target.x + 20,
+            y: target.y,
+            z: target.z
+        )
+        let fullyLit = try updateMetalWorldPlan(
+            auxiliaryBaseline,
+            level: level,
+            playerView: playerView,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1,
+                systemsGameTime: 0.5
+            ),
+            trainingCameraMonitor: monitor,
+            trainingGuidebotReturnMarkerLightDistance: 50
+        )
+        let pulseFloor = try updateMetalWorldPlan(
+            fullyLit,
+            level: level,
+            playerView: playerView,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1,
+                systemsGameTime: 1
+            ),
+            trainingCameraMonitor: monitor,
+            trainingGuidebotReturnMarkerLightDistance: 50
+        )
+
+        XCTAssertGreaterThan(
+            fullyLit.preparedDraws[auxiliaryOnlyIndex]
+                .vertices[0].dynamicLight.x,
+            0
+        )
+        XCTAssertEqual(
+            pulseFloor.preparedDraws[auxiliaryOnlyIndex]
+                .vertices[0].dynamicLight,
+            .zero
+        )
+    }
+
     func testCameraMonitorUsesSourceLeftBiggerPopupViewport() {
         let viewport = cameraMonitorMetalViewport(
             drawableWidth: 1_200,

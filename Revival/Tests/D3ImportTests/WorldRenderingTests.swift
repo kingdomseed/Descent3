@@ -277,12 +277,6 @@ final class WorldRenderingTests: XCTestCase {
             ),
             4
         )
-        XCTAssertEqual(
-            RevivalGameplayView.sourceStreamingVoiceName(
-                for: simultaneous.trainingOpeningFeedback
-            ),
-            "welcome.osf"
-        )
     }
 
     func testTrainingOpeningGoalContactStaysOnReachedIndoorTrace() throws {
@@ -916,6 +910,496 @@ final class WorldRenderingTests: XCTestCase {
             resumedPopup.update(at: 212.2, input: .zero)
                 .trainingOpeningFeedback.isEmpty
         )
+    }
+
+    func testGuidebotReturnCollisionRunsScript058OnceAcrossReload() throws {
+        let level = makeTrainingCameraMonitorLevel()
+        try level.validate()
+        let chain = try XCTUnwrap(level.trainingCameraMonitorChain)
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        _ = simulation.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
+        let requested = simulation.update(
+            at: 0.3,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        XCTAssertEqual(requested.trainingOpeningFeedback, [
+            .init(
+                hudMessages: ["GB: Returning to ship."],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "GBotAcceptOrder.wav"
+            ),
+        ])
+        var completed: PlayerSimulationFrame?
+        for frameIndex in 4...100 {
+            let frame = simulation.update(
+                at: Double(frameIndex) * 0.1,
+                input: .zero
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "proceed6.osf"
+            }) {
+                completed = frame
+                break
+            }
+        }
+        let script058 = try XCTUnwrap(completed)
+        XCTAssertEqual(script058.trainingOpeningFeedback, [
+            .init(
+                hudMessages: ["GB: Entering ship!"],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true
+            ),
+            .init(
+                hudMessages: ["Excellent!"],
+                voiceSourceName: "proceed6.osf",
+                voicePrecedesHUDMessages: true
+            ),
+        ])
+        XCTAssertNil(script058.trainingGuidebot)
+        XCTAssertEqual(
+            script058.trainingGuidebotReturnMarkerLightDistance,
+            50
+        )
+        assertTrainingGuidebotReturnBarrier(
+            level: simulation.level,
+            rendersFaces: false
+        )
+        XCTAssertFalse(simulation.level.objectPresentations.contains {
+            $0.objectHandle
+                == level.trainingRobotGuidebotChain?.guidebotObjectHandle
+                && $0.isVisible
+        })
+        let postReturnF4 = simulation.update(
+            at: Double(script058.gameTime) + 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        XCTAssertNil(postReturnF4.trainingGuidebot)
+        XCTAssertTrue(postReturnF4.trainingOpeningFeedback.isEmpty)
+
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(simulation.continuation)
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 100
+        )
+        let afterReload = restored.update(at: 100.1, input: .zero)
+        XCTAssertTrue(afterReload.trainingOpeningFeedback.isEmpty)
+        XCTAssertNil(afterReload.trainingGuidebot)
+        XCTAssertEqual(
+            afterReload.trainingGuidebotReturnMarkerLightDistance,
+            chain.returnToShip?.openMarkerLightDistance
+        )
+        assertTrainingGuidebotReturnBarrier(
+            level: restored.level,
+            rendersFaces: false
+        )
+    }
+
+    func testGuidebotReturnTracksLivePlayerMovementInSameFrame()
+        throws
+    {
+        let level = makeTrainingCameraMonitorLevel()
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
+        _ = simulation.update(
+            at: 0.3,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+
+        let followingMovedPlayer = simulation.update(
+            at: 0.4,
+            input: .init(forward: 1)
+        )
+
+        XCTAssertEqual(
+            followingMovedPlayer.trainingGuidebot?.destination,
+            followingMovedPlayer.playerView.camera.position
+        )
+    }
+
+    func testGuidebotReturnReallocatesWhenLivePlayerChangesRooms()
+        throws
+    {
+        var level = makeTrainingCameraMonitorLevel()
+        let targetPosition = Vector3(
+            x: 10_000,
+            y: 10_000,
+            z: 10_000
+        )
+        let targetRoom = makeSourceContainmentRoom(
+            center: targetPosition,
+            texture: level.surfacePhysics[0].texture,
+            sourceIndex: 999,
+            halfExtent: 100
+        )
+        level.rooms.append(targetRoom)
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
+        let requested = simulation.update(
+            at: 0.3,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        let guidebot = try XCTUnwrap(requested.trainingGuidebot)
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var playerLocation = try XCTUnwrap(
+            continuationObject["playerLocation"] as? [String: Any]
+        )
+        playerLocation["room"] = ["_0": targetRoom.sourceIndex]
+        continuationObject["playerLocation"] = playerLocation
+        continuationObject["playerPosition"] = [
+            "x": targetPosition.x,
+            "y": targetPosition.y,
+            "z": targetPosition.z,
+        ]
+        let movedPlayerContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: continuationObject
+            )
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: movedPlayerContinuation,
+            resumedAtTimestamp: 100
+        )
+
+        let reallocated = restored.update(at: 100.1, input: .zero)
+
+        let reallocatedGuidebot = try XCTUnwrap(
+            reallocated.trainingGuidebot
+        )
+        let liveTarget = reallocated.playerView.camera.position
+        XCTAssertEqual(reallocatedGuidebot.destination, liveTarget)
+        if reallocatedGuidebot.routeFailure == nil {
+            XCTAssertEqual(
+                reallocatedGuidebot.route.roomSourceIndices.last,
+                targetRoom.sourceIndex
+            )
+        } else {
+            XCTAssertEqual(reallocatedGuidebot.route.mode, .direct)
+            XCTAssertEqual(
+                reallocatedGuidebot.route.points,
+                [liveTarget]
+            )
+            XCTAssertNotEqual(
+                reallocatedGuidebot.route,
+                guidebot.route
+            )
+        }
+    }
+
+    func testGuidebotCrossRoomReturnReachesScript058() throws {
+        var level = makeTrainingCameraMonitorLevel()
+        let start = RoomCamera.trainingRoom3.position
+        let turn = Vector3(x: start.x, y: start.y + 200, z: start.z)
+        let destination = Vector3(
+            x: start.x + 400,
+            y: start.y + 200,
+            z: start.z
+        )
+        let blockingTexture = try XCTUnwrap(
+            level.surfacePhysics.first {
+                $0.behavior == .blocking
+            }?.texture
+        )
+        let returnTexture = SourceResource(
+            storedIndex: 908,
+            sourceName: "Alien Force Field_1"
+        )
+        func portalFace(
+            _ face: LevelFace,
+            portalIndex: Int
+        ) -> LevelFace {
+            .init(
+                corners: face.corners,
+                flags: face.flags,
+                portalIndex: portalIndex,
+                texture: returnTexture
+            )
+        }
+        var room3 = makeSourceContainmentRoom(
+            center: start,
+            texture: blockingTexture,
+            sourceIndex: 3,
+            halfExtent: 100
+        )
+        room3 = LevelRoom(
+            sourceIndex: 3,
+            pathPoint: start,
+            vertices: room3.vertices,
+            faces: room3.faces.enumerated().map {
+                $0.offset == 3
+                    ? portalFace($0.element, portalIndex: 0)
+                    : $0.element
+            },
+            portals: [
+                .init(
+                    faceIndex: 3,
+                    connectedRoom: 2,
+                    connectedPortal: 0,
+                    pathPoint: .init(
+                        x: start.x,
+                        y: start.y + 100,
+                        z: start.z
+                    )
+                ),
+            ]
+        )
+        var room2 = makeSourceContainmentRoom(
+            center: turn,
+            texture: blockingTexture,
+            sourceIndex: 2,
+            halfExtent: 100
+        )
+        room2 = LevelRoom(
+            sourceIndex: 2,
+            pathPoint: turn,
+            vertices: room2.vertices,
+            faces: room2.faces.enumerated().map {
+                if $0.offset == 2 {
+                    return portalFace($0.element, portalIndex: 0)
+                }
+                if $0.offset == 1 {
+                    return portalFace($0.element, portalIndex: 1)
+                }
+                return $0.element
+            },
+            portals: [
+                .init(
+                    faceIndex: 2,
+                    connectedRoom: 3,
+                    connectedPortal: 0,
+                    pathPoint: .init(
+                        x: start.x,
+                        y: start.y + 100,
+                        z: start.z
+                    )
+                ),
+                .init(
+                    faceIndex: 1,
+                    connectedRoom: 1,
+                    connectedPortal: 0,
+                    pathPoint: .init(
+                        x: start.x + 100,
+                        y: start.y + 200,
+                        z: start.z
+                    )
+                ),
+            ]
+        )
+        var room1 = makeSourceContainmentRoom(
+            center: destination,
+            texture: blockingTexture,
+            sourceIndex: 1,
+            halfExtent: 300
+        )
+        room1 = LevelRoom(
+            sourceIndex: 1,
+            pathPoint: destination,
+            vertices: room1.vertices,
+            faces: room1.faces.enumerated().map {
+                $0.offset == 0
+                    ? portalFace($0.element, portalIndex: 0)
+                    : $0.element
+            },
+            portals: [
+                .init(
+                    faceIndex: 0,
+                    connectedRoom: 2,
+                    connectedPortal: 1,
+                    pathPoint: .init(
+                        x: start.x + 100,
+                        y: start.y + 200,
+                        z: start.z
+                    )
+                )
+            ]
+        )
+        var objects = level.objects
+        for handle in [UInt32(2_048), 6_167, 6_183, 10_245] {
+            let objectIndex = try XCTUnwrap(objects.firstIndex {
+                $0.handle == handle
+            })
+            objects[objectIndex].location = .room(3)
+            objects[objectIndex].position = start
+        }
+        level = replacing(
+            level,
+            rooms: [room1, room2, room3],
+            objects: objects,
+            indoorNavigation: .init(
+                sourceHighestRoomPlusTerrainRegions: 11,
+                sourceWasVerified: true,
+                rooms: []
+            )
+        )
+        let guidebotDefinition = try XCTUnwrap(
+            level.trainingRobotGuidebotChain?.guidebot
+        )
+        let allocated = try trainingGuidebotRoute(
+            in: level,
+            startRoomSourceIndex: 3,
+            start: start,
+            startForward: .init(x: 1, y: 0, z: 0),
+            destinationRoomSourceIndex: 1,
+            destination: destination,
+            radius: max(0, guidebotDefinition.collisionRadius - 0.1)
+        ).get()
+        XCTAssertEqual(allocated.mode, .roomPortals)
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
+
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        continuationObject["playerLocation"] = [
+            "room": ["_0": 1],
+        ]
+        continuationObject["playerPosition"] = [
+            "x": destination.x,
+            "y": destination.y,
+            "z": destination.z,
+        ]
+        let movedPlayerContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: continuationObject
+            )
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: movedPlayerContinuation,
+            resumedAtTimestamp: 100
+        )
+
+        var completed: PlayerSimulationFrame?
+        for frameIndex in 1...200 {
+            let frame = restored.update(
+                at: 100 + Double(frameIndex) * 0.1,
+                input: frameIndex == 1
+                    ? .init(deploysTrainingGuidebot: true)
+                    : .zero
+            )
+            if frameIndex == 1 {
+                XCTAssertEqual(
+                    frame.trainingGuidebot?.route.mode,
+                    .roomPortals
+                )
+                XCTAssertEqual(
+                    frame.trainingGuidebot?.route
+                        .roomSourceIndices.last,
+                    1
+                )
+                XCTAssertGreaterThan(
+                    frame.trainingGuidebot?.route
+                        .roomSourceIndices.count ?? 0,
+                    1
+                )
+            }
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "proceed6.osf"
+            }) {
+                completed = frame
+                break
+            }
+        }
+
+        let script058 = try XCTUnwrap(completed)
+        XCTAssertNil(script058.trainingGuidebot)
+        XCTAssertEqual(
+            script058.trainingGuidebotReturnMarkerLightDistance,
+            50
+        )
+        assertTrainingGuidebotReturnBarrier(
+            level: restored.level,
+            rendersFaces: false
+        )
+    }
+
+    func testContinuationRejectsUnrequestedGuidebotReturnTask() throws {
+        let level = makeTrainingCameraMonitorLevel()
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var robotState = try XCTUnwrap(
+            continuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(robotState["returnWasRequested"] as? Bool, false)
+        var guidebot = try XCTUnwrap(
+            robotState["guidebot"] as? [String: Any]
+        )
+        guidebot["task"] = "returnToShip"
+        robotState["guidebot"] = guidebot
+        continuationObject["trainingRobotGuidebotState"] = robotState
+        let hostileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: continuationObject
+            )
+        )
+
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileContinuation,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
     }
 
     func testCameraMonitorPickupCompletesLocateGoalAcrossReload() throws {
@@ -2121,6 +2605,87 @@ final class WorldRenderingTests: XCTestCase {
             }
         )
         XCTAssertEqual(presentedActions, ["voice", "hud"])
+
+        let sameFrameReturn: [TrainingOpeningFeedback] = [
+            .init(
+                hudMessages: ["GB: Returning to ship."],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "GBotAcceptOrder.wav"
+            ),
+            .init(
+                hudMessages: ["GB: Entering ship!"],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true
+            ),
+            .init(
+                hudMessages: ["Excellent!"],
+                voiceSourceName: "proceed6.osf",
+                voicePrecedesHUDMessages: true
+            ),
+        ]
+        var orderedPresentation: [String] = []
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            sameFrameReturn,
+            attemptVoice: {
+                orderedPresentation.append("voice:\($0)")
+            },
+            attemptSound: {
+                orderedPresentation.append("sound:\($0)")
+            },
+            presentHUDMessages: {
+                orderedPresentation.append(
+                    "hud:\($0.joined(separator: "|"))"
+                )
+            }
+        )
+        XCTAssertEqual(orderedPresentation, [
+            "sound:GBotAcceptOrder.wav",
+            "hud:GB: Returning to ship.",
+            "hud:GB: Entering ship!",
+            "voice:proceed6.osf",
+            "hud:Excellent!",
+        ])
+    }
+
+    @MainActor
+    func testTrainingFeedbackSequenceAttemptsOnlyFinalStreamingVoice() {
+        let feedback: [TrainingOpeningFeedback] = [
+            .init(
+                hudMessages: ["first"],
+                voiceSourceName: "return1.osf",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "first.wav"
+            ),
+            .init(
+                hudMessages: ["second"],
+                voiceSourceName: "welcome.osf",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "second.wav"
+            ),
+        ]
+        var presentation: [String] = []
+
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            feedback,
+            attemptVoice: {
+                presentation.append("voice:\($0)")
+            },
+            attemptSound: {
+                presentation.append("sound:\($0)")
+            },
+            presentHUDMessages: {
+                presentation.append("hud:\($0.joined(separator: "|"))")
+            }
+        )
+
+        XCTAssertEqual(presentation, [
+            "sound:first.wav",
+            "hud:first",
+            "voice:welcome.osf",
+            "sound:second.wav",
+            "hud:second",
+        ])
     }
 
     func testIndoorTracePreservesPortalIndexTraversalOrder() {
@@ -4925,6 +5490,67 @@ func makeTrainingRobotGuidebotLevel() -> Level {
 func makeTrainingCameraMonitorLevel() -> Level {
     var level = makeTrainingRobotGuidebotLevel()
     let player = level.objects.first { $0.handle == 2_048 }!
+    let returnBarrierRoomIndex = level.rooms.firstIndex {
+        $0.sourceIndex == 2
+    }!
+    let sourceForceField = level.rooms[returnBarrierRoomIndex]
+        .faces[
+            level.rooms[returnBarrierRoomIndex].portals[0].faceIndex
+        ].texture
+    let stockReturnForceField = SourceResource(
+        storedIndex: 908,
+        sourceName: "Alien Force Field_1"
+    )
+    var rooms = level.rooms
+    for portalIndex in [0, 1] {
+        let portal = rooms[returnBarrierRoomIndex].portals[portalIndex]
+        rooms[returnBarrierRoomIndex].faces[portal.faceIndex].texture =
+            stockReturnForceField
+        let reciprocalRoomIndex = rooms.firstIndex {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        let reciprocal = rooms[reciprocalRoomIndex]
+            .portals[portal.connectedPortal]
+        rooms[reciprocalRoomIndex].faces[reciprocal.faceIndex].texture =
+            stockReturnForceField
+    }
+    let sourceForceFieldMaterial = level.presentationMaterials.first {
+        $0.texture == sourceForceField
+    }!
+    level = replacing(
+        level,
+        rooms: rooms,
+        surfacePhysics: level.surfacePhysics + [
+            .init(
+                texture: stockReturnForceField,
+                behavior: .forceField
+            ),
+        ],
+        presentationMaterials: level.presentationMaterials + [
+            .init(
+                texture: stockReturnForceField,
+                bitmapSourceName: "Alien Force Field_1.ogf",
+                image: sourceForceFieldMaterial.image,
+                blend: sourceForceFieldMaterial.blend,
+                lightmapBlend: sourceForceFieldMaterial.lightmapBlend,
+                waterProcedural: sourceForceFieldMaterial.waterProcedural,
+                sourceArchive: sourceForceFieldMaterial.sourceArchive,
+                sourceSHA256: String(repeating: "8", count: 64)
+            ),
+        ],
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current + [
+                .init(
+                    category: "texture",
+                    source: stockReturnForceField,
+                    state: "presentation-payload-imported",
+                    provenance: "synthetic canonical fixture"
+                ),
+            ],
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
     let cameraMonitorSource = SourceResource(
         storedIndex: 9_000,
         sourceName: "monitor.OOF"
@@ -5047,6 +5673,29 @@ func makeTrainingCameraMonitorLevel() -> Level {
             lightmapSubmodels: []
         ))
     }
+    level.objects.append(.init(
+        handle: 10_245,
+        type: 11,
+        storedID: 205,
+        definition: .init(
+            storedIndex: 205,
+            sourceName: "Blinking Red Light-DM"
+        ),
+        instanceName: "FlashLight-3",
+        flags: 4_096,
+        doorShields: nil,
+        location: player.location,
+        position: player.position,
+        orientation: player.orientation,
+        containsType: 0,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    ))
     level = replacing(
         level,
         dependencyManifest: .init(
@@ -5065,6 +5714,15 @@ func makeTrainingCameraMonitorLevel() -> Level {
                     source: .init(
                         storedIndex: 114,
                         sourceName: "new wall cam"
+                    ),
+                    state: "identity-recorded",
+                    provenance: "synthetic canonical fixture"
+                ),
+                .init(
+                    category: "object-definition",
+                    source: .init(
+                        storedIndex: 205,
+                        sourceName: "Blinking Red Light-DM"
                     ),
                     state: "identity-recorded",
                     provenance: "synthetic canonical fixture"
@@ -5129,7 +5787,29 @@ func makeTrainingCameraMonitorLevel() -> Level {
             cameraGunpointIndex: 0,
             cameraLocalPosition: .zero,
             cameraLocalForward: .init(x: 0, y: 0, z: -1),
-            completionTimerDuration: 2
+            completionTimerDuration: 2,
+            returnToShip: .init(
+                markerLightObjectHandle: 10_245,
+                markerLightPresentation: .init(
+                    primaryColor: .init(x: 1, y: 0.25, z: 0),
+                    secondaryColor: .zero,
+                    timeInterval: 0.5,
+                    flickerDistance: 0.2,
+                    directionalDot: 0,
+                    flags: 4,
+                    timebits: .max,
+                    angle: 0,
+                    lightingRenderType: 2
+                ),
+                barrierRoomSourceIndex: 2,
+                orderedPortalIndices: [0, 1],
+                openMarkerLightDistance: 50,
+                returnMessage: "GB: Returning to ship.",
+                returnSoundSourceName: "GBotAcceptOrder.wav",
+                arrivalMessage: "GB: Entering ship!",
+                successMessage: "Excellent!",
+                successVoiceSourceName: "proceed6.osf"
+            )
         ),
         voiceClips: [
             syntheticVoiceClip(
@@ -5142,21 +5822,62 @@ func makeTrainingCameraMonitorLevel() -> Level {
                 sourceEntryIndex: 7,
                 sourceHash: "2"
             ),
+            syntheticVoiceClip(
+                name: "proceed6.osf",
+                sourceEntryIndex: 26,
+                sourceHash: "4"
+            ),
         ],
-        soundClip: .init(
-            logicalName: "PupC1",
-            sourceName: "PupC.wav",
-            sourceEntryIndex: 3,
-            sampleRate: 22_050,
-            channelCount: 1,
-            frameCount: 1,
-            pcm16LittleEndian: Data(repeating: 0, count: 2),
-            pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
-            sourceArchive: "missions/training.mn3",
-            sourceSHA256: String(repeating: "3", count: 64),
-            importVolume: 1
-        )
+        soundClips: [
+            .init(
+                logicalName: "PupC1",
+                sourceName: "PupC.wav",
+                sourceEntryIndex: 3,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: Data(repeating: 0, count: 2),
+                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: String(repeating: "3", count: 64),
+                importVolume: 1
+            ),
+            .init(
+                logicalName: "GBotAcceptOrder1",
+                sourceName: "GBotAcceptOrder.wav",
+                sourceEntryIndex: 1_257,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: Data(repeating: 0, count: 2),
+                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: String(repeating: "5", count: 64),
+                importVolume: 1
+            ),
+        ]
     )
+}
+
+private func assertTrainingGuidebotReturnBarrier(
+    level: Level,
+    rendersFaces: Bool
+) {
+    let chain = level.trainingCameraMonitorChain!.returnToShip!
+    let room = level.rooms.first {
+        $0.sourceIndex == chain.barrierRoomSourceIndex
+    }!
+    for portalIndex in chain.orderedPortalIndices {
+        let portal = room.portals[portalIndex]
+        XCTAssertEqual(portal.flags & 1 != 0, rendersFaces)
+        let connectedRoom = level.rooms.first {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        XCTAssertEqual(
+            connectedRoom.portals[portal.connectedPortal].flags & 1 != 0,
+            rendersFaces
+        )
+    }
 }
 
 private func syntheticVoiceClip(
