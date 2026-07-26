@@ -670,6 +670,8 @@ func runD3Import(
         "GuideBotC.osf",
         "GuideBotD.osf",
         "proceed6.osf",
+        "intro6.osf",
+        "GuideBotF.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -788,6 +790,9 @@ func runD3Import(
     let returnBarrierRoom = robotGuidebotLevel.rooms.first {
         $0.name?.caseInsensitiveCompare("PortalRoom5") == .orderedSame
     }!
+    let killbotEntryTrigger = robotGuidebotLevel.triggers.first {
+        $0.name.caseInsensitiveCompare("Portal3") == .orderedSame
+    }!
     let cameraMonitorModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare(
             cameraMonitorPage.primaryModelName
@@ -883,10 +888,23 @@ func runD3Import(
                 returnSoundSourceName: returnSoundPage.sourceName,
                 arrivalMessage: "GB: Entering ship!",
                 successMessage: messages["GoodJob"]!,
-                successVoiceSourceName: "proceed6.osf"
+                successVoiceSourceName: "proceed6.osf",
+                killbotEntry: .init(
+                    triggerName: killbotEntryTrigger.name,
+                    triggerRoomSourceIndex:
+                        killbotEntryTrigger.roomIndex,
+                    triggerFaceIndex: killbotEntryTrigger.faceIndex,
+                    orderedPortalIndices: [1, 0],
+                    closedMarkerLightDistance: 0,
+                    entryMessage: messages["KillBotIntro"]!,
+                    entryVoiceSourceName: "intro6.osf",
+                    followupDelay: 13,
+                    followupMessage: messages["KillBot2"]!,
+                    followupVoiceSourceName: "guidebotf.osf"
+                )
             )
         ),
-        voiceClips: Array(voiceClips.suffix(3)),
+        voiceClips: Array(voiceClips[5...9]),
         soundClips: [
             .init(
                 logicalName: pickupSoundPage.logicalName,
@@ -935,6 +953,11 @@ func runD3Import(
             && returnMarkerLight.location == .room(40)
             && returnBarrierRoom.sourceIndex == 40
             && returnBarrierRoom.portals.count == 2
+            && killbotEntryTrigger.roomIndex
+                == returnBarrierRoom.sourceIndex
+            && killbotEntryTrigger.faceIndex == 1
+            && killbotEntryTrigger.flags == 8
+            && killbotEntryTrigger.activator == 1
     )
     let level = cameraMonitorLevel
     let playerView = defaultPlayerView(in: level)

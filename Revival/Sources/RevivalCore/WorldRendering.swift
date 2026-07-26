@@ -862,6 +862,14 @@ private struct TrainingCameraMonitorState:
     var script058WasPresented = false
 }
 
+private struct TrainingKillbotEntryState:
+    Codable, Equatable, Sendable
+{
+    var wasTriggered = false
+    var followupTimerRemaining: Float?
+    var followupWasPresented = false
+}
+
 private enum TrainingGuidebotTask: String, Codable, Equatable, Sendable {
     case outbound
     case returnToShip
@@ -937,6 +945,8 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
         TrainingRobotGuidebotState?
     fileprivate let trainingCameraMonitorState:
         TrainingCameraMonitorState?
+    fileprivate let trainingKillbotEntryState:
+        TrainingKillbotEntryState?
 }
 
 enum PlayerSimulationContinuationError: Error, Equatable {
@@ -976,6 +986,8 @@ final class PlayerSimulation {
         TrainingRobotGuidebotState?
     private var trainingCameraMonitorState:
         TrainingCameraMonitorState?
+    private var trainingKillbotEntryState:
+        TrainingKillbotEntryState?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -1005,6 +1017,10 @@ final class PlayerSimulation {
         trainingCameraMonitorState = level.trainingCameraMonitorChain.map {
             _ in TrainingCameraMonitorState()
         }
+        trainingKillbotEntryState =
+            level.trainingCameraMonitorChain?.returnToShip?.killbotEntry.map {
+                _ in TrainingKillbotEntryState()
+            }
     }
 
     init(
@@ -1013,9 +1029,14 @@ final class PlayerSimulation {
         resumedAtTimestamp: Double
     ) throws {
         let expectedSchema =
-            level.trainingCameraMonitorChain?.returnToShip == nil
-                ? (level.trainingCameraMonitorChain == nil ? 3 : 4)
-                : 5
+            level.trainingCameraMonitorChain?.returnToShip?
+                .killbotEntry == nil
+                ? (
+                    level.trainingCameraMonitorChain?.returnToShip == nil
+                        ? (level.trainingCameraMonitorChain == nil ? 3 : 4)
+                        : 5
+                )
+                : 6
         guard continuation.schemaVersion == expectedSchema else {
             throw PlayerSimulationContinuationError.unsupportedSchema
         }
@@ -1059,8 +1080,17 @@ final class PlayerSimulation {
                 )
             }
         }
+        if continuation.trainingKillbotEntryState?.wasTriggered == true {
+            closeTrainingKillbotEntryBarrier(in: &continuationLevel)
+        }
         guard validTrainingCameraMonitorContinuation(
             continuation.trainingCameraMonitorState,
+            level: continuationLevel
+        ) else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
+        guard validTrainingKillbotEntryContinuation(
+            continuation.trainingKillbotEntryState,
             level: continuationLevel
         ) else {
             throw PlayerSimulationContinuationError.invalidState
@@ -1156,6 +1186,8 @@ final class PlayerSimulation {
             continuation.trainingRobotGuidebotState
         trainingCameraMonitorState =
             continuation.trainingCameraMonitorState
+        trainingKillbotEntryState =
+            continuation.trainingKillbotEntryState
         restoreTrainingGuidebotPresentation()
         if trainingRobotGuidebotState?.guidebotEnteredShip == true,
            let handle =
@@ -1173,9 +1205,18 @@ final class PlayerSimulation {
         let player = level.objects.first { $0.handle == binding.objectHandle }!
         return PlayerSimulationContinuation(
             schemaVersion:
-                level.trainingCameraMonitorChain?.returnToShip == nil
-                    ? (level.trainingCameraMonitorChain == nil ? 3 : 4)
-                    : 5,
+                level.trainingCameraMonitorChain?.returnToShip?
+                    .killbotEntry == nil
+                    ? (
+                        level.trainingCameraMonitorChain?.returnToShip == nil
+                            ? (
+                                level.trainingCameraMonitorChain == nil
+                                    ? 3
+                                    : 4
+                            )
+                            : 5
+                    )
+                    : 6,
             levelKey: level.levelKey,
             levelSHA256: level.source.levelSHA256,
             playerLocation: player.location,
@@ -1199,7 +1240,9 @@ final class PlayerSimulation {
             trainingRobotGuidebotState:
                 trainingRobotGuidebotState,
             trainingCameraMonitorState:
-                trainingCameraMonitorState
+                trainingCameraMonitorState,
+            trainingKillbotEntryState:
+                trainingKillbotEntryState
         )
     }
 
@@ -1727,6 +1770,7 @@ final class PlayerSimulation {
         var roomSourceIndex = startRoom
         var trainingForwardGoalWasReachedThisFrame = false
         var trainingGalleryWasCrossedThisFrame = false
+        var trainingKillbotEntryWasCrossedThisFrame = false
         var trainingCameraMonitorWasHitThisFrame = false
         if ship.physics.behaviors.contains(.wiggle) {
             if sqrt(dot(force, force)) < 0.1 {
@@ -1768,6 +1812,12 @@ final class PlayerSimulation {
             trainingGalleryWasCrossedThisFrame =
                 trainingGalleryWasCrossedThisFrame
                 || trainingGalleryTriggerWasCrossed(
+                    in: level,
+                    passedPortalFaces: trace.passedPortalFaces
+                )
+            trainingKillbotEntryWasCrossedThisFrame =
+                trainingKillbotEntryWasCrossedThisFrame
+                || trainingKillbotEntryTriggerWasCrossed(
                     in: level,
                     passedPortalFaces: trace.passedPortalFaces
                 )
@@ -1911,6 +1961,12 @@ final class PlayerSimulation {
             trainingGalleryWasCrossedThisFrame =
                 trainingGalleryWasCrossedThisFrame
                 || trainingGalleryTriggerWasCrossed(
+                    in: level,
+                    passedPortalFaces: trace.passedPortalFaces
+                )
+            trainingKillbotEntryWasCrossedThisFrame =
+                trainingKillbotEntryWasCrossedThisFrame
+                || trainingKillbotEntryTriggerWasCrossed(
                     in: level,
                     passedPortalFaces: trace.passedPortalFaces
                 )
@@ -2072,6 +2128,22 @@ final class PlayerSimulation {
             galleryState.wasTriggered = true
             trainingGalleryBarrierState = galleryState
         }
+        if var state = trainingKillbotEntryState,
+           !state.wasTriggered,
+           trainingKillbotEntryWasCrossedThisFrame,
+           let returnChain =
+                level.trainingCameraMonitorChain?.returnToShip,
+           let chain = returnChain.killbotEntry {
+            state.wasTriggered = true
+            state.followupTimerRemaining = chain.followupDelay
+            trainingOpeningFeedback.append(.init(
+                hudMessages: [chain.entryMessage],
+                voiceSourceName: chain.entryVoiceSourceName,
+                voicePrecedesHUDMessages: false
+            ))
+            closeTrainingKillbotEntryBarrier(in: &level)
+            trainingKillbotEntryState = state
+        }
         if var state = trainingRobotGuidebotState,
            let chain = level.trainingRobotGuidebotChain {
             if !state.guidebotContinuationWasPresented,
@@ -2139,6 +2211,27 @@ final class PlayerSimulation {
             }
             trainingOpeningState = openingState
         }
+        if var state = trainingKillbotEntryState,
+           state.wasTriggered,
+           !state.followupWasPresented,
+           !trainingKillbotEntryWasCrossedThisFrame,
+           let chain = level.trainingCameraMonitorChain?.returnToShip?
+                .killbotEntry,
+           var timer = state.followupTimerRemaining {
+            timer -= systemsFrameDuration
+            if timer <= 0.000_001 {
+                state.followupTimerRemaining = nil
+                state.followupWasPresented = true
+                trainingOpeningFeedback.append(.init(
+                    hudMessages: [chain.followupMessage],
+                    voiceSourceName: chain.followupVoiceSourceName,
+                    voicePrecedesHUDMessages: true
+                ))
+            } else {
+                state.followupTimerRemaining = timer
+            }
+            trainingKillbotEntryState = state
+        }
 
         if afterburnerIsActive {
             afterburnerMagnitude += 2 * systemsFrameDuration
@@ -2202,7 +2295,11 @@ final class PlayerSimulation {
             trainingGalleryMarkerLightDistance:
                 trainingGalleryBarrierState?.markerLightDistance,
             trainingGuidebotReturnMarkerLightDistance:
-                trainingCameraMonitorState?.returnMarkerLightDistance,
+                trainingKillbotEntryState?.wasTriggered == true
+                    ? level.trainingCameraMonitorChain?.returnToShip?
+                        .killbotEntry?.closedMarkerLightDistance
+                    : trainingCameraMonitorState?
+                        .returnMarkerLightDistance,
             trainingGuidebot:
                 trainingRobotGuidebotState?.guidebot?.frame,
             trainingCameraMonitor: cameraMonitorFrame
@@ -2244,6 +2341,21 @@ private func trainingGalleryTriggerWasCrossed(
     return passedPortalFaces.contains {
         $0.roomSourceIndex == barrier.triggerRoomSourceIndex
             && $0.faceIndex == barrier.triggerFaceIndex
+    }
+}
+
+private func trainingKillbotEntryTriggerWasCrossed(
+    in level: Level,
+    passedPortalFaces: [IndoorPortalCrossing]
+) -> Bool {
+    guard let entry =
+            level.trainingCameraMonitorChain?.returnToShip?.killbotEntry
+    else {
+        return false
+    }
+    return passedPortalFaces.contains {
+        $0.roomSourceIndex == entry.triggerRoomSourceIndex
+            && $0.faceIndex == entry.triggerFaceIndex
     }
 }
 
@@ -2435,7 +2547,10 @@ private func validTrainingRobotGuidebotContinuation(
         return false
     }
     if state.guidebotContinuationWasPresented
-        && (!state.guidebotIsDeployed || galleryState?.wasTriggered != true) {
+        && (
+            (!state.guidebotIsDeployed && !state.guidebotEnteredShip)
+                || galleryState?.wasTriggered != true
+        ) {
         return false
     }
     if state.returnWasRequested {
@@ -2528,6 +2643,30 @@ private func validTrainingCameraMonitorContinuation(
         && level.objects.contains {
             $0.handle == chain.pickupObjectHandle
         }
+}
+
+private func validTrainingKillbotEntryContinuation(
+    _ state: TrainingKillbotEntryState?,
+    level: Level
+) -> Bool {
+    guard let chain =
+            level.trainingCameraMonitorChain?.returnToShip?.killbotEntry
+    else {
+        return state == nil
+    }
+    guard let state else { return false }
+    if state.wasTriggered {
+        guard trainingKillbotEntryBarrierRendersFaces(in: level),
+              state.followupWasPresented
+                == (state.followupTimerRemaining == nil) else {
+            return false
+        }
+        return state.followupTimerRemaining.map {
+            $0.isFinite && $0 > 0 && $0 <= chain.followupDelay
+        } ?? true
+    }
+    return state.followupTimerRemaining == nil
+        && !state.followupWasPresented
 }
 
 private func setObjectPresentationVisibility(
@@ -2744,6 +2883,43 @@ private func openTrainingGuidebotReturnBarrier(in level: inout Level) {
         }!
         level.rooms[connectedRoomIndex]
             .portals[portal.connectedPortal].flags &= ~UInt32(1)
+    }
+}
+
+private func trainingKillbotEntryBarrierRendersFaces(
+    in level: Level
+) -> Bool {
+    guard let barrier =
+            level.trainingCameraMonitorChain?.returnToShip,
+          let entry = barrier.killbotEntry,
+          let room = level.rooms.first(where: {
+              $0.sourceIndex == barrier.barrierRoomSourceIndex
+          }) else {
+        return false
+    }
+    return entry.orderedPortalIndices.allSatisfy {
+        room.portals[$0].flags & 1 != 0
+    }
+}
+
+private func closeTrainingKillbotEntryBarrier(in level: inout Level) {
+    guard let barrier =
+            level.trainingCameraMonitorChain?.returnToShip,
+          let entry = barrier.killbotEntry,
+          let barrierRoomIndex = level.rooms.firstIndex(where: {
+              $0.sourceIndex == barrier.barrierRoomSourceIndex
+          }) else {
+        return
+    }
+    for portalIndex in entry.orderedPortalIndices {
+        let portal =
+            level.rooms[barrierRoomIndex].portals[portalIndex]
+        level.rooms[barrierRoomIndex].portals[portalIndex].flags |= 1
+        let connectedRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        level.rooms[connectedRoomIndex]
+            .portals[portal.connectedPortal].flags |= 1
     }
 }
 

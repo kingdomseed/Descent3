@@ -327,7 +327,10 @@ final class RevivalProjectDocument: NSDocument {
         }
         registerTrainingGuidebotReturnBarrierUndo(isOpen: previous)
         undoManager?.setActionName(
-            "Set Training Guidebot Return Barrier"
+            project.level.trainingCameraMonitorChain?.returnToShip?
+                .killbotEntry == nil
+                ? "Set Training Guidebot Return Barrier"
+                : "Set Training Killbot Entry Barrier"
         )
         refreshWindowControllers()
     }

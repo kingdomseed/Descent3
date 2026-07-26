@@ -565,6 +565,7 @@ struct TrainingGuidebotReturnChain: Codable, Equatable, Sendable {
     let arrivalMessage: String
     let successMessage: String
     let successVoiceSourceName: String
+    let killbotEntry: TrainingKillbotEntryChain?
 
     init(
         markerLightObjectHandle: UInt32,
@@ -576,7 +577,8 @@ struct TrainingGuidebotReturnChain: Codable, Equatable, Sendable {
         returnSoundSourceName: String,
         arrivalMessage: String,
         successMessage: String,
-        successVoiceSourceName: String
+        successVoiceSourceName: String,
+        killbotEntry: TrainingKillbotEntryChain? = nil
     ) {
         self.markerLightObjectHandle = markerLightObjectHandle
         self.markerLightPresentation = markerLightPresentation
@@ -588,7 +590,21 @@ struct TrainingGuidebotReturnChain: Codable, Equatable, Sendable {
         self.arrivalMessage = arrivalMessage
         self.successMessage = successMessage
         self.successVoiceSourceName = successVoiceSourceName
+        self.killbotEntry = killbotEntry
     }
+}
+
+struct TrainingKillbotEntryChain: Codable, Equatable, Sendable {
+    let triggerName: String
+    let triggerRoomSourceIndex: Int
+    let triggerFaceIndex: Int
+    let orderedPortalIndices: [Int]
+    let closedMarkerLightDistance: Float
+    let entryMessage: String
+    let entryVoiceSourceName: String
+    let followupDelay: Float
+    let followupMessage: String
+    let followupVoiceSourceName: String
 }
 
 struct TrainingMarkerLightPresentation:
@@ -944,6 +960,8 @@ func validateStockTrainingCameraMonitorPackage(
     guidebotC: CanonicalVoiceClip?,
     guidebotD: CanonicalVoiceClip?,
     proceed6: CanonicalVoiceClip? = nil,
+    intro6: CanonicalVoiceClip? = nil,
+    guidebotF: CanonicalVoiceClip? = nil,
     pickupSound: CanonicalSoundClip?,
     returnSound: CanonicalSoundClip? = nil,
     objects: [PlacedObject],
@@ -995,7 +1013,21 @@ func validateStockTrainingCameraMonitorPackage(
                 returnSoundSourceName: "GBotAcceptOrder.wav",
                 arrivalMessage: "GB: Entering ship!",
                 successMessage: "Excellent!",
-                successVoiceSourceName: "proceed6.osf"
+                successVoiceSourceName: "proceed6.osf",
+                killbotEntry: .init(
+                    triggerName: "Portal3",
+                    triggerRoomSourceIndex: 40,
+                    triggerFaceIndex: 1,
+                    orderedPortalIndices: [1, 0],
+                    closedMarkerLightDistance: 0,
+                    entryMessage:
+                        "Now you are on your own in this room. There are 4 robots and 2 powerups. Get the powerups and kill the robots.",
+                    entryVoiceSourceName: "intro6.osf",
+                    followupDelay: 13,
+                    followupMessage:
+                        "Some parts of this area are very dark.  Turn on your headlight or fire flares to see.  Use your guidebot if you need help finding a robot or powerup.",
+                    followupVoiceSourceName: "guidebotf.osf"
+                )
             )
           ),
           guidebotC?.sourceEntryIndex == 6,
@@ -1025,6 +1057,26 @@ func validateStockTrainingCameraMonitorPackage(
           proceed6?.sourceArchive == "missions/training.mn3",
           proceed6?.sourceSHA256
             == "b3cd5455401af0f387d8cde20c3c869897aef55070cf8cfadd141c0f291bc403",
+          intro6?.sourceName == "intro6.osf",
+          intro6?.sourceEntryIndex == 15,
+          intro6?.sampleRate == 22_050,
+          intro6?.channelCount == 1,
+          intro6?.frameCount == 212_125,
+          intro6?.pcmSHA256
+            == "5ee0e98d12a0648b8ce0e239ff5df36da37b4e9d6634a846d6a91fa849a1cf79",
+          intro6?.sourceArchive == "missions/training.mn3",
+          intro6?.sourceSHA256
+            == "e8e955dd608942543f5442d1c187018286ea060fcc7440a4e180df24e602fc4a",
+          guidebotF?.sourceName == "guidebotf.osf",
+          guidebotF?.sourceEntryIndex == 9,
+          guidebotF?.sampleRate == 22_050,
+          guidebotF?.channelCount == 1,
+          guidebotF?.frameCount == 91_221,
+          guidebotF?.pcmSHA256
+            == "244adc2baaeab1ccdf69a676a4b7cb5b81561db53a1fce1f50bd9b899c077c49",
+          guidebotF?.sourceArchive == "missions/training.mn3",
+          guidebotF?.sourceSHA256
+            == "bc15f7be1b1a9203d1fbc264649d9d8b23d24daf522df70c9460e9007904e2f2",
           pickupSound?.logicalName == "PupC1",
           pickupSound?.sourceName == "PupC.wav",
           pickupSound?.sourceEntryIndex == 130,
@@ -1913,10 +1965,59 @@ struct Level: Codable, Equatable, Sendable {
             })
             let returnToShipIsValid = chain.returnToShip.map({
                 returnChain in
-                validTrainingGuidebotReturnBarrier(
+                let killbotEntryIsValid =
+                    returnChain.killbotEntry.map { entry in
+                        guard entry.triggerRoomSourceIndex
+                                == returnChain.barrierRoomSourceIndex,
+                              returnChain.orderedPortalIndices.contains(
+                                where: { portalIndex in
+                                    guard let room = rooms.first(where: {
+                                        $0.sourceIndex
+                                            == entry.triggerRoomSourceIndex
+                                    }),
+                                    room.portals.indices.contains(
+                                        portalIndex
+                                    ) else {
+                                        return false
+                                    }
+                                    return room.portals[portalIndex].faceIndex
+                                        == entry.triggerFaceIndex
+                                }
+                              ),
+                              Set(entry.orderedPortalIndices)
+                                == Set(returnChain.orderedPortalIndices),
+                              entry.orderedPortalIndices.count
+                                == returnChain.orderedPortalIndices.count,
+                              triggers.contains(where: {
+                                  $0.name == entry.triggerName
+                                      && $0.roomIndex
+                                        == entry.triggerRoomSourceIndex
+                                      && $0.faceIndex
+                                        == entry.triggerFaceIndex
+                                      && $0.flags == 8
+                                      && $0.activator == 1
+                              }),
+                              entry.closedMarkerLightDistance.isFinite,
+                              entry.closedMarkerLightDistance >= 0,
+                              entry.followupDelay.isFinite,
+                              entry.followupDelay > 0,
+                              isNonempty(entry.entryMessage),
+                              isNonempty(entry.followupMessage),
+                              clipNames.contains(
+                                entry.entryVoiceSourceName.lowercased()
+                              ),
+                              clipNames.contains(
+                                entry.followupVoiceSourceName.lowercased()
+                              ) else {
+                            return false
+                        }
+                        return true
+                    } ?? true
+                return validTrainingGuidebotReturnBarrier(
                     returnChain,
                     in: self
                 )
+                    && killbotEntryIsValid
                     && clipNames.contains(
                         returnChain.successVoiceSourceName.lowercased()
                     )
@@ -2091,6 +2192,14 @@ struct Level: Codable, Equatable, Sendable {
                 $0.sourceName.caseInsensitiveCompare("proceed6.osf")
                     == .orderedSame
             }
+            let intro6 = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("intro6.osf")
+                    == .orderedSame
+            }
+            let guidebotF = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("guidebotf.osf")
+                    == .orderedSame
+            }
             guard let lesson = trainingOpeningLesson,
                   missionKey == "descent3.mission.pilot-training",
                   levelKey == "descent3.level.training-mission",
@@ -2132,7 +2241,7 @@ struct Level: Codable, Equatable, Sendable {
                     == "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
                   barrier.voiceSourceName == "guidebota.osf",
                   voiceClips.count
-                    == (trainingCameraMonitorChain == nil ? 5 : 8),
+                    == (trainingCameraMonitorChain == nil ? 5 : 10),
                   guidebotA?.sourceEntryIndex == 4,
                   guidebotA?.sampleRate == 22_050,
                   guidebotA?.channelCount == 1,
@@ -2164,6 +2273,8 @@ struct Level: Codable, Equatable, Sendable {
                     guidebotC: guidebotC,
                     guidebotD: guidebotD,
                     proceed6: proceed6,
+                    intro6: intro6,
+                    guidebotF: guidebotF,
                     pickupSound: soundClips.first {
                         $0.logicalName == "PupC1"
                     },

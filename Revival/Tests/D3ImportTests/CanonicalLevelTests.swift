@@ -834,7 +834,21 @@ final class CanonicalLevelTests: XCTestCase {
                 returnSoundSourceName: "GBotAcceptOrder.wav",
                 arrivalMessage: "GB: Entering ship!",
                 successMessage: "Excellent!",
-                successVoiceSourceName: "proceed6.osf"
+                successVoiceSourceName: "proceed6.osf",
+                killbotEntry: .init(
+                    triggerName: "Portal3",
+                    triggerRoomSourceIndex: 40,
+                    triggerFaceIndex: 1,
+                    orderedPortalIndices: [1, 0],
+                    closedMarkerLightDistance: 0,
+                    entryMessage:
+                        "Now you are on your own in this room. There are 4 robots and 2 powerups. Get the powerups and kill the robots.",
+                    entryVoiceSourceName: "intro6.osf",
+                    followupDelay: 13,
+                    followupMessage:
+                        "Some parts of this area are very dark.  Turn on your headlight or fire flares to see.  Use your guidebot if you need help finding a robot or powerup.",
+                    followupVoiceSourceName: "guidebotf.osf"
+                )
             )
         )
         func voice(
@@ -886,6 +900,24 @@ final class CanonicalLevelTests: XCTestCase {
             sourceSHA256:
                 "b3cd5455401af0f387d8cde20c3c869897aef55070cf8cfadd141c0f291bc403"
         )
+        let intro6 = voice(
+            name: "intro6.osf",
+            index: 15,
+            frames: 212_125,
+            pcmSHA256:
+                "5ee0e98d12a0648b8ce0e239ff5df36da37b4e9d6634a846d6a91fa849a1cf79",
+            sourceSHA256:
+                "e8e955dd608942543f5442d1c187018286ea060fcc7440a4e180df24e602fc4a"
+        )
+        let guidebotF = voice(
+            name: "guidebotf.osf",
+            index: 9,
+            frames: 91_221,
+            pcmSHA256:
+                "244adc2baaeab1ccdf69a676a4b7cb5b81561db53a1fce1f50bd9b899c077c49",
+            sourceSHA256:
+                "bc15f7be1b1a9203d1fbc264649d9d8b23d24daf522df70c9460e9007904e2f2"
+        )
         let pickupSound = CanonicalSoundClip(
             logicalName: "PupC1",
             sourceName: "PupC.wav",
@@ -936,13 +968,16 @@ final class CanonicalLevelTests: XCTestCase {
         }
         func validate(
             guidebotC: CanonicalVoiceClip,
-            guidebotD: CanonicalVoiceClip
+            guidebotD: CanonicalVoiceClip,
+            intro6Override: CanonicalVoiceClip? = nil
         ) throws {
             try validateStockTrainingCameraMonitorPackage(
                 chain: chain,
                 guidebotC: guidebotC,
                 guidebotD: guidebotD,
                 proceed6: proceed6,
+                intro6: intro6Override ?? intro6,
+                guidebotF: guidebotF,
                 pickupSound: pickupSound,
                 returnSound: returnSound,
                 objects: stockObjects,
@@ -976,6 +1011,25 @@ final class CanonicalLevelTests: XCTestCase {
                 returnSound: hostileReturnSound,
                 objects: stockObjects,
                 objectPresentations: [presentation]
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Camera Monitor package")
+            )
+        }
+        let hostileIntro6 = voice(
+            name: intro6.sourceName,
+            index: intro6.sourceEntryIndex + 1,
+            frames: intro6.frameCount,
+            pcmSHA256: intro6.pcmSHA256,
+            sourceSHA256: intro6.sourceSHA256
+        )
+        XCTAssertThrowsError(
+            try validate(
+                guidebotC: guidebotC,
+                guidebotD: guidebotD,
+                intro6Override: hostileIntro6
             )
         ) {
             XCTAssertEqual(
@@ -1169,6 +1223,17 @@ final class CanonicalLevelTests: XCTestCase {
         XCTAssertFalse(
             validTrainingGuidebotReturnBarrier(barrier, in: level)
         )
+        XCTAssertThrowsError(try level.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Camera Monitor chain")
+            )
+        }
+    }
+
+    func testSchemaTenRejectsInvalidKillbotEntryTimer() throws {
+        let level = makeTrainingKillbotEntryLevel(followupDelay: 0)
+
         XCTAssertThrowsError(try level.validate()) {
             XCTAssertEqual(
                 $0 as? LevelValidationError,

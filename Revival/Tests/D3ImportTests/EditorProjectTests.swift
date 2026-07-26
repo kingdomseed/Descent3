@@ -628,6 +628,126 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testKillbotEntryBarrierHasSourceDiagnosticAndNamedUndo()
+        throws
+    {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(
+            path: "candidate.revival",
+            directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(
+                path: "library",
+                directoryHint: .isDirectory
+            )
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false
+        )
+        try writeCanonicalPackage(
+            makeTrainingKillbotEntryLevel(),
+            to: candidate
+        )
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        document.undoManager?.groupsByEvent = false
+
+        XCTAssertEqual(
+            document.project.trainingKillbotEntrySourceDiagnostic,
+            "TrainingMission.cpp Scripts 042 + 039 / Portal3 + PortalRoom5"
+        )
+        try document.selectRoom(sourceIndex: 2)
+        try document.selectPortal(0)
+        document.undoManager?.beginUndoGrouping()
+        try document.setSelectedPortalRendersFaces(true)
+        document.undoManager?.endUndoGrouping()
+
+        XCTAssertEqual(
+            document.undoManager?.undoActionName,
+            "Set Training Killbot Entry Barrier"
+        )
+        document.undoManager?.undo()
+        assertTrainingGuidebotReturnBarrierRendering(
+            in: document.project.level,
+            rendersFaces: false
+        )
+        document.undoManager?.redo()
+        assertTrainingGuidebotReturnBarrierRendering(
+            in: document.project.level,
+            rendersFaces: true
+        )
+        document.undoManager?.undo()
+        assertTrainingGuidebotReturnBarrierRendering(
+            in: document.project.level,
+            rendersFaces: false
+        )
+
+        let first = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        let second = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(
+            first.fileWrappers?["project.json"]?.regularFileContents,
+            second.fileWrappers?["project.json"]?.regularFileContents
+        )
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(
+            from: first,
+            ofType: RevivalProjectDocument.projectType
+        )
+        assertTrainingGuidebotReturnBarrierRendering(
+            in: reopened.project.level,
+            rendersFaces: false
+        )
+
+        let playSession = reopened.makePlaySession()
+        reopened.commitPlaySession(playSession, renderingWorld: false)
+        let simulation = playSession.makePlayerSimulation(
+            presentationReadyTimestamp: 0
+        )
+        var didEnter = false
+        for frameIndex in 1...40 {
+            let frame = simulation.update(
+                at: Double(frameIndex) * 0.1,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "intro6.osf"
+            }) {
+                didEnter = true
+                break
+            }
+        }
+        XCTAssertTrue(didEnter)
+        assertTrainingGuidebotReturnBarrierRendering(
+            in: simulation.level,
+            rendersFaces: true
+        )
+        assertTrainingGuidebotReturnBarrierRendering(
+            in: reopened.project.level,
+            rendersFaces: false
+        )
+        reopened.returnToEditor(renderingWorld: false)
+        XCTAssertNil(reopened.playSession)
+        assertTrainingGuidebotReturnBarrierRendering(
+            in: reopened.project.level,
+            rendersFaces: false
+        )
+    }
+
+    @MainActor
     func testObjectAndPlayerStartTransformsUseStableIdentitiesAndNamedUndo() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())

@@ -1007,6 +1007,227 @@ final class WorldRenderingTests: XCTestCase {
         )
     }
 
+    func testKillbotEntryClosesPortalRoom5AndRunsTimedInstructionAcrossReload()
+        throws
+    {
+        let level = makeTrainingKillbotEntryLevel()
+        try level.validate()
+        let initialSimulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var initialContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(initialSimulation.continuation)
+            ) as? [String: Any]
+        )
+        var initialGalleryState = try XCTUnwrap(
+            initialContinuationObject["trainingGalleryBarrierState"]
+                as? [String: Any]
+        )
+        initialGalleryState["wasTriggered"] = true
+        initialGalleryState["markerLightDistance"] = 0
+        initialContinuationObject["trainingGalleryBarrierState"] =
+            initialGalleryState
+        let gallerySimulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: initialContinuationObject
+                )
+            ),
+            resumedAtTimestamp: 0
+        )
+        gallerySimulation.destroyTrainingRobot(handle: 4_112)
+        var destroyedContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(gallerySimulation.continuation)
+            ) as? [String: Any]
+        )
+        var destroyedRobotState = try XCTUnwrap(
+            destroyedContinuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        destroyedRobotState.removeValue(
+            forKey: "destructionTimerRemaining"
+        )
+        destroyedRobotState["destructionFeedbackWasPresented"] = true
+        destroyedRobotState["enabledControlHUDIsVisible"] = false
+        destroyedContinuationObject["trainingRobotGuidebotState"] =
+            destroyedRobotState
+        let simulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: destroyedContinuationObject
+                )
+            ),
+            resumedAtTimestamp: 0
+        )
+        var timestamp = 0.1
+        _ = simulation.update(
+            at: timestamp,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        timestamp += 0.1
+        _ = simulation.update(
+            at: timestamp,
+            input: .init(usesInventory: true)
+        )
+        timestamp += 0.1
+        _ = simulation.update(
+            at: timestamp,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        var script058: PlayerSimulationFrame?
+        for _ in 1...100 {
+            timestamp += 0.1
+            let frame = simulation.update(
+                at: timestamp,
+                input: .zero
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "proceed6.osf"
+            }) {
+                script058 = frame
+                break
+            }
+        }
+        let returned = try XCTUnwrap(script058)
+        timestamp = Double(returned.gameTime) + 0.1
+        XCTAssertTrue(
+            simulation.update(at: timestamp, input: .zero)
+                .trainingOpeningFeedback.isEmpty
+        )
+        var entered: PlayerSimulationFrame?
+        for frameIndex in 1...40 {
+            timestamp += 0.1
+            let frame = simulation.update(
+                at: timestamp,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "intro6.osf"
+            }) {
+                XCTAssertEqual(frameIndex, 1)
+                entered = frame
+                break
+            }
+        }
+        let entry = try XCTUnwrap(entered)
+        XCTAssertEqual(entry.trainingOpeningFeedback.last, .init(
+            hudMessages: [
+                "Now you are on your own in this room. There are 4 robots and 2 powerups. Get the powerups and kill the robots.",
+            ],
+            voiceSourceName: "intro6.osf",
+            voicePrecedesHUDMessages: false
+        ))
+        XCTAssertEqual(
+            entry.trainingGuidebotReturnMarkerLightDistance,
+            0
+        )
+        assertTrainingGuidebotReturnBarrier(
+            level: simulation.level,
+            rendersFaces: true
+        )
+
+        let continuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: continuationData
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            containingIndoorRoomSourceIndex(
+                in: simulation.level,
+                position: entry.playerView.camera.position,
+                candidates: [entry.playerView.roomSourceIndex]
+            ),
+            entry.playerView.roomSourceIndex
+        )
+        let galleryState = try XCTUnwrap(
+            continuationObject["trainingGalleryBarrierState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(galleryState["wasTriggered"] as? Bool, true)
+        XCTAssertEqual(galleryState["markerLightDistance"] as? Double, 50)
+        let robotState = try XCTUnwrap(
+            continuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(robotState["robotWasDestroyed"] as? Bool, true)
+        XCTAssertEqual(robotState["guidebotEnteredShip"] as? Bool, true)
+        let cameraState = try XCTUnwrap(
+            continuationObject["trainingCameraMonitorState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(cameraState["script058WasPresented"] as? Bool, true)
+        XCTAssertEqual(
+            cameraState["returnMarkerLightDistance"] as? Double,
+            50
+        )
+        let killbotEntryState = try XCTUnwrap(
+            continuationObject["trainingKillbotEntryState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                killbotEntryState["followupTimerRemaining"] as? Double
+            ),
+            13,
+            accuracy: 0.000_001
+        )
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: continuationData
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 100
+        )
+        assertTrainingGuidebotReturnBarrier(
+            level: restored.level,
+            rendersFaces: true
+        )
+
+        for frameIndex in 1...129 {
+            let frame = restored.update(
+                at: 100 + Double(frameIndex) * 0.1,
+                input: .zero
+            )
+            XCTAssertFalse(
+                frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebotf.osf"
+                })
+            )
+        }
+        let followupTimestamp = 113.0
+        let timer14 = restored.update(
+            at: followupTimestamp,
+            input: .zero
+        )
+        XCTAssertEqual(timer14.trainingOpeningFeedback.last, .init(
+            hudMessages: [
+                "Some parts of this area are very dark.  Turn on your headlight or fire flares to see.  Use your guidebot if you need help finding a robot or powerup.",
+            ],
+            voiceSourceName: "guidebotf.osf",
+            voicePrecedesHUDMessages: true
+        ))
+        XCTAssertTrue(
+            restored.update(
+                at: followupTimestamp + 0.1,
+                input: .zero
+            ).trainingOpeningFeedback.allSatisfy {
+                $0.voiceSourceName != "guidebotf.osf"
+            }
+        )
+    }
+
     func testGuidebotReturnTracksLivePlayerMovementInSameFrame()
         throws
     {
@@ -5856,6 +6077,144 @@ func makeTrainingCameraMonitorLevel() -> Level {
                 importVolume: 1
             ),
         ]
+    )
+}
+
+func makeTrainingKillbotEntryLevel(
+    followupDelay: Float = 13
+) -> Level {
+    let level = makeTrainingCameraMonitorLevel()
+    let camera = level.trainingCameraMonitorChain!
+    let returnChain = camera.returnToShip!
+    let addedVoices = [
+        syntheticVoiceClip(
+            name: "intro6.osf",
+            sourceEntryIndex: 25,
+            sourceHash: "6"
+        ),
+        syntheticVoiceClip(
+            name: "guidebotf.osf",
+            sourceEntryIndex: 27,
+            sourceHash: "7"
+        ),
+    ]
+    let killbotEntry = TrainingKillbotEntryChain(
+        triggerName: "Portal3",
+        triggerRoomSourceIndex: returnChain.barrierRoomSourceIndex,
+        triggerFaceIndex: 1,
+        orderedPortalIndices: [1, 0],
+        closedMarkerLightDistance: 0,
+        entryMessage:
+            "Now you are on your own in this room. There are 4 robots and 2 powerups. Get the powerups and kill the robots.",
+        entryVoiceSourceName: "intro6.osf",
+        followupDelay: followupDelay,
+        followupMessage:
+            "Some parts of this area are very dark.  Turn on your headlight or fire flares to see.  Use your guidebot if you need help finding a robot or powerup.",
+        followupVoiceSourceName: "guidebotf.osf"
+    )
+    let updatedReturn = TrainingGuidebotReturnChain(
+        markerLightObjectHandle: returnChain.markerLightObjectHandle,
+        markerLightPresentation: returnChain.markerLightPresentation,
+        barrierRoomSourceIndex: returnChain.barrierRoomSourceIndex,
+        orderedPortalIndices: returnChain.orderedPortalIndices,
+        openMarkerLightDistance: returnChain.openMarkerLightDistance,
+        returnMessage: returnChain.returnMessage,
+        returnSoundSourceName: returnChain.returnSoundSourceName,
+        arrivalMessage: returnChain.arrivalMessage,
+        successMessage: returnChain.successMessage,
+        successVoiceSourceName: returnChain.successVoiceSourceName,
+        killbotEntry: killbotEntry
+    )
+    let updatedCamera = TrainingCameraMonitorChain(
+        pickupObjectHandle: camera.pickupObjectHandle,
+        securityCameraObjectHandle: camera.securityCameraObjectHandle,
+        pickupCollisionRadius: camera.pickupCollisionRadius,
+        pickupMessage: camera.pickupMessage,
+        pickupVoiceSourceName: camera.pickupVoiceSourceName,
+        pickupSoundSourceName: camera.pickupSoundSourceName,
+        useMessage: camera.useMessage,
+        useVoiceSourceName: camera.useVoiceSourceName,
+        popupDuration: camera.popupDuration,
+        popupZoom: camera.popupZoom,
+        cameraGunpointIndex: camera.cameraGunpointIndex,
+        cameraLocalPosition: camera.cameraLocalPosition,
+        cameraLocalForward: camera.cameraLocalForward,
+        completionTimerDuration: camera.completionTimerDuration,
+        returnToShip: updatedReturn
+    )
+    let trigger = LevelTrigger(
+        name: killbotEntry.triggerName,
+        roomIndex: killbotEntry.triggerRoomSourceIndex,
+        faceIndex: killbotEntry.triggerFaceIndex,
+        flags: 8,
+        activator: 1
+    )
+    var rooms = level.rooms
+    let triggerRoomIndex = rooms.firstIndex {
+        $0.sourceIndex == killbotEntry.triggerRoomSourceIndex
+    }!
+    for faceIndex in [0, killbotEntry.triggerFaceIndex] {
+        let triggerFace = rooms[triggerRoomIndex].faces[faceIndex]
+        rooms[triggerRoomIndex].faces[faceIndex] = .init(
+            corners: triggerFace.corners,
+            flags: triggerFace.flags | 0x0010,
+            portalIndex: triggerFace.portalIndex,
+            texture: triggerFace.texture,
+            lightmapInfoIndex: triggerFace.lightmapInfoIndex,
+            allowsLightCorona: triggerFace.allowsLightCorona,
+            lightMultiple: triggerFace.lightMultiple,
+            special: triggerFace.special
+        )
+    }
+    let gallery = level.trainingGalleryBarrier!
+    let syntheticGallery = TrainingGalleryBarrier(
+        triggerName: gallery.triggerName,
+        triggerRoomSourceIndex: gallery.triggerRoomSourceIndex,
+        triggerFaceIndex: 0,
+        barrierRoomSourceIndex: gallery.barrierRoomSourceIndex,
+        orderedPortalIndices: gallery.orderedPortalIndices,
+        markerLightObjectHandle: gallery.markerLightObjectHandle,
+        openMarkerLightDistance: gallery.openMarkerLightDistance,
+        successMessage: gallery.successMessage,
+        guidebotInstruction: gallery.guidebotInstruction,
+        voiceSourceName: gallery.voiceSourceName
+    )
+    let triggers = level.triggers.map { candidate in
+        candidate.name == gallery.triggerName
+            ? .init(
+                name: candidate.name,
+                roomIndex: candidate.roomIndex,
+                faceIndex: 0,
+                flags: candidate.flags,
+                activator: candidate.activator
+            )
+            : candidate
+    } + [trigger]
+    return replacing(
+        level,
+        rooms: rooms,
+        triggers: triggers,
+        surfacePhysics: level.surfacePhysics,
+        trainingGalleryBarrier: syntheticGallery,
+        trainingCameraMonitorChain: updatedCamera,
+        voiceClips: level.voiceClips + addedVoices,
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current
+                + addedVoices.map {
+                    .init(
+                        category: "voice",
+                        source: .init(
+                            storedIndex: $0.sourceEntryIndex,
+                            sourceName: $0.sourceName
+                        ),
+                        state: "canonical-pcm-imported",
+                        provenance:
+                            "\($0.sourceArchive) \($0.sourceSHA256)"
+                    )
+                },
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
     )
 }
 

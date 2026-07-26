@@ -491,6 +491,17 @@ struct RevivalProject: Equatable, Sendable {
         }
         return "TrainingMission.cpp Script 058 / \(marker.instanceName ?? "FlashLight-3") + \(room.name ?? "PortalRoom5")"
     }
+    var trainingKillbotEntrySourceDiagnostic: String? {
+        guard let returnChain =
+                level.trainingCameraMonitorChain?.returnToShip,
+              let entry = returnChain.killbotEntry,
+              let room = level.rooms.first(where: {
+                  $0.sourceIndex == returnChain.barrierRoomSourceIndex
+              }) else {
+            return nil
+        }
+        return "TrainingMission.cpp Scripts 042 + 039 / \(entry.triggerName) + \(room.name ?? "PortalRoom5")"
+    }
     var trainingGalleryBarrierIsOpen: Bool {
         guard let barrier = level.trainingGalleryBarrier,
               let room = level.rooms.first(where: {
