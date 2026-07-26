@@ -1000,6 +1000,7 @@ func editorIdleStatusMessage(
         project.trainingKillbotEntrySourceDiagnostic,
         project.trainingRASBot1DeathSourceDiagnostic,
         project.trainingRASBot2DeathSourceDiagnostic,
+        project.trainingRASBot3DeathSourceDiagnostic,
     ].compactMap { $0 }
     guard !sourceDiagnostics.isEmpty else { return status }
     return "\(status)\nSource: \(sourceDiagnostics.joined(separator: "; "))"
