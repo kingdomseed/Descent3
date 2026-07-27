@@ -1909,6 +1909,60 @@ final class CanonicalLevelTests: XCTestCase {
         )
     }
 
+    func testSchemaElevenRequiresExactLastBot3DeathProducer() throws {
+        let level = makeTrainingLastBot3DeathLevel()
+        try level.validate()
+        XCTAssertEqual(level.schemaVersion, 11)
+
+        let chain = try XCTUnwrap(level.trainingLastBot3DeathChain)
+        XCTAssertEqual(chain.robotObjectHandle, 2_081)
+        XCTAssertEqual(chain.robotRoomSourceIndex, 47)
+        XCTAssertEqual(chain.robotFlags, 5_121)
+        XCTAssertEqual(chain.combat, .stockTraining)
+
+        let wrongHandle = TrainingLastBot3DeathChain(
+            robotObjectHandle: 2_082,
+            robotRoomSourceIndex: chain.robotRoomSourceIndex,
+            robotFlags: chain.robotFlags,
+            combat: chain.combat
+        )
+        assertValidationError(
+            .invalidDependency("Training LastBot3 death chain"),
+            level.addingTrainingLastBot3DeathChain(wrongHandle)
+        )
+
+        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == chain.robotObjectHandle
+        })
+        let robot = level.objects[robotIndex]
+        let wrongName = PlacedObject(
+            handle: robot.handle,
+            type: robot.type,
+            storedID: robot.storedID,
+            definition: robot.definition,
+            instanceName: "LastBot4",
+            flags: robot.flags,
+            doorShields: robot.doorShields,
+            location: robot.location,
+            position: robot.position,
+            orientation: robot.orientation,
+            containsType: robot.containsType,
+            containsID: robot.containsID,
+            containsCount: robot.containsCount,
+            lifeLeft: robot.lifeLeft,
+            soundSource: robot.soundSource,
+            inertScriptName: robot.inertScriptName,
+            inertModuleName: robot.inertModuleName,
+            lightmapSubmodels: robot.lightmapSubmodels
+        )
+        var wrongObjects = level.objects
+        wrongObjects[robotIndex] = wrongName
+        assertValidationError(
+            .invalidDependency("Training LastBot3 death chain"),
+            replacing(level, objects: wrongObjects)
+        )
+    }
+
     func testSchemaEightRejectsWrongTrainingGalleryMarkerIdentity() throws {
         let level = makeTrainingGalleryBarrierLevel()
         try level.validate()
@@ -4319,6 +4373,7 @@ func replacing(
     trainingRASBot3DeathChain: TrainingRASBot3DeathChain? = nil,
     trainingRASBot4DeathChain: TrainingRASBot4DeathChain? = nil,
     trainingLastBot1DeathChain: TrainingLastBot1DeathChain? = nil,
+    trainingLastBot3DeathChain: TrainingLastBot3DeathChain? = nil,
     trainingInvulnerabilityPickupChain:
         TrainingInvulnerabilityPickupChain? = nil,
     trainingCloakPickupChain: TrainingCloakPickupChain? = nil,
@@ -4395,6 +4450,8 @@ func replacing(
     )
     replaced.trainingLastBot2DeathChain =
         level.trainingLastBot2DeathChain
+    replaced.trainingLastBot3DeathChain =
+        trainingLastBot3DeathChain ?? level.trainingLastBot3DeathChain
     return replaced
 }
 

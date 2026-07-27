@@ -620,6 +620,7 @@ typealias TrainingRASBot3DeathChain = TrainingRobotDeathChain
 typealias TrainingRASBot4DeathChain = TrainingRobotDeathChain
 typealias TrainingLastBot1DeathChain = TrainingRobotDeathChain
 typealias TrainingLastBot2DeathChain = TrainingRobotDeathChain
+typealias TrainingLastBot3DeathChain = TrainingRobotDeathChain
 
 struct TrainingInvulnerabilityPickupChain:
     Codable, Equatable, Sendable
@@ -1180,6 +1181,22 @@ func validateStockTrainingLastBot2DeathPackage(
     )
 }
 
+func validateStockTrainingLastBot3DeathPackage(
+    chain: TrainingLastBot3DeathChain?,
+    objects: [PlacedObject],
+    objectPresentations: [ObjectPresentationReference]
+) throws {
+    try validateStockTrainingRASBotDeathPackage(
+        chain: chain,
+        expectedHandle: 2_081,
+        expectedRoomSourceIndex: 47,
+        expectedInstanceName: "LastBot3",
+        dependencyName: "Training LastBot3 package",
+        objects: objects,
+        objectPresentations: objectPresentations
+    )
+}
+
 private func canonicalPCM16ByteCount(
     frameCount: Int,
     channelCount: Int
@@ -1685,6 +1702,7 @@ struct Level: Codable, Equatable, Sendable {
     let trainingRASBot4DeathChain: TrainingRASBot4DeathChain?
     let trainingLastBot1DeathChain: TrainingLastBot1DeathChain?
     var trainingLastBot2DeathChain: TrainingLastBot2DeathChain? = nil
+    var trainingLastBot3DeathChain: TrainingLastBot3DeathChain? = nil
     let trainingInvulnerabilityPickupChain: TrainingInvulnerabilityPickupChain?
     let trainingCloakPickupChain: TrainingCloakPickupChain?
     let trainingLastRoomChain: TrainingLastRoomChain?
@@ -1799,6 +1817,7 @@ struct Level: Codable, Equatable, Sendable {
                 && trainingRASBot4DeathChain == nil
                 && trainingLastBot1DeathChain == nil
                 && trainingLastBot2DeathChain == nil
+                && trainingLastBot3DeathChain == nil
             || schemaVersion == 10
                 && trainingCameraMonitorChain != nil
                 && trainingRASBot1DeathChain == nil
@@ -1807,6 +1826,7 @@ struct Level: Codable, Equatable, Sendable {
                 && trainingRASBot4DeathChain == nil
                 && trainingLastBot1DeathChain == nil
                 && trainingLastBot2DeathChain == nil
+                && trainingLastBot3DeathChain == nil
                 && _soundClips.wasPresent
             || schemaVersion == 11
                 && trainingCameraMonitorChain != nil
@@ -2502,6 +2522,28 @@ struct Level: Codable, Equatable, Sendable {
                 )
             }
         }
+        if let chain = trainingLastBot3DeathChain {
+            guard trainingLastBot2DeathChain != nil,
+                  chain.combat == .stockTraining,
+                  let robot = objects.first(where: {
+                      $0.handle == chain.robotObjectHandle
+                  }),
+                  robot.type == 2,
+                  robot.storedID == 106,
+                  robot.definition?.sourceName
+                    == "RAS1 Light Security Flyer",
+                  robot.instanceName == "LastBot3",
+                  robot.location == .room(chain.robotRoomSourceIndex),
+                  robot.flags == chain.robotFlags,
+                  objectPresentations.contains(where: {
+                      $0.objectHandle == chain.robotObjectHandle
+                          && $0.isVisible
+                  }) else {
+                throw LevelValidationError.invalidDependency(
+                    "Training LastBot3 death chain"
+                )
+            }
+        }
         if let chain = trainingInvulnerabilityPickupChain {
             let presentation = objectPresentations.first {
                 $0.objectHandle == chain.pickupObjectHandle
@@ -2997,6 +3039,13 @@ struct Level: Codable, Equatable, Sendable {
             if trainingLastBot2DeathChain != nil {
                 try validateStockTrainingLastBot2DeathPackage(
                     chain: trainingLastBot2DeathChain,
+                    objects: objects,
+                    objectPresentations: objectPresentations
+                )
+            }
+            if trainingLastBot3DeathChain != nil {
+                try validateStockTrainingLastBot3DeathPackage(
+                    chain: trainingLastBot3DeathChain,
                     objects: objects,
                     objectPresentations: objectPresentations
                 )
@@ -3971,6 +4020,14 @@ struct Level: Codable, Equatable, Sendable {
     ) -> Level {
         var level = self
         level.trainingLastBot2DeathChain = chain
+        return level
+    }
+
+    func addingTrainingLastBot3DeathChain(
+        _ chain: TrainingLastBot3DeathChain
+    ) -> Level {
+        var level = self
+        level.trainingLastBot3DeathChain = chain
         return level
     }
 

@@ -595,6 +595,8 @@ func runD3Import(
                 return nil
             }
             page = generic
+        } else if object.handle == 2_081 {
+            page = destroyRobotPage
         } else if object.handle == 4_112
                     || object.handle == 2_074
                     || object.handle == 2_075
@@ -854,6 +856,9 @@ func runD3Import(
     }!
     let lastBot2 = robotGuidebotLevel.objects.first {
         $0.instanceName == "LastBot2"
+    }!
+    let lastBot3 = robotGuidebotLevel.objects.first {
+        $0.instanceName == "LastBot3"
     }!
     let invulnerabilityPickup = robotGuidebotLevel.objects.first {
         $0.instanceName?.caseInsensitiveCompare("InvulnPowerup2")
@@ -1186,6 +1191,16 @@ func runD3Import(
             && lastBot2.location == .room(46)
     )
     precondition(
+        lastBot3.handle == 2_081
+            && lastBot3.type == 2
+            && lastBot3.storedID == 106
+            && lastBot3.definition?.sourceName
+                == "RAS1 Light Security Flyer"
+            && lastBot3.instanceName == "LastBot3"
+            && lastBot3.flags == 5_121
+            && lastBot3.location == .room(47)
+    )
+    precondition(
         invulnerabilityPickup.handle == 2_076
             && invulnerabilityPickup.type == 7
             && invulnerabilityPickup.storedID == 3
@@ -1448,11 +1463,19 @@ func runD3Import(
             combat: .stockTraining
         )
     )
-    let level = lastBot1Level.addingTrainingLastBot2DeathChain(
+    let lastBot2Level = lastBot1Level.addingTrainingLastBot2DeathChain(
         .init(
             robotObjectHandle: lastBot2.handle,
             robotRoomSourceIndex: 46,
             robotFlags: lastBot2.flags,
+            combat: .stockTraining
+        )
+    )
+    let level = lastBot2Level.addingTrainingLastBot3DeathChain(
+        .init(
+            robotObjectHandle: lastBot3.handle,
+            robotRoomSourceIndex: 47,
+            robotFlags: lastBot3.flags,
             combat: .stockTraining
         )
     )
