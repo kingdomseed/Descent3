@@ -1727,6 +1727,97 @@ final class CanonicalLevelTests: XCTestCase {
         )
     }
 
+    func testSchemaElevenRequiresExactLastBot1DeathProducer() throws {
+        let level = makeTrainingLastBot1DeathLevel()
+        try level.validate()
+        XCTAssertEqual(level.schemaVersion, 11)
+
+        let chain = try XCTUnwrap(level.trainingLastBot1DeathChain)
+        XCTAssertEqual(chain.robotObjectHandle, 4_127)
+        XCTAssertEqual(chain.robotRoomSourceIndex, 14)
+        XCTAssertEqual(chain.robotFlags, 5_121)
+        XCTAssertEqual(chain.combat, .stockTraining)
+
+        let wrongHandle = TrainingLastBot1DeathChain(
+            robotObjectHandle: 2_080,
+            robotRoomSourceIndex: chain.robotRoomSourceIndex,
+            robotFlags: chain.robotFlags,
+            combat: chain.combat
+        )
+        assertValidationError(
+            .invalidDependency("Training LastBot1 death chain"),
+            level.addingTrainingLastBot1DeathChain(wrongHandle)
+        )
+
+        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == chain.robotObjectHandle
+        })
+        let robot = level.objects[robotIndex]
+        func replacingRobot(
+            instanceName: String = "LastBot1",
+            flags: UInt32 = 5_121,
+            location: SpatialLocation = .room(14)
+        ) -> PlacedObject {
+            PlacedObject(
+                handle: robot.handle,
+                type: robot.type,
+                storedID: robot.storedID,
+                definition: robot.definition,
+                instanceName: instanceName,
+                flags: flags,
+                doorShields: robot.doorShields,
+                location: location,
+                position: robot.position,
+                orientation: robot.orientation,
+                containsType: robot.containsType,
+                containsID: robot.containsID,
+                containsCount: robot.containsCount,
+                lifeLeft: robot.lifeLeft,
+                soundSource: robot.soundSource,
+                inertScriptName: robot.inertScriptName,
+                inertModuleName: robot.inertModuleName,
+                lightmapSubmodels: robot.lightmapSubmodels
+            )
+        }
+        for replacement in [
+            replacingRobot(instanceName: "LastBot2"),
+            replacingRobot(flags: 5_120),
+            replacingRobot(location: .room(45)),
+        ] {
+            var objects = level.objects
+            objects[robotIndex] = replacement
+            assertValidationError(
+                .invalidDependency("Training LastBot1 death chain"),
+                replacing(level, objects: objects)
+            )
+        }
+
+        let presentationIndex = try XCTUnwrap(
+            level.objectPresentations.firstIndex {
+                $0.objectHandle == chain.robotObjectHandle
+            }
+        )
+        let presentation = level.objectPresentations[presentationIndex]
+        var hiddenPresentations = level.objectPresentations
+        hiddenPresentations[presentationIndex] = .init(
+            objectHandle: presentation.objectHandle,
+            primaryModel: presentation.primaryModel,
+            mediumModel: presentation.mediumModel,
+            lowModel: presentation.lowModel,
+            dyingModel: presentation.dyingModel,
+            mediumDistance: presentation.mediumDistance,
+            lowDistance: presentation.lowDistance,
+            isVisible: false
+        )
+        assertValidationError(
+            .invalidDependency("Training LastBot1 death chain"),
+            replacing(
+                level,
+                objectPresentations: hiddenPresentations
+            )
+        )
+    }
+
     func testSchemaEightRejectsWrongTrainingGalleryMarkerIdentity() throws {
         let level = makeTrainingGalleryBarrierLevel()
         try level.validate()
@@ -4136,6 +4227,7 @@ func replacing(
     trainingRASBot2DeathChain: TrainingRASBot2DeathChain? = nil,
     trainingRASBot3DeathChain: TrainingRASBot3DeathChain? = nil,
     trainingRASBot4DeathChain: TrainingRASBot4DeathChain? = nil,
+    trainingLastBot1DeathChain: TrainingLastBot1DeathChain? = nil,
     trainingInvulnerabilityPickupChain:
         TrainingInvulnerabilityPickupChain? = nil,
     trainingCloakPickupChain: TrainingCloakPickupChain? = nil,
@@ -4193,6 +4285,8 @@ func replacing(
             trainingRASBot3DeathChain ?? level.trainingRASBot3DeathChain,
         trainingRASBot4DeathChain:
             trainingRASBot4DeathChain ?? level.trainingRASBot4DeathChain,
+        trainingLastBot1DeathChain:
+            trainingLastBot1DeathChain ?? level.trainingLastBot1DeathChain,
         trainingInvulnerabilityPickupChain:
             trainingInvulnerabilityPickupChain
             ?? level.trainingInvulnerabilityPickupChain,
