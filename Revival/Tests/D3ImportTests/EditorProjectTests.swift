@@ -1289,6 +1289,133 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testCloakPowerup2AndLastRoomTailHaveEditorOwnership()
+        throws
+    {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(
+            path: "candidate.revival",
+            directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(
+                path: "library",
+                directoryHint: .isDirectory
+            )
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false
+        )
+        try writeCanonicalPackage(
+            makeTrainingCloakPickupLevel(),
+            to: candidate
+        )
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        document.undoManager?.groupsByEvent = false
+
+        XCTAssertEqual(
+            document.project.trainingCloakPickupSourceDiagnostic,
+            "TrainingMission.cpp Script 048 / CloakPowerup2 pickup"
+        )
+        XCTAssertEqual(
+            document.project.trainingLastRoomSourceDiagnostic,
+            "TrainingMission.cpp Scripts 034/049 / PortalRoom6 completion"
+        )
+        let pickup = try XCTUnwrap(
+            document.project.level.objects.first {
+                $0.handle == 2_073
+            })
+        document.undoManager?.beginUndoGrouping()
+        try document.moveObject(
+            handle: pickup.handle,
+            to: .init(
+                x: pickup.position.x + 0.25,
+                y: pickup.position.y,
+                z: pickup.position.z
+            )
+        )
+        document.undoManager?.endUndoGrouping()
+        XCTAssertEqual(document.undoManager?.undoActionName, "Move Object")
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == pickup.handle
+            }?.position,
+            pickup.position
+        )
+
+        let first = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        let second = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(
+            first.fileWrappers?["project.json"]?.regularFileContents,
+            second.fileWrappers?["project.json"]?.regularFileContents
+        )
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(
+            from: first,
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertNotNil(reopened.project.level.trainingCloakPickupChain)
+        XCTAssertNotNil(reopened.project.level.trainingLastRoomChain)
+
+        let session = reopened.makePlaySession()
+        reopened.commitPlaySession(session, renderingWorld: false)
+        let initial = session.makePlayerSimulation(
+            presentationReadyTimestamp: 0
+        )
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(initial.continuation)
+            ) as? [String: Any]
+        )
+        continuationObject["playerLocation"] = [
+            "room": ["_0": 11]
+        ]
+        continuationObject["playerPosition"] = [
+            "x": pickup.position.x,
+            "y": pickup.position.y,
+            "z": pickup.position.z,
+        ]
+        let simulation = try PlayerSimulation(
+            level: session.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: continuationObject
+                )
+            ),
+            resumedAtTimestamp: 0
+        )
+        let frame = simulation.update(at: 0.1, input: .zero)
+        XCTAssertEqual(frame.trainingCloak?.phase, .fadingOut)
+        XCTAssertFalse(simulation.level.objects.contains {
+            $0.handle == pickup.handle
+        })
+        XCTAssertTrue(reopened.project.level.objects.contains {
+            $0.handle == pickup.handle
+        })
+        reopened.returnToEditor(renderingWorld: false)
+        XCTAssertNil(reopened.playSession)
+        XCTAssertTrue(reopened.project.level.objects.contains {
+            $0.handle == pickup.handle
+        })
+    }
+
+    @MainActor
     func testObjectAndPlayerStartTransformsUseStableIdentitiesAndNamedUndo() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())

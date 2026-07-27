@@ -634,6 +634,31 @@ struct TrainingInvulnerabilityPickupChain:
     let expiredSoundSourceName: String
 }
 
+struct TrainingCloakPickupChain: Codable, Equatable, Sendable {
+    let pickupObjectHandle: UInt32
+    let pickupRoomSourceIndex: Int
+    let pickupObjectFlags: UInt32
+    let pickupCollisionRadius: Float
+    let fadeDuration: Float
+    let cloakDuration: Float
+    let activatedMessage: String
+    let expiredMessage: String
+    let pickupSoundSourceName: String
+    let activatedSoundSourceName: String
+    let expiredSoundSourceName: String
+}
+
+struct TrainingLastRoomChain: Codable, Equatable, Sendable {
+    let barrierRoomSourceIndex: Int
+    let orderedPortalIndices: [Int]
+    let markerLightObjectHandle: UInt32
+    let markerLightPresentation: TrainingMarkerLightPresentation
+    let openMarkerLightDistance: Float
+    let timerDuration: Float
+    let completionMessages: [String]
+    let completionVoiceSourceName: String
+}
+
 struct TrainingMarkerLightPresentation:
     Codable, Equatable, Sendable
 {
@@ -1586,6 +1611,8 @@ struct Level: Codable, Equatable, Sendable {
     let trainingRASBot3DeathChain: TrainingRASBot3DeathChain?
     let trainingRASBot4DeathChain: TrainingRASBot4DeathChain?
     let trainingInvulnerabilityPickupChain: TrainingInvulnerabilityPickupChain?
+    let trainingCloakPickupChain: TrainingCloakPickupChain?
+    let trainingLastRoomChain: TrainingLastRoomChain?
     let voiceClips: [CanonicalVoiceClip]
     @SchemaCompatibleSoundClips
     private(set) var soundClips: [CanonicalSoundClip]
@@ -1626,6 +1653,8 @@ struct Level: Codable, Equatable, Sendable {
         trainingRASBot4DeathChain: TrainingRASBot4DeathChain? = nil,
         trainingInvulnerabilityPickupChain:
             TrainingInvulnerabilityPickupChain? = nil,
+        trainingCloakPickupChain: TrainingCloakPickupChain? = nil,
+        trainingLastRoomChain: TrainingLastRoomChain? = nil,
         voiceClips: [CanonicalVoiceClip] = [],
         soundClips: [CanonicalSoundClip] = [],
         dependencyManifest: DependencyManifest,
@@ -1664,6 +1693,8 @@ struct Level: Codable, Equatable, Sendable {
         self.trainingRASBot4DeathChain = trainingRASBot4DeathChain
         self.trainingInvulnerabilityPickupChain =
             trainingInvulnerabilityPickupChain
+        self.trainingCloakPickupChain = trainingCloakPickupChain
+        self.trainingLastRoomChain = trainingLastRoomChain
         self.voiceClips = voiceClips
         self.soundClips = soundClips
         self.dependencyManifest = dependencyManifest
@@ -2395,6 +2426,143 @@ struct Level: Codable, Equatable, Sendable {
                 )
             }
         }
+        if let chain = trainingCloakPickupChain {
+            let presentation = objectPresentations.first {
+                $0.objectHandle == chain.pickupObjectHandle
+                    && $0.isVisible
+            }
+            let model = presentation.flatMap { presentation in
+                models.first { $0.source == presentation.primaryModel }
+            }
+            let mediumModel = presentation?.mediumModel.flatMap {
+                source in models.first { $0.source == source }
+            }
+            let lowModel = presentation?.lowModel.flatMap {
+                source in models.first { $0.source == source }
+            }
+            let reachedSoundNames = Set(soundClips.map(\.sourceName))
+            guard trainingInvulnerabilityPickupChain != nil,
+                chain.pickupObjectHandle == 2_073,
+                chain.pickupRoomSourceIndex == 11,
+                chain.pickupObjectFlags == 5_120,
+                chain.pickupCollisionRadius.isFinite,
+                chain.pickupCollisionRadius > 0,
+                chain.fadeDuration == 1,
+                chain.cloakDuration == 30,
+                chain.activatedMessage == "Cloak On",
+                chain.expiredMessage == "Cloak Off",
+                chain.pickupSoundSourceName == "Power03.wav",
+                chain.activatedSoundSourceName == "ShpCloakOn.wav",
+                chain.expiredSoundSourceName == "ShpCloakOffBeep.wav",
+                let pickup = objects.first(where: {
+                    $0.handle == chain.pickupObjectHandle
+                }),
+                pickup.type == 7,
+                pickup.storedID == 4,
+                pickup.definition
+                    == .init(storedIndex: 4, sourceName: "Cloak"),
+                pickup.instanceName == "CloakPowerup2",
+                pickup.flags == chain.pickupObjectFlags,
+                pickup.location == .room(chain.pickupRoomSourceIndex),
+                presentation?.primaryModel.sourceName == "cloak.OOF",
+                presentation?.mediumModel?.sourceName
+                    == "CloakMed.OOF",
+                presentation?.lowModel?.sourceName
+                    == "CloakLow.OOF",
+                presentation?.dyingModel == nil,
+                presentation?.mediumDistance == 35,
+                presentation?.lowDistance == 50,
+                model?.sourceArchive == "d3.hog",
+                model?.sourceSHA256
+                    == "ccce90c9dbc266c0a22ab00339689059888719b212116191049ef4396ebc5baa",
+                mediumModel?.sourceArchive == "d3.hog",
+                mediumModel?.sourceSHA256
+                    == "7b6e66b1ad23328b43dc007de7cb2b8806397f69bab95647e350554f479e0c6b",
+                lowModel?.sourceArchive == "d3.hog",
+                lowModel?.sourceSHA256
+                    == "38754663d76df10a7d6d41e241cfe2fc08b9f7fb99addb41cb5ed1fc205f119f",
+                model?.collisionRadius == chain.pickupCollisionRadius,
+                reachedSoundNames.contains(chain.pickupSoundSourceName),
+                reachedSoundNames.contains(chain.activatedSoundSourceName),
+                reachedSoundNames.contains(chain.expiredSoundSourceName)
+            else {
+                throw LevelValidationError.invalidDependency(
+                    "Training CloakPowerup2 pickup chain"
+                )
+            }
+        }
+        if let chain = trainingLastRoomChain {
+            let room = rooms.first {
+                $0.sourceIndex == chain.barrierRoomSourceIndex
+            }
+            let marker = objects.first {
+                $0.handle == chain.markerLightObjectHandle
+            }
+            guard trainingCloakPickupChain != nil,
+                chain.barrierRoomSourceIndex == 44,
+                chain.orderedPortalIndices == [1, 0],
+                chain.markerLightObjectHandle == 4_117,
+                chain.openMarkerLightDistance == 50,
+                chain.timerDuration == 2,
+                chain.completionMessages == [
+                    "Excellent!",
+                    "Now proceed through the doorway that just opened to begin the last stage of your training.",
+                ],
+                chain.completionVoiceSourceName == "proceed5.osf",
+                let room,
+                chain.orderedPortalIndices.allSatisfy(
+                    room.portals.indices.contains
+                ),
+                marker?.type == 11,
+                marker?.storedID == 205,
+                marker?.definition == .init(
+                    storedIndex: 205,
+                    sourceName: "Blinking Red Light-DM"
+                ),
+                marker?.instanceName == "FlashLight-4",
+                marker?.flags == 4_096,
+                marker?.location
+                    == .room(chain.barrierRoomSourceIndex),
+                chain.markerLightPresentation == .init(
+                    primaryColor: .init(x: 1, y: 0.25, z: 0),
+                    secondaryColor: .zero,
+                    timeInterval: 0.5,
+                    flickerDistance: 0.2,
+                    directionalDot: 0,
+                    flags: 4,
+                    timebits: .max,
+                    angle: 0,
+                    lightingRenderType: 2
+                ),
+                chain.orderedPortalIndices.allSatisfy({ portalIndex in
+                    let portal = room.portals[portalIndex]
+                    guard portal.flags & 1 != 0,
+                        let connectedRoom = rooms.first(where: {
+                            $0.sourceIndex == portal.connectedRoom
+                        }),
+                        connectedRoom.portals.indices.contains(
+                            portal.connectedPortal
+                        )
+                    else {
+                        return false
+                    }
+                    let reciprocal =
+                        connectedRoom.portals[portal.connectedPortal]
+                    return reciprocal.connectedRoom == room.sourceIndex
+                        && reciprocal.connectedPortal == portalIndex
+                        && reciprocal.flags & 1 != 0
+                }),
+                voiceClips.contains(where: {
+                    $0.sourceName.caseInsensitiveCompare(
+                        chain.completionVoiceSourceName
+                    ) == .orderedSame
+                })
+            else {
+                throw LevelValidationError.invalidDependency(
+                    "Training Script 034 / 049 last-room chain"
+                )
+            }
+        }
         var voiceNames = Set<String>()
         for clip in voiceClips {
             let voiceSource = SourceResource(
@@ -2645,6 +2813,11 @@ struct Level: Codable, Equatable, Sendable {
                         "Training InvulnPowerup2 package"
                     )
                 }
+            }
+            if trainingCloakPickupChain != nil {
+                try validateStockTrainingCloakSoundPackage(
+                    soundClips
+                )
             }
         }
         var retiredSlots = Set<Int>()
@@ -3606,6 +3779,136 @@ struct Level: Codable, Equatable, Sendable {
                 historicalEagerBaseline:
                     dependencyManifest.historicalEagerBaseline
             ),
+            sourceChunks: sourceChunks
+        )
+    }
+
+    func addingTrainingCloakPickupChain(
+        _ chain: TrainingCloakPickupChain,
+        soundClips addedSoundClips: [CanonicalSoundClip]
+    ) -> Level {
+        var dependencies = dependencyManifest.current
+        let objectDefinition = DependencyRecord(
+            category: "object-definition",
+            source: .init(storedIndex: 4, sourceName: "Cloak"),
+            state: "canonical-object-definition",
+            provenance:
+                "training.mn3/TrainingMission.d3l handle 2073"
+        )
+        if !dependencies.contains(where: {
+            $0.category == objectDefinition.category
+                && $0.source == objectDefinition.source
+        }) {
+            dependencies.append(objectDefinition)
+        }
+        for clip in addedSoundClips {
+            let reached = DependencyRecord(
+                category: "sound",
+                source: .init(
+                    storedIndex: clip.sourceEntryIndex,
+                    sourceName: clip.sourceName
+                ),
+                state: "canonical-pcm-imported",
+                provenance:
+                    "\(clip.sourceArchive) \(clip.sourceSHA256)"
+            )
+            if let index = dependencies.firstIndex(where: {
+                $0.category == reached.category
+                    && $0.source == reached.source
+            }) {
+                dependencies[index] = reached
+            } else {
+                dependencies.append(reached)
+            }
+        }
+        return Level(
+            schemaVersion: 11,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
+            lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
+            objectPresentations: objectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
+            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
+            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
+            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
+            trainingInvulnerabilityPickupChain:
+                trainingInvulnerabilityPickupChain,
+            trainingCloakPickupChain: chain,
+            voiceClips: voiceClips,
+            soundClips: soundClips + addedSoundClips,
+            dependencyManifest: .init(
+                current: dependencies,
+                historicalEagerBaseline:
+                    dependencyManifest.historicalEagerBaseline
+            ),
+            sourceChunks: sourceChunks
+        )
+    }
+
+    func addingTrainingLastRoomChain(
+        _ chain: TrainingLastRoomChain
+    ) -> Level {
+        Level(
+            schemaVersion: 11,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
+            lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
+            objectPresentations: objectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
+            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
+            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
+            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
+            trainingInvulnerabilityPickupChain:
+                trainingInvulnerabilityPickupChain,
+            trainingCloakPickupChain: trainingCloakPickupChain,
+            trainingLastRoomChain: chain,
+            voiceClips: voiceClips,
+            soundClips: soundClips,
+            dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
         )
     }
@@ -4580,6 +4883,58 @@ extension Level {
                 "missing \(dependency.category):\(dependency.source.sourceName)"
             )
         }
+    }
+}
+
+func validateStockTrainingCloakSoundPackage(
+    _ soundClips: [CanonicalSoundClip]
+) throws {
+    let pickupSound = soundClips.first {
+        $0.logicalName == "Powerup pickup"
+    }
+    let activatedSound = soundClips.first {
+        $0.logicalName == "Cloak on"
+    }
+    let expiredSound = soundClips.first {
+        $0.logicalName == "Cloak off"
+    }
+    guard pickupSound?.sourceName == "Power03.wav",
+        pickupSound?.sourceEntryIndex == 2_657,
+        pickupSound?.sampleRate == 22_050,
+        pickupSound?.channelCount == 1,
+        pickupSound?.frameCount == 15_189,
+        pickupSound?.sourceArchive == "d3.hog",
+        pickupSound?.sourceSHA256
+            == "1e16aae37b233dd724d4baa001f48b83681fbc33eb16d21269cd52c5b7e8cea3",
+        pickupSound?.pcmSHA256
+            == "48908714345e648ce9e713d24b9aa66bfe763a82d961a83ca9543852bca8aadc",
+        pickupSound?.importVolume == 1,
+        activatedSound?.sourceName == "ShpCloakOn.wav",
+        activatedSound?.sourceEntryIndex == 3_247,
+        activatedSound?.sampleRate == 22_050,
+        activatedSound?.channelCount == 1,
+        activatedSound?.frameCount == 33_046,
+        activatedSound?.sourceArchive == "d3.hog",
+        activatedSound?.sourceSHA256
+            == "27d19947e58370b18722fbcbe2fba64bf5094e3752a069bd1d2e1ed76e70c58e",
+        activatedSound?.pcmSHA256
+            == "61b52e468bfbe6bf5bd96ac158ef3ab7fd0d048fa375896c80de83df2129cdb2",
+        activatedSound?.importVolume == 0.5,
+        expiredSound?.sourceName == "ShpCloakOffBeep.wav",
+        expiredSound?.sourceEntryIndex == 3_246,
+        expiredSound?.sampleRate == 22_050,
+        expiredSound?.channelCount == 1,
+        expiredSound?.frameCount == 45_609,
+        expiredSound?.sourceArchive == "d3.hog",
+        expiredSound?.sourceSHA256
+            == "29c9bb2fe254a9c2e75b8ae0f13b60627088294f075fbd74eae449e76c767154",
+        expiredSound?.pcmSHA256
+            == "8ca941f9d4a30f4b3431af4b86ff153b955885a23c686fa56fb7a8d0bfa0e87d",
+        expiredSound?.importVolume == 0.5
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training CloakPowerup2 package"
+        )
     }
 }
 

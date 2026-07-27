@@ -430,6 +430,11 @@ func runD3Import(
         overlay: overlayData,
         name: "Invulnerability"
     )
+    let cloakPage = try resolveRetailGenericModelPage(
+        table: tableData,
+        overlay: overlayData,
+        name: "Cloak"
+    )
     let securityCameraPage = try resolveRetailGenericModelPage(
         table: tableData,
         overlay: overlayData,
@@ -459,10 +464,13 @@ func runD3Import(
         cameraMonitorPage.primaryModelName,
         cameraMonitorPage.mediumModelName,
         cameraMonitorPage.lowModelName,
-            invulnerabilityPage.primaryModelName,
-            invulnerabilityPage.mediumModelName,
-            invulnerabilityPage.lowModelName,
-        ].compactMap { $0 })
+        invulnerabilityPage.primaryModelName,
+        invulnerabilityPage.mediumModelName,
+        invulnerabilityPage.lowModelName,
+        cloakPage.primaryModelName,
+        cloakPage.mediumModelName,
+        cloakPage.lowModelName,
+    ].compactMap { $0 })
     let sortedModelNames = reachedModelNames.sorted {
         $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
     }
@@ -609,6 +617,12 @@ func runD3Import(
             ) == .orderedSame
         {
             page = invulnerabilityPage
+        } else if object.handle == 2_073,
+            object.definition?.sourceName.caseInsensitiveCompare(
+                cloakPage.name
+            ) == .orderedSame
+        {
+            page = cloakPage
         } else {
             return nil
         }
@@ -622,13 +636,13 @@ func runD3Import(
             lowDistance: page.lowDistance
         )
     }
-    precondition(reachedObjectPresentations.count == 14)
+    precondition(reachedObjectPresentations.count == 15)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 25)
+    precondition(deferredRoomObjects.count == 24)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -833,6 +847,18 @@ func runD3Import(
         $0.instanceName?.caseInsensitiveCompare("InvulnPowerup2")
             == .orderedSame
     }!
+    let lastRoomMarker = robotGuidebotLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("FlashLight-4")
+            == .orderedSame
+    }!
+    let lastRoomBarrier = robotGuidebotLevel.rooms.first {
+        $0.name?.caseInsensitiveCompare("PortalRoom6")
+            == .orderedSame
+    }!
+    let cloakPickup = robotGuidebotLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("CloakPowerup2")
+            == .orderedSame
+    }!
     let cameraMonitorModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare(
             cameraMonitorPage.primaryModelName
@@ -841,6 +867,11 @@ func runD3Import(
     let invulnerabilityModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare(
             invulnerabilityPage.primaryModelName
+        ) == .orderedSame
+    }!
+    let cloakModel = reachedModels.first {
+        $0.source.sourceName.caseInsensitiveCompare(
+            cloakPage.primaryModelName
         ) == .orderedSame
     }!
     guard
@@ -943,6 +974,34 @@ func runD3Import(
     let invulnerabilityOffSound = try decodeReachedPCM16WAV(
         invulnerabilityOffSoundPayload
     )
+    let cloakOnSoundPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "Cloak on"
+    )
+    let cloakOnSoundEntry = d3Archive.uniqueEntry(
+        named: cloakOnSoundPage.sourceName
+    )
+    let cloakOnSoundEntryIndex =
+        d3Archive.entries.firstIndex(of: cloakOnSoundEntry)!
+    let cloakOnSoundPayload = d3.data.subdata(
+        in: cloakOnSoundEntry.payloadRange
+    )
+    let cloakOnSound = try decodeReachedPCM16WAV(cloakOnSoundPayload)
+    let cloakOffSoundPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "Cloak off"
+    )
+    let cloakOffSoundEntry = d3Archive.uniqueEntry(
+        named: cloakOffSoundPage.sourceName
+    )
+    let cloakOffSoundEntryIndex =
+        d3Archive.entries.firstIndex(of: cloakOffSoundEntry)!
+    let cloakOffSoundPayload = d3.data.subdata(
+        in: cloakOffSoundEntry.payloadRange
+    )
+    let cloakOffSound = try decodeReachedPCM16WAV(cloakOffSoundPayload)
     let cameraMonitorLevel =
         robotGuidebotLevel
         .addingTrainingCameraMonitorChain(
@@ -1106,6 +1165,15 @@ func runD3Import(
             && invulnerabilityPickup.flags == 5_120
             && invulnerabilityPickup.location == .room(12)
     )
+    precondition(
+        cloakPickup.handle == 2_073
+            && cloakPickup.type == 7
+            && cloakPickup.storedID == 4
+            && cloakPickup.definition
+                == .init(storedIndex: 4, sourceName: "Cloak")
+            && cloakPickup.flags == 5_120
+            && cloakPickup.location == .room(11)
+    )
     let rasBot1Level = cameraMonitorLevel.addingTrainingRASBot1DeathChain(
         .init(
             robotObjectHandle: rasBot1.handle,
@@ -1138,7 +1206,8 @@ func runD3Import(
             combat: .stockTraining
         )
     )
-    let level = rasBot4Level.addingTrainingInvulnerabilityPickupChain(
+    let invulnerabilityLevel =
+        rasBot4Level.addingTrainingInvulnerabilityPickupChain(
         .init(
             pickupObjectHandle: invulnerabilityPickup.handle,
             pickupRoomSourceIndex: 12,
@@ -1224,7 +1293,101 @@ func runD3Import(
                     invulnerabilityOffSoundPage.importVolume * 0.5
             ),
         ]
+        )
+    let cloakLevel =
+        invulnerabilityLevel.addingTrainingCloakPickupChain(
+        .init(
+            pickupObjectHandle: cloakPickup.handle,
+            pickupRoomSourceIndex: 11,
+            pickupObjectFlags: cloakPickup.flags,
+            pickupCollisionRadius: cloakModel.collisionRadius,
+            fadeDuration: 1,
+            cloakDuration: 30,
+            activatedMessage: "Cloak On",
+            expiredMessage: "Cloak Off",
+            pickupSoundSourceName:
+                invulnerabilityPickupSoundPage.sourceName,
+            activatedSoundSourceName: cloakOnSoundPage.sourceName,
+            expiredSoundSourceName: cloakOffSoundPage.sourceName
+        ),
+        soundClips: [
+            .init(
+                logicalName: cloakOnSoundPage.logicalName,
+                sourceName: cloakOnSoundPage.sourceName,
+                sourceEntryIndex: cloakOnSoundEntryIndex,
+                sampleRate: cloakOnSound.sampleRate,
+                channelCount: cloakOnSound.channelCount,
+                frameCount: cloakOnSound.frameCount,
+                pcm16LittleEndian: cloakOnSound.pcm16LittleEndian,
+                pcmSHA256: canonicalSHA256(
+                    cloakOnSound.pcm16LittleEndian
+                ),
+                sourceArchive: d3File.relativePath,
+                sourceSHA256: canonicalSHA256(cloakOnSoundPayload),
+                importVolume: cloakOnSoundPage.importVolume * 0.5
+            ),
+            .init(
+                logicalName: cloakOffSoundPage.logicalName,
+                sourceName: cloakOffSoundPage.sourceName,
+                sourceEntryIndex: cloakOffSoundEntryIndex,
+                sampleRate: cloakOffSound.sampleRate,
+                channelCount: cloakOffSound.channelCount,
+                frameCount: cloakOffSound.frameCount,
+                pcm16LittleEndian: cloakOffSound.pcm16LittleEndian,
+                pcmSHA256: canonicalSHA256(
+                    cloakOffSound.pcm16LittleEndian
+                ),
+                sourceArchive: d3File.relativePath,
+                sourceSHA256: canonicalSHA256(cloakOffSoundPayload),
+                importVolume: cloakOffSoundPage.importVolume * 0.5
+            ),
+        ]
+        )
+    precondition(
+        lastRoomBarrier.sourceIndex == 44
+            && lastRoomBarrier.portals.count == 2
+            && lastRoomBarrier.portals[0].flags & 1 != 0
+            && lastRoomBarrier.portals[1].flags & 1 != 0
+            && lastRoomMarker.handle == 4_117
+            && lastRoomMarker.type == 11
+            && lastRoomMarker.storedID == 205
+            && lastRoomMarker.definition
+                == .init(
+                    storedIndex: 205,
+                    sourceName: "Blinking Red Light-DM"
+                )
+            && lastRoomMarker.flags == 4_096
+            && lastRoomMarker.location == .room(44)
     )
+    let level = cloakLevel.addingTrainingLastRoomChain(.init(
+        barrierRoomSourceIndex: 44,
+        orderedPortalIndices: [1, 0],
+        markerLightObjectHandle: lastRoomMarker.handle,
+        markerLightPresentation: .init(
+            primaryColor:
+                returnMarkerLightPresentation.primaryColor,
+            secondaryColor:
+                returnMarkerLightPresentation.secondaryColor,
+            timeInterval:
+                returnMarkerLightPresentation.timeInterval,
+            flickerDistance:
+                returnMarkerLightPresentation.flickerDistance,
+            directionalDot:
+                returnMarkerLightPresentation.directionalDot,
+            flags: returnMarkerLightPresentation.flags,
+            timebits: returnMarkerLightPresentation.timebits,
+            angle: returnMarkerLightPresentation.angle,
+            lightingRenderType:
+                returnMarkerLightPresentation.lightingRenderType
+        ),
+        openMarkerLightDistance: 50,
+        timerDuration: 2,
+        completionMessages: [
+            "Excellent!",
+            "Now proceed through the doorway that just opened to begin the last stage of your training.",
+        ],
+        completionVoiceSourceName: "proceed5.osf"
+    ))
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
     precondition(

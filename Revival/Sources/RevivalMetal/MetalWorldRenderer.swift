@@ -247,8 +247,11 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
                     systemsGameTime: frame.systemsGameTime
                 ),
                 trainingCameraMonitor: frame.trainingCameraMonitor,
+                trainingCloak: frame.trainingCloak,
                 trainingGuidebotReturnMarkerLightDistance:
-                    frame.trainingGuidebotReturnMarkerLightDistance
+                    frame.trainingGuidebotReturnMarkerLightDistance,
+                trainingLastRoomMarkerLightDistance:
+                    frame.trainingLastRoomMarkerLightDistance
             )
         )
     }

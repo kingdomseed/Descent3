@@ -1,6 +1,215 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testSchemaElevenValidatesExactTrainingCloakAndLastRoomChain()
+        throws
+    {
+        let level = makeTrainingCloakPickupLevel()
+        try level.validate()
+
+        XCTAssertEqual(level.schemaVersion, 11)
+        let cloak = try XCTUnwrap(level.trainingCloakPickupChain)
+        XCTAssertEqual(cloak.pickupObjectHandle, 2_073)
+        XCTAssertEqual(cloak.pickupRoomSourceIndex, 11)
+        XCTAssertEqual(cloak.pickupObjectFlags, 5_120)
+        XCTAssertEqual(cloak.fadeDuration, 1)
+        XCTAssertEqual(cloak.cloakDuration, 30)
+        XCTAssertEqual(cloak.activatedMessage, "Cloak On")
+        XCTAssertEqual(cloak.expiredMessage, "Cloak Off")
+        XCTAssertEqual(cloak.pickupSoundSourceName, "Power03.wav")
+        XCTAssertEqual(
+            cloak.activatedSoundSourceName,
+            "ShpCloakOn.wav"
+        )
+        XCTAssertEqual(
+            cloak.expiredSoundSourceName,
+            "ShpCloakOffBeep.wav"
+        )
+        let lastRoom = try XCTUnwrap(level.trainingLastRoomChain)
+        XCTAssertEqual(lastRoom.orderedPortalIndices, [1, 0])
+        XCTAssertEqual(lastRoom.markerLightObjectHandle, 4_117)
+        XCTAssertEqual(lastRoom.openMarkerLightDistance, 50)
+        XCTAssertEqual(lastRoom.timerDuration, 2)
+        XCTAssertEqual(
+            lastRoom.completionVoiceSourceName,
+            "proceed5.osf"
+        )
+
+        let missingPickup = replacing(
+            level,
+            objects: level.objects.filter { $0.handle != 2_073 },
+            models: level.models.filter {
+                !["cloak.OOF", "CloakMed.OOF", "CloakLow.OOF"]
+                    .contains($0.source.sourceName)
+            },
+            objectPresentations: level.objectPresentations.filter {
+                $0.objectHandle != 2_073
+            },
+            dependencyManifest: .init(
+                current: level.dependencyManifest.current.filter {
+                    !(
+                        $0.category == "model"
+                            && [
+                                "cloak.OOF",
+                                "CloakMed.OOF",
+                                "CloakLow.OOF",
+                            ].contains($0.source.sourceName)
+                    )
+                },
+                historicalEagerBaseline:
+                    level.dependencyManifest.historicalEagerBaseline
+            )
+        )
+        assertValidationError(
+            .invalidDependency("Training CloakPowerup2 pickup chain"),
+            missingPickup
+        )
+
+        let hostileFade = replacing(
+            level,
+            trainingCloakPickupChain: .init(
+                pickupObjectHandle: cloak.pickupObjectHandle,
+                pickupRoomSourceIndex: cloak.pickupRoomSourceIndex,
+                pickupObjectFlags: cloak.pickupObjectFlags,
+                pickupCollisionRadius: cloak.pickupCollisionRadius,
+                fadeDuration: 0.5,
+                cloakDuration: cloak.cloakDuration,
+                activatedMessage: cloak.activatedMessage,
+                expiredMessage: cloak.expiredMessage,
+                pickupSoundSourceName: cloak.pickupSoundSourceName,
+                activatedSoundSourceName:
+                    cloak.activatedSoundSourceName,
+                expiredSoundSourceName: cloak.expiredSoundSourceName
+            )
+        )
+        assertValidationError(
+            .invalidDependency("Training CloakPowerup2 pickup chain"),
+            hostileFade
+        )
+
+        let cloakModelIndex = try XCTUnwrap(level.models.firstIndex {
+            $0.source.sourceName == "cloak.OOF"
+        })
+        var hostileModels = level.models
+        let cloakModel = hostileModels[cloakModelIndex]
+        hostileModels[cloakModelIndex] = .init(
+            source: cloakModel.source,
+            collisionRadius: cloakModel.collisionRadius,
+            submodels: cloakModel.submodels,
+            bounds: cloakModel.bounds,
+            sourceArchive: cloakModel.sourceArchive,
+            sourceSHA256: String(repeating: "0", count: 64)
+        )
+        assertValidationError(
+            .invalidDependency("Training CloakPowerup2 pickup chain"),
+            replacing(level, models: hostileModels)
+        )
+
+        let exactPCMHashes = [
+            "Power03.wav":
+                "48908714345e648ce9e713d24b9aa66bfe763a82d961a83ca9543852bca8aadc",
+            "ShpCloakOn.wav":
+                "61b52e468bfbe6bf5bd96ac158ef3ab7fd0d048fa375896c80de83df2129cdb2",
+            "ShpCloakOffBeep.wav":
+                "8ca941f9d4a30f4b3431af4b86ff153b955885a23c686fa56fb7a8d0bfa0e87d",
+        ]
+        let stockSounds = level.soundClips.map { clip in
+            guard let exactPCMHash = exactPCMHashes[clip.sourceName]
+            else { return clip }
+            return CanonicalSoundClip(
+                logicalName: clip.logicalName,
+                sourceName: clip.sourceName,
+                sourceEntryIndex: clip.sourceEntryIndex,
+                sampleRate: clip.sampleRate,
+                channelCount: clip.channelCount,
+                frameCount: clip.frameCount,
+                pcm16LittleEndian: clip.pcm16LittleEndian,
+                pcmSHA256: exactPCMHash,
+                sourceArchive: clip.sourceArchive,
+                sourceSHA256: clip.sourceSHA256,
+                importVolume: clip.importVolume
+            )
+        }
+        XCTAssertNoThrow(
+            try validateStockTrainingCloakSoundPackage(stockSounds)
+        )
+        for sourceName in exactPCMHashes.keys.sorted() {
+            var hostileSounds = stockSounds
+            let index = try XCTUnwrap(hostileSounds.firstIndex {
+                $0.sourceName == sourceName
+            })
+            let clip = hostileSounds[index]
+            let hostilePCM = Data(
+                repeating: 1,
+                count: clip.pcm16LittleEndian.count
+            )
+            hostileSounds[index] = .init(
+                logicalName: clip.logicalName,
+                sourceName: clip.sourceName,
+                sourceEntryIndex: clip.sourceEntryIndex,
+                sampleRate: clip.sampleRate,
+                channelCount: clip.channelCount,
+                frameCount: clip.frameCount,
+                pcm16LittleEndian: hostilePCM,
+                pcmSHA256: canonicalSHA256(hostilePCM),
+                sourceArchive: clip.sourceArchive,
+                sourceSHA256: clip.sourceSHA256,
+                importVolume: clip.importVolume
+            )
+            XCTAssertThrowsError(
+                try validateStockTrainingCloakSoundPackage(hostileSounds),
+                sourceName
+            ) {
+                XCTAssertEqual(
+                    $0 as? LevelValidationError,
+                    .invalidDependency("Training CloakPowerup2 package")
+                )
+            }
+        }
+
+        let hostileMarkerPresentation = replacing(
+            level,
+            trainingLastRoomChain: .init(
+                barrierRoomSourceIndex:
+                    lastRoom.barrierRoomSourceIndex,
+                orderedPortalIndices:
+                    lastRoom.orderedPortalIndices,
+                markerLightObjectHandle:
+                    lastRoom.markerLightObjectHandle,
+                markerLightPresentation: .init(
+                    primaryColor: .zero,
+                    secondaryColor:
+                        lastRoom.markerLightPresentation.secondaryColor,
+                    timeInterval:
+                        lastRoom.markerLightPresentation.timeInterval,
+                    flickerDistance:
+                        lastRoom.markerLightPresentation.flickerDistance,
+                    directionalDot:
+                        lastRoom.markerLightPresentation.directionalDot,
+                    flags: lastRoom.markerLightPresentation.flags,
+                    timebits:
+                        lastRoom.markerLightPresentation.timebits,
+                    angle: lastRoom.markerLightPresentation.angle,
+                    lightingRenderType:
+                        lastRoom.markerLightPresentation
+                            .lightingRenderType
+                ),
+                openMarkerLightDistance:
+                    lastRoom.openMarkerLightDistance,
+                timerDuration: lastRoom.timerDuration,
+                completionMessages: lastRoom.completionMessages,
+                completionVoiceSourceName:
+                    lastRoom.completionVoiceSourceName
+            )
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 034 / 049 last-room chain"
+            ),
+            hostileMarkerPresentation
+        )
+    }
+
     func testSchemaElevenValidatesExactTrainingInvulnerabilityPickupChain()
         throws
     {
@@ -3794,8 +4003,13 @@ func replacing(
     trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
     trainingCameraMonitorChain: TrainingCameraMonitorChain? = nil,
     trainingRASBot1DeathChain: TrainingRASBot1DeathChain? = nil,
+    trainingRASBot2DeathChain: TrainingRASBot2DeathChain? = nil,
+    trainingRASBot3DeathChain: TrainingRASBot3DeathChain? = nil,
+    trainingRASBot4DeathChain: TrainingRASBot4DeathChain? = nil,
     trainingInvulnerabilityPickupChain:
         TrainingInvulnerabilityPickupChain? = nil,
+    trainingCloakPickupChain: TrainingCloakPickupChain? = nil,
+    trainingLastRoomChain: TrainingLastRoomChain? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
     soundClips: [CanonicalSoundClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
@@ -3842,9 +4056,19 @@ func replacing(
             trainingCameraMonitorChain ?? level.trainingCameraMonitorChain,
         trainingRASBot1DeathChain:
             trainingRASBot1DeathChain ?? level.trainingRASBot1DeathChain,
+        trainingRASBot2DeathChain:
+            trainingRASBot2DeathChain ?? level.trainingRASBot2DeathChain,
+        trainingRASBot3DeathChain:
+            trainingRASBot3DeathChain ?? level.trainingRASBot3DeathChain,
+        trainingRASBot4DeathChain:
+            trainingRASBot4DeathChain ?? level.trainingRASBot4DeathChain,
         trainingInvulnerabilityPickupChain:
             trainingInvulnerabilityPickupChain
             ?? level.trainingInvulnerabilityPickupChain,
+        trainingCloakPickupChain:
+            trainingCloakPickupChain ?? level.trainingCloakPickupChain,
+        trainingLastRoomChain:
+            trainingLastRoomChain ?? level.trainingLastRoomChain,
         voiceClips: voiceClips ?? level.voiceClips,
         soundClips: soundClips ?? level.soundClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
@@ -3852,7 +4076,7 @@ func replacing(
     )
 }
 
-private func replacing(
+func replacing(
     _ source: LevelSource,
     profileIdentifier: String? = nil,
     profileFiles: [SourceFileFingerprint]? = nil,

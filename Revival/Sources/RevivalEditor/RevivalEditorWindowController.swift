@@ -1003,6 +1003,8 @@ func editorIdleStatusMessage(
         project.trainingRASBot3DeathSourceDiagnostic,
         project.trainingRASBot4DeathSourceDiagnostic,
         project.trainingInvulnerabilityPickupSourceDiagnostic,
+        project.trainingCloakPickupSourceDiagnostic,
+        project.trainingLastRoomSourceDiagnostic,
     ].compactMap { $0 }
     guard !sourceDiagnostics.isEmpty else { return status }
     return "\(status)\nSource: \(sourceDiagnostics.joined(separator: "; "))"

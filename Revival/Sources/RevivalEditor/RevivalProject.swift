@@ -548,6 +548,26 @@ struct RevivalProject: Equatable, Sendable {
         }
         return "TrainingMission.cpp Script 047 / \(pickup.instanceName ?? "InvulnPowerup2") pickup"
     }
+    var trainingCloakPickupSourceDiagnostic: String? {
+        guard let chain = level.trainingCloakPickupChain,
+            let pickup = level.objects.first(where: {
+                $0.handle == chain.pickupObjectHandle
+            })
+        else {
+            return nil
+        }
+        return "TrainingMission.cpp Script 048 / \(pickup.instanceName ?? "CloakPowerup2") pickup"
+    }
+    var trainingLastRoomSourceDiagnostic: String? {
+        guard let chain = level.trainingLastRoomChain,
+            level.rooms.contains(where: {
+                $0.sourceIndex == chain.barrierRoomSourceIndex
+            })
+        else {
+            return nil
+        }
+        return "TrainingMission.cpp Scripts 034/049 / PortalRoom6 completion"
+    }
     var trainingGalleryBarrierIsOpen: Bool {
         guard let barrier = level.trainingGalleryBarrier,
               let room = level.rooms.first(where: {

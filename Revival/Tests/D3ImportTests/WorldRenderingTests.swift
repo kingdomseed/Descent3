@@ -1871,6 +1871,380 @@ final class WorldRenderingTests: XCTestCase {
             })
     }
 
+    func testCloakPowerup2FadesAndPersistsItsStockVisibilityEffect()
+        throws
+    {
+        var level = makeTrainingCloakPickupLevel()
+        try level.validate()
+        let chain = try XCTUnwrap(level.trainingCloakPickupChain)
+        let pickup = try XCTUnwrap(level.objects.first {
+            $0.handle == chain.pickupObjectHandle
+        })
+        let playerIndex = level.objects.firstIndex {
+            $0.handle == 2_048
+        }!
+        let combinedRadius =
+            defaultPlayerView(in: level).collisionRadius
+            + chain.pickupCollisionRadius
+        level.objects[playerIndex].location =
+            .room(chain.pickupRoomSourceIndex)
+        level.objects[playerIndex].position = .init(
+            x: pickup.position.x + combinedRadius - 0.01,
+            y: pickup.position.y,
+            z: pickup.position.z
+        )
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        var frame = simulation.update(at: 0.1, input: .zero)
+
+        XCTAssertEqual(frame.trainingCloak?.phase, .fadingOut)
+        XCTAssertEqual(
+            try XCTUnwrap(frame.trainingCloak?.objectAlpha),
+            0.908,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            frame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Cloak On"],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: true,
+                    soundSourceName: "ShpCloakOn.wav"
+                ),
+                .init(
+                    hudMessages: [],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: true,
+                    soundSourceName: "Power03.wav"
+                ),
+            ]
+        )
+        XCTAssertFalse(simulation.level.objects.contains {
+            $0.handle == chain.pickupObjectHandle
+        })
+        for frameIndex in 2...10 {
+            frame = simulation.update(
+                at: Double(frameIndex) * 0.1,
+                input: .zero
+            )
+        }
+        XCTAssertEqual(frame.trainingCloak?.phase, .cloaked)
+        XCTAssertEqual(frame.trainingCloak?.objectAlpha, 0.13)
+        XCTAssertEqual(
+            RevivalGameplayView.cloakStatusPresentation(
+                frame.trainingCloak
+            ).cloakText,
+            "CLK"
+        )
+        let warningPulse =
+            RevivalGameplayView.cloakStatusPresentation(.init(
+                phase: .cloaked,
+                phaseRemaining: 2.25,
+                phaseDuration: 30
+            ))
+        XCTAssertEqual(warningPulse.cloakText, "CLK")
+        XCTAssertEqual(
+            warningPulse.shipOpacity,
+            128.0 / 255,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            warningPulse.cloakOpacity,
+            127.0 / 255,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            warningPulse.shipOpacity + warningPulse.cloakOpacity,
+            1,
+            accuracy: 0.000_1
+        )
+        let shipMonitorPath =
+            RevivalGameplayView.cloakShipMonitorPath(
+                in: CGRect(x: 0, y: 0, width: 96, height: 28)
+            )
+        XCTAssertFalse(shipMonitorPath.isEmpty)
+        XCTAssertGreaterThan(
+            shipMonitorPath.boundingBoxOfPath.width,
+            shipMonitorPath.boundingBoxOfPath.height
+        )
+        XCTAssertGreaterThan(
+            shipMonitorPath.boundingBoxOfPath.height,
+            10
+        )
+        let continuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: continuationData)
+                as? [String: Any]
+        )
+        XCTAssertEqual(continuationObject["schemaVersion"] as? Int, 7)
+        let cloakState = try XCTUnwrap(
+            continuationObject["trainingCloakPickupState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(cloakState["wasConsumed"] as? Bool, true)
+        XCTAssertEqual(cloakState["phase"] as? String, "cloaked")
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: continuationData
+            ),
+            resumedAtTimestamp: 100
+        )
+        frame = restored.update(at: 100.1, input: .zero)
+        XCTAssertEqual(frame.trainingCloak?.phase, .cloaked)
+        XCTAssertTrue(frame.trainingOpeningFeedback.isEmpty)
+
+        var nearExpiryObject = continuationObject
+        var nearExpiryState = cloakState
+        nearExpiryState["phaseRemaining"] = 0.1
+        nearExpiryObject["trainingCloakPickupState"] = nearExpiryState
+        let nearExpiry = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: nearExpiryObject
+                )
+            ),
+            resumedAtTimestamp: 200
+        )
+        let fadeIn = nearExpiry.update(at: 200.1, input: .zero)
+        XCTAssertEqual(fadeIn.trainingCloak?.phase, .fadingIn)
+        XCTAssertEqual(fadeIn.trainingCloak?.objectAlpha, 0.08)
+        XCTAssertEqual(
+            fadeIn.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Cloak Off"],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: true,
+                    soundSourceName: "ShpCloakOffBeep.wav"
+                )
+            ]
+        )
+        XCTAssertEqual(
+            RevivalGameplayView.cloakStatusPresentation(
+                fadeIn.trainingCloak
+            ).cloakText,
+            ""
+        )
+        var finalFrame = fadeIn
+        for frameIndex in 2...11 {
+            finalFrame = nearExpiry.update(
+                at: 200 + Double(frameIndex) * 0.1,
+                input: .zero
+            )
+        }
+        XCTAssertNil(finalFrame.trainingCloak)
+        XCTAssertTrue(finalFrame.trainingOpeningFeedback.isEmpty)
+
+        let postExpiry = try PlayerSimulation(
+            level: level,
+            continuation: nearExpiry.continuation,
+            resumedAtTimestamp: 300
+        )
+        let repeated = postExpiry.update(at: 300.1, input: .zero)
+        XCTAssertNil(repeated.trainingCloak)
+        XCTAssertTrue(repeated.trainingOpeningFeedback.isEmpty)
+        XCTAssertFalse(postExpiry.level.objects.contains {
+            $0.handle == chain.pickupObjectHandle
+        })
+    }
+
+    func testCloakPowerup2SixthProducerRunsScript034AndTimerNineOnce()
+        throws
+    {
+        let level = makeTrainingCloakPickupLevel()
+        let cloak = try XCTUnwrap(level.trainingCloakPickupChain)
+        let pickup = try XCTUnwrap(level.objects.first {
+            $0.handle == cloak.pickupObjectHandle
+        })
+        let initial = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var readyObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(initial.continuation)
+            ) as? [String: Any]
+        )
+        for key in [
+            "trainingRASBot1DeathState",
+            "trainingRASBot2DeathState",
+            "trainingRASBot3DeathState",
+            "trainingRASBot4DeathState",
+        ] {
+            readyObject[key] = [
+                "wasDestroyed": true,
+                "shields": -5,
+            ]
+        }
+        readyObject["trainingInvulnerabilityPickupState"] = [
+            "scriptWasTriggered": true,
+            "wasConsumed": true,
+        ]
+        readyObject["playerLocation"] = [
+            "room": ["_0": cloak.pickupRoomSourceIndex]
+        ]
+        readyObject["playerPosition"] = [
+            "x": pickup.position.x,
+            "y": pickup.position.y,
+            "z": pickup.position.z,
+        ]
+        let simulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: readyObject)
+            ),
+            resumedAtTimestamp: 0
+        )
+
+        var frame = simulation.update(at: 0.1, input: .zero)
+
+        let chain = try XCTUnwrap(level.trainingLastRoomChain)
+        func assertBarrierIsOpen(in level: Level) throws {
+            let barrier = try XCTUnwrap(level.rooms.first {
+                $0.sourceIndex == chain.barrierRoomSourceIndex
+            })
+            for portalIndex in chain.orderedPortalIndices {
+                let portal = barrier.portals[portalIndex]
+                XCTAssertEqual(portal.flags & 1, 0)
+                let connected = try XCTUnwrap(level.rooms.first {
+                    $0.sourceIndex == portal.connectedRoom
+                })
+                XCTAssertEqual(
+                    connected.portals[portal.connectedPortal].flags & 1,
+                    0
+                )
+            }
+        }
+        XCTAssertEqual(chain.orderedPortalIndices, [1, 0])
+        try assertBarrierIsOpen(in: simulation.level)
+        XCTAssertEqual(frame.trainingLastRoomMarkerLightDistance, 50)
+        XCTAssertFalse(frame.trainingOpeningFeedback.contains {
+            $0.voiceSourceName == "proceed5.osf"
+        })
+        let triggeredData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let triggeredObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: triggeredData)
+                as? [String: Any]
+        )
+        let triggeredState = try XCTUnwrap(
+            triggeredObject["trainingLastRoomState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(triggeredState["wasTriggered"] as? Bool, true)
+        XCTAssertEqual(
+            try XCTUnwrap(
+                triggeredState["timerRemaining"] as? Double
+            ),
+            2,
+            accuracy: 0.000_1
+        )
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: triggeredData
+            ),
+            resumedAtTimestamp: 100
+        )
+        try assertBarrierIsOpen(in: restored.level)
+        for frameIndex in 1...20 {
+            frame = restored.update(
+                at: 100 + Double(frameIndex) * 0.1,
+                input: .zero
+            )
+        }
+        XCTAssertEqual(
+            frame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [
+                        "Excellent!",
+                        "Now proceed through the doorway that just opened to begin the last stage of your training.",
+                    ],
+                    voiceSourceName: "proceed5.osf",
+                    voicePrecedesHUDMessages: false
+                )
+            ]
+        )
+        let repeated = restored.update(at: 102.1, input: .zero)
+        XCTAssertTrue(repeated.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(repeated.trainingLastRoomMarkerLightDistance, 50)
+
+        let completed = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(restored.continuation)
+            ),
+            resumedAtTimestamp: 200
+        )
+        try assertBarrierIsOpen(in: completed.level)
+        let resumedCompleted = completed.update(
+            at: 200.1,
+            input: .zero
+        )
+        XCTAssertTrue(
+            resumedCompleted.trainingOpeningFeedback.isEmpty
+        )
+        XCTAssertEqual(
+            resumedCompleted.trainingLastRoomMarkerLightDistance,
+            50
+        )
+    }
+
+    func testSchemaSevenContinuationDefaultsNewScript048States()
+        throws
+    {
+        let previousLevel = makeTrainingInvulnerabilityPickupLevel()
+        let previous = PlayerSimulation(
+            level: previousLevel,
+            presentationReadyTimestamp: 0
+        )
+        let previousData = try JSONEncoder().encode(previous.continuation)
+        let previousObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: previousData)
+                as? [String: Any]
+        )
+        XCTAssertNil(previousObject["trainingCloakPickupState"])
+        XCTAssertNil(previousObject["trainingLastRoomState"])
+
+        let currentLevel = makeTrainingCloakPickupLevel()
+        let restored = try PlayerSimulation(
+            level: currentLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: previousData
+            ),
+            resumedAtTimestamp: 100
+        )
+
+        XCTAssertTrue(restored.level.objects.contains {
+            $0.handle == 2_073
+        })
+        let currentObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(restored.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertNotNil(currentObject["trainingCloakPickupState"])
+        XCTAssertNotNil(currentObject["trainingLastRoomState"])
+    }
+
     func testGuidebotReturnTracksLivePlayerMovementInSameFrame()
         throws
     {
@@ -2584,6 +2958,44 @@ final class WorldRenderingTests: XCTestCase {
         )
 
         XCTAssertTrue(frame.trainingOpeningFeedback.isEmpty)
+    }
+
+    func testSchemaSevenRejectsTriggeredLastRoomWithoutSixProducers()
+        throws
+    {
+        let level = makeTrainingCloakPickupLevel()
+        let initial = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var hostile = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(initial.continuation)
+            ) as? [String: Any]
+        )
+        hostile["trainingLastRoomState"] = [
+            "wasTriggered": true,
+            "markerLightDistance": 50,
+            "timerRemaining": 2,
+            "wasPresented": false,
+        ]
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostile)
+        )
+
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: continuation,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
     }
 
     func testTrainingGuidebotUsesVerifiedBoundaryNodesAroundBlockedDirectLine() throws {
@@ -7310,6 +7722,347 @@ func makeTrainingInvulnerabilityPickupLevel() -> Level {
         ),
         soundClips: [pickup, activated, expired]
     )
+}
+
+func makeTrainingCloakPickupLevel() -> Level {
+    var level = makeTrainingInvulnerabilityPickupLevel()
+    if !level.rooms.contains(where: { $0.sourceIndex == 11 }) {
+        let template = level.rooms.first { $0.sourceIndex == 12 }!
+        level.rooms.append(.init(
+            sourceIndex: 11,
+            name: "Cloak Room",
+            pathPoint: template.pathPoint,
+            vertices: template.vertices,
+            faces: template.faces,
+            portals: [],
+            flags: template.flags,
+            pulseTime: template.pulseTime,
+            pulseOffset: template.pulseOffset,
+            mirrorFaceIndex: template.mirrorFaceIndex,
+            door: template.door,
+            volumeLights: template.volumeLights,
+            fog: template.fog,
+            ambientSoundPattern: template.ambientSoundPattern,
+            reverb: template.reverb,
+            damage: template.damage,
+            damageType: template.damageType
+        ))
+    }
+    let pickupRoom = level.rooms.first { $0.sourceIndex == 11 }!
+    let player = level.objects.first { $0.handle == 2_048 }!
+    let presentation = level.objectPresentations.first {
+        $0.objectHandle == 2_076
+    }!
+    let modelTemplate = level.models.first {
+        $0.source == presentation.primaryModel
+    }!
+    let cloakModelSources = [
+        SourceResource(storedIndex: 20, sourceName: "cloak.OOF"),
+        SourceResource(storedIndex: 21, sourceName: "CloakMed.OOF"),
+        SourceResource(storedIndex: 22, sourceName: "CloakLow.OOF"),
+    ]
+    let cloakModelHashes = [
+        "ccce90c9dbc266c0a22ab00339689059888719b212116191049ef4396ebc5baa",
+        "7b6e66b1ad23328b43dc007de7cb2b8806397f69bab95647e350554f479e0c6b",
+        "38754663d76df10a7d6d41e241cfe2fc08b9f7fb99addb41cb5ed1fc205f119f",
+    ]
+    let cloakModels = zip(cloakModelSources, cloakModelHashes).map {
+        source, hash in
+        CanonicalModel(
+            source: source,
+            collisionRadius:
+                source == cloakModelSources[0]
+                    ? 1.223_636_7
+                    : modelTemplate.collisionRadius,
+            submodels: modelTemplate.submodels,
+            bounds: modelTemplate.bounds,
+            sourceArchive: "d3.hog",
+            sourceSHA256: hash
+        )
+    }
+    level = replacing(
+        level,
+        source: replacing(
+            level.source,
+            profileFiles:
+                level.source.profileFiles
+                + [
+                    .init(
+                        relativePath: "d3.hog",
+                        byteCount: 194_030_423,
+                        sha256:
+                            "a0f1cb2c1a73da828a5fd4e80d6544b63da04e177dc2b894d9e6418296bc24c6"
+                    )
+                ]
+        ),
+        models: level.models + cloakModels,
+        dependencyManifest: .init(
+            current:
+                level.dependencyManifest.current
+                + cloakModelSources.map {
+                    DependencyRecord(
+                        category: "model",
+                        source: $0,
+                        state: "presentation-payload-imported",
+                        provenance: "d3.hog"
+                    )
+                },
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
+    level.objects.append(.init(
+        handle: 2_073,
+        type: 7,
+        storedID: 4,
+        definition: .init(storedIndex: 4, sourceName: "Cloak"),
+        instanceName: "CloakPowerup2",
+        flags: 5_120,
+        doorShields: nil,
+        location: .room(11),
+        position: pickupRoom.pathPoint,
+        orientation: player.orientation,
+        containsType: 255,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    ))
+    level.objectPresentations.append(.init(
+        objectHandle: 2_073,
+        primaryModel: cloakModelSources[0],
+        mediumModel: cloakModelSources[1],
+        lowModel: cloakModelSources[2],
+        dyingModel: nil,
+        mediumDistance: 35,
+        lowDistance: 50
+    ))
+    let pickupPCM = Data(repeating: 0, count: 15_189 * 2)
+    let pickup = CanonicalSoundClip(
+        logicalName: "Powerup pickup",
+        sourceName: "Power03.wav",
+        sourceEntryIndex: 2_657,
+        sampleRate: 22_050,
+        channelCount: 1,
+        frameCount: 15_189,
+        pcm16LittleEndian: pickupPCM,
+        pcmSHA256: canonicalSHA256(pickupPCM),
+        sourceArchive: "d3.hog",
+        sourceSHA256:
+            "1e16aae37b233dd724d4baa001f48b83681fbc33eb16d21269cd52c5b7e8cea3",
+        importVolume: 1
+    )
+    level = replacing(
+        level,
+        soundClips:
+            level.soundClips.filter { $0.sourceName != "Power03.wav" }
+            + [pickup],
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current.filter {
+                !(
+                    $0.category == "sound"
+                        && $0.source.sourceName == "Power03.wav"
+                )
+            } + [
+                .init(
+                    category: "sound",
+                    source: .init(
+                        storedIndex: pickup.sourceEntryIndex,
+                        sourceName: pickup.sourceName
+                    ),
+                    state: "canonical-pcm-imported",
+                    provenance:
+                        "\(pickup.sourceArchive) \(pickup.sourceSHA256)"
+                )
+            ],
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
+    let cloakOnPCM = Data(repeating: 0, count: 33_046 * 2)
+    let cloakOn = CanonicalSoundClip(
+        logicalName: "Cloak on",
+        sourceName: "ShpCloakOn.wav",
+        sourceEntryIndex: 3_247,
+        sampleRate: 22_050,
+        channelCount: 1,
+        frameCount: 33_046,
+        pcm16LittleEndian: cloakOnPCM,
+        pcmSHA256: canonicalSHA256(cloakOnPCM),
+        sourceArchive: "d3.hog",
+        sourceSHA256:
+            "27d19947e58370b18722fbcbe2fba64bf5094e3752a069bd1d2e1ed76e70c58e",
+        importVolume: 0.5
+    )
+    let cloakOffPCM = Data(repeating: 0, count: 45_609 * 2)
+    let cloakOff = CanonicalSoundClip(
+        logicalName: "Cloak off",
+        sourceName: "ShpCloakOffBeep.wav",
+        sourceEntryIndex: 3_246,
+        sampleRate: 22_050,
+        channelCount: 1,
+        frameCount: 45_609,
+        pcm16LittleEndian: cloakOffPCM,
+        pcmSHA256: canonicalSHA256(cloakOffPCM),
+        sourceArchive: "d3.hog",
+        sourceSHA256:
+            "29c9bb2fe254a9c2e75b8ae0f13b60627088294f075fbd74eae449e76c767154",
+        importVolume: 0.5
+    )
+    let cloakLevel = level.addingTrainingCloakPickupChain(
+        .init(
+            pickupObjectHandle: 2_073,
+            pickupRoomSourceIndex: 11,
+            pickupObjectFlags: 5_120,
+            pickupCollisionRadius: cloakModels[0].collisionRadius,
+            fadeDuration: 1,
+            cloakDuration: 30,
+            activatedMessage: "Cloak On",
+            expiredMessage: "Cloak Off",
+            pickupSoundSourceName: "Power03.wav",
+            activatedSoundSourceName: "ShpCloakOn.wav",
+            expiredSoundSourceName: "ShpCloakOffBeep.wav"
+        ),
+        soundClips: [cloakOn, cloakOff]
+    )
+    var lastRoomLevel = cloakLevel
+    let lastRoomTemplate = lastRoomLevel.rooms.first {
+        $0.sourceIndex == 2
+    }!
+    precondition(lastRoomTemplate.portals.count == 2)
+    var lastRoomPortals: [LevelPortal] = []
+    var connectedRooms: [LevelRoom] = []
+    for portalIndex in lastRoomTemplate.portals.indices {
+        let sourcePortal = lastRoomTemplate.portals[portalIndex]
+        let sourceConnectedRoom = lastRoomLevel.rooms.first {
+            $0.sourceIndex == sourcePortal.connectedRoom
+        }!
+        let sourceReciprocal =
+            sourceConnectedRoom.portals[sourcePortal.connectedPortal]
+        let connectedSourceIndex = 45 + portalIndex
+        lastRoomPortals.append(.init(
+            flags: 1,
+            faceIndex: sourcePortal.faceIndex,
+            connectedRoom: connectedSourceIndex,
+            connectedPortal: 0,
+            boundaryNodeIndex: -1,
+            pathPoint: sourcePortal.pathPoint,
+            combineMaster: -1
+        ))
+        let connectedFaces = sourceConnectedRoom.faces.enumerated().map {
+            faceIndex, face in
+            LevelFace(
+                corners: face.corners,
+                flags: face.flags,
+                portalIndex:
+                    faceIndex == sourceReciprocal.faceIndex ? 0 : nil,
+                texture: face.texture,
+                lightmapInfoIndex: face.lightmapInfoIndex,
+                allowsLightCorona: face.allowsLightCorona,
+                lightMultiple: face.lightMultiple,
+                special: face.special
+            )
+        }
+        connectedRooms.append(.init(
+            sourceIndex: connectedSourceIndex,
+            name: "PortalRoom6 test neighbor \(portalIndex)",
+            pathPoint: sourceConnectedRoom.pathPoint,
+            vertices: sourceConnectedRoom.vertices,
+            faces: connectedFaces,
+            portals: [
+                .init(
+                    flags: 1,
+                    faceIndex: sourceReciprocal.faceIndex,
+                    connectedRoom: 44,
+                    connectedPortal: portalIndex,
+                    boundaryNodeIndex: -1,
+                    pathPoint: sourceReciprocal.pathPoint,
+                    combineMaster: -1
+                ),
+            ],
+            flags: sourceConnectedRoom.flags,
+            pulseTime: sourceConnectedRoom.pulseTime,
+            pulseOffset: sourceConnectedRoom.pulseOffset,
+            mirrorFaceIndex: sourceConnectedRoom.mirrorFaceIndex,
+            door: sourceConnectedRoom.door,
+            volumeLights: sourceConnectedRoom.volumeLights,
+            fog: sourceConnectedRoom.fog,
+            ambientSoundPattern:
+                sourceConnectedRoom.ambientSoundPattern,
+            reverb: sourceConnectedRoom.reverb,
+            damage: sourceConnectedRoom.damage,
+            damageType: sourceConnectedRoom.damageType
+        ))
+    }
+    let lastRoom = LevelRoom(
+        sourceIndex: 44,
+        name: "PortalRoom6",
+        pathPoint: lastRoomTemplate.pathPoint,
+        vertices: lastRoomTemplate.vertices,
+        faces: lastRoomTemplate.faces,
+        portals: lastRoomPortals,
+        flags: lastRoomTemplate.flags,
+        pulseTime: lastRoomTemplate.pulseTime,
+        pulseOffset: lastRoomTemplate.pulseOffset,
+        mirrorFaceIndex: lastRoomTemplate.mirrorFaceIndex,
+        door: lastRoomTemplate.door,
+        volumeLights: lastRoomTemplate.volumeLights,
+        fog: lastRoomTemplate.fog,
+        ambientSoundPattern: lastRoomTemplate.ambientSoundPattern,
+        reverb: lastRoomTemplate.reverb,
+        damage: lastRoomTemplate.damage,
+        damageType: lastRoomTemplate.damageType
+    )
+    lastRoomLevel.rooms.append(contentsOf: [lastRoom] + connectedRooms)
+    lastRoomLevel.objects.append(.init(
+        handle: 4_117,
+        type: 11,
+        storedID: 205,
+        definition: .init(
+            storedIndex: 205,
+            sourceName: "Blinking Red Light-DM"
+        ),
+        instanceName: "FlashLight-4",
+        flags: 4_096,
+        doorShields: nil,
+        location: .room(44),
+        position: lastRoom.pathPoint,
+        orientation: player.orientation,
+        containsType: 0,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    ))
+    return lastRoomLevel.addingTrainingLastRoomChain(.init(
+        barrierRoomSourceIndex: 44,
+        orderedPortalIndices: [1, 0],
+        markerLightObjectHandle: 4_117,
+        markerLightPresentation: .init(
+            primaryColor: .init(x: 1, y: 0.25, z: 0),
+            secondaryColor: .zero,
+            timeInterval: 0.5,
+            flickerDistance: 0.2,
+            directionalDot: 0,
+            flags: 4,
+            timebits: .max,
+            angle: 0,
+            lightingRenderType: 2
+        ),
+        openMarkerLightDistance: 50,
+        timerDuration: 2,
+        completionMessages: [
+            "Excellent!",
+            "Now proceed through the doorway that just opened to begin the last stage of your training.",
+        ],
+        completionVoiceSourceName: "proceed5.osf"
+    ))
 }
 
 private func assertTrainingGuidebotReturnBarrier(

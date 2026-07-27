@@ -1,6 +1,170 @@
 import XCTest
 
 final class MetalWorldPlanTests: XCTestCase {
+    func testScript034MarkerDistanceLightsReachedMetalWorld() throws {
+        var level = makeTrainingCloakPickupLevel()
+        let playerView = defaultPlayerView(in: level)
+        let markerHandle = try XCTUnwrap(
+            level.trainingLastRoomChain?.markerLightObjectHandle
+        )
+        let markerIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == markerHandle
+        })
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            playerView: playerView
+        )
+        let target = try XCTUnwrap(
+            initial.draws.first?.vertices.first?.position
+        )
+        level.objects[markerIndex].location =
+            .room(playerView.roomSourceIndex)
+        level.objects[markerIndex].position = .init(
+            x: target.x + 20,
+            y: target.y,
+            z: target.z
+        )
+
+        let lit = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            playerView: playerView,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1,
+                systemsGameTime: 0.5
+            ),
+            trainingLastRoomMarkerLightDistance: 50
+        )
+
+        XCTAssertGreaterThan(
+            lit.draws[0].vertices[0].dynamicLight.x,
+            0
+        )
+    }
+
+    func testCloakAlphaReachesAuxiliaryCameraPlayerDraws() throws {
+        let level = makeTrainingCloakPickupLevel()
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(at: 0.1, input: .zero)
+        let used = simulation.update(
+            at: 0.2,
+            input: .init(usesInventory: true)
+        )
+        let monitor = try XCTUnwrap(used.trainingCameraMonitor)
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            playerView: used.playerView
+        )
+
+        let faded = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            playerView: used.playerView,
+            trainingCameraMonitor: monitor,
+            trainingCloak: .init(
+                phase: .fadingOut,
+                phaseRemaining: 0.5,
+                phaseDuration: 1
+            )
+        )
+        let playerDraws = faded.auxiliaryDraws.filter {
+            $0.objectHandle == used.playerView.objectHandle
+        }
+
+        XCTAssertFalse(playerDraws.isEmpty)
+        for draw in playerDraws {
+            XCTAssertEqual(
+                draw.blend,
+                .sourceAlpha(opacity: 138)
+            )
+            for vertex in draw.vertices {
+                XCTAssertEqual(
+                    vertex.presentation.x,
+                    0.54,
+                    accuracy: 0.000_1
+                )
+            }
+        }
+
+        let cloakFrame = TrainingCloakFrame(
+            phase: .cloaked,
+            phaseRemaining: 20,
+            phaseDuration: 30
+        )
+        XCTAssertEqual(cloakFrame.objectDeformationRange, 0.1)
+        let baseline = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            playerView: used.playerView,
+            trainingCameraMonitor: monitor
+        )
+        let cloaked = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            playerView: used.playerView,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1,
+                systemsGameTime: 1
+            ),
+            trainingCameraMonitor: monitor,
+            trainingCloak: cloakFrame
+        )
+        let baselinePlayerDraw = try XCTUnwrap(
+            baseline.auxiliaryDraws.first {
+                $0.objectHandle == used.playerView.objectHandle
+            }
+        )
+        let cloakedPlayerDraw = try XCTUnwrap(
+            cloaked.auxiliaryDraws.first {
+                $0.objectHandle == used.playerView.objectHandle
+                    && $0.model == baselinePlayerDraw.model
+                    && $0.submodelIndex
+                        == baselinePlayerDraw.submodelIndex
+                    && $0.faceIndex == baselinePlayerDraw.faceIndex
+            }
+        )
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == used.playerView.objectHandle
+        })
+        var changedVertexCount = 0
+        for (baselineVertex, cloakedVertex) in zip(
+            baselinePlayerDraw.vertices,
+            cloakedPlayerDraw.vertices
+        ) {
+            let baselineOffset = SIMD3<Float>(
+                baselineVertex.position.x - player.position.x,
+                baselineVertex.position.y - player.position.y,
+                baselineVertex.position.z - player.position.z
+            )
+            let cloakedOffset = SIMD3<Float>(
+                cloakedVertex.position.x - player.position.x,
+                cloakedVertex.position.y - player.position.y,
+                cloakedVertex.position.z - player.position.z
+            )
+            let baselineRadius = (
+                baselineOffset.x * baselineOffset.x
+                    + baselineOffset.y * baselineOffset.y
+                    + baselineOffset.z * baselineOffset.z
+            ).squareRoot()
+            let cloakedRadius = (
+                cloakedOffset.x * cloakedOffset.x
+                    + cloakedOffset.y * cloakedOffset.y
+                    + cloakedOffset.z * cloakedOffset.z
+            ).squareRoot()
+            guard baselineRadius > 0 else { continue }
+            let ratio = cloakedRadius / baselineRadius
+            XCTAssertGreaterThanOrEqual(ratio, 0.9)
+            XCTAssertLessThanOrEqual(ratio, 1.1)
+            if abs(ratio - 1) > 0.000_1 {
+                changedVertexCount += 1
+            }
+        }
+        XCTAssertGreaterThan(changedVertexCount, 0)
+    }
+
     func testScript058MarkerDistanceLightsReachedMetalWorld() throws {
         var level = makeTrainingCameraMonitorLevel()
         let playerView = defaultPlayerView(in: level)

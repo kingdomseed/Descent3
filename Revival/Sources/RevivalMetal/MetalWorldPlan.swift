@@ -173,7 +173,9 @@ func updateMetalWorldPlan(
     playerView: PlayerView,
     presentationFrame: MetalPresentationFrame? = nil,
     trainingCameraMonitor: TrainingCameraMonitorFrame? = nil,
-    trainingGuidebotReturnMarkerLightDistance: Float? = nil
+    trainingCloak: TrainingCloakFrame? = nil,
+    trainingGuidebotReturnMarkerLightDistance: Float? = nil,
+    trainingLastRoomMarkerLightDistance: Float? = nil
 ) throws -> MetalWorldPlan {
     try updateMetalWorldPlan(
         prepared,
@@ -183,8 +185,11 @@ func updateMetalWorldPlan(
         excludedObjectHandle: playerView.objectHandle,
         presentationFrame: presentationFrame,
         trainingCameraMonitor: trainingCameraMonitor,
+        trainingCloak: trainingCloak,
         trainingGuidebotReturnMarkerLightDistance:
-            trainingGuidebotReturnMarkerLightDistance
+            trainingGuidebotReturnMarkerLightDistance,
+        trainingLastRoomMarkerLightDistance:
+            trainingLastRoomMarkerLightDistance
     )
 }
 
@@ -201,7 +206,9 @@ func updateMetalWorldPlan(
         excludedObjectHandle: prepared.excludedObjectHandle,
         presentationFrame: presentationFrame,
         trainingCameraMonitor: nil,
-        trainingGuidebotReturnMarkerLightDistance: nil
+        trainingCloak: nil,
+        trainingGuidebotReturnMarkerLightDistance: nil,
+        trainingLastRoomMarkerLightDistance: nil
     )
 }
 
@@ -213,7 +220,9 @@ private func updateMetalWorldPlan(
     excludedObjectHandle: UInt32?,
     presentationFrame: MetalPresentationFrame?,
     trainingCameraMonitor: TrainingCameraMonitorFrame?,
-    trainingGuidebotReturnMarkerLightDistance: Float?
+    trainingCloak: TrainingCloakFrame?,
+    trainingGuidebotReturnMarkerLightDistance: Float?,
+    trainingLastRoomMarkerLightDistance: Float?
 ) throws -> MetalWorldPlan {
     let extraction = try extractWorldForRendering(
         level,
@@ -261,8 +270,28 @@ private func updateMetalWorldPlan(
     }
     let auxiliaryOpaque = auxiliaryExtraction?.opaqueDrawItems
         .map(makeMetalWorldDraw) ?? []
-    let auxiliaryObjects = auxiliaryExtraction?.modelDrawItems
-        .map(makeMetalWorldDraw) ?? []
+    let auxiliaryObjects: [MetalWorldDraw] =
+        (auxiliaryExtraction?.modelDrawItems ?? [])
+        .map(makeMetalWorldDraw)
+        .map { draw in
+            guard draw.objectHandle == excludedObjectHandle,
+                let trainingCloak,
+                let player = level.objects.first(where: {
+                    $0.handle == excludedObjectHandle
+                })
+            else {
+                return draw
+            }
+            return applyingObjectCloak(
+                to: draw,
+                alpha: trainingCloak.objectAlpha,
+                deformationRange:
+                    trainingCloak.objectDeformationRange,
+                center: player.position,
+                visualTick:
+                    presentationFrame?.visualTick ?? 0
+            )
+        }
     let auxiliaryTranslucent =
         auxiliaryExtraction?.translucentDrawItems
             .map(makeMetalWorldDraw) ?? []
@@ -327,6 +356,31 @@ private func updateMetalWorldPlan(
             }
         }
     }
+    if let distance = trainingLastRoomMarkerLightDistance,
+       distance > 0,
+       let chain = level.trainingLastRoomChain,
+       let marker = level.objects.first(where: {
+           $0.handle == chain.markerLightObjectHandle
+       }),
+       let gameTime = presentationFrame?.systemsGameTime {
+        let light = sourceTrainingMarkerLight(
+            chain.markerLightPresentation,
+            gameTime: gameTime
+        )
+        if light.distanceScale > 0 {
+            for index in Set(
+                activeDrawIndices + auxiliaryActiveDrawIndices
+            ) {
+                updatedPreparedDraws[index] =
+                    applyingTrainingMarkerLight(
+                        to: updatedPreparedDraws[index],
+                        position: marker.position,
+                        distance: distance * light.distanceScale,
+                        color: light.color
+                    )
+            }
+        }
+    }
     let coronaPresentation = presentationFrame.map {
         advanceLightCoronas(
             prepared.lightCoronaStates,
@@ -358,6 +412,65 @@ private func updateMetalWorldPlan(
         auxiliaryDraws: auxiliaryActiveDrawIndices.map {
             updatedPreparedDraws[$0]
         }
+    )
+}
+
+private func applyingObjectCloak(
+    to draw: MetalWorldDraw,
+    alpha: Float,
+    deformationRange: Float,
+    center: Vector3,
+    visualTick: Int
+) -> MetalWorldDraw {
+    precondition(alpha.isFinite && (0...1).contains(alpha))
+    precondition(
+        deformationRange.isFinite
+            && (0...0.1).contains(deformationRange)
+    )
+    let opacity = UInt8((alpha * 255).rounded())
+    return MetalWorldDraw(
+        roomSourceIndex: draw.roomSourceIndex,
+        faceIndex: draw.faceIndex,
+        objectHandle: draw.objectHandle,
+        model: draw.model,
+        submodelIndex: draw.submodelIndex,
+        texture: draw.texture,
+        sourceColor: draw.sourceColor,
+        blend: .sourceAlpha(opacity: opacity),
+        writesDepth: draw.writesDepth,
+        lightmapBlend: draw.lightmapBlend,
+        lightmapPageIndex: draw.lightmapPageIndex,
+        vertices: draw.vertices.enumerated().map {
+            vertexIndex, vertex in
+            let seed =
+                UInt32(truncatingIfNeeded: vertexIndex)
+                &* 1_103_515_245
+                &+ UInt32(truncatingIfNeeded: visualTick)
+                &* 12_345
+            let sourceVariation =
+                (Float(Int(seed % 1_000)) - 500) / 500
+            let scale =
+                1 + deformationRange * sourceVariation
+            let deformedPosition = SIMD4<Float>(
+                center.x + (vertex.position.x - center.x) * scale,
+                center.y + (vertex.position.y - center.y) * scale,
+                center.z + (vertex.position.z - center.z) * scale,
+                vertex.position.w
+            )
+            return MetalWorldVertex(
+                position: deformedPosition,
+                textureAndLightmapUV: vertex.textureAndLightmapUV,
+                presentation: SIMD4<Float>(
+                    alpha,
+                    vertex.presentation.y,
+                    vertex.presentation.z,
+                    vertex.presentation.w
+                ),
+                surfaceColor: vertex.surfaceColor,
+                dynamicLight: vertex.dynamicLight
+            )
+        },
+        indices: draw.indices
     )
 }
 

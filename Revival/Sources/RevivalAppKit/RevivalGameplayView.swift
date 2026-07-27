@@ -46,6 +46,9 @@ final class RevivalGameplayView: MTKView {
     private let enabledControlsLabel = NSTextField(labelWithString: "")
     private let invulnerabilityStatusLabel =
         NSTextField(labelWithString: "")
+    private let cloakShipMonitor = NoninteractiveTrainingOverlay()
+    private let cloakShipMonitorShape = CAShapeLayer()
+    private let cloakStatusLabel = NSTextField(labelWithString: "")
     private let invulnerabilityMonitorRing = NoninteractiveTrainingOverlay()
     private let cameraMonitorBorder = NoninteractiveTrainingOverlay()
     private var trainingVoicePlayer: AVAudioPlayer?
@@ -111,6 +114,17 @@ final class RevivalGameplayView: MTKView {
             ),
             width: max(0, width - 104),
             height: 28
+        )
+        cloakStatusLabel.frame = NSRect(
+            x: left + max(0, width - 96),
+            y: invulnerabilityStatusLabel.frame.minY,
+            width: 96,
+            height: 28
+        )
+        cloakShipMonitor.frame = cloakStatusLabel.frame
+        cloakShipMonitorShape.frame = cloakShipMonitor.bounds
+        cloakShipMonitorShape.path = Self.cloakShipMonitorPath(
+            in: cloakShipMonitor.bounds
         )
         cameraMonitorBorder.frame = Self.cameraMonitorFrame(
             drawableWidth: bounds.width,
@@ -193,6 +207,8 @@ final class RevivalGameplayView: MTKView {
             trainingMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
             invulnerabilityStatusLabel.stringValue = ""
+            cloakShipMonitor.isHidden = true
+            cloakStatusLabel.stringValue = ""
             invulnerabilityMonitorRing.isHidden = true
             trainingMessageExpiresAt = nil
             trainingVoicePlayer?.stop()
@@ -213,6 +229,13 @@ final class RevivalGameplayView: MTKView {
             Self.invulnerabilityStatusText(
                 remaining: frame.trainingInvulnerabilityRemaining
             )
+        let cloakStatus = Self.cloakStatusPresentation(
+            frame.trainingCloak
+        )
+        cloakShipMonitor.isHidden = false
+        cloakShipMonitor.alphaValue = cloakStatus.shipOpacity
+        cloakStatusLabel.stringValue = cloakStatus.cloakText
+        cloakStatusLabel.alphaValue = cloakStatus.cloakOpacity
         if let pulse = Self.invulnerabilityMonitorPulse(
             remaining: frame.trainingInvulnerabilityRemaining,
             gameTime: frame.gameTime,
@@ -450,6 +473,62 @@ final class RevivalGameplayView: MTKView {
         return "INVULNERABLE \(tenths / 10).\(abs(tenths % 10))"
     }
 
+    nonisolated static func cloakStatusPresentation(
+        _ cloak: TrainingCloakFrame?
+    ) -> (
+        cloakText: String,
+        shipOpacity: CGFloat,
+        cloakOpacity: CGFloat
+    ) {
+        guard let cloak, cloak.phase == .cloaked else {
+            return ("", 1, 0)
+        }
+        guard cloak.phaseRemaining < 3 else {
+            return ("CLK", 0, 1)
+        }
+        let fraction =
+            cloak.phaseRemaining - floor(cloak.phaseRemaining)
+        let shipAlpha =
+            128 - 127 * cos(2 * Float.pi * fraction)
+        let shipOpacity = CGFloat(shipAlpha / 255)
+        return ("CLK", shipOpacity, 1 - shipOpacity)
+    }
+
+    nonisolated static func cloakShipMonitorPath(
+        in rect: CGRect
+    ) -> CGPath {
+        let drawingRect = rect.insetBy(dx: 4, dy: 3)
+        guard drawingRect.width > 0, drawingRect.height > 0 else {
+            return CGMutablePath()
+        }
+        let points: [(CGFloat, CGFloat)] = [
+            (0.50, 0.95),
+            (0.60, 0.62),
+            (0.88, 0.25),
+            (0.64, 0.34),
+            (0.58, 0.10),
+            (0.50, 0.23),
+            (0.42, 0.10),
+            (0.36, 0.34),
+            (0.12, 0.25),
+            (0.40, 0.62),
+        ]
+        let path = CGMutablePath()
+        for (index, point) in points.enumerated() {
+            let position = CGPoint(
+                x: drawingRect.minX + point.0 * drawingRect.width,
+                y: drawingRect.minY + point.1 * drawingRect.height
+            )
+            if index == 0 {
+                path.move(to: position)
+            } else {
+                path.addLine(to: position)
+            }
+        }
+        path.closeSubpath()
+        return path
+    }
+
     nonisolated static func invulnerabilityMonitorPulse(
         remaining: Float?,
         gameTime: Float,
@@ -532,10 +611,20 @@ final class RevivalGameplayView: MTKView {
             "Training Camera Monitor view"
         )
         addSubview(cameraMonitorBorder)
+        cloakShipMonitor.wantsLayer = true
+        cloakShipMonitorShape.fillColor =
+            NSColor.systemBlue.withAlphaComponent(0.25).cgColor
+        cloakShipMonitorShape.strokeColor = NSColor.systemBlue.cgColor
+        cloakShipMonitorShape.lineWidth = 2
+        cloakShipMonitor.layer?.addSublayer(cloakShipMonitorShape)
+        cloakShipMonitor.isHidden = true
+        cloakShipMonitor.setAccessibilityLabel("Player ship monitor")
+        addSubview(cloakShipMonitor)
         for label in [
             enabledControlsLabel,
             trainingMessageLabel,
             invulnerabilityStatusLabel,
+            cloakStatusLabel,
         ] {
             label.isHidden = false
             label.isEditable = false
@@ -556,6 +645,8 @@ final class RevivalGameplayView: MTKView {
         invulnerabilityStatusLabel.setAccessibilityLabel(
             "Invulnerability status"
         )
+        cloakStatusLabel.textColor = .systemBlue
+        cloakStatusLabel.setAccessibilityLabel("Cloak status")
     }
 
     nonisolated private static func controlSummary(
