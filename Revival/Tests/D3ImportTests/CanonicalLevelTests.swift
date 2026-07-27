@@ -1818,6 +1818,97 @@ final class CanonicalLevelTests: XCTestCase {
         )
     }
 
+    func testSchemaElevenRequiresExactLastBot2DeathProducer() throws {
+        let level = makeTrainingLastBot2DeathLevel()
+        try level.validate()
+        XCTAssertEqual(level.schemaVersion, 11)
+
+        let chain = try XCTUnwrap(level.trainingLastBot2DeathChain)
+        XCTAssertEqual(chain.robotObjectHandle, 2_080)
+        XCTAssertEqual(chain.robotRoomSourceIndex, 46)
+        XCTAssertEqual(chain.robotFlags, 5_121)
+        XCTAssertEqual(chain.combat, .stockTraining)
+
+        let wrongHandle = TrainingLastBot2DeathChain(
+            robotObjectHandle: 2_081,
+            robotRoomSourceIndex: chain.robotRoomSourceIndex,
+            robotFlags: chain.robotFlags,
+            combat: chain.combat
+        )
+        assertValidationError(
+            .invalidDependency("Training LastBot2 death chain"),
+            level.addingTrainingLastBot2DeathChain(wrongHandle)
+        )
+
+        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == chain.robotObjectHandle
+        })
+        let robot = level.objects[robotIndex]
+        func replacingRobot(
+            instanceName: String = "LastBot2",
+            flags: UInt32 = 5_121,
+            location: SpatialLocation = .room(46)
+        ) -> PlacedObject {
+            PlacedObject(
+                handle: robot.handle,
+                type: robot.type,
+                storedID: robot.storedID,
+                definition: robot.definition,
+                instanceName: instanceName,
+                flags: flags,
+                doorShields: robot.doorShields,
+                location: location,
+                position: robot.position,
+                orientation: robot.orientation,
+                containsType: robot.containsType,
+                containsID: robot.containsID,
+                containsCount: robot.containsCount,
+                lifeLeft: robot.lifeLeft,
+                soundSource: robot.soundSource,
+                inertScriptName: robot.inertScriptName,
+                inertModuleName: robot.inertModuleName,
+                lightmapSubmodels: robot.lightmapSubmodels
+            )
+        }
+        for replacement in [
+            replacingRobot(instanceName: "LastBot3"),
+            replacingRobot(flags: 5_120),
+            replacingRobot(location: .room(45)),
+        ] {
+            var objects = level.objects
+            objects[robotIndex] = replacement
+            assertValidationError(
+                .invalidDependency("Training LastBot2 death chain"),
+                replacing(level, objects: objects)
+            )
+        }
+
+        let presentationIndex = try XCTUnwrap(
+            level.objectPresentations.firstIndex {
+                $0.objectHandle == chain.robotObjectHandle
+            }
+        )
+        let presentation = level.objectPresentations[presentationIndex]
+        var hiddenPresentations = level.objectPresentations
+        hiddenPresentations[presentationIndex] = .init(
+            objectHandle: presentation.objectHandle,
+            primaryModel: presentation.primaryModel,
+            mediumModel: presentation.mediumModel,
+            lowModel: presentation.lowModel,
+            dyingModel: presentation.dyingModel,
+            mediumDistance: presentation.mediumDistance,
+            lowDistance: presentation.lowDistance,
+            isVisible: false
+        )
+        assertValidationError(
+            .invalidDependency("Training LastBot2 death chain"),
+            replacing(
+                level,
+                objectPresentations: hiddenPresentations
+            )
+        )
+    }
+
     func testSchemaEightRejectsWrongTrainingGalleryMarkerIdentity() throws {
         let level = makeTrainingGalleryBarrierLevel()
         try level.validate()
@@ -4238,7 +4329,7 @@ func replacing(
     dependencyManifest: DependencyManifest? = nil,
     sourceChunks: [SourceChunkRecord]? = nil
 ) -> Level {
-    Level(
+    var replaced = Level(
         schemaVersion: schemaVersion ?? level.schemaVersion,
         missionKey: missionKey ?? level.missionKey,
         levelKey: levelKey ?? level.levelKey,
@@ -4302,6 +4393,9 @@ func replacing(
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
         sourceChunks: sourceChunks ?? level.sourceChunks
     )
+    replaced.trainingLastBot2DeathChain =
+        level.trainingLastBot2DeathChain
+    return replaced
 }
 
 func replacing(

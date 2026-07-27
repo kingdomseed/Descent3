@@ -1003,6 +1003,7 @@ func editorIdleStatusMessage(
         project.trainingRASBot3DeathSourceDiagnostic,
         project.trainingRASBot4DeathSourceDiagnostic,
         project.trainingLastBot1DeathSourceDiagnostic,
+        project.trainingLastBot2DeathSourceDiagnostic,
         project.trainingInvulnerabilityPickupSourceDiagnostic,
         project.trainingCloakPickupSourceDiagnostic,
         project.trainingLastRoomSourceDiagnostic,

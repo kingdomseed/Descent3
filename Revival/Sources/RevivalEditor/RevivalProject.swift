@@ -547,6 +547,15 @@ struct RevivalProject: Equatable, Sendable {
         }
         return "TrainingMission.cpp Script 051 / \(robot.instanceName ?? "LastBot1") death"
     }
+    var trainingLastBot2DeathSourceDiagnostic: String? {
+        guard let chain = level.trainingLastBot2DeathChain,
+              let robot = level.objects.first(where: {
+                  $0.handle == chain.robotObjectHandle
+              }) else {
+            return nil
+        }
+        return "TrainingMission.cpp Script 052 / \(robot.instanceName ?? "LastBot2") death"
+    }
     var trainingInvulnerabilityPickupSourceDiagnostic: String? {
         guard let chain = level.trainingInvulnerabilityPickupChain,
             let pickup = level.objects.first(where: {

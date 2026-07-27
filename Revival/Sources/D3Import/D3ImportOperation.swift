@@ -600,7 +600,8 @@ func runD3Import(
                     || object.handle == 2_075
                     || object.handle == 2_077
                     || object.handle == 2_078
-                    || object.handle == 4_127,
+                    || object.handle == 4_127
+                    || object.handle == 2_080,
                   object.definition?.sourceName.caseInsensitiveCompare(
                       destroyRobotPage.name
             ) == .orderedSame
@@ -637,13 +638,13 @@ func runD3Import(
             lowDistance: page.lowDistance
         )
     }
-    precondition(reachedObjectPresentations.count == 16)
+    precondition(reachedObjectPresentations.count == 18)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 23)
+    precondition(deferredRoomObjects.count == 21)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -850,6 +851,9 @@ func runD3Import(
     }!
     let lastBot1 = robotGuidebotLevel.objects.first {
         $0.instanceName == "LastBot1"
+    }!
+    let lastBot2 = robotGuidebotLevel.objects.first {
+        $0.instanceName == "LastBot2"
     }!
     let invulnerabilityPickup = robotGuidebotLevel.objects.first {
         $0.instanceName?.caseInsensitiveCompare("InvulnPowerup2")
@@ -1172,6 +1176,16 @@ func runD3Import(
             && lastBot1.location == .room(14)
     )
     precondition(
+        lastBot2.handle == 2_080
+            && lastBot2.type == 2
+            && lastBot2.storedID == 106
+            && lastBot2.definition?.sourceName
+                == "RAS1 Light Security Flyer"
+            && lastBot2.instanceName == "LastBot2"
+            && lastBot2.flags == 5_121
+            && lastBot2.location == .room(46)
+    )
+    precondition(
         invulnerabilityPickup.handle == 2_076
             && invulnerabilityPickup.type == 7
             && invulnerabilityPickup.storedID == 3
@@ -1425,11 +1439,20 @@ func runD3Import(
             ),
             voiceClip: voiceClips[10]
         )
-    let level = finalRoomEntryLevel.addingTrainingLastBot1DeathChain(
+    let lastBot1Level =
+        finalRoomEntryLevel.addingTrainingLastBot1DeathChain(
         .init(
             robotObjectHandle: lastBot1.handle,
             robotRoomSourceIndex: 14,
             robotFlags: lastBot1.flags,
+            combat: .stockTraining
+        )
+    )
+    let level = lastBot1Level.addingTrainingLastBot2DeathChain(
+        .init(
+            robotObjectHandle: lastBot2.handle,
+            robotRoomSourceIndex: 46,
+            robotFlags: lastBot2.flags,
             combat: .stockTraining
         )
     )
