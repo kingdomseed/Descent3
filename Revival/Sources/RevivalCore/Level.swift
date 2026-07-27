@@ -619,6 +619,21 @@ typealias TrainingRASBot2DeathChain = TrainingRobotDeathChain
 typealias TrainingRASBot3DeathChain = TrainingRobotDeathChain
 typealias TrainingRASBot4DeathChain = TrainingRobotDeathChain
 
+struct TrainingInvulnerabilityPickupChain:
+    Codable, Equatable, Sendable
+{
+    let pickupObjectHandle: UInt32
+    let pickupRoomSourceIndex: Int
+    let pickupObjectFlags: UInt32
+    let pickupCollisionRadius: Float
+    let duration: Float
+    let activatedMessage: String
+    let expiredMessage: String
+    let pickupSoundSourceName: String
+    let activatedSoundSourceName: String
+    let expiredSoundSourceName: String
+}
+
 struct TrainingMarkerLightPresentation:
     Codable, Equatable, Sendable
 {
@@ -1570,6 +1585,7 @@ struct Level: Codable, Equatable, Sendable {
     let trainingRASBot2DeathChain: TrainingRASBot2DeathChain?
     let trainingRASBot3DeathChain: TrainingRASBot3DeathChain?
     let trainingRASBot4DeathChain: TrainingRASBot4DeathChain?
+    let trainingInvulnerabilityPickupChain: TrainingInvulnerabilityPickupChain?
     let voiceClips: [CanonicalVoiceClip]
     @SchemaCompatibleSoundClips
     private(set) var soundClips: [CanonicalSoundClip]
@@ -1608,6 +1624,8 @@ struct Level: Codable, Equatable, Sendable {
         trainingRASBot2DeathChain: TrainingRASBot2DeathChain? = nil,
         trainingRASBot3DeathChain: TrainingRASBot3DeathChain? = nil,
         trainingRASBot4DeathChain: TrainingRASBot4DeathChain? = nil,
+        trainingInvulnerabilityPickupChain:
+            TrainingInvulnerabilityPickupChain? = nil,
         voiceClips: [CanonicalVoiceClip] = [],
         soundClips: [CanonicalSoundClip] = [],
         dependencyManifest: DependencyManifest,
@@ -1644,6 +1662,8 @@ struct Level: Codable, Equatable, Sendable {
         self.trainingRASBot2DeathChain = trainingRASBot2DeathChain
         self.trainingRASBot3DeathChain = trainingRASBot3DeathChain
         self.trainingRASBot4DeathChain = trainingRASBot4DeathChain
+        self.trainingInvulnerabilityPickupChain =
+            trainingInvulnerabilityPickupChain
         self.voiceClips = voiceClips
         self.soundClips = soundClips
         self.dependencyManifest = dependencyManifest
@@ -2323,6 +2343,58 @@ struct Level: Codable, Equatable, Sendable {
                 )
             }
         }
+        if let chain = trainingInvulnerabilityPickupChain {
+            let presentation = objectPresentations.first {
+                $0.objectHandle == chain.pickupObjectHandle
+                    && $0.isVisible
+            }
+            let model = presentation.flatMap { presentation in
+                models.first {
+                    $0.source == presentation.primaryModel
+                }
+            }
+            let reachedSoundNames = Set(soundClips.map(\.sourceName))
+            guard trainingRASBot4DeathChain != nil,
+                chain.pickupObjectHandle == 2_076,
+                chain.pickupRoomSourceIndex == 12,
+                chain.pickupObjectFlags == 5_120,
+                chain.pickupCollisionRadius.isFinite,
+                chain.pickupCollisionRadius > 0,
+                chain.duration == 30,
+                chain.activatedMessage == "Invulnerability On",
+                chain.expiredMessage == "Invulnerability Off",
+                chain.pickupSoundSourceName == "Power03.wav",
+                chain.activatedSoundSourceName == "Invon.wav",
+                chain.expiredSoundSourceName == "Invoff.wav",
+                let pickup = objects.first(where: {
+                    $0.handle == chain.pickupObjectHandle
+                }),
+                pickup.type == 7,
+                pickup.storedID == 3,
+                pickup.definition
+                    == .init(
+                        storedIndex: 3,
+                        sourceName: "Invulnerability"
+                    ),
+                pickup.instanceName == "InvulnPowerup2",
+                pickup.flags == chain.pickupObjectFlags,
+                pickup.location == .room(chain.pickupRoomSourceIndex),
+                model?.collisionRadius == chain.pickupCollisionRadius,
+                reachedSoundNames.contains(
+                    chain.pickupSoundSourceName
+                ),
+                reachedSoundNames.contains(
+                    chain.activatedSoundSourceName
+                ),
+                reachedSoundNames.contains(
+                    chain.expiredSoundSourceName
+                )
+            else {
+                throw LevelValidationError.invalidDependency(
+                    "Training InvulnPowerup2 pickup chain"
+                )
+            }
+        }
         var voiceNames = Set<String>()
         for clip in voiceClips {
             let voiceSource = SourceResource(
@@ -2552,6 +2624,27 @@ struct Level: Codable, Equatable, Sendable {
                     objects: objects,
                     objectPresentations: objectPresentations
                 )
+            }
+            if trainingInvulnerabilityPickupChain != nil {
+                let pickupSound = soundClips.first {
+                    $0.logicalName == "Powerup pickup"
+                }
+                let activatedSound = soundClips.first {
+                    $0.logicalName == "Invulnerability on"
+                }
+                let expiredSound = soundClips.first {
+                    $0.logicalName == "Invulnerability off"
+                }
+                guard pickupSound?.sourceName == "Power03.wav",
+                    activatedSound?.sourceName == "Invon.wav",
+                    activatedSound?.importVolume == 0.5,
+                    expiredSound?.sourceName == "Invoff.wav",
+                    expiredSound?.importVolume == 0.5
+                else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training InvulnPowerup2 package"
+                    )
+                }
             }
         }
         var retiredSlots = Set<Int>()
@@ -2841,7 +2934,7 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     func addingSurfacePhysics(_ entries: [SurfacePhysicsEntry]) -> Level {
-        Level(
+        return Level(
             schemaVersion: schemaVersion,
             missionKey: missionKey,
             levelKey: levelKey,
@@ -3428,6 +3521,91 @@ struct Level: Codable, Equatable, Sendable {
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
+            sourceChunks: sourceChunks
+        )
+    }
+
+    func addingTrainingInvulnerabilityPickupChain(
+        _ chain: TrainingInvulnerabilityPickupChain,
+        soundClips addedSoundClips: [CanonicalSoundClip]
+    ) -> Level {
+        var dependencies = dependencyManifest.current
+        let objectDefinition = DependencyRecord(
+            category: "object-definition",
+            source: .init(
+                storedIndex: 3,
+                sourceName: "Invulnerability"
+            ),
+            state: "canonical-object-definition",
+            provenance:
+                "training.mn3/TrainingMission.d3l handle 2076"
+        )
+        if !dependencies.contains(where: {
+            $0.category == objectDefinition.category
+                && $0.source == objectDefinition.source
+        }) {
+            dependencies.append(objectDefinition)
+        }
+        for clip in addedSoundClips {
+            let reached = DependencyRecord(
+                category: "sound",
+                source: .init(
+                    storedIndex: clip.sourceEntryIndex,
+                    sourceName: clip.sourceName
+                ),
+                state: "canonical-pcm-imported",
+                provenance:
+                    "\(clip.sourceArchive) \(clip.sourceSHA256)"
+            )
+            if let index = dependencies.firstIndex(where: {
+                $0.category == reached.category
+                    && $0.source == reached.source
+            }) {
+                dependencies[index] = reached
+            } else {
+                dependencies.append(reached)
+            }
+        }
+        return Level(
+            schemaVersion: 11,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
+            lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
+            objectPresentations: objectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
+            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
+            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
+            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
+            trainingInvulnerabilityPickupChain: chain,
+            voiceClips: voiceClips,
+            soundClips: soundClips + addedSoundClips,
+            dependencyManifest: .init(
+                current: dependencies,
+                historicalEagerBaseline:
+                    dependencyManifest.historicalEagerBaseline
+            ),
             sourceChunks: sourceChunks
         )
     }

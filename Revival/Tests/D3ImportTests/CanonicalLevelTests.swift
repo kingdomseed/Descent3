@@ -1,6 +1,60 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testSchemaElevenValidatesExactTrainingInvulnerabilityPickupChain()
+        throws
+    {
+        let level = makeTrainingInvulnerabilityPickupLevel()
+        try level.validate()
+
+        XCTAssertEqual(level.schemaVersion, 11)
+        let chain = try XCTUnwrap(
+            level.trainingInvulnerabilityPickupChain
+        )
+        XCTAssertEqual(chain.pickupObjectHandle, 2_076)
+        XCTAssertEqual(chain.pickupRoomSourceIndex, 12)
+        XCTAssertEqual(chain.pickupObjectFlags, 5_120)
+        XCTAssertEqual(chain.duration, 30)
+        XCTAssertEqual(chain.activatedMessage, "Invulnerability On")
+        XCTAssertEqual(chain.expiredMessage, "Invulnerability Off")
+        XCTAssertEqual(chain.pickupSoundSourceName, "Power03.wav")
+        XCTAssertEqual(chain.activatedSoundSourceName, "Invon.wav")
+        XCTAssertEqual(chain.expiredSoundSourceName, "Invoff.wav")
+
+        let missingPickup = replacing(
+            level,
+            objects: level.objects.filter { $0.handle != 2_076 },
+            objectPresentations: level.objectPresentations.filter {
+                $0.objectHandle != 2_076
+            }
+        )
+        assertValidationError(
+            .invalidDependency("Training InvulnPowerup2 pickup chain"),
+            missingPickup
+        )
+
+        let hostileDuration = replacing(
+            level,
+            trainingInvulnerabilityPickupChain: .init(
+                pickupObjectHandle: chain.pickupObjectHandle,
+                pickupRoomSourceIndex: chain.pickupRoomSourceIndex,
+                pickupObjectFlags: chain.pickupObjectFlags,
+                pickupCollisionRadius: chain.pickupCollisionRadius,
+                duration: 29,
+                activatedMessage: chain.activatedMessage,
+                expiredMessage: chain.expiredMessage,
+                pickupSoundSourceName: chain.pickupSoundSourceName,
+                activatedSoundSourceName:
+                    chain.activatedSoundSourceName,
+                expiredSoundSourceName: chain.expiredSoundSourceName
+            )
+        )
+        assertValidationError(
+            .invalidDependency("Training InvulnPowerup2 pickup chain"),
+            hostileDuration
+        )
+    }
+
     func testRadiusAwareIndoorTraceStopsAtRenderedPortalAndCrossesOpenPortal() throws {
         let rendered = makeIndoorTraceLevel(portalFlags: 0x0000_0001)
         let start = Vector3(x: 0, y: 0, z: 0)
@@ -3740,6 +3794,8 @@ func replacing(
     trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
     trainingCameraMonitorChain: TrainingCameraMonitorChain? = nil,
     trainingRASBot1DeathChain: TrainingRASBot1DeathChain? = nil,
+    trainingInvulnerabilityPickupChain:
+        TrainingInvulnerabilityPickupChain? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
     soundClips: [CanonicalSoundClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
@@ -3786,6 +3842,9 @@ func replacing(
             trainingCameraMonitorChain ?? level.trainingCameraMonitorChain,
         trainingRASBot1DeathChain:
             trainingRASBot1DeathChain ?? level.trainingRASBot1DeathChain,
+        trainingInvulnerabilityPickupChain:
+            trainingInvulnerabilityPickupChain
+            ?? level.trainingInvulnerabilityPickupChain,
         voiceClips: voiceClips ?? level.voiceClips,
         soundClips: soundClips ?? level.soundClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,

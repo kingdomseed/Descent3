@@ -425,6 +425,11 @@ func runD3Import(
         overlay: overlayData,
         name: "Camera Monitor"
     )
+    let invulnerabilityPage = try resolveRetailGenericModelPage(
+        table: tableData,
+        overlay: overlayData,
+        name: "Invulnerability"
+    )
     let securityCameraPage = try resolveRetailGenericModelPage(
         table: tableData,
         overlay: overlayData,
@@ -454,7 +459,10 @@ func runD3Import(
         cameraMonitorPage.primaryModelName,
         cameraMonitorPage.mediumModelName,
         cameraMonitorPage.lowModelName,
-    ].compactMap { $0 })
+            invulnerabilityPage.primaryModelName,
+            invulnerabilityPage.mediumModelName,
+            invulnerabilityPage.lowModelName,
+        ].compactMap { $0 })
     let sortedModelNames = reachedModelNames.sorted {
         $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
     }
@@ -586,13 +594,21 @@ func runD3Import(
                     || object.handle == 2_078,
                   object.definition?.sourceName.caseInsensitiveCompare(
                       destroyRobotPage.name
-                  ) == .orderedSame {
+            ) == .orderedSame
+        {
             page = destroyRobotPage
         } else if object.handle == 6_167,
                   object.definition?.sourceName.caseInsensitiveCompare(
                       cameraMonitorPage.name
-                  ) == .orderedSame {
+            ) == .orderedSame
+        {
             page = cameraMonitorPage
+        } else if object.handle == 2_076,
+            object.definition?.sourceName.caseInsensitiveCompare(
+                invulnerabilityPage.name
+            ) == .orderedSame
+        {
+            page = invulnerabilityPage
         } else {
             return nil
         }
@@ -606,13 +622,13 @@ func runD3Import(
             lowDistance: page.lowDistance
         )
     }
-    precondition(reachedObjectPresentations.count == 13)
+    precondition(reachedObjectPresentations.count == 14)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 26)
+    precondition(deferredRoomObjects.count == 25)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -813,20 +829,32 @@ func runD3Import(
         $0.instanceName?.caseInsensitiveCompare("RASBot4")
             == .orderedSame
     }!
+    let invulnerabilityPickup = robotGuidebotLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("InvulnPowerup2")
+            == .orderedSame
+    }!
     let cameraMonitorModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare(
             cameraMonitorPage.primaryModelName
         ) == .orderedSame
     }!
-    guard let securityCameraArchive = presentationArchives.first(
-        where: {
+    let invulnerabilityModel = reachedModels.first {
+        $0.source.sourceName.caseInsensitiveCompare(
+            invulnerabilityPage.primaryModelName
+        ) == .orderedSame
+    }!
+    guard
+        let securityCameraArchive = presentationArchives.first(
+            where: {
             $0.archive.entry(
                 named: securityCameraPage.primaryModelName
             ) != nil
         }
-    ), let securityCameraEntry = securityCameraArchive.archive.entry(
-        named: securityCameraPage.primaryModelName
-    ) else {
+        ),
+        let securityCameraEntry = securityCameraArchive.archive.entry(
+            named: securityCameraPage.primaryModelName
+        )
+    else {
         throw D3ImportOperationError.missingPresentationAsset(
             securityCameraPage.primaryModelName
         )
@@ -851,6 +879,24 @@ func runD3Import(
         in: pickupSoundEntry.payloadRange
     )
     let pickupSound = try decodeReachedPCM16WAV(pickupSoundPayload)
+    let invulnerabilityPickupSoundPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "Powerup pickup"
+    )
+    let invulnerabilityPickupSoundEntry = d3Archive.uniqueEntry(
+        named: invulnerabilityPickupSoundPage.sourceName
+    )
+    let invulnerabilityPickupSoundEntryIndex =
+        d3Archive.entries.firstIndex(
+            of: invulnerabilityPickupSoundEntry
+        )!
+    let invulnerabilityPickupSoundPayload = d3.data.subdata(
+        in: invulnerabilityPickupSoundEntry.payloadRange
+    )
+    let invulnerabilityPickupSound = try decodeReachedPCM16WAV(
+        invulnerabilityPickupSoundPayload
+    )
     let returnSoundPage = try resolveRetailSoundPage(
         table: tableData,
         overlay: overlayData,
@@ -865,7 +911,40 @@ func runD3Import(
         in: returnSoundEntry.payloadRange
     )
     let returnSound = try decodeReachedPCM16WAV(returnSoundPayload)
-    let cameraMonitorLevel = robotGuidebotLevel
+    let invulnerabilityOnSoundPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "Invulnerability on"
+    )
+    let invulnerabilityOnSoundEntry = d3Archive.uniqueEntry(
+        named: invulnerabilityOnSoundPage.sourceName
+    )
+    let invulnerabilityOnSoundEntryIndex =
+        d3Archive.entries.firstIndex(of: invulnerabilityOnSoundEntry)!
+    let invulnerabilityOnSoundPayload = d3.data.subdata(
+        in: invulnerabilityOnSoundEntry.payloadRange
+    )
+    let invulnerabilityOnSound = try decodeReachedPCM16WAV(
+        invulnerabilityOnSoundPayload
+    )
+    let invulnerabilityOffSoundPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "Invulnerability off"
+    )
+    let invulnerabilityOffSoundEntry = d3Archive.uniqueEntry(
+        named: invulnerabilityOffSoundPage.sourceName
+    )
+    let invulnerabilityOffSoundEntryIndex =
+        d3Archive.entries.firstIndex(of: invulnerabilityOffSoundEntry)!
+    let invulnerabilityOffSoundPayload = d3.data.subdata(
+        in: invulnerabilityOffSoundEntry.payloadRange
+    )
+    let invulnerabilityOffSound = try decodeReachedPCM16WAV(
+        invulnerabilityOffSoundPayload
+    )
+    let cameraMonitorLevel =
+        robotGuidebotLevel
         .addingTrainingCameraMonitorChain(
         .init(
             pickupObjectHandle: cameraMonitor.handle,
@@ -1015,6 +1094,18 @@ func runD3Import(
             && rasBot4.flags == 5_121
             && rasBot4.location == .room(0)
     )
+    precondition(
+        invulnerabilityPickup.handle == 2_076
+            && invulnerabilityPickup.type == 7
+            && invulnerabilityPickup.storedID == 3
+            && invulnerabilityPickup.definition
+                == .init(
+                    storedIndex: 3,
+                    sourceName: "Invulnerability"
+                )
+            && invulnerabilityPickup.flags == 5_120
+            && invulnerabilityPickup.location == .room(12)
+    )
     let rasBot1Level = cameraMonitorLevel.addingTrainingRASBot1DeathChain(
         .init(
             robotObjectHandle: rasBot1.handle,
@@ -1039,13 +1130,100 @@ func runD3Import(
             combat: .stockTraining
         )
     )
-    let level = rasBot3Level.addingTrainingRASBot4DeathChain(
+    let rasBot4Level = rasBot3Level.addingTrainingRASBot4DeathChain(
         .init(
             robotObjectHandle: rasBot4.handle,
             robotRoomSourceIndex: 0,
             robotFlags: rasBot4.flags,
             combat: .stockTraining
         )
+    )
+    let level = rasBot4Level.addingTrainingInvulnerabilityPickupChain(
+        .init(
+            pickupObjectHandle: invulnerabilityPickup.handle,
+            pickupRoomSourceIndex: 12,
+            pickupObjectFlags: invulnerabilityPickup.flags,
+            pickupCollisionRadius:
+                invulnerabilityModel.collisionRadius,
+            duration: 30,
+            activatedMessage: "Invulnerability On",
+            expiredMessage: "Invulnerability Off",
+            pickupSoundSourceName:
+                invulnerabilityPickupSoundPage.sourceName,
+            activatedSoundSourceName:
+                invulnerabilityOnSoundPage.sourceName,
+            expiredSoundSourceName:
+                invulnerabilityOffSoundPage.sourceName
+        ),
+        soundClips: [
+            .init(
+                logicalName:
+                    invulnerabilityPickupSoundPage.logicalName,
+                sourceName:
+                    invulnerabilityPickupSoundPage.sourceName,
+                sourceEntryIndex:
+                    invulnerabilityPickupSoundEntryIndex,
+                sampleRate: invulnerabilityPickupSound.sampleRate,
+                channelCount:
+                    invulnerabilityPickupSound.channelCount,
+                frameCount: invulnerabilityPickupSound.frameCount,
+                pcm16LittleEndian:
+                    invulnerabilityPickupSound.pcm16LittleEndian,
+                pcmSHA256: canonicalSHA256(
+                    invulnerabilityPickupSound.pcm16LittleEndian
+                ),
+                sourceArchive: d3File.relativePath,
+                sourceSHA256: canonicalSHA256(
+                    invulnerabilityPickupSoundPayload
+                ),
+                importVolume:
+                    invulnerabilityPickupSoundPage.importVolume
+            ),
+            .init(
+                logicalName:
+                    invulnerabilityOnSoundPage.logicalName,
+                sourceName:
+                    invulnerabilityOnSoundPage.sourceName,
+                sourceEntryIndex:
+                    invulnerabilityOnSoundEntryIndex,
+                sampleRate: invulnerabilityOnSound.sampleRate,
+                channelCount: invulnerabilityOnSound.channelCount,
+                frameCount: invulnerabilityOnSound.frameCount,
+                pcm16LittleEndian:
+                    invulnerabilityOnSound.pcm16LittleEndian,
+                pcmSHA256: canonicalSHA256(
+                    invulnerabilityOnSound.pcm16LittleEndian
+                ),
+                sourceArchive: d3File.relativePath,
+                sourceSHA256: canonicalSHA256(
+                    invulnerabilityOnSoundPayload
+                ),
+                importVolume:
+                    invulnerabilityOnSoundPage.importVolume * 0.5
+            ),
+            .init(
+                logicalName:
+                    invulnerabilityOffSoundPage.logicalName,
+                sourceName:
+                    invulnerabilityOffSoundPage.sourceName,
+                sourceEntryIndex:
+                    invulnerabilityOffSoundEntryIndex,
+                sampleRate: invulnerabilityOffSound.sampleRate,
+                channelCount: invulnerabilityOffSound.channelCount,
+                frameCount: invulnerabilityOffSound.frameCount,
+                pcm16LittleEndian:
+                    invulnerabilityOffSound.pcm16LittleEndian,
+                pcmSHA256: canonicalSHA256(
+                    invulnerabilityOffSound.pcm16LittleEndian
+                ),
+                sourceArchive: d3File.relativePath,
+                sourceSHA256: canonicalSHA256(
+                    invulnerabilityOffSoundPayload
+                ),
+                importVolume:
+                    invulnerabilityOffSoundPage.importVolume * 0.5
+            ),
+        ]
     )
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)

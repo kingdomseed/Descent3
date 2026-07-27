@@ -447,6 +447,7 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingGuidebotReturnMarkerLightDistance: Float?
     let trainingGuidebot: TrainingGuidebotFrame?
     let trainingCameraMonitor: TrainingCameraMonitorFrame?
+    let trainingInvulnerabilityRemaining: Float?
 }
 
 struct TrainingOpeningFeedback: Equatable, Sendable {
@@ -882,6 +883,14 @@ private typealias TrainingRASBot2DeathState = TrainingRobotDeathState
 private typealias TrainingRASBot3DeathState = TrainingRobotDeathState
 private typealias TrainingRASBot4DeathState = TrainingRobotDeathState
 
+private struct TrainingInvulnerabilityPickupState:
+    Codable, Equatable, Sendable
+{
+    var scriptWasTriggered = false
+    var wasConsumed = false
+    var remainingDuration: Float?
+}
+
 private enum TrainingGuidebotTask: String, Codable, Equatable, Sendable {
     case outbound
     case returnToShip
@@ -951,22 +960,15 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     let wiggleFalloff: Float
     let lastThrustTime: Float
     fileprivate let trainingOpeningState: TrainingOpeningState?
-    fileprivate let trainingGalleryBarrierState:
-        TrainingGalleryBarrierState?
-    fileprivate let trainingRobotGuidebotState:
-        TrainingRobotGuidebotState?
-    fileprivate let trainingCameraMonitorState:
-        TrainingCameraMonitorState?
-    fileprivate let trainingKillbotEntryState:
-        TrainingKillbotEntryState?
-    fileprivate let trainingRASBot1DeathState:
-        TrainingRASBot1DeathState?
-    fileprivate let trainingRASBot2DeathState:
-        TrainingRASBot2DeathState?
-    fileprivate let trainingRASBot3DeathState:
-        TrainingRASBot3DeathState?
-    fileprivate let trainingRASBot4DeathState:
-        TrainingRASBot4DeathState?
+    fileprivate let trainingGalleryBarrierState: TrainingGalleryBarrierState?
+    fileprivate let trainingRobotGuidebotState: TrainingRobotGuidebotState?
+    fileprivate let trainingCameraMonitorState: TrainingCameraMonitorState?
+    fileprivate let trainingKillbotEntryState: TrainingKillbotEntryState?
+    fileprivate let trainingRASBot1DeathState: TrainingRASBot1DeathState?
+    fileprivate let trainingRASBot2DeathState: TrainingRASBot2DeathState?
+    fileprivate let trainingRASBot3DeathState: TrainingRASBot3DeathState?
+    fileprivate let trainingRASBot4DeathState: TrainingRASBot4DeathState?
+    fileprivate let trainingInvulnerabilityPickupState: TrainingInvulnerabilityPickupState?
 }
 
 enum PlayerSimulationContinuationError: Error, Equatable {
@@ -1014,22 +1016,15 @@ final class PlayerSimulation {
     private var pauseDepth = 0
     private var pauseTimestamp: Double?
     private var trainingOpeningState: TrainingOpeningState?
-    private var trainingGalleryBarrierState:
-        TrainingGalleryBarrierState?
-    private var trainingRobotGuidebotState:
-        TrainingRobotGuidebotState?
-    private var trainingCameraMonitorState:
-        TrainingCameraMonitorState?
-    private var trainingKillbotEntryState:
-        TrainingKillbotEntryState?
-    private var trainingRASBot1DeathState:
-        TrainingRASBot1DeathState?
-    private var trainingRASBot2DeathState:
-        TrainingRASBot2DeathState?
-    private var trainingRASBot3DeathState:
-        TrainingRASBot3DeathState?
-    private var trainingRASBot4DeathState:
-        TrainingRASBot4DeathState?
+    private var trainingGalleryBarrierState: TrainingGalleryBarrierState?
+    private var trainingRobotGuidebotState: TrainingRobotGuidebotState?
+    private var trainingCameraMonitorState: TrainingCameraMonitorState?
+    private var trainingKillbotEntryState: TrainingKillbotEntryState?
+    private var trainingRASBot1DeathState: TrainingRASBot1DeathState?
+    private var trainingRASBot2DeathState: TrainingRASBot2DeathState?
+    private var trainingRASBot3DeathState: TrainingRASBot3DeathState?
+    private var trainingRASBot4DeathState: TrainingRASBot4DeathState?
+    private var trainingInvulnerabilityPickupState: TrainingInvulnerabilityPickupState?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -1075,6 +1070,10 @@ final class PlayerSimulation {
         trainingRASBot4DeathState = level.trainingRASBot4DeathChain.map {
             TrainingRASBot4DeathState(shields: $0.combat.robotShields)
         }
+        trainingInvulnerabilityPickupState =
+            level.trainingInvulnerabilityPickupChain.map {
+                _ in TrainingInvulnerabilityPickupState()
+            }
     }
 
     init(
@@ -1153,44 +1152,83 @@ final class PlayerSimulation {
                 $0.handle == chain.robotObjectHandle
             }
         }
-        guard validTrainingCameraMonitorContinuation(
-            continuation.trainingCameraMonitorState,
+        if continuation.trainingInvulnerabilityPickupState?
+            .wasConsumed == true
+        {
+            guard
+                let chain =
+                    continuationLevel.trainingInvulnerabilityPickupChain
+            else {
+                throw PlayerSimulationContinuationError.invalidState
+            }
+            continuationLevel.objects.removeAll {
+                $0.handle == chain.pickupObjectHandle
+            }
+            setObjectPresentationVisibility(
+                in: &continuationLevel,
+                handle: chain.pickupObjectHandle,
+                isVisible: false
+            )
+        }
+        guard
+            validTrainingCameraMonitorContinuation(
+                continuation.trainingCameraMonitorState,
             level: continuationLevel
-        ) else {
+            )
+        else {
             throw PlayerSimulationContinuationError.invalidState
         }
-        guard validTrainingKillbotEntryContinuation(
-            continuation.trainingKillbotEntryState,
+        guard
+            validTrainingKillbotEntryContinuation(
+                continuation.trainingKillbotEntryState,
             level: continuationLevel
-        ) else {
+            )
+        else {
             throw PlayerSimulationContinuationError.invalidState
         }
-        guard validTrainingRASBot1DeathContinuation(
-            continuation.trainingRASBot1DeathState,
+        guard
+            validTrainingRASBot1DeathContinuation(
+                continuation.trainingRASBot1DeathState,
             level: continuationLevel
-        ) else {
+            )
+        else {
             throw PlayerSimulationContinuationError.invalidState
         }
-        guard validTrainingRASBot2DeathContinuation(
-            continuation.trainingRASBot2DeathState,
+        guard
+            validTrainingRASBot2DeathContinuation(
+                continuation.trainingRASBot2DeathState,
             level: continuationLevel
-        ) else {
+            )
+        else {
             throw PlayerSimulationContinuationError.invalidState
         }
-        guard validTrainingRASBot3DeathContinuation(
-            continuation.trainingRASBot3DeathState,
+        guard
+            validTrainingRASBot3DeathContinuation(
+                continuation.trainingRASBot3DeathState,
             level: continuationLevel
-        ) else {
+            )
+        else {
             throw PlayerSimulationContinuationError.invalidState
         }
-        guard validTrainingRASBot4DeathContinuation(
-            continuation.trainingRASBot4DeathState,
+        guard
+            validTrainingRASBot4DeathContinuation(
+                continuation.trainingRASBot4DeathState,
             level: continuationLevel
-        ) else {
+            )
+        else {
             throw PlayerSimulationContinuationError.invalidState
         }
-        guard validTrainingGalleryBarrierContinuation(
-            continuation.trainingGalleryBarrierState,
+        guard
+            validTrainingInvulnerabilityPickupContinuation(
+                continuation.trainingInvulnerabilityPickupState,
+                level: continuationLevel
+            )
+        else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
+        guard
+            validTrainingGalleryBarrierContinuation(
+                continuation.trainingGalleryBarrierState,
             robotGuidebotState:
                 continuation.trainingRobotGuidebotState,
             level: continuationLevel
@@ -1290,6 +1328,8 @@ final class PlayerSimulation {
             continuation.trainingRASBot3DeathState
         trainingRASBot4DeathState =
             continuation.trainingRASBot4DeathState
+        trainingInvulnerabilityPickupState =
+            continuation.trainingInvulnerabilityPickupState
         restoreTrainingGuidebotPresentation()
         if trainingRobotGuidebotState?.guidebotEnteredShip == true,
            let handle =
@@ -1340,7 +1380,9 @@ final class PlayerSimulation {
             trainingRASBot3DeathState:
                 trainingRASBot3DeathState,
             trainingRASBot4DeathState:
-                trainingRASBot4DeathState
+                trainingRASBot4DeathState,
+            trainingInvulnerabilityPickupState:
+                trainingInvulnerabilityPickupState
         )
     }
 
@@ -2114,6 +2156,7 @@ final class PlayerSimulation {
         var trainingGalleryWasCrossedThisFrame = false
         var trainingKillbotEntryWasCrossedThisFrame = false
         var trainingCameraMonitorWasHitThisFrame = false
+        var trainingInvulnerabilityPickupWasHitThisFrame = false
         if ship.physics.behaviors.contains(.wiggle) {
             if sqrt(dot(force, force)) < 0.1 {
                 wiggleFalloff -= systemsFrameDuration / 2
@@ -2145,6 +2188,17 @@ final class PlayerSimulation {
                 || trainingCameraMonitorPickupWasHit(
                     in: level,
                     state: trainingCameraMonitorState,
+                    playerStart: traceStart,
+                    playerEnd: trace.finalPosition,
+                    playerRadius: view.collisionRadius,
+                    visitedRoomSourceIndices:
+                        trace.visitedRoomSourceIndices
+                )
+            trainingInvulnerabilityPickupWasHitThisFrame =
+                trainingInvulnerabilityPickupWasHitThisFrame
+                || trainingInvulnerabilityPickupWasHit(
+                    in: level,
+                    state: trainingInvulnerabilityPickupState,
                     playerStart: traceStart,
                     playerEnd: trace.finalPosition,
                     playerRadius: view.collisionRadius,
@@ -2300,6 +2354,17 @@ final class PlayerSimulation {
                     visitedRoomSourceIndices:
                         trace.visitedRoomSourceIndices
                 )
+            trainingInvulnerabilityPickupWasHitThisFrame =
+                trainingInvulnerabilityPickupWasHitThisFrame
+                || trainingInvulnerabilityPickupWasHit(
+                    in: level,
+                    state: trainingInvulnerabilityPickupState,
+                    playerStart: traceStart,
+                    playerEnd: trace.finalPosition,
+                    playerRadius: view.collisionRadius,
+                    visitedRoomSourceIndices:
+                        trace.visitedRoomSourceIndices
+                )
             trainingGalleryWasCrossedThisFrame =
                 trainingGalleryWasCrossedThisFrame
                 || trainingGalleryTriggerWasCrossed(
@@ -2387,10 +2452,48 @@ final class PlayerSimulation {
         )
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
+        if trainingInvulnerabilityPickupWasHitThisFrame,
+            var state = trainingInvulnerabilityPickupState,
+            let chain = level.trainingInvulnerabilityPickupChain
+        {
+            if !state.scriptWasTriggered {
+                state.scriptWasTriggered = true
+            }
+            if state.remainingDuration == nil {
+                state.wasConsumed = true
+                state.remainingDuration = chain.duration
+                level.objects.removeAll {
+                    $0.handle == chain.pickupObjectHandle
+                }
+                setObjectPresentationVisibility(
+                    in: &level,
+                    handle: chain.pickupObjectHandle,
+                    isVisible: false
+                )
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [chain.activatedMessage],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: true,
+                        soundSourceName:
+                            chain.activatedSoundSourceName
+                    ))
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: true,
+                        soundSourceName: chain.pickupSoundSourceName
+                    ))
+            }
+            trainingInvulnerabilityPickupState = state
+        }
         if guidebotReturnWasRequestedThisFrame,
-           let chain = level.trainingCameraMonitorChain?.returnToShip {
-            trainingOpeningFeedback.append(.init(
-                hudMessages: [chain.returnMessage],
+            let chain = level.trainingCameraMonitorChain?.returnToShip
+        {
+            trainingOpeningFeedback.append(
+                .init(
+                    hudMessages: [chain.returnMessage],
                 voiceSourceName: "",
                 voicePrecedesHUDMessages: true,
                 soundSourceName: chain.returnSoundSourceName
@@ -2486,13 +2589,35 @@ final class PlayerSimulation {
             closeTrainingKillbotEntryBarrier(in: &level)
             trainingKillbotEntryState = state
         }
+        if var state = trainingInvulnerabilityPickupState,
+            var remaining = state.remainingDuration,
+            let chain = level.trainingInvulnerabilityPickupChain
+        {
+            remaining -= systemsFrameDuration
+            if remaining <= 0.000_001 {
+                state.remainingDuration = nil
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [chain.expiredMessage],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: true,
+                        soundSourceName: chain.expiredSoundSourceName
+                    ))
+            } else {
+                state.remainingDuration = remaining
+            }
+            trainingInvulnerabilityPickupState = state
+        }
         if var state = trainingRobotGuidebotState,
-           let chain = level.trainingRobotGuidebotChain {
+            let chain = level.trainingRobotGuidebotChain
+        {
             if !state.guidebotContinuationWasPresented,
                state.guidebotIsDeployed,
-               trainingGalleryBarrierState?.wasTriggered == true {
-                trainingOpeningFeedback.append(.init(
-                    hudMessages: [chain.deployedGuidebotMessage],
+                trainingGalleryBarrierState?.wasTriggered == true
+            {
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [chain.deployedGuidebotMessage],
                     voiceSourceName:
                         chain.deployedGuidebotVoiceSourceName,
                     voicePrecedesHUDMessages: true
@@ -2644,7 +2769,9 @@ final class PlayerSimulation {
                         .returnMarkerLightDistance,
             trainingGuidebot:
                 trainingRobotGuidebotState?.guidebot?.frame,
-            trainingCameraMonitor: cameraMonitorFrame
+            trainingCameraMonitor: cameraMonitorFrame,
+            trainingInvulnerabilityRemaining:
+                trainingInvulnerabilityPickupState?.remainingDuration
         )
     }
 
@@ -2743,6 +2870,35 @@ private func trainingCameraMonitorPickupWasHit(
           }),
           case let .room(pickupRoomSourceIndex) = pickup.location,
           visitedRoomSourceIndices.contains(pickupRoomSourceIndex) else {
+        return false
+    }
+    return segmentSphereHitFraction(
+        start: playerStart,
+        end: playerEnd,
+        center: pickup.position,
+        radius: playerRadius + chain.pickupCollisionRadius
+    ) != nil
+}
+
+private func trainingInvulnerabilityPickupWasHit(
+    in level: Level,
+    state: TrainingInvulnerabilityPickupState?,
+    playerStart: Vector3,
+    playerEnd: Vector3,
+    playerRadius: Float,
+    visitedRoomSourceIndices: [Int]
+) -> Bool {
+    guard let state,
+        !state.wasConsumed,
+        let chain = level.trainingInvulnerabilityPickupChain,
+        let pickup = level.objects.first(where: {
+            $0.handle == chain.pickupObjectHandle
+        }),
+        pickup.location == .room(chain.pickupRoomSourceIndex),
+        visitedRoomSourceIndices.contains(
+            chain.pickupRoomSourceIndex
+        )
+    else {
         return false
     }
     return segmentSphereHitFraction(
@@ -3089,6 +3245,32 @@ private func validTrainingRASBot4DeathContinuation(
     return state.wasDestroyed
         ? state.shields < 0 && !robotIsPresent
         : state.shields >= 0 && robotIsPresent
+}
+
+private func validTrainingInvulnerabilityPickupContinuation(
+    _ state: TrainingInvulnerabilityPickupState?,
+    level: Level
+) -> Bool {
+    guard let chain = level.trainingInvulnerabilityPickupChain else {
+        return state == nil
+    }
+    guard let state,
+        state.remainingDuration.map({
+            $0.isFinite && $0 > 0 && $0 <= chain.duration
+        }) ?? true,
+        !state.wasConsumed || state.scriptWasTriggered,
+        state.remainingDuration == nil || state.wasConsumed
+    else {
+        return false
+    }
+    let pickupIsPresent = level.objects.contains {
+        $0.handle == chain.pickupObjectHandle
+    }
+    if state.wasConsumed {
+        return !pickupIsPresent
+    }
+    return pickupIsPresent
+        && state.remainingDuration == nil
 }
 
 private func setObjectPresentationVisibility(

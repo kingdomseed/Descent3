@@ -44,9 +44,12 @@ final class RevivalGameplayView: MTKView {
     private var afterburnerIsHeld = false
     private let trainingMessageLabel = NSTextField(labelWithString: "")
     private let enabledControlsLabel = NSTextField(labelWithString: "")
+    private let invulnerabilityStatusLabel =
+        NSTextField(labelWithString: "")
+    private let invulnerabilityMonitorRing = NoninteractiveTrainingOverlay()
     private let cameraMonitorBorder = NoninteractiveTrainingOverlay()
     private var trainingVoicePlayer: AVAudioPlayer?
-    private var trainingSoundPlayer: AVAudioPlayer?
+    private var trainingSoundPlayers: [AVAudioPlayer] = []
     private var trainingMessageExpiresAt: Float?
 
     override var acceptsFirstResponder: Bool { true }
@@ -99,6 +102,15 @@ final class RevivalGameplayView: MTKView {
             y: enabledControlsLabel.frame.maxY + 8,
             width: width,
             height: CGFloat(trainingMessageLabel.maximumNumberOfLines) * 28
+        )
+        invulnerabilityStatusLabel.frame = NSRect(
+            x: left,
+            y: max(
+                trainingMessageLabel.frame.maxY + 8,
+                bounds.height - 52
+            ),
+            width: max(0, width - 104),
+            height: 28
         )
         cameraMonitorBorder.frame = Self.cameraMonitorFrame(
             drawableWidth: bounds.width,
@@ -180,11 +192,13 @@ final class RevivalGameplayView: MTKView {
             clearInput()
             trainingMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
+            invulnerabilityStatusLabel.stringValue = ""
+            invulnerabilityMonitorRing.isHidden = true
             trainingMessageExpiresAt = nil
             trainingVoicePlayer?.stop()
             trainingVoicePlayer = nil
-            trainingSoundPlayer?.stop()
-            trainingSoundPlayer = nil
+            trainingSoundPlayers.forEach { $0.stop() }
+            trainingSoundPlayers.removeAll()
             cameraMonitorBorder.isHidden = true
         }
     }
@@ -195,6 +209,24 @@ final class RevivalGameplayView: MTKView {
         soundClips: [CanonicalSoundClip] = []
     ) throws {
         cameraMonitorBorder.isHidden = frame.trainingCameraMonitor == nil
+        invulnerabilityStatusLabel.stringValue =
+            Self.invulnerabilityStatusText(
+                remaining: frame.trainingInvulnerabilityRemaining
+            )
+        if let pulse = Self.invulnerabilityMonitorPulse(
+            remaining: frame.trainingInvulnerabilityRemaining,
+            gameTime: frame.gameTime,
+            drawableWidth: bounds.width,
+            drawableHeight: bounds.height
+        ) {
+            invulnerabilityMonitorRing.frame = pulse.frame
+            invulnerabilityMonitorRing.alphaValue = pulse.alpha
+            invulnerabilityMonitorRing.layer?.cornerRadius =
+                pulse.frame.width / 2
+            invulnerabilityMonitorRing.isHidden = false
+        } else {
+            invulnerabilityMonitorRing.isHidden = true
+        }
         guard !voiceClips.isEmpty else {
             trainingMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
@@ -291,19 +323,21 @@ final class RevivalGameplayView: MTKView {
         from soundClips: [CanonicalSoundClip]
     ) throws {
         do {
-            trainingSoundPlayer?.stop()
-            guard let clip = soundClips.first(where: {
-                $0.sourceName.caseInsensitiveCompare(soundSourceName)
+            trainingSoundPlayers.removeAll { !$0.isPlaying }
+            guard
+                let clip = soundClips.first(where: {
+                    $0.sourceName.caseInsensitiveCompare(soundSourceName)
                     == .orderedSame
                     || $0.logicalName.caseInsensitiveCompare(soundSourceName)
                         == .orderedSame
-            }) else {
+                })
+            else {
                 throw TrainingOpeningPresentationError.soundPlaybackFailed(
                     soundSourceName
                 )
             }
             let player = try AVAudioPlayer(data: Self.waveData(for: clip))
-            trainingSoundPlayer = player
+            trainingSoundPlayers.append(player)
             player.volume = clip.importVolume
             player.prepareToPlay()
             guard player.play() else {
@@ -312,8 +346,6 @@ final class RevivalGameplayView: MTKView {
                 )
             }
         } catch {
-            trainingSoundPlayer?.stop()
-            trainingSoundPlayer = nil
             throw TrainingOpeningPresentationError.soundPlaybackFailed(
                 soundSourceName
             )
@@ -410,6 +442,45 @@ final class RevivalGameplayView: MTKView {
         )
     }
 
+    nonisolated static func invulnerabilityStatusText(
+        remaining: Float?
+    ) -> String {
+        guard let remaining, remaining > 0 else { return "" }
+        let tenths = Int((remaining * 10).rounded())
+        return "INVULNERABLE \(tenths / 10).\(abs(tenths % 10))"
+    }
+
+    nonisolated static func invulnerabilityMonitorPulse(
+        remaining: Float?,
+        gameTime: Float,
+        drawableWidth: CGFloat,
+        drawableHeight: CGFloat
+    ) -> (frame: CGRect, alpha: CGFloat)? {
+        guard let remaining, remaining > 0,
+            drawableWidth > 0, drawableHeight > 0
+        else {
+            return nil
+        }
+        let virtualWidth = min(
+            drawableWidth,
+            drawableHeight * 4 / 3
+        )
+        let left = (drawableWidth - virtualWidth) / 2
+        let side = max(48, min(88, virtualWidth * 0.075))
+        let margin = max(18, virtualWidth * 0.02)
+        let phase = CGFloat(gameTime - floor(gameTime))
+        let expansion = side * phase * 0.06
+        return (
+            CGRect(
+                x: left + virtualWidth - margin - side - expansion,
+                y: drawableHeight - margin - side - expansion,
+                width: side + expansion * 2,
+                height: side + expansion * 2
+            ),
+            1 - phase / 2
+        )
+    }
+
     nonisolated static func controllerInput(
         leftX: Float,
         leftY: Float,
@@ -439,6 +510,20 @@ final class RevivalGameplayView: MTKView {
     }
 
     private func configureTrainingOverlay() {
+        invulnerabilityMonitorRing.wantsLayer = true
+        invulnerabilityMonitorRing.layer?.borderColor =
+            NSColor.systemRed.cgColor
+        invulnerabilityMonitorRing.layer?.borderWidth = 4
+        invulnerabilityMonitorRing.layer?.shadowColor =
+            NSColor.systemRed.cgColor
+        invulnerabilityMonitorRing.layer?.shadowOpacity = 0.8
+        invulnerabilityMonitorRing.layer?.shadowRadius = 5
+        invulnerabilityMonitorRing.layer?.shadowOffset = .zero
+        invulnerabilityMonitorRing.isHidden = true
+        invulnerabilityMonitorRing.setAccessibilityLabel(
+            "Invulnerability ship monitor pulse"
+        )
+        addSubview(invulnerabilityMonitorRing)
         cameraMonitorBorder.wantsLayer = true
         cameraMonitorBorder.layer?.borderColor = NSColor.systemRed.cgColor
         cameraMonitorBorder.layer?.borderWidth = 2
@@ -447,7 +532,11 @@ final class RevivalGameplayView: MTKView {
             "Training Camera Monitor view"
         )
         addSubview(cameraMonitorBorder)
-        for label in [enabledControlsLabel, trainingMessageLabel] {
+        for label in [
+            enabledControlsLabel,
+            trainingMessageLabel,
+            invulnerabilityStatusLabel,
+        ] {
             label.isHidden = false
             label.isEditable = false
             label.isSelectable = false
@@ -463,6 +552,10 @@ final class RevivalGameplayView: MTKView {
         )
         trainingMessageLabel.maximumNumberOfLines = 2
         trainingMessageLabel.setAccessibilityLabel("Training instruction")
+        invulnerabilityStatusLabel.textColor = .systemRed
+        invulnerabilityStatusLabel.setAccessibilityLabel(
+            "Invulnerability status"
+        )
     }
 
     nonisolated private static func controlSummary(

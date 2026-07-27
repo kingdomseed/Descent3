@@ -1605,6 +1605,272 @@ final class WorldRenderingTests: XCTestCase {
         })
     }
 
+    func testInvulnPowerup2ConsumesOnceAndExpiresAcrossContinuation()
+        throws
+    {
+        let level = makeTrainingInvulnerabilityPickupLevel()
+        try level.validate()
+        var runtimeLevel = level
+        let playerIndex = runtimeLevel.objects.firstIndex {
+            $0.handle == 2_048
+        }!
+        let pickupObject = runtimeLevel.objects.first {
+            $0.handle == 2_076
+        }!
+        let chain = try XCTUnwrap(
+            runtimeLevel.trainingInvulnerabilityPickupChain
+        )
+        let playerRadius = defaultPlayerView(
+            in: runtimeLevel
+        ).collisionRadius
+        let combinedRadius =
+            playerRadius + chain.pickupCollisionRadius
+        runtimeLevel.objects[playerIndex].location = .room(12)
+        runtimeLevel.objects[playerIndex].position = .init(
+            x: pickupObject.position.x + combinedRadius + 0.01,
+            y: pickupObject.position.y,
+            z: pickupObject.position.z
+        )
+        let outside = PlayerSimulation(
+            level: runtimeLevel,
+            presentationReadyTimestamp: 0
+        )
+        let outsideFrame = outside.update(at: 0.1, input: .init())
+        XCTAssertNil(outsideFrame.trainingInvulnerabilityRemaining)
+        XCTAssertTrue(
+            outside.level.objects.contains {
+                $0.handle == chain.pickupObjectHandle
+            })
+
+        runtimeLevel.objects[playerIndex].position = .init(
+            x: pickupObject.position.x + combinedRadius - 0.01,
+            y: pickupObject.position.y,
+            z: pickupObject.position.z
+        )
+        let simulation = PlayerSimulation(
+            level: runtimeLevel,
+            presentationReadyTimestamp: 0
+        )
+
+        let pickup = simulation.update(at: 0.1, input: .init())
+
+        XCTAssertEqual(
+            try XCTUnwrap(
+                pickup.trainingInvulnerabilityRemaining
+            ),
+            29.9,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            pickup.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Invulnerability On"],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: true,
+                    soundSourceName: "Invon.wav"
+                ),
+                .init(
+                    hudMessages: [],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: true,
+                    soundSourceName: "Power03.wav"
+                ),
+            ])
+        XCTAssertFalse(
+            simulation.level.objects.contains {
+                $0.handle == chain.pickupObjectHandle
+            })
+        XCTAssertEqual(
+            RevivalGameplayView.invulnerabilityStatusText(
+                remaining: pickup.trainingInvulnerabilityRemaining
+            ),
+            "INVULNERABLE 29.9"
+        )
+        let pulseStart = try XCTUnwrap(
+            RevivalGameplayView.invulnerabilityMonitorPulse(
+                remaining: pickup.trainingInvulnerabilityRemaining,
+                gameTime: 12,
+                drawableWidth: 1_600,
+                drawableHeight: 900
+            )
+        )
+        let pulseQuarter = try XCTUnwrap(
+            RevivalGameplayView.invulnerabilityMonitorPulse(
+                remaining: pickup.trainingInvulnerabilityRemaining,
+                gameTime: 12.25,
+                drawableWidth: 1_600,
+                drawableHeight: 900
+            )
+        )
+        XCTAssertEqual(pulseStart.frame.width, pulseStart.frame.height)
+        XCTAssertEqual(
+            pulseQuarter.frame.width,
+            pulseQuarter.frame.height
+        )
+        XCTAssertEqual(
+            pulseQuarter.frame.width / pulseStart.frame.width,
+            1.03,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(pulseStart.alpha, 1, accuracy: 0.000_1)
+        XCTAssertEqual(pulseQuarter.alpha, 0.875, accuracy: 0.000_1)
+        let portraitPulse = try XCTUnwrap(
+            RevivalGameplayView.invulnerabilityMonitorPulse(
+                remaining: pickup.trainingInvulnerabilityRemaining,
+                gameTime: 12.25,
+                drawableWidth: 900,
+                drawableHeight: 1_600
+            )
+        )
+        XCTAssertEqual(
+            portraitPulse.frame.width,
+            portraitPulse.frame.height
+        )
+        XCTAssertNil(
+            RevivalGameplayView.invulnerabilityMonitorPulse(
+                remaining: nil,
+                gameTime: 12.25,
+                drawableWidth: 1_600,
+                drawableHeight: 900
+            )
+        )
+
+        let continuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: continuationData)
+                as? [String: Any]
+        )
+        XCTAssertEqual(continuationObject["schemaVersion"] as? Int, 7)
+        let invulnerabilityState = try XCTUnwrap(
+            continuationObject["trainingInvulnerabilityPickupState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(invulnerabilityState["wasConsumed"] as? Bool, true)
+        XCTAssertEqual(
+            try XCTUnwrap(
+                invulnerabilityState["remainingDuration"] as? Double
+            ),
+            29.9,
+            accuracy: 0.000_1
+        )
+
+        var hostileObject = continuationObject
+        var hostileState = invulnerabilityState
+        hostileState["remainingDuration"] = 30.1
+        hostileObject["trainingInvulnerabilityPickupState"] = hostileState
+        let hostileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: runtimeLevel,
+                continuation: hostileContinuation,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var chainlessLevelObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(runtimeLevel)
+            ) as? [String: Any]
+        )
+        chainlessLevelObject.removeValue(
+            forKey: "trainingInvulnerabilityPickupChain"
+        )
+        let chainlessLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(
+                withJSONObject: chainlessLevelObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: chainlessLevel,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: continuationData
+                ),
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        let restored = try PlayerSimulation(
+            level: runtimeLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: continuationData
+            ),
+            resumedAtTimestamp: 100
+        )
+        let afterReload = restored.update(at: 100.1, input: .init())
+        XCTAssertEqual(
+            try XCTUnwrap(
+                afterReload.trainingInvulnerabilityRemaining
+            ),
+            29.8,
+            accuracy: 0.000_1
+        )
+        XCTAssertTrue(afterReload.trainingOpeningFeedback.isEmpty)
+
+        let handoff = restored.update(at: 130.0, input: .init())
+        XCTAssertEqual(
+            try XCTUnwrap(
+                handoff.trainingInvulnerabilityRemaining
+            ),
+            29.7,
+            accuracy: 0.000_1
+        )
+        XCTAssertTrue(handoff.trainingOpeningFeedback.isEmpty)
+        let expired = restored.update(at: 130.1, input: .init())
+        XCTAssertNil(expired.trainingInvulnerabilityRemaining)
+        XCTAssertEqual(
+            expired.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Invulnerability Off"],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: true,
+                    soundSourceName: "Invoff.wav"
+                )
+            ])
+        XCTAssertEqual(
+            RevivalGameplayView.invulnerabilityStatusText(
+                remaining: expired.trainingInvulnerabilityRemaining
+            ),
+            ""
+        )
+
+        let postExpiry = try PlayerSimulation(
+            level: runtimeLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(restored.continuation)
+            ),
+            resumedAtTimestamp: 200
+        )
+        let repeated = postExpiry.update(at: 200.1, input: .init())
+        XCTAssertNil(repeated.trainingInvulnerabilityRemaining)
+        XCTAssertTrue(repeated.trainingOpeningFeedback.isEmpty)
+        XCTAssertFalse(
+            postExpiry.level.objects.contains {
+                $0.handle == chain.pickupObjectHandle
+            })
+    }
+
     func testGuidebotReturnTracksLivePlayerMovementInSameFrame()
         throws
     {
@@ -6899,6 +7165,151 @@ func makeTrainingRASBot4DeathLevel() -> Level {
         robotFlags: 5_121,
         combat: .stockTraining
     ))
+}
+
+func makeTrainingInvulnerabilityPickupLevel() -> Level {
+    var level = makeTrainingRASBot4DeathLevel()
+    let playerIndex = level.objects.firstIndex {
+        $0.handle == 2_048
+    }!
+    let originalPlayer = level.objects[playerIndex]
+    let originalRoomSourceIndex: Int
+    if case .room(let sourceIndex) = originalPlayer.location {
+        originalRoomSourceIndex = sourceIndex
+    } else {
+        preconditionFailure("Synthetic Training player is indoor")
+    }
+    let originalRoom = level.rooms.first {
+        $0.sourceIndex == originalRoomSourceIndex
+    }!
+    level.rooms.append(
+        .init(
+            sourceIndex: 12,
+            name: "Invuln Room",
+            pathPoint: originalRoom.pathPoint,
+            vertices: originalRoom.vertices,
+            faces: originalRoom.faces.map {
+                .init(
+                    corners: $0.corners,
+                    flags: $0.flags,
+                    portalIndex: nil,
+                    texture: $0.texture,
+                    lightmapInfoIndex: nil,
+                    allowsLightCorona: $0.allowsLightCorona,
+                    lightMultiple: $0.lightMultiple,
+                    special: $0.special
+                )
+            },
+            portals: [],
+            flags: originalRoom.flags,
+            pulseTime: originalRoom.pulseTime,
+            pulseOffset: originalRoom.pulseOffset,
+            mirrorFaceIndex: originalRoom.mirrorFaceIndex,
+            door: originalRoom.door,
+            volumeLights: originalRoom.volumeLights,
+            fog: originalRoom.fog,
+            ambientSoundPattern: originalRoom.ambientSoundPattern,
+            reverb: originalRoom.reverb,
+            damage: originalRoom.damage,
+            damageType: originalRoom.damageType
+        ))
+    let pickupRoom = level.rooms.last!
+    let player = level.objects[playerIndex]
+    let presentation = level.objectPresentations.first {
+        $0.objectHandle == 2_078
+    }!
+    let model = level.models.first {
+        $0.source == presentation.primaryModel
+    }!
+    level.objects.append(
+        .init(
+            handle: 2_076,
+            type: 7,
+            storedID: 3,
+            definition: .init(
+                storedIndex: 3,
+                sourceName: "Invulnerability"
+            ),
+            instanceName: "InvulnPowerup2",
+            flags: 5_120,
+            doorShields: nil,
+            location: .room(12),
+            position: pickupRoom.pathPoint,
+            orientation: player.orientation,
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        ))
+    level.objectPresentations.append(
+        .init(
+            objectHandle: 2_076,
+            primaryModel: model.source,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil
+        ))
+    let template = level.soundClips.first!
+    let pickup = CanonicalSoundClip(
+        logicalName: "Powerup pickup",
+        sourceName: "Power03.wav",
+        sourceEntryIndex: 499,
+        sampleRate: template.sampleRate,
+        channelCount: template.channelCount,
+        frameCount: template.frameCount,
+        pcm16LittleEndian: template.pcm16LittleEndian,
+        pcmSHA256: template.pcmSHA256,
+        sourceArchive: template.sourceArchive,
+        sourceSHA256: template.sourceSHA256,
+        importVolume: 1
+    )
+    let activated = CanonicalSoundClip(
+        logicalName: "Invulnerability on",
+        sourceName: "Invon.wav",
+        sourceEntryIndex: 500,
+        sampleRate: template.sampleRate,
+        channelCount: template.channelCount,
+        frameCount: template.frameCount,
+        pcm16LittleEndian: template.pcm16LittleEndian,
+        pcmSHA256: template.pcmSHA256,
+        sourceArchive: template.sourceArchive,
+        sourceSHA256: template.sourceSHA256,
+        importVolume: 0.5
+    )
+    let expired = CanonicalSoundClip(
+        logicalName: "Invulnerability off",
+        sourceName: "Invoff.wav",
+        sourceEntryIndex: 501,
+        sampleRate: template.sampleRate,
+        channelCount: template.channelCount,
+        frameCount: template.frameCount,
+        pcm16LittleEndian: template.pcm16LittleEndian,
+        pcmSHA256: template.pcmSHA256,
+        sourceArchive: template.sourceArchive,
+        sourceSHA256: template.sourceSHA256,
+        importVolume: 0.5
+    )
+    return level.addingTrainingInvulnerabilityPickupChain(
+        .init(
+            pickupObjectHandle: 2_076,
+            pickupRoomSourceIndex: 12,
+            pickupObjectFlags: 5_120,
+            pickupCollisionRadius: model.collisionRadius,
+            duration: 30,
+            activatedMessage: "Invulnerability On",
+            expiredMessage: "Invulnerability Off",
+            pickupSoundSourceName: "Power03.wav",
+            activatedSoundSourceName: "Invon.wav",
+            expiredSoundSourceName: "Invoff.wav"
+        ),
+        soundClips: [pickup, activated, expired]
+    )
 }
 
 private func assertTrainingGuidebotReturnBarrier(

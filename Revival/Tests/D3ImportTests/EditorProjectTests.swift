@@ -1148,6 +1148,147 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testInvulnPowerup2HasDiagnosticUndoAndDisposablePlayReturn()
+        throws
+    {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(
+            path: "candidate.revival",
+            directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(
+                path: "library",
+                directoryHint: .isDirectory
+            )
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false
+        )
+        try writeCanonicalPackage(
+            makeTrainingInvulnerabilityPickupLevel(),
+            to: candidate
+        )
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        document.undoManager?.groupsByEvent = false
+
+        XCTAssertEqual(
+            document.project.trainingInvulnerabilityPickupSourceDiagnostic,
+            "TrainingMission.cpp Script 047 / InvulnPowerup2 pickup"
+        )
+        let pickup = try XCTUnwrap(
+            document.project.level.objects.first {
+                $0.handle == 2_076
+            })
+        document.undoManager?.beginUndoGrouping()
+        let movedPosition = Vector3(
+            x: pickup.position.x + 0.25,
+            y: pickup.position.y,
+            z: pickup.position.z
+        )
+        try document.moveObject(
+            handle: pickup.handle,
+            to: movedPosition
+        )
+        document.undoManager?.endUndoGrouping()
+        XCTAssertEqual(document.undoManager?.undoActionName, "Move Object")
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == pickup.handle
+            }?.position,
+            pickup.position
+        )
+
+        let first = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        let second = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(
+            first.fileWrappers?["project.json"]?.regularFileContents,
+            second.fileWrappers?["project.json"]?.regularFileContents
+        )
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(
+            from: first,
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertNotNil(
+            reopened.project.level.trainingInvulnerabilityPickupChain
+        )
+
+        let session = reopened.makePlaySession()
+        reopened.commitPlaySession(session, renderingWorld: false)
+        let initialSimulation = session.makePlayerSimulation(
+            presentationReadyTimestamp: 0
+        )
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    initialSimulation.continuation
+                )
+            ) as? [String: Any]
+        )
+        let room = try XCTUnwrap(
+            session.level.rooms.first { $0.sourceIndex == 12 }
+        )
+        var playerLocation = try XCTUnwrap(
+            continuationObject["playerLocation"] as? [String: Any]
+        )
+        playerLocation["room"] = ["_0": 12]
+        continuationObject["playerLocation"] = playerLocation
+        continuationObject["playerPosition"] = [
+            "x": room.pathPoint.x,
+            "y": room.pathPoint.y,
+            "z": room.pathPoint.z,
+        ]
+        let simulation = try PlayerSimulation(
+            level: session.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: continuationObject
+                )
+            ),
+            resumedAtTimestamp: 0
+        )
+        let frame = simulation.update(at: 0.1, input: .init())
+        XCTAssertEqual(
+            try XCTUnwrap(
+                frame.trainingInvulnerabilityRemaining
+            ),
+            29.9,
+            accuracy: 0.000_1
+        )
+        XCTAssertFalse(
+            simulation.level.objects.contains {
+                $0.handle == pickup.handle
+            })
+        XCTAssertTrue(
+            reopened.project.level.objects.contains {
+                $0.handle == pickup.handle
+            })
+        reopened.returnToEditor(renderingWorld: false)
+        XCTAssertNil(reopened.playSession)
+        XCTAssertTrue(
+            reopened.project.level.objects.contains {
+                $0.handle == pickup.handle
+            })
+    }
+
+    @MainActor
     func testObjectAndPlayerStartTransformsUseStableIdentitiesAndNamedUndo() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())
