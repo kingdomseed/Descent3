@@ -936,6 +936,12 @@ private struct TrainingLastRoomState: Codable, Equatable, Sendable {
     var wasPresented = false
 }
 
+private struct TrainingFinalRoomEntryState:
+    Codable, Equatable, Sendable
+{
+    var wasTriggered = false
+}
+
 private enum TrainingGuidebotTask: String, Codable, Equatable, Sendable {
     case outbound
     case returnToShip
@@ -1016,6 +1022,8 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     fileprivate let trainingInvulnerabilityPickupState: TrainingInvulnerabilityPickupState?
     fileprivate let trainingCloakPickupState: TrainingCloakPickupState?
     fileprivate let trainingLastRoomState: TrainingLastRoomState?
+    fileprivate let trainingFinalRoomEntryState:
+        TrainingFinalRoomEntryState?
 }
 
 enum PlayerSimulationContinuationError: Error, Equatable {
@@ -1074,6 +1082,8 @@ final class PlayerSimulation {
     private var trainingInvulnerabilityPickupState: TrainingInvulnerabilityPickupState?
     private var trainingCloakPickupState: TrainingCloakPickupState?
     private var trainingLastRoomState: TrainingLastRoomState?
+    private var trainingFinalRoomEntryState:
+        TrainingFinalRoomEntryState?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -1129,6 +1139,10 @@ final class PlayerSimulation {
         trainingLastRoomState = level.trainingLastRoomChain.map {
             _ in TrainingLastRoomState()
         }
+        trainingFinalRoomEntryState =
+            level.trainingFinalRoomEntryChain.map {
+                _ in TrainingFinalRoomEntryState()
+            }
     }
 
     init(
@@ -1153,6 +1167,11 @@ final class PlayerSimulation {
             continuation.trainingLastRoomState
             ?? level.trainingLastRoomChain.map {
                 _ in TrainingLastRoomState()
+            }
+        let restoredFinalRoomEntryState =
+            continuation.trainingFinalRoomEntryState
+            ?? level.trainingFinalRoomEntryChain.map {
+                _ in TrainingFinalRoomEntryState()
             }
         var routeAllocationLevel = level
         if continuation.trainingGalleryBarrierState?.wasTriggered == true {
@@ -1252,6 +1271,9 @@ final class PlayerSimulation {
         if restoredLastRoomState?.wasTriggered == true {
             openTrainingLastRoomBarrier(in: &continuationLevel)
         }
+        if restoredFinalRoomEntryState?.wasTriggered == true {
+            closeTrainingLastRoomBarrier(in: &continuationLevel)
+        }
         guard
             validTrainingCameraMonitorContinuation(
                 continuation.trainingCameraMonitorState,
@@ -1319,6 +1341,8 @@ final class PlayerSimulation {
         guard
             validTrainingLastRoomContinuation(
                 restoredLastRoomState,
+                finalRoomEntryWasTriggered:
+                    restoredFinalRoomEntryState?.wasTriggered == true,
                 allProducersWereTriggered:
                     continuation.trainingRASBot1DeathState?
                         .wasDestroyed == true
@@ -1335,6 +1359,13 @@ final class PlayerSimulation {
                 level: continuationLevel
             )
         else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
+        guard validTrainingFinalRoomEntryContinuation(
+            restoredFinalRoomEntryState,
+            lastRoomState: restoredLastRoomState,
+            level: continuationLevel
+        ) else {
             throw PlayerSimulationContinuationError.invalidState
         }
         guard
@@ -1443,6 +1474,7 @@ final class PlayerSimulation {
             continuation.trainingInvulnerabilityPickupState
         trainingCloakPickupState = restoredCloakPickupState
         trainingLastRoomState = restoredLastRoomState
+        trainingFinalRoomEntryState = restoredFinalRoomEntryState
         restoreTrainingGuidebotPresentation()
         if trainingRobotGuidebotState?.guidebotEnteredShip == true,
            let handle =
@@ -1497,7 +1529,9 @@ final class PlayerSimulation {
             trainingInvulnerabilityPickupState:
                 trainingInvulnerabilityPickupState,
             trainingCloakPickupState: trainingCloakPickupState,
-            trainingLastRoomState: trainingLastRoomState
+            trainingLastRoomState: trainingLastRoomState,
+            trainingFinalRoomEntryState:
+                trainingFinalRoomEntryState
         )
     }
 
@@ -2270,6 +2304,7 @@ final class PlayerSimulation {
         var trainingForwardGoalWasReachedThisFrame = false
         var trainingGalleryWasCrossedThisFrame = false
         var trainingKillbotEntryWasCrossedThisFrame = false
+        var trainingFinalRoomEntryWasCrossedThisFrame = false
         var trainingCameraMonitorWasHitThisFrame = false
         var trainingInvulnerabilityPickupWasHitThisFrame = false
         var trainingCloakPickupWasHitThisFrame = false
@@ -2341,6 +2376,12 @@ final class PlayerSimulation {
             trainingKillbotEntryWasCrossedThisFrame =
                 trainingKillbotEntryWasCrossedThisFrame
                 || trainingKillbotEntryTriggerWasCrossed(
+                    in: level,
+                    passedPortalFaces: trace.passedPortalFaces
+                )
+            trainingFinalRoomEntryWasCrossedThisFrame =
+                trainingFinalRoomEntryWasCrossedThisFrame
+                || trainingFinalRoomEntryTriggerWasCrossed(
                     in: level,
                     passedPortalFaces: trace.passedPortalFaces
                 )
@@ -2512,6 +2553,12 @@ final class PlayerSimulation {
             trainingKillbotEntryWasCrossedThisFrame =
                 trainingKillbotEntryWasCrossedThisFrame
                 || trainingKillbotEntryTriggerWasCrossed(
+                    in: level,
+                    passedPortalFaces: trace.passedPortalFaces
+                )
+            trainingFinalRoomEntryWasCrossedThisFrame =
+                trainingFinalRoomEntryWasCrossedThisFrame
+                || trainingFinalRoomEntryTriggerWasCrossed(
                     in: level,
                     passedPortalFaces: trace.passedPortalFaces
                 )
@@ -2778,6 +2825,27 @@ final class PlayerSimulation {
             ))
             closeTrainingKillbotEntryBarrier(in: &level)
             trainingKillbotEntryState = state
+        }
+        if var state = trainingFinalRoomEntryState,
+           !state.wasTriggered,
+           trainingLastRoomState?.wasTriggered == true,
+           trainingFinalRoomEntryWasCrossedThisFrame,
+           let chain = level.trainingFinalRoomEntryChain
+        {
+            trainingLastRoomState?.markerLightDistance = 0
+            trainingOpeningFeedback.append(.init(
+                hudMessages: [chain.successMessage],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true
+            ))
+            closeTrainingLastRoomBarrier(in: &level)
+            trainingOpeningFeedback.append(.init(
+                hudMessages: [chain.instructionMessage],
+                voiceSourceName: chain.voiceSourceName,
+                voicePrecedesHUDMessages: true
+            ))
+            state.wasTriggered = true
+            trainingFinalRoomEntryState = state
         }
         if var state = trainingInvulnerabilityPickupState,
             var remaining = state.remainingDuration,
@@ -3072,6 +3140,19 @@ private func trainingKillbotEntryTriggerWasCrossed(
     return passedPortalFaces.contains {
         $0.roomSourceIndex == entry.triggerRoomSourceIndex
             && $0.faceIndex == entry.triggerFaceIndex
+    }
+}
+
+private func trainingFinalRoomEntryTriggerWasCrossed(
+    in level: Level,
+    passedPortalFaces: [IndoorPortalCrossing]
+) -> Bool {
+    guard let chain = level.trainingFinalRoomEntryChain else {
+        return false
+    }
+    return passedPortalFaces.contains {
+        $0.roomSourceIndex == chain.triggerRoomSourceIndex
+            && $0.faceIndex == chain.triggerFaceIndex
     }
 }
 
@@ -3595,6 +3676,7 @@ private func validTrainingCloakPickupContinuation(
 
 private func validTrainingLastRoomContinuation(
     _ state: TrainingLastRoomState?,
+    finalRoomEntryWasTriggered: Bool,
     allProducersWereTriggered: Bool,
     level: Level
 ) -> Bool {
@@ -3618,13 +3700,55 @@ private func validTrainingLastRoomContinuation(
     let room = level.rooms.first {
         $0.sourceIndex == chain.barrierRoomSourceIndex
     }!
-    return state.markerLightDistance == chain.openMarkerLightDistance
+    let expectedMarkerDistance: Float =
+        finalRoomEntryWasTriggered ? 0 : chain.openMarkerLightDistance
+    let expectedPortalFlag: UInt32 =
+        finalRoomEntryWasTriggered ? 1 : 0
+    return state.markerLightDistance == expectedMarkerDistance
         && chain.orderedPortalIndices.allSatisfy {
-            room.portals[$0].flags & 1 == 0
+            room.portals[$0].flags & 1 == expectedPortalFlag
         }
         && (state.wasPresented
             ? state.timerRemaining == nil
             : state.timerRemaining != nil)
+}
+
+private func validTrainingFinalRoomEntryContinuation(
+    _ state: TrainingFinalRoomEntryState?,
+    lastRoomState: TrainingLastRoomState?,
+    level: Level
+) -> Bool {
+    guard level.trainingFinalRoomEntryChain != nil else {
+        return state == nil
+    }
+    guard let state else { return false }
+    if !state.wasTriggered {
+        return true
+    }
+    guard lastRoomState?.wasTriggered == true,
+        lastRoomState?.markerLightDistance == 0,
+        let lastRoom = level.trainingLastRoomChain,
+        let room = level.rooms.first(where: {
+            $0.sourceIndex == lastRoom.barrierRoomSourceIndex
+        })
+    else {
+        return false
+    }
+    return lastRoom.orderedPortalIndices.allSatisfy { portalIndex in
+        let portal = room.portals[portalIndex]
+        guard portal.flags & 1 != 0,
+            let connectedRoom = level.rooms.first(where: {
+                $0.sourceIndex == portal.connectedRoom
+            }),
+            connectedRoom.portals.indices.contains(
+                portal.connectedPortal
+            )
+        else {
+            return false
+        }
+        return connectedRoom.portals[portal.connectedPortal].flags & 1
+            != 0
+    }
 }
 
 private func setObjectPresentationVisibility(
@@ -3860,6 +3984,25 @@ private func openTrainingLastRoomBarrier(in level: inout Level) {
         }!
         level.rooms[connectedRoomIndex]
             .portals[portal.connectedPortal].flags &= ~UInt32(1)
+    }
+}
+
+private func closeTrainingLastRoomBarrier(in level: inout Level) {
+    guard let chain = level.trainingLastRoomChain,
+        let roomIndex = level.rooms.firstIndex(where: {
+            $0.sourceIndex == chain.barrierRoomSourceIndex
+        })
+    else {
+        return
+    }
+    for portalIndex in chain.orderedPortalIndices {
+        let portal = level.rooms[roomIndex].portals[portalIndex]
+        level.rooms[roomIndex].portals[portalIndex].flags |= 1
+        let connectedRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        level.rooms[connectedRoomIndex]
+            .portals[portal.connectedPortal].flags |= 1
     }
 }
 

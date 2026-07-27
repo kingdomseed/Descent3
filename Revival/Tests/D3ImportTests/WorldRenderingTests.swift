@@ -2207,7 +2207,7 @@ final class WorldRenderingTests: XCTestCase {
         )
     }
 
-    func testSchemaSevenContinuationDefaultsNewScript048States()
+    func testSchemaSevenContinuationDefaultsScript048And050States()
         throws
     {
         let previousLevel = makeTrainingInvulnerabilityPickupLevel()
@@ -2222,8 +2222,9 @@ final class WorldRenderingTests: XCTestCase {
         )
         XCTAssertNil(previousObject["trainingCloakPickupState"])
         XCTAssertNil(previousObject["trainingLastRoomState"])
+        XCTAssertNil(previousObject["trainingFinalRoomEntryState"])
 
-        let currentLevel = makeTrainingCloakPickupLevel()
+        let currentLevel = makeTrainingFinalRoomEntryLevel()
         let restored = try PlayerSimulation(
             level: currentLevel,
             continuation: JSONDecoder().decode(
@@ -2243,6 +2244,148 @@ final class WorldRenderingTests: XCTestCase {
         )
         XCTAssertNotNil(currentObject["trainingCloakPickupState"])
         XCTAssertNotNil(currentObject["trainingLastRoomState"])
+        XCTAssertNotNil(
+            currentObject["trainingFinalRoomEntryState"]
+        )
+    }
+
+    func testScript050ClosesPortalRoomSixInSourceOrderAndSurvivesReload()
+        throws
+    {
+        let level = makeTrainingFinalRoomEntryLevel()
+        try level.validate()
+        let chain = try XCTUnwrap(level.trainingFinalRoomEntryChain)
+        let simulation = try PlayerSimulation(
+            level: level,
+            continuation: script050ReadyContinuation(in: level),
+            resumedAtTimestamp: 0
+        )
+
+        let frame = simulation.update(at: 0.1, input: .zero)
+
+        XCTAssertEqual(
+            frame.trainingOpeningFeedback.suffix(2),
+            [
+                .init(
+                    hudMessages: [chain.successMessage],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: true
+                ),
+                .init(
+                    hudMessages: [chain.instructionMessage],
+                    voiceSourceName: chain.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                ),
+            ]
+        )
+        let closedRoom = try XCTUnwrap(simulation.level.rooms.first {
+            $0.sourceIndex
+                == level.trainingLastRoomChain?.barrierRoomSourceIndex
+        })
+        for portalIndex in [1, 0] {
+            let portal = closedRoom.portals[portalIndex]
+            XCTAssertNotEqual(portal.flags & 1, 0)
+            let connected = try XCTUnwrap(
+                simulation.level.rooms.first {
+                    $0.sourceIndex == portal.connectedRoom
+                }
+            )
+            XCTAssertNotEqual(
+                connected.portals[portal.connectedPortal].flags & 1,
+                0
+            )
+        }
+        XCTAssertEqual(frame.trainingLastRoomMarkerLightDistance, 0)
+        let continuedData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: continuedData)
+                as? [String: Any]
+        )
+        XCTAssertEqual(
+            (
+                continuedObject["trainingFinalRoomEntryState"]
+                    as? [String: Any]
+            )?["wasTriggered"] as? Bool,
+            true
+        )
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: continuedData
+            ),
+            resumedAtTimestamp: 100
+        )
+        let repeated = restored.update(at: 100.1, input: .zero)
+        XCTAssertTrue(repeated.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(
+            repeated.trainingLastRoomMarkerLightDistance,
+            0
+        )
+
+        let sameFrameTail = try PlayerSimulation(
+            level: level,
+            continuation: script050ReadyContinuation(
+                in: level,
+                timerRemaining: 0.1
+            ),
+            resumedAtTimestamp: 0
+        ).update(at: 0.1, input: .zero)
+        XCTAssertEqual(
+            sameFrameTail.trainingOpeningFeedback.suffix(3),
+            [
+                .init(
+                    hudMessages: [chain.successMessage],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: true
+                ),
+                .init(
+                    hudMessages: [chain.instructionMessage],
+                    voiceSourceName: chain.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                ),
+                .init(
+                    hudMessages:
+                        level.trainingLastRoomChain?.completionMessages
+                        ?? [],
+                    voiceSourceName: "proceed5.osf",
+                    voicePrecedesHUDMessages: false
+                ),
+            ]
+        )
+
+        let fresh = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(fresh.continuation)
+            ) as? [String: Any]
+        )
+        hostileObject["trainingFinalRoomEntryState"] = [
+            "wasTriggered": true
+        ]
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: hostileObject
+                    )
+                ),
+                resumedAtTimestamp: 200
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
     }
 
     func testGuidebotReturnTracksLivePlayerMovementInSameFrame()
@@ -3939,6 +4082,12 @@ final class WorldRenderingTests: XCTestCase {
                 voicePrecedesHUDMessages: true,
                 soundSourceName: "second.wav"
             ),
+            .init(
+                hudMessages: ["third"],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "third.wav"
+            ),
         ]
         var presentation: [String] = []
 
@@ -3961,6 +4110,8 @@ final class WorldRenderingTests: XCTestCase {
             "voice:welcome.osf",
             "sound:second.wav",
             "hud:second",
+            "sound:third.wav",
+            "hud:third",
         ])
     }
 
@@ -7942,23 +8093,25 @@ func makeTrainingCloakPickupLevel() -> Level {
         }!
         let sourceReciprocal =
             sourceConnectedRoom.portals[sourcePortal.connectedPortal]
-        let connectedSourceIndex = 45 + portalIndex
+        let connectedSourceIndex = portalIndex == 0 ? 41 : 45
+        let connectedPortalIndex = portalIndex == 0 ? 3 : 0
         lastRoomPortals.append(.init(
             flags: 1,
             faceIndex: sourcePortal.faceIndex,
             connectedRoom: connectedSourceIndex,
-            connectedPortal: 0,
+            connectedPortal: connectedPortalIndex,
             boundaryNodeIndex: -1,
             pathPoint: sourcePortal.pathPoint,
             combineMaster: -1
         ))
-        let connectedFaces = sourceConnectedRoom.faces.enumerated().map {
+        var connectedFaces = sourceConnectedRoom.faces.enumerated().map {
             faceIndex, face in
             LevelFace(
                 corners: face.corners,
                 flags: face.flags,
                 portalIndex:
-                    faceIndex == sourceReciprocal.faceIndex ? 0 : nil,
+                    faceIndex == sourceReciprocal.faceIndex
+                        ? connectedPortalIndex : nil,
                 texture: face.texture,
                 lightmapInfoIndex: face.lightmapInfoIndex,
                 allowsLightCorona: face.allowsLightCorona,
@@ -7966,23 +8119,107 @@ func makeTrainingCloakPickupLevel() -> Level {
                 special: face.special
             )
         }
-        connectedRooms.append(.init(
-            sourceIndex: connectedSourceIndex,
-            name: "PortalRoom6 test neighbor \(portalIndex)",
-            pathPoint: sourceConnectedRoom.pathPoint,
-            vertices: sourceConnectedRoom.vertices,
-            faces: connectedFaces,
-            portals: [
-                .init(
+        var connectedPortals: [LevelPortal] = []
+        if portalIndex == 0 {
+            for auxiliaryPortalIndex in 0..<3 {
+                let faceIndex = connectedFaces.count
+                connectedFaces.append(.init(
+                    corners: sourceConnectedRoom.faces[
+                        sourceReciprocal.faceIndex
+                    ].corners,
+                    flags: sourceConnectedRoom.faces[
+                        sourceReciprocal.faceIndex
+                    ].flags,
+                    portalIndex: auxiliaryPortalIndex,
+                    texture: sourceConnectedRoom.faces[
+                        sourceReciprocal.faceIndex
+                    ].texture,
+                    lightmapInfoIndex: sourceConnectedRoom.faces[
+                        sourceReciprocal.faceIndex
+                    ].lightmapInfoIndex,
+                    allowsLightCorona: sourceConnectedRoom.faces[
+                        sourceReciprocal.faceIndex
+                    ].allowsLightCorona,
+                    lightMultiple: sourceConnectedRoom.faces[
+                        sourceReciprocal.faceIndex
+                    ].lightMultiple,
+                    special: sourceConnectedRoom.faces[
+                        sourceReciprocal.faceIndex
+                    ].special
+                ))
+                connectedPortals.append(.init(
                     flags: 1,
-                    faceIndex: sourceReciprocal.faceIndex,
-                    connectedRoom: 44,
-                    connectedPortal: portalIndex,
+                    faceIndex: faceIndex,
+                    connectedRoom: 60 + auxiliaryPortalIndex,
+                    connectedPortal: 0,
                     boundaryNodeIndex: -1,
                     pathPoint: sourceReciprocal.pathPoint,
                     combineMaster: -1
-                ),
-            ],
+                ))
+                let auxiliaryFace = lastRoomTemplate.faces[
+                    sourcePortal.faceIndex
+                ]
+                connectedRooms.append(.init(
+                    sourceIndex: 60 + auxiliaryPortalIndex,
+                    name: "P6 auxiliary \(auxiliaryPortalIndex)",
+                    pathPoint: lastRoomTemplate.pathPoint,
+                    vertices: lastRoomTemplate.vertices,
+                    faces: [
+                        .init(
+                            corners: auxiliaryFace.corners,
+                            flags: auxiliaryFace.flags,
+                            portalIndex: 0,
+                            texture: auxiliaryFace.texture,
+                            lightmapInfoIndex:
+                                auxiliaryFace.lightmapInfoIndex,
+                            allowsLightCorona:
+                                auxiliaryFace.allowsLightCorona,
+                            lightMultiple: auxiliaryFace.lightMultiple,
+                            special: auxiliaryFace.special
+                        )
+                    ],
+                    portals: [
+                        .init(
+                            flags: 1,
+                            faceIndex: 0,
+                            connectedRoom: 41,
+                            connectedPortal: auxiliaryPortalIndex,
+                            boundaryNodeIndex: -1,
+                            pathPoint: sourcePortal.pathPoint,
+                            combineMaster: -1
+                        )
+                    ],
+                    flags: lastRoomTemplate.flags,
+                    pulseTime: lastRoomTemplate.pulseTime,
+                    pulseOffset: lastRoomTemplate.pulseOffset,
+                    mirrorFaceIndex: lastRoomTemplate.mirrorFaceIndex,
+                    door: lastRoomTemplate.door,
+                    volumeLights: lastRoomTemplate.volumeLights,
+                    fog: lastRoomTemplate.fog,
+                    ambientSoundPattern:
+                        lastRoomTemplate.ambientSoundPattern,
+                    reverb: lastRoomTemplate.reverb,
+                    damage: lastRoomTemplate.damage,
+                    damageType: lastRoomTemplate.damageType
+                ))
+            }
+        }
+        connectedPortals.append(.init(
+            flags: 1,
+            faceIndex: sourceReciprocal.faceIndex,
+            connectedRoom: 44,
+            connectedPortal: portalIndex,
+            boundaryNodeIndex: -1,
+            pathPoint: sourceReciprocal.pathPoint,
+            combineMaster: -1
+        ))
+        connectedRooms.append(.init(
+            sourceIndex: connectedSourceIndex,
+            name: "P6 neighbor \(portalIndex)",
+            pathPoint: sourceConnectedRoom.pathPoint,
+            vertices: sourceConnectedRoom.vertices,
+            faces: connectedFaces,
+            portals: connectedPortals,
             flags: sourceConnectedRoom.flags,
             pulseTime: sourceConnectedRoom.pulseTime,
             pulseOffset: sourceConnectedRoom.pulseOffset,
@@ -8063,6 +8300,151 @@ func makeTrainingCloakPickupLevel() -> Level {
         ],
         completionVoiceSourceName: "proceed5.osf"
     ))
+}
+
+func makeTrainingFinalRoomEntryLevel() -> Level {
+    let level = makeTrainingCloakPickupLevel()
+    let chain = TrainingFinalRoomEntryChain(
+        triggerName: "Portal4",
+        triggerRoomSourceIndex: 44,
+        triggerFaceIndex: 1,
+        successMessage: "Excellent!",
+        instructionMessage:
+            "Now for your final and most difficult task. Locate and destroy the last 5 robots.",
+        voiceSourceName: "intro7.osf"
+    )
+    let trigger = LevelTrigger(
+        name: chain.triggerName,
+        roomIndex: chain.triggerRoomSourceIndex,
+        faceIndex: chain.triggerFaceIndex,
+        flags: 8,
+        activator: 1
+    )
+    let pcm = Data(repeating: 0, count: 2)
+    return replacing(
+        level,
+        triggers: level.triggers + [trigger]
+    ).addingTrainingFinalRoomEntryChain(
+        chain,
+        voiceClip: .init(
+            sourceName: chain.voiceSourceName,
+            sourceEntryIndex: 16,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 1,
+            pcm16LittleEndian: pcm,
+            pcmSHA256: canonicalSHA256(pcm),
+            sourceArchive: "missions/training.mn3",
+            sourceSHA256:
+                "7348ded9ee2c6735ea712b52647f0bfa7478a508c03c10af5f837741a836c67f"
+        )
+    )
+}
+
+func replacingTrainingRoom(
+    _ room: LevelRoom,
+    sourceIndex: Int,
+    portals: [LevelPortal]
+) -> LevelRoom {
+    LevelRoom(
+        sourceIndex: sourceIndex,
+        name: room.name,
+        pathPoint: room.pathPoint,
+        vertices: room.vertices,
+        faces: room.faces,
+        portals: portals,
+        flags: room.flags,
+        pulseTime: room.pulseTime,
+        pulseOffset: room.pulseOffset,
+        mirrorFaceIndex: room.mirrorFaceIndex,
+        door: room.door,
+        volumeLights: room.volumeLights,
+        fog: room.fog,
+        ambientSoundPattern: room.ambientSoundPattern,
+        reverb: room.reverb,
+        damage: room.damage,
+        damageType: room.damageType
+    )
+}
+
+func script050ReadyContinuation(
+    in level: Level,
+    timerRemaining: Float = 1.5
+) throws -> PlayerSimulationContinuation {
+    let chain = try XCTUnwrap(level.trainingFinalRoomEntryChain)
+    let room = try XCTUnwrap(level.rooms.first {
+        $0.sourceIndex == chain.triggerRoomSourceIndex
+    })
+    let face = room.faces[chain.triggerFaceIndex]
+    let centerSum = face.corners.reduce(Vector3.zero) {
+        let vertex = room.vertices[$1.vertexIndex]
+        return .init(
+            x: $0.x + vertex.x,
+            y: $0.y + vertex.y,
+            z: $0.z + vertex.z
+        )
+    }
+    let divisor = Float(face.corners.count)
+    let center = Vector3(
+        x: centerSum.x / divisor,
+        y: centerSum.y / divisor,
+        z: centerSum.z / divisor
+    )
+    let normal = try XCTUnwrap(
+        canonicalFaceNormal(room: room, face: face)
+    )
+    let playerRadius = defaultPlayerView(in: level).collisionRadius
+    let initial = PlayerSimulation(
+        level: level,
+        presentationReadyTimestamp: 0
+    )
+    var object = try XCTUnwrap(
+        JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(initial.continuation)
+        ) as? [String: Any]
+    )
+    for key in [
+        "trainingRASBot1DeathState",
+        "trainingRASBot2DeathState",
+        "trainingRASBot3DeathState",
+        "trainingRASBot4DeathState",
+    ] {
+        object[key] = [
+            "wasDestroyed": true,
+            "shields": -5,
+        ]
+    }
+    object["trainingInvulnerabilityPickupState"] = [
+        "scriptWasTriggered": true,
+        "wasConsumed": true,
+    ]
+    object["trainingCloakPickupState"] = [
+        "scriptWasTriggered": true,
+        "wasConsumed": true,
+    ]
+    object["trainingLastRoomState"] = [
+        "wasTriggered": true,
+        "markerLightDistance": 50,
+        "timerRemaining": timerRemaining,
+        "wasPresented": false,
+    ]
+    object["playerLocation"] = [
+        "room": ["_0": chain.triggerRoomSourceIndex]
+    ]
+    object["playerPosition"] = [
+        "x": center.x + normal.x * (playerRadius + 1),
+        "y": center.y + normal.y * (playerRadius + 1),
+        "z": center.z + normal.z * (playerRadius + 1),
+    ]
+    object["velocity"] = [
+        "x": -normal.x * 100,
+        "y": -normal.y * 100,
+        "z": -normal.z * 100,
+    ]
+    return try JSONDecoder().decode(
+        PlayerSimulationContinuation.self,
+        from: JSONSerialization.data(withJSONObject: object)
+    )
 }
 
 private func assertTrainingGuidebotReturnBarrier(

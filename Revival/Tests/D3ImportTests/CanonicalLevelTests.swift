@@ -1,6 +1,136 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testSchemaElevenValidatesExactTrainingFinalRoomEntryChain()
+        throws
+    {
+        let level = makeTrainingFinalRoomEntryLevel()
+        try level.validate()
+
+        XCTAssertEqual(level.schemaVersion, 11)
+        let chain = try XCTUnwrap(level.trainingFinalRoomEntryChain)
+        XCTAssertEqual(chain.triggerName, "Portal4")
+        XCTAssertEqual(chain.triggerRoomSourceIndex, 44)
+        XCTAssertEqual(chain.triggerFaceIndex, 1)
+        XCTAssertEqual(chain.successMessage, "Excellent!")
+        XCTAssertEqual(
+            chain.instructionMessage,
+            "Now for your final and most difficult task. Locate and destroy the last 5 robots."
+        )
+        XCTAssertEqual(chain.voiceSourceName, "intro7.osf")
+
+        let stockVoice = CanonicalVoiceClip(
+            sourceName: "intro7.osf",
+            sourceEntryIndex: 16,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 469_201,
+            pcm16LittleEndian: Data(),
+            pcmSHA256:
+                "381ce960f6a266b1014cdcfdfc2cc3607a053d3c4b062215e5512127e7bd2711",
+            sourceArchive: "missions/training.mn3",
+            sourceSHA256:
+                "7348ded9ee2c6735ea712b52647f0bfa7478a508c03c10af5f837741a836c67f"
+        )
+        XCTAssertNoThrow(
+            try validateStockTrainingFinalRoomEntryPackage(
+                chain: chain,
+                intro7: stockVoice
+            )
+        )
+        let hostilePCM = Data(repeating: 1, count: 469_201 * 2)
+        var hostileVoice = stockVoice
+        hostileVoice = .init(
+            sourceName: hostileVoice.sourceName,
+            sourceEntryIndex: hostileVoice.sourceEntryIndex,
+            sampleRate: hostileVoice.sampleRate,
+            channelCount: hostileVoice.channelCount,
+            frameCount: hostileVoice.frameCount,
+            pcm16LittleEndian: hostilePCM,
+            pcmSHA256: canonicalSHA256(hostilePCM),
+            sourceArchive: hostileVoice.sourceArchive,
+            sourceSHA256: hostileVoice.sourceSHA256
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingFinalRoomEntryPackage(
+                chain: chain,
+                intro7: hostileVoice
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Script 050 package")
+            )
+        }
+
+        let trigger = try XCTUnwrap(level.triggers.first {
+            $0.name == chain.triggerName
+        })
+        let hostileTrigger = LevelTrigger(
+            name: trigger.name,
+            roomIndex: trigger.roomIndex,
+            faceIndex: trigger.faceIndex,
+            flags: 0,
+            activator: trigger.activator
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 050 final-room entry"),
+            replacing(
+                level,
+                triggers: level.triggers.map {
+                    $0.name == hostileTrigger.name ? hostileTrigger : $0
+                }
+            )
+        )
+    }
+
+    func testSchemaElevenRejectsReroutedReciprocalTrainingFinalRoomBarrier()
+        throws
+    {
+        let level = makeTrainingFinalRoomEntryLevel()
+        let reroutedRooms = level.rooms.map { room in
+            replacingTrainingRoom(
+                room,
+                sourceIndex: room.sourceIndex,
+                portals: room.portals.enumerated().map {
+                    portalIndex, portal in
+                    LevelPortal(
+                        flags: portal.flags,
+                        faceIndex: portal.faceIndex,
+                        connectedRoom: {
+                            if room.name == "P6 neighbor 0" {
+                                if portalIndex == 2 { return 44 }
+                                if portalIndex == 3 { return 62 }
+                            }
+                            return portal.connectedRoom
+                        }(),
+                        connectedPortal: {
+                            if room.name == "PortalRoom6"
+                                && portal.connectedRoom == 41 {
+                                return 2
+                            }
+                            if room.name == "P6 auxiliary 2" {
+                                return 3
+                            }
+                            return portal.connectedPortal
+                        }(),
+                        boundaryNodeIndex: portal.boundaryNodeIndex,
+                        pathPoint: portal.pathPoint,
+                        combineMaster: portal.combineMaster
+                    )
+                }
+            )
+        }
+        assertValidationError(
+            .invalidDependency("Training Script 050 final-room entry"),
+            replacing(
+                level,
+                rooms: reroutedRooms,
+                surfacePhysics: level.surfacePhysics
+            )
+        )
+    }
+
     func testSchemaElevenValidatesExactTrainingCloakAndLastRoomChain()
         throws
     {
@@ -4010,6 +4140,7 @@ func replacing(
         TrainingInvulnerabilityPickupChain? = nil,
     trainingCloakPickupChain: TrainingCloakPickupChain? = nil,
     trainingLastRoomChain: TrainingLastRoomChain? = nil,
+    trainingFinalRoomEntryChain: TrainingFinalRoomEntryChain? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
     soundClips: [CanonicalSoundClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
@@ -4069,6 +4200,9 @@ func replacing(
             trainingCloakPickupChain ?? level.trainingCloakPickupChain,
         trainingLastRoomChain:
             trainingLastRoomChain ?? level.trainingLastRoomChain,
+        trainingFinalRoomEntryChain:
+            trainingFinalRoomEntryChain
+            ?? level.trainingFinalRoomEntryChain,
         voiceClips: voiceClips ?? level.voiceClips,
         soundClips: soundClips ?? level.soundClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,

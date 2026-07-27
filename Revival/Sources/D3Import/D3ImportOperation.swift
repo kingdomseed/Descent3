@@ -706,6 +706,7 @@ func runD3Import(
         "proceed6.osf",
         "intro6.osf",
         "GuideBotF.osf",
+        "Intro7.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -826,6 +827,9 @@ func runD3Import(
     }!
     let killbotEntryTrigger = robotGuidebotLevel.triggers.first {
         $0.name.caseInsensitiveCompare("Portal3") == .orderedSame
+    }!
+    let finalRoomEntryTrigger = robotGuidebotLevel.triggers.first {
+        $0.name.caseInsensitiveCompare("Portal4") == .orderedSame
     }!
     let rasBot1 = robotGuidebotLevel.objects.first {
         $0.instanceName?.caseInsensitiveCompare("RASBot1")
@@ -1359,7 +1363,7 @@ func runD3Import(
             && lastRoomMarker.flags == 4_096
             && lastRoomMarker.location == .room(44)
     )
-    let level = cloakLevel.addingTrainingLastRoomChain(.init(
+    let lastRoomLevel = cloakLevel.addingTrainingLastRoomChain(.init(
         barrierRoomSourceIndex: 44,
         orderedPortalIndices: [1, 0],
         markerLightObjectHandle: lastRoomMarker.handle,
@@ -1388,6 +1392,24 @@ func runD3Import(
         ],
         completionVoiceSourceName: "proceed5.osf"
     ))
+    precondition(
+        finalRoomEntryTrigger.roomIndex == 44
+            && finalRoomEntryTrigger.faceIndex == 1
+            && finalRoomEntryTrigger.flags == 8
+            && finalRoomEntryTrigger.activator == 1
+    )
+    let level = lastRoomLevel.addingTrainingFinalRoomEntryChain(
+        .init(
+            triggerName: finalRoomEntryTrigger.name,
+            triggerRoomSourceIndex:
+                finalRoomEntryTrigger.roomIndex,
+            triggerFaceIndex: finalRoomEntryTrigger.faceIndex,
+            successMessage: messages["GoodJob"]!,
+            instructionMessage: messages["FinalSessionIntro"]!,
+            voiceSourceName: "intro7.osf"
+        ),
+        voiceClip: voiceClips[10]
+    )
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
     precondition(

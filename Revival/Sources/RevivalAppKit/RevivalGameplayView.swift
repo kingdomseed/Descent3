@@ -315,7 +315,9 @@ final class RevivalGameplayView: MTKView {
         attemptSound: (String) throws -> Void,
         presentHUDMessages: ([String]) -> Void
     ) {
-        let selectedVoiceIndex = feedback.indices.last
+        let selectedVoiceIndex = feedback.indices.last {
+            !feedback[$0].voiceSourceName.isEmpty
+        }
         for (index, event) in feedback.enumerated() {
             presentTrainingFeedback(
                 voicePrecedesHUDMessages:

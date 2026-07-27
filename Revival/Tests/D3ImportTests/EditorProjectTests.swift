@@ -1289,7 +1289,7 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
-    func testCloakPowerup2AndLastRoomTailHaveEditorOwnership()
+    func testCloakLastRoomAndScript050HaveEditorOwnership()
         throws
     {
         let root = FileManager.default.temporaryDirectory
@@ -1310,7 +1310,7 @@ final class EditorProjectTests: XCTestCase {
             withIntermediateDirectories: false
         )
         try writeCanonicalPackage(
-            makeTrainingCloakPickupLevel(),
+            makeTrainingFinalRoomEntryLevel(),
             to: candidate
         )
         let activation = try library.installAndActivate(from: candidate)
@@ -1327,6 +1327,10 @@ final class EditorProjectTests: XCTestCase {
         XCTAssertEqual(
             document.project.trainingLastRoomSourceDiagnostic,
             "TrainingMission.cpp Scripts 034/049 / PortalRoom6 completion"
+        )
+        XCTAssertEqual(
+            document.project.trainingFinalRoomEntrySourceDiagnostic,
+            "TrainingMission.cpp Script 050 / Portal4 final combat entry"
         )
         let pickup = try XCTUnwrap(
             document.project.level.objects.first {
@@ -1371,6 +1375,9 @@ final class EditorProjectTests: XCTestCase {
         )
         XCTAssertNotNil(reopened.project.level.trainingCloakPickupChain)
         XCTAssertNotNil(reopened.project.level.trainingLastRoomChain)
+        XCTAssertNotNil(
+            reopened.project.level.trainingFinalRoomEntryChain
+        )
 
         let session = reopened.makePlaySession()
         reopened.commitPlaySession(session, renderingWorld: false)
@@ -1408,6 +1415,18 @@ final class EditorProjectTests: XCTestCase {
         XCTAssertTrue(reopened.project.level.objects.contains {
             $0.handle == pickup.handle
         })
+
+        let script050 = try PlayerSimulation(
+            level: session.level,
+            continuation: try script050ReadyContinuation(in: session.level),
+            resumedAtTimestamp: 0
+        )
+        let entryFrame = script050.update(at: 0.1, input: .zero)
+        XCTAssertEqual(
+            entryFrame.trainingOpeningFeedback.suffix(2).last?
+                .voiceSourceName,
+            "intro7.osf"
+        )
         reopened.returnToEditor(renderingWorld: false)
         XCTAssertNil(reopened.playSession)
         XCTAssertTrue(reopened.project.level.objects.contains {
