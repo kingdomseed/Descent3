@@ -1,0 +1,82 @@
+Revival/Tests/D3ImportTests/EditorProjectTests.swift
+  s_c503f7c0529e13::t_fc677481c8327f 1150-1180,1182-1289
+  s_e215d8a01f73cf::t_67578a1b965beb 1181
+  s_c503f7c0529e13::t_5270194100bd6c 1290
+Revival/Sources/D3Import/D3ImportOperation.swift
+  s_e215d8a01f73cf::t_35b4365d981983 882-899
+  s_e215d8a01f73cf::t_67578a1b965beb 1157
+  s_e215d8a01f73cf::t_07fff69e402ee6 844-845
+  s_c503f7c0529e13::t_fc677481c8327f 428-432,462-465,597-598,603-604,606-611,625,631,832-835,841-843,846-848,853-857,914-947,1097-1108,1133,1141-1156,1158-1227
+docs/revival/behavior-system.md
+  s_c503f7c0529e13::t_702f5af7ed7e81 19
+Revival/Sources/RevivalCore/Level.swift
+  s_e215d8a01f73cf::t_9c6c882d3bb758 622,624,635-636
+  s_c503f7c0529e13::t_fc677481c8327f 623,625-634,1588,1627-1628,1665-1666,2346-2396,2628-2648,2937,3528-3610
+  s_e215d8a01f73cf::t_67578a1b965beb 2397,3611-3612
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_23aa47693de765 219-220,244-245
+  s_c503f7c0529e13::t_c29c90b207b365 22-25,27-29,31,58-60
+  s_c503f7c0529e13::t_0d95e4fe6ecf75 61
+Revival/Sources/RevivalEditor/RevivalProject.swift
+  s_c503f7c0529e13::t_fc677481c8327f 541-549
+  s_e215d8a01f73cf::t_67578a1b965beb 550
+Revival/Tests/D3ImportTests/CanonicalLevelTests.swift
+  s_c503f7c0529e13::t_fc677481c8327f 4-56,3797-3798,3845-3847
+  s_e215d8a01f73cf::t_67578a1b965beb 57
+Revival/Sources/RevivalAppKit/RevivalGameplayView.swift
+  s_e215d8a01f73cf::t_67578a1b965beb 452
+  s_c503f7c0529e13::t_fc677481c8327f 47-48,52,106-114,195,200-201,212-215,326-329,333-334,340,445-451,460-461,535-539,555-558
+  s_c503f7c0529e13::t_3fff490168c934 49,196,216-229,453-459,462-483,513-526
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_e215d8a01f73cf::t_07fff69e402ee6 1227-1228,2902-2909
+  s_e215d8a01f73cf::t_643125f4fb35a1 886,888,892-893,2883,2890,2910,3250,3253,3274
+  s_c503f7c0529e13::t_fc677481c8327f 450,887,889-891,963-971,1019-1027,1073-1076,1155-1175,1177-1178,1181-1183,1185-1186,1189-1191,1193-1194,1197-1199,1201-1202,1205-1207,1209-1210,1213-1215,1217-1218,1221-1226,1229-1231,1331-1332,1383-1385,2159,2197-2207,2357-2367,2455-2490,2492-2496,2592-2610,2612-2613,2616-2620,2772-2774,2884-2889,2891-2901,3251-3252,3254-3273
+  s_c503f7c0529e13::t_e8d7d6f4d77070 2911,3275
+docs/revival/content-pipeline.md
+  s_e215d8a01f73cf::t_d0b77b97b768e3 112
+docs/revival/functional-completeness-ledger.md
+  s_e215d8a01f73cf::t_0189875a7b6bc5 204
+  s_c503f7c0529e13::t_702f5af7ed7e81 100
+  s_e215d8a01f73cf::t_fbf415db282e90 202
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_c503f7c0529e13::t_fc677481c8327f 1640-1643,1655,1657-1737,1739-1758,1760-1779,1781-1872,7171-7185,7187-7258,7273-7312
+  s_e215d8a01f73cf::t_23e8100e10c48e 1617,1630-1632,1646-1648
+  s_e215d8a01f73cf::t_63126bad34a75c 1608-1616,1618-1629,1633-1639,1644-1645,1649-1653
+  s_e215d8a01f73cf::t_e4bbd340ce728f 7186
+  s_e215d8a01f73cf::t_67578a1b965beb 1654,1656,1738,1759,1780,1873,7170
+  s_e215d8a01f73cf::t_35b4365d981983 7259-7272
+  s_c503f7c0529e13::t_f87d41b2df6f75 7313-7314
+Revival/Sources/RevivalEditor/RevivalEditorWindowController.swift
+  s_c503f7c0529e13::t_fc677481c8327f 1005
+docs/revival/source-translation-ledger.md
+  s_e215d8a01f73cf::t_a9d6cfe8fd2626 737
+  s_e215d8a01f73cf::t_3108794b851f80 724-729,731,734,736,740
+  s_e215d8a01f73cf::t_fbf415db282e90 732
+  s_c503f7c0529e13::t_702f5af7ed7e81 733,735,738
+  s_e215d8a01f73cf::t_2ad67774c4240c 739
+  s_e215d8a01f73cf::t_d0b77b97b768e3 730
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d1c35902007ba67ddf867d40c016feb0056b2768",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_e215d8a01f73cf": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fa01e-5382-7f30-91eb-a48aff56a2dd",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
