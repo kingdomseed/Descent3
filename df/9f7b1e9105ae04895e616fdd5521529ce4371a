@@ -1,0 +1,65 @@
+docs/revival/source-translation-ledger.md
+  s_71fb7231625957::t_085007e2bd89c8 806
+  s_71fb7231625957::t_686c663a742e5a 791-798,800-803,807
+  s_71fb7231625957::t_4c512993bc599f 799
+  s_71fb7231625957::t_ccb81b09819af1 804
+  s_c503f7c0529e13::t_dba28fff601a77 805
+Revival/Sources/RevivalEditor/RevivalProject.swift
+  s_71fb7231625957::t_c3e089bb9dce0a 550-558
+Revival/Tests/D3ImportTests/EditorProjectTests.swift
+  s_71fb7231625957::t_c2d2399de8a9c2 1245-1247,1251-1344
+  s_71fb7231625957::t_a364d934125d6e 1248-1250
+docs/revival/functional-completeness-ledger.md
+  s_71fb7231625957::t_8122114e1792ea 26,28,204
+Revival/Sources/RevivalCore/Level.swift
+  s_71fb7231625957::t_b86c55e1dcc5ec 622,1167-1182,1687,2483-2504,2997-3003,3969-3974
+  s_71fb7231625957::t_62485c317ba669 1801,1809
+  s_71fb7231625957::t_935b338e8b3c31 3975-3976
+Revival/Sources/RevivalEditor/RevivalEditorWindowController.swift
+  s_71fb7231625957::t_c3e089bb9dce0a 1006
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_8941d8dc095d75 22-25,27-29,31
+  s_c503f7c0529e13::t_83942e82da49ad 60-63,229-230,258-259
+Revival/Sources/D3Import/D3ImportOperation.swift
+  s_71fb7231625957::t_1b7420db2c96bd 603-604,855-857,1178-1187,1442-1443,1451-1455
+  s_c503f7c0529e13::t_dba28fff601a77 641,647
+  s_71fb7231625957::t_1f43021366d656 1456-1458
+docs/revival/content-pipeline.md
+  s_71fb7231625957::t_8122114e1792ea 112
+Revival/Tests/D3ImportTests/CanonicalLevelTests.swift
+  s_71fb7231625957::t_c5f905bb062970 1876
+  s_71fb7231625957::t_b86c55e1dcc5ec 4332,4396-4398
+  s_71fb7231625957::t_40a4e6f6302c52 1821-1875,1877-1911
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_71fb7231625957::t_40a4e6f6302c52 8729-8821
+  s_71fb7231625957::t_f34e3739d0802d 1775-1899
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_71fb7231625957::t_6543958ceea3c3 915,1026-1027,1089,1143-1145,1197-1203,1277-1286,1381-1388,1538,1597-1598,2000-2014,2132-2137,2143,2250-2265,2311-2318,2341-2342,2345-2347,2387-2390,2397,2426-2430,3820-3837,3839
+  s_71fb7231625957::t_7d28ccf36fe4ce 3838
+docs/revival/behavior-system.md
+  s_71fb7231625957::t_8122114e1792ea 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "df9f7b1e9105ae04895e616fdd5521529ce4371a",
+  "prompts": {},
+  "sessions": {
+    "s_71fb7231625957": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fa4c3-dee5-7310-857c-b5ef985f6175",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
