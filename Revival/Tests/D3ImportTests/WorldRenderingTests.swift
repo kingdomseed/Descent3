@@ -2022,6 +2022,130 @@ final class WorldRenderingTests: XCTestCase {
         })
     }
 
+    func testLastBot4DeathUsesNearestPrimaryLaserOnceAndSurvivesReload()
+        throws
+    {
+        var level = makeTrainingLastBot4DeathLevel()
+        try level.validate()
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 2_048 }
+        )
+        level.objects[playerIndex].location = .room(47)
+        let fartherTargetIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 2_081 }
+        )
+        let playerPosition = level.objects[playerIndex].position
+        let playerForward = level.objects[playerIndex].orientation.forward
+        level.objects[fartherTargetIndex].position = .init(
+            x: playerPosition.x + playerForward.x * 40,
+            y: playerPosition.y + playerForward.y * 40,
+            z: playerPosition.z + playerForward.z * 40
+        )
+        let chain = try XCTUnwrap(level.trainingLastBot4DeathChain)
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        var timestamp = 0.0
+        for _ in 1...4 {
+            timestamp += 0.25
+            _ = simulation.update(
+                at: timestamp,
+                input: .init(firesPrimaryWeapon: true)
+            )
+        }
+
+        XCTAssertFalse(simulation.level.objects.contains {
+            $0.handle == chain.robotObjectHandle
+        })
+        XCTAssertTrue(simulation.level.objects.contains {
+            $0.handle == 2_081
+        })
+        let continuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: continuationData)
+                as? [String: Any]
+        )
+        XCTAssertEqual(continuationObject["schemaVersion"] as? Int, 7)
+        let deathState = try XCTUnwrap(
+            continuationObject["trainingLastBot4DeathState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(deathState["wasDestroyed"] as? Bool, true)
+
+        var hostileObject = continuationObject
+        var hostileDeathState = deathState
+        hostileDeathState["shields"] = 55
+        hostileObject["trainingLastBot4DeathState"] = hostileDeathState
+        let hostileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileContinuation,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        timestamp += 0.25
+        _ = simulation.update(
+            at: timestamp,
+            input: .init(firesPrimaryWeapon: true)
+        )
+        let repeatedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            (repeatedObject["trainingLastBot4DeathState"]
+                as? [String: Any])?["shields"] as? Double,
+            deathState["shields"] as? Double
+        )
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: continuationData
+            ),
+            resumedAtTimestamp: 100
+        )
+        XCTAssertFalse(restored.level.objects.contains {
+            $0.handle == chain.robotObjectHandle
+        })
+        XCTAssertTrue(restored.level.objects.contains {
+            $0.handle == 2_081
+        })
+
+        var priorSchemaObject = continuationObject
+        priorSchemaObject.removeValue(
+            forKey: "trainingLastBot4DeathState"
+        )
+        let priorSchemaContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: priorSchemaObject)
+        )
+        let priorSchemaRestored = try PlayerSimulation(
+            level: level,
+            continuation: priorSchemaContinuation,
+            resumedAtTimestamp: 200
+        )
+        XCTAssertTrue(priorSchemaRestored.level.objects.contains {
+            $0.handle == chain.robotObjectHandle
+        })
+    }
+
     func testInvulnPowerup2ConsumesOnceAndExpiresAcrossContinuation()
         throws
     {
@@ -9031,6 +9155,52 @@ func makeTrainingLastBot3DeathLevel() -> Level {
     ))
     return level.addingTrainingLastBot3DeathChain(.init(
         robotObjectHandle: 2_081,
+        robotRoomSourceIndex: 47,
+        robotFlags: 5_121,
+        combat: .stockTraining
+    ))
+}
+
+func makeTrainingLastBot4DeathLevel() -> Level {
+    var level = makeTrainingLastBot3DeathLevel()
+    let lastBot3 = level.objects.first { $0.handle == 2_081 }!
+    let lastBot3Presentation = level.objectPresentations.first {
+        $0.objectHandle == 2_081
+    }!
+    level.objects.append(.init(
+        handle: 2_082,
+        type: 2,
+        storedID: 106,
+        definition: .init(
+            storedIndex: 106,
+            sourceName: "RAS1 Light Security Flyer"
+        ),
+        instanceName: "LastBot4",
+        flags: 5_121,
+        doorShields: nil,
+        location: .room(47),
+        position: lastBot3.position,
+        orientation: lastBot3.orientation,
+        containsType: 0,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    ))
+    level.objectPresentations.append(.init(
+        objectHandle: 2_082,
+        primaryModel: lastBot3Presentation.primaryModel,
+        mediumModel: lastBot3Presentation.mediumModel,
+        lowModel: lastBot3Presentation.lowModel,
+        dyingModel: lastBot3Presentation.dyingModel,
+        mediumDistance: lastBot3Presentation.mediumDistance,
+        lowDistance: lastBot3Presentation.lowDistance
+    ))
+    return level.addingTrainingLastBot4DeathChain(.init(
+        robotObjectHandle: 2_082,
         robotRoomSourceIndex: 47,
         robotFlags: 5_121,
         combat: .stockTraining
