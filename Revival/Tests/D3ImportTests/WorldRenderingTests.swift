@@ -2146,6 +2146,131 @@ final class WorldRenderingTests: XCTestCase {
         })
     }
 
+    func testLastBot5DeathUsesNearestPrimaryLaserOnceAndSurvivesReload()
+        throws
+    {
+        var level = makeTrainingLastBot5DeathLevel()
+        try level.validate()
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 2_048 }
+        )
+        level.objects[playerIndex].location = .room(48)
+        let fartherTargetIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 2_082 }
+        )
+        level.objects[fartherTargetIndex].location = .room(48)
+        let playerPosition = level.objects[playerIndex].position
+        let playerForward = level.objects[playerIndex].orientation.forward
+        level.objects[fartherTargetIndex].position = .init(
+            x: playerPosition.x + playerForward.x * 40,
+            y: playerPosition.y + playerForward.y * 40,
+            z: playerPosition.z + playerForward.z * 40
+        )
+        let chain = try XCTUnwrap(level.trainingLastBot5DeathChain)
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        var timestamp = 0.0
+        for _ in 1...4 {
+            timestamp += 0.25
+            _ = simulation.update(
+                at: timestamp,
+                input: .init(firesPrimaryWeapon: true)
+            )
+        }
+
+        XCTAssertFalse(simulation.level.objects.contains {
+            $0.handle == chain.robotObjectHandle
+        })
+        XCTAssertTrue(simulation.level.objects.contains {
+            $0.handle == 2_082
+        })
+        let continuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: continuationData)
+                as? [String: Any]
+        )
+        XCTAssertEqual(continuationObject["schemaVersion"] as? Int, 7)
+        let deathState = try XCTUnwrap(
+            continuationObject["trainingLastBot5DeathState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(deathState["wasDestroyed"] as? Bool, true)
+
+        var hostileObject = continuationObject
+        var hostileDeathState = deathState
+        hostileDeathState["shields"] = 55
+        hostileObject["trainingLastBot5DeathState"] = hostileDeathState
+        let hostileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileContinuation,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        timestamp += 0.25
+        _ = simulation.update(
+            at: timestamp,
+            input: .init(firesPrimaryWeapon: true)
+        )
+        let repeatedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            (repeatedObject["trainingLastBot5DeathState"]
+                as? [String: Any])?["shields"] as? Double,
+            deathState["shields"] as? Double
+        )
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: continuationData
+            ),
+            resumedAtTimestamp: 100
+        )
+        XCTAssertFalse(restored.level.objects.contains {
+            $0.handle == chain.robotObjectHandle
+        })
+        XCTAssertTrue(restored.level.objects.contains {
+            $0.handle == 2_082
+        })
+
+        var priorSchemaObject = continuationObject
+        priorSchemaObject.removeValue(
+            forKey: "trainingLastBot5DeathState"
+        )
+        let priorSchemaContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: priorSchemaObject)
+        )
+        let priorSchemaRestored = try PlayerSimulation(
+            level: level,
+            continuation: priorSchemaContinuation,
+            resumedAtTimestamp: 200
+        )
+        XCTAssertTrue(priorSchemaRestored.level.objects.contains {
+            $0.handle == chain.robotObjectHandle
+        })
+    }
+
     func testInvulnPowerup2ConsumesOnceAndExpiresAcrossContinuation()
         throws
     {
@@ -9202,6 +9327,95 @@ func makeTrainingLastBot4DeathLevel() -> Level {
     return level.addingTrainingLastBot4DeathChain(.init(
         robotObjectHandle: 2_082,
         robotRoomSourceIndex: 47,
+        robotFlags: 5_121,
+        combat: .stockTraining
+    ))
+}
+
+func makeTrainingLastBot5DeathLevel() -> Level {
+    var level = makeTrainingLastBot4DeathLevel()
+    let player = level.objects.first { $0.handle == 2_048 }!
+    let playerRoomSourceIndex: Int
+    switch player.location {
+    case let .room(sourceIndex):
+        playerRoomSourceIndex = sourceIndex
+    case .terrainCell:
+        preconditionFailure("Synthetic Training player is indoor")
+    }
+    let playerRoom = level.rooms.first {
+        $0.sourceIndex == playerRoomSourceIndex
+    }!
+    if !level.rooms.contains(where: { $0.sourceIndex == 48 }) {
+        level.rooms.append(.init(
+            sourceIndex: 48,
+            name: "LastBot5 Room",
+            pathPoint: playerRoom.pathPoint,
+            vertices: playerRoom.vertices,
+            faces: playerRoom.faces.map {
+                .init(
+                    corners: $0.corners,
+                    flags: $0.flags,
+                    portalIndex: nil,
+                    texture: $0.texture,
+                    lightmapInfoIndex: nil,
+                    allowsLightCorona: $0.allowsLightCorona,
+                    lightMultiple: $0.lightMultiple,
+                    special: $0.special
+                )
+            },
+            portals: [],
+            flags: playerRoom.flags,
+            pulseTime: playerRoom.pulseTime,
+            pulseOffset: playerRoom.pulseOffset,
+            mirrorFaceIndex: playerRoom.mirrorFaceIndex,
+            door: playerRoom.door,
+            volumeLights: playerRoom.volumeLights,
+            fog: playerRoom.fog,
+            ambientSoundPattern: playerRoom.ambientSoundPattern,
+            reverb: playerRoom.reverb,
+            damage: playerRoom.damage,
+            damageType: playerRoom.damageType
+        ))
+    }
+    let lastBot4 = level.objects.first { $0.handle == 2_082 }!
+    let lastBot4Presentation = level.objectPresentations.first {
+        $0.objectHandle == 2_082
+    }!
+    level.objects.append(.init(
+        handle: 2_083,
+        type: 2,
+        storedID: 106,
+        definition: .init(
+            storedIndex: 106,
+            sourceName: "RAS1 Light Security Flyer"
+        ),
+        instanceName: "LastBot5",
+        flags: 5_121,
+        doorShields: nil,
+        location: .room(48),
+        position: lastBot4.position,
+        orientation: lastBot4.orientation,
+        containsType: 0,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    ))
+    level.objectPresentations.append(.init(
+        objectHandle: 2_083,
+        primaryModel: lastBot4Presentation.primaryModel,
+        mediumModel: lastBot4Presentation.mediumModel,
+        lowModel: lastBot4Presentation.lowModel,
+        dyingModel: lastBot4Presentation.dyingModel,
+        mediumDistance: lastBot4Presentation.mediumDistance,
+        lowDistance: lastBot4Presentation.lowDistance
+    ))
+    return level.addingTrainingLastBot5DeathChain(.init(
+        robotObjectHandle: 2_083,
+        robotRoomSourceIndex: 48,
         robotFlags: 5_121,
         combat: .stockTraining
     ))

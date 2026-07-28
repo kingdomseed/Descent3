@@ -915,6 +915,7 @@ private typealias TrainingLastBot1DeathState = TrainingRobotDeathState
 private typealias TrainingLastBot2DeathState = TrainingRobotDeathState
 private typealias TrainingLastBot3DeathState = TrainingRobotDeathState
 private typealias TrainingLastBot4DeathState = TrainingRobotDeathState
+private typealias TrainingLastBot5DeathState = TrainingRobotDeathState
 
 private struct TrainingInvulnerabilityPickupState:
     Codable, Equatable, Sendable
@@ -1031,6 +1032,8 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
         TrainingLastBot3DeathState?
     fileprivate let trainingLastBot4DeathState:
         TrainingLastBot4DeathState?
+    fileprivate let trainingLastBot5DeathState:
+        TrainingLastBot5DeathState?
     fileprivate let trainingInvulnerabilityPickupState: TrainingInvulnerabilityPickupState?
     fileprivate let trainingCloakPickupState: TrainingCloakPickupState?
     fileprivate let trainingLastRoomState: TrainingLastRoomState?
@@ -1095,6 +1098,7 @@ final class PlayerSimulation {
     private var trainingLastBot2DeathState: TrainingLastBot2DeathState?
     private var trainingLastBot3DeathState: TrainingLastBot3DeathState?
     private var trainingLastBot4DeathState: TrainingLastBot4DeathState?
+    private var trainingLastBot5DeathState: TrainingLastBot5DeathState?
     private var trainingInvulnerabilityPickupState: TrainingInvulnerabilityPickupState?
     private var trainingCloakPickupState: TrainingCloakPickupState?
     private var trainingLastRoomState: TrainingLastRoomState?
@@ -1156,6 +1160,9 @@ final class PlayerSimulation {
         }
         trainingLastBot4DeathState = level.trainingLastBot4DeathChain.map {
             TrainingLastBot4DeathState(shields: $0.combat.robotShields)
+        }
+        trainingLastBot5DeathState = level.trainingLastBot5DeathChain.map {
+            TrainingLastBot5DeathState(shields: $0.combat.robotShields)
         }
         trainingInvulnerabilityPickupState =
             level.trainingInvulnerabilityPickupChain.map {
@@ -1226,6 +1233,13 @@ final class PlayerSimulation {
             continuation.trainingLastBot4DeathState
             ?? level.trainingLastBot4DeathChain.map {
                 TrainingLastBot4DeathState(
+                    shields: $0.combat.robotShields
+                )
+            }
+        let restoredLastBot5DeathState =
+            continuation.trainingLastBot5DeathState
+            ?? level.trainingLastBot5DeathChain.map {
+                TrainingLastBot5DeathState(
                     shields: $0.combat.robotShields
                 )
             }
@@ -1325,6 +1339,16 @@ final class PlayerSimulation {
         if restoredLastBot4DeathState?.wasDestroyed == true {
             guard let chain =
                 continuationLevel.trainingLastBot4DeathChain
+            else {
+                throw PlayerSimulationContinuationError.invalidState
+            }
+            continuationLevel.objects.removeAll {
+                $0.handle == chain.robotObjectHandle
+            }
+        }
+        if restoredLastBot5DeathState?.wasDestroyed == true {
+            guard let chain =
+                continuationLevel.trainingLastBot5DeathChain
             else {
                 throw PlayerSimulationContinuationError.invalidState
             }
@@ -1445,6 +1469,14 @@ final class PlayerSimulation {
         guard
             validTrainingLastBot4DeathContinuation(
                 restoredLastBot4DeathState,
+                level: continuationLevel
+            )
+        else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
+        guard
+            validTrainingLastBot5DeathContinuation(
+                restoredLastBot5DeathState,
                 level: continuationLevel
             )
         else {
@@ -1602,6 +1634,7 @@ final class PlayerSimulation {
         trainingLastBot2DeathState = restoredLastBot2DeathState
         trainingLastBot3DeathState = restoredLastBot3DeathState
         trainingLastBot4DeathState = restoredLastBot4DeathState
+        trainingLastBot5DeathState = restoredLastBot5DeathState
         trainingInvulnerabilityPickupState =
             continuation.trainingInvulnerabilityPickupState
         trainingCloakPickupState = restoredCloakPickupState
@@ -1666,6 +1699,8 @@ final class PlayerSimulation {
                 trainingLastBot3DeathState,
             trainingLastBot4DeathState:
                 trainingLastBot4DeathState,
+            trainingLastBot5DeathState:
+                trainingLastBot5DeathState,
             trainingInvulnerabilityPickupState:
                 trainingInvulnerabilityPickupState,
             trainingCloakPickupState: trainingCloakPickupState,
@@ -2112,6 +2147,21 @@ final class PlayerSimulation {
         trainingLastBot4DeathState = state
     }
 
+    func destroyTrainingLastBot5(handle: UInt32) {
+        guard let chain = level.trainingLastBot5DeathChain,
+              handle == chain.robotObjectHandle,
+              var state = trainingLastBot5DeathState,
+              !state.wasDestroyed,
+              level.objects.contains(where: { $0.handle == handle })
+        else {
+            return
+        }
+        level.objects.removeAll { $0.handle == handle }
+        state.wasDestroyed = true
+        state.shields = min(state.shields, -0.000_001)
+        trainingLastBot5DeathState = state
+    }
+
     func update(at timestamp: Double, input: InputSnapshot) -> PlayerSimulationFrame {
         precondition(timestamp.isFinite && timestamp >= lastTimestamp)
         precondition(pauseDepth == 0)
@@ -2247,6 +2297,12 @@ final class PlayerSimulation {
                     $0.handle == lastBot4Chain.robotObjectHandle
                 }
             }
+            let lastBot5Chain = level.trainingLastBot5DeathChain
+            let lastBot5 = lastBot5Chain.flatMap { lastBot5Chain in
+                level.objects.first {
+                    $0.handle == lastBot5Chain.robotObjectHandle
+                }
+            }
             var rasBot1State = trainingRASBot1DeathState
             var rasBot2State = trainingRASBot2DeathState
             var rasBot3State = trainingRASBot3DeathState
@@ -2255,6 +2311,7 @@ final class PlayerSimulation {
             var lastBot2State = trainingLastBot2DeathState
             var lastBot3State = trainingLastBot3DeathState
             var lastBot4State = trainingLastBot4DeathState
+            var lastBot5State = trainingLastBot5DeathState
             var survivingProjectiles: [TrainingLaserProjectileState] = []
             for var projectile in state.projectiles {
                 let end = projectile.position
@@ -2405,7 +2462,23 @@ final class PlayerSimulation {
                         center: robot.position,
                         radius:
                             lastBot4Chain.combat.projectileRadius
-                                + lastBot4Chain.combat
+                        + lastBot4Chain.combat
+                                    .robotCollisionRadius
+                    )
+                }
+                let lastBot5Hit = lastBot5.flatMap { robot -> Float? in
+                    guard robot.location
+                            == .room(projectile.roomSourceIndex),
+                          let lastBot5Chain else {
+                        return nil
+                    }
+                    return segmentSphereHitFraction(
+                        start: projectile.position,
+                        end: end,
+                        center: robot.position,
+                        radius:
+                            lastBot5Chain.combat.projectileRadius
+                                + lastBot5Chain.combat
                                     .robotCollisionRadius
                     )
                 }
@@ -2478,6 +2551,14 @@ final class PlayerSimulation {
                         lastBot4Hit
                     )
                 }
+                if let lastBot5Hit,
+                   lastBot5Hit
+                    < (nearestRASBotHit?.fraction ?? .infinity) {
+                    nearestRASBotHit = (
+                        lastBot5Chain!.robotObjectHandle,
+                        lastBot5Hit
+                    )
+                }
                 if let nearestRASBotHit,
                    nearestRASBotHit.fraction
                     <= traceFraction + 0.000_1,
@@ -2512,9 +2593,13 @@ final class PlayerSimulation {
                         == lastBot3Chain?.robotObjectHandle {
                         lastBot3State?.shields -=
                             lastBot3Chain!.combat.projectileDamage
-                    } else {
+                    } else if nearestRASBotHit.handle
+                        == lastBot4Chain?.robotObjectHandle {
                         lastBot4State?.shields -=
                             lastBot4Chain!.combat.projectileDamage
+                    } else {
+                        lastBot5State?.shields -=
+                            lastBot5Chain!.combat.projectileDamage
                     }
                     continue
                 }
@@ -2566,6 +2651,10 @@ final class PlayerSimulation {
                 lastBot4State.map {
                     !$0.wasDestroyed && $0.shields < 0
                 } ?? false
+            let lastBot5WasKilled =
+                lastBot5State.map {
+                    !$0.wasDestroyed && $0.shields < 0
+                } ?? false
             trainingRobotGuidebotState = state
             trainingRASBot1DeathState = rasBot1State
             trainingRASBot2DeathState = rasBot2State
@@ -2575,6 +2664,7 @@ final class PlayerSimulation {
             trainingLastBot2DeathState = lastBot2State
             trainingLastBot3DeathState = lastBot3State
             trainingLastBot4DeathState = lastBot4State
+            trainingLastBot5DeathState = lastBot5State
             if robotWasKilled {
                 destroyTrainingRobot(handle: chain.destroyRobotObjectHandle)
             }
@@ -2616,6 +2706,11 @@ final class PlayerSimulation {
             if lastBot4WasKilled {
                 destroyTrainingLastBot4(
                     handle: lastBot4Chain!.robotObjectHandle
+                )
+            }
+            if lastBot5WasKilled {
+                destroyTrainingLastBot5(
+                    handle: lastBot5Chain!.robotObjectHandle
                 )
             }
         }
@@ -4065,6 +4160,26 @@ private func validTrainingLastBot4DeathContinuation(
     level: Level
 ) -> Bool {
     guard let chain = level.trainingLastBot4DeathChain else {
+        return state == nil
+    }
+    guard let state,
+          state.shields.isFinite,
+          state.shields <= chain.combat.robotShields else {
+        return false
+    }
+    let robotIsPresent = level.objects.contains {
+        $0.handle == chain.robotObjectHandle
+    }
+    return state.wasDestroyed
+        ? state.shields < 0 && !robotIsPresent
+        : state.shields >= 0 && robotIsPresent
+}
+
+private func validTrainingLastBot5DeathContinuation(
+    _ state: TrainingLastBot5DeathState?,
+    level: Level
+) -> Bool {
+    guard let chain = level.trainingLastBot5DeathChain else {
         return state == nil
     }
     guard let state,
