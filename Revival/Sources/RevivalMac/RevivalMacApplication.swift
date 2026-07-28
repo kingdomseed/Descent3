@@ -30,10 +30,14 @@ private final class RevivalMacApplicationDelegate: NSObject,
     }
 
     private let library = CanonicalPackageLibrary.revivalMac
+    private let profileLibrary = PilotProfileLibrary.revivalMac
     private var window: NSWindow?
     private var renderer: MetalWorldRenderer?
     private var gameplayView: RevivalGameplayView?
     private var simulation: PlayerSimulation?
+    private var profileRecord: PilotProfileLibraryRecord?
+    private var activeProfileID: UUID?
+    private var pendingTrainingProgressPackage: CanonicalPackageReference?
     private var playerInput = PlayerInputState()
     private var statusLabel: NSTextField?
     private var contentRequests = CanonicalPackageRequestQueue<ContentRequest>()
@@ -67,12 +71,25 @@ private final class RevivalMacApplicationDelegate: NSObject,
             )
         }
 
-        if contentRequests.isEmpty {
-            enqueue(.loadActive)
-        } else if libraryPreparationError == nil {
-            processNextContentRequest()
-        } else {
-            contentRequests.removeAllPending()
+        do {
+            let record = try profileLibrary.load()
+            profileRecord = record
+            gameplayView?.presentPilotProfileSelection(
+                profiles: record.profiles.map { ($0.id, $0.name) },
+                defaultProfileID: record.defaultProfileID,
+                selectedProfileID: record.defaultProfileID
+            )
+            setStatus(
+                record.profiles.isEmpty
+                    ? "Create and confirm a named pilot before Training."
+                    : "Confirm a pilot for this Training session.",
+                isError: false
+            )
+        } catch {
+            setStatus(
+                "Could not load pilot profiles: \(error.localizedDescription)",
+                isError: true
+            )
         }
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
@@ -145,7 +162,9 @@ private final class RevivalMacApplicationDelegate: NSObject,
 
     private func enqueue(_ request: ContentRequest) {
         contentRequests.append(request)
-        processNextContentRequest()
+        if activeProfileID != nil {
+            processNextContentRequest()
+        }
     }
 
     private func processNextContentRequest() {
@@ -246,6 +265,25 @@ private final class RevivalMacApplicationDelegate: NSObject,
                 frameDuration: simulation.frameDuration
             )
             let frame = simulation.update(at: timestamp, input: input)
+            var completionStatus: (message: String, isError: Bool)?
+            if frame.trainingFinalGoal != nil {
+                do {
+                    try self.persistTrainingProgress(
+                        package: activation.reference
+                    )
+                    completionStatus = (
+                        "Training progress saved. Acknowledge the result to complete the session.",
+                        false
+                    )
+                } catch {
+                    self.pendingTrainingProgressPackage =
+                        activation.reference
+                    completionStatus = (
+                        "Training completed, but progress was not saved: \(error.localizedDescription) Fix storage access, then acknowledge again to retry.",
+                        true
+                    )
+                }
+            }
             do {
                 try self.gameplayView?.presentTrainingOpening(
                     frame: frame,
@@ -255,10 +293,12 @@ private final class RevivalMacApplicationDelegate: NSObject,
                 try renderer.update(level: simulation.level, frame: frame)
                 if frame.trainingFinalGoal != nil {
                     renderer.setFrameUpdate(nil)
-                    self.setStatus(
-                        "Acknowledge the Training mission result to complete the session.",
-                        isError: false
-                    )
+                    if let completionStatus {
+                        self.setStatus(
+                            completionStatus.message,
+                            isError: completionStatus.isError
+                        )
+                    }
                 }
             } catch {
                 renderer.setFrameUpdate(nil)
@@ -344,6 +384,15 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.trainingRestartRequested = {
                 [weak self] in self?.restartTrainingSession()
             }
+            gameplayView.pilotProfileCreationRequested = {
+                [weak self] in self?.createPilotProfile(named: $0)
+            }
+            gameplayView.pilotProfileConfirmationRequested = {
+                [weak self] in self?.confirmPilotProfile($0)
+            }
+            gameplayView.pilotProfileCancellationRequested = {
+                [weak self] in self?.cancelPilotProfileSelection()
+            }
             window.makeFirstResponder(gameplayView)
             self.gameplayView = gameplayView
         }
@@ -364,7 +413,25 @@ private final class RevivalMacApplicationDelegate: NSObject,
     }
 
     private func acknowledgeTrainingResult() {
-        guard let simulation,
+        guard let simulation else { return }
+        if let pendingTrainingProgressPackage {
+            do {
+                try persistTrainingProgress(
+                    package: pendingTrainingProgressPackage
+                )
+                setStatus(
+                    "Training progress saved. Completing the session.",
+                    isError: false
+                )
+            } catch {
+                setStatus(
+                    "Training progress is still unsaved: \(error.localizedDescription) Fix storage access, then acknowledge again to retry.",
+                    isError: true
+                )
+                return
+            }
+        }
+        guard
               simulation.acknowledgeTrainingResult() == .completed else {
             return
         }
@@ -390,6 +457,77 @@ private final class RevivalMacApplicationDelegate: NSObject,
     private func restartTrainingSession() {
         guard simulation == nil else { return }
         enqueue(.loadActive)
+    }
+
+    private func createPilotProfile(named name: String) {
+        do {
+            let record = try profileLibrary.createProfile(named: name)
+            profileRecord = record
+            let createdID = record.profiles.last?.id
+            gameplayView?.presentPilotProfileSelection(
+                profiles: record.profiles.map { ($0.id, $0.name) },
+                defaultProfileID: record.defaultProfileID,
+                selectedProfileID: createdID
+            )
+            setStatus(
+                "Pilot created. Confirm the selected pilot to begin Training.",
+                isError: false
+            )
+        } catch {
+            setStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func confirmPilotProfile(_ profileID: UUID) {
+        do {
+            let record = try profileLibrary.confirmProfile(profileID)
+            profileRecord = record
+            activeProfileID = profileID
+            finishPilotProfileSelection()
+        } catch {
+            setStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func cancelPilotProfileSelection() {
+        guard let record = profileRecord,
+              let defaultProfileID = record.defaultProfileID,
+              record.profiles.contains(where: {
+                  $0.id == defaultProfileID
+              }) else {
+            setStatus(
+                "Create and confirm a named pilot before Training.",
+                isError: true
+            )
+            return
+        }
+        activeProfileID = defaultProfileID
+        finishPilotProfileSelection()
+    }
+
+    private func finishPilotProfileSelection() {
+        gameplayView?.hidePilotProfileSelection()
+        setStatus("Loading Training for the selected pilot…", isError: false)
+        if contentRequests.isEmpty {
+            enqueue(.loadActive)
+        } else if libraryPreparationError == nil {
+            processNextContentRequest()
+        } else {
+            contentRequests.removeAllPending()
+        }
+    }
+
+    private func persistTrainingProgress(
+        package: CanonicalPackageReference
+    ) throws {
+        guard let activeProfileID else {
+            throw PilotProfileLibraryError.unknownProfile
+        }
+        profileRecord = try profileLibrary.recordTrainingCompletion(
+            profileID: activeProfileID,
+            package: package
+        )
+        pendingTrainingProgressPackage = nil
     }
 
     private func setStatus(_ message: String, isError: Bool) {

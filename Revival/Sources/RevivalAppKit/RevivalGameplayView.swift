@@ -36,6 +36,9 @@ final class RevivalGameplayView: MTKView {
     var inventoryUseRequested: (() -> Void)?
     var trainingResultAcknowledgementRequested: (() -> Void)?
     var trainingRestartRequested: (() -> Void)?
+    var pilotProfileCreationRequested: ((String) -> Void)?
+    var pilotProfileConfirmationRequested: ((UUID) -> Void)?
+    var pilotProfileCancellationRequested: (() -> Void)?
 
     private var heldKeys: Set<UInt16> = []
     private var pendingMouseX: Float = 0
@@ -60,6 +63,28 @@ final class RevivalGameplayView: MTKView {
         target: nil,
         action: nil
     )
+    private let pilotProfileOverlay = NSView()
+    private let pilotProfileTitle = NSTextField(
+        labelWithString: "Choose Pilot"
+    )
+    private let pilotProfilePopup = NSPopUpButton()
+    private let pilotProfileNameField = NSTextField()
+    private let pilotProfileCreateButton = NSButton(
+        title: "Create",
+        target: nil,
+        action: nil
+    )
+    private let pilotProfileConfirmButton = NSButton(
+        title: "Confirm",
+        target: nil,
+        action: nil
+    )
+    private let pilotProfileCancelButton = NSButton(
+        title: "Cancel",
+        target: nil,
+        action: nil
+    )
+    private var pilotProfileIDs: [UUID] = []
     private var trainingVoicePlayer: AVAudioPlayer?
     private var trainingSoundPlayers: [AVAudioPlayer] = []
     private var trainingMessageExpiresAt: Float?
@@ -72,6 +97,7 @@ final class RevivalGameplayView: MTKView {
     override init(frame frameRect: NSRect, device: (any MTLDevice)?) {
         super.init(frame: frameRect, device: device)
         configureTrainingOverlay()
+        configurePilotProfileOverlay()
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(controllerDidConnect(_:)),
@@ -156,6 +182,50 @@ final class RevivalGameplayView: MTKView {
                 bounds.midX - trainingRestartButton.frame.width / 2
             ),
             y: max(24, bounds.midY - 150)
+        )
+        let profileWidth = min(420, max(280, bounds.width - 64))
+        let profileLeft = (bounds.width - profileWidth) / 2
+        let profileBottom = max(40, (bounds.height - 230) / 2)
+        pilotProfileOverlay.frame = bounds
+        pilotProfileTitle.frame = NSRect(
+            x: profileLeft,
+            y: profileBottom + 185,
+            width: profileWidth,
+            height: 32
+        )
+        pilotProfilePopup.frame = NSRect(
+            x: profileLeft,
+            y: profileBottom + 140,
+            width: profileWidth,
+            height: 30
+        )
+        pilotProfileNameField.frame = NSRect(
+            x: profileLeft,
+            y: profileBottom + 92,
+            width: profileWidth - 100,
+            height: 28
+        )
+        pilotProfileCreateButton.frame = NSRect(
+            x: profileLeft + profileWidth - 88,
+            y: profileBottom + 91,
+            width: 88,
+            height: 30
+        )
+        let buttonWidth: CGFloat = 96
+        let buttonGap: CGFloat = 12
+        let buttonLeft =
+            profileLeft + (profileWidth - buttonWidth * 2 - buttonGap) / 2
+        pilotProfileCancelButton.frame = NSRect(
+            x: buttonLeft,
+            y: profileBottom + 32,
+            width: buttonWidth,
+            height: 32
+        )
+        pilotProfileConfirmButton.frame = NSRect(
+            x: buttonLeft + buttonWidth + buttonGap,
+            y: profileBottom + 32,
+            width: buttonWidth,
+            height: 32
         )
     }
 
@@ -534,6 +604,48 @@ final class RevivalGameplayView: MTKView {
         trainingRestartButton.isEnabled = available
     }
 
+    func presentPilotProfileSelection(
+        profiles: [(id: UUID, name: String)],
+        defaultProfileID: UUID?,
+        selectedProfileID: UUID?
+    ) {
+        pilotProfileIDs = profiles.map(\.id)
+        pilotProfilePopup.removeAllItems()
+        pilotProfilePopup.addItems(withTitles: profiles.map(\.name))
+        let selection =
+            selectedProfileID
+            ?? defaultProfileID
+            ?? profiles.first?.id
+        if let selection,
+           let index = pilotProfileIDs.firstIndex(of: selection) {
+            pilotProfilePopup.selectItem(at: index)
+        }
+        pilotProfileConfirmButton.isEnabled = !pilotProfileIDs.isEmpty
+        pilotProfileCancelButton.isEnabled = defaultProfileID != nil
+        pilotProfileNameField.stringValue = ""
+        pilotProfileOverlay.isHidden = false
+        needsLayout = true
+    }
+
+    func hidePilotProfileSelection() {
+        pilotProfileOverlay.isHidden = true
+    }
+
+    @objc func requestPilotProfileCreation() {
+        pilotProfileCreationRequested?(pilotProfileNameField.stringValue)
+    }
+
+    @objc func requestPilotProfileConfirmation() {
+        let index = pilotProfilePopup.indexOfSelectedItem
+        guard pilotProfileIDs.indices.contains(index) else { return }
+        pilotProfileConfirmationRequested?(pilotProfileIDs[index])
+    }
+
+    @objc func requestPilotProfileCancellation() {
+        guard pilotProfileCancelButton.isEnabled else { return }
+        pilotProfileCancellationRequested?()
+    }
+
     @objc func requestTrainingRestart() {
         guard !trainingRestartButton.isHidden,
               trainingRestartButton.isEnabled else {
@@ -798,6 +910,42 @@ final class RevivalGameplayView: MTKView {
             "Play Training Again"
         )
         addSubview(trainingRestartButton)
+    }
+
+    private func configurePilotProfileOverlay() {
+        pilotProfileOverlay.wantsLayer = true
+        pilotProfileOverlay.layer?.backgroundColor =
+            NSColor.black.withAlphaComponent(0.94).cgColor
+        pilotProfileOverlay.isHidden = true
+        pilotProfileOverlay.setAccessibilityLabel("Pilot profile selection")
+        addSubview(pilotProfileOverlay)
+
+        pilotProfileTitle.alignment = .center
+        pilotProfileTitle.font = .boldSystemFont(ofSize: 24)
+        pilotProfileTitle.textColor = .white
+        pilotProfileOverlay.addSubview(pilotProfileTitle)
+
+        pilotProfilePopup.setAccessibilityLabel("Available pilots")
+        pilotProfileOverlay.addSubview(pilotProfilePopup)
+
+        pilotProfileNameField.placeholderString = "Pilot name"
+        pilotProfileNameField.setAccessibilityLabel("New pilot name")
+        pilotProfileOverlay.addSubview(pilotProfileNameField)
+
+        pilotProfileCreateButton.target = self
+        pilotProfileCreateButton.action =
+            #selector(requestPilotProfileCreation)
+        pilotProfileOverlay.addSubview(pilotProfileCreateButton)
+
+        pilotProfileConfirmButton.target = self
+        pilotProfileConfirmButton.action =
+            #selector(requestPilotProfileConfirmation)
+        pilotProfileOverlay.addSubview(pilotProfileConfirmButton)
+
+        pilotProfileCancelButton.target = self
+        pilotProfileCancelButton.action =
+            #selector(requestPilotProfileCancellation)
+        pilotProfileOverlay.addSubview(pilotProfileCancelButton)
     }
 
     nonisolated static func trainingEndLevelText(
