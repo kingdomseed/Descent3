@@ -163,6 +163,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
         case let .install(packageURL):
             setStatus("Installing \(packageURL.lastPathComponent)…", isError: false)
         }
+        gameplayView?.setTrainingRestartAvailable(false)
 
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -193,6 +194,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                             isError: false
                         )
                     }
+                    self.gameplayView?.setTrainingRestartAvailable(true)
                     return
                 }
                 try self.present(activation, with: renderer)
@@ -208,6 +210,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                     "Could not \(operation): \(error.localizedDescription)",
                     isError: true
                 )
+                self.gameplayView?.setTrainingRestartAvailable(true)
             }
         }
     }
@@ -225,6 +228,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             level: activation.level,
             presentationReadyTimestamp: presentationReadyTimestamp
         )
+        gameplayView?.prepareForTrainingSession()
         self.simulation = simulation
         playerInput = PlayerInputState()
         playerInput.setGameplayActive(
@@ -337,6 +341,9 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.trainingResultAcknowledgementRequested = {
                 [weak self] in self?.acknowledgeTrainingResult()
             }
+            gameplayView.trainingRestartRequested = {
+                [weak self] in self?.restartTrainingSession()
+            }
             window.makeFirstResponder(gameplayView)
             self.gameplayView = gameplayView
         }
@@ -368,7 +375,21 @@ private final class RevivalMacApplicationDelegate: NSObject,
             at: timestamp
         )
         gameplayView?.setGameplayActive(false)
-        setStatus("Training session completed.", isError: false)
+        let completedLevelName = simulation.level.metadata.name
+        renderer?.unload()
+        self.simulation = nil
+        gameplayView?.presentTrainingContentReadyState(
+            completedLevelName: completedLevelName
+        )
+        setStatus(
+            "Training completed. Play again, open canonical content, or quit.",
+            isError: false
+        )
+    }
+
+    private func restartTrainingSession() {
+        guard simulation == nil else { return }
+        enqueue(.loadActive)
     }
 
     private func setStatus(_ message: String, isError: Bool) {

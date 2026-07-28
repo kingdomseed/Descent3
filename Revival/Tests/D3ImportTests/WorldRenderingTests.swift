@@ -2660,6 +2660,56 @@ final class WorldRenderingTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testCompletedTrainingSessionOffersOneDirectRestartAction() throws {
+        let view = RevivalGameplayView(frame: .zero, device: nil)
+        var restartRequests = 0
+        view.trainingRestartRequested = {
+            restartRequests += 1
+        }
+
+        view.presentTrainingContentReadyState(
+            completedLevelName: "Training Mission"
+        )
+
+        let contentReadyLabel = try XCTUnwrap(
+            view.subviews.compactMap { $0 as? NSTextField }.first {
+                $0.stringValue.hasPrefix("Training Mission completed.")
+            }
+        )
+        let restartButton = try XCTUnwrap(
+            view.subviews.compactMap { $0 as? NSButton }.first {
+                $0.title == "Play Training Again"
+            }
+        )
+        XCTAssertFalse(restartButton.isHidden)
+        XCTAssertTrue(restartButton.isEnabled)
+        XCTAssertEqual(
+            contentReadyLabel.stringValue,
+            """
+            Training Mission completed.
+
+            Play Training Again, open canonical content, or quit.
+            """
+        )
+        view.requestTrainingRestart()
+        XCTAssertEqual(restartRequests, 1)
+
+        view.setTrainingRestartAvailable(false)
+        XCTAssertFalse(restartButton.isEnabled)
+        view.requestTrainingRestart()
+        XCTAssertEqual(restartRequests, 1)
+
+        view.setTrainingRestartAvailable(true)
+        XCTAssertTrue(restartButton.isEnabled)
+        view.requestTrainingRestart()
+        XCTAssertEqual(restartRequests, 2)
+
+        view.prepareForTrainingSession()
+        XCTAssertTrue(restartButton.isHidden)
+        XCTAssertFalse(restartButton.isEnabled)
+    }
+
     func testInvulnPowerup2ConsumesOnceAndExpiresAcrossContinuation()
         throws
     {

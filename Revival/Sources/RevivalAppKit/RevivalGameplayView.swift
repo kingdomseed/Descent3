@@ -35,6 +35,7 @@ final class RevivalGameplayView: MTKView {
     var primaryFireRequested: (() -> Void)?
     var inventoryUseRequested: (() -> Void)?
     var trainingResultAcknowledgementRequested: (() -> Void)?
+    var trainingRestartRequested: (() -> Void)?
 
     private var heldKeys: Set<UInt16> = []
     private var pendingMouseX: Float = 0
@@ -54,6 +55,11 @@ final class RevivalGameplayView: MTKView {
     private let cameraMonitorBorder = NoninteractiveTrainingOverlay()
     private let trainingEndLevelOverlay = NoninteractiveTrainingOverlay()
     private let trainingEndLevelLabel = NSTextField(labelWithString: "")
+    private let trainingRestartButton = NSButton(
+        title: "Play Training Again",
+        target: nil,
+        action: nil
+    )
     private var trainingVoicePlayer: AVAudioPlayer?
     private var trainingSoundPlayers: [AVAudioPlayer] = []
     private var trainingMessageExpiresAt: Float?
@@ -142,6 +148,14 @@ final class RevivalGameplayView: MTKView {
             y: max(24, bounds.midY - 180),
             width: min(480, max(0, bounds.width - 48)),
             height: min(360, max(0, bounds.height - 48))
+        )
+        trainingRestartButton.sizeToFit()
+        trainingRestartButton.frame.origin = NSPoint(
+            x: max(
+                24,
+                bounds.midX - trainingRestartButton.frame.width / 2
+            ),
+            y: max(24, bounds.midY - 150)
         )
     }
 
@@ -264,6 +278,8 @@ final class RevivalGameplayView: MTKView {
                 Self.trainingPostLevelResultText(
                     finalGoal.postLevelResult
                 )
+            trainingRestartButton.isEnabled = false
+            trainingRestartButton.isHidden = true
             if !trainingResultIsPresented {
                 trainingResultPresentedAt =
                     ProcessInfo.processInfo.systemUptime
@@ -288,6 +304,7 @@ final class RevivalGameplayView: MTKView {
         )
         trainingEndLevelOverlay.isHidden = true
         trainingEndLevelLabel.isHidden = true
+        trainingRestartButton.isHidden = true
         cameraMonitorBorder.isHidden = frame.trainingCameraMonitor == nil
         invulnerabilityStatusLabel.stringValue =
             Self.invulnerabilityStatusText(
@@ -483,6 +500,47 @@ final class RevivalGameplayView: MTKView {
         heldInputChanged?(.zero)
         controllerInputChanged?(.zero)
         releaseMouse()
+    }
+
+    func presentTrainingContentReadyState(completedLevelName: String) {
+        NSObject.cancelPreviousPerformRequests(
+            withTarget: self,
+            selector: #selector(trainingResultAdmissionDidOpen),
+            object: nil
+        )
+        trainingResultIsPresented = false
+        trainingResultPresentedAt = nil
+        pendingTrainingResultKeyAcknowledgement = false
+        trainingEndLevelLabel.stringValue = """
+        \(completedLevelName) completed.
+
+        Play Training Again, open canonical content, or quit.
+        """
+        trainingEndLevelOverlay.isHidden = false
+        trainingEndLevelLabel.isHidden = false
+        trainingRestartButton.isHidden = false
+        setTrainingRestartAvailable(true)
+    }
+
+    func prepareForTrainingSession() {
+        trainingRestartButton.isEnabled = false
+        trainingRestartButton.isHidden = true
+        trainingEndLevelOverlay.isHidden = true
+        trainingEndLevelLabel.isHidden = true
+    }
+
+    func setTrainingRestartAvailable(_ available: Bool) {
+        guard !trainingRestartButton.isHidden else { return }
+        trainingRestartButton.isEnabled = available
+    }
+
+    @objc func requestTrainingRestart() {
+        guard !trainingRestartButton.isHidden,
+              trainingRestartButton.isEnabled else {
+            return
+        }
+        setTrainingRestartAvailable(false)
+        trainingRestartRequested?()
     }
 
     nonisolated static func heldInput(
@@ -733,6 +791,13 @@ final class RevivalGameplayView: MTKView {
             "Training mission result text"
         )
         addSubview(trainingEndLevelLabel)
+        trainingRestartButton.target = self
+        trainingRestartButton.action = #selector(requestTrainingRestart)
+        trainingRestartButton.isHidden = true
+        trainingRestartButton.setAccessibilityLabel(
+            "Play Training Again"
+        )
+        addSubview(trainingRestartButton)
     }
 
     nonisolated static func trainingEndLevelText(
