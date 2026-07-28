@@ -2,6 +2,415 @@ import XCTest
 
 final class WorldRenderingTests: XCTestCase {
     @MainActor
+    func testTrainingScript006IsUnconditionalOrderedOneShotAndRestores()
+        throws
+    {
+        let base = makeTrainingScript003Level()
+        let player = try XCTUnwrap(
+            base.objects.first { $0.handle == 2_048 }
+        )
+        let goalHandles: [UInt32] = [
+            12_301,
+            12_300,
+            12_299,
+            18_441,
+        ]
+        func level(
+            contacting handle: UInt32,
+            at position: Vector3? = nil
+        ) throws -> Level {
+            let contactPosition = position ?? player.position
+            var objects = base.objects
+            for goalHandle in goalHandles {
+                let index = try XCTUnwrap(
+                    objects.firstIndex { $0.handle == goalHandle }
+                )
+                objects[index].position = goalHandle == handle
+                    ? contactPosition
+                    : .init(
+                        x: contactPosition.x + 100,
+                        y: contactPosition.y,
+                        z: contactPosition.z
+                    )
+                objects[index].location = .room(1)
+            }
+            let roomIndex = try XCTUnwrap(
+                base.rooms.firstIndex { $0.sourceIndex == 1 }
+            )
+            var rooms = base.rooms
+            rooms[roomIndex] = makeSourceContainmentRoom(
+                center: contactPosition,
+                texture: base.surfacePhysics[0].texture,
+                sourceIndex: 1,
+                halfExtent: 200
+            )
+            return replacing(base, rooms: rooms, objects: objects)
+        }
+        func resumed(
+            _ continuation: PlayerSimulationContinuation,
+            contacting handle: UInt32,
+            at timestamp: Double
+        ) throws -> PlayerSimulation {
+            let resumedLevel = try level(
+                contacting: handle,
+                at: continuation.playerPosition
+            )
+            XCTAssertEqual(
+                containingIndoorRoomSourceIndex(
+                    in: resumedLevel,
+                    position: continuation.playerPosition,
+                    candidates: [1]
+                ),
+                1,
+                "resume at \(timestamp)"
+            )
+            return try PlayerSimulation(
+                level: resumedLevel,
+                continuation: continuation,
+                resumedAtTimestamp: timestamp
+            )
+        }
+
+        let early = PlayerSimulation(
+            level: try level(contacting: 18_441),
+            presentationReadyTimestamp: 0
+        )
+        let earlyFrame = early.update(at: 0.1, input: .zero)
+        XCTAssertEqual(
+            earlyFrame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Excellent!"],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false
+                ),
+                .init(
+                    hudMessages: [
+                        "Now Slide down until you return to the start position.",
+                    ],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false
+                ),
+                .init(
+                    hudMessages: [],
+                    voiceSourceName: "return3.osf",
+                    voicePrecedesHUDMessages: false
+                ),
+            ]
+        )
+        XCTAssertEqual(earlyFrame.enabledPlayerControls, [.forward, .down])
+        var presentationOrder: [String] = []
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            earlyFrame.trainingOpeningFeedback,
+            attemptVoice: { presentationOrder.append("voice:\($0)") },
+            attemptSound: { presentationOrder.append("sound:\($0)") },
+            presentHUDMessages: {
+                presentationOrder.append(contentsOf: $0.map { "hud:\($0)" })
+            }
+        )
+        XCTAssertEqual(
+            presentationOrder,
+            [
+                "hud:Excellent!",
+                "hud:Now Slide down until you return to the start position.",
+                "voice:return3.osf",
+            ]
+        )
+
+        let afterEarlyForward = try resumed(
+            early.continuation,
+            contacting: 12_301,
+            at: 1
+        )
+        XCTAssertEqual(
+            afterEarlyForward.update(at: 1.1, input: .zero)
+                .enabledPlayerControls,
+            [.reverse, .down]
+        )
+        let afterEarlyLeft = try resumed(
+            afterEarlyForward.continuation,
+            contacting: 12_300,
+            at: 2
+        )
+        XCTAssertEqual(
+            afterEarlyLeft.update(at: 2.1, input: .zero)
+                .enabledPlayerControls,
+            [.left, .down]
+        )
+        let afterEarlyRight = try resumed(
+            afterEarlyLeft.continuation,
+            contacting: 12_299,
+            at: 3
+        )
+        XCTAssertEqual(
+            afterEarlyRight.update(at: 3.1, input: .zero)
+                .enabledPlayerControls,
+            [.right, .down]
+        )
+        let afterEarlyUp = try resumed(
+            afterEarlyRight.continuation,
+            contacting: 12_300,
+            at: 4
+        )
+        XCTAssertEqual(
+            afterEarlyUp.update(at: 4.1, input: .zero)
+                .enabledPlayerControls,
+            [.up, .down]
+        )
+        let restoredAfterEarlyUp = try resumed(
+            try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(afterEarlyUp.continuation)
+            ),
+            contacting: 0,
+            at: 5
+        )
+        let restoredAfterEarlyUpFrame = restoredAfterEarlyUp.update(
+            at: 5.1,
+            input: .zero
+        )
+        XCTAssertEqual(
+            restoredAfterEarlyUpFrame.enabledPlayerControls,
+            [.up, .down]
+        )
+        XCTAssertTrue(
+            restoredAfterEarlyUpFrame.trainingOpeningFeedback.isEmpty
+        )
+        let earlyRight = PlayerSimulation(
+            level: try level(contacting: 12_299),
+            presentationReadyTimestamp: 6
+        )
+        XCTAssertEqual(
+            earlyRight.update(at: 6.1, input: .zero)
+                .enabledPlayerControls,
+            [.forward, .right]
+        )
+        let earlyRightDown = try resumed(
+            earlyRight.continuation,
+            contacting: 18_441,
+            at: 7
+        )
+        XCTAssertEqual(
+            earlyRightDown.update(at: 7.1, input: .zero)
+                .enabledPlayerControls,
+            [.forward, .right, .down]
+        )
+        let restoredEarlyRightDown = try resumed(
+            try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(earlyRightDown.continuation)
+            ),
+            contacting: 0,
+            at: 8
+        )
+        XCTAssertEqual(
+            restoredEarlyRightDown.update(at: 8.1, input: .zero)
+                .enabledPlayerControls,
+            [.forward, .right, .down]
+        )
+        let earlyRightUpDown = try resumed(
+            earlyRightDown.continuation,
+            contacting: 12_300,
+            at: 8.2
+        )
+        XCTAssertEqual(
+            earlyRightUpDown.update(at: 8.3, input: .zero)
+                .enabledPlayerControls,
+            [.forward, .up, .down]
+        )
+        let reverseUpDown = try resumed(
+            earlyRightUpDown.continuation,
+            contacting: 12_301,
+            at: 8.4
+        )
+        XCTAssertEqual(
+            reverseUpDown.update(at: 8.5, input: .zero)
+                .enabledPlayerControls,
+            [.reverse, .up, .down]
+        )
+        let restoredReverseUpDown = try resumed(
+            try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(reverseUpDown.continuation)
+            ),
+            contacting: 0,
+            at: 8.6
+        )
+        let restoredReverseUpDownFrame = restoredReverseUpDown.update(
+            at: 8.7,
+            input: .zero
+        )
+        XCTAssertEqual(
+            restoredReverseUpDownFrame.enabledPlayerControls,
+            [.reverse, .up, .down]
+        )
+        XCTAssertTrue(
+            restoredReverseUpDownFrame.trainingOpeningFeedback.isEmpty
+        )
+
+        let reverse = PlayerSimulation(
+            level: try level(contacting: 12_301),
+            presentationReadyTimestamp: 9
+        )
+        XCTAssertEqual(
+            reverse.update(at: 9.1, input: .zero)
+                .enabledPlayerControls,
+            [.reverse]
+        )
+        let reverseRight = try resumed(
+            reverse.continuation,
+            contacting: 12_299,
+            at: 10
+        )
+        XCTAssertEqual(
+            reverseRight.update(at: 10.1, input: .zero)
+                .enabledPlayerControls,
+            [.reverse, .right]
+        )
+        let reverseRightDown = try resumed(
+            reverseRight.continuation,
+            contacting: 18_441,
+            at: 11
+        )
+        XCTAssertEqual(
+            reverseRightDown.update(at: 11.1, input: .zero)
+                .enabledPlayerControls,
+            [.reverse, .right, .down]
+        )
+        let restoredReverseRightDown = try resumed(
+            try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(reverseRightDown.continuation)
+            ),
+            contacting: 0,
+            at: 12
+        )
+        XCTAssertEqual(
+            restoredReverseRightDown.update(at: 12.1, input: .zero)
+                .enabledPlayerControls,
+            [.reverse, .right, .down]
+        )
+
+        let normal = PlayerSimulation(
+            level: try level(contacting: 12_301),
+            presentationReadyTimestamp: 20
+        )
+        _ = normal.update(at: 20.1, input: .zero)
+        let normalLeft = try resumed(
+            normal.continuation,
+            contacting: 12_300,
+            at: 21
+        )
+        _ = normalLeft.update(at: 21.1, input: .zero)
+        let normalRight = try resumed(
+            normalLeft.continuation,
+            contacting: 12_299,
+            at: 22
+        )
+        _ = normalRight.update(at: 22.1, input: .zero)
+        let normalUp = try resumed(
+            normalRight.continuation,
+            contacting: 12_300,
+            at: 23
+        )
+        XCTAssertEqual(
+            normalUp.update(at: 23.1, input: .zero).enabledPlayerControls,
+            [.up]
+        )
+        let normalDown = try resumed(
+            normalUp.continuation,
+            contacting: 18_441,
+            at: 24
+        )
+        let normalDownFrame = normalDown.update(at: 24.1, input: .zero)
+        XCTAssertEqual(normalDownFrame.enabledPlayerControls, [.down])
+        XCTAssertEqual(
+            normalDownFrame.trainingOpeningFeedback.map(\.voiceSourceName),
+            ["", "", "return3.osf"]
+        )
+        let restored = try PlayerSimulation(
+            level: try level(contacting: 18_441),
+            continuation: try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(normalDown.continuation)
+            ),
+            resumedAtTimestamp: 25
+        )
+        let restoredFrame = restored.update(at: 25.1, input: .zero)
+        XCTAssertTrue(restoredFrame.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(restoredFrame.enabledPlayerControls, [.down])
+
+        var missingLesson = try XCTUnwrap(
+            normalDown.level.trainingOpeningLesson
+        )
+        missingLesson.returnDown = nil
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: replacing(
+                    normalDown.level,
+                    trainingOpeningLesson: missingLesson
+                ),
+                continuation: normalDown.continuation,
+                resumedAtTimestamp: 26
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(normalDown.continuation)
+            ) as? [String: Any]
+        )
+        var hostileOpening = try XCTUnwrap(
+            hostileObject["trainingOpeningState"] as? [String: Any]
+        )
+        hostileOpening["enabledControls"] = 33
+        hostileObject["trainingOpeningState"] = hostileOpening
+        let hostileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: normalDown.level,
+                continuation: hostileContinuation,
+                resumedAtTimestamp: 27
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        let script006Level = try level(contacting: 0)
+        var compatibleLesson = try XCTUnwrap(
+            script006Level.trainingOpeningLesson
+        )
+        compatibleLesson.returnDown = nil
+        let compatibleLevel = replacing(
+            script006Level,
+            trainingOpeningLesson: compatibleLesson
+        )
+        let oldContinuation = PlayerSimulation(
+            level: compatibleLevel,
+            presentationReadyTimestamp: 30
+        ).continuation
+        let restoredOld = try PlayerSimulation(
+            level: script006Level,
+            continuation: try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(oldContinuation)
+            ),
+            resumedAtTimestamp: 31
+        ).update(at: 31.1, input: .zero)
+        XCTAssertEqual(restoredOld.enabledPlayerControls, [.forward])
+    }
+
+    @MainActor
     func testTrainingOpeningUsesPriorFrameTimerThenScript004OnceAndRestores() throws {
         var level = makeSliceSixObjectRenderLevel()
         let goalHandle: UInt32 = 12_301
@@ -8787,6 +9196,7 @@ func makeTrainingScript003Level() -> Level {
         ("left1.osf", 18),
         ("return2.osf", 29),
         ("up1.osf", 37),
+        ("return3.osf", 30),
     ].map { name, index in
         CanonicalVoiceClip(
             sourceName: name,
@@ -8840,6 +9250,17 @@ func makeTrainingScript003Level() -> Level {
                 successMessage: "Excellent!",
                 instruction: "Now Slide up  until you stop.",
                 voiceSourceName: "up1.osf"
+            ),
+            returnDown: .init(
+                upGoalObjectHandle: 18_441,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: model,
+                    objectType: 7
+                ),
+                successMessage: "Excellent!",
+                instruction:
+                    "Now Slide down until you return to the start position.",
+                voiceSourceName: "return3.osf"
             )
         ),
         voiceClips: clips

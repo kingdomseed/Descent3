@@ -387,9 +387,18 @@ final class EditorProjectTests: XCTestCase {
                 $0.handle == 12_300
             }
         )
+        let upGoal = try XCTUnwrap(
+            document.project.level.objects.first {
+                $0.handle == 18_441
+            }
+        )
         XCTAssertEqual(
             document.project.trainingReturnUpSourceDiagnostic,
             "TrainingMission.cpp Script 005 / StartGoal handle 12300 / up1.osf"
+        )
+        XCTAssertEqual(
+            document.project.trainingReturnDownSourceDiagnostic,
+            "TrainingMission.cpp Script 006 / UpGoal handle 18441 / return3.osf"
         )
         XCTAssertEqual(
             document.project.trainingReturnRightSourceDiagnostic,
@@ -412,6 +421,14 @@ final class EditorProjectTests: XCTestCase {
                 project: document.project,
                 selection: document.editorSelection
             ).contains(
+                "TrainingMission.cpp Script 006 / UpGoal handle 18441 / return3.osf"
+            )
+        )
+        XCTAssertTrue(
+            editorIdleStatusMessage(
+                project: document.project,
+                selection: document.editorSelection
+            ).contains(
                 "TrainingMission.cpp Script 004 / LeftGoal handle 12299 / return2.osf"
             )
         )
@@ -424,31 +441,31 @@ final class EditorProjectTests: XCTestCase {
             )
         )
 
-        try document.rotateObjectQuarterTurn(handle: startGoal.handle)
+        try document.rotateObjectQuarterTurn(handle: upGoal.handle)
         XCTAssertEqual(
             document.undoManager?.undoActionName,
             "Transform Object"
         )
         XCTAssertNotEqual(
             document.project.level.objects.first {
-                $0.handle == startGoal.handle
+                $0.handle == upGoal.handle
             }?.orientation,
-            startGoal.orientation
+            upGoal.orientation
         )
         let rotatedOrientation = document.project.level.objects.first {
-            $0.handle == startGoal.handle
+            $0.handle == upGoal.handle
         }?.orientation
         document.undoManager?.undo()
         XCTAssertEqual(
             document.project.level.objects.first {
-                $0.handle == startGoal.handle
+                $0.handle == upGoal.handle
             }?.orientation,
-            startGoal.orientation
+            upGoal.orientation
         )
         document.undoManager?.redo()
         XCTAssertEqual(
             document.project.level.objects.first {
-                $0.handle == startGoal.handle
+                $0.handle == upGoal.handle
             }?.orientation,
             rotatedOrientation
         )
@@ -474,9 +491,9 @@ final class EditorProjectTests: XCTestCase {
         XCTAssertEqual(reopened.project, document.project)
         XCTAssertEqual(
             immutableBase.objects.first {
-                $0.handle == startGoal.handle
+                $0.handle == upGoal.handle
             }?.orientation,
-            startGoal.orientation
+            upGoal.orientation
         )
 
         let playSession = reopened.makePlaySession()
@@ -492,14 +509,19 @@ final class EditorProjectTests: XCTestCase {
             leftGoal.handle
         )
         XCTAssertEqual(
+            playSession.level.trainingOpeningLesson?.returnDown?
+                .upGoalObjectHandle,
+            upGoal.handle
+        )
+        XCTAssertEqual(
             reopened.project.level.objects.first {
-                $0.handle == startGoal.handle
+                $0.handle == upGoal.handle
             }?.orientation,
             rotatedOrientation
         )
         XCTAssertEqual(
             playSession.level.objects.first {
-                $0.handle == startGoal.handle
+                $0.handle == upGoal.handle
             }?.orientation,
             rotatedOrientation
         )
@@ -507,7 +529,7 @@ final class EditorProjectTests: XCTestCase {
         XCTAssertNil(reopened.playSession)
         XCTAssertEqual(
             reopened.project.level.objects.first {
-                $0.handle == startGoal.handle
+                $0.handle == upGoal.handle
             }?.orientation,
             rotatedOrientation
         )

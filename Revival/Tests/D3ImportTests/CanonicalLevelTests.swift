@@ -1,6 +1,47 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testScript006RequiresHiddenCollisionActiveUpGoal() throws {
+        let level = makeTrainingScript003Level()
+        XCTAssertNoThrow(try level.validate())
+        let lesson = try XCTUnwrap(level.trainingOpeningLesson)
+        let returnDown = try XCTUnwrap(lesson.returnDown)
+        let presentationIndex = try XCTUnwrap(
+            level.objectPresentations.firstIndex {
+                $0.objectHandle == returnDown.upGoalObjectHandle
+            }
+        )
+        var visiblePresentations = level.objectPresentations
+        let hidden = visiblePresentations[presentationIndex]
+        visiblePresentations[presentationIndex] = .init(
+            objectHandle: hidden.objectHandle,
+            primaryModel: hidden.primaryModel,
+            mediumModel: hidden.mediumModel,
+            lowModel: hidden.lowModel,
+            dyingModel: hidden.dyingModel,
+            mediumDistance: hidden.mediumDistance,
+            lowDistance: hidden.lowDistance,
+            isVisible: true
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 006 return-down lesson"),
+            replacing(level, objectPresentations: visiblePresentations)
+        )
+
+        var missingTarget = lesson
+        missingTarget.returnDown = .init(
+            upGoalObjectHandle: 999_999,
+            collisionRadius: returnDown.collisionRadius,
+            successMessage: returnDown.successMessage,
+            instruction: returnDown.instruction,
+            voiceSourceName: returnDown.voiceSourceName
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 006 return-down lesson"),
+            replacing(level, trainingOpeningLesson: missingTarget)
+        )
+    }
+
     func testSchemaElevenValidatesExactTrainingFinalRoomEntryChain()
         throws
     {

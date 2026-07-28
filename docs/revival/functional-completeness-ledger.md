@@ -294,6 +294,15 @@ The former ambient-life runtime row is preserved as `F-001` in [Future opportuni
 | `T-006`, `T-009` | RevivalEditor exposes the direct Script 005 / StartGoal / `up1.osf` diagnostic. Existing named `Transform Object` undo/redo, deterministic save/reopen and immutable-base → derived-project → disposable-play → project-return ownership cover the reused StartGoal without a behavior project, alternate renderer or second session path. |
 | `T-016` | The schema-11 validator admits the optional exact hidden-but-collision-active StartGoal identity, room, position, `invisiblepowerup.OOF` doubled contact radius, messages and `up1.osf` source/PCM provenance while accepting older schema-11 packages without the extension. The owned import promoted 48 rooms, 41 objects, 22 presentations, 15 voices, seven sounds and 2667 current dependencies; exact-final content/level/report hashes are recorded in the source ledger. |
 
+### Phase 5 Script 006 functional reconciliation
+
+| Capability rows | Reconciled proof |
+| --- | --- |
+| `B-008`, `B-010` | The opening continuation now includes Script 006's first room-owned radius-aware collision with hidden UpGoal. Its only live predicate is counter 006 below one: it emits separate `GoodJob` then `GoDown` HUD moments, removes exact up bit 16, starts `return3.osf`, inserts exact down bit 32 and increments only counter 006 in released order. Optional schema-7 state preserves the normal Script-005 down-only result and every released early-collision order while retaining unrelated bits, including the live Script 004 → Script 006 → Script 005 → Script 001 reverse+up+down result; round-trip reload emits no repeated feedback. Hostile lesson/mask combinations still fail at the untrusted boundary. Script 007 and Scripts 008–015 remain deferred. |
+| `B-012`, `T-003` | Schema 11 carries 16 reached Training voices. D3Import decodes owned `return3.osf` entry 30 to exact canonical mono PCM at 22,050 Hz and 109,709 frames, with source SHA-256 `be5df14b5a410e52888404e09c01cb7c6084ec8389b4cb04a1090fbae31652ea` and PCM SHA-256 `6adba1f7b3881732f208938676a8c1fac3ccf7f74bc332f10868e498fecbd482`; the canonical boundary requires exact English `GoDown`. Broader localization and unreached audio remain open. |
+| `T-006`, `T-009` | RevivalEditor exposes the direct Script 006 / UpGoal / `return3.osf` diagnostic. Named `Transform Object` undo/redo, deterministic save/reopen and immutable-base → derived-project → disposable-play → project-return ownership directly exercise UpGoal without a behavior project, alternate renderer or second session path. |
+| `T-016` | The schema-11 validator admits the optional exact hidden-but-collision-active UpGoal identity, raw flags/orientation, room, position, `invisiblepowerup.OOF` doubled contact radius, messages and `return3.osf` source/PCM provenance while accepting older schema-11 packages without the extension. The final isolated Release import promoted 48 rooms, 41 objects, 22 presentations, 16 voices, seven sounds and 2668 current dependencies; exact hashes are recorded in the source ledger. |
+
 ## Ledger audit gate
 
 Before Phase 0 closes, the capability audit must:
