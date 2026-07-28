@@ -4,6 +4,17 @@ final class WorldRenderingTests: XCTestCase {
     func testTrainingOpeningUsesPriorFrameTimerThenForwardGoalOnceAndRestores() throws {
         var level = makeSliceSixObjectRenderLevel()
         let goalHandle: UInt32 = 12_301
+        let startGoalHandle: UInt32 = 12_300
+        let startGoalPresentation = try XCTUnwrap(
+            level.objectPresentations.first {
+                $0.objectHandle == startGoalHandle
+            }
+        )
+        let startGoalModel = try XCTUnwrap(
+            level.models.first {
+                $0.source == startGoalPresentation.primaryModel
+            }
+        )
         let lesson = TrainingOpeningLesson(
             forwardGoalObjectHandle: goalHandle,
             welcomeDelay: 1,
@@ -12,7 +23,16 @@ final class WorldRenderingTests: XCTestCase {
             welcomeVoiceSourceName: "welcome.osf",
             successMessage: "Excellent!",
             reverseInstruction: "Now use the reverse Key to return to where you started!",
-            successVoiceSourceName: "return1.osf"
+            successVoiceSourceName: "return1.osf",
+            returnLeft: .init(
+                startGoalObjectHandle: startGoalHandle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: startGoalModel,
+                    objectType: 7
+                ),
+                instruction: "Now Go Left until you stop.",
+                voiceSourceName: "left1.osf"
+            )
         )
         level = level.addingTrainingOpeningLesson(lesson, voiceClips: [])
 
@@ -54,7 +74,7 @@ final class WorldRenderingTests: XCTestCase {
         level.objects[goalIndex].position = Vector3(
             x: level.objects[playerIndex].position.x,
             y: level.objects[playerIndex].position.y,
-            z: level.objects[playerIndex].position.z + 0.5
+            z: level.objects[playerIndex].position.z + 50
         )
         level.objects[goalIndex].location = level.objects[playerIndex].location
         level.objects[playerIndex].orientation = Matrix3(
@@ -68,6 +88,9 @@ final class WorldRenderingTests: XCTestCase {
         )
         XCTAssertFalse(
             hiddenGoalExtraction.admittedObjectHandles.contains(goalHandle)
+        )
+        XCTAssertFalse(
+            hiddenGoalExtraction.admittedObjectHandles.contains(startGoalHandle)
         )
 
         let timerOnly = PlayerSimulation(
@@ -142,6 +165,74 @@ final class WorldRenderingTests: XCTestCase {
         )
         XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(afterRestore.enabledPlayerControls, [.reverse])
+
+        var returnFrame: PlayerSimulationFrame?
+        for frameIndex in 2...40 {
+            let frame = restored.update(
+                at: 100 + Double(frameIndex) * 0.1,
+                input: .init(forward: -1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "left1.osf"
+            }) {
+                returnFrame = frame
+                break
+            }
+        }
+        let returnedToStart = try XCTUnwrap(returnFrame)
+        XCTAssertEqual(
+            returnedToStart.trainingOpeningFeedback,
+            [.init(
+                hudMessages: ["Now Go Left until you stop."],
+                voiceSourceName: "left1.osf",
+                voicePrecedesHUDMessages: false
+            )]
+        )
+        XCTAssertEqual(returnedToStart.enabledPlayerControls, [.left])
+        let afterReturn = restored.update(
+            at: 104.1,
+            input: .init(forward: -1)
+        )
+        XCTAssertTrue(afterReturn.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(afterReturn.enabledPlayerControls, [.left])
+
+        let returnedContinuationData = try JSONEncoder().encode(
+            restored.continuation
+        )
+        let returnedContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: returnedContinuationData
+        )
+        let restoredAfterReturn = try PlayerSimulation(
+            level: level,
+            continuation: returnedContinuation,
+            resumedAtTimestamp: 200
+        )
+        let resumedAfterReturn = restoredAfterReturn.update(
+            at: 200.1,
+            input: .init(forward: -1, sideways: -1)
+        )
+        XCTAssertTrue(resumedAfterReturn.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(resumedAfterReturn.enabledPlayerControls, [.left])
+
+        var compatibleLesson = lesson
+        compatibleLesson.returnLeft = nil
+        let compatibleLevel = replacing(
+            level,
+            trainingOpeningLesson: compatibleLesson
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: compatibleLevel,
+                continuation: returnedContinuation,
+                resumedAtTimestamp: 300
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
 
         let continuationObject = try XCTUnwrap(
             JSONSerialization.jsonObject(with: continuationData)
@@ -8201,6 +8292,58 @@ func makeTrainingGalleryBarrierLevel() -> Level {
             sourceArchive: "missions/training.mn3",
             sourceSHA256: String(repeating: "a", count: 64)
         )
+    )
+}
+
+func makeTrainingScript003Level() -> Level {
+    let level = makeSliceSixObjectRenderLevel()
+    let startGoalHandle: UInt32 = 12_300
+    let presentation = level.objectPresentations.first {
+        $0.objectHandle == startGoalHandle
+    }!
+    let model = level.models.first {
+        $0.source == presentation.primaryModel
+    }!
+    let pcm = Data(repeating: 0, count: 2)
+    let clips = [
+        ("welcome.osf", 38),
+        ("return1.osf", 28),
+        ("left1.osf", 18),
+    ].map { name, index in
+        CanonicalVoiceClip(
+            sourceName: name,
+            sourceEntryIndex: index,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 1,
+            pcm16LittleEndian: pcm,
+            pcmSHA256: canonicalSHA256(pcm),
+            sourceArchive: "missions/training.mn3",
+            sourceSHA256: String(repeating: "a", count: 64)
+        )
+    }
+    return level.addingTrainingOpeningLesson(
+        .init(
+            forwardGoalObjectHandle: 12_301,
+            welcomeDelay: 1,
+            welcomeMessage: "Welcome to the Descent 3 Training session.",
+            forwardInstruction: "Move forward until you stop.",
+            welcomeVoiceSourceName: "welcome.osf",
+            successMessage: "Excellent!",
+            reverseInstruction:
+                "Now use the reverse Key to return to where you started!",
+            successVoiceSourceName: "return1.osf",
+            returnLeft: .init(
+                startGoalObjectHandle: startGoalHandle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: model,
+                    objectType: 7
+                ),
+                instruction: "Now Go Left until you stop.",
+                voiceSourceName: "left1.osf"
+            )
+        ),
+        voiceClips: clips
     )
 }
 

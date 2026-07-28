@@ -352,6 +352,132 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testTrainingScript003HasDiagnosticNamedUndoAndDisposablePlayOwnership()
+        throws
+    {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(
+            path: "candidate.revival",
+            directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false
+        )
+        let immutableBase = makeTrainingScript003Level()
+        try writeCanonicalPackage(immutableBase, to: candidate)
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        let startGoal = try XCTUnwrap(
+            document.project.level.objects.first {
+                $0.handle == 12_300
+            }
+        )
+        XCTAssertEqual(
+            document.project.trainingReturnLeftSourceDiagnostic,
+            "TrainingMission.cpp Script 003 / StartGoal handle 12300 / left1.osf"
+        )
+        XCTAssertTrue(
+            editorIdleStatusMessage(
+                project: document.project,
+                selection: document.editorSelection
+            ).contains(
+                "TrainingMission.cpp Script 003 / StartGoal handle 12300 / left1.osf"
+            )
+        )
+
+        try document.rotateObjectQuarterTurn(handle: startGoal.handle)
+        XCTAssertEqual(
+            document.undoManager?.undoActionName,
+            "Transform Object"
+        )
+        XCTAssertNotEqual(
+            document.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation,
+            startGoal.orientation
+        )
+        let rotatedOrientation = document.project.level.objects.first {
+            $0.handle == startGoal.handle
+        }?.orientation
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation,
+            startGoal.orientation
+        )
+        document.undoManager?.redo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation,
+            rotatedOrientation
+        )
+
+        let firstWrapper = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        let secondWrapper = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(
+            firstWrapper.fileWrappers?["project.json"]?.regularFileContents,
+            secondWrapper.fileWrappers?["project.json"]?.regularFileContents
+        )
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(
+            from: firstWrapper,
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(reopened.project, document.project)
+        XCTAssertEqual(
+            immutableBase.objects.first {
+                $0.handle == startGoal.handle
+            }?.position,
+            startGoal.position
+        )
+
+        let playSession = reopened.makePlaySession()
+        reopened.commitPlaySession(playSession, renderingWorld: false)
+        XCTAssertEqual(
+            playSession.level.trainingOpeningLesson?.returnLeft?
+                .startGoalObjectHandle,
+            startGoal.handle
+        )
+        XCTAssertEqual(
+            reopened.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation,
+            document.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation
+        )
+        reopened.returnToEditor(renderingWorld: false)
+        XCTAssertNil(reopened.playSession)
+        XCTAssertEqual(
+            reopened.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation,
+            document.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation
+        )
+    }
+
+    @MainActor
     func testTrainingGalleryBarrierEditsAtomicallyPersistUndoAndStayOutOfPlayReturn() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)

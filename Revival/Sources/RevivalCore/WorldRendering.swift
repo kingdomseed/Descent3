@@ -902,6 +902,7 @@ private struct TrainingOpeningState: Codable, Equatable, Sendable {
     var timerRemaining: Float
     var welcomeWasPresented = false
     var forwardGoalWasReached = false
+    var returnGoalWasReached: Bool? = nil
     var enabledControls: PlayerControlMask = [.forward]
 }
 
@@ -1693,9 +1694,14 @@ final class PlayerSimulation {
               continuation.trainingOpeningState.map({
                   $0.timerRemaining.isFinite
                       && ($0.welcomeWasPresented || $0.timerRemaining > 0)
-                      && ($0.forwardGoalWasReached
-                          ? $0.enabledControls == [.reverse]
-                          : $0.enabledControls == [.forward])
+                      && ($0.returnGoalWasReached != true
+                          || level.trainingOpeningLesson?.returnLeft != nil)
+                      && ($0.returnGoalWasReached == true
+                          ? $0.forwardGoalWasReached
+                              && $0.enabledControls == [.left]
+                          : $0.forwardGoalWasReached
+                              ? $0.enabledControls == [.reverse]
+                              : $0.enabledControls == [.forward])
               }) ?? true,
               (level.trainingOpeningLesson == nil)
                 == (continuation.trainingOpeningState == nil) else {
@@ -2906,6 +2912,7 @@ final class PlayerSimulation {
         var position = object.position
         var roomSourceIndex = startRoom
         var trainingForwardGoalWasReachedThisFrame = false
+        var trainingReturnGoalWasReachedThisFrame = false
         var trainingGalleryWasCrossedThisFrame = false
         var trainingKillbotEntryWasCrossedThisFrame = false
         var trainingFinalRoomEntryWasCrossedThisFrame = false
@@ -3013,6 +3020,20 @@ final class PlayerSimulation {
                         visitedRoomSourceIndices:
                             trace.visitedRoomSourceIndices
                     )
+                if trainingOpeningState?.forwardGoalWasReached == true,
+                   trainingOpeningState?.returnGoalWasReached != true,
+                   let returnLeft = lesson.returnLeft {
+                    trainingReturnGoalWasReachedThisFrame =
+                        trainingReturnGoalWasReached(
+                            in: level,
+                            lesson: returnLeft,
+                            playerStart: traceStart,
+                            playerEnd: trace.finalPosition,
+                            playerRadius: view.collisionRadius,
+                            visitedRoomSourceIndices:
+                                trace.visitedRoomSourceIndices
+                        )
+                }
             }
             if case .noHit = trace.outcome {
                 position = trace.finalPosition
@@ -3197,6 +3218,21 @@ final class PlayerSimulation {
                     trainingForwardGoalWasReached(
                         in: level,
                         lesson: lesson,
+                        playerStart: traceStart,
+                        playerEnd: trace.finalPosition,
+                        playerRadius: view.collisionRadius,
+                        visitedRoomSourceIndices:
+                            trace.visitedRoomSourceIndices
+                    )
+            }
+            if !trainingReturnGoalWasReachedThisFrame,
+               trainingOpeningState?.forwardGoalWasReached == true,
+               trainingOpeningState?.returnGoalWasReached != true,
+               let returnLeft = level.trainingOpeningLesson?.returnLeft {
+                trainingReturnGoalWasReachedThisFrame =
+                    trainingReturnGoalWasReached(
+                        in: level,
+                        lesson: returnLeft,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
                         playerRadius: view.collisionRadius,
@@ -3652,6 +3688,19 @@ final class PlayerSimulation {
                     voiceSourceName: lesson.successVoiceSourceName,
                     voicePrecedesHUDMessages: false
                 ))
+            }
+            if openingState.forwardGoalWasReached,
+               openingState.returnGoalWasReached != true,
+               trainingReturnGoalWasReachedThisFrame,
+               let returnLeft = lesson.returnLeft {
+                openingState.enabledControls.remove(.reverse)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [returnLeft.instruction],
+                    voiceSourceName: returnLeft.voiceSourceName,
+                    voicePrecedesHUDMessages: false
+                ))
+                openingState.enabledControls.insert(.left)
+                openingState.returnGoalWasReached = true
             }
             if !openingState.welcomeWasPresented {
                 openingState.timerRemaining -= systemsFrameDuration
@@ -5044,6 +5093,49 @@ private func trainingForwardGoalWasReached(
         model: model,
         objectType: target.type
     )
+    return trainingOpeningGoalWasReached(
+        target: target,
+        targetRadius: targetRadius,
+        playerStart: playerStart,
+        playerEnd: playerEnd,
+        playerRadius: playerRadius,
+        visitedRoomSourceIndices: visitedRoomSourceIndices
+    )
+}
+
+private func trainingReturnGoalWasReached(
+    in level: Level,
+    lesson: TrainingReturnLeftLesson,
+    playerStart: Vector3,
+    playerEnd: Vector3,
+    playerRadius: Float,
+    visitedRoomSourceIndices: [Int]
+) -> Bool {
+    let target = level.objects.first {
+        $0.handle == lesson.startGoalObjectHandle
+    }!
+    return trainingOpeningGoalWasReached(
+        target: target,
+        targetRadius: lesson.collisionRadius,
+        playerStart: playerStart,
+        playerEnd: playerEnd,
+        playerRadius: playerRadius,
+        visitedRoomSourceIndices: visitedRoomSourceIndices
+    )
+}
+
+private func trainingOpeningGoalWasReached(
+    target: PlacedObject,
+    targetRadius: Float,
+    playerStart: Vector3,
+    playerEnd: Vector3,
+    playerRadius: Float,
+    visitedRoomSourceIndices: [Int]
+) -> Bool {
+    guard case let .room(targetRoomSourceIndex) = target.location,
+          visitedRoomSourceIndices.contains(targetRoomSourceIndex) else {
+        return false
+    }
     let movement = playerEnd - playerStart
     let lengthSquared = dot(movement, movement)
     let fraction: Float

@@ -1015,6 +1015,7 @@ func editorIdleStatusMessage(
     let status =
         "Editing \(level.metadata.name) — \(level.rooms.count) complete resident rooms — source room \(selection.room.sourceIndex), face \(selection.face.faceIndex) selected — \(project.semanticDiff.count) authored changes."
     let sourceDiagnostics = [
+        project.trainingReturnLeftSourceDiagnostic,
         project.trainingGalleryBarrierSourceDiagnostic,
         project.trainingRobotGuidebotSourceDiagnostic,
         project.trainingGuidebotReturnSourceDiagnostic,

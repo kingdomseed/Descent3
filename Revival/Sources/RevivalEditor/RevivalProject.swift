@@ -462,6 +462,16 @@ struct RevivalProject: Equatable, Sendable {
 
     var baseReference: CanonicalPackageReference { source.base }
     var persistedSource: RevivalProjectSource { source }
+    var trainingReturnLeftSourceDiagnostic: String? {
+        guard let returnLeft =
+                level.trainingOpeningLesson?.returnLeft,
+              let goal = level.objects.first(where: {
+                  $0.handle == returnLeft.startGoalObjectHandle
+              }) else {
+            return nil
+        }
+        return "TrainingMission.cpp Script 003 / \(goal.instanceName ?? "StartGoal") handle \(goal.handle) / \(returnLeft.voiceSourceName)"
+    }
     var trainingGalleryBarrierSourceDiagnostic: String? {
         level.trainingGalleryBarrier.map {
             "TrainingMission.cpp Script 032 / \($0.triggerName)"

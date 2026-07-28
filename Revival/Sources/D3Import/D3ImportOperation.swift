@@ -711,7 +711,30 @@ func runD3Import(
     let forwardGoal = playerLevel.objects.first {
         $0.instanceName?.caseInsensitiveCompare("ForwardGoal") == .orderedSame
     }!
-    precondition(forwardGoal.handle == 12_301 && forwardGoal.type == 7)
+    let startGoal = playerLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("StartGoal") == .orderedSame
+    }!
+    let startGoalPresentation = playerLevel.objectPresentations.first {
+        $0.objectHandle == startGoal.handle
+    }!
+    let startGoalModel = playerLevel.models.first {
+        $0.source == startGoalPresentation.primaryModel
+    }!
+    precondition(
+        forwardGoal.handle == 12_301
+            && forwardGoal.type == 7
+            && startGoal.handle == 12_300
+            && startGoal.type == 7
+            && startGoal.storedID == 67
+            && startGoal.definition?.referenceRuntimeIndex == 68
+            && startGoal.instanceName == "StartGoal"
+            && startGoal.flags == 36_864
+            && startGoal.location == .room(1)
+            && startGoal.position
+                == .init(x: 2_062.7678, y: -134.19601, z: 2_201.679)
+            && startGoalPresentation.primaryModel.sourceName
+                == "invisiblepowerup.OOF"
+    )
     let voiceNames = [
         "Welcome.osf",
         "Return1.osf",
@@ -725,6 +748,7 @@ func runD3Import(
         "GuideBotF.osf",
         "Intro7.osf",
         "Done.osf",
+        "left1.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -752,9 +776,22 @@ func runD3Import(
             welcomeVoiceSourceName: "welcome.osf",
             successMessage: messages["GoodJob"]!,
             reverseInstruction: messages["GoBackwards"]!,
-            successVoiceSourceName: "return1.osf"
+            successVoiceSourceName: "return1.osf",
+            returnLeft: .init(
+                startGoalObjectHandle: startGoal.handle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: startGoalModel,
+                    objectType: startGoal.type
+                ),
+                instruction: messages["GoLeft"]!,
+                voiceSourceName: "left1.osf"
+            )
         ),
-        voiceClips: Array(voiceClips.prefix(2))
+        voiceClips: [
+            voiceClips[0],
+            voiceClips[1],
+            voiceClips[voiceClips.count - 1],
+        ]
     )
     let galleryTrigger = openingLevel.triggers.first {
         $0.name.caseInsensitiveCompare("Portal2") == .orderedSame
@@ -1634,7 +1671,7 @@ func runD3Import(
         initialFaceSHA256
             == "9540339832d41b1ff667a9a08a627e989694fec246509a081e08413544838100"
     )
-    precondition(initialExtraction.admittedObjectHandles == [12_300])
+    precondition(initialExtraction.admittedObjectHandles.isEmpty)
     precondition(
         initialExtraction.lightCoronas.map {
             "\($0.roomSourceIndex):\($0.faceIndex)"
@@ -1679,7 +1716,7 @@ func runD3Import(
     return report
 }
 
-private func parseTrainingMessages(_ data: Data) throws -> [String: String] {
+func parseTrainingMessages(_ data: Data) throws -> [String: String] {
     guard let text = String(data: data, encoding: .utf8) else {
         throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
     }
@@ -1700,9 +1737,13 @@ private func parseTrainingMessages(_ data: Data) throws -> [String: String] {
         }
         messages[key] = value
     }
-    guard ["Welcome", "GoForward", "GoodJob", "GoBackwards"].allSatisfy({
-        messages[$0] != nil
-    }) else {
+    guard [
+        "Welcome",
+        "GoForward",
+        "GoodJob",
+        "GoBackwards",
+        "GoLeft",
+    ].allSatisfy({ messages[$0] != nil }) else {
         throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
     }
     return messages
