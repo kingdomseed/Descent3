@@ -469,6 +469,14 @@ struct TrainingReturnLeftLesson: Codable, Equatable, Sendable {
     let voiceSourceName: String
 }
 
+struct TrainingReturnRightLesson: Codable, Equatable, Sendable {
+    let leftGoalObjectHandle: UInt32
+    let collisionRadius: Float
+    let successMessage: String
+    let instruction: String
+    let voiceSourceName: String
+}
+
 struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var forwardGoalObjectHandle: UInt32
     let welcomeDelay: Float
@@ -479,6 +487,7 @@ struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     let reverseInstruction: String
     let successVoiceSourceName: String
     var returnLeft: TrainingReturnLeftLesson? = nil
+    var returnRight: TrainingReturnRightLesson? = nil
 }
 
 struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
@@ -2353,6 +2362,36 @@ struct Level: Codable, Equatable, Sendable {
                     )
                 }
             }
+            if let returnRight = lesson.returnRight {
+                guard returnRight.collisionRadius.isFinite,
+                      returnRight.collisionRadius > 0,
+                      isNonempty(returnRight.successMessage),
+                      isNonempty(returnRight.instruction),
+                      isNonempty(returnRight.voiceSourceName),
+                      lesson.returnLeft != nil,
+                      let target = objects.first(where: {
+                          $0.handle == returnRight.leftGoalObjectHandle
+                      }),
+                      target.type == 7,
+                      let presentation = objectPresentations.first(where: {
+                          $0.objectHandle == target.handle && !$0.isVisible
+                      }),
+                      let model = models.first(where: {
+                          $0.source == presentation.primaryModel
+                      }),
+                      returnRight.collisionRadius
+                        == sourceObjectPresentationSize(
+                            model: model,
+                            objectType: target.type
+                        ),
+                      clipNames.contains(
+                          returnRight.voiceSourceName.lowercased()
+                      ) else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training Script 004 return-right lesson"
+                    )
+                }
+            }
         }
         if let barrier = trainingGalleryBarrier {
             let oneShotFlag: UInt16 = 8
@@ -3181,6 +3220,10 @@ struct Level: Codable, Equatable, Sendable {
                 $0.sourceName.caseInsensitiveCompare("left1.osf")
                     == .orderedSame
             }
+            let return2 = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("return2.osf")
+                    == .orderedSame
+            }
             let guidebotA = voiceClips.first {
                 $0.sourceName.caseInsensitiveCompare("guidebota.osf")
                     == .orderedSame
@@ -3296,6 +3339,61 @@ struct Level: Codable, Equatable, Sendable {
                     )
                 }
             }
+            if let returnRight = lesson.returnRight {
+                let leftGoal = objects.first {
+                    $0.handle == returnRight.leftGoalObjectHandle
+                }
+                let leftGoalPresentation = objectPresentations.first {
+                    $0.objectHandle == returnRight.leftGoalObjectHandle
+                }
+                guard returnRight.leftGoalObjectHandle == 12_299,
+                      returnRight.collisionRadius == 10.052_409,
+                      returnRight.successMessage == "Excellent!",
+                      returnRight.instruction
+                        == "Now Slide right until you return to the start position.",
+                      returnRight.voiceSourceName == "return2.osf",
+                      leftGoal?.type == 7,
+                      leftGoal?.storedID == 67,
+                      leftGoal?.definition?.storedIndex == 67,
+                      leftGoal?.definition?.referenceRuntimeIndex == 68,
+                      leftGoal?.definition?.sourceName
+                        == "Invisiblepowerup",
+                      leftGoal?.instanceName == "LeftGoal",
+                      leftGoal?.flags == 4_352,
+                      leftGoal?.location == .room(1),
+                      leftGoal?.position
+                        == .init(
+                            x: 1_958.2805,
+                            y: -131.22517,
+                            z: 2_205.8071
+                        ),
+                      leftGoal?.orientation
+                        == .init(
+                            right: .init(x: -1, y: 0, z: 0),
+                            up: .init(x: 0, y: 1, z: -0),
+                            forward: .init(x: -0, y: -0, z: -1)
+                        ),
+                      leftGoalPresentation?.primaryModel
+                        == .init(
+                            storedIndex: 6,
+                            sourceName: "invisiblepowerup.OOF"
+                        ),
+                      leftGoalPresentation?.isVisible == false,
+                      return2?.sourceEntryIndex == 29,
+                      return2?.sampleRate == 22_050,
+                      return2?.channelCount == 1,
+                      return2?.frameCount == 68_621,
+                      return2?.pcmSHA256
+                        == "ff071aa8d667e067092809982a62d1c2d93f4e2ac23c494921d5d9a77e579962",
+                      return2?.sourceArchive == "missions/training.mn3",
+                      return2?.sourceSHA256
+                        == "095478ec99ea94f1ca2f0ac0c710f2c74b940f5cfd7b791a8af16a4c154eb547"
+                else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training Script 004 package"
+                    )
+                }
+            }
             guard let barrier = trainingGalleryBarrier,
                   barrier.triggerName == "Portal2",
                   barrier.triggerRoomSourceIndex == 38,
@@ -3310,12 +3408,18 @@ struct Level: Codable, Equatable, Sendable {
                   barrier.voiceSourceName == "guidebota.osf",
                   voiceClips.count == (
                     trainingFinalBotsCompletionChain != nil
-                        ? 12 + (lesson.returnLeft == nil ? 0 : 1)
+                        ? 12
+                            + (lesson.returnLeft == nil ? 0 : 1)
+                            + (lesson.returnRight == nil ? 0 : 1)
                         : trainingFinalRoomEntryChain != nil
-                            ? 11 + (lesson.returnLeft == nil ? 0 : 1)
+                            ? 11
+                                + (lesson.returnLeft == nil ? 0 : 1)
+                                + (lesson.returnRight == nil ? 0 : 1)
                         : (
                             trainingCameraMonitorChain == nil ? 5 : 10
-                        ) + (lesson.returnLeft == nil ? 0 : 1)
+                        )
+                            + (lesson.returnLeft == nil ? 0 : 1)
+                            + (lesson.returnRight == nil ? 0 : 1)
                   ),
                   guidebotA?.sourceEntryIndex == 4,
                   guidebotA?.sampleRate == 22_050,
@@ -3920,6 +4024,7 @@ struct Level: Codable, Equatable, Sendable {
             let hiddenHandles = [
                 lesson.forwardGoalObjectHandle,
                 lesson.returnLeft?.startGoalObjectHandle,
+                lesson.returnRight?.leftGoalObjectHandle,
             ]
             guard hiddenHandles.contains(presentation.objectHandle) else {
                 return presentation

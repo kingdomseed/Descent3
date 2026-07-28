@@ -1,14 +1,29 @@
 import XCTest
 
 final class PreparedRetailProfileTests: XCTestCase {
-    func testTrainingMessagesRequireScript003GoLeft() throws {
+    func testTrainingMessagesRequireScript004GoRight() throws {
         let missingGoLeft = Data("""
             Welcome=Welcome
             GoForward=Forward
             GoodJob=Excellent
             GoBackwards=Reverse
+            GoRight=Right
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoLeft)) {
+            XCTAssertEqual(
+                $0 as? D3ImportOperationError,
+                .missingPresentationAsset("TrainingMission.msg")
+            )
+        }
+
+        let missingGoRight = Data("""
+            Welcome=Welcome
+            GoForward=Forward
+            GoodJob=Excellent
+            GoBackwards=Reverse
+            GoLeft=Left
+            """.utf8)
+        XCTAssertThrowsError(try parseTrainingMessages(missingGoRight)) {
             XCTAssertEqual(
                 $0 as? D3ImportOperationError,
                 .missingPresentationAsset("TrainingMission.msg")
@@ -21,10 +36,11 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoodJob=Excellent
             GoBackwards=Reverse
             GoLeft=Left
+            GoRight=Right
             """.utf8)
         XCTAssertEqual(
-            try parseTrainingMessages(complete)["GoLeft"],
-            "Left"
+            try parseTrainingMessages(complete)["GoRight"],
+            "Right"
         )
     }
 

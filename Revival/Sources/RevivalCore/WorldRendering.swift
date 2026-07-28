@@ -903,6 +903,7 @@ private struct TrainingOpeningState: Codable, Equatable, Sendable {
     var welcomeWasPresented = false
     var forwardGoalWasReached = false
     var returnGoalWasReached: Bool? = nil
+    var rightGoalWasReached: Bool? = nil
     var enabledControls: PlayerControlMask = [.forward]
 }
 
@@ -1691,17 +1692,43 @@ final class PlayerSimulation {
               continuation.wiggleFalloff.isFinite,
               (0...1).contains(continuation.wiggleFalloff),
               continuation.lastThrustTime.isFinite,
-              continuation.trainingOpeningState.map({
-                  $0.timerRemaining.isFinite
-                      && ($0.welcomeWasPresented || $0.timerRemaining > 0)
-                      && ($0.returnGoalWasReached != true
+              continuation.trainingOpeningState.map({ state in
+                  let controlsAreValid: Bool
+                  if state.rightGoalWasReached == true {
+                      if state.returnGoalWasReached == true {
+                          controlsAreValid =
+                              state.forwardGoalWasReached
+                              && (
+                                  state.enabledControls == [.right]
+                                    || state.enabledControls
+                                        == [.left, .right]
+                              )
+                      } else if state.forwardGoalWasReached {
+                          controlsAreValid =
+                              state.enabledControls == [.reverse, .right]
+                      } else {
+                          controlsAreValid =
+                              state.enabledControls == [.forward, .right]
+                      }
+                  } else if state.returnGoalWasReached == true {
+                      controlsAreValid =
+                          state.forwardGoalWasReached
+                          && state.enabledControls == [.left]
+                  } else if state.forwardGoalWasReached {
+                      controlsAreValid = state.enabledControls == [.reverse]
+                  } else {
+                      controlsAreValid = state.enabledControls == [.forward]
+                  }
+                  return state.timerRemaining.isFinite
+                      && (
+                          state.welcomeWasPresented
+                            || state.timerRemaining > 0
+                      )
+                      && (state.returnGoalWasReached != true
                           || level.trainingOpeningLesson?.returnLeft != nil)
-                      && ($0.returnGoalWasReached == true
-                          ? $0.forwardGoalWasReached
-                              && $0.enabledControls == [.left]
-                          : $0.forwardGoalWasReached
-                              ? $0.enabledControls == [.reverse]
-                              : $0.enabledControls == [.forward])
+                      && (state.rightGoalWasReached != true
+                          || level.trainingOpeningLesson?.returnRight != nil)
+                      && controlsAreValid
               }) ?? true,
               (level.trainingOpeningLesson == nil)
                 == (continuation.trainingOpeningState == nil) else {
@@ -2913,6 +2940,7 @@ final class PlayerSimulation {
         var roomSourceIndex = startRoom
         var trainingForwardGoalWasReachedThisFrame = false
         var trainingReturnGoalWasReachedThisFrame = false
+        var trainingRightGoalWasReachedThisFrame = false
         var trainingGalleryWasCrossedThisFrame = false
         var trainingKillbotEntryWasCrossedThisFrame = false
         var trainingFinalRoomEntryWasCrossedThisFrame = false
@@ -3027,6 +3055,19 @@ final class PlayerSimulation {
                         trainingReturnGoalWasReached(
                             in: level,
                             lesson: returnLeft,
+                            playerStart: traceStart,
+                            playerEnd: trace.finalPosition,
+                            playerRadius: view.collisionRadius,
+                            visitedRoomSourceIndices:
+                                trace.visitedRoomSourceIndices
+                        )
+                }
+                if trainingOpeningState?.rightGoalWasReached != true,
+                   let returnRight = lesson.returnRight {
+                    trainingRightGoalWasReachedThisFrame =
+                        trainingRightGoalWasReached(
+                            in: level,
+                            lesson: returnRight,
                             playerStart: traceStart,
                             playerEnd: trace.finalPosition,
                             playerRadius: view.collisionRadius,
@@ -3233,6 +3274,20 @@ final class PlayerSimulation {
                     trainingReturnGoalWasReached(
                         in: level,
                         lesson: returnLeft,
+                        playerStart: traceStart,
+                        playerEnd: trace.finalPosition,
+                        playerRadius: view.collisionRadius,
+                        visitedRoomSourceIndices:
+                            trace.visitedRoomSourceIndices
+                    )
+            }
+            if !trainingRightGoalWasReachedThisFrame,
+               trainingOpeningState?.rightGoalWasReached != true,
+               let returnRight = level.trainingOpeningLesson?.returnRight {
+                trainingRightGoalWasReachedThisFrame =
+                    trainingRightGoalWasReached(
+                        in: level,
+                        lesson: returnRight,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
                         playerRadius: view.collisionRadius,
@@ -3679,7 +3734,8 @@ final class PlayerSimulation {
             if !openingState.forwardGoalWasReached,
                trainingForwardGoalWasReachedThisFrame {
                 openingState.forwardGoalWasReached = true
-                openingState.enabledControls = [.reverse]
+                openingState.enabledControls.remove(.forward)
+                openingState.enabledControls.insert(.reverse)
                 trainingOpeningFeedback.append(TrainingOpeningFeedback(
                     hudMessages: [
                         lesson.successMessage,
@@ -3701,6 +3757,25 @@ final class PlayerSimulation {
                 ))
                 openingState.enabledControls.insert(.left)
                 openingState.returnGoalWasReached = true
+            }
+            if openingState.rightGoalWasReached != true,
+               trainingRightGoalWasReachedThisFrame,
+               let returnRight = lesson.returnRight {
+                openingState.enabledControls.remove(.left)
+                openingState.enabledControls.insert(.right)
+                trainingOpeningFeedback.append(contentsOf: [
+                    TrainingOpeningFeedback(
+                        hudMessages: [returnRight.successMessage],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: false
+                    ),
+                    TrainingOpeningFeedback(
+                        hudMessages: [returnRight.instruction],
+                        voiceSourceName: returnRight.voiceSourceName,
+                        voicePrecedesHUDMessages: true
+                    ),
+                ])
+                openingState.rightGoalWasReached = true
             }
             if !openingState.welcomeWasPresented {
                 openingState.timerRemaining -= systemsFrameDuration
@@ -5113,6 +5188,27 @@ private func trainingReturnGoalWasReached(
 ) -> Bool {
     let target = level.objects.first {
         $0.handle == lesson.startGoalObjectHandle
+    }!
+    return trainingOpeningGoalWasReached(
+        target: target,
+        targetRadius: lesson.collisionRadius,
+        playerStart: playerStart,
+        playerEnd: playerEnd,
+        playerRadius: playerRadius,
+        visitedRoomSourceIndices: visitedRoomSourceIndices
+    )
+}
+
+private func trainingRightGoalWasReached(
+    in level: Level,
+    lesson: TrainingReturnRightLesson,
+    playerStart: Vector3,
+    playerEnd: Vector3,
+    playerRadius: Float,
+    visitedRoomSourceIndices: [Int]
+) -> Bool {
+    let target = level.objects.first {
+        $0.handle == lesson.leftGoalObjectHandle
     }!
     return trainingOpeningGoalWasReached(
         target: target,
