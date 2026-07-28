@@ -10,6 +10,7 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoRight=Right
             GoUp=Up
             GoDown=Down
+            Repeat=Repeat
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoLeft)) {
             XCTAssertEqual(
@@ -26,6 +27,7 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoLeft=Left
             GoUp=Up
             GoDown=Down
+            Repeat=Repeat
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoRight)) {
             XCTAssertEqual(
@@ -42,6 +44,7 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoLeft=Left
             GoRight=Right
             GoDown=Down
+            Repeat=Repeat
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoUp)) {
             XCTAssertEqual(
@@ -58,8 +61,26 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoLeft=Left
             GoRight=Right
             GoUp=Up
+            Repeat=Repeat
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoDown)) {
+            XCTAssertEqual(
+                $0 as? D3ImportOperationError,
+                .missingPresentationAsset("TrainingMission.msg")
+            )
+        }
+
+        let missingRepeat = Data("""
+            Welcome=Welcome
+            GoForward=Forward
+            GoodJob=Excellent
+            GoBackwards=Reverse
+            GoLeft=Left
+            GoRight=Right
+            GoUp=Up
+            GoDown=Down
+            """.utf8)
+        XCTAssertThrowsError(try parseTrainingMessages(missingRepeat)) {
             XCTAssertEqual(
                 $0 as? D3ImportOperationError,
                 .missingPresentationAsset("TrainingMission.msg")
@@ -75,10 +96,15 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoRight=Right
             GoUp=Now Slide up  until you stop.
             GoDown=Now Slide down until you return to the start position.
+            Repeat=Let's repeat the exercise we just did.
             """.utf8)
         XCTAssertEqual(
             try parseTrainingMessages(complete)["GoDown"],
             "Now Slide down until you return to the start position."
+        )
+        XCTAssertEqual(
+            try parseTrainingMessages(complete)["Repeat"],
+            "Let's repeat the exercise we just did."
         )
     }
 

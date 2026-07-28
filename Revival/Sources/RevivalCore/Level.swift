@@ -493,6 +493,15 @@ struct TrainingReturnDownLesson: Codable, Equatable, Sendable {
     let voiceSourceName: String
 }
 
+struct TrainingRepeatForwardLesson: Codable, Equatable, Sendable {
+    let startGoalObjectHandle: UInt32
+    let collisionRadius: Float
+    let successMessage: String
+    let repeatMessage: String
+    let forwardInstruction: String
+    let voiceSourceName: String
+}
+
 struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var forwardGoalObjectHandle: UInt32
     let welcomeDelay: Float
@@ -506,6 +515,7 @@ struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var returnRight: TrainingReturnRightLesson? = nil
     var returnUp: TrainingReturnUpLesson? = nil
     var returnDown: TrainingReturnDownLesson? = nil
+    var repeatForward: TrainingRepeatForwardLesson? = nil
 }
 
 struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
@@ -2038,14 +2048,30 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     func validate() throws {
-        try validate(allowImportStagingPresentation: false)
+        try validate(
+            allowImportStagingPresentation: false,
+            enforceStockSourceInvariants: true
+        )
+    }
+
+    func validateForAuthoring() throws {
+        try validate(
+            allowImportStagingPresentation: false,
+            enforceStockSourceInvariants: false
+        )
     }
 
     func validateForImportStaging() throws {
-        try validate(allowImportStagingPresentation: true)
+        try validate(
+            allowImportStagingPresentation: true,
+            enforceStockSourceInvariants: true
+        )
     }
 
-    private func validate(allowImportStagingPresentation: Bool) throws {
+    private func validate(
+        allowImportStagingPresentation: Bool,
+        enforceStockSourceInvariants: Bool
+    ) throws {
         guard (
             schemaVersion == 9
                 && trainingCameraMonitorChain == nil
@@ -2466,6 +2492,37 @@ struct Level: Codable, Equatable, Sendable {
                       ) else {
                     throw LevelValidationError.invalidDependency(
                         "Training Script 006 return-down lesson"
+                    )
+                }
+            }
+            if let repeatForward = lesson.repeatForward {
+                guard repeatForward.collisionRadius.isFinite,
+                      repeatForward.collisionRadius > 0,
+                      isNonempty(repeatForward.successMessage),
+                      isNonempty(repeatForward.repeatMessage),
+                      isNonempty(repeatForward.forwardInstruction),
+                      isNonempty(repeatForward.voiceSourceName),
+                      lesson.returnDown != nil,
+                      let target = objects.first(where: {
+                          $0.handle == repeatForward.startGoalObjectHandle
+                      }),
+                      target.type == 7,
+                      let presentation = objectPresentations.first(where: {
+                          $0.objectHandle == target.handle && !$0.isVisible
+                      }),
+                      let model = models.first(where: {
+                          $0.source == presentation.primaryModel
+                      }),
+                      repeatForward.collisionRadius
+                        == sourceObjectPresentationSize(
+                            model: model,
+                            objectType: target.type
+                        ),
+                      clipNames.contains(
+                          repeatForward.voiceSourceName.lowercased()
+                      ) else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training Script 007 repeat-forward lesson"
                     )
                 }
             }
@@ -3284,7 +3341,9 @@ struct Level: Codable, Equatable, Sendable {
                 == "fc1d81921cc4b2618e441b7b9d08c4bcb5cff90731be1bfa6f3a7b054fc0cb54"
             && source.levelSHA256
                 == "915a561cd3bd720d88bffed72fe41b4ff711c287711f060ecd9696e2cd5f7d41"
-        if hasStockTrainingSource && !allowImportStagingPresentation {
+        if enforceStockSourceInvariants,
+           hasStockTrainingSource,
+           !allowImportStagingPresentation {
             let welcome = voiceClips.first {
                 $0.sourceName.caseInsensitiveCompare("welcome.osf")
                     == .orderedSame
@@ -3307,6 +3366,10 @@ struct Level: Codable, Equatable, Sendable {
             }
             let return3 = voiceClips.first {
                 $0.sourceName.caseInsensitiveCompare("return3.osf")
+                    == .orderedSame
+            }
+            let repeatVoice = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("repeat.osf")
                     == .orderedSame
             }
             let guidebotA = voiceClips.first {
@@ -3348,6 +3411,64 @@ struct Level: Codable, Equatable, Sendable {
             let done = voiceClips.first {
                 $0.sourceName.caseInsensitiveCompare("done.osf")
                     == .orderedSame
+            }
+            if let repeatForward =
+                    trainingOpeningLesson?.repeatForward {
+                let startGoal = objects.first {
+                    $0.handle == repeatForward.startGoalObjectHandle
+                }
+                let startGoalPresentation = objectPresentations.first {
+                    $0.objectHandle == repeatForward.startGoalObjectHandle
+                }
+                guard repeatForward.startGoalObjectHandle == 12_300,
+                      repeatForward.collisionRadius == 10.052_409,
+                      repeatForward.successMessage == "Excellent!",
+                      repeatForward.repeatMessage
+                        == "Let's repeat the exercise we just did.",
+                      repeatForward.forwardInstruction
+                        == "Move forward until you stop.",
+                      repeatForward.voiceSourceName == "repeat.osf",
+                      startGoal?.type == 7,
+                      startGoal?.storedID == 67,
+                      startGoal?.definition?.storedIndex == 67,
+                      startGoal?.definition?.referenceRuntimeIndex == 68,
+                      startGoal?.definition?.sourceName
+                        == "Invisiblepowerup",
+                      startGoal?.instanceName == "StartGoal",
+                      startGoal?.flags == 36_864,
+                      startGoal?.location == .room(1),
+                      startGoal?.position
+                        == .init(
+                            x: 2_062.7678,
+                            y: -134.19601,
+                            z: 2_201.679
+                        ),
+                      startGoal?.orientation
+                        == .init(
+                            right: .init(x: -1, y: 0, z: 0),
+                            up: .init(x: 0, y: 1, z: -0),
+                            forward: .init(x: -0, y: -0, z: -1)
+                        ),
+                      startGoalPresentation?.primaryModel
+                        == .init(
+                            storedIndex: 6,
+                            sourceName: "invisiblepowerup.OOF"
+                        ),
+                      startGoalPresentation?.isVisible == false,
+                      repeatVoice?.sourceEntryIndex == 27,
+                      repeatVoice?.sampleRate == 22_050,
+                      repeatVoice?.channelCount == 1,
+                      repeatVoice?.frameCount == 109_469,
+                      repeatVoice?.pcmSHA256
+                        == "d9253f693ae288ad1b38d32094a8fc4ee3b3949fa4364f31a5faa2def2c780ce",
+                      repeatVoice?.sourceArchive == "missions/training.mn3",
+                      repeatVoice?.sourceSHA256
+                        == "d85d9aa316ee5c16018c838ed5f930c48af2e67d78071ad574926f8ef15e1b0e"
+                else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training Script 007 package"
+                    )
+                }
             }
             guard let lesson = trainingOpeningLesson,
                   missionKey == "descent3.mission.pilot-training",
@@ -3600,12 +3721,14 @@ struct Level: Codable, Equatable, Sendable {
                             + (lesson.returnRight == nil ? 0 : 1)
                             + (lesson.returnUp == nil ? 0 : 1)
                             + (lesson.returnDown == nil ? 0 : 1)
+                            + (lesson.repeatForward == nil ? 0 : 1)
                         : trainingFinalRoomEntryChain != nil
                             ? 11
                                 + (lesson.returnLeft == nil ? 0 : 1)
                                 + (lesson.returnRight == nil ? 0 : 1)
                                 + (lesson.returnUp == nil ? 0 : 1)
                                 + (lesson.returnDown == nil ? 0 : 1)
+                                + (lesson.repeatForward == nil ? 0 : 1)
                         : (
                             trainingCameraMonitorChain == nil ? 5 : 10
                         )
@@ -3613,6 +3736,7 @@ struct Level: Codable, Equatable, Sendable {
                             + (lesson.returnRight == nil ? 0 : 1)
                             + (lesson.returnUp == nil ? 0 : 1)
                             + (lesson.returnDown == nil ? 0 : 1)
+                            + (lesson.repeatForward == nil ? 0 : 1)
                   ),
                   guidebotA?.sourceEntryIndex == 4,
                   guidebotA?.sampleRate == 22_050,

@@ -1,6 +1,95 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testScript007RequiresHiddenCollisionActiveStartGoal() throws {
+        let level = makeTrainingScript003Level()
+        XCTAssertNoThrow(try level.validate())
+        var lesson = try XCTUnwrap(level.trainingOpeningLesson)
+        let repeatForward = try XCTUnwrap(lesson.repeatForward)
+        lesson.returnLeft = nil
+        lesson.returnRight = nil
+        lesson.returnUp = nil
+        let isolatedLevel = replacing(level, trainingOpeningLesson: lesson)
+        let presentationIndex = try XCTUnwrap(
+            isolatedLevel.objectPresentations.firstIndex {
+                $0.objectHandle == repeatForward.startGoalObjectHandle
+            }
+        )
+        var visiblePresentations = isolatedLevel.objectPresentations
+        let hidden = visiblePresentations[presentationIndex]
+        visiblePresentations[presentationIndex] = .init(
+            objectHandle: hidden.objectHandle,
+            primaryModel: hidden.primaryModel,
+            mediumModel: hidden.mediumModel,
+            lowModel: hidden.lowModel,
+            dyingModel: hidden.dyingModel,
+            mediumDistance: hidden.mediumDistance,
+            lowDistance: hidden.lowDistance,
+            isVisible: true
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 007 repeat-forward lesson"),
+            replacing(isolatedLevel, objectPresentations: visiblePresentations)
+        )
+
+        lesson.repeatForward = .init(
+            startGoalObjectHandle: 999_999,
+            collisionRadius: repeatForward.collisionRadius,
+            successMessage: repeatForward.successMessage,
+            repeatMessage: repeatForward.repeatMessage,
+            forwardInstruction: repeatForward.forwardInstruction,
+            voiceSourceName: repeatForward.voiceSourceName
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 007 repeat-forward lesson"),
+            replacing(isolatedLevel, trainingOpeningLesson: lesson)
+        )
+
+        lesson.repeatForward = repeatForward
+        var stockLevel = replacing(
+            isolatedLevel,
+            trainingOpeningLesson: lesson,
+            voiceClips: isolatedLevel.voiceClips.filter {
+                !["left1.osf", "return2.osf", "up1.osf"].contains(
+                    $0.sourceName
+                )
+            }
+        )
+        stockLevel = replacing(
+            stockLevel,
+            missionKey: "descent3.mission.pilot-training",
+            levelKey: "descent3.level.training-mission",
+            source: replacing(
+                stockLevel.source,
+                archiveSHA256:
+                    "fc1d81921cc4b2618e441b7b9d08c4bcb5cff90731be1bfa6f3a7b054fc0cb54",
+                levelSHA256:
+                    "915a561cd3bd720d88bffed72fe41b4ff711c287711f060ecd9696e2cd5f7d41"
+            )
+        )
+        var hostileObjects = stockLevel.objects
+        let targetIndex = try XCTUnwrap(
+            hostileObjects.firstIndex {
+                $0.handle == repeatForward.startGoalObjectHandle
+            }
+        )
+        hostileObjects[targetIndex].orientation = .init(
+            right: .init(x: 1, y: 0, z: 0),
+            up: .init(x: 0, y: 1, z: 0),
+            forward: .init(x: 0, y: 0, z: 1)
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 007 package"),
+            replacing(stockLevel, objects: hostileObjects)
+        )
+        XCTAssertNoThrow(
+            try replacing(
+                stockLevel,
+                objects: hostileObjects
+            ).validateForAuthoring()
+        )
+    }
+
     func testScript006RequiresHiddenCollisionActiveUpGoal() throws {
         let level = makeTrainingScript003Level()
         XCTAssertNoThrow(try level.validate())

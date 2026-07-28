@@ -502,6 +502,16 @@ struct RevivalProject: Equatable, Sendable {
         }
         return "TrainingMission.cpp Script 006 / \(goal.instanceName ?? "UpGoal") handle \(goal.handle) / \(returnDown.voiceSourceName)"
     }
+    var trainingRepeatForwardSourceDiagnostic: String? {
+        guard let repeatForward =
+                level.trainingOpeningLesson?.repeatForward,
+              let goal = level.objects.first(where: {
+                  $0.handle == repeatForward.startGoalObjectHandle
+              }) else {
+            return nil
+        }
+        return "TrainingMission.cpp Script 007 / \(goal.instanceName ?? "StartGoal") handle \(goal.handle) / \(repeatForward.voiceSourceName)"
+    }
     var trainingGalleryBarrierSourceDiagnostic: String? {
         level.trainingGalleryBarrier.map {
             "TrainingMission.cpp Script 032 / \($0.triggerName)"
@@ -1006,7 +1016,7 @@ struct RevivalProject: Equatable, Sendable {
         var candidate = level
         candidate.rooms[roomIndex].faces[faceIndex].texture = texture
         do {
-            try candidate.validate()
+            try candidate.validateForAuthoring()
         } catch let error as LevelValidationError {
             if case .invalidDependency = error {
                 throw RevivalProjectError.faceEditRejected(
@@ -1052,7 +1062,7 @@ struct RevivalProject: Equatable, Sendable {
             rendersFace: rendersFace
         )
         do {
-            try candidate.validate()
+            try candidate.validateForAuthoring()
         } catch let error as LevelValidationError {
             switch error {
             case .invalidDependency:
@@ -1160,7 +1170,7 @@ struct RevivalProject: Equatable, Sendable {
             ))
         }
         do {
-            try candidate.validate()
+            try candidate.validateForAuthoring()
         } catch {
             throw RevivalProjectError.trainingGalleryBarrierEditRejected
         }
@@ -1217,7 +1227,7 @@ struct RevivalProject: Equatable, Sendable {
             ))
         }
         do {
-            try candidate.validate()
+            try candidate.validateForAuthoring()
         } catch {
             throw RevivalProjectError
                 .trainingGuidebotReturnBarrierEditRejected
@@ -1260,7 +1270,7 @@ struct RevivalProject: Equatable, Sendable {
         var candidate = level
         candidate.rooms[roomIndex].vertices[vertexIndex] = position
         do {
-            try candidate.validate()
+            try candidate.validateForAuthoring()
         } catch let error as LevelValidationError {
             throw RevivalProjectError.roomVertexEditRejected(
                 roomSourceIndex: roomSourceIndex,
@@ -1329,7 +1339,7 @@ struct RevivalProject: Equatable, Sendable {
         candidate.objects[objectIndex].position = transform.position
         candidate.objects[objectIndex].orientation = transform.orientation
         do {
-            try candidate.validate()
+            try candidate.validateForAuthoring()
         } catch let error as LevelValidationError {
             preconditionFailure("Validated object orientation broke an unrelated level invariant: \(error)")
         }
@@ -1381,7 +1391,7 @@ struct RevivalProject: Equatable, Sendable {
         candidate.objects[objectIndex].position = transform.position
         candidate.objects[objectIndex].orientation = transform.orientation
         do {
-            try candidate.validate()
+            try candidate.validateForAuthoring()
         } catch let error as LevelValidationError {
             preconditionFailure("Validated player-start orientation broke an unrelated level invariant: \(error)")
         }
@@ -1610,7 +1620,7 @@ struct RevivalProject: Equatable, Sendable {
                 handle: identity.handle
             )
         }
-        try level.validate()
+        try level.validateForAuthoring()
         try validateAuthoredIndoorOwnership(
             in: level,
             editedRoomSourceIndices: Set(source.roomVertexEdits.map(\.roomSourceIndex)),
@@ -1704,7 +1714,7 @@ struct RevivalProject: Equatable, Sendable {
         var candidate = level
         candidate.objects[objectIndex].location = .room(containingRoom)
         candidate.objects[objectIndex].position = trace.finalPosition
-        try candidate.validate()
+        try candidate.validateForAuthoring()
         level = candidate
         if object.type == D3SourceIdentity.playerObjectType {
             updatePlayerStartTransformEdit(

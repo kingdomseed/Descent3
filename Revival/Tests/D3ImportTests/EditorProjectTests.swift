@@ -401,6 +401,10 @@ final class EditorProjectTests: XCTestCase {
             "TrainingMission.cpp Script 006 / UpGoal handle 18441 / return3.osf"
         )
         XCTAssertEqual(
+            document.project.trainingRepeatForwardSourceDiagnostic,
+            "TrainingMission.cpp Script 007 / StartGoal handle 12300 / repeat.osf"
+        )
+        XCTAssertEqual(
             document.project.trainingReturnRightSourceDiagnostic,
             "TrainingMission.cpp Script 004 / LeftGoal handle 12299 / return2.osf"
         )
@@ -422,6 +426,14 @@ final class EditorProjectTests: XCTestCase {
                 selection: document.editorSelection
             ).contains(
                 "TrainingMission.cpp Script 006 / UpGoal handle 18441 / return3.osf"
+            )
+        )
+        XCTAssertTrue(
+            editorIdleStatusMessage(
+                project: document.project,
+                selection: document.editorSelection
+            ).contains(
+                "TrainingMission.cpp Script 007 / StartGoal handle 12300 / repeat.osf"
             )
         )
         XCTAssertTrue(
@@ -469,6 +481,30 @@ final class EditorProjectTests: XCTestCase {
             }?.orientation,
             rotatedOrientation
         )
+        try document.rotateObjectQuarterTurn(handle: startGoal.handle)
+        XCTAssertEqual(
+            document.undoManager?.undoActionName,
+            "Transform Object"
+        )
+        let rotatedStartGoalOrientation =
+            document.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation
+        XCTAssertNotEqual(rotatedStartGoalOrientation, startGoal.orientation)
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation,
+            startGoal.orientation
+        )
+        document.undoManager?.redo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation,
+            rotatedStartGoalOrientation
+        )
 
         let firstWrapper = try document.fileWrapper(
             ofType: RevivalProjectDocument.projectType
@@ -495,6 +531,12 @@ final class EditorProjectTests: XCTestCase {
             }?.orientation,
             upGoal.orientation
         )
+        XCTAssertEqual(
+            immutableBase.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation,
+            startGoal.orientation
+        )
 
         let playSession = reopened.makePlaySession()
         reopened.commitPlaySession(playSession, renderingWorld: false)
@@ -514,6 +556,11 @@ final class EditorProjectTests: XCTestCase {
             upGoal.handle
         )
         XCTAssertEqual(
+            playSession.level.trainingOpeningLesson?.repeatForward?
+                .startGoalObjectHandle,
+            startGoal.handle
+        )
+        XCTAssertEqual(
             reopened.project.level.objects.first {
                 $0.handle == upGoal.handle
             }?.orientation,
@@ -525,6 +572,12 @@ final class EditorProjectTests: XCTestCase {
             }?.orientation,
             rotatedOrientation
         )
+        XCTAssertEqual(
+            playSession.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation,
+            rotatedStartGoalOrientation
+        )
         reopened.returnToEditor(renderingWorld: false)
         XCTAssertNil(reopened.playSession)
         XCTAssertEqual(
@@ -532,6 +585,12 @@ final class EditorProjectTests: XCTestCase {
                 $0.handle == upGoal.handle
             }?.orientation,
             rotatedOrientation
+        )
+        XCTAssertEqual(
+            reopened.project.level.objects.first {
+                $0.handle == startGoal.handle
+            }?.orientation,
+            rotatedStartGoalOrientation
         )
     }
 

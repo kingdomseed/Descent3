@@ -750,6 +750,12 @@ func runD3Import(
             && startGoal.location == .room(1)
             && startGoal.position
                 == .init(x: 2_062.7678, y: -134.19601, z: 2_201.679)
+            && startGoal.orientation
+                == .init(
+                    right: .init(x: -1, y: 0, z: 0),
+                    up: .init(x: 0, y: 1, z: 0),
+                    forward: .init(x: 0, y: 0, z: -1)
+                )
             && startGoalPresentation.primaryModel.sourceName
                 == "invisiblepowerup.OOF"
             && leftGoal.handle == 12_299
@@ -809,6 +815,7 @@ func runD3Import(
         "return2.osf",
         "up1.osf",
         "return3.osf",
+        "repeat.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -875,6 +882,17 @@ func runD3Import(
                 successMessage: messages["GoodJob"]!,
                 instruction: messages["GoDown"]!,
                 voiceSourceName: "return3.osf"
+            ),
+            repeatForward: .init(
+                startGoalObjectHandle: startGoal.handle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: startGoalModel,
+                    objectType: startGoal.type
+                ),
+                successMessage: messages["GoodJob"]!,
+                repeatMessage: messages["Repeat"]!,
+                forwardInstruction: messages["GoForward"]!,
+                voiceSourceName: "repeat.osf"
             )
         ),
         voiceClips: [
@@ -884,6 +902,7 @@ func runD3Import(
             voiceClips[13],
             voiceClips[14],
             voiceClips[15],
+            voiceClips[16],
         ]
     )
     let galleryTrigger = openingLevel.triggers.first {
@@ -1839,6 +1858,7 @@ func parseTrainingMessages(_ data: Data) throws -> [String: String] {
         "GoRight",
         "GoUp",
         "GoDown",
+        "Repeat",
     ].allSatisfy({ messages[$0] != nil }) else {
         throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
     }
