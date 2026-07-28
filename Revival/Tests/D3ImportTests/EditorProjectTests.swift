@@ -1760,6 +1760,142 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testScript057FinalGoalHasDiagnosticUndoAndAutomaticPlayReturn()
+        throws
+    {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(
+            path: "candidate.revival",
+            directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(
+                path: "library",
+                directoryHint: .isDirectory
+            )
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false
+        )
+        try writeCanonicalPackage(
+            makeTrainingFinalGoalLevel(),
+            to: candidate
+        )
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        document.undoManager?.groupsByEvent = false
+
+        XCTAssertEqual(
+            document.project.trainingFinalGoalSourceDiagnostic,
+            "TrainingMission.cpp Script 057 / FinalGoal collision and successful level end"
+        )
+        let goal = try XCTUnwrap(document.project.level.objects.first {
+            $0.handle == 6_180
+        })
+        let goalRoom = try XCTUnwrap(
+            document.project.level.rooms.first {
+                $0.sourceIndex == 17
+            }
+        )
+        let divisor = Float(goalRoom.vertices.count)
+        let editPosition = Vector3(
+            x: goalRoom.vertices.reduce(0) { $0 + $1.x } / divisor,
+            y: goalRoom.vertices.reduce(0) { $0 + $1.y } / divisor,
+            z: goalRoom.vertices.reduce(0) { $0 + $1.z } / divisor
+        )
+        document.undoManager?.beginUndoGrouping()
+        try document.moveObject(
+            handle: goal.handle,
+            to: editPosition
+        )
+        document.undoManager?.endUndoGrouping()
+        XCTAssertEqual(document.undoManager?.undoActionName, "Move Object")
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == goal.handle
+            }?.position,
+            goal.position
+        )
+
+        let first = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        let second = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(
+            first.fileWrappers?["project.json"]?.regularFileContents,
+            second.fileWrappers?["project.json"]?.regularFileContents
+        )
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(
+            from: first,
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertNotNil(reopened.project.level.trainingFinalGoalChain)
+
+        let session = reopened.makePlaySession()
+        reopened.commitPlaySession(session, renderingWorld: false)
+        let simulation = session.makePlayerSimulation(
+            presentationReadyTimestamp: 0
+        )
+        simulation.destroyTrainingLastBot1(handle: 4_127)
+        simulation.destroyTrainingLastBot2(handle: 2_080)
+        simulation.destroyTrainingLastBot3(handle: 2_081)
+        simulation.destroyTrainingLastBot4(handle: 2_082)
+        simulation.destroyTrainingLastBot5(handle: 2_083)
+        _ = simulation.update(at: 0.1, input: .zero)
+        var ready = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        ready["playerLocation"] = ["room": ["_0": 17]]
+        ready["playerPosition"] = [
+            "x": goal.position.x,
+            "y": goal.position.y,
+            "z": goal.position.z,
+        ]
+        let collisionSimulation = try PlayerSimulation(
+            level: session.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: ready)
+            ),
+            resumedAtTimestamp: 0
+        )
+        let frame = collisionSimulation.update(at: 0.2, input: .zero)
+        XCTAssertTrue(
+            reopened.finishPlaySessionIfLevelEnded(
+                frame,
+                renderingWorld: false
+            )
+        )
+        XCTAssertNil(reopened.playSession)
+        XCTAssertEqual(
+            reopened.project.level.objects.first {
+                $0.handle == goal.handle
+            }?.position,
+            goal.position
+        )
+        XCTAssertFalse(
+            reopened.project.level.objectPresentations.first {
+                $0.objectHandle == goal.handle
+            }?.isVisible ?? true
+        )
+    }
+
+    @MainActor
     func testInvulnPowerup2HasDiagnosticUndoAndDisposablePlayReturn()
         throws
     {

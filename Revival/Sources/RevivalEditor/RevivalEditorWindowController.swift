@@ -701,6 +701,27 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                     )
                     let frame = simulation.update(at: timestamp, input: input)
                     do {
+                        if self.projectDocument
+                            .finishPlaySessionIfLevelEnded(
+                                frame,
+                                renderingWorld: false
+                            ) {
+                            renderer.setFrameUpdate(nil)
+                            self.playSimulation = nil
+                            self.gameplayView.setGameplayActive(false)
+                            self.playerInput = PlayerInputState()
+                            try self.replaceRenderedWorld(
+                                level: self.projectDocument.project.level,
+                                camera: self.projectDocument.camera
+                            )
+                            self.window?.makeFirstResponder(
+                                self.roomNameField
+                            )
+                            self.setSuccessStatus(
+                                "Training complete. Returned to the unchanged editor document state."
+                            )
+                            return
+                        }
                         try self.gameplayView.presentTrainingOpening(
                             frame: frame,
                             voiceClips: simulation.level.voiceClips,
@@ -1012,6 +1033,7 @@ func editorIdleStatusMessage(
         project.trainingLastRoomSourceDiagnostic,
         project.trainingFinalRoomEntrySourceDiagnostic,
         project.trainingFinalBotsCompletionSourceDiagnostic,
+        project.trainingFinalGoalSourceDiagnostic,
     ].compactMap { $0 }
     guard !sourceDiagnostics.isEmpty else { return status }
     return "\(status)\nSource: \(sourceDiagnostics.joined(separator: "; "))"

@@ -677,6 +677,13 @@ struct TrainingFinalBotsCompletionChain:
     let completionVoiceSourceName: String
 }
 
+struct TrainingFinalGoalChain: Codable, Equatable, Sendable {
+    let goalObjectHandle: UInt32
+    let goalRoomSourceIndex: Int
+    let goalObjectFlags: UInt32
+    let goalCollisionRadius: Float
+}
+
 struct TrainingFinalRoomEntryChain: Codable, Equatable, Sendable {
     let triggerName: String
     let triggerRoomSourceIndex: Int
@@ -1091,6 +1098,54 @@ func validateStockTrainingFinalBotsCompletionPackage(
     else {
         throw LevelValidationError.invalidDependency(
             "Training Scripts 035/056 completion"
+        )
+    }
+}
+
+func validateStockTrainingFinalGoalPackage(
+    chain: TrainingFinalGoalChain?,
+    level: Level
+) throws {
+    guard let chain,
+          chain.goalObjectHandle == 6_180,
+          chain.goalRoomSourceIndex == 17,
+          chain.goalObjectFlags == 4_096,
+          chain.goalCollisionRadius.bitPattern == 0x40a0_84bf,
+          level.trainingFinalBotsCompletionChain != nil,
+          let goal = level.objects.first(where: {
+              $0.handle == chain.goalObjectHandle
+          }),
+          goal.type == 7,
+          goal.storedID == 67,
+          goal.definition?.storedIndex == 67,
+          goal.definition?.sourceName == "Invisiblepowerup",
+          goal.definition?.referenceRuntimeIndex == nil
+            || goal.definition?.referenceRuntimeIndex == 68,
+          goal.instanceName == "FinalGoal",
+          goal.flags == chain.goalObjectFlags,
+          goal.location == .room(chain.goalRoomSourceIndex),
+          let presentation = level.objectPresentations.first(where: {
+              $0.objectHandle == chain.goalObjectHandle
+          }),
+          presentation.primaryModel.sourceName
+            .caseInsensitiveCompare("invisiblepowerup.OOF")
+                == .orderedSame,
+          presentation.mediumModel == nil,
+          presentation.lowModel == nil,
+          presentation.dyingModel == nil,
+          presentation.mediumDistance == nil,
+          presentation.lowDistance == nil,
+          !presentation.isVisible,
+          let model = level.models.first(where: {
+              $0.source == presentation.primaryModel
+          }),
+          model.collisionRadius == chain.goalCollisionRadius,
+          level.rooms.contains(where: {
+              $0.sourceIndex == chain.goalRoomSourceIndex
+          })
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training Script 057 FinalGoal chain"
         )
     }
 }
@@ -1840,6 +1895,7 @@ struct Level: Codable, Equatable, Sendable {
     var trainingLastBot5DeathChain: TrainingLastBot5DeathChain? = nil
     var trainingFinalBotsCompletionChain:
         TrainingFinalBotsCompletionChain? = nil
+    var trainingFinalGoalChain: TrainingFinalGoalChain? = nil
     let trainingInvulnerabilityPickupChain: TrainingInvulnerabilityPickupChain?
     let trainingCloakPickupChain: TrainingCloakPickupChain?
     let trainingLastRoomChain: TrainingLastRoomChain?
@@ -1890,6 +1946,7 @@ struct Level: Codable, Equatable, Sendable {
         trainingFinalRoomEntryChain: TrainingFinalRoomEntryChain? = nil,
         trainingFinalBotsCompletionChain:
             TrainingFinalBotsCompletionChain? = nil,
+        trainingFinalGoalChain: TrainingFinalGoalChain? = nil,
         voiceClips: [CanonicalVoiceClip] = [],
         soundClips: [CanonicalSoundClip] = [],
         dependencyManifest: DependencyManifest,
@@ -1934,6 +1991,7 @@ struct Level: Codable, Equatable, Sendable {
         self.trainingFinalRoomEntryChain = trainingFinalRoomEntryChain
         self.trainingFinalBotsCompletionChain =
             trainingFinalBotsCompletionChain
+        self.trainingFinalGoalChain = trainingFinalGoalChain
         self.voiceClips = voiceClips
         self.soundClips = soundClips
         self.dependencyManifest = dependencyManifest
@@ -2988,6 +3046,12 @@ struct Level: Codable, Equatable, Sendable {
                 requiresExactVoice: false
             )
         }
+        if trainingFinalGoalChain != nil {
+            try validateStockTrainingFinalGoalPackage(
+                chain: trainingFinalGoalChain,
+                level: self
+            )
+        }
         var voiceNames = Set<String>()
         for clip in voiceClips {
             let voiceSource = SourceResource(
@@ -3299,6 +3363,42 @@ struct Level: Codable, Equatable, Sendable {
                 try validateStockTrainingFinalBotsCompletionPackage(
                     chain: trainingFinalBotsCompletionChain,
                     done: done,
+                    level: self
+                )
+            }
+            if trainingFinalGoalChain != nil {
+                guard let room = rooms.first(where: {
+                    $0.sourceIndex == 17
+                }),
+                      let goal = objects.first(where: {
+                          $0.handle == 6_180
+                      }),
+                      goal.definition?.referenceRuntimeIndex == 68,
+                      goal.containsType == 255,
+                      goal.containsID == 0,
+                      goal.containsCount == 0,
+                      goal.position == .init(
+                          x: 2_061.773_4,
+                          y: -756.230_65,
+                          z: 3_681.408_2
+                      ),
+                      goal.orientation == .init(
+                          right: .init(x: -1, y: 0, z: 0),
+                          up: .init(x: 0, y: 1, z: 0),
+                          forward: .init(x: 0, y: 0, z: -1)
+                      ),
+                      room.portals.count == 2,
+                      room.portals[0].connectedRoom == 18,
+                      room.portals[0].connectedPortal == 0,
+                      room.portals[1].connectedRoom == 16,
+                      room.portals[1].connectedPortal == 1
+                else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training Script 057 stock topology"
+                    )
+                }
+                try validateStockTrainingFinalGoalPackage(
+                    chain: trainingFinalGoalChain,
                     level: self
                 )
             }
@@ -4369,6 +4469,14 @@ struct Level: Codable, Equatable, Sendable {
             trainingLastBot4DeathChain
         level.trainingLastBot5DeathChain =
             trainingLastBot5DeathChain
+        return level
+    }
+
+    func addingTrainingFinalGoalChain(
+        _ chain: TrainingFinalGoalChain
+    ) -> Level {
+        var level = self
+        level.trainingFinalGoalChain = chain
         return level
     }
 

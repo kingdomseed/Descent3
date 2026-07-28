@@ -451,6 +451,32 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingCloak: TrainingCloakFrame?
     let trainingLastRoomMarkerLightDistance: Float?
     let trainingFinalBotsMarkerLightDistance: Float?
+    let trainingFinalGoal: TrainingFinalGoalFrame?
+}
+
+enum TrainingEndLevelState: String, Codable, Equatable, Sendable {
+    case succeeded
+}
+
+enum TrainingDifficulty: String, Codable, Equatable, Sendable {
+    case rookie = "Rookie"
+}
+
+struct TrainingEndLevelPresentation: Equatable, Sendable {
+    let title: String
+    let levelName: String
+    let difficulty: TrainingDifficulty
+    let showsHUD: Bool
+    let playsGameplayAudio: Bool
+    let showsCockpit: Bool
+    let showsHeadlightIndicator: Bool
+}
+
+struct TrainingFinalGoalFrame: Equatable, Sendable {
+    let endLevelState: TrainingEndLevelState
+    let scriptActionCounter: Int
+    let controlsAreSuspended: Bool
+    let presentation: TrainingEndLevelPresentation
 }
 
 enum TrainingCloakPhase: String, Codable, Equatable, Sendable {
@@ -951,6 +977,13 @@ private struct TrainingFinalBotsCompletionState:
     var wasPresented = false
 }
 
+private struct TrainingFinalGoalState:
+    Codable, Equatable, Sendable
+{
+    var endLevelWasRequested = false
+    var scriptActionCounter = 0
+}
+
 private struct TrainingFinalRoomEntryState:
     Codable, Equatable, Sendable
 {
@@ -1051,6 +1084,7 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
         TrainingFinalRoomEntryState?
     fileprivate let trainingFinalBotsCompletionState:
         TrainingFinalBotsCompletionState?
+    fileprivate let trainingFinalGoalState: TrainingFinalGoalState?
 }
 
 enum PlayerSimulationContinuationError: Error, Equatable {
@@ -1118,6 +1152,7 @@ final class PlayerSimulation {
         TrainingFinalRoomEntryState?
     private var trainingFinalBotsCompletionState:
         TrainingFinalBotsCompletionState?
+    private var trainingFinalGoalState: TrainingFinalGoalState?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -1196,6 +1231,9 @@ final class PlayerSimulation {
             level.trainingFinalBotsCompletionChain.map {
                 _ in TrainingFinalBotsCompletionState()
             }
+        trainingFinalGoalState = level.trainingFinalGoalChain.map {
+            _ in TrainingFinalGoalState()
+        }
     }
 
     init(
@@ -1230,6 +1268,11 @@ final class PlayerSimulation {
             continuation.trainingFinalBotsCompletionState
             ?? level.trainingFinalBotsCompletionChain.map {
                 _ in TrainingFinalBotsCompletionState()
+            }
+        let restoredFinalGoalState =
+            continuation.trainingFinalGoalState
+            ?? level.trainingFinalGoalChain.map {
+                _ in TrainingFinalGoalState()
             }
         let restoredLastBot1DeathState =
             continuation.trainingLastBot1DeathState
@@ -1566,6 +1609,13 @@ final class PlayerSimulation {
         ) else {
             throw PlayerSimulationContinuationError.invalidState
         }
+        guard validTrainingFinalGoalContinuation(
+            restoredFinalGoalState,
+            finalBotsState: restoredFinalBotsCompletionState,
+            level: continuationLevel
+        ) else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
         guard
             validTrainingGalleryBarrierContinuation(
                 continuation.trainingGalleryBarrierState,
@@ -1680,6 +1730,7 @@ final class PlayerSimulation {
         trainingFinalRoomEntryState = restoredFinalRoomEntryState
         trainingFinalBotsCompletionState =
             restoredFinalBotsCompletionState
+        trainingFinalGoalState = restoredFinalGoalState
         restoreTrainingGuidebotPresentation()
         if trainingRobotGuidebotState?.guidebotEnteredShip == true,
            let handle =
@@ -1748,7 +1799,8 @@ final class PlayerSimulation {
             trainingFinalRoomEntryState:
                 trainingFinalRoomEntryState,
             trainingFinalBotsCompletionState:
-                trainingFinalBotsCompletionState
+                trainingFinalBotsCompletionState,
+            trainingFinalGoalState: trainingFinalGoalState
         )
     }
 
@@ -2215,14 +2267,21 @@ final class PlayerSimulation {
             $0.handle == binding.objectHandle
         }!
         var object = level.objects[objectIndex]
-        let currentEnabledControls = trainingPlayerControlMask(
-            galleryWasTriggered:
-                trainingGalleryBarrierState?.wasTriggered == true,
-            controlsWereRestored:
-                trainingRobotGuidebotState?.controlsWereRestored == true,
-            openingControls: trainingOpeningState?.enabledControls
-        )
-        let input = input.applying(currentEnabledControls)
+        let controlsAreSuspended =
+            trainingFinalGoalState?.endLevelWasRequested == true
+        let currentEnabledControls = controlsAreSuspended
+            ? PlayerControlMask(rawValue: 0)
+            : trainingPlayerControlMask(
+                galleryWasTriggered:
+                    trainingGalleryBarrierState?.wasTriggered == true,
+                controlsWereRestored:
+                    trainingRobotGuidebotState?
+                        .controlsWereRestored == true,
+                openingControls: trainingOpeningState?.enabledControls
+            )
+        let input = controlsAreSuspended
+            ? InputSnapshot.zero
+            : input.applying(currentEnabledControls)
         let cameraMonitorWasUsedAtFrameStart =
             trainingCameraMonitorState?.wasUsed == true
         var guidebotReturnWasRequestedThisFrame = false
@@ -2825,6 +2884,7 @@ final class PlayerSimulation {
         var trainingCameraMonitorWasHitThisFrame = false
         var trainingInvulnerabilityPickupWasHitThisFrame = false
         var trainingCloakPickupWasHitThisFrame = false
+        var trainingFinalGoalWasHitThisFrame = false
         if ship.physics.behaviors.contains(.wiggle) {
             if sqrt(dot(force, force)) < 0.1 {
                 wiggleFalloff -= systemsFrameDuration / 2
@@ -2878,6 +2938,18 @@ final class PlayerSimulation {
                 || trainingCloakPickupWasHit(
                     in: level,
                     state: trainingCloakPickupState,
+                    playerStart: traceStart,
+                    playerEnd: trace.finalPosition,
+                    playerRadius: view.collisionRadius,
+                    visitedRoomSourceIndices:
+                        trace.visitedRoomSourceIndices
+                )
+            trainingFinalGoalWasHitThisFrame =
+                trainingFinalGoalWasHitThisFrame
+                || trainingFinalGoalWasHit(
+                    in: level,
+                    state: trainingFinalGoalState,
+                    finalBotsState: trainingFinalBotsCompletionState,
                     playerStart: traceStart,
                     playerEnd: trace.finalPosition,
                     playerRadius: view.collisionRadius,
@@ -3061,6 +3133,18 @@ final class PlayerSimulation {
                     visitedRoomSourceIndices:
                         trace.visitedRoomSourceIndices
                 )
+            trainingFinalGoalWasHitThisFrame =
+                trainingFinalGoalWasHitThisFrame
+                || trainingFinalGoalWasHit(
+                    in: level,
+                    state: trainingFinalGoalState,
+                    finalBotsState: trainingFinalBotsCompletionState,
+                    playerStart: traceStart,
+                    playerEnd: trace.finalPosition,
+                    playerRadius: view.collisionRadius,
+                    visitedRoomSourceIndices:
+                        trace.visitedRoomSourceIndices
+                )
             trainingGalleryWasCrossedThisFrame =
                 trainingGalleryWasCrossedThisFrame
                 || trainingGalleryTriggerWasCrossed(
@@ -3156,6 +3240,15 @@ final class PlayerSimulation {
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
         var trainingLastRoomWasTriggeredThisFrame = false
         var trainingFinalBotsWasTriggeredThisFrame = false
+        if trainingFinalGoalWasHitThisFrame,
+           var state = trainingFinalGoalState,
+           !state.endLevelWasRequested {
+            // TrainingMission.cpp Script 057 calls aEndLevel before it
+            // increments ScriptActionCtr_057.
+            state.endLevelWasRequested = true
+            state.scriptActionCounter += 1
+            trainingFinalGoalState = state
+        }
         if trainingInvulnerabilityPickupWasHitThisFrame,
             var state = trainingInvulnerabilityPickupState,
             let chain = level.trainingInvulnerabilityPickupChain
@@ -3583,6 +3676,24 @@ final class PlayerSimulation {
             level: level,
             state: trainingCameraMonitorState
         )
+        let finalGoalFrame: TrainingFinalGoalFrame? =
+            trainingFinalGoalState.flatMap { state in
+            guard state.endLevelWasRequested else { return nil }
+            return TrainingFinalGoalFrame(
+                endLevelState: .succeeded,
+                scriptActionCounter: state.scriptActionCounter,
+                controlsAreSuspended: true,
+                presentation: .init(
+                    title: "Mission Successful",
+                    levelName: level.metadata.name,
+                    difficulty: .rookie,
+                    showsHUD: false,
+                    playsGameplayAudio: false,
+                    showsCockpit: false,
+                    showsHeadlightIndicator: false
+                )
+            )
+        }
         if var state = trainingCameraMonitorState {
             if var remaining = state.popupRemaining {
                 remaining -= systemsFrameDuration
@@ -3614,16 +3725,26 @@ final class PlayerSimulation {
             angularVelocity: angularVelocity,
             turnrollFixedAngle: turnrollFixedAngle,
             wallContact: wallContact,
-            enabledPlayerControls: trainingPlayerControlMask(
-                galleryWasTriggered:
-                    trainingGalleryBarrierState?.wasTriggered == true,
-                controlsWereRestored:
-                    trainingRobotGuidebotState?.controlsWereRestored == true,
-                openingControls: trainingOpeningState?.enabledControls
-            ),
+            enabledPlayerControls:
+                finalGoalFrame == nil
+                    ? trainingPlayerControlMask(
+                        galleryWasTriggered:
+                            trainingGalleryBarrierState?
+                                .wasTriggered == true,
+                        controlsWereRestored:
+                            trainingRobotGuidebotState?
+                                .controlsWereRestored == true,
+                        openingControls:
+                            trainingOpeningState?.enabledControls
+                    )
+                    : PlayerControlMask(rawValue: 0),
             showsEnabledPlayerControls:
-                trainingRobotGuidebotState?.enabledControlHUDIsVisible
-                    ?? (trainingOpeningState != nil),
+                finalGoalFrame == nil
+                    && (
+                        trainingRobotGuidebotState?
+                            .enabledControlHUDIsVisible
+                            ?? (trainingOpeningState != nil)
+                    ),
             trainingOpeningFeedback: trainingOpeningFeedback,
             trainingGalleryMarkerLightDistance:
                 trainingGalleryBarrierState?.markerLightDistance,
@@ -3646,7 +3767,8 @@ final class PlayerSimulation {
                 trainingLastRoomState?.markerLightDistance,
             trainingFinalBotsMarkerLightDistance:
                 trainingFinalBotsCompletionState?
-                    .markerLightDistance
+                    .markerLightDistance,
+            trainingFinalGoal: finalGoalFrame
         )
     }
 
@@ -3821,6 +3943,37 @@ private func trainingCloakPickupWasHit(
         end: playerEnd,
         center: pickup.position,
         radius: playerRadius + chain.pickupCollisionRadius
+    ) != nil
+}
+
+private func trainingFinalGoalWasHit(
+    in level: Level,
+    state: TrainingFinalGoalState?,
+    finalBotsState: TrainingFinalBotsCompletionState?,
+    playerStart: Vector3,
+    playerEnd: Vector3,
+    playerRadius: Float,
+    visitedRoomSourceIndices: [Int]
+) -> Bool {
+    guard let state,
+          !state.endLevelWasRequested,
+          finalBotsState?.wasTriggered == true,
+          let chain = level.trainingFinalGoalChain,
+          let goal = level.objects.first(where: {
+              $0.handle == chain.goalObjectHandle
+          }),
+          goal.location == .room(chain.goalRoomSourceIndex),
+          visitedRoomSourceIndices.contains(
+              chain.goalRoomSourceIndex
+          )
+    else {
+        return false
+    }
+    return segmentSphereHitFraction(
+        start: playerStart,
+        end: playerEnd,
+        center: goal.position,
+        radius: playerRadius + chain.goalCollisionRadius
     ) != nil
 }
 
@@ -4419,6 +4572,22 @@ private func validTrainingFinalBotsCompletionContinuation(
     return state.wasPresented
         ? state.timerRemaining == nil
         : state.timerRemaining != nil
+}
+
+private func validTrainingFinalGoalContinuation(
+    _ state: TrainingFinalGoalState?,
+    finalBotsState: TrainingFinalBotsCompletionState?,
+    level: Level
+) -> Bool {
+    guard level.trainingFinalGoalChain != nil else {
+        return state == nil
+    }
+    guard let state else { return false }
+    if state.endLevelWasRequested {
+        return state.scriptActionCounter == 1
+            && finalBotsState?.wasTriggered == true
+    }
+    return state.scriptActionCounter == 0
 }
 
 private func validTrainingFinalRoomEntryContinuation(

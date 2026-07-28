@@ -249,6 +249,13 @@ private final class RevivalMacApplicationDelegate: NSObject,
                     soundClips: simulation.level.soundClips
                 )
                 try renderer.update(level: simulation.level, frame: frame)
+                if frame.trainingFinalGoal != nil {
+                    renderer.setFrameUpdate(nil)
+                    self.setStatus(
+                        "Training complete.",
+                        isError: false
+                    )
+                }
             } catch {
                 renderer.setFrameUpdate(nil)
                 self.setStatus(error.localizedDescription, isError: true)

@@ -51,6 +51,8 @@ final class RevivalGameplayView: MTKView {
     private let cloakStatusLabel = NSTextField(labelWithString: "")
     private let invulnerabilityMonitorRing = NoninteractiveTrainingOverlay()
     private let cameraMonitorBorder = NoninteractiveTrainingOverlay()
+    private let trainingEndLevelOverlay = NoninteractiveTrainingOverlay()
+    private let trainingEndLevelLabel = NSTextField(labelWithString: "")
     private var trainingVoicePlayer: AVAudioPlayer?
     private var trainingSoundPlayers: [AVAudioPlayer] = []
     private var trainingMessageExpiresAt: Float?
@@ -129,6 +131,13 @@ final class RevivalGameplayView: MTKView {
         cameraMonitorBorder.frame = Self.cameraMonitorFrame(
             drawableWidth: bounds.width,
             drawableHeight: bounds.height
+        )
+        trainingEndLevelOverlay.frame = bounds
+        trainingEndLevelLabel.frame = NSRect(
+            x: max(24, bounds.midX - 240),
+            y: max(24, bounds.midY - 60),
+            width: min(480, max(0, bounds.width - 48)),
+            height: 120
         )
     }
 
@@ -216,6 +225,8 @@ final class RevivalGameplayView: MTKView {
             trainingSoundPlayers.forEach { $0.stop() }
             trainingSoundPlayers.removeAll()
             cameraMonitorBorder.isHidden = true
+            trainingEndLevelOverlay.isHidden = true
+            trainingEndLevelLabel.isHidden = true
         }
     }
 
@@ -224,6 +235,27 @@ final class RevivalGameplayView: MTKView {
         voiceClips: [CanonicalVoiceClip],
         soundClips: [CanonicalSoundClip] = []
     ) throws {
+        if let finalGoal = frame.trainingFinalGoal {
+            trainingMessageLabel.stringValue = ""
+            enabledControlsLabel.stringValue = ""
+            invulnerabilityStatusLabel.stringValue = ""
+            cloakShipMonitor.isHidden = true
+            cloakStatusLabel.stringValue = ""
+            invulnerabilityMonitorRing.isHidden = true
+            cameraMonitorBorder.isHidden = true
+            trainingMessageExpiresAt = nil
+            trainingVoicePlayer?.stop()
+            trainingVoicePlayer = nil
+            trainingSoundPlayers.forEach { $0.stop() }
+            trainingSoundPlayers.removeAll()
+            trainingEndLevelLabel.stringValue =
+                Self.trainingEndLevelText(finalGoal.presentation)
+            trainingEndLevelOverlay.isHidden = false
+            trainingEndLevelLabel.isHidden = false
+            return
+        }
+        trainingEndLevelOverlay.isHidden = true
+        trainingEndLevelLabel.isHidden = true
         cameraMonitorBorder.isHidden = frame.trainingCameraMonitor == nil
         invulnerabilityStatusLabel.stringValue =
             Self.invulnerabilityStatusText(
@@ -649,6 +681,36 @@ final class RevivalGameplayView: MTKView {
         )
         cloakStatusLabel.textColor = .systemBlue
         cloakStatusLabel.setAccessibilityLabel("Cloak status")
+        trainingEndLevelOverlay.wantsLayer = true
+        trainingEndLevelOverlay.layer?.backgroundColor =
+            NSColor.black.cgColor
+        trainingEndLevelOverlay.isHidden = true
+        trainingEndLevelOverlay.setAccessibilityLabel(
+            "Training mission result"
+        )
+        addSubview(trainingEndLevelOverlay)
+        trainingEndLevelLabel.isEditable = false
+        trainingEndLevelLabel.isSelectable = false
+        trainingEndLevelLabel.drawsBackground = false
+        trainingEndLevelLabel.textColor = .white
+        trainingEndLevelLabel.alignment = .center
+        trainingEndLevelLabel.maximumNumberOfLines = 3
+        trainingEndLevelLabel.font = .boldSystemFont(ofSize: 22)
+        trainingEndLevelLabel.isHidden = true
+        trainingEndLevelLabel.setAccessibilityLabel(
+            "Training mission result text"
+        )
+        addSubview(trainingEndLevelLabel)
+    }
+
+    nonisolated static func trainingEndLevelText(
+        _ presentation: TrainingEndLevelPresentation
+    ) -> String {
+        [
+            presentation.title,
+            presentation.levelName,
+            "Difficulty: \(presentation.difficulty.rawValue)",
+        ].joined(separator: "\n")
     }
 
     nonisolated private static func controlSummary(

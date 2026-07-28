@@ -2407,6 +2407,137 @@ final class WorldRenderingTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testScript057FinalGoalEndsTrainingInSourceOrderAndSurvivesReload()
+        throws
+    {
+        let level = makeTrainingFinalGoalLevel()
+        try level.validate()
+        let chain = try XCTUnwrap(level.trainingFinalGoalChain)
+        let goal = try XCTUnwrap(level.objects.first {
+            $0.handle == chain.goalObjectHandle
+        })
+        let initial = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        initial.destroyTrainingLastBot1(handle: 4_127)
+        initial.destroyTrainingLastBot2(handle: 2_080)
+        initial.destroyTrainingLastBot3(handle: 2_081)
+        initial.destroyTrainingLastBot4(handle: 2_082)
+        initial.destroyTrainingLastBot5(handle: 2_083)
+        _ = initial.update(at: 0.1, input: .zero)
+        var ready = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(initial.continuation)
+            ) as? [String: Any]
+        )
+        ready["playerLocation"] = [
+            "room": ["_0": chain.goalRoomSourceIndex]
+        ]
+        ready["playerPosition"] = [
+            "x": goal.position.x,
+            "y": goal.position.y,
+            "z": goal.position.z,
+        ]
+        let simulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: ready)
+            ),
+            resumedAtTimestamp: 0
+        )
+
+        let frame = simulation.update(at: 0.2, input: .zero)
+
+        let finalGoal = try XCTUnwrap(frame.trainingFinalGoal)
+        XCTAssertEqual(finalGoal.endLevelState, .succeeded)
+        XCTAssertEqual(finalGoal.scriptActionCounter, 1)
+        XCTAssertTrue(finalGoal.controlsAreSuspended)
+        XCTAssertEqual(frame.enabledPlayerControls, [])
+        XCTAssertFalse(frame.showsEnabledPlayerControls)
+        XCTAssertEqual(
+            finalGoal.presentation,
+            .init(
+                title: "Mission Successful",
+                levelName: "Training Mission",
+                difficulty: .rookie,
+                showsHUD: false,
+                playsGameplayAudio: false,
+                showsCockpit: false,
+                showsHeadlightIndicator: false
+            )
+        )
+        XCTAssertEqual(
+            RevivalGameplayView.trainingEndLevelText(
+                finalGoal.presentation
+            ),
+            "Mission Successful\nTraining Mission\nDifficulty: Rookie"
+        )
+
+        let continuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: continuationData)
+                as? [String: Any]
+        )
+        XCTAssertEqual(continuationObject["schemaVersion"] as? Int, 7)
+        let finalGoalState = try XCTUnwrap(
+            continuationObject["trainingFinalGoalState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(
+            finalGoalState["endLevelWasRequested"] as? Bool,
+            true
+        )
+        XCTAssertEqual(
+            finalGoalState["scriptActionCounter"] as? Int,
+            1
+        )
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: continuationData
+            ),
+            resumedAtTimestamp: 100
+        )
+        let restoredFrame = restored.update(at: 100.1, input: .zero)
+        XCTAssertEqual(
+            restoredFrame.trainingFinalGoal?.endLevelState,
+            .succeeded
+        )
+        XCTAssertEqual(
+            restoredFrame.trainingFinalGoal?.scriptActionCounter,
+            1
+        )
+
+        var hostile = continuationObject
+        var hostileFinalGoalState = finalGoalState
+        hostileFinalGoalState["scriptActionCounter"] = 2
+        hostile["trainingFinalGoalState"] = hostileFinalGoalState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: hostile
+                    )
+                ),
+                resumedAtTimestamp: 200
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
     func testInvulnPowerup2ConsumesOnceAndExpiresAcrossContinuation()
         throws
     {
@@ -9729,6 +9860,97 @@ func makeTrainingFinalBotsCompletionLevel() -> Level {
             sourceSHA256: canonicalSHA256(pcm)
         )
     )
+}
+
+func makeTrainingFinalGoalLevel() -> Level {
+    var level = makeTrainingFinalBotsCompletionLevel()
+    let roomTemplate = level.rooms.first {
+        $0.sourceIndex == 1
+    }!
+    let player = level.objects.first { $0.handle == 2_048 }!
+    let room = makeSourceContainmentRoom(
+        center: player.position,
+        texture: roomTemplate.faces[0].texture,
+        sourceIndex: 17,
+        halfExtent: 100
+    )
+    level.rooms.removeAll { $0.sourceIndex == 17 }
+    level.rooms.append(room)
+    let goal = PlacedObject(
+        handle: 6_180,
+        type: 7,
+        storedID: 67,
+        definition: .init(
+            storedIndex: 67,
+            sourceName: "Invisiblepowerup"
+        ),
+        instanceName: "FinalGoal",
+        flags: 4_096,
+        doorShields: nil,
+        location: .room(17),
+        position: player.position,
+        orientation: .init(
+            right: .init(x: -1, y: 0, z: 0),
+            up: .init(x: 0, y: 1, z: 0),
+            forward: .init(x: 0, y: 0, z: -1)
+        ),
+        containsType: 0,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    )
+    level.objects.append(goal)
+    let modelSource = SourceResource(
+        storedIndex: 4,
+        sourceName: "invisiblepowerup.OOF"
+    )
+    level.objectPresentations.append(.init(
+        objectHandle: goal.handle,
+        primaryModel: modelSource,
+        mediumModel: nil,
+        lowModel: nil,
+        dyingModel: nil,
+        mediumDistance: nil,
+        lowDistance: nil,
+        isVisible: false
+    ))
+    var models = level.models
+    if let modelIndex = models.firstIndex(where: {
+        $0.source == modelSource
+    }) {
+        let model = models[modelIndex]
+        models[modelIndex] = CanonicalModel(
+            source: model.source,
+            collisionRadius: Float(bitPattern: 0x40a0_84bf),
+            submodels: model.submodels,
+            bounds: model.bounds,
+            sourceArchive: model.sourceArchive,
+            sourceSHA256: model.sourceSHA256
+        )
+    }
+    level = replacing(
+        level,
+        metadata: .init(
+            name: "Training Mission",
+            designer: level.metadata.designer,
+            copyright: level.metadata.copyright,
+            notes: level.metadata.notes,
+            gravity: level.metadata.gravity,
+            alwaysCheckCeiling: level.metadata.alwaysCheckCeiling,
+            ceilingHeight: level.metadata.ceilingHeight
+        ),
+        models: models
+    )
+    return level.addingTrainingFinalGoalChain(.init(
+        goalObjectHandle: goal.handle,
+        goalRoomSourceIndex: 17,
+        goalObjectFlags: goal.flags,
+        goalCollisionRadius: Float(bitPattern: 0x40a0_84bf)
+    ))
 }
 
 func replacingTrainingRoom(

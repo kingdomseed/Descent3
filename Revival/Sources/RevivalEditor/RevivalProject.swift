@@ -642,6 +642,16 @@ struct RevivalProject: Equatable, Sendable {
         }
         return "TrainingMission.cpp Scripts 035/056 / PortalRoom7 completion"
     }
+    var trainingFinalGoalSourceDiagnostic: String? {
+        guard let chain = level.trainingFinalGoalChain,
+              let goal = level.objects.first(where: {
+                  $0.handle == chain.goalObjectHandle
+              })
+        else {
+            return nil
+        }
+        return "TrainingMission.cpp Script 057 / \(goal.instanceName ?? "FinalGoal") collision and successful level end"
+    }
     var trainingGalleryBarrierIsOpen: Bool {
         guard let barrier = level.trainingGalleryBarrier,
               let room = level.rooms.first(where: {

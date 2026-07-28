@@ -618,6 +618,20 @@ final class RevivalProjectDocument: NSDocument {
         refreshWindowControllers(renderWorld: renderingWorld)
     }
 
+    @discardableResult
+    func finishPlaySessionIfLevelEnded(
+        _ frame: PlayerSimulationFrame,
+        renderingWorld: Bool = true
+    ) -> Bool {
+        guard frame.trainingFinalGoal?.endLevelState == .succeeded,
+              playSession != nil else {
+            return false
+        }
+        playSession = nil
+        refreshWindowControllers(renderWorld: renderingWorld)
+        return true
+    }
+
     private func restoreRoomName(
         sourceIndex: Int,
         to name: String?

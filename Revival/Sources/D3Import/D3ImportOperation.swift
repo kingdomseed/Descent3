@@ -572,6 +572,11 @@ func runD3Import(
     let pyroModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare("PyroGL.OOF") == .orderedSame
     }!
+    let invisiblePowerupModel = reachedModels.first {
+        $0.source.sourceName.caseInsensitiveCompare(
+            "invisiblepowerup.OOF"
+        ) == .orderedSame
+    }!
     precondition(
         pyroModel.sourceSHA256
             == "0b004302ffe60a50e39b8f8261a3c11ca0044f11000ef6e039527e4c1ebff75b"
@@ -588,6 +593,11 @@ func runD3Import(
                 return nil
             }
             page = ship
+        } else if object.handle == 6_180,
+                  object.definition?.sourceName.caseInsensitiveCompare(
+                      generic.name
+                  ) == .orderedSame {
+            page = generic
         } else if object.definition?.sourceName.caseInsensitiveCompare(generic.name)
             == .orderedSame {
             guard case .room(let room) = object.location,
@@ -639,16 +649,17 @@ func runD3Import(
             lowModel: page.lowModelName.map { modelSources[$0.lowercased()]! },
             dyingModel: page.dyingModelName.map { modelSources[$0.lowercased()]! },
             mediumDistance: page.mediumDistance,
-            lowDistance: page.lowDistance
+            lowDistance: page.lowDistance,
+            isVisible: object.handle != 6_180
         )
     }
-    precondition(reachedObjectPresentations.count == 20)
+    precondition(reachedObjectPresentations.count == 21)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 19)
+    precondition(deferredRoomObjects.count == 18)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -1237,6 +1248,34 @@ func runD3Import(
             && lastBot5.flags == 5_121
             && lastBot5.location == .room(48)
     )
+    let finalGoal = topologyLevel.objects.first {
+        $0.handle == 6_180
+    }!
+    precondition(
+        finalGoal.type == 7
+            && finalGoal.storedID == 67
+            && finalGoal.definition?.storedIndex == 67
+            && finalGoal.definition?.sourceName == "Invisiblepowerup"
+            && finalGoal.definition?.referenceRuntimeIndex == 68
+            && finalGoal.instanceName == "FinalGoal"
+            && finalGoal.flags == 4_096
+            && finalGoal.location == .room(17)
+            && finalGoal.position == .init(
+                x: 2_061.773_4,
+                y: -756.230_65,
+                z: 3_681.408_2
+            )
+            && finalGoal.orientation == .init(
+                right: .init(x: -1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: 0),
+                forward: .init(x: 0, y: 0, z: -1)
+            )
+            && finalGoal.containsType == 255
+            && finalGoal.containsID == 0
+            && finalGoal.containsCount == 0
+            && invisiblePowerupModel.collisionRadius.bitPattern
+                == 0x40a0_84bf
+    )
     precondition(
         invulnerabilityPickup.handle == 2_076
             && invulnerabilityPickup.type == 7
@@ -1544,7 +1583,8 @@ func runD3Import(
                 $0.flags & 1 != 0
             }
     )
-    let level = lastBot5Level.addingTrainingFinalBotsCompletionChain(
+    let finalBotsLevel =
+        lastBot5Level.addingTrainingFinalBotsCompletionChain(
         .init(
             barrierRoomSourceIndex: finalBotsBarrier.sourceIndex,
             orderedPortalIndices: [0, 1],
@@ -1567,6 +1607,12 @@ func runD3Import(
         ),
         voiceClip: voiceClips[11]
     )
+    let level = finalBotsLevel.addingTrainingFinalGoalChain(.init(
+        goalObjectHandle: finalGoal.handle,
+        goalRoomSourceIndex: 17,
+        goalObjectFlags: finalGoal.flags,
+        goalCollisionRadius: invisiblePowerupModel.collisionRadius
+    ))
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
     precondition(

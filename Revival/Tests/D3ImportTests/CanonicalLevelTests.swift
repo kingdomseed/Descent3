@@ -2146,6 +2146,63 @@ final class CanonicalLevelTests: XCTestCase {
         )
     }
 
+    func testSchemaElevenRequiresExactScript057FinalGoalChain() throws {
+        let level = makeTrainingFinalGoalLevel()
+        try level.validate()
+
+        XCTAssertEqual(level.schemaVersion, 11)
+        let chain = try XCTUnwrap(level.trainingFinalGoalChain)
+        XCTAssertEqual(chain.goalObjectHandle, 6_180)
+        XCTAssertEqual(chain.goalRoomSourceIndex, 17)
+        XCTAssertEqual(chain.goalObjectFlags, 4_096)
+        XCTAssertEqual(
+            chain.goalCollisionRadius,
+            Float(bitPattern: 0x40a0_84bf)
+        )
+        let presentation = try XCTUnwrap(
+            level.objectPresentations.first {
+                $0.objectHandle == chain.goalObjectHandle
+            }
+        )
+        XCTAssertEqual(
+            presentation.primaryModel.sourceName,
+            "invisiblepowerup.OOF"
+        )
+        XCTAssertFalse(presentation.isVisible)
+
+        let wrongRadius = TrainingFinalGoalChain(
+            goalObjectHandle: chain.goalObjectHandle,
+            goalRoomSourceIndex: chain.goalRoomSourceIndex,
+            goalObjectFlags: chain.goalObjectFlags,
+            goalCollisionRadius: 1
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 057 FinalGoal chain"),
+            level.addingTrainingFinalGoalChain(wrongRadius)
+        )
+
+        var visiblePresentations = level.objectPresentations
+        let presentationIndex = try XCTUnwrap(
+            visiblePresentations.firstIndex {
+                $0.objectHandle == chain.goalObjectHandle
+            }
+        )
+        visiblePresentations[presentationIndex] = .init(
+            objectHandle: presentation.objectHandle,
+            primaryModel: presentation.primaryModel,
+            mediumModel: presentation.mediumModel,
+            lowModel: presentation.lowModel,
+            dyingModel: presentation.dyingModel,
+            mediumDistance: presentation.mediumDistance,
+            lowDistance: presentation.lowDistance,
+            isVisible: true
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 057 FinalGoal chain"),
+            replacing(level, objectPresentations: visiblePresentations)
+        )
+    }
+
     func testSchemaEightRejectsWrongTrainingGalleryMarkerIdentity() throws {
         let level = makeTrainingGalleryBarrierLevel()
         try level.validate()
@@ -4566,6 +4623,7 @@ func replacing(
     trainingFinalRoomEntryChain: TrainingFinalRoomEntryChain? = nil,
     trainingFinalBotsCompletionChain:
         TrainingFinalBotsCompletionChain? = nil,
+    trainingFinalGoalChain: TrainingFinalGoalChain? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
     soundClips: [CanonicalSoundClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
@@ -4633,6 +4691,9 @@ func replacing(
         trainingFinalBotsCompletionChain:
             trainingFinalBotsCompletionChain
             ?? level.trainingFinalBotsCompletionChain,
+        trainingFinalGoalChain:
+            trainingFinalGoalChain
+            ?? level.trainingFinalGoalChain,
         voiceClips: voiceClips ?? level.voiceClips,
         soundClips: soundClips ?? level.soundClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
@@ -4649,6 +4710,8 @@ func replacing(
     replaced.trainingFinalBotsCompletionChain =
         trainingFinalBotsCompletionChain
         ?? level.trainingFinalBotsCompletionChain
+    replaced.trainingFinalGoalChain =
+        trainingFinalGoalChain ?? level.trainingFinalGoalChain
     return replaced
 }
 
