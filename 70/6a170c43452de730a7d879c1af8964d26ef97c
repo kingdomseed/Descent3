@@ -1,0 +1,80 @@
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_756d9216e09217::t_39fe97aba68c8c 3052-3072
+  s_756d9216e09217::t_20bc6ac5fcd5f4 9584,9587-9607,9609-9648,9669
+  s_756d9216e09217::t_94168eeef23820 9581-9583,9585-9586,9649-9668,9670-9684,9686-9733
+  s_756d9216e09217::t_9e5a23176e8f57 9685
+  s_756d9216e09217::t_cc77ac38d2f8d8 2274-2315,2319-2409
+  s_756d9216e09217::t_7d9eba26dfe598 2316-2318,9608
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_756d9216e09217::t_2717bef46b4631 1420-1422,1557-1568,1681-1682,1749-1751
+  s_756d9216e09217::t_c1a3e9787e8a9d 1233,3158,3246-3262,3455-3476
+  s_756d9216e09217::t_c42d22ed1e459b 3646-3649
+  s_756d9216e09217::t_9a72d547fd2286 453,945-953,1052-1053,1119-1120,1195-1198,1229-1232
+  s_756d9216e09217::t_21a768b8532f4b 4376-4423,4698-4709,4715-4716
+  s_756d9216e09217::t_62fa9d8bf58d16 4710-4714
+  s_756d9216e09217::t_850b011f0f870f 4717
+Revival/Sources/RevivalMetal/MetalWorldRenderer.swift
+  s_756d9216e09217::t_92b09e832e424f 254-256
+Revival/Sources/RevivalEditor/RevivalEditorWindowController.swift
+  s_756d9216e09217::t_702d497c7950c1 1014
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_ff832653987a10 4,22-25,27-29,31,63-66,269-270
+Revival/Tests/D3ImportTests/CanonicalLevelTests.swift
+  s_756d9216e09217::t_795fdcedfad6ee 2074-2092,2143-2144,2146-2148
+  s_756d9216e09217::t_8c80eb6ac549f6 2093-2138
+  s_756d9216e09217::t_50c7999dd74ba1 4567-4568,4633-4635,4649-4651
+  s_756d9216e09217::t_9e5a23176e8f57 2140-2142
+  s_756d9216e09217::t_c52f889a5d3fa0 2139,2145
+Revival/Sources/RevivalMetal/MetalWorldPlan.swift
+  s_756d9216e09217::t_92b09e832e424f 178-179,193-195,214-215,229-230,389-391
+  s_756d9216e09217::t_30d9f93c1646c2 392-394
+  s_756d9216e09217::t_05faddd26225a8 395-413
+docs/revival/source-translation-ledger.md
+  s_756d9216e09217::t_651c2c5677403c 876
+  s_756d9216e09217::t_c9e230c8dee56a 877
+  s_756d9216e09217::t_e4f040c552545f 861-875,878
+Revival/Sources/RevivalCore/Level.swift
+  s_756d9216e09217::t_a0f63284ec1b03 4302-4374
+  s_756d9216e09217::t_fa1e41fe91e162 3276-3298
+  s_756d9216e09217::t_a2864c0c5fc436 1012-1014,1017-1064,1073-1097
+  s_756d9216e09217::t_1c756586a918c6 3112-3115,3157-3160,3275,3299-3302,3304
+  s_756d9216e09217::t_fd61af10d04498 1015-1016,1065-1072,2987-2988
+  s_756d9216e09217::t_c4f70e77e43761 667-679,1841-1842,1891-1892,1935-1936,1964,1976
+  s_756d9216e09217::t_089a466d68b2c5 2980-2986,2989-2990
+  s_756d9216e09217::t_471136b8135838 3303
+Revival/Tests/D3ImportTests/MetalWorldPlanTests.swift
+  s_756d9216e09217::t_0d37ca88d93cf6 45-86
+Revival/Sources/RevivalEditor/RevivalProject.swift
+  s_756d9216e09217::t_702d497c7950c1 632-644
+Revival/Tests/D3ImportTests/EditorProjectTests.swift
+  s_756d9216e09217::t_0b4926981f5037 1651-1761
+  s_756d9216e09217::t_7438b2eb09f989 1650
+docs/revival/functional-completeness-ledger.md
+  s_756d9216e09217::t_e4f040c552545f 250,263
+Revival/Sources/D3Import/D3ImportOperation.swift
+  s_756d9216e09217::t_2ae7853611e26d 716,884-891,1527,1535-1569
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "706a170c43452de730a7d879c1af8964d26ef97c",
+  "prompts": {},
+  "sessions": {
+    "s_756d9216e09217": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fa70b-be71-7ea2-911b-66c5e3c5cc64",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
