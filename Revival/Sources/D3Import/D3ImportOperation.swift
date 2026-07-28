@@ -713,6 +713,7 @@ func runD3Import(
         "intro6.osf",
         "GuideBotF.osf",
         "Intro7.osf",
+        "Done.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -878,6 +879,14 @@ func runD3Import(
     }!
     let lastRoomBarrier = robotGuidebotLevel.rooms.first {
         $0.name?.caseInsensitiveCompare("PortalRoom6")
+            == .orderedSame
+    }!
+    let finalBotsMarker = robotGuidebotLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("FlashLight-5")
+            == .orderedSame
+    }!
+    let finalBotsBarrier = robotGuidebotLevel.rooms.first {
+        $0.name?.caseInsensitiveCompare("PortalRoom7")
             == .orderedSame
     }!
     let cloakPickup = robotGuidebotLevel.objects.first {
@@ -1515,13 +1524,48 @@ func runD3Import(
             combat: .stockTraining
         )
     )
-    let level = lastBot4Level.addingTrainingLastBot5DeathChain(
+    let lastBot5Level = lastBot4Level.addingTrainingLastBot5DeathChain(
         .init(
             robotObjectHandle: lastBot5.handle,
             robotRoomSourceIndex: 48,
             robotFlags: lastBot5.flags,
             combat: .stockTraining
         )
+    )
+    precondition(
+        finalBotsMarker.handle == 4_118
+            && finalBotsMarker.type == 11
+            && finalBotsMarker.storedID == 205
+            && finalBotsMarker.flags == 4_096
+            && finalBotsMarker.location == .room(16)
+            && finalBotsBarrier.sourceIndex == 16
+            && finalBotsBarrier.portals.count == 2
+            && finalBotsBarrier.portals.allSatisfy {
+                $0.flags & 1 != 0
+            }
+    )
+    let level = lastBot5Level.addingTrainingFinalBotsCompletionChain(
+        .init(
+            barrierRoomSourceIndex: finalBotsBarrier.sourceIndex,
+            orderedPortalIndices: [0, 1],
+            markerLightObjectHandle: finalBotsMarker.handle,
+            markerLightPresentation: .init(
+                primaryColor: .init(x: 1, y: 0.25, z: 0),
+                secondaryColor: .zero,
+                timeInterval: 0.5,
+                flickerDistance: 0.2,
+                directionalDot: 0,
+                flags: 4,
+                timebits: .max,
+                angle: 0,
+                lightingRenderType: 2
+            ),
+            openMarkerLightDistance: 50,
+            timerDuration: 2,
+            completionMessage: messages["AllDone"]!,
+            completionVoiceSourceName: "done.osf"
+        ),
+        voiceClip: voiceClips[11]
     )
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)

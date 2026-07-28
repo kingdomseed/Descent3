@@ -42,6 +42,48 @@ final class MetalWorldPlanTests: XCTestCase {
         )
     }
 
+    func testScript035MarkerDistanceLightsReachedMetalWorld() throws {
+        var level = makeTrainingFinalBotsCompletionLevel()
+        let playerView = defaultPlayerView(in: level)
+        let markerHandle = try XCTUnwrap(
+            level.trainingFinalBotsCompletionChain?
+                .markerLightObjectHandle
+        )
+        let markerIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == markerHandle
+        })
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            playerView: playerView
+        )
+        let target = try XCTUnwrap(
+            initial.draws.first?.vertices.first?.position
+        )
+        level.objects[markerIndex].location =
+            .room(playerView.roomSourceIndex)
+        level.objects[markerIndex].position = .init(
+            x: target.x + 20,
+            y: target.y,
+            z: target.z
+        )
+
+        let lit = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            playerView: playerView,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1,
+                systemsGameTime: 0.5
+            ),
+            trainingFinalBotsMarkerLightDistance: 50
+        )
+
+        XCTAssertGreaterThan(
+            lit.draws[0].vertices[0].dynamicLight.x,
+            0
+        )
+    }
+
     func testCloakAlphaReachesAuxiliaryCameraPlayerDraws() throws {
         let level = makeTrainingCloakPickupLevel()
         let simulation = PlayerSimulation(

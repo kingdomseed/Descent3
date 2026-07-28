@@ -1648,6 +1648,118 @@ final class EditorProjectTests: XCTestCase {
     }
 
     @MainActor
+    func testFinalBotsCompletionHasDiagnosticUndoAndDisposablePlayReturn()
+        throws
+    {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(
+            path: "candidate.revival",
+            directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(
+                path: "library",
+                directoryHint: .isDirectory
+            )
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: false
+        )
+        try writeCanonicalPackage(
+            makeTrainingFinalBotsCompletionLevel(),
+            to: candidate
+        )
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        document.undoManager?.groupsByEvent = false
+
+        XCTAssertEqual(
+            document.project.trainingFinalBotsCompletionSourceDiagnostic,
+            "TrainingMission.cpp Scripts 035/056 / PortalRoom7 completion"
+        )
+        let marker = try XCTUnwrap(document.project.level.objects.first {
+            $0.handle == 4_118
+        })
+        document.undoManager?.beginUndoGrouping()
+        try document.moveObject(
+            handle: marker.handle,
+            to: .init(
+                x: marker.position.x + 0.5,
+                y: marker.position.y,
+                z: marker.position.z
+            )
+        )
+        document.undoManager?.endUndoGrouping()
+        XCTAssertEqual(document.undoManager?.undoActionName, "Move Object")
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == marker.handle
+            }?.position,
+            marker.position
+        )
+
+        let first = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        let second = try document.fileWrapper(
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(
+            first.fileWrappers?["project.json"]?.regularFileContents,
+            second.fileWrappers?["project.json"]?.regularFileContents
+        )
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(
+            from: first,
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertNotNil(
+            reopened.project.level.trainingFinalBotsCompletionChain
+        )
+
+        let session = reopened.makePlaySession()
+        reopened.commitPlaySession(session, renderingWorld: false)
+        let simulation = session.makePlayerSimulation(
+            presentationReadyTimestamp: 0
+        )
+        simulation.destroyTrainingLastBot1(handle: 4_127)
+        simulation.destroyTrainingLastBot2(handle: 2_080)
+        simulation.destroyTrainingLastBot3(handle: 2_081)
+        simulation.destroyTrainingLastBot4(handle: 2_082)
+        simulation.destroyTrainingLastBot5(handle: 2_083)
+        _ = simulation.update(at: 0.1, input: .zero)
+        let playBarrier = try XCTUnwrap(simulation.level.rooms.first {
+            $0.sourceIndex == 16
+        })
+        let projectBarrier = try XCTUnwrap(
+            reopened.project.level.rooms.first {
+                $0.sourceIndex == 16
+            }
+        )
+        XCTAssertEqual(playBarrier.portals[0].flags & 1, 0)
+        XCTAssertNotEqual(projectBarrier.portals[0].flags & 1, 0)
+
+        reopened.returnToEditor(renderingWorld: false)
+        XCTAssertNil(reopened.playSession)
+        XCTAssertNotEqual(
+            reopened.project.level.rooms.first {
+                $0.sourceIndex == 16
+            }?.portals[0].flags ?? 0,
+            0
+        )
+    }
+
+    @MainActor
     func testInvulnPowerup2HasDiagnosticUndoAndDisposablePlayReturn()
         throws
     {

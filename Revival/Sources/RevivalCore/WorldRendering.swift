@@ -450,6 +450,7 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingInvulnerabilityRemaining: Float?
     let trainingCloak: TrainingCloakFrame?
     let trainingLastRoomMarkerLightDistance: Float?
+    let trainingFinalBotsMarkerLightDistance: Float?
 }
 
 enum TrainingCloakPhase: String, Codable, Equatable, Sendable {
@@ -941,6 +942,15 @@ private struct TrainingLastRoomState: Codable, Equatable, Sendable {
     var wasPresented = false
 }
 
+private struct TrainingFinalBotsCompletionState:
+    Codable, Equatable, Sendable
+{
+    var wasTriggered = false
+    var markerLightDistance: Float = 0
+    var timerRemaining: Float?
+    var wasPresented = false
+}
+
 private struct TrainingFinalRoomEntryState:
     Codable, Equatable, Sendable
 {
@@ -1039,6 +1049,8 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     fileprivate let trainingLastRoomState: TrainingLastRoomState?
     fileprivate let trainingFinalRoomEntryState:
         TrainingFinalRoomEntryState?
+    fileprivate let trainingFinalBotsCompletionState:
+        TrainingFinalBotsCompletionState?
 }
 
 enum PlayerSimulationContinuationError: Error, Equatable {
@@ -1104,6 +1116,8 @@ final class PlayerSimulation {
     private var trainingLastRoomState: TrainingLastRoomState?
     private var trainingFinalRoomEntryState:
         TrainingFinalRoomEntryState?
+    private var trainingFinalBotsCompletionState:
+        TrainingFinalBotsCompletionState?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -1178,6 +1192,10 @@ final class PlayerSimulation {
             level.trainingFinalRoomEntryChain.map {
                 _ in TrainingFinalRoomEntryState()
             }
+        trainingFinalBotsCompletionState =
+            level.trainingFinalBotsCompletionChain.map {
+                _ in TrainingFinalBotsCompletionState()
+            }
     }
 
     init(
@@ -1207,6 +1225,11 @@ final class PlayerSimulation {
             continuation.trainingFinalRoomEntryState
             ?? level.trainingFinalRoomEntryChain.map {
                 _ in TrainingFinalRoomEntryState()
+            }
+        let restoredFinalBotsCompletionState =
+            continuation.trainingFinalBotsCompletionState
+            ?? level.trainingFinalBotsCompletionChain.map {
+                _ in TrainingFinalBotsCompletionState()
             }
         let restoredLastBot1DeathState =
             continuation.trainingLastBot1DeathState
@@ -1394,6 +1417,9 @@ final class PlayerSimulation {
         if restoredFinalRoomEntryState?.wasTriggered == true {
             closeTrainingLastRoomBarrier(in: &continuationLevel)
         }
+        if restoredFinalBotsCompletionState?.wasTriggered == true {
+            openTrainingFinalBotsBarrier(in: &continuationLevel)
+        }
         guard
             validTrainingCameraMonitorContinuation(
                 continuation.trainingCameraMonitorState,
@@ -1528,6 +1554,18 @@ final class PlayerSimulation {
         ) else {
             throw PlayerSimulationContinuationError.invalidState
         }
+        guard validTrainingFinalBotsCompletionContinuation(
+            restoredFinalBotsCompletionState,
+            allProducersWereDestroyed:
+                restoredLastBot1DeathState?.wasDestroyed == true
+                && restoredLastBot2DeathState?.wasDestroyed == true
+                && restoredLastBot3DeathState?.wasDestroyed == true
+                && restoredLastBot4DeathState?.wasDestroyed == true
+                && restoredLastBot5DeathState?.wasDestroyed == true,
+            level: continuationLevel
+        ) else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
         guard
             validTrainingGalleryBarrierContinuation(
                 continuation.trainingGalleryBarrierState,
@@ -1640,6 +1678,8 @@ final class PlayerSimulation {
         trainingCloakPickupState = restoredCloakPickupState
         trainingLastRoomState = restoredLastRoomState
         trainingFinalRoomEntryState = restoredFinalRoomEntryState
+        trainingFinalBotsCompletionState =
+            restoredFinalBotsCompletionState
         restoreTrainingGuidebotPresentation()
         if trainingRobotGuidebotState?.guidebotEnteredShip == true,
            let handle =
@@ -1706,7 +1746,9 @@ final class PlayerSimulation {
             trainingCloakPickupState: trainingCloakPickupState,
             trainingLastRoomState: trainingLastRoomState,
             trainingFinalRoomEntryState:
-                trainingFinalRoomEntryState
+                trainingFinalRoomEntryState,
+            trainingFinalBotsCompletionState:
+                trainingFinalBotsCompletionState
         )
     }
 
@@ -3113,6 +3155,7 @@ final class PlayerSimulation {
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
         var trainingLastRoomWasTriggeredThisFrame = false
+        var trainingFinalBotsWasTriggeredThisFrame = false
         if trainingInvulnerabilityPickupWasHitThisFrame,
             var state = trainingInvulnerabilityPickupState,
             let chain = level.trainingInvulnerabilityPickupChain
@@ -3199,6 +3242,23 @@ final class PlayerSimulation {
             trainingLastRoomState = state
             trainingLastRoomWasTriggeredThisFrame = true
             openTrainingLastRoomBarrier(in: &level)
+        }
+        if var state = trainingFinalBotsCompletionState,
+            !state.wasTriggered,
+            trainingLastBot1DeathState?.wasDestroyed == true,
+            trainingLastBot2DeathState?.wasDestroyed == true,
+            trainingLastBot3DeathState?.wasDestroyed == true,
+            trainingLastBot4DeathState?.wasDestroyed == true,
+            trainingLastBot5DeathState?.wasDestroyed == true,
+            let chain = level.trainingFinalBotsCompletionChain
+        {
+            state.wasTriggered = true
+            state.markerLightDistance =
+                chain.openMarkerLightDistance
+            state.timerRemaining = chain.timerDuration
+            trainingFinalBotsCompletionState = state
+            trainingFinalBotsWasTriggeredThisFrame = true
+            openTrainingFinalBotsBarrier(in: &level)
         }
         if guidebotReturnWasRequestedThisFrame,
             let chain = level.trainingCameraMonitorChain?.returnToShip
@@ -3392,6 +3452,28 @@ final class PlayerSimulation {
             }
             trainingLastRoomState = state
         }
+        if var state = trainingFinalBotsCompletionState,
+            !trainingFinalBotsWasTriggeredThisFrame,
+            var remaining = state.timerRemaining,
+            let chain = level.trainingFinalBotsCompletionChain
+        {
+            remaining -= systemsFrameDuration
+            if remaining <= 0.000_001 {
+                state.timerRemaining = nil
+                if !state.wasPresented {
+                    state.wasPresented = true
+                    trainingOpeningFeedback.append(.init(
+                        hudMessages: [chain.completionMessage],
+                        voiceSourceName:
+                            chain.completionVoiceSourceName,
+                        voicePrecedesHUDMessages: false
+                    ))
+                }
+            } else {
+                state.timerRemaining = remaining
+            }
+            trainingFinalBotsCompletionState = state
+        }
         if var state = trainingRobotGuidebotState,
             let chain = level.trainingRobotGuidebotChain
         {
@@ -3561,7 +3643,10 @@ final class PlayerSimulation {
                 chain: level.trainingCloakPickupChain
             ),
             trainingLastRoomMarkerLightDistance:
-                trainingLastRoomState?.markerLightDistance
+                trainingLastRoomState?.markerLightDistance,
+            trainingFinalBotsMarkerLightDistance:
+                trainingFinalBotsCompletionState?
+                    .markerLightDistance
         )
     }
 
@@ -4288,6 +4373,54 @@ private func validTrainingLastRoomContinuation(
             : state.timerRemaining != nil)
 }
 
+private func validTrainingFinalBotsCompletionContinuation(
+    _ state: TrainingFinalBotsCompletionState?,
+    allProducersWereDestroyed: Bool,
+    level: Level
+) -> Bool {
+    guard let chain = level.trainingFinalBotsCompletionChain else {
+        return state == nil
+    }
+    guard let state,
+          state.markerLightDistance.isFinite,
+          state.timerRemaining.map({
+              $0.isFinite && $0 > 0
+                  && $0 <= chain.timerDuration
+          }) ?? true
+    else {
+        return false
+    }
+    if !state.wasTriggered {
+        return state.markerLightDistance == 0
+            && state.timerRemaining == nil
+            && !state.wasPresented
+    }
+    guard allProducersWereDestroyed,
+          state.markerLightDistance
+            == chain.openMarkerLightDistance,
+          let room = level.rooms.first(where: {
+              $0.sourceIndex == chain.barrierRoomSourceIndex
+          }),
+          chain.orderedPortalIndices.allSatisfy({
+              let portal = room.portals[$0]
+              guard portal.flags & 1 == 0,
+                    let connected = level.rooms.first(where: {
+                        $0.sourceIndex == portal.connectedRoom
+                    })
+              else {
+                  return false
+              }
+              return connected.portals[portal.connectedPortal].flags
+                  & 1 == 0
+          })
+    else {
+        return false
+    }
+    return state.wasPresented
+        ? state.timerRemaining == nil
+        : state.timerRemaining != nil
+}
+
 private func validTrainingFinalRoomEntryContinuation(
     _ state: TrainingFinalRoomEntryState?,
     lastRoomState: TrainingLastRoomState?,
@@ -4554,6 +4687,26 @@ private func openTrainingLastRoomBarrier(in level: inout Level) {
     for portalIndex in chain.orderedPortalIndices {
         let portal = level.rooms[roomIndex].portals[portalIndex]
         level.rooms[roomIndex].portals[portalIndex].flags &= ~UInt32(1)
+        let connectedRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        level.rooms[connectedRoomIndex]
+            .portals[portal.connectedPortal].flags &= ~UInt32(1)
+    }
+}
+
+private func openTrainingFinalBotsBarrier(in level: inout Level) {
+    guard let chain = level.trainingFinalBotsCompletionChain,
+          let roomIndex = level.rooms.firstIndex(where: {
+              $0.sourceIndex == chain.barrierRoomSourceIndex
+          })
+    else {
+        return
+    }
+    for portalIndex in chain.orderedPortalIndices {
+        let portal = level.rooms[roomIndex].portals[portalIndex]
+        level.rooms[roomIndex].portals[portalIndex].flags
+            &= ~UInt32(1)
         let connectedRoomIndex = level.rooms.firstIndex {
             $0.sourceIndex == portal.connectedRoom
         }!

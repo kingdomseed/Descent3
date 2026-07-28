@@ -2271,6 +2271,142 @@ final class WorldRenderingTests: XCTestCase {
         })
     }
 
+    func testScripts035And056OpenPortalRoomSevenThenPresentOnceAfterTimer()
+        throws
+    {
+        let level = makeTrainingFinalBotsCompletionLevel()
+        try level.validate()
+        let chain = try XCTUnwrap(
+            level.trainingFinalBotsCompletionChain
+        )
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        simulation.destroyTrainingLastBot1(handle: 4_127)
+        simulation.destroyTrainingLastBot2(handle: 2_080)
+        simulation.destroyTrainingLastBot3(handle: 2_081)
+        simulation.destroyTrainingLastBot4(handle: 2_082)
+        simulation.destroyTrainingLastBot5(handle: 2_083)
+        var frame = simulation.update(at: 0.1, input: .zero)
+
+        func assertBarrierIsOpen(in level: Level) throws {
+            let barrier = try XCTUnwrap(level.rooms.first {
+                $0.sourceIndex == chain.barrierRoomSourceIndex
+            })
+            for portalIndex in chain.orderedPortalIndices {
+                let portal = barrier.portals[portalIndex]
+                XCTAssertEqual(portal.flags & 1, 0)
+                let connected = try XCTUnwrap(level.rooms.first {
+                    $0.sourceIndex == portal.connectedRoom
+                })
+                XCTAssertEqual(
+                    connected.portals[portal.connectedPortal].flags & 1,
+                    0
+                )
+            }
+        }
+
+        try assertBarrierIsOpen(in: simulation.level)
+        XCTAssertEqual(
+            frame.trainingFinalBotsMarkerLightDistance,
+            50
+        )
+        XCTAssertFalse(frame.trainingOpeningFeedback.contains {
+            $0.voiceSourceName == chain.completionVoiceSourceName
+        })
+        let pendingData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let pendingObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: pendingData)
+                as? [String: Any]
+        )
+        XCTAssertEqual(pendingObject["schemaVersion"] as? Int, 7)
+        let pendingState = try XCTUnwrap(
+            pendingObject["trainingFinalBotsCompletionState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(pendingState["wasTriggered"] as? Bool, true)
+        XCTAssertEqual(
+            try XCTUnwrap(pendingState["timerRemaining"] as? Double),
+            2,
+            accuracy: 0.000_1
+        )
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: pendingData
+            ),
+            resumedAtTimestamp: 100
+        )
+        try assertBarrierIsOpen(in: restored.level)
+        for frameIndex in 1...20 {
+            frame = restored.update(
+                at: 100 + Double(frameIndex) * 0.1,
+                input: .zero
+            )
+        }
+        XCTAssertEqual(
+            frame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [chain.completionMessage],
+                    voiceSourceName: chain.completionVoiceSourceName,
+                    voicePrecedesHUDMessages: false
+                )
+            ]
+        )
+        XCTAssertTrue(
+            restored.update(
+                at: 102.1,
+                input: .zero
+            ).trainingOpeningFeedback.isEmpty
+        )
+
+        let completed = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(restored.continuation)
+            ),
+            resumedAtTimestamp: 200
+        )
+        try assertBarrierIsOpen(in: completed.level)
+        XCTAssertTrue(
+            completed.update(
+                at: 200.1,
+                input: .zero
+            ).trainingOpeningFeedback.isEmpty
+        )
+
+        var hostileObject = pendingObject
+        var hostileState = pendingState
+        hostileState["markerLightDistance"] = 0
+        hostileObject["trainingFinalBotsCompletionState"] =
+            hostileState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: hostileObject
+                    )
+                ),
+                resumedAtTimestamp: 300
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
     func testInvulnPowerup2ConsumesOnceAndExpiresAcrossContinuation()
         throws
     {
@@ -2912,6 +3048,27 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertNotNil(currentObject["trainingLastRoomState"])
         XCTAssertNotNil(
             currentObject["trainingFinalRoomEntryState"]
+        )
+
+        let finalBotsLevel =
+            makeTrainingFinalBotsCompletionLevel()
+        let finalBotsRestored = try PlayerSimulation(
+            level: finalBotsLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: previousData
+            ),
+            resumedAtTimestamp: 200
+        )
+        let finalBotsObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    finalBotsRestored.continuation
+                )
+            ) as? [String: Any]
+        )
+        XCTAssertNotNil(
+            finalBotsObject["trainingFinalBotsCompletionState"]
         )
     }
 
@@ -9419,6 +9576,159 @@ func makeTrainingLastBot5DeathLevel() -> Level {
         robotFlags: 5_121,
         combat: .stockTraining
     ))
+}
+
+func makeTrainingFinalBotsCompletionLevel() -> Level {
+    var level = makeTrainingLastBot5DeathLevel()
+    let template = level.rooms.first {
+        $0.sourceIndex == 2
+    }!
+    precondition(template.portals.count == 2)
+    var barrierPortals: [LevelPortal] = []
+    var connectedRooms: [LevelRoom] = []
+    for portalIndex in template.portals.indices {
+        let sourcePortal = template.portals[portalIndex]
+        let sourceConnectedRoom = level.rooms.first {
+            $0.sourceIndex == sourcePortal.connectedRoom
+        }!
+        let reciprocal =
+            sourceConnectedRoom.portals[sourcePortal.connectedPortal]
+        let connectedSourceIndex = 70 + portalIndex
+        barrierPortals.append(.init(
+            flags: 1,
+            faceIndex: sourcePortal.faceIndex,
+            connectedRoom: connectedSourceIndex,
+            connectedPortal: 0,
+            boundaryNodeIndex: -1,
+            pathPoint: sourcePortal.pathPoint,
+            combineMaster: -1
+        ))
+        connectedRooms.append(.init(
+            sourceIndex: connectedSourceIndex,
+            name: "P7 neighbor \(portalIndex)",
+            pathPoint: sourceConnectedRoom.pathPoint,
+            vertices: sourceConnectedRoom.vertices,
+            faces: sourceConnectedRoom.faces.enumerated().map {
+                faceIndex, face in
+                .init(
+                    corners: face.corners,
+                    flags: face.flags,
+                    portalIndex:
+                        faceIndex == reciprocal.faceIndex ? 0 : nil,
+                    texture: face.texture,
+                    lightmapInfoIndex: face.lightmapInfoIndex,
+                    allowsLightCorona: face.allowsLightCorona,
+                    lightMultiple: face.lightMultiple,
+                    special: face.special
+                )
+            },
+            portals: [
+                .init(
+                    flags: 1,
+                    faceIndex: reciprocal.faceIndex,
+                    connectedRoom: 16,
+                    connectedPortal: portalIndex,
+                    boundaryNodeIndex: -1,
+                    pathPoint: reciprocal.pathPoint,
+                    combineMaster: -1
+                )
+            ],
+            flags: sourceConnectedRoom.flags,
+            pulseTime: sourceConnectedRoom.pulseTime,
+            pulseOffset: sourceConnectedRoom.pulseOffset,
+            mirrorFaceIndex: sourceConnectedRoom.mirrorFaceIndex,
+            door: sourceConnectedRoom.door,
+            volumeLights: sourceConnectedRoom.volumeLights,
+            fog: sourceConnectedRoom.fog,
+            ambientSoundPattern:
+                sourceConnectedRoom.ambientSoundPattern,
+            reverb: sourceConnectedRoom.reverb,
+            damage: sourceConnectedRoom.damage,
+            damageType: sourceConnectedRoom.damageType
+        ))
+    }
+    let barrier = LevelRoom(
+        sourceIndex: 16,
+        name: "PortalRoom7",
+        pathPoint: template.pathPoint,
+        vertices: template.vertices,
+        faces: template.faces,
+        portals: barrierPortals,
+        flags: template.flags,
+        pulseTime: template.pulseTime,
+        pulseOffset: template.pulseOffset,
+        mirrorFaceIndex: template.mirrorFaceIndex,
+        door: template.door,
+        volumeLights: template.volumeLights,
+        fog: template.fog,
+        ambientSoundPattern: template.ambientSoundPattern,
+        reverb: template.reverb,
+        damage: template.damage,
+        damageType: template.damageType
+    )
+    level.rooms.append(contentsOf: [barrier] + connectedRooms)
+    let player = level.objects.first {
+        $0.handle == 2_048
+    }!
+    level.objects.append(.init(
+        handle: 4_118,
+        type: 11,
+        storedID: 205,
+        definition: .init(
+            storedIndex: 205,
+            sourceName: "Blinking Red Light-DM"
+        ),
+        instanceName: "FlashLight-5",
+        flags: 4_096,
+        doorShields: nil,
+        location: .room(16),
+        position: barrier.pathPoint,
+        orientation: player.orientation,
+        containsType: 0,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    ))
+    let chain = TrainingFinalBotsCompletionChain(
+        barrierRoomSourceIndex: 16,
+        orderedPortalIndices: [0, 1],
+        markerLightObjectHandle: 4_118,
+        markerLightPresentation: .init(
+            primaryColor: .init(x: 1, y: 0.25, z: 0),
+            secondaryColor: .zero,
+            timeInterval: 0.5,
+            flickerDistance: 0.2,
+            directionalDot: 0,
+            flags: 4,
+            timebits: .max,
+            angle: 0,
+            lightingRenderType: 2
+        ),
+        openMarkerLightDistance: 50,
+        timerDuration: 2,
+        completionMessage:
+            "Great Job! Now fly through the opened doorway to end your training. Good job Recruit!",
+        completionVoiceSourceName: "done.osf"
+    )
+    let pcm = Data(repeating: 0, count: 2)
+    return level.addingTrainingFinalBotsCompletionChain(
+        chain,
+        voiceClip: .init(
+            sourceName: chain.completionVoiceSourceName,
+            sourceEntryIndex: 9,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 1,
+            pcm16LittleEndian: pcm,
+            pcmSHA256: canonicalSHA256(pcm),
+            sourceArchive: "missions/training.mn3",
+            sourceSHA256: canonicalSHA256(pcm)
+        )
+    )
 }
 
 func replacingTrainingRoom(

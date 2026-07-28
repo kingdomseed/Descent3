@@ -664,6 +664,19 @@ struct TrainingLastRoomChain: Codable, Equatable, Sendable {
     let completionVoiceSourceName: String
 }
 
+struct TrainingFinalBotsCompletionChain:
+    Codable, Equatable, Sendable
+{
+    let barrierRoomSourceIndex: Int
+    let orderedPortalIndices: [Int]
+    let markerLightObjectHandle: UInt32
+    let markerLightPresentation: TrainingMarkerLightPresentation
+    let openMarkerLightDistance: Float
+    let timerDuration: Float
+    let completionMessage: String
+    let completionVoiceSourceName: String
+}
+
 struct TrainingFinalRoomEntryChain: Codable, Equatable, Sendable {
     let triggerName: String
     let triggerRoomSourceIndex: Int
@@ -992,6 +1005,92 @@ func validateStockTrainingFinalRoomEntryPackage(
     else {
         throw LevelValidationError.invalidDependency(
             "Training Script 050 package"
+        )
+    }
+}
+
+func validateStockTrainingFinalBotsCompletionPackage(
+    chain: TrainingFinalBotsCompletionChain?,
+    done: CanonicalVoiceClip?,
+    level: Level,
+    requiresExactVoice: Bool = true
+) throws {
+    let expectedPresentation = TrainingMarkerLightPresentation(
+        primaryColor: .init(x: 1, y: 0.25, z: 0),
+        secondaryColor: .zero,
+        timeInterval: 0.5,
+        flickerDistance: 0.2,
+        directionalDot: 0,
+        flags: 4,
+        timebits: .max,
+        angle: 0,
+        lightingRenderType: 2
+    )
+    guard let chain,
+          chain.barrierRoomSourceIndex == 16,
+          chain.orderedPortalIndices == [0, 1],
+          chain.markerLightObjectHandle == 4_118,
+          chain.markerLightPresentation == expectedPresentation,
+          chain.openMarkerLightDistance == 50,
+          chain.timerDuration == 2,
+          chain.completionMessage
+            == "Great Job! Now fly through the opened doorway to end your training. Good job Recruit!",
+          chain.completionVoiceSourceName == "done.osf",
+          level.trainingLastBot1DeathChain != nil,
+          level.trainingLastBot2DeathChain != nil,
+          level.trainingLastBot3DeathChain != nil,
+          level.trainingLastBot4DeathChain != nil,
+          level.trainingLastBot5DeathChain != nil,
+          let room = level.rooms.first(where: {
+              $0.sourceIndex == chain.barrierRoomSourceIndex
+          }),
+          room.name == "PortalRoom7",
+          chain.orderedPortalIndices.allSatisfy(
+              room.portals.indices.contains
+          ),
+          let marker = level.objects.first(where: {
+              $0.handle == chain.markerLightObjectHandle
+          }),
+          marker.type == 11,
+          marker.storedID == 205,
+          marker.definition?.sourceName == "Blinking Red Light-DM",
+          marker.instanceName == "FlashLight-5",
+          marker.flags == 4_096,
+          marker.location == .room(16),
+          done?.sourceName.caseInsensitiveCompare("done.osf")
+            == .orderedSame,
+          done?.sampleRate == 22_050,
+          done?.channelCount == 1,
+          done?.sourceArchive == "missions/training.mn3",
+          !requiresExactVoice || (
+              done?.sourceEntryIndex == 2
+                  && done?.frameCount == 234_609
+                  && done?.pcmSHA256
+                    == "87efaee428868cf09d74ae72ded48f91ce6f9db55ee823c82fcbf37c07487953"
+                  && done?.sourceSHA256
+                    == "a14ce32c2b72fb222c9dfdfdbc277b062ebbb6774e5757c4fe1602b87630383c"
+          ),
+          chain.orderedPortalIndices.allSatisfy({ portalIndex in
+              let portal = room.portals[portalIndex]
+              guard portal.flags & 1 != 0,
+                    let connected = level.rooms.first(where: {
+                        $0.sourceIndex == portal.connectedRoom
+                    }),
+                    connected.portals.indices.contains(
+                        portal.connectedPortal
+                    )
+              else {
+                  return false
+              }
+              let reciprocal =
+                  connected.portals[portal.connectedPortal]
+              return reciprocal.connectedRoom == room.sourceIndex
+                  && reciprocal.connectedPortal == portalIndex
+                  && reciprocal.flags & 1 != 0
+          })
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training Scripts 035/056 completion"
         )
     }
 }
@@ -1739,6 +1838,8 @@ struct Level: Codable, Equatable, Sendable {
     var trainingLastBot3DeathChain: TrainingLastBot3DeathChain? = nil
     var trainingLastBot4DeathChain: TrainingLastBot4DeathChain? = nil
     var trainingLastBot5DeathChain: TrainingLastBot5DeathChain? = nil
+    var trainingFinalBotsCompletionChain:
+        TrainingFinalBotsCompletionChain? = nil
     let trainingInvulnerabilityPickupChain: TrainingInvulnerabilityPickupChain?
     let trainingCloakPickupChain: TrainingCloakPickupChain?
     let trainingLastRoomChain: TrainingLastRoomChain?
@@ -1787,6 +1888,8 @@ struct Level: Codable, Equatable, Sendable {
         trainingCloakPickupChain: TrainingCloakPickupChain? = nil,
         trainingLastRoomChain: TrainingLastRoomChain? = nil,
         trainingFinalRoomEntryChain: TrainingFinalRoomEntryChain? = nil,
+        trainingFinalBotsCompletionChain:
+            TrainingFinalBotsCompletionChain? = nil,
         voiceClips: [CanonicalVoiceClip] = [],
         soundClips: [CanonicalSoundClip] = [],
         dependencyManifest: DependencyManifest,
@@ -1829,6 +1932,8 @@ struct Level: Codable, Equatable, Sendable {
         self.trainingCloakPickupChain = trainingCloakPickupChain
         self.trainingLastRoomChain = trainingLastRoomChain
         self.trainingFinalRoomEntryChain = trainingFinalRoomEntryChain
+        self.trainingFinalBotsCompletionChain =
+            trainingFinalBotsCompletionChain
         self.voiceClips = voiceClips
         self.soundClips = soundClips
         self.dependencyManifest = dependencyManifest
@@ -1856,6 +1961,7 @@ struct Level: Codable, Equatable, Sendable {
                 && trainingLastBot3DeathChain == nil
                 && trainingLastBot4DeathChain == nil
                 && trainingLastBot5DeathChain == nil
+                && trainingFinalBotsCompletionChain == nil
             || schemaVersion == 10
                 && trainingCameraMonitorChain != nil
                 && trainingRASBot1DeathChain == nil
@@ -1867,6 +1973,7 @@ struct Level: Codable, Equatable, Sendable {
                 && trainingLastBot3DeathChain == nil
                 && trainingLastBot4DeathChain == nil
                 && trainingLastBot5DeathChain == nil
+                && trainingFinalBotsCompletionChain == nil
                 && _soundClips.wasPresent
             || schemaVersion == 11
                 && trainingCameraMonitorChain != nil
@@ -2870,6 +2977,17 @@ struct Level: Codable, Equatable, Sendable {
                 )
             }
         }
+        if trainingFinalBotsCompletionChain != nil {
+            try validateStockTrainingFinalBotsCompletionPackage(
+                chain: trainingFinalBotsCompletionChain,
+                done: voiceClips.first {
+                    $0.sourceName.caseInsensitiveCompare("done.osf")
+                        == .orderedSame
+                },
+                level: self,
+                requiresExactVoice: false
+            )
+        }
         var voiceNames = Set<String>()
         for clip in voiceClips {
             let voiceSource = SourceResource(
@@ -2991,6 +3109,10 @@ struct Level: Codable, Equatable, Sendable {
                 $0.sourceName.caseInsensitiveCompare("intro7.osf")
                     == .orderedSame
             }
+            let done = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("done.osf")
+                    == .orderedSame
+            }
             guard let lesson = trainingOpeningLesson,
                   missionKey == "descent3.mission.pilot-training",
                   levelKey == "descent3.level.training-mission",
@@ -3032,8 +3154,10 @@ struct Level: Codable, Equatable, Sendable {
                     == "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
                   barrier.voiceSourceName == "guidebota.osf",
                   voiceClips.count == (
-                    trainingFinalRoomEntryChain != nil
-                        ? 11
+                    trainingFinalBotsCompletionChain != nil
+                        ? 12
+                        : trainingFinalRoomEntryChain != nil
+                            ? 11
                         : (trainingCameraMonitorChain == nil ? 5 : 10)
                   ),
                   guidebotA?.sourceEntryIndex == 4,
@@ -3146,6 +3270,36 @@ struct Level: Codable, Equatable, Sendable {
                     chain: trainingLastBot5DeathChain,
                     objects: objects,
                     objectPresentations: objectPresentations
+                )
+            }
+            if trainingFinalBotsCompletionChain != nil {
+                guard let room = rooms.first(where: {
+                    $0.sourceIndex == 16
+                }),
+                      room.portals.count == 2,
+                      room.portals[0].faceIndex == 0,
+                      room.portals[0].connectedRoom == 45,
+                      room.portals[0].connectedPortal == 9,
+                      room.portals[1].faceIndex == 1,
+                      room.portals[1].connectedRoom == 17,
+                      room.portals[1].connectedPortal == 1,
+                      let marker = objects.first(where: {
+                          $0.handle == 4_118
+                      }),
+                      marker.position == .init(
+                          x: 2_061.565_4,
+                          y: -745.747_4,
+                          z: 3_661.294_2
+                      )
+                else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training Scripts 035/056 stock topology"
+                    )
+                }
+                try validateStockTrainingFinalBotsCompletionPackage(
+                    chain: trainingFinalBotsCompletionChain,
+                    done: done,
+                    level: self
                 )
             }
             if trainingInvulnerabilityPickupChain != nil {
@@ -4142,6 +4296,79 @@ struct Level: Codable, Equatable, Sendable {
     ) -> Level {
         var level = self
         level.trainingLastBot5DeathChain = chain
+        return level
+    }
+
+    func addingTrainingFinalBotsCompletionChain(
+        _ chain: TrainingFinalBotsCompletionChain,
+        voiceClip: CanonicalVoiceClip
+    ) -> Level {
+        let dependency = DependencyRecord(
+            category: "voice",
+            source: .init(
+                storedIndex: voiceClip.sourceEntryIndex,
+                sourceName: voiceClip.sourceName
+            ),
+            state: "canonical-pcm-imported",
+            provenance:
+                "\(voiceClip.sourceArchive) \(voiceClip.sourceSHA256)"
+        )
+        var level = Level(
+            schemaVersion: 11,
+            missionKey: missionKey,
+            levelKey: levelKey,
+            source: source,
+            metadata: metadata,
+            rooms: rooms,
+            terrain: terrain,
+            objects: objects,
+            retiredObjectHandles: retiredObjectHandles,
+            paths: paths,
+            goals: goals,
+            goalFlags: goalFlags,
+            triggers: triggers,
+            playerStartFlags: playerStartFlags,
+            indoorNavigation: indoorNavigation,
+            lightmaps: lightmaps,
+            surfacePhysics: surfacePhysics,
+            presentationMaterials: presentationMaterials,
+            presentationCoronaAssets: presentationCoronaAssets,
+            models: models,
+            shipDefinitions: shipDefinitions,
+            defaultPlayerBinding: defaultPlayerBinding,
+            objectPresentations: objectPresentations,
+            trainingOpeningLesson: trainingOpeningLesson,
+            trainingGalleryBarrier: trainingGalleryBarrier,
+            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
+            trainingCameraMonitorChain: trainingCameraMonitorChain,
+            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
+            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
+            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
+            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
+            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
+            trainingInvulnerabilityPickupChain:
+                trainingInvulnerabilityPickupChain,
+            trainingCloakPickupChain: trainingCloakPickupChain,
+            trainingLastRoomChain: trainingLastRoomChain,
+            trainingFinalRoomEntryChain: trainingFinalRoomEntryChain,
+            trainingFinalBotsCompletionChain: chain,
+            voiceClips: voiceClips + [voiceClip],
+            soundClips: soundClips,
+            dependencyManifest: .init(
+                current: dependencyManifest.current + [dependency],
+                historicalEagerBaseline:
+                    dependencyManifest.historicalEagerBaseline
+            ),
+            sourceChunks: sourceChunks
+        )
+        level.trainingLastBot2DeathChain =
+            trainingLastBot2DeathChain
+        level.trainingLastBot3DeathChain =
+            trainingLastBot3DeathChain
+        level.trainingLastBot4DeathChain =
+            trainingLastBot4DeathChain
+        level.trainingLastBot5DeathChain =
+            trainingLastBot5DeathChain
         return level
     }
 

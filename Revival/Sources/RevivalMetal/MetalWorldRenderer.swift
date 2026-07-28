@@ -251,7 +251,9 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
                 trainingGuidebotReturnMarkerLightDistance:
                     frame.trainingGuidebotReturnMarkerLightDistance,
                 trainingLastRoomMarkerLightDistance:
-                    frame.trainingLastRoomMarkerLightDistance
+                    frame.trainingLastRoomMarkerLightDistance,
+                trainingFinalBotsMarkerLightDistance:
+                    frame.trainingFinalBotsMarkerLightDistance
             )
         )
     }

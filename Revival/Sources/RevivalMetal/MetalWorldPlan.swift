@@ -175,7 +175,8 @@ func updateMetalWorldPlan(
     trainingCameraMonitor: TrainingCameraMonitorFrame? = nil,
     trainingCloak: TrainingCloakFrame? = nil,
     trainingGuidebotReturnMarkerLightDistance: Float? = nil,
-    trainingLastRoomMarkerLightDistance: Float? = nil
+    trainingLastRoomMarkerLightDistance: Float? = nil,
+    trainingFinalBotsMarkerLightDistance: Float? = nil
 ) throws -> MetalWorldPlan {
     try updateMetalWorldPlan(
         prepared,
@@ -189,7 +190,9 @@ func updateMetalWorldPlan(
         trainingGuidebotReturnMarkerLightDistance:
             trainingGuidebotReturnMarkerLightDistance,
         trainingLastRoomMarkerLightDistance:
-            trainingLastRoomMarkerLightDistance
+            trainingLastRoomMarkerLightDistance,
+        trainingFinalBotsMarkerLightDistance:
+            trainingFinalBotsMarkerLightDistance
     )
 }
 
@@ -208,7 +211,8 @@ func updateMetalWorldPlan(
         trainingCameraMonitor: nil,
         trainingCloak: nil,
         trainingGuidebotReturnMarkerLightDistance: nil,
-        trainingLastRoomMarkerLightDistance: nil
+        trainingLastRoomMarkerLightDistance: nil,
+        trainingFinalBotsMarkerLightDistance: nil
     )
 }
 
@@ -222,7 +226,8 @@ private func updateMetalWorldPlan(
     trainingCameraMonitor: TrainingCameraMonitorFrame?,
     trainingCloak: TrainingCloakFrame?,
     trainingGuidebotReturnMarkerLightDistance: Float?,
-    trainingLastRoomMarkerLightDistance: Float?
+    trainingLastRoomMarkerLightDistance: Float?,
+    trainingFinalBotsMarkerLightDistance: Float?
 ) throws -> MetalWorldPlan {
     let extraction = try extractWorldForRendering(
         level,
@@ -359,6 +364,31 @@ private func updateMetalWorldPlan(
     if let distance = trainingLastRoomMarkerLightDistance,
        distance > 0,
        let chain = level.trainingLastRoomChain,
+       let marker = level.objects.first(where: {
+           $0.handle == chain.markerLightObjectHandle
+       }),
+       let gameTime = presentationFrame?.systemsGameTime {
+        let light = sourceTrainingMarkerLight(
+            chain.markerLightPresentation,
+            gameTime: gameTime
+        )
+        if light.distanceScale > 0 {
+            for index in Set(
+                activeDrawIndices + auxiliaryActiveDrawIndices
+            ) {
+                updatedPreparedDraws[index] =
+                    applyingTrainingMarkerLight(
+                        to: updatedPreparedDraws[index],
+                        position: marker.position,
+                        distance: distance * light.distanceScale,
+                        color: light.color
+                    )
+            }
+        }
+    }
+    if let distance = trainingFinalBotsMarkerLightDistance,
+       distance > 0,
+       let chain = level.trainingFinalBotsCompletionChain,
        let marker = level.objects.first(where: {
            $0.handle == chain.markerLightObjectHandle
        }),

@@ -2071,6 +2071,81 @@ final class CanonicalLevelTests: XCTestCase {
         )
     }
 
+    func testSchemaElevenRequiresExactFinalBotsCompletionChain() throws {
+        let level = makeTrainingFinalBotsCompletionLevel()
+        try level.validate()
+
+        XCTAssertEqual(level.schemaVersion, 11)
+        let chain = try XCTUnwrap(
+            level.trainingFinalBotsCompletionChain
+        )
+        XCTAssertEqual(chain.barrierRoomSourceIndex, 16)
+        XCTAssertEqual(chain.orderedPortalIndices, [0, 1])
+        XCTAssertEqual(chain.markerLightObjectHandle, 4_118)
+        XCTAssertEqual(chain.openMarkerLightDistance, 50)
+        XCTAssertEqual(chain.timerDuration, 2)
+        XCTAssertEqual(
+            chain.completionMessage,
+            "Great Job! Now fly through the opened doorway to end your training. Good job Recruit!"
+        )
+        XCTAssertEqual(chain.completionVoiceSourceName, "done.osf")
+
+        let stockVoice = CanonicalVoiceClip(
+            sourceName: "done.osf",
+            sourceEntryIndex: 2,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 234_609,
+            pcm16LittleEndian: Data(),
+            pcmSHA256:
+                "87efaee428868cf09d74ae72ded48f91ce6f9db55ee823c82fcbf37c07487953",
+            sourceArchive: "missions/training.mn3",
+            sourceSHA256:
+                "a14ce32c2b72fb222c9dfdfdbc277b062ebbb6774e5757c4fe1602b87630383c"
+        )
+        XCTAssertNoThrow(
+            try validateStockTrainingFinalBotsCompletionPackage(
+                chain: chain,
+                done: stockVoice,
+                level: level
+            )
+        )
+        let wrongVoice = CanonicalVoiceClip(
+            sourceName: stockVoice.sourceName,
+            sourceEntryIndex: 3,
+            sampleRate: stockVoice.sampleRate,
+            channelCount: stockVoice.channelCount,
+            frameCount: stockVoice.frameCount,
+            pcm16LittleEndian: stockVoice.pcm16LittleEndian,
+            pcmSHA256: stockVoice.pcmSHA256,
+            sourceArchive: stockVoice.sourceArchive,
+            sourceSHA256: stockVoice.sourceSHA256
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingFinalBotsCompletionPackage(
+                chain: chain,
+                done: wrongVoice,
+                level: level
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency(
+                    "Training Scripts 035/056 completion"
+                )
+            )
+        }
+
+        var hostile = level
+        hostile.objects.removeAll {
+            $0.handle == chain.markerLightObjectHandle
+        }
+        assertValidationError(
+            .invalidDependency("Training Scripts 035/056 completion"),
+            hostile
+        )
+    }
+
     func testSchemaEightRejectsWrongTrainingGalleryMarkerIdentity() throws {
         let level = makeTrainingGalleryBarrierLevel()
         try level.validate()
@@ -4489,6 +4564,8 @@ func replacing(
     trainingCloakPickupChain: TrainingCloakPickupChain? = nil,
     trainingLastRoomChain: TrainingLastRoomChain? = nil,
     trainingFinalRoomEntryChain: TrainingFinalRoomEntryChain? = nil,
+    trainingFinalBotsCompletionChain:
+        TrainingFinalBotsCompletionChain? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
     soundClips: [CanonicalSoundClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
@@ -4553,6 +4630,9 @@ func replacing(
         trainingFinalRoomEntryChain:
             trainingFinalRoomEntryChain
             ?? level.trainingFinalRoomEntryChain,
+        trainingFinalBotsCompletionChain:
+            trainingFinalBotsCompletionChain
+            ?? level.trainingFinalBotsCompletionChain,
         voiceClips: voiceClips ?? level.voiceClips,
         soundClips: soundClips ?? level.soundClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
@@ -4566,6 +4646,9 @@ func replacing(
         trainingLastBot4DeathChain ?? level.trainingLastBot4DeathChain
     replaced.trainingLastBot5DeathChain =
         trainingLastBot5DeathChain ?? level.trainingLastBot5DeathChain
+    replaced.trainingFinalBotsCompletionChain =
+        trainingFinalBotsCompletionChain
+        ?? level.trainingFinalBotsCompletionChain
     return replaced
 }
 
