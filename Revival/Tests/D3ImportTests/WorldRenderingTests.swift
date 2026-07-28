@@ -2421,6 +2421,11 @@ final class WorldRenderingTests: XCTestCase {
             level: level,
             presentationReadyTimestamp: 0
         )
+        initial.destroyTrainingRobot(handle: 4_112)
+        initial.destroyTrainingRASBot1(handle: 2_074)
+        initial.destroyTrainingRASBot2(handle: 2_075)
+        initial.destroyTrainingRASBot3(handle: 2_077)
+        initial.destroyTrainingRASBot4(handle: 2_078)
         initial.destroyTrainingLastBot1(handle: 4_127)
         initial.destroyTrainingLastBot2(handle: 2_080)
         initial.destroyTrainingLastBot3(handle: 2_081)
@@ -2455,6 +2460,22 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(finalGoal.endLevelState, .succeeded)
         XCTAssertEqual(finalGoal.scriptActionCounter, 1)
         XCTAssertTrue(finalGoal.controlsAreSuspended)
+        XCTAssertEqual(
+            finalGoal.postLevelResult,
+            .init(
+                title: "Mission Successful",
+                levelName: "Training Mission",
+                difficulty: .rookie,
+                score: 2_000,
+                elapsedTime: 0.1,
+                enemyKills: 10,
+                shields: 100,
+                energy: 100,
+                deaths: 0,
+                restores: 0,
+                objectives: []
+            )
+        )
         XCTAssertEqual(frame.enabledPlayerControls, [])
         XCTAssertFalse(frame.showsEnabledPlayerControls)
         XCTAssertEqual(
@@ -2474,6 +2495,107 @@ final class WorldRenderingTests: XCTestCase {
                 finalGoal.presentation
             ),
             "Mission Successful\nTraining Mission\nDifficulty: Rookie"
+        )
+        XCTAssertEqual(
+            RevivalGameplayView.trainingPostLevelResultText(
+                finalGoal.postLevelResult
+            ),
+            """
+            Mission Successful
+            Training Mission
+            Difficulty: Rookie
+            Score: 2000
+            Time: 0:00
+            Enemies Killed: 10
+            Shields: 100
+            Energy: 100
+            Deaths: 0
+            Restores: 0
+            """
+        )
+        XCTAssertTrue(
+            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+                keyCode: 36,
+                resultIsPresented: true,
+                presentationElapsedTime: 2
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+                keyCode: 36,
+                resultIsPresented: true,
+                presentationElapsedTime: 1.999
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+                keyCode: 36,
+                resultIsPresented: false,
+                presentationElapsedTime: 2
+            )
+        )
+        XCTAssertTrue(
+            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+                keyCode: 49,
+                resultIsPresented: true,
+                presentationElapsedTime: 2
+            )
+        )
+        XCTAssertTrue(
+            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+                keyCode: 53,
+                resultIsPresented: true,
+                presentationElapsedTime: 2
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+                resultIsPresented: true,
+                presentationElapsedTime: 1.999,
+                queuedKey: false,
+                mouseButtonIsPressed: true,
+                controllerButtonIsPressed: false
+            )
+        )
+        XCTAssertTrue(
+            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+                resultIsPresented: true,
+                presentationElapsedTime: 2,
+                queuedKey: true,
+                mouseButtonIsPressed: false,
+                controllerButtonIsPressed: false
+            )
+        )
+        XCTAssertTrue(
+            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+                resultIsPresented: true,
+                presentationElapsedTime: 2,
+                queuedKey: false,
+                mouseButtonIsPressed: true,
+                controllerButtonIsPressed: false
+            )
+        )
+        XCTAssertTrue(
+            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+                resultIsPresented: true,
+                presentationElapsedTime: 2,
+                queuedKey: false,
+                mouseButtonIsPressed: false,
+                controllerButtonIsPressed: true
+            )
+        )
+        XCTAssertEqual(
+            simulation.trainingSessionOutcome,
+            .awaitingResultAcknowledgement
+        )
+        XCTAssertEqual(
+            simulation.acknowledgeTrainingResult(),
+            .completed
+        )
+        XCTAssertEqual(simulation.trainingSessionOutcome, .completed)
+        XCTAssertEqual(
+            simulation.acknowledgeTrainingResult(),
+            .completed
         )
 
         let continuationData = try JSONEncoder().encode(

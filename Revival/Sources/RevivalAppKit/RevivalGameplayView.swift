@@ -34,6 +34,7 @@ final class RevivalGameplayView: MTKView {
     var guidebotDeployRequested: (() -> Void)?
     var primaryFireRequested: (() -> Void)?
     var inventoryUseRequested: (() -> Void)?
+    var trainingResultAcknowledgementRequested: (() -> Void)?
 
     private var heldKeys: Set<UInt16> = []
     private var pendingMouseX: Float = 0
@@ -56,6 +57,9 @@ final class RevivalGameplayView: MTKView {
     private var trainingVoicePlayer: AVAudioPlayer?
     private var trainingSoundPlayers: [AVAudioPlayer] = []
     private var trainingMessageExpiresAt: Float?
+    private var trainingResultIsPresented = false
+    private var trainingResultPresentedAt: TimeInterval?
+    private var pendingTrainingResultKeyAcknowledgement = false
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -135,13 +139,19 @@ final class RevivalGameplayView: MTKView {
         trainingEndLevelOverlay.frame = bounds
         trainingEndLevelLabel.frame = NSRect(
             x: max(24, bounds.midX - 240),
-            y: max(24, bounds.midY - 60),
+            y: max(24, bounds.midY - 180),
             width: min(480, max(0, bounds.width - 48)),
-            height: 120
+            height: min(360, max(0, bounds.height - 48))
         )
     }
 
     override func keyDown(with event: NSEvent) {
+        if trainingResultIsPresented,
+           Self.isTrainingResultAcknowledgementKey(event.keyCode) {
+            pendingTrainingResultKeyAcknowledgement = true
+            requestTrainingResultAcknowledgement()
+            return
+        }
         if event.keyCode == 53 {
             releaseMouse()
             return
@@ -188,6 +198,10 @@ final class RevivalGameplayView: MTKView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        if trainingResultIsPresented {
+            requestTrainingResultAcknowledgement()
+            return
+        }
         guard gameplayIsActive else {
             super.mouseDown(with: event)
             return
@@ -225,8 +239,6 @@ final class RevivalGameplayView: MTKView {
             trainingSoundPlayers.forEach { $0.stop() }
             trainingSoundPlayers.removeAll()
             cameraMonitorBorder.isHidden = true
-            trainingEndLevelOverlay.isHidden = true
-            trainingEndLevelLabel.isHidden = true
         }
     }
 
@@ -249,11 +261,31 @@ final class RevivalGameplayView: MTKView {
             trainingSoundPlayers.forEach { $0.stop() }
             trainingSoundPlayers.removeAll()
             trainingEndLevelLabel.stringValue =
-                Self.trainingEndLevelText(finalGoal.presentation)
+                Self.trainingPostLevelResultText(
+                    finalGoal.postLevelResult
+                )
+            if !trainingResultIsPresented {
+                trainingResultPresentedAt =
+                    ProcessInfo.processInfo.systemUptime
+                perform(
+                    #selector(trainingResultAdmissionDidOpen),
+                    with: nil,
+                    afterDelay: 2
+                )
+            }
+            trainingResultIsPresented = true
             trainingEndLevelOverlay.isHidden = false
             trainingEndLevelLabel.isHidden = false
             return
         }
+        trainingResultIsPresented = false
+        trainingResultPresentedAt = nil
+        pendingTrainingResultKeyAcknowledgement = false
+        NSObject.cancelPreviousPerformRequests(
+            withTarget: self,
+            selector: #selector(trainingResultAdmissionDidOpen),
+            object: nil
+        )
         trainingEndLevelOverlay.isHidden = true
         trainingEndLevelLabel.isHidden = true
         cameraMonitorBorder.isHidden = frame.trainingCameraMonitor == nil
@@ -694,8 +726,8 @@ final class RevivalGameplayView: MTKView {
         trainingEndLevelLabel.drawsBackground = false
         trainingEndLevelLabel.textColor = .white
         trainingEndLevelLabel.alignment = .center
-        trainingEndLevelLabel.maximumNumberOfLines = 3
-        trainingEndLevelLabel.font = .boldSystemFont(ofSize: 22)
+        trainingEndLevelLabel.maximumNumberOfLines = 14
+        trainingEndLevelLabel.font = .boldSystemFont(ofSize: 20)
         trainingEndLevelLabel.isHidden = true
         trainingEndLevelLabel.setAccessibilityLabel(
             "Training mission result text"
@@ -711,6 +743,66 @@ final class RevivalGameplayView: MTKView {
             presentation.levelName,
             "Difficulty: \(presentation.difficulty.rawValue)",
         ].joined(separator: "\n")
+    }
+
+    nonisolated static func trainingPostLevelResultText(
+        _ result: TrainingPostLevelResult
+    ) -> String {
+        let elapsedSeconds = max(0, Int(result.elapsedTime))
+        var lines = [
+            result.title,
+            result.levelName,
+            "Difficulty: \(result.difficulty.rawValue)",
+            "Score: \(result.score)",
+            "Time: \(elapsedSeconds / 60):"
+                + String(format: "%02d", elapsedSeconds % 60),
+            "Enemies Killed: \(result.enemyKills)",
+            "Shields: \(Int(result.shields.rounded()))",
+            "Energy: \(Int(result.energy.rounded()))",
+            "Deaths: \(result.deaths)",
+            "Restores: \(result.restores)",
+        ]
+        if !result.objectives.isEmpty {
+            lines.append("Objectives")
+            lines.append(contentsOf: result.objectives)
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    nonisolated static func requestsTrainingResultAcknowledgement(
+        keyCode: UInt16,
+        resultIsPresented: Bool,
+        presentationElapsedTime: TimeInterval
+    ) -> Bool {
+        requestsTrainingResultAcknowledgement(
+            resultIsPresented: resultIsPresented,
+            presentationElapsedTime: presentationElapsedTime,
+            queuedKey: isTrainingResultAcknowledgementKey(keyCode),
+            mouseButtonIsPressed: false,
+            controllerButtonIsPressed: false
+        )
+    }
+
+    nonisolated static func requestsTrainingResultAcknowledgement(
+        resultIsPresented: Bool,
+        presentationElapsedTime: TimeInterval,
+        queuedKey: Bool,
+        mouseButtonIsPressed: Bool,
+        controllerButtonIsPressed: Bool
+    ) -> Bool {
+        resultIsPresented
+            && presentationElapsedTime >= 2
+            && (
+                queuedKey
+                || mouseButtonIsPressed
+                || controllerButtonIsPressed
+            )
+    }
+
+    nonisolated private static func isTrainingResultAcknowledgementKey(
+        _ keyCode: UInt16
+    ) -> Bool {
+        [36, 49, 53].contains(keyCode)
     }
 
     nonisolated private static func controlSummary(
@@ -835,12 +927,86 @@ final class RevivalGameplayView: MTKView {
         activeController = controller
         controller?.handlerQueue = .main
         controller?.extendedGamepad?.valueChangedHandler = {
-            [weak self] _, _ in
+            [weak self] _, element in
             MainActor.assumeIsolated {
-                self?.publishControllerInput()
+                guard let self else { return }
+                if self.trainingResultIsPresented,
+                   let button = element as? GCControllerButtonInput,
+                   button.isPressed {
+                    self.requestTrainingResultAcknowledgement()
+                    return
+                }
+                self.publishControllerInput()
             }
         }
         publishControllerInput()
+    }
+
+    private func requestTrainingResultAcknowledgement() {
+        guard Self.requestsTrainingResultAcknowledgement(
+            resultIsPresented: trainingResultIsPresented,
+            presentationElapsedTime:
+                trainingResultPresentationElapsedTime,
+            queuedKey: pendingTrainingResultKeyAcknowledgement,
+            mouseButtonIsPressed: NSEvent.pressedMouseButtons != 0,
+            controllerButtonIsPressed:
+                controllerHasPressedButton
+        ) else {
+            return
+        }
+        trainingResultIsPresented = false
+        trainingResultPresentedAt = nil
+        pendingTrainingResultKeyAcknowledgement = false
+        NSObject.cancelPreviousPerformRequests(
+            withTarget: self,
+            selector: #selector(trainingResultAdmissionDidOpen),
+            object: nil
+        )
+        trainingResultAcknowledgementRequested?()
+    }
+
+    @objc private func trainingResultAdmissionDidOpen() {
+        requestTrainingResultAcknowledgement()
+    }
+
+    private var trainingResultPresentationElapsedTime: TimeInterval {
+        guard let trainingResultPresentedAt else { return 0 }
+        return ProcessInfo.processInfo.systemUptime
+            - trainingResultPresentedAt
+    }
+
+    private var controllerHasPressedButton: Bool {
+        guard let gamepad = activeController?.extendedGamepad else {
+            return false
+        }
+        var buttons = [
+            gamepad.buttonA,
+            gamepad.buttonB,
+            gamepad.buttonX,
+            gamepad.buttonY,
+            gamepad.buttonMenu,
+            gamepad.leftShoulder,
+            gamepad.rightShoulder,
+            gamepad.leftTrigger,
+            gamepad.rightTrigger,
+            gamepad.dpad.up,
+            gamepad.dpad.down,
+            gamepad.dpad.left,
+            gamepad.dpad.right,
+        ]
+        if let button = gamepad.buttonOptions {
+            buttons.append(button)
+        }
+        if let button = gamepad.buttonHome {
+            buttons.append(button)
+        }
+        if let button = gamepad.leftThumbstickButton {
+            buttons.append(button)
+        }
+        if let button = gamepad.rightThumbstickButton {
+            buttons.append(button)
+        }
+        return buttons.contains(where: \.isPressed)
     }
 
     private func disconnectController() {

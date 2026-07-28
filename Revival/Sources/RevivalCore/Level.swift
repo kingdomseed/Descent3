@@ -835,6 +835,10 @@ struct TrainingGuidebotDefinition: Codable, Equatable, Sendable {
 }
 
 extension TrainingRobotCombatDefinition {
+    // d3.hog/table.gam generic page "RAS1 Light Security Flyer",
+    // version 27 score field. All ten Training combat chains use this page.
+    static let stockTrainingScore = 200
+
     static let stockTraining = Self(
         robotShields: 55,
         robotCollisionRadius: 4.576_441_8,

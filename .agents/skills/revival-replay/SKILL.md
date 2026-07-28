@@ -31,7 +31,12 @@ Replay records the information the selected simulation actually needs. Preserve 
 - A public replay revision is explicit and validated at intake. Add a migration only for a real released native revision.
 - An incompatible revision fails with an actionable diagnostic; it does not trigger a legacy reader or hidden fallback.
 - Checkpoints and hashes describe exactly which authoritative state they cover. They are evidence, not a claim that every platform float is magically deterministic.
-- Playback uses the selected scheduler and simulation ownership. Do not retain variable and fixed replay modes.
+- Recording and playback use the sole explicit variable-delta `PlayerSimulation.update(at:input:)` path. Record each admitted update duration plus the exact `InputSnapshot` consumed by that update; a presentation callback rejected before the reusable-slot, drawable, and render-pass admission point records no update, input, or duration. Playback consumes those recorded values through the same path without a fixed tick, idealized display deadline, presentation callback record, replay-only simulation seam, or variable/fixed mode.
+- Continuation schema 7 is the current fail-closed, level-key and source-hash-bound internal `PlayerSimulation` snapshot. It is not a replay revision, recorded input history, authoritative RNG record, checkpoint stream, or Phase 5 player save-slot format, and replay must not silently reinterpret or publish it as one.
+
+## First replay census
+
+Before selecting the first replay design, construct one finite source census from `Descent3/demofile.cpp`, the reached `Descent3/GameLoop.cpp` record/playback calls, `misc/psrand.cpp`, and every current presentation or gameplay caller that seeds or consumes the same random stream. Name the released revision, record and playback roots, initialization and end conditions, simulation and presentation consumers, editor and session callers, and deferred multiplayer edges. Account for the authoritative initial seed and every reached consumption in source order before claiming repeatable playback or an authoritative hash; do not assume presentation randomness is harmless, split RNG ownership without an accepted deliberate difference, or infer determinism from input recording alone.
 
 ## Prohibited complexity
 

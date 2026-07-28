@@ -472,11 +472,31 @@ struct TrainingEndLevelPresentation: Equatable, Sendable {
     let showsHeadlightIndicator: Bool
 }
 
+struct TrainingPostLevelResult: Equatable, Sendable {
+    let title: String
+    let levelName: String
+    let difficulty: TrainingDifficulty
+    let score: Int
+    let elapsedTime: Float
+    let enemyKills: Int
+    let shields: Float
+    let energy: Float
+    let deaths: Int
+    let restores: Int
+    let objectives: [String]
+}
+
+enum TrainingSessionOutcome: Equatable, Sendable {
+    case awaitingResultAcknowledgement
+    case completed
+}
+
 struct TrainingFinalGoalFrame: Equatable, Sendable {
     let endLevelState: TrainingEndLevelState
     let scriptActionCounter: Int
     let controlsAreSuspended: Bool
     let presentation: TrainingEndLevelPresentation
+    let postLevelResult: TrainingPostLevelResult
 }
 
 enum TrainingCloakPhase: String, Codable, Equatable, Sendable {
@@ -1124,6 +1144,7 @@ final class PlayerSimulation {
     private(set) var afterburnerFuel: Float = 5
     private(set) var afterburnerIsActive = false
     private(set) var energy: Float = 100
+    private(set) var trainingSessionOutcome: TrainingSessionOutcome?
     private(set) var afterburnerMagnitude: Float = 0
     private(set) var wiggleFalloff: Float = 0
 
@@ -1153,6 +1174,7 @@ final class PlayerSimulation {
     private var trainingFinalBotsCompletionState:
         TrainingFinalBotsCompletionState?
     private var trainingFinalGoalState: TrainingFinalGoalState?
+    private var trainingPostLevelResult: TrainingPostLevelResult?
 
     init(level: Level, presentationReadyTimestamp: Double) {
         precondition(presentationReadyTimestamp.isFinite)
@@ -1731,6 +1753,12 @@ final class PlayerSimulation {
         trainingFinalBotsCompletionState =
             restoredFinalBotsCompletionState
         trainingFinalGoalState = restoredFinalGoalState
+        if restoredFinalGoalState?.endLevelWasRequested == true {
+            trainingPostLevelResult = makeTrainingPostLevelResult(
+                elapsedTime: gameTime
+            )
+            trainingSessionOutcome = .awaitingResultAcknowledgement
+        }
         restoreTrainingGuidebotPresentation()
         if trainingRobotGuidebotState?.guidebotEnteredShip == true,
            let handle =
@@ -3248,6 +3276,10 @@ final class PlayerSimulation {
             state.endLevelWasRequested = true
             state.scriptActionCounter += 1
             trainingFinalGoalState = state
+            trainingPostLevelResult = makeTrainingPostLevelResult(
+                elapsedTime: systemsGameTime
+            )
+            trainingSessionOutcome = .awaitingResultAcknowledgement
         }
         if trainingInvulnerabilityPickupWasHitThisFrame,
             var state = trainingInvulnerabilityPickupState,
@@ -3678,7 +3710,10 @@ final class PlayerSimulation {
         )
         let finalGoalFrame: TrainingFinalGoalFrame? =
             trainingFinalGoalState.flatMap { state in
-            guard state.endLevelWasRequested else { return nil }
+            guard state.endLevelWasRequested,
+                  let postLevelResult = trainingPostLevelResult else {
+                return nil
+            }
             return TrainingFinalGoalFrame(
                 endLevelState: .succeeded,
                 scriptActionCounter: state.scriptActionCounter,
@@ -3691,7 +3726,8 @@ final class PlayerSimulation {
                     playsGameplayAudio: false,
                     showsCockpit: false,
                     showsHeadlightIndicator: false
-                )
+                ),
+                postLevelResult: postLevelResult
             )
         }
         if var state = trainingCameraMonitorState {
@@ -3769,6 +3805,49 @@ final class PlayerSimulation {
                 trainingFinalBotsCompletionState?
                     .markerLightDistance,
             trainingFinalGoal: finalGoalFrame
+        )
+    }
+
+    func acknowledgeTrainingResult() -> TrainingSessionOutcome? {
+        guard trainingPostLevelResult != nil else { return nil }
+        trainingSessionOutcome = .completed
+        return trainingSessionOutcome
+    }
+
+    private func makeTrainingPostLevelResult(
+        elapsedTime: Float
+    ) -> TrainingPostLevelResult {
+        let enemyKills = [
+            trainingRobotGuidebotState?.robotWasDestroyed == true,
+            trainingRASBot1DeathState?.wasDestroyed == true,
+            trainingRASBot2DeathState?.wasDestroyed == true,
+            trainingRASBot3DeathState?.wasDestroyed == true,
+            trainingRASBot4DeathState?.wasDestroyed == true,
+            trainingLastBot1DeathState?.wasDestroyed == true,
+            trainingLastBot2DeathState?.wasDestroyed == true,
+            trainingLastBot3DeathState?.wasDestroyed == true,
+            trainingLastBot4DeathState?.wasDestroyed == true,
+            trainingLastBot5DeathState?.wasDestroyed == true,
+        ].count(where: { $0 })
+        return TrainingPostLevelResult(
+            title: "Mission Successful",
+            levelName: level.metadata.name,
+            difficulty: .rookie,
+            score:
+                enemyKills
+                * TrainingRobotCombatDefinition.stockTrainingScore,
+            elapsedTime: elapsedTime,
+            enemyKills: enemyKills,
+            // Player damage, death, and restore ownership are later Phase 5
+            // islands. The current normal Training path retains its source
+            // initial ratings and has no admitted death or restore transition.
+            shields: 100,
+            energy: energy,
+            deaths: 0,
+            restores: 0,
+            // Training's two camera goals do not carry LGF_TELCOM_LISTS, so
+            // SinglePlayerPostLevelResults presents no objective rows.
+            objectives: []
         )
     }
 

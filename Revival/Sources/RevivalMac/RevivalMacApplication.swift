@@ -252,7 +252,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                 if frame.trainingFinalGoal != nil {
                     renderer.setFrameUpdate(nil)
                     self.setStatus(
-                        "Training complete.",
+                        "Acknowledge the Training mission result to complete the session.",
                         isError: false
                     )
                 }
@@ -334,6 +334,9 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.inventoryUseRequested = {
                 [weak self] in self?.playerInput.requestInventoryUse()
             }
+            gameplayView.trainingResultAcknowledgementRequested = {
+                [weak self] in self?.acknowledgeTrainingResult()
+            }
             window.makeFirstResponder(gameplayView)
             self.gameplayView = gameplayView
         }
@@ -344,12 +347,28 @@ private final class RevivalMacApplicationDelegate: NSObject,
         let active =
             NSApplication.shared.isActive
             && window?.isKeyWindow == true
+            && simulation?.trainingSessionOutcome != .completed
         playerInput.setGameplayActive(
             active,
             simulation: simulation,
             at: ProcessInfo.processInfo.systemUptime
         )
         gameplayView?.setGameplayActive(active && simulation != nil)
+    }
+
+    private func acknowledgeTrainingResult() {
+        guard let simulation,
+              simulation.acknowledgeTrainingResult() == .completed else {
+            return
+        }
+        let timestamp = ProcessInfo.processInfo.systemUptime
+        playerInput.setGameplayActive(
+            false,
+            simulation: simulation,
+            at: timestamp
+        )
+        gameplayView?.setGameplayActive(false)
+        setStatus("Training session completed.", isError: false)
     }
 
     private func setStatus(_ message: String, isError: Bool) {
