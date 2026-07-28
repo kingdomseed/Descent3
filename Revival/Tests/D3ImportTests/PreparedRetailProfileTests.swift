@@ -1,13 +1,14 @@
 import XCTest
 
 final class PreparedRetailProfileTests: XCTestCase {
-    func testTrainingMessagesRequireScript004GoRight() throws {
+    func testTrainingMessagesRequireScript005GoUp() throws {
         let missingGoLeft = Data("""
             Welcome=Welcome
             GoForward=Forward
             GoodJob=Excellent
             GoBackwards=Reverse
             GoRight=Right
+            GoUp=Up
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoLeft)) {
             XCTAssertEqual(
@@ -22,8 +23,24 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoodJob=Excellent
             GoBackwards=Reverse
             GoLeft=Left
+            GoUp=Up
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoRight)) {
+            XCTAssertEqual(
+                $0 as? D3ImportOperationError,
+                .missingPresentationAsset("TrainingMission.msg")
+            )
+        }
+
+        let missingGoUp = Data("""
+            Welcome=Welcome
+            GoForward=Forward
+            GoodJob=Excellent
+            GoBackwards=Reverse
+            GoLeft=Left
+            GoRight=Right
+            """.utf8)
+        XCTAssertThrowsError(try parseTrainingMessages(missingGoUp)) {
             XCTAssertEqual(
                 $0 as? D3ImportOperationError,
                 .missingPresentationAsset("TrainingMission.msg")
@@ -37,10 +54,11 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoBackwards=Reverse
             GoLeft=Left
             GoRight=Right
+            GoUp=Now Slide up  until you stop.
             """.utf8)
         XCTAssertEqual(
-            try parseTrainingMessages(complete)["GoRight"],
-            "Right"
+            try parseTrainingMessages(complete)["GoUp"],
+            "Now Slide up  until you stop."
         )
     }
 

@@ -55,6 +55,16 @@ final class WorldRenderingTests: XCTestCase {
                 instruction:
                     "Now Slide right until you return to the start position.",
                 voiceSourceName: "return2.osf"
+            ),
+            returnUp: .init(
+                startGoalObjectHandle: startGoalHandle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: startGoalModel,
+                    objectType: 7
+                ),
+                successMessage: "Excellent!",
+                instruction: "Now Slide up  until you stop.",
+                voiceSourceName: "up1.osf"
             )
         )
         level = level.addingTrainingOpeningLesson(lesson, voiceClips: [])
@@ -125,13 +135,39 @@ final class WorldRenderingTests: XCTestCase {
         )
         let resumedUnconditionalScript004 = restoredUnconditionalScript004
             .update(at: 1.1, input: .zero)
-        XCTAssertTrue(
-            resumedUnconditionalScript004.trainingOpeningFeedback.isEmpty
+        XCTAssertEqual(
+            resumedUnconditionalScript004.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Excellent!"],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false
+                ),
+                .init(
+                    hudMessages: ["Now Slide up  until you stop."],
+                    voiceSourceName: "up1.osf",
+                    voicePrecedesHUDMessages: true
+                ),
+            ]
         )
         XCTAssertEqual(
             resumedUnconditionalScript004.enabledPlayerControls,
-            [.forward, .right]
+            [.forward, .up]
         )
+        let earlyUpContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(
+                restoredUnconditionalScript004.continuation
+            )
+        )
+        let restoredEarlyUp = try PlayerSimulation(
+            level: unconditionalLevel,
+            continuation: earlyUpContinuation,
+            resumedAtTimestamp: 2
+        ).update(at: 2.1, input: .zero)
+        XCTAssertTrue(restoredEarlyUp.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(restoredEarlyUp.enabledPlayerControls, [.forward, .up])
+
         var earlyForwardGoalFrame: PlayerSimulationFrame?
         var earlyTimestamp = 1.1
         for _ in 0..<80 {
@@ -149,7 +185,7 @@ final class WorldRenderingTests: XCTestCase {
         }
         XCTAssertEqual(
             try XCTUnwrap(earlyForwardGoalFrame).enabledPlayerControls,
-            [.reverse, .right]
+            [.reverse, .up]
         )
         let earlyForwardContinuation = try JSONDecoder().decode(
             PlayerSimulationContinuation.self,
@@ -168,7 +204,7 @@ final class WorldRenderingTests: XCTestCase {
         )
         XCTAssertEqual(
             resumedAfterEarlyForward.enabledPlayerControls,
-            [.reverse, .right]
+            [.reverse, .up]
         )
         var earlyReturnGoalFrame: PlayerSimulationFrame?
         var earlyReturnTimestamp = 100.1
@@ -187,7 +223,7 @@ final class WorldRenderingTests: XCTestCase {
         }
         XCTAssertEqual(
             try XCTUnwrap(earlyReturnGoalFrame).enabledPlayerControls,
-            [.left, .right]
+            [.left, .up]
         )
         let earlyReturnContinuation = try JSONDecoder().decode(
             PlayerSimulationContinuation.self,
@@ -205,7 +241,7 @@ final class WorldRenderingTests: XCTestCase {
                 at: 200.1,
                 input: .zero
             ).enabledPlayerControls,
-            [.left, .right]
+            [.left, .up]
         )
 
         let timerLevel = level
@@ -264,6 +300,91 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertFalse(
             hiddenGoalExtraction.admittedObjectHandles.contains(startGoalHandle)
         )
+
+        var sharedCallbackLevel = level
+        let sharedPlayerIndex = try XCTUnwrap(
+            sharedCallbackLevel.objects.firstIndex { $0.handle == 2_048 }
+        )
+        let sharedForwardIndex = try XCTUnwrap(
+            sharedCallbackLevel.objects.firstIndex { $0.handle == goalHandle }
+        )
+        let sharedLeftIndex = try XCTUnwrap(
+            sharedCallbackLevel.objects.firstIndex { $0.handle == 12_299 }
+        )
+        let sharedStartIndex = try XCTUnwrap(
+            sharedCallbackLevel.objects.firstIndex {
+                $0.handle == startGoalHandle
+            }
+        )
+        let sharedPlayerPosition =
+            sharedCallbackLevel.objects[sharedPlayerIndex].position
+        let sharedPlayerLocation =
+            sharedCallbackLevel.objects[sharedPlayerIndex].location
+        sharedCallbackLevel.objects[sharedForwardIndex].position =
+            sharedPlayerPosition
+        sharedCallbackLevel.objects[sharedForwardIndex].location =
+            sharedPlayerLocation
+        sharedCallbackLevel.objects[sharedLeftIndex].position =
+            sharedPlayerPosition
+        sharedCallbackLevel.objects[sharedLeftIndex].location =
+            sharedPlayerLocation
+        sharedCallbackLevel.objects[sharedStartIndex].position = .init(
+            x: sharedPlayerPosition.x,
+            y: sharedPlayerPosition.y,
+            z: sharedPlayerPosition.z + 50
+        )
+        let sharedCallbackSetup = PlayerSimulation(
+            level: sharedCallbackLevel,
+            presentationReadyTimestamp: 0
+        )
+        let sharedSetupFrame = sharedCallbackSetup.update(
+            at: 0.1,
+            input: .zero
+        )
+        XCTAssertEqual(
+            sharedSetupFrame.enabledPlayerControls,
+            [.reverse, .right]
+        )
+        sharedCallbackLevel.objects[sharedForwardIndex].position = .init(
+            x: sharedPlayerPosition.x,
+            y: sharedPlayerPosition.y,
+            z: sharedPlayerPosition.z + 50
+        )
+        sharedCallbackLevel.objects[sharedLeftIndex].position = .init(
+            x: sharedPlayerPosition.x,
+            y: sharedPlayerPosition.y,
+            z: sharedPlayerPosition.z + 50
+        )
+        sharedCallbackLevel.objects[sharedStartIndex].position =
+            sharedPlayerPosition
+        sharedCallbackLevel.objects[sharedStartIndex].location =
+            sharedPlayerLocation
+        let sharedCallback = try PlayerSimulation(
+            level: sharedCallbackLevel,
+            continuation: sharedCallbackSetup.continuation,
+            resumedAtTimestamp: 10
+        ).update(at: 10.1, input: .zero)
+        XCTAssertEqual(
+            sharedCallback.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Now Go Left until you stop."],
+                    voiceSourceName: "left1.osf",
+                    voicePrecedesHUDMessages: false
+                ),
+                .init(
+                    hudMessages: ["Excellent!"],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false
+                ),
+                .init(
+                    hudMessages: ["Now Slide up  until you stop."],
+                    voiceSourceName: "up1.osf",
+                    voicePrecedesHUDMessages: true
+                ),
+            ]
+        )
+        XCTAssertEqual(sharedCallback.enabledPlayerControls, [.left, .up])
 
         let timerOnly = PlayerSimulation(
             level: timerLevel,
@@ -452,6 +573,19 @@ final class WorldRenderingTests: XCTestCase {
             PlayerSimulationContinuation.self,
             from: script004ContinuationData
         )
+        var compatibleScript004Lesson = lesson
+        compatibleScript004Lesson.returnUp = nil
+        let compatibleScript004 = try PlayerSimulation(
+            level: replacing(
+                level,
+                trainingOpeningLesson: compatibleScript004Lesson
+            ),
+            continuation: script004Continuation,
+            resumedAtTimestamp: 300
+        ).update(at: 300.1, input: .zero)
+        XCTAssertTrue(compatibleScript004.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(compatibleScript004.enabledPlayerControls, [.right])
+
         let restoredAfterScript004 = try PlayerSimulation(
             level: level,
             continuation: script004Continuation,
@@ -461,8 +595,76 @@ final class WorldRenderingTests: XCTestCase {
             at: 300.1,
             input: .init(sideways: 1)
         )
-        XCTAssertTrue(resumedAfterScript004.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(resumedAfterScript004.enabledPlayerControls, [.right])
+        var script005Frame = resumedAfterScript004.trainingOpeningFeedback
+            .contains(where: {
+                $0.voiceSourceName == "up1.osf"
+            }) ? resumedAfterScript004 : nil
+        if script005Frame == nil {
+            for frameIndex in 2...80 {
+                let frame = restoredAfterScript004.update(
+                    at: 300 + Double(frameIndex) * 0.1,
+                    input: .init(sideways: 1)
+                )
+                if frame.trainingOpeningFeedback.contains(where: {
+                    $0.voiceSourceName == "up1.osf"
+                }) {
+                    script005Frame = frame
+                    break
+                }
+            }
+        }
+        let returnedFromLeft = try XCTUnwrap(script005Frame)
+        XCTAssertEqual(
+            returnedFromLeft.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Excellent!"],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false
+                ),
+                .init(
+                    hudMessages: ["Now Slide up  until you stop."],
+                    voiceSourceName: "up1.osf",
+                    voicePrecedesHUDMessages: true
+                ),
+            ]
+        )
+        XCTAssertEqual(returnedFromLeft.enabledPlayerControls, [.up])
+        let afterScript005 = restoredAfterScript004.update(
+            at: 308.1,
+            input: .init(sideways: 1)
+        )
+        XCTAssertTrue(afterScript005.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(afterScript005.enabledPlayerControls, [.up])
+
+        let script005Continuation = restoredAfterScript004.continuation
+        let restoredAfterScript005 = try PlayerSimulation(
+            level: level,
+            continuation: script005Continuation,
+            resumedAtTimestamp: 400
+        ).update(at: 400.1, input: .zero)
+        XCTAssertTrue(
+            restoredAfterScript005.trainingOpeningFeedback.isEmpty
+        )
+        XCTAssertEqual(restoredAfterScript005.enabledPlayerControls, [.up])
+
+        var missingUpLesson = lesson
+        missingUpLesson.returnUp = nil
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: replacing(
+                    level,
+                    trainingOpeningLesson: missingUpLesson
+                ),
+                continuation: script005Continuation,
+                resumedAtTimestamp: 400
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
 
         var missingRightLesson = lesson
         missingRightLesson.returnRight = nil
@@ -8584,6 +8786,7 @@ func makeTrainingScript003Level() -> Level {
         ("return1.osf", 28),
         ("left1.osf", 18),
         ("return2.osf", 29),
+        ("up1.osf", 37),
     ].map { name, index in
         CanonicalVoiceClip(
             sourceName: name,
@@ -8627,6 +8830,16 @@ func makeTrainingScript003Level() -> Level {
                 instruction:
                     "Now Slide right until you return to the start position.",
                 voiceSourceName: "return2.osf"
+            ),
+            returnUp: .init(
+                startGoalObjectHandle: startGoalHandle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: model,
+                    objectType: 7
+                ),
+                successMessage: "Excellent!",
+                instruction: "Now Slide up  until you stop.",
+                voiceSourceName: "up1.osf"
             )
         ),
         voiceClips: clips

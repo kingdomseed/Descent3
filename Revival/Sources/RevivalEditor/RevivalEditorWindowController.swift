@@ -1017,6 +1017,7 @@ func editorIdleStatusMessage(
     let sourceDiagnostics = [
         project.trainingReturnLeftSourceDiagnostic,
         project.trainingReturnRightSourceDiagnostic,
+        project.trainingReturnUpSourceDiagnostic,
         project.trainingGalleryBarrierSourceDiagnostic,
         project.trainingRobotGuidebotSourceDiagnostic,
         project.trainingGuidebotReturnSourceDiagnostic,

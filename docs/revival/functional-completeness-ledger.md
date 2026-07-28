@@ -285,6 +285,15 @@ The former ambient-life runtime row is preserved as `F-001` in [Future opportuni
 | `T-006`, `T-009` | RevivalEditor exposes the direct Script 004 / LeftGoal / `return2.osf` source diagnostic. Existing named `Transform Object` undo/redo, deterministic save/reopen and immutable-base → derived-project → disposable-play → project-return ownership cover LeftGoal without a behavior project, alternate renderer or second session path. |
 | `T-016` | The current schema-11 validator admits the optional exact hidden-but-collision-active LeftGoal identity, raw flags/orientation, room, position, `invisiblepowerup.OOF` doubled contact radius, messages and `return2.osf` provenance while accepting older schema-11 packages without the extension. The exact-final fresh-destination Release import promoted 48 rooms, 41 objects, 22 presentations, 14 voices, seven sounds and 2666 current dependencies. |
 
+### Phase 5 Script 005 functional reconciliation
+
+| Capability rows | Reconciled proof |
+| --- | --- |
+| `B-008`, `B-010` | The opening continuation includes the next normal-play branch after Script 004: the first eligible room-owned radius-aware contact with the existing hidden StartGoal removes right bit 8, inserts up bit 16, emits distinct `GoodJob` then `up1.osf`/`GoUp` feedback in released order and advances only Script 005 once. The released predicate depends only on counter 004, so optional schema-7 state preserves `forward+up`, `reverse+up`, up-only and `left+up` results; a shared eligible StartGoal callback runs Script 003 before Script 005. Impossible states fail at the untrusted restore boundary, older values decode without the optional member and HUD/voice never replay. Script 006 and every later behavior family remain deferred. |
+| `B-012`, `T-003` | Schema 11 carries 15 reached Training voices. D3Import decodes owned `up1.osf` entry 37 to exact canonical mono PCM at 22,050 Hz and 77,797 frames, with source SHA-256 `ce2f2c94ca3a2b000924e1ffde8d75e1faa590188dd2d991c3fb0082f6e32876` and PCM SHA-256 `9f65aa9804b9c8819e335c6733c05db265bf7dc72dabd43c28387e3e9bc67adb`; the canonical boundary requires exact English `GoUp`, including the source text's two spaces before `until`. Broader localization and unreached audio remain open. |
+| `T-006`, `T-009` | RevivalEditor exposes the direct Script 005 / StartGoal / `up1.osf` diagnostic. Existing named `Transform Object` undo/redo, deterministic save/reopen and immutable-base → derived-project → disposable-play → project-return ownership cover the reused StartGoal without a behavior project, alternate renderer or second session path. |
+| `T-016` | The schema-11 validator admits the optional exact hidden-but-collision-active StartGoal identity, room, position, `invisiblepowerup.OOF` doubled contact radius, messages and `up1.osf` source/PCM provenance while accepting older schema-11 packages without the extension. The owned import promoted 48 rooms, 41 objects, 22 presentations, 15 voices, seven sounds and 2667 current dependencies; exact-final content/level/report hashes are recorded in the source ledger. |
+
 ## Ledger audit gate
 
 Before Phase 0 closes, the capability audit must:

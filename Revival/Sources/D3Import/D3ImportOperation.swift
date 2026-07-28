@@ -776,6 +776,7 @@ func runD3Import(
         "Done.osf",
         "left1.osf",
         "return2.osf",
+        "up1.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -822,6 +823,16 @@ func runD3Import(
                 successMessage: messages["GoodJob"]!,
                 instruction: messages["GoRight"]!,
                 voiceSourceName: "return2.osf"
+            ),
+            returnUp: .init(
+                startGoalObjectHandle: startGoal.handle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: startGoalModel,
+                    objectType: startGoal.type
+                ),
+                successMessage: messages["GoodJob"]!,
+                instruction: messages["GoUp"]!,
+                voiceSourceName: "up1.osf"
             )
         ),
         voiceClips: [
@@ -829,6 +840,7 @@ func runD3Import(
             voiceClips[1],
             voiceClips[12],
             voiceClips[13],
+            voiceClips[14],
         ]
     )
     let galleryTrigger = openingLevel.triggers.first {
@@ -1782,6 +1794,7 @@ func parseTrainingMessages(_ data: Data) throws -> [String: String] {
         "GoBackwards",
         "GoLeft",
         "GoRight",
+        "GoUp",
     ].allSatisfy({ messages[$0] != nil }) else {
         throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
     }
