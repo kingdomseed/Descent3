@@ -738,9 +738,43 @@ func runD3Import(
     let upGoalModel = playerLevel.models.first {
         $0.source == upGoalPresentation.primaryModel
     }!
+    let forwardGoalPresentation = playerLevel.objectPresentations.first {
+        $0.objectHandle == forwardGoal.handle
+    }!
+    let forwardGoalModel = playerLevel.models.first {
+        $0.source == forwardGoalPresentation.primaryModel
+    }!
     precondition(
         forwardGoal.handle == 12_301
             && forwardGoal.type == 7
+            && forwardGoal.storedID == 67
+            && forwardGoal.definition?.storedIndex == 67
+            && forwardGoal.definition?.referenceRuntimeIndex == 68
+            && forwardGoal.definition?.sourceName == "Invisiblepowerup"
+            && forwardGoal.instanceName == "ForwardGoal"
+            && forwardGoal.flags == 36_864
+            && forwardGoal.location == .room(1)
+            && forwardGoal.position
+                == .init(x: 2_060.4836, y: -131.22517, z: 2_310.928)
+            && forwardGoal.orientation
+                == .init(
+                    right: .init(x: -0.997_518_1, y: 0, z: 0.070_410_63),
+                    up: .init(x: 0, y: 1, z: 0),
+                    forward: .init(x: -0.070_410_63, y: 0, z: -0.997_518_1)
+                )
+            && forwardGoal.containsType == 255
+            && forwardGoal.containsID == 0
+            && forwardGoal.containsCount == 0
+            && forwardGoal.lifeLeft == 0
+            && forwardGoalPresentation.primaryModel
+                == .init(
+                    storedIndex: 6,
+                    sourceName: "invisiblepowerup.OOF"
+                )
+            && sourceObjectPresentationSize(
+                model: forwardGoalModel,
+                objectType: forwardGoal.type
+            ) == 10.052_409
             && startGoal.handle == 12_300
             && startGoal.type == 7
             && startGoal.storedID == 67
@@ -834,6 +868,40 @@ func runD3Import(
             sourceSHA256: canonicalSHA256(payload)
         )
     }
+    let menuBeepPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "MenuBeepEnter"
+    )
+    precondition(
+        menuBeepPage.storedIndex == 481
+            && menuBeepPage.logicalName == "MenuBeepEnter"
+            && menuBeepPage.sourceName == "MenuBeepSelectC.wav"
+            && menuBeepPage.importVolume == 0.7
+    )
+    let menuBeepEntry = d3Archive.uniqueEntry(
+        named: menuBeepPage.sourceName
+    )
+    let menuBeepEntryIndex = d3Archive.entries.firstIndex(
+        of: menuBeepEntry
+    )!
+    let menuBeepPayload = d3.data.subdata(
+        in: menuBeepEntry.payloadRange
+    )
+    let menuBeep = try decodeReachedPCM16WAV(menuBeepPayload)
+    let menuBeepClip = CanonicalSoundClip(
+        logicalName: menuBeepPage.logicalName,
+        sourceName: menuBeepPage.sourceName,
+        sourceEntryIndex: menuBeepEntryIndex,
+        sampleRate: menuBeep.sampleRate,
+        channelCount: menuBeep.channelCount,
+        frameCount: menuBeep.frameCount,
+        pcm16LittleEndian: menuBeep.pcm16LittleEndian,
+        pcmSHA256: canonicalSHA256(menuBeep.pcm16LittleEndian),
+        sourceArchive: d3File.relativePath,
+        sourceSHA256: canonicalSHA256(menuBeepPayload),
+        importVolume: menuBeepPage.importVolume
+    )
     let openingLevel = playerLevel.addingTrainingOpeningLesson(
         .init(
             forwardGoalObjectHandle: forwardGoal.handle,
@@ -893,6 +961,15 @@ func runD3Import(
                 repeatMessage: messages["Repeat"]!,
                 forwardInstruction: messages["GoForward"]!,
                 voiceSourceName: "repeat.osf"
+            ),
+            repeatForwardGoal: .init(
+                forwardGoalObjectHandle: forwardGoal.handle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: forwardGoalModel,
+                    objectType: forwardGoal.type
+                ),
+                reverseInstruction: messages["GoBackwards"]!,
+                soundLogicalName: menuBeepPage.logicalName
             )
         ),
         voiceClips: [
@@ -903,7 +980,8 @@ func runD3Import(
             voiceClips[14],
             voiceClips[15],
             voiceClips[16],
-        ]
+        ],
+        soundClips: [menuBeepClip]
     )
     let galleryTrigger = openingLevel.triggers.first {
         $0.name.caseInsensitiveCompare("Portal2") == .orderedSame

@@ -502,6 +502,13 @@ struct TrainingRepeatForwardLesson: Codable, Equatable, Sendable {
     let voiceSourceName: String
 }
 
+struct TrainingRepeatForwardGoalLesson: Codable, Equatable, Sendable {
+    let forwardGoalObjectHandle: UInt32
+    let collisionRadius: Float
+    let reverseInstruction: String
+    let soundLogicalName: String
+}
+
 struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var forwardGoalObjectHandle: UInt32
     let welcomeDelay: Float
@@ -516,6 +523,7 @@ struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var returnUp: TrainingReturnUpLesson? = nil
     var returnDown: TrainingReturnDownLesson? = nil
     var repeatForward: TrainingRepeatForwardLesson? = nil
+    var repeatForwardGoal: TrainingRepeatForwardGoalLesson? = nil
 }
 
 struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
@@ -1031,6 +1039,74 @@ func validateStockTrainingRobotGuidebotPackage(
     else {
         throw LevelValidationError.invalidDependency(
             "Training robot and Guidebot package"
+        )
+    }
+}
+
+func validateStockTrainingRepeatForwardGoalPackage(
+    lesson: TrainingRepeatForwardGoalLesson?,
+    forwardGoal: PlacedObject?,
+    presentation: ObjectPresentationReference?,
+    menuBeep: CanonicalSoundClip?
+) throws {
+    guard let lesson,
+          lesson.forwardGoalObjectHandle == 12_301,
+          lesson.collisionRadius == 10.052_409,
+          lesson.reverseInstruction
+            == "Now use the reverse Key to return to where you started!",
+          lesson.soundLogicalName == "MenuBeepEnter",
+          forwardGoal?.type == 7,
+          forwardGoal?.storedID == 67,
+          forwardGoal?.definition?.storedIndex == 67,
+          forwardGoal?.definition?.referenceRuntimeIndex == 68,
+          forwardGoal?.definition?.sourceName == "Invisiblepowerup",
+          forwardGoal?.instanceName == "ForwardGoal",
+          forwardGoal?.flags == 36_864,
+          forwardGoal?.location == .room(1),
+          forwardGoal?.position
+            == .init(
+                x: 2_060.4836,
+                y: -131.22517,
+                z: 2_310.928
+            ),
+          forwardGoal?.orientation
+            == .init(
+                right: .init(
+                    x: -0.997_518_1,
+                    y: 0,
+                    z: 0.070_410_63
+                ),
+                up: .init(x: 0, y: 1, z: 0),
+                forward: .init(
+                    x: -0.070_410_63,
+                    y: 0,
+                    z: -0.997_518_1
+                )
+            ),
+          forwardGoal?.containsType == 255,
+          forwardGoal?.containsID == 0,
+          forwardGoal?.containsCount == 0,
+          forwardGoal?.lifeLeft == 0,
+          presentation?.primaryModel
+            == .init(
+                storedIndex: 6,
+                sourceName: "invisiblepowerup.OOF"
+            ),
+          presentation?.isVisible == false,
+          menuBeep?.sourceName == "MenuBeepSelectC.wav",
+          menuBeep?.sourceEntryIndex == 2_079,
+          menuBeep?.sampleRate == 22_050,
+          menuBeep?.channelCount == 1,
+          menuBeep?.frameCount == 2_321,
+          menuBeep?.pcmSHA256
+            == "050b01b05e33233f6486c89d18e897a6f219ed8ecd706d6022ef9fdf01383439",
+          menuBeep?.sourceArchive == "d3.hog",
+          menuBeep?.sourceSHA256
+            == "7176c7fe69ab31912d349065861a512f34f9649a117f6b3c97bee54b68ea2cea",
+          menuBeep?.importVolume == 0.7
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training Script 008 package"
         )
     }
 }
@@ -2526,6 +2602,39 @@ struct Level: Codable, Equatable, Sendable {
                     )
                 }
             }
+            if let repeatForwardGoal = lesson.repeatForwardGoal {
+                let soundNames = Set(soundClips.flatMap {
+                    [$0.logicalName.lowercased(), $0.sourceName.lowercased()]
+                })
+                guard repeatForwardGoal.collisionRadius.isFinite,
+                      repeatForwardGoal.collisionRadius > 0,
+                      isNonempty(repeatForwardGoal.reverseInstruction),
+                      isNonempty(repeatForwardGoal.soundLogicalName),
+                      lesson.repeatForward != nil,
+                      let target = objects.first(where: {
+                          $0.handle
+                            == repeatForwardGoal.forwardGoalObjectHandle
+                      }),
+                      target.type == 7,
+                      let presentation = objectPresentations.first(where: {
+                          $0.objectHandle == target.handle && !$0.isVisible
+                      }),
+                      let model = models.first(where: {
+                          $0.source == presentation.primaryModel
+                      }),
+                      repeatForwardGoal.collisionRadius
+                        == sourceObjectPresentationSize(
+                            model: model,
+                            objectType: target.type
+                        ),
+                      soundNames.contains(
+                          repeatForwardGoal.soundLogicalName.lowercased()
+                      ) else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training Script 008 repeat-ForwardGoal lesson"
+                    )
+                }
+            }
         }
         if let barrier = trainingGalleryBarrier {
             let oneShotFlag: UInt16 = 8
@@ -3411,6 +3520,26 @@ struct Level: Codable, Equatable, Sendable {
             let done = voiceClips.first {
                 $0.sourceName.caseInsensitiveCompare("done.osf")
                     == .orderedSame
+            }
+            if let repeatForwardGoal =
+                    trainingOpeningLesson?.repeatForwardGoal {
+                let forwardGoal = objects.first {
+                    $0.handle == repeatForwardGoal.forwardGoalObjectHandle
+                }
+                let forwardGoalPresentation = objectPresentations.first {
+                    $0.objectHandle
+                        == repeatForwardGoal.forwardGoalObjectHandle
+                }
+                let menuBeep = soundClips.first {
+                    $0.logicalName.caseInsensitiveCompare("MenuBeepEnter")
+                        == .orderedSame
+                }
+                try validateStockTrainingRepeatForwardGoalPackage(
+                    lesson: repeatForwardGoal,
+                    forwardGoal: forwardGoal,
+                    presentation: forwardGoalPresentation,
+                    menuBeep: menuBeep
+                )
             }
             if let repeatForward =
                     trainingOpeningLesson?.repeatForward {
@@ -4335,7 +4464,8 @@ struct Level: Codable, Equatable, Sendable {
 
     func addingTrainingOpeningLesson(
         _ lesson: TrainingOpeningLesson,
-        voiceClips: [CanonicalVoiceClip]
+        voiceClips: [CanonicalVoiceClip],
+        soundClips addedSoundClips: [CanonicalSoundClip] = []
     ) -> Level {
         let lessonPresentations = objectPresentations.map { presentation in
             let hiddenHandles = [
@@ -4344,6 +4474,7 @@ struct Level: Codable, Equatable, Sendable {
                 lesson.returnRight?.leftGoalObjectHandle,
                 lesson.returnUp?.startGoalObjectHandle,
                 lesson.returnDown?.upGoalObjectHandle,
+                lesson.repeatForwardGoal?.forwardGoalObjectHandle,
             ]
             guard hiddenHandles.contains(presentation.objectHandle) else {
                 return presentation
@@ -4364,6 +4495,19 @@ struct Level: Codable, Equatable, Sendable {
             dependencies.append(
                 .init(
                     category: "voice",
+                    source: .init(
+                        storedIndex: clip.sourceEntryIndex,
+                        sourceName: clip.sourceName
+                    ),
+                    state: "canonical-pcm-imported",
+                    provenance: "\(clip.sourceArchive) \(clip.sourceSHA256)"
+                )
+            )
+        }
+        for clip in addedSoundClips {
+            dependencies.append(
+                .init(
+                    category: "sound",
                     source: .init(
                         storedIndex: clip.sourceEntryIndex,
                         sourceName: clip.sourceName
@@ -4407,7 +4551,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             voiceClips: voiceClips,
-            soundClips: soundClips,
+            soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
                 current: dependencies,
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline

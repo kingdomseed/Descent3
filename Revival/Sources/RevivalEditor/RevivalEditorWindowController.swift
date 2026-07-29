@@ -1020,6 +1020,7 @@ func editorIdleStatusMessage(
         project.trainingReturnUpSourceDiagnostic,
         project.trainingReturnDownSourceDiagnostic,
         project.trainingRepeatForwardSourceDiagnostic,
+        project.trainingRepeatForwardGoalSourceDiagnostic,
         project.trainingGalleryBarrierSourceDiagnostic,
         project.trainingRobotGuidebotSourceDiagnostic,
         project.trainingGuidebotReturnSourceDiagnostic,

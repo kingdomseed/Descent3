@@ -512,6 +512,16 @@ struct RevivalProject: Equatable, Sendable {
         }
         return "TrainingMission.cpp Script 007 / \(goal.instanceName ?? "StartGoal") handle \(goal.handle) / \(repeatForward.voiceSourceName)"
     }
+    var trainingRepeatForwardGoalSourceDiagnostic: String? {
+        guard let repeatForwardGoal =
+                level.trainingOpeningLesson?.repeatForwardGoal,
+              let goal = level.objects.first(where: {
+                  $0.handle == repeatForwardGoal.forwardGoalObjectHandle
+              }) else {
+            return nil
+        }
+        return "TrainingMission.cpp Script 008 / \(goal.instanceName ?? "ForwardGoal") handle \(goal.handle) / \(repeatForwardGoal.soundLogicalName)"
+    }
     var trainingGalleryBarrierSourceDiagnostic: String? {
         level.trainingGalleryBarrier.map {
             "TrainingMission.cpp Script 032 / \($0.triggerName)"

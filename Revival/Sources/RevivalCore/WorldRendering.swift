@@ -907,6 +907,7 @@ private struct TrainingOpeningState: Codable, Equatable, Sendable {
     var upGoalWasReached: Bool? = nil
     var downGoalWasReached: Bool? = nil
     var repeatForwardWasPresented: Bool? = nil
+    var repeatForwardGoalWasPresented: Bool? = nil
     var enabledControls: PlayerControlMask = [.forward]
 }
 
@@ -1763,6 +1764,17 @@ final class PlayerSimulation {
                           return controls
                       }
                   }
+                  if state.repeatForwardGoalWasPresented == true {
+                      guard state.repeatForwardWasPresented == true else {
+                          return false
+                      }
+                      expectedControls = expectedControls.map { controls in
+                          var controls = controls
+                          controls.remove(.forward)
+                          controls.insert(.reverse)
+                          return controls
+                      }
+                  }
                   return state.timerRemaining.isFinite
                       && (
                           state.welcomeWasPresented
@@ -1781,6 +1793,9 @@ final class PlayerSimulation {
                           || level.trainingOpeningLesson?.returnDown != nil)
                       && (state.repeatForwardWasPresented != true
                           || level.trainingOpeningLesson?.repeatForward != nil)
+                      && (state.repeatForwardGoalWasPresented != true
+                          || level.trainingOpeningLesson?.repeatForwardGoal
+                            != nil)
                       && expectedControls.contains(state.enabledControls)
               }) ?? true,
               (level.trainingOpeningLesson == nil)
@@ -3878,14 +3893,32 @@ final class PlayerSimulation {
                 openingState.forwardGoalWasReached = true
                 openingState.enabledControls.remove(.forward)
                 openingState.enabledControls.insert(.reverse)
+                trainingOpeningFeedback.append(contentsOf: [
+                    TrainingOpeningFeedback(
+                        hudMessages: [lesson.successMessage],
+                        voiceSourceName: lesson.successVoiceSourceName,
+                        voicePrecedesHUDMessages: false
+                    ),
+                    TrainingOpeningFeedback(
+                        hudMessages: [lesson.reverseInstruction],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: false
+                    ),
+                ])
+            }
+            if openingState.repeatForwardWasPresented == true,
+               openingState.repeatForwardGoalWasPresented != true,
+               trainingForwardGoalWasReachedThisFrame,
+               let repeatForwardGoal = lesson.repeatForwardGoal {
+                openingState.enabledControls.remove(.forward)
+                openingState.enabledControls.insert(.reverse)
                 trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [
-                        lesson.successMessage,
-                        lesson.reverseInstruction,
-                    ],
-                    voiceSourceName: lesson.successVoiceSourceName,
-                    voicePrecedesHUDMessages: false
+                    hudMessages: [repeatForwardGoal.reverseInstruction],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false,
+                    soundSourceName: repeatForwardGoal.soundLogicalName
                 ))
+                openingState.repeatForwardGoalWasPresented = true
             }
             if openingState.forwardGoalWasReached,
                openingState.returnGoalWasReached != true,

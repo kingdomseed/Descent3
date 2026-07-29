@@ -1,11 +1,186 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testScript008RequiresExactHiddenForwardGoalAndMenuBeep() throws {
+        var stockLevel = makeTrainingScript003Level()
+        stockLevel = replacing(
+            stockLevel,
+            missionKey: "descent3.mission.pilot-training",
+            levelKey: "descent3.level.training-mission",
+            source: replacing(
+                stockLevel.source,
+                archiveSHA256:
+                    "fc1d81921cc4b2618e441b7b9d08c4bcb5cff90731be1bfa6f3a7b054fc0cb54",
+                levelSHA256:
+                    "915a561cd3bd720d88bffed72fe41b4ff711c287711f060ecd9696e2cd5f7d41"
+            )
+        )
+        let repeatForwardGoal = try XCTUnwrap(
+            stockLevel.trainingOpeningLesson?.repeatForwardGoal
+        )
+        let stockRepeatForwardGoal = TrainingRepeatForwardGoalLesson(
+            forwardGoalObjectHandle: 12_301,
+            collisionRadius: 10.052_409,
+            reverseInstruction:
+                "Now use the reverse Key to return to where you started!",
+            soundLogicalName: "MenuBeepEnter"
+        )
+        let fixtureForwardGoal = try XCTUnwrap(
+            stockLevel.objects.first {
+                $0.handle == repeatForwardGoal.forwardGoalObjectHandle
+            }
+        )
+        let forwardGoal = PlacedObject(
+            handle: 12_301,
+            type: 7,
+            storedID: 67,
+            definition: .init(
+                storedIndex: 67,
+                sourceName: "Invisiblepowerup",
+                referenceRuntimeIndex: 68
+            ),
+            instanceName: "ForwardGoal",
+            flags: 36_864,
+            doorShields: nil,
+            location: .room(1),
+            position: .init(
+                x: 2_060.4836,
+                y: -131.22517,
+                z: 2_310.928
+            ),
+            orientation: .init(
+                right: .init(
+                    x: -0.997_518_1,
+                    y: 0,
+                    z: 0.070_410_63
+                ),
+                up: .init(x: 0, y: 1, z: 0),
+                forward: .init(
+                    x: -0.070_410_63,
+                    y: 0,
+                    z: -0.997_518_1
+                )
+            ),
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: fixtureForwardGoal.soundSource,
+            inertScriptName: fixtureForwardGoal.inertScriptName,
+            inertModuleName: fixtureForwardGoal.inertModuleName,
+            lightmapSubmodels: fixtureForwardGoal.lightmapSubmodels
+        )
+        let presentation = ObjectPresentationReference(
+            objectHandle: 12_301,
+            primaryModel: .init(
+                storedIndex: 6,
+                sourceName: "invisiblepowerup.OOF"
+            ),
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil,
+            isVisible: false
+        )
+        let fixtureMenuBeep = try XCTUnwrap(
+            stockLevel.soundClips.first {
+                $0.logicalName == repeatForwardGoal.soundLogicalName
+            }
+        )
+        let stockMenuBeep = CanonicalSoundClip(
+            logicalName: fixtureMenuBeep.logicalName,
+            sourceName: "MenuBeepSelectC.wav",
+            sourceEntryIndex: 2_079,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 2_321,
+            pcm16LittleEndian: fixtureMenuBeep.pcm16LittleEndian,
+            pcmSHA256:
+                "050b01b05e33233f6486c89d18e897a6f219ed8ecd706d6022ef9fdf01383439",
+            sourceArchive: "d3.hog",
+            sourceSHA256:
+                "7176c7fe69ab31912d349065861a512f34f9649a117f6b3c97bee54b68ea2cea",
+            importVolume: 0.7
+        )
+        XCTAssertNoThrow(
+            try validateStockTrainingRepeatForwardGoalPackage(
+                lesson: stockRepeatForwardGoal,
+                forwardGoal: forwardGoal,
+                presentation: presentation,
+                menuBeep: stockMenuBeep
+            )
+        )
+
+        var hostileForwardGoal = forwardGoal
+        hostileForwardGoal.orientation = .init(
+            right: .init(x: 1, y: 0, z: 0),
+            up: .init(x: 0, y: 1, z: 0),
+            forward: .init(x: 0, y: 0, z: 1)
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingRepeatForwardGoalPackage(
+                lesson: stockRepeatForwardGoal,
+                forwardGoal: hostileForwardGoal,
+                presentation: presentation,
+                menuBeep: stockMenuBeep
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Script 008 package")
+            )
+        }
+
+        let wrongVolumeMenuBeep = CanonicalSoundClip(
+            logicalName: stockMenuBeep.logicalName,
+            sourceName: stockMenuBeep.sourceName,
+            sourceEntryIndex: stockMenuBeep.sourceEntryIndex,
+            sampleRate: stockMenuBeep.sampleRate,
+            channelCount: stockMenuBeep.channelCount,
+            frameCount: stockMenuBeep.frameCount,
+            pcm16LittleEndian: stockMenuBeep.pcm16LittleEndian,
+            pcmSHA256: stockMenuBeep.pcmSHA256,
+            sourceArchive: stockMenuBeep.sourceArchive,
+            sourceSHA256: stockMenuBeep.sourceSHA256,
+            importVolume: 1
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingRepeatForwardGoalPackage(
+                lesson: stockRepeatForwardGoal,
+                forwardGoal: forwardGoal,
+                presentation: presentation,
+                menuBeep: wrongVolumeMenuBeep
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Script 008 package")
+            )
+        }
+
+        var hostileObjects = stockLevel.objects
+        let targetIndex = try XCTUnwrap(
+            hostileObjects.firstIndex {
+                $0.handle == repeatForwardGoal.forwardGoalObjectHandle
+            }
+        )
+        hostileObjects[targetIndex].orientation =
+            hostileForwardGoal.orientation
+        XCTAssertNoThrow(
+            try replacing(
+                stockLevel,
+                objects: hostileObjects
+            ).validateForAuthoring()
+        )
+    }
+
     func testScript007RequiresHiddenCollisionActiveStartGoal() throws {
         let level = makeTrainingScript003Level()
         XCTAssertNoThrow(try level.validate())
         var lesson = try XCTUnwrap(level.trainingOpeningLesson)
         let repeatForward = try XCTUnwrap(lesson.repeatForward)
+        lesson.repeatForwardGoal = nil
         lesson.returnLeft = nil
         lesson.returnRight = nil
         lesson.returnUp = nil
