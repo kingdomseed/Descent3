@@ -1,6 +1,209 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testScript009RequiresExactHiddenStartGoalAndLRightVoice() throws {
+        let stockLevel = makeTrainingScript003Level()
+        let repeatReturnLeft = try XCTUnwrap(
+            stockLevel.trainingOpeningLesson?.repeatReturnLeft
+        )
+        XCTAssertEqual(repeatReturnLeft.startGoalObjectHandle, 12_300)
+        XCTAssertEqual(
+            repeatReturnLeft.instruction,
+            "Now Go Left until you stop."
+        )
+        XCTAssertEqual(repeatReturnLeft.voiceSourceName, "lright.osf")
+        XCTAssertNoThrow(try stockLevel.validate())
+
+        let fixtureStartGoal = try XCTUnwrap(
+            stockLevel.objects.first {
+                $0.handle == repeatReturnLeft.startGoalObjectHandle
+            }
+        )
+        let stockLesson = TrainingRepeatReturnLeftLesson(
+            startGoalObjectHandle: 12_300,
+            collisionRadius: 10.052_409,
+            instruction: "Now Go Left until you stop.",
+            voiceSourceName: "lright.osf"
+        )
+        let stockStartGoal = PlacedObject(
+            handle: 12_300,
+            type: 7,
+            storedID: 67,
+            definition: .init(
+                storedIndex: 67,
+                sourceName: "Invisiblepowerup",
+                referenceRuntimeIndex: 68
+            ),
+            instanceName: "StartGoal",
+            flags: 36_864,
+            doorShields: nil,
+            location: .room(1),
+            position: .init(
+                x: 2_062.7678,
+                y: -134.19601,
+                z: 2_201.679
+            ),
+            orientation: .init(
+                right: .init(x: -1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: -0),
+                forward: .init(x: -0, y: -0, z: -1)
+            ),
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: fixtureStartGoal.soundSource,
+            inertScriptName: fixtureStartGoal.inertScriptName,
+            inertModuleName: fixtureStartGoal.inertModuleName,
+            lightmapSubmodels: fixtureStartGoal.lightmapSubmodels
+        )
+        let stockPresentation = ObjectPresentationReference(
+            objectHandle: 12_300,
+            primaryModel: .init(
+                storedIndex: 6,
+                sourceName: "invisiblepowerup.OOF"
+            ),
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil,
+            isVisible: false
+        )
+        let fixtureLRight = try XCTUnwrap(
+            stockLevel.voiceClips.first {
+                $0.sourceName == "lright.osf"
+            }
+        )
+        let stockLRight = CanonicalVoiceClip(
+            sourceName: "lright.osf",
+            sourceEntryIndex: 19,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 43_289,
+            pcm16LittleEndian: fixtureLRight.pcm16LittleEndian,
+            pcmSHA256:
+                "db92df633fdc0010fe9c5cc89f452ea79107e0abdfd4a1ff1e845220abf8b7b5",
+            sourceArchive: "missions/training.mn3",
+            sourceSHA256:
+                "234c82a439232af1072a7cb6aef8e6d14b6432a2c7a642f7a8e4904a01e88294"
+        )
+        XCTAssertNoThrow(
+            try validateStockTrainingRepeatReturnLeftPackage(
+                lesson: stockLesson,
+                startGoal: stockStartGoal,
+                presentation: stockPresentation,
+                lright: stockLRight
+            )
+        )
+
+        var hostileStartGoal = stockStartGoal
+        hostileStartGoal.location = .room(2)
+        XCTAssertThrowsError(
+            try validateStockTrainingRepeatReturnLeftPackage(
+                lesson: stockLesson,
+                startGoal: hostileStartGoal,
+                presentation: stockPresentation,
+                lright: stockLRight
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Script 009 package")
+            )
+        }
+        let wrongLRight = CanonicalVoiceClip(
+            sourceName: stockLRight.sourceName,
+            sourceEntryIndex: stockLRight.sourceEntryIndex,
+            sampleRate: stockLRight.sampleRate,
+            channelCount: stockLRight.channelCount,
+            frameCount: stockLRight.frameCount,
+            pcm16LittleEndian: stockLRight.pcm16LittleEndian,
+            pcmSHA256: stockLRight.pcmSHA256,
+            sourceArchive: stockLRight.sourceArchive,
+            sourceSHA256: String(repeating: "0", count: 64)
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingRepeatReturnLeftPackage(
+                lesson: stockLesson,
+                startGoal: stockStartGoal,
+                presentation: stockPresentation,
+                lright: wrongLRight
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Script 009 package")
+            )
+        }
+
+        var authoredObjects = stockLevel.objects
+        let authoredTargetIndex = try XCTUnwrap(
+            authoredObjects.firstIndex {
+                $0.handle == repeatReturnLeft.startGoalObjectHandle
+            }
+        )
+        let authoredPosition = authoredObjects[authoredTargetIndex].position
+        authoredObjects[authoredTargetIndex].position = .init(
+            x: authoredPosition.x + 1,
+            y: authoredPosition.y,
+            z: authoredPosition.z
+        )
+        XCTAssertNoThrow(
+            try replacing(
+                stockLevel,
+                objects: authoredObjects
+            ).validateForAuthoring()
+        )
+
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 009 repeat-return-left lesson"
+            ),
+            replacing(
+                stockLevel,
+                voiceClips: stockLevel.voiceClips.filter {
+                    $0.sourceName != "lright.osf"
+                }
+            )
+        )
+
+        var divergentLesson = try XCTUnwrap(
+            stockLevel.trainingOpeningLesson
+        )
+        let leftGoal = try XCTUnwrap(
+            stockLevel.objects.first { $0.handle == 12_299 }
+        )
+        let leftGoalPresentation = try XCTUnwrap(
+            stockLevel.objectPresentations.first {
+                $0.objectHandle == leftGoal.handle
+            }
+        )
+        let leftGoalModel = try XCTUnwrap(
+            stockLevel.models.first {
+                $0.source == leftGoalPresentation.primaryModel
+            }
+        )
+        divergentLesson.repeatReturnLeft = .init(
+            startGoalObjectHandle: leftGoal.handle,
+            collisionRadius: sourceObjectPresentationSize(
+                model: leftGoalModel,
+                objectType: leftGoal.type
+            ),
+            instruction: repeatReturnLeft.instruction,
+            voiceSourceName: repeatReturnLeft.voiceSourceName
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 009 repeat-return-left lesson"
+            ),
+            replacing(
+                stockLevel,
+                trainingOpeningLesson: divergentLesson
+            )
+        )
+    }
+
     func testScript008RequiresExactHiddenForwardGoalAndMenuBeep() throws {
         var stockLevel = makeTrainingScript003Level()
         stockLevel = replacing(

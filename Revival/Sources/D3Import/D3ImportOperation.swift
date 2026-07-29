@@ -850,6 +850,7 @@ func runD3Import(
         "up1.osf",
         "return3.osf",
         "repeat.osf",
+        "lright.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -970,6 +971,15 @@ func runD3Import(
                 ),
                 reverseInstruction: messages["GoBackwards"]!,
                 soundLogicalName: menuBeepPage.logicalName
+            ),
+            repeatReturnLeft: .init(
+                startGoalObjectHandle: startGoal.handle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: startGoalModel,
+                    objectType: startGoal.type
+                ),
+                instruction: messages["GoLeft"]!,
+                voiceSourceName: "lright.osf"
             )
         ),
         voiceClips: [
@@ -980,6 +990,7 @@ func runD3Import(
             voiceClips[14],
             voiceClips[15],
             voiceClips[16],
+            voiceClips[17],
         ],
         soundClips: [menuBeepClip]
     )
