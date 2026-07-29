@@ -448,7 +448,7 @@ final class EditorProjectTests: XCTestCase {
         )
         XCTAssertEqual(
             document.project.trainingDodgeAttemptSourceDiagnostic,
-            "TrainingMission.cpp Scripts 033,016,017,018,020 / StartDodge 4106 / DoneDodgeingGoal 12302 / DodgeTurrett 8199 / FlashLight-1 4120 / PortalRoom2+3 portals 0,1 / intro2.osf+almost.osf+proceed3.osf"
+            "TrainingMission.cpp Scripts 033,016,017,018,020,019 / StartDodge 4106 / DoneDodgeingGoal 12302 / DodgeTurrett 8199 / FlashLight-1 4120 / PortalRoom2+3 portals 0,1 / intro2.osf+almost.osf+proceed3.osf+proceed4.osf"
         )
         XCTAssertEqual(
             document.project.trainingReturnRightSourceDiagnostic,
@@ -543,7 +543,7 @@ final class EditorProjectTests: XCTestCase {
                 project: document.project,
                 selection: document.editorSelection
             ).contains(
-                "TrainingMission.cpp Scripts 033,016,017,018,020 / StartDodge 4106"
+                "TrainingMission.cpp Scripts 033,016,017,018,020,019 / StartDodge 4106"
             )
         )
         XCTAssertTrue(
@@ -597,31 +597,19 @@ final class EditorProjectTests: XCTestCase {
             )
             XCTAssertEqual(openedRoom.portals[portalIndex].flags & 1, 0)
         }
-        try document.selectRoom(sourceIndex: 49)
-        for portalIndex in [0, 1] {
-            try document.selectPortal(portalIndex)
-            try document.setSelectedPortalRendersFaces(false)
-            XCTAssertEqual(
-                document.undoManager?.undoActionName,
-                "Set Portal Rendering"
-            )
-            document.undoManager?.undo()
-            let restoredRoom = try XCTUnwrap(
+        for sourceIndex in [49, 36] {
+            let boundPortalRoom = try XCTUnwrap(
                 document.project.level.rooms.first {
-                    $0.sourceIndex == 49
+                    $0.sourceIndex == sourceIndex
                 }
             )
-            XCTAssertNotEqual(
-                restoredRoom.portals[portalIndex].flags & 1,
-                0
-            )
-            document.undoManager?.redo()
-            let openedRoom = try XCTUnwrap(
-                document.project.level.rooms.first {
-                    $0.sourceIndex == 49
-                }
-            )
-            XCTAssertEqual(openedRoom.portals[portalIndex].flags & 1, 0)
+            XCTAssertEqual(boundPortalRoom.portals.count, 2)
+            for portalIndex in [0, 1] {
+                XCTAssertNotEqual(
+                    boundPortalRoom.portals[portalIndex].flags & 1,
+                    0
+                )
+            }
         }
 
         try document.rotateObjectQuarterTurn(handle: upGoal.handle)
@@ -775,6 +763,10 @@ final class EditorProjectTests: XCTestCase {
         )
         XCTAssertEqual(reopened.project, document.project)
         XCTAssertEqual(
+            reopened.project.trainingDodgeAttemptSourceDiagnostic,
+            document.project.trainingDodgeAttemptSourceDiagnostic
+        )
+        XCTAssertEqual(
             immutableBase.objects.first {
                 $0.handle == upGoal.handle
             }?.orientation,
@@ -851,6 +843,10 @@ final class EditorProjectTests: XCTestCase {
             playSession.level.trainingOpeningLesson?.finishCourse?
                 .finishCourseObjectHandle,
             finishCourse.handle
+        )
+        XCTAssertEqual(
+            playSession.level.trainingDodgeAttempt?.dodgeExit,
+            reopened.project.level.trainingDodgeAttempt?.dodgeExit
         )
         XCTAssertEqual(
             reopened.project.level.objects.first {

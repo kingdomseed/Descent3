@@ -599,6 +599,18 @@ struct TrainingDodgeTurretDefinition: Codable, Equatable, Sendable {
     let projectileLifetime: Float
 }
 
+struct TrainingDodgeExitLesson: Codable, Equatable, Sendable {
+    let objectHandle: UInt32
+    let collisionRadius: Float
+    let markerLightObjectHandle: UInt32
+    let markerLightDistance: Float
+    let portalRoomSourceIndex: Int
+    let orderedPortalIndices: [Int]
+    let disabledControlMask: UInt32
+    let instruction: String
+    let voiceSourceName: String
+}
+
 struct TrainingDodgeAttempt: Codable, Equatable, Sendable {
     let startDodgeObjectHandle: UInt32
     let startDodgeCollisionRadius: Float
@@ -628,6 +640,7 @@ struct TrainingDodgeAttempt: Codable, Equatable, Sendable {
     let successMarkerLightDistance: Float
     let markerLightPresentation: TrainingMarkerLightPresentation
     let turret: TrainingDodgeTurretDefinition
+    var dodgeExit: TrainingDodgeExitLesson? = nil
 }
 
 struct TrainingOpeningLesson: Codable, Equatable, Sendable {
@@ -1871,6 +1884,9 @@ func validateStockTrainingDodgeAttemptPackage(
     let proceed = level.voiceClips.first {
         $0.sourceName == "proceed3.osf"
     }
+    let proceed4 = level.voiceClips.first {
+        $0.sourceName == "proceed4.osf"
+    }
     let fire = level.soundClips.first {
         $0.logicalName == "WpmLaserBlueFire"
     }
@@ -2027,6 +2043,35 @@ func validateStockTrainingDodgeAttemptPackage(
         throw LevelValidationError.invalidDependency(
             "Training timed dodge stock package"
         )
+    }
+    if let exit = dodge.dodgeExit {
+        guard exit.objectHandle == dodge.doneDodgeingGoalObjectHandle,
+            exit.collisionRadius
+                == dodge.doneDodgeingGoalCollisionRadius,
+            exit.markerLightObjectHandle
+                == dodge.flashLightObjectHandle,
+            exit.markerLightDistance == 50,
+            exit.portalRoomSourceIndex
+                == dodge.portalRoomThreeSourceIndex,
+            exit.orderedPortalIndices == dodge.orderedPortalIndices,
+            exit.disabledControlMask == 62,
+            exit.instruction
+                == "Now keep moving forward into the next room.",
+            exit.voiceSourceName == "proceed4.osf",
+            proceed4?.sourceEntryIndex == 24,
+            proceed4?.sampleRate == 22_050,
+            proceed4?.channelCount == 1,
+            proceed4?.frameCount == 99_405,
+            proceed4?.pcmSHA256
+                == "92228006e3a802cc067a1650f735cc1a04865bf68d35ab3bc94343049e3dadc7",
+            proceed4?.sourceArchive == "missions/training.mn3",
+            proceed4?.sourceSHA256
+                == "d7442b4192e34ed6b7b529f3b3d555be64ef3437c000611ff7fa57d6989550e9"
+        else {
+            throw LevelValidationError.invalidDependency(
+                "Training Script 019 stock package"
+            )
+        }
     }
 }
 
@@ -3990,6 +4035,26 @@ struct Level: Codable, Equatable, Sendable {
                             )
                     }
                 }
+            let dodgeExitIsValid = dodge.dodgeExit.map { exit in
+                exit.objectHandle
+                    == dodge.doneDodgeingGoalObjectHandle
+                    && exit.collisionRadius
+                        == dodge.doneDodgeingGoalCollisionRadius
+                    && exit.markerLightObjectHandle
+                        == dodge.flashLightObjectHandle
+                    && exit.markerLightDistance == 50
+                    && exit.portalRoomSourceIndex
+                        == dodge.portalRoomThreeSourceIndex
+                    && exit.orderedPortalIndices
+                        == dodge.orderedPortalIndices
+                    && exit.disabledControlMask == 62
+                    && exit.instruction
+                        == "Now keep moving forward into the next room."
+                    && exit.voiceSourceName == "proceed4.osf"
+                    && clipNames.contains(
+                        exit.voiceSourceName.lowercased()
+                    )
+            } ?? true
             guard dodge.startDodgeObjectHandle == 4_106,
                 dodge.startDodgeCollisionRadius == 10.052_409,
                 dodge.doneDodgeingGoalObjectHandle == 12_302,
@@ -4036,6 +4101,7 @@ struct Level: Codable, Equatable, Sendable {
                 requiredClips.allSatisfy({
                     clipNames.contains($0.lowercased())
                 }),
+                dodgeExitIsValid,
                 start?.type == 7,
                 start?.storedID == 67,
                 start?.definition?.storedIndex == 67,
@@ -5598,8 +5664,9 @@ struct Level: Codable, Equatable, Sendable {
                     )
                 }
             }
-            let dodgeVoiceCount =
-                trainingDodgeAttempt == nil ? 0 : 3
+            let dodgeVoiceCount = trainingDodgeAttempt.map {
+                $0.dodgeExit == nil ? 3 : 4
+            } ?? 0
             guard let barrier = trainingGalleryBarrier,
                   barrier.triggerName == "Portal2",
                   barrier.triggerRoomSourceIndex == 38,

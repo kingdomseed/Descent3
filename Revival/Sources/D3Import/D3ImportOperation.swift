@@ -997,6 +997,7 @@ func runD3Import(
         "Intro2.osf",
         "Almost.osf",
         "Proceed3.osf",
+        "Proceed4.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -1237,6 +1238,7 @@ func runD3Import(
             voiceClips[22],
             voiceClips[23],
             voiceClips[24],
+            voiceClips[25],
         ],
         soundClips: [menuBeepClip,
             dodgeFireSoundClip,
@@ -2324,6 +2326,20 @@ func runD3Import(
             projectileSpeed: 200,
             projectileLifetime: 5
     ))
+    level.trainingDodgeAttempt?.dodgeExit = .init(
+        objectHandle: doneDodgeingGoal.handle,
+        collisionRadius: sourceObjectPresentationSize(
+            model: invisiblePowerupModel,
+            objectType: doneDodgeingGoal.type
+        ),
+        markerLightObjectHandle: dodgeMarker.handle,
+        markerLightDistance: 50,
+        portalRoomSourceIndex: portalRoomThree.sourceIndex,
+        orderedPortalIndices: [0, 1],
+        disabledControlMask: 62,
+        instruction: messages["KeepMovingOutofDodging"]!,
+        voiceSourceName: "proceed4.osf"
+    )
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
     precondition(
@@ -2428,6 +2444,7 @@ func parseTrainingMessages(_ data: Data) throws -> [String: String] {
             "KeepDodging",
             "AlmostDoneDodge",
             "LeaveDodge",
+            "KeepMovingOutofDodging",
     ].allSatisfy({ messages[$0] != nil }) else {
         throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
     }

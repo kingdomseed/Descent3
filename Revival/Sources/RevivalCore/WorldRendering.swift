@@ -1104,6 +1104,7 @@ private struct TrainingDodgeAttemptState:
     var script033Count = 0
     var script016Count = 0
     var script017Count = 0
+    var script019Count: Int? = nil
     var script018Count = 0
     var script020Count = 0
     var triggerTimerRemaining: Float?
@@ -1378,6 +1379,8 @@ final class PlayerSimulation {
             && restoredDodgeAttemptState?.script017Count == 0
         let dodgeAttemptHasSucceeded =
             restoredDodgeAttemptState?.script017Count == 1
+        let dodgeExitWasReached =
+            restoredDodgeAttemptState?.script019Count == 1
         let restoredLastBot1DeathState =
             continuation.trainingLastBot1DeathState
             ?? level.trainingLastBot1DeathChain.map {
@@ -1936,6 +1939,21 @@ final class PlayerSimulation {
                           return false
                       }
                   }
+                  let dodgeExitControlMaskIsReachable: Bool = {
+                      guard dodgeExitWasReached else {
+                          return false
+                      }
+                      let lowBits =
+                          state.enabledControls.rawValue & 63
+                      if lowBits == 0 || lowBits == 1 {
+                          return true
+                      }
+                      if dodgeAttemptIsActive && lowBits == 60 {
+                          return true
+                      }
+                      return dodgeAttemptHasSucceeded
+                          && (lowBits == 3 || lowBits == 63)
+                  }()
                   if state.startCourseWasPresented == true {
                       guard let startCourse =
                               level.trainingOpeningLesson?.startCourse
@@ -1946,11 +1964,11 @@ final class PlayerSimulation {
                           guard state.enabledControls.rawValue
                                   == startCourse.enabledControlMask
                               || state.enabledControls.rawValue == 32
-                              || (
+                                  || (
                                   dodgeAttemptHasSucceeded
-                                    && state.enabledControls.rawValue & 63
-                                        == 63
+                                    && state.enabledControls.rawValue == 63
                               )
+                              || dodgeExitControlMaskIsReachable
                           else {
                               return false
                           }
@@ -1960,9 +1978,9 @@ final class PlayerSimulation {
                                     == startCourse.enabledControlMask
                                   || (
                                       dodgeAttemptIsActive
-                                        && state.enabledControls.rawValue & 63
-                                            == 60
+                                        && state.enabledControls.rawValue == 60
                                   )
+                                  || dodgeExitControlMaskIsReachable
                           else {
                               return false
                           }
@@ -1978,22 +1996,22 @@ final class PlayerSimulation {
                           guard state.enabledControls.rawValue
                                   == finishCourse.enabledControlMask
                               || state.enabledControls.rawValue == 63
-                              || (
+                                  || (
                                   dodgeAttemptHasSucceeded
-                                    && state.enabledControls.rawValue & 63
-                                        == 63
+                                    && state.enabledControls.rawValue == 63
                               )
+                              || dodgeExitControlMaskIsReachable
                           else {
                               return false
                           }
                       } else {
                           guard state.enabledControls.rawValue
                                   == finishCourse.enabledControlMask
-                              || (
+                                  || (
                                   dodgeAttemptHasSucceeded
-                                    && state.enabledControls.rawValue & 63
-                                        == 63
+                                    && state.enabledControls.rawValue == 63
                               )
+                              || dodgeExitControlMaskIsReachable
                           else {
                               return false
                           }
@@ -2043,15 +2061,14 @@ final class PlayerSimulation {
                           state.startCourseWasPresented == true
                             || state.finishCourseWasPresented == true
                             || (dodgeAttemptIsActive
-                                && state.enabledControls.rawValue & 63
-                                    == 60)
+                                && state.enabledControls.rawValue == 60)
                             || (dodgeAttemptHasSucceeded
-                                && state.enabledControls.rawValue & 63
-                                    == 63)
+                                && state.enabledControls.rawValue == 63)
+                            || dodgeExitControlMaskIsReachable
                             || expectedControls.contains(
                                 state.enabledControls
                             )
-                      )
+                        )
               }) ?? true,
               (level.trainingOpeningLesson == nil)
                 == (continuation.trainingOpeningState == nil) else {
@@ -2118,6 +2135,7 @@ final class PlayerSimulation {
         var restoredOpeningState = continuation.trainingOpeningState
         if restoredOpeningState?.startCourseWasPresented == true,
            !dodgeAttemptIsActive,
+           !dodgeExitWasReached,
            !(restoredOpeningState?.finishCourseWasPresented == true
                 && restoredOpeningState?.enabledControls.rawValue == 32),
            let startCourse =
@@ -2159,6 +2177,16 @@ final class PlayerSimulation {
                 portalIndices:
                     restoredLevel.trainingDodgeAttempt!
                     .orderedPortalIndices,
+                rendersFaces: false
+            )
+        }
+        if restoredDodgeAttemptState?.script019Count == 1,
+            let exit = restoredLevel.trainingDodgeAttempt?.dodgeExit
+        {
+            setTrainingDodgePortalRenderState(
+                in: &restoredLevel,
+                roomSourceIndex: exit.portalRoomSourceIndex,
+                portalIndices: exit.orderedPortalIndices,
                 rendersFaces: false
             )
         }
@@ -4190,6 +4218,50 @@ final class PlayerSimulation {
                 dodgeState.script033Count += 1
             }
 
+            if let exit = dodge.dodgeExit,
+                (dodgeState.script019Count ?? 0) < 1,
+                case .room(35) = player.location,
+                let doneDodgeingGoal = level.objects.first(where: {
+                    $0.handle == exit.objectHandle
+                }),
+                segmentSphereHitFraction(
+                    start: object.position,
+                    end: player.position,
+                    center: doneDodgeingGoal.position,
+                    radius:
+                        exit.collisionRadius
+                        + view.collisionRadius
+                ) != nil
+            {
+                dodgeState.markerLightDistance =
+                    exit.markerLightDistance
+                setTrainingDodgePortalRenderState(
+                    in: &level,
+                    roomSourceIndex: exit.portalRoomSourceIndex,
+                    portalIndices: exit.orderedPortalIndices,
+                    rendersFaces: false
+                )
+                if var openingState = trainingOpeningState {
+                    openingState.enabledControls = .init(
+                        rawValue:
+                            openingState.enabledControls.rawValue
+                            & ~exit.disabledControlMask
+                    )
+                    trainingOpeningState = openingState
+                }
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [exit.instruction],
+                        voiceSourceName: exit.voiceSourceName,
+                        voicePrecedesHUDMessages: true
+                    ))
+                dodgeState.script019Count =
+                    min(
+                        (dodgeState.script019Count ?? 0) + 1,
+                        trainingScriptActionCounterMaximum
+                    )
+            }
+
             if shields < dodge.restoredPlayerShields,
                 dodgeState.script016Count > 0,
                 dodgeState.script017Count == 0
@@ -5398,6 +5470,9 @@ private func validTrainingDodgeAttemptContinuation(
         state.script033Count == 0 || state.script033Count == 1,
         state.script016Count == 0 || state.script016Count == 1,
         state.script017Count == 0 || state.script017Count == 1,
+        state.script019Count == nil
+            || state.script019Count == 0
+            || state.script019Count == 1,
         (0...trainingScriptActionCounterMaximum).contains(
             state.script018Count
         ),
@@ -5407,6 +5482,7 @@ private func validTrainingDodgeAttemptContinuation(
         state.markerLightDistance.isFinite,
         state.markerLightDistance
             == (state.script017Count == 1
+                || state.script019Count == 1
                 ? dodge.successMarkerLightDistance : 0),
         state.firingMaskIndex >= 0,
         state.firingMaskIndex < dodge.turret.gunpoints.count,
@@ -5465,6 +5541,9 @@ private func validTrainingDodgeAttemptContinuation(
                     <= dodge.turret.projectileLifetime
         })
     else {
+        return false
+    }
+    if state.script019Count == 1 && dodge.dodgeExit == nil {
         return false
     }
     if state.script018Count > 0 && state.script016Count == 0 {

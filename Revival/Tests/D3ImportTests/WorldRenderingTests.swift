@@ -2,6 +2,443 @@ import XCTest
 
 final class WorldRenderingTests: XCTestCase {
     @MainActor
+    func testScript019EarlyContactOpensExitOnceAndRestoresSilently()
+        throws
+    {
+        func expandingDodgeRoom(_ source: Level) -> Level {
+            var level = source
+            let roomIndex = level.rooms.firstIndex {
+                $0.sourceIndex == 35
+            }!
+            let vertices = level.rooms[roomIndex].vertices
+            let center = Vector3(
+                x: vertices.map(\.x).reduce(0, +)
+                    / Float(vertices.count),
+                y: vertices.map(\.y).reduce(0, +)
+                    / Float(vertices.count),
+                z: vertices.map(\.z).reduce(0, +)
+                    / Float(vertices.count)
+            )
+            level.rooms[roomIndex].vertices = vertices.map {
+                .init(
+                    x: center.x + ($0.x - center.x) * 100,
+                    y: center.y + ($0.y - center.y) * 100,
+                    z: center.z + ($0.z - center.z) * 100
+                )
+            }
+            return level
+        }
+
+        var level = expandingDodgeRoom(
+            makeTrainingDodgeAttemptLevel()
+        )
+        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let exit = try XCTUnwrap(dodge.dodgeExit)
+        let done = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == exit.objectHandle
+            }
+        )
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            }
+        )
+        level.objects[playerIndex].location = done.location
+        level.objects[playerIndex].position = done.position
+
+        let portalRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex {
+                $0.sourceIndex == exit.portalRoomSourceIndex
+            }
+        )
+        for (offset, portalIndex) in
+            exit.orderedPortalIndices.enumerated()
+        {
+            level.rooms[portalRoomIndex].portals[portalIndex].flags
+                |= UInt32(1 << (offset + 3))
+            let portal =
+                level.rooms[portalRoomIndex].portals[portalIndex]
+            let reciprocalRoomIndex = try XCTUnwrap(
+                level.rooms.firstIndex {
+                    $0.sourceIndex == portal.connectedRoom
+                }
+            )
+            level.rooms[reciprocalRoomIndex]
+                .portals[portal.connectedPortal].flags
+                |= UInt32(1 << (offset + 5))
+        }
+
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(at: 0.1, input: .zero)
+        XCTAssertEqual(frame.enabledPlayerControls.rawValue, 1)
+        XCTAssertEqual(
+            frame.trainingDodgeMarkerLightDistance,
+            exit.markerLightDistance
+        )
+        XCTAssertEqual(
+            frame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [exit.instruction],
+                    voiceSourceName: exit.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                )
+            ]
+        )
+        let openedRoom = try XCTUnwrap(
+            simulation.level.rooms.first {
+                $0.sourceIndex == exit.portalRoomSourceIndex
+            }
+        )
+        for (offset, portalIndex) in
+            exit.orderedPortalIndices.enumerated()
+        {
+            let portal = openedRoom.portals[portalIndex]
+            XCTAssertEqual(
+                portal.flags,
+                UInt32(1 << (offset + 3))
+            )
+            let reciprocal = try XCTUnwrap(
+                simulation.level.rooms.first {
+                    $0.sourceIndex == portal.connectedRoom
+                }
+            ).portals[portal.connectedPortal]
+            XCTAssertEqual(
+                reciprocal.flags,
+                UInt32(1 << (offset + 5))
+            )
+        }
+        XCTAssertTrue(
+            simulation.update(at: 0.2, input: .zero)
+                .trainingOpeningFeedback.isEmpty
+        )
+
+        var restoreLevel = expandingDodgeRoom(
+            makeTrainingDodgeAttemptLevel()
+        )
+        let restorePlayerIndex = try XCTUnwrap(
+            restoreLevel.objects.firstIndex {
+                $0.handle
+                    == restoreLevel.defaultPlayerBinding?.objectHandle
+            }
+        )
+        restoreLevel.objects[restorePlayerIndex].location =
+            done.location
+        restoreLevel.objects[restorePlayerIndex].position =
+            done.position
+        let restorableEarlySimulation = PlayerSimulation(
+            level: restoreLevel,
+            presentationReadyTimestamp: 0
+        )
+        let earlyFrame = restorableEarlySimulation.update(
+            at: 0.1,
+            input: .zero
+        )
+        XCTAssertEqual(
+            earlyFrame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [exit.instruction],
+                    voiceSourceName: exit.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                )
+            ]
+        )
+        XCTAssertEqual(earlyFrame.enabledPlayerControls.rawValue, 1)
+        let earlyContinuation =
+            restorableEarlySimulation.continuation
+        let earlyState = try encodedDodgeState(earlyContinuation)
+        XCTAssertEqual(earlyState["script019Count"] as? Int, 1)
+
+        var reachedHighBitObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(earlyContinuation)
+            ) as? [String: Any]
+        )
+        var reachedHighBitOpening = try XCTUnwrap(
+            reachedHighBitObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        reachedHighBitOpening["enabledControls"] = 65
+        reachedHighBitObject["trainingOpeningState"] =
+            reachedHighBitOpening
+        let reachedHighBitContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: reachedHighBitObject
+            )
+        )
+        let restoredEarly = try PlayerSimulation(
+            level: restoreLevel,
+            continuation: reachedHighBitContinuation,
+            resumedAtTimestamp: 1
+        )
+        let restoredEarlyFrame = restoredEarly.update(
+            at: 1.1,
+            input: .zero
+        )
+        XCTAssertTrue(
+            restoredEarlyFrame.trainingOpeningFeedback.isEmpty
+        )
+        XCTAssertEqual(
+            restoredEarlyFrame.enabledPlayerControls.rawValue,
+            65
+        )
+
+        var earlyThenSuccessObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(earlyContinuation)
+            ) as? [String: Any]
+        )
+        var earlyThenSuccessOpening = try XCTUnwrap(
+            earlyThenSuccessObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        earlyThenSuccessOpening["enabledControls"] = 67
+        earlyThenSuccessObject["trainingOpeningState"] =
+            earlyThenSuccessOpening
+        var earlyThenSuccessState = try XCTUnwrap(
+            earlyThenSuccessObject["trainingDodgeAttemptState"]
+                as? [String: Any]
+        )
+        earlyThenSuccessState["script033Count"] = 1
+        earlyThenSuccessState["script016Count"] = 1
+        earlyThenSuccessState["script017Count"] = 1
+        earlyThenSuccessState["script019Count"] = 1
+        earlyThenSuccessState["markerLightDistance"] = 50
+        earlyThenSuccessState["turretIsPowered"] = false
+        earlyThenSuccessState.removeValue(
+            forKey: "triggerTimerRemaining"
+        )
+        earlyThenSuccessState.removeValue(
+            forKey: "successTimerRemaining"
+        )
+        earlyThenSuccessState.removeValue(
+            forKey: "almostDoneTimerRemaining"
+        )
+        earlyThenSuccessObject["trainingDodgeAttemptState"] =
+            earlyThenSuccessState
+        let earlyThenSuccess = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: earlyThenSuccessObject
+            )
+        )
+        let restoredEarlyThenSuccess = try PlayerSimulation(
+            level: restoreLevel,
+            continuation: earlyThenSuccess,
+            resumedAtTimestamp: 1.5
+        )
+        let earlyThenSuccessFrame = restoredEarlyThenSuccess.update(
+            at: 1.6,
+            input: .zero
+        )
+        XCTAssertTrue(
+            earlyThenSuccessFrame.trainingOpeningFeedback.isEmpty
+        )
+        XCTAssertEqual(
+            earlyThenSuccessFrame.enabledPlayerControls.rawValue,
+            67
+        )
+
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(earlyContinuation)
+            ) as? [String: Any]
+        )
+        var hostileState = try XCTUnwrap(
+            hostileObject["trainingDodgeAttemptState"]
+                as? [String: Any]
+        )
+        hostileState["script019Count"] = 2
+        hostileObject["trainingDodgeAttemptState"] = hostileState
+        let hostile = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: hostileObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: restoreLevel,
+                continuation: hostile,
+                resumedAtTimestamp: 2
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var oldLevel = expandingDodgeRoom(
+            makeTrainingDodgeAttemptLevel()
+        )
+        let oldPlayerIndex = try XCTUnwrap(
+            oldLevel.objects.firstIndex {
+                $0.handle == oldLevel.defaultPlayerBinding?.objectHandle
+            }
+        )
+        oldLevel.objects[oldPlayerIndex].location = done.location
+        oldLevel.objects[oldPlayerIndex].position = done.position
+        let oldSimulation = PlayerSimulation(
+            level: oldLevel,
+            presentationReadyTimestamp: 0
+        )
+        var oldObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(oldSimulation.continuation)
+            ) as? [String: Any]
+        )
+        var oldState = try XCTUnwrap(
+            oldObject["trainingDodgeAttemptState"]
+                as? [String: Any]
+        )
+        oldState.removeValue(forKey: "script019Count")
+        oldObject["trainingDodgeAttemptState"] = oldState
+        let oldContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: oldObject)
+        )
+        let restoredOld = try PlayerSimulation(
+            level: oldLevel,
+            continuation: oldContinuation,
+            resumedAtTimestamp: 2.5
+        )
+        let oldContactFrame = restoredOld.update(
+            at: 2.6,
+            input: .zero
+        )
+        XCTAssertEqual(
+            oldContactFrame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [exit.instruction],
+                    voiceSourceName: exit.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                )
+            ]
+        )
+        XCTAssertTrue(
+            restoredOld.update(at: 2.7, input: .zero)
+                .trainingOpeningFeedback.isEmpty
+        )
+
+        var unreachedHighBitObject = oldObject
+        var unreachedHighBitOpening = try XCTUnwrap(
+            unreachedHighBitObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        unreachedHighBitOpening["enabledControls"] = 65
+        unreachedHighBitObject["trainingOpeningState"] =
+            unreachedHighBitOpening
+        let unreachedHighBit = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: unreachedHighBitObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: oldLevel,
+                continuation: unreachedHighBit,
+                resumedAtTimestamp: 3
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var unreachedActiveObject = oldObject
+        var unreachedActiveOpening = try XCTUnwrap(
+            unreachedActiveObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        unreachedActiveOpening["enabledControls"] = 124
+        unreachedActiveObject["trainingOpeningState"] =
+            unreachedActiveOpening
+        var unreachedActiveState = try XCTUnwrap(
+            unreachedActiveObject["trainingDodgeAttemptState"]
+                as? [String: Any]
+        )
+        unreachedActiveState["script033Count"] = 1
+        unreachedActiveState["triggerTimerRemaining"] = 5
+        unreachedActiveObject["trainingDodgeAttemptState"] =
+            unreachedActiveState
+        let unreachedActive = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: unreachedActiveObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: oldLevel,
+                continuation: unreachedActive,
+                resumedAtTimestamp: 3.5
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var unreachedSuccessObject = oldObject
+        var unreachedSuccessOpening = try XCTUnwrap(
+            unreachedSuccessObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        unreachedSuccessOpening["enabledControls"] = 127
+        unreachedSuccessObject["trainingOpeningState"] =
+            unreachedSuccessOpening
+        var unreachedSuccessState = try XCTUnwrap(
+            unreachedSuccessObject["trainingDodgeAttemptState"]
+                as? [String: Any]
+        )
+        unreachedSuccessState["script033Count"] = 1
+        unreachedSuccessState["script016Count"] = 1
+        unreachedSuccessState["script017Count"] = 1
+        unreachedSuccessState["markerLightDistance"] = 50
+        unreachedSuccessState["turretIsPowered"] = false
+        unreachedSuccessState.removeValue(
+            forKey: "triggerTimerRemaining"
+        )
+        unreachedSuccessState.removeValue(
+            forKey: "successTimerRemaining"
+        )
+        unreachedSuccessState.removeValue(
+            forKey: "almostDoneTimerRemaining"
+        )
+        unreachedSuccessObject["trainingDodgeAttemptState"] =
+            unreachedSuccessState
+        let unreachedSuccess = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: unreachedSuccessObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: oldLevel,
+                continuation: unreachedSuccess,
+                resumedAtTimestamp: 4
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
+    @MainActor
     func testTimedDodgeUsesRealTurretHitAndReleasedTimerOrder() throws {
         var level = makeTrainingDodgeAttemptLevel()
         let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
@@ -282,6 +719,69 @@ final class WorldRenderingTests: XCTestCase {
                 continuation: restorableContinuation,
                 resumedAtTimestamp: timestamp + 1
             )
+        )
+
+        let done = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == dodge.doneDodgeingGoalObjectHandle
+            }
+        )
+        hostileObject["playerLocation"] =
+            try JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(done.location)
+            )
+        hostileObject["playerPosition"] =
+            try JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(done.position)
+            )
+        let normalExitContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        let normalExitSimulation = try PlayerSimulation(
+            level: level,
+            continuation: normalExitContinuation,
+            resumedAtTimestamp: timestamp + 2
+        )
+        let normalExitFrame = normalExitSimulation.update(
+            at: timestamp + 2.1,
+            input: .zero
+        )
+        let exit = try XCTUnwrap(dodge.dodgeExit)
+        XCTAssertEqual(
+            normalExitFrame.enabledPlayerControls.rawValue,
+            1
+        )
+        XCTAssertEqual(
+            normalExitFrame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [exit.instruction],
+                    voiceSourceName: exit.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                )
+            ]
+        )
+        let normalExitState = try encodedDodgeState(
+            normalExitSimulation.continuation
+        )
+        XCTAssertEqual(normalExitState["script017Count"] as? Int, 1)
+        XCTAssertEqual(normalExitState["script019Count"] as? Int, 1)
+        let restoredNormalExit = try PlayerSimulation(
+            level: level,
+            continuation: normalExitSimulation.continuation,
+            resumedAtTimestamp: timestamp + 3
+        )
+        let restoredNormalExitFrame = restoredNormalExit.update(
+            at: timestamp + 3.1,
+            input: .zero
+        )
+        XCTAssertTrue(
+            restoredNormalExitFrame.trainingOpeningFeedback.isEmpty
+        )
+        XCTAssertEqual(
+            restoredNormalExitFrame.enabledPlayerControls.rawValue,
+            1
         )
 
         hostileDodgeState["script033Count"] = 0
@@ -13515,7 +14015,12 @@ func makeTrainingDodgeAttemptLevel() -> Level {
     )
 
     let pcm = Data(repeating: 0, count: 2)
-    let dodgeVoices = ["intro2.osf", "almost.osf", "proceed3.osf"]
+    let dodgeVoices = [
+        "intro2.osf",
+        "almost.osf",
+        "proceed3.osf",
+        "proceed4.osf",
+    ]
         .enumerated().map { index, name in
             CanonicalVoiceClip(
                 sourceName: name,
@@ -13716,6 +14221,18 @@ func makeTrainingDodgeAttemptLevel() -> Level {
             projectileSpeed: 200,
             projectileLifetime: 5
         )
+    )
+    level.trainingDodgeAttempt?.dodgeExit = .init(
+        objectHandle: 12_302,
+        collisionRadius: 10.052_409,
+        markerLightObjectHandle: 4_120,
+        markerLightDistance: 50,
+        portalRoomSourceIndex: 36,
+        orderedPortalIndices: [0, 1],
+        disabledControlMask: 62,
+        instruction:
+            "Now keep moving forward into the next room.",
+        voiceSourceName: "proceed4.osf"
     )
     return level
 }

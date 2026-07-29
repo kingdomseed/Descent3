@@ -109,6 +109,12 @@ final class PreparedRetailProfileTests: XCTestCase {
             Repeat=Let's repeat the exercise we just did.
             ContinueToCourse=Continue Sliding down to start the next step.
             CourseInstructions=Now, manuever through this tunnel using the sliding skills you just learned.
+            DodgeIntro=Next you are going to practice dodging.
+            Dodge30=To complete this step, dodge the turrett fire for 20 seconds.
+            KeepDodging=Oops, you were hit! Keep moving!
+            AlmostDoneDodge=You are almost done! Keep up the good work!
+            LeaveDodge=Now using your sliding skills, proceed forward to the flashing green light.
+            KeepMovingOutofDodging=Now keep moving forward into the next room.
             """.utf8)
         XCTAssertEqual(
             try parseTrainingMessages(complete)["GoDown"],
@@ -118,6 +124,31 @@ final class PreparedRetailProfileTests: XCTestCase {
             try parseTrainingMessages(complete)["Repeat"],
             "Let's repeat the exercise we just did."
         )
+        XCTAssertEqual(
+            try parseTrainingMessages(complete)[
+                "KeepMovingOutofDodging"
+            ],
+            "Now keep moving forward into the next room."
+        )
+
+        let missingScript019Message = Data(
+            String(decoding: complete, as: UTF8.self)
+                .split(whereSeparator: \.isNewline)
+                .filter {
+                    !$0.trimmingCharacters(in: .whitespaces)
+                        .hasPrefix("KeepMovingOutofDodging=")
+                }
+                .joined(separator: "\n")
+                .utf8
+        )
+        XCTAssertThrowsError(
+            try parseTrainingMessages(missingScript019Message)
+        ) {
+            XCTAssertEqual(
+                $0 as? D3ImportOperationError,
+                .missingPresentationAsset("TrainingMission.msg")
+            )
+        }
     }
 
     func testTrainingProfilePinsTheOwnedPreparedInstallation() {

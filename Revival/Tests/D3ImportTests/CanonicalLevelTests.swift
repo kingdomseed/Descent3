@@ -1,6 +1,83 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testScript019DodgeExitRequiresExactStockBindingsAndMedia() throws {
+        let level = makeTrainingDodgeAttemptLevel()
+        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let exit = try XCTUnwrap(dodge.dodgeExit)
+
+        XCTAssertEqual(exit.objectHandle, 12_302)
+        XCTAssertEqual(exit.collisionRadius, 10.052_409)
+        XCTAssertEqual(exit.markerLightObjectHandle, 4_120)
+        XCTAssertEqual(exit.markerLightDistance, 50)
+        XCTAssertEqual(exit.portalRoomSourceIndex, 36)
+        XCTAssertEqual(exit.orderedPortalIndices, [0, 1])
+        XCTAssertEqual(exit.disabledControlMask, 62)
+        XCTAssertEqual(
+            exit.instruction,
+            "Now keep moving forward into the next room."
+        )
+        XCTAssertEqual(exit.voiceSourceName, "proceed4.osf")
+        XCTAssertNotNil(
+            level.voiceClips.first {
+                $0.sourceName == exit.voiceSourceName
+            }
+        )
+        XCTAssertNoThrow(try level.validate())
+
+        var oldLevel = level
+        oldLevel.trainingDodgeAttempt?.dodgeExit = nil
+        oldLevel = replacing(
+            oldLevel,
+            voiceClips: oldLevel.voiceClips.filter {
+                $0.sourceName != "proceed4.osf"
+            },
+            dependencyManifest: .init(
+                current: oldLevel.dependencyManifest.current.filter {
+                    $0.source.sourceName != "proceed4.osf"
+                },
+                historicalEagerBaseline:
+                    oldLevel.dependencyManifest.historicalEagerBaseline
+            )
+        )
+        var oldObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(oldLevel)
+            ) as? [String: Any]
+        )
+        var oldDodge = try XCTUnwrap(
+            oldObject["trainingDodgeAttempt"] as? [String: Any]
+        )
+        oldDodge.removeValue(forKey: "dodgeExit")
+        oldObject["trainingDodgeAttempt"] = oldDodge
+        let decodedOldLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: oldObject)
+        )
+        XCTAssertNil(decodedOldLevel.trainingDodgeAttempt?.dodgeExit)
+        XCTAssertNoThrow(try decodedOldLevel.validate())
+
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(level)
+            ) as? [String: Any]
+        )
+        var hostileDodge = try XCTUnwrap(
+            hostileObject["trainingDodgeAttempt"] as? [String: Any]
+        )
+        var hostileExit = try XCTUnwrap(
+            hostileDodge["dodgeExit"] as? [String: Any]
+        )
+        hostileExit["disabledControlMask"] = 63
+        hostileDodge["dodgeExit"] = hostileExit
+        hostileObject["trainingDodgeAttempt"] = hostileDodge
+        let hostileLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(try hostileLevel.validate())
+    }
+
     func testTimedDodgeAttemptRequiresExactStockBindingsAndMedia() throws {
         let level = makeTrainingDodgeAttemptLevel()
         let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
@@ -220,6 +297,25 @@ final class CanonicalLevelTests: XCTestCase {
             }?.pcmSHA256,
             "abc67c37d716253959d0ec615b364b6ff59b896179fc3f93256be3870ed3dabd"
         )
+        let exit = try XCTUnwrap(dodge.dodgeExit)
+        XCTAssertEqual(
+            stockLevel.voiceClips.first {
+                $0.sourceName == exit.voiceSourceName
+            }?.sourceEntryIndex,
+            24
+        )
+        XCTAssertEqual(
+            stockLevel.voiceClips.first {
+                $0.sourceName == exit.voiceSourceName
+            }?.sourceSHA256,
+            "d7442b4192e34ed6b7b529f3b3d555be64ef3437c000611ff7fa57d6989550e9"
+        )
+        XCTAssertEqual(
+            stockLevel.voiceClips.first {
+                $0.sourceName == exit.voiceSourceName
+            }?.pcmSHA256,
+            "92228006e3a802cc067a1650f735cc1a04865bf68d35ab3bc94343049e3dadc7"
+        )
 
         var hostileObject = try XCTUnwrap(
             JSONSerialization.jsonObject(
@@ -242,6 +338,29 @@ final class CanonicalLevelTests: XCTestCase {
         assertValidationError(
             .invalidDependency("Training timed dodge stock package"),
             hostileLevel
+        )
+
+        hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(stockLevel)
+            ) as? [String: Any]
+        )
+        hostileDodge = try XCTUnwrap(
+            hostileObject["trainingDodgeAttempt"] as? [String: Any]
+        )
+        var hostileExit = try XCTUnwrap(
+            hostileDodge["dodgeExit"] as? [String: Any]
+        )
+        hostileExit["voiceSourceName"] = "proceed3.osf"
+        hostileDodge["dodgeExit"] = hostileExit
+        hostileObject["trainingDodgeAttempt"] = hostileDodge
+        let hostileExitLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        assertValidationError(
+            .invalidDependency("Training timed dodge attempt"),
+            hostileExitLevel
         )
     }
 
