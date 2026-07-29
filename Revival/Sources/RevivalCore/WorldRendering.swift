@@ -915,6 +915,7 @@ private struct TrainingOpeningState: Codable, Equatable, Sendable {
     var repeatReturnRightWasPresented: Bool? = nil
     var repeatReturnUpWasPresented: Bool? = nil
     var repeatReturnDownWasPresented: Bool? = nil
+    var continueToCourseWasPresented: Bool? = nil
     var enabledControls: PlayerControlMask = [.forward]
 }
 
@@ -1349,6 +1350,22 @@ final class PlayerSimulation {
             closeTrainingGalleryBarrier(in: &routeAllocationLevel)
         }
         var continuationLevel = routeAllocationLevel
+        if continuation.trainingOpeningState?
+            .continueToCourseWasPresented == true
+        {
+            guard let continueToCourse =
+                    continuationLevel.trainingOpeningLesson?
+                        .continueToCourse,
+                  trainingContinueToCoursePortalsHaveRenderState(
+                      in: continuationLevel,
+                      lesson: continueToCourse,
+                      rendersFaces: true
+                  )
+            else {
+                throw PlayerSimulationContinuationError.invalidState
+            }
+            openTrainingContinueToCoursePortals(in: &continuationLevel)
+        }
         if continuation.trainingRobotGuidebotState?.robotWasDestroyed == true {
             let chain = continuationLevel.trainingRobotGuidebotChain!
             continuationLevel.objects.removeAll {
@@ -1831,6 +1848,11 @@ final class PlayerSimulation {
                           return controls
                       }
                   }
+                  if state.continueToCourseWasPresented == true {
+                      guard state.repeatReturnDownWasPresented == true else {
+                          return false
+                      }
+                  }
                   return state.timerRemaining.isFinite
                       && (
                           state.welcomeWasPresented
@@ -1864,11 +1886,26 @@ final class PlayerSimulation {
                       && (state.repeatReturnDownWasPresented != true
                           || level.trainingOpeningLesson?.repeatReturnDown
                             != nil)
+                      && (state.continueToCourseWasPresented != true
+                          || level.trainingOpeningLesson?.continueToCourse
+                            != nil)
                       && expectedControls.contains(state.enabledControls)
               }) ?? true,
               (level.trainingOpeningLesson == nil)
                 == (continuation.trainingOpeningState == nil) else {
             throw PlayerSimulationContinuationError.invalidState
+        }
+        if let continueToCourse =
+                continuationLevel.trainingOpeningLesson?.continueToCourse,
+           continuation.trainingOpeningState?
+            .continueToCourseWasPresented == true {
+            guard trainingContinueToCoursePortalsHaveRenderState(
+                in: continuationLevel,
+                lesson: continueToCourse,
+                rendersFaces: false
+            ) else {
+                throw PlayerSimulationContinuationError.invalidState
+            }
         }
         var restoredLevel = continuationLevel
         let binding = restoredLevel.defaultPlayerBinding!
@@ -4091,6 +4128,18 @@ final class PlayerSimulation {
                 openingState.enabledControls.insert(.down)
                 openingState.repeatReturnDownWasPresented = true
             }
+            if openingState.continueToCourseWasPresented != true,
+               openingState.repeatReturnDownWasPresented == true,
+               trainingStartGoalWasReachedThisFrame,
+               let continueToCourse = lesson.continueToCourse {
+                openTrainingContinueToCoursePortals(in: &level)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [continueToCourse.instruction],
+                    voiceSourceName: continueToCourse.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                ))
+                openingState.continueToCourseWasPresented = true
+            }
             if !openingState.welcomeWasPresented {
                 openingState.timerRemaining -= systemsFrameDuration
                 if openingState.timerRemaining <= 0.000_001 {
@@ -5321,6 +5370,61 @@ private func closeTrainingGalleryBarrier(in level: inout Level) {
         }!
         level.rooms[connectedRoomIndex]
             .portals[portal.connectedPortal].flags |= 1
+    }
+}
+
+private func trainingContinueToCoursePortalsHaveRenderState(
+    in level: Level,
+    lesson: TrainingContinueToCourseLesson,
+    rendersFaces: Bool
+) -> Bool {
+    guard let room = level.rooms.first(where: {
+        $0.sourceIndex == lesson.portalRoomSourceIndex
+    }),
+          lesson.orderedPortalIndices.allSatisfy(
+              room.portals.indices.contains
+          )
+    else {
+        return false
+    }
+    let expectedBit: UInt32 = rendersFaces ? 1 : 0
+    return lesson.orderedPortalIndices.allSatisfy { portalIndex in
+        let portal = room.portals[portalIndex]
+        guard portal.flags & 1 == expectedBit,
+              let connectedRoom = level.rooms.first(where: {
+                  $0.sourceIndex == portal.connectedRoom
+              }),
+              connectedRoom.portals.indices.contains(
+                  portal.connectedPortal
+              )
+        else {
+            return false
+        }
+        let reciprocal =
+            connectedRoom.portals[portal.connectedPortal]
+        return reciprocal.connectedRoom == room.sourceIndex
+            && reciprocal.connectedPortal == portalIndex
+            && reciprocal.flags & 1 == expectedBit
+    }
+}
+
+private func openTrainingContinueToCoursePortals(in level: inout Level) {
+    guard let lesson =
+            level.trainingOpeningLesson?.continueToCourse,
+          let roomIndex = level.rooms.firstIndex(where: {
+              $0.sourceIndex == lesson.portalRoomSourceIndex
+          })
+    else {
+        return
+    }
+    for portalIndex in lesson.orderedPortalIndices {
+        let portal = level.rooms[roomIndex].portals[portalIndex]
+        level.rooms[roomIndex].portals[portalIndex].flags &= ~UInt32(1)
+        let connectedRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        level.rooms[connectedRoomIndex]
+            .portals[portal.connectedPortal].flags &= ~UInt32(1)
     }
 }
 

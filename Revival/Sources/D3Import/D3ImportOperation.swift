@@ -738,6 +738,19 @@ func runD3Import(
     let upGoalModel = playerLevel.models.first {
         $0.source == upGoalPresentation.primaryModel
     }!
+    let portalRoomOne = playerLevel.rooms.first {
+        $0.name?.caseInsensitiveCompare("PortalRoom1") == .orderedSame
+    }!
+    precondition(
+        portalRoomOne.sourceIndex == 2
+            && portalRoomOne.portals.count == 2
+            && portalRoomOne.portals[0].faceIndex == 0
+            && portalRoomOne.portals[0].connectedRoom == 1
+            && portalRoomOne.portals[0].connectedPortal == 0
+            && portalRoomOne.portals[1].faceIndex == 1
+            && portalRoomOne.portals[1].connectedRoom == 3
+            && portalRoomOne.portals[1].connectedPortal == 0
+    )
     let forwardGoalPresentation = playerLevel.objectPresentations.first {
         $0.objectHandle == forwardGoal.handle
     }!
@@ -852,6 +865,7 @@ func runD3Import(
         "repeat.osf",
         "lright.osf",
         "udown.osf",
+        "proceed1.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -1008,6 +1022,17 @@ func runD3Import(
                 ),
                 instruction: messages["GoDown"]!,
                 soundLogicalName: menuBeepPage.logicalName
+            ),
+            continueToCourse: .init(
+                startGoalObjectHandle: startGoal.handle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: startGoalModel,
+                    objectType: startGoal.type
+                ),
+                portalRoomSourceIndex: portalRoomOne.sourceIndex,
+                orderedPortalIndices: [0, 1],
+                instruction: messages["ContinueToCourse"]!,
+                voiceSourceName: "proceed1.osf"
             )
         ),
         voiceClips: [
@@ -1020,6 +1045,7 @@ func runD3Import(
             voiceClips[16],
             voiceClips[17],
             voiceClips[18],
+            voiceClips[19],
         ],
         soundClips: [menuBeepClip]
     )

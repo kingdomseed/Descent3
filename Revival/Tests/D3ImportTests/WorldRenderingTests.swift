@@ -2,6 +2,369 @@ import XCTest
 
 final class WorldRenderingTests: XCTestCase {
     @MainActor
+    func testTrainingScript013OpensPortalRoomOneThenRestoresSilently()
+        throws
+    {
+        let level = makeTrainingScript003Level()
+        let continueToCourse = try XCTUnwrap(
+            level.trainingOpeningLesson?.continueToCourse
+        )
+        XCTAssertEqual(continueToCourse.startGoalObjectHandle, 12_300)
+        XCTAssertEqual(continueToCourse.portalRoomSourceIndex, 2)
+        XCTAssertEqual(continueToCourse.orderedPortalIndices, [0, 1])
+        XCTAssertEqual(
+            continueToCourse.instruction,
+            "Continue Sliding down to start the next step."
+        )
+        XCTAssertEqual(continueToCourse.voiceSourceName, "proceed1.osf")
+
+        let portalRoom = try XCTUnwrap(
+            level.rooms.first {
+                $0.sourceIndex == continueToCourse.portalRoomSourceIndex
+            }
+        )
+        let originalPortalFlags = continueToCourse.orderedPortalIndices.map {
+            portalRoom.portals[$0].flags
+        }
+        let originalReciprocalFlags = continueToCourse.orderedPortalIndices.map {
+            let portal = portalRoom.portals[$0]
+            return level.rooms.first {
+                $0.sourceIndex == portal.connectedRoom
+            }!.portals[portal.connectedPortal].flags
+        }
+        XCTAssertTrue(originalPortalFlags.allSatisfy { $0 & 1 != 0 })
+        XCTAssertTrue(originalReciprocalFlags.allSatisfy { $0 & 1 != 0 })
+
+        let player = try XCTUnwrap(
+            level.objects.first { $0.handle == 2_048 }
+        )
+        let goalHandles: [UInt32] = [
+            12_301,
+            12_300,
+            12_299,
+            18_441,
+        ]
+        func contacting(
+            _ handle: UInt32,
+            at position: Vector3
+        ) throws -> Level {
+            var objects = level.objects
+            for goalHandle in goalHandles {
+                let index = try XCTUnwrap(
+                    objects.firstIndex { $0.handle == goalHandle }
+                )
+                objects[index].position = goalHandle == handle
+                    ? position
+                    : .init(
+                        x: position.x + 100,
+                        y: position.y,
+                        z: position.z
+                    )
+                objects[index].location = .room(1)
+            }
+            let roomIndex = try XCTUnwrap(
+                level.rooms.firstIndex { $0.sourceIndex == 1 }
+            )
+            var rooms = level.rooms
+            rooms[roomIndex] = addingSourceContainmentShell(
+                to: rooms[roomIndex],
+                center: position,
+                texture: level.surfacePhysics[0].texture,
+                halfExtent: 200
+            )
+            return replacing(level, rooms: rooms, objects: objects)
+        }
+        func resumed(
+            _ continuation: PlayerSimulationContinuation,
+            contacting handle: UInt32,
+            at timestamp: Double,
+            level resumedLevel: Level? = nil
+        ) throws -> PlayerSimulation {
+            let contactLevel = try contacting(
+                handle,
+                at: continuation.playerPosition
+            )
+            return try PlayerSimulation(
+                level: resumedLevel.map {
+                    replacing(
+                        contactLevel,
+                        trainingOpeningLesson: $0.trainingOpeningLesson
+                    )
+                } ?? contactLevel,
+                continuation: continuation,
+                resumedAtTimestamp: timestamp
+            )
+        }
+        func advance(
+            _ continuation: PlayerSimulationContinuation,
+            contacting handle: UInt32,
+            at timestamp: Double
+        ) throws -> PlayerSimulation {
+            let simulation = try resumed(
+                continuation,
+                contacting: handle,
+                at: timestamp
+            )
+            _ = simulation.update(at: timestamp + 0.05, input: .zero)
+            return simulation
+        }
+
+        let firstForward = PlayerSimulation(
+            level: try contacting(12_301, at: player.position),
+            presentationReadyTimestamp: 0
+        )
+        _ = firstForward.update(at: 0.05, input: .zero)
+        let firstLeftGoal = try advance(
+            firstForward.continuation,
+            contacting: 12_299,
+            at: 1
+        )
+        let returnUp = try advance(
+            firstLeftGoal.continuation,
+            contacting: 12_300,
+            at: 2
+        )
+        let returnDown = try advance(
+            returnUp.continuation,
+            contacting: 18_441,
+            at: 3
+        )
+        let repeatForward = try advance(
+            returnDown.continuation,
+            contacting: 12_300,
+            at: 4
+        )
+        let repeatForwardGoal = try advance(
+            repeatForward.continuation,
+            contacting: 12_301,
+            at: 5
+        )
+        let repeatReturnLeft = try advance(
+            repeatForwardGoal.continuation,
+            contacting: 12_300,
+            at: 6
+        )
+        let repeatReturnRight = try advance(
+            repeatReturnLeft.continuation,
+            contacting: 12_299,
+            at: 7
+        )
+        let repeatReturnUp = try advance(
+            repeatReturnRight.continuation,
+            contacting: 12_300,
+            at: 8
+        )
+        let repeatReturnDown = try advance(
+            repeatReturnUp.continuation,
+            contacting: 18_441,
+            at: 9
+        )
+        let normal = try resumed(
+            repeatReturnDown.continuation,
+            contacting: 12_300,
+            at: 10
+        )
+        let normalFrame = normal.update(at: 10.05, input: .zero)
+        XCTAssertEqual(
+            normalFrame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [
+                        "Continue Sliding down to start the next step.",
+                    ],
+                    voiceSourceName: "proceed1.osf",
+                    voicePrecedesHUDMessages: true
+                ),
+            ]
+        )
+        XCTAssertEqual(normalFrame.enabledPlayerControls, [.down])
+        var presentationOrder: [String] = []
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            normalFrame.trainingOpeningFeedback,
+            attemptVoice: {
+                presentationOrder.append("voice:\($0)")
+            },
+            attemptSound: { _, _ in
+                XCTFail("Script 013 does not play a sound")
+            },
+            presentHUDMessages: {
+                presentationOrder.append(
+                    contentsOf: $0.map { "hud:\($0)" }
+                )
+            }
+        )
+        XCTAssertEqual(
+            presentationOrder,
+            [
+                "voice:proceed1.osf",
+                "hud:Continue Sliding down to start the next step.",
+            ]
+        )
+
+        let openedRoom = try XCTUnwrap(
+            normal.level.rooms.first {
+                $0.sourceIndex == continueToCourse.portalRoomSourceIndex
+            }
+        )
+        for (offset, portalIndex) in
+            continueToCourse.orderedPortalIndices.enumerated()
+        {
+            let portal = openedRoom.portals[portalIndex]
+            XCTAssertEqual(
+                portal.flags,
+                originalPortalFlags[offset] & ~UInt32(1)
+            )
+            let connected = try XCTUnwrap(
+                normal.level.rooms.first {
+                    $0.sourceIndex == portal.connectedRoom
+                }
+            )
+            XCTAssertEqual(
+                connected.portals[portal.connectedPortal].flags,
+                originalReciprocalFlags[offset] & ~UInt32(1)
+            )
+        }
+
+        let restored = try PlayerSimulation(
+            level: try contacting(
+                12_300,
+                at: normal.continuation.playerPosition
+            ),
+            continuation: try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(normal.continuation)
+            ),
+            resumedAtTimestamp: 11
+        )
+        let restoredFrame = restored.update(at: 11.05, input: .zero)
+        XCTAssertTrue(restoredFrame.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(restoredFrame.enabledPlayerControls, [.down])
+        let restoredRoom = try XCTUnwrap(
+            restored.level.rooms.first {
+                $0.sourceIndex == continueToCourse.portalRoomSourceIndex
+            }
+        )
+        XCTAssertTrue(
+            continueToCourse.orderedPortalIndices.allSatisfy {
+                restoredRoom.portals[$0].flags & 1 == 0
+            }
+        )
+
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(normal.continuation)
+            ) as? [String: Any]
+        )
+        for (key, value) in [
+            ("repeatReturnDownWasPresented", false),
+            ("enabledControls", 16),
+        ] as [(String, Any)] {
+            var hostileObject = continuationObject
+            var hostileOpening = try XCTUnwrap(
+                hostileObject["trainingOpeningState"] as? [String: Any]
+            )
+            hostileOpening[key] = value
+            hostileObject["trainingOpeningState"] = hostileOpening
+            let hostile = try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: hostileObject
+                )
+            )
+            XCTAssertThrowsError(
+                try PlayerSimulation(
+                    level: level,
+                    continuation: hostile,
+                    resumedAtTimestamp: 12
+                )
+            ) {
+                XCTAssertEqual(
+                    $0 as? PlayerSimulationContinuationError,
+                    .invalidState
+                )
+            }
+        }
+
+        var hostilePortalRooms = level.rooms
+        let hostilePortalRoomIndex = try XCTUnwrap(
+            hostilePortalRooms.firstIndex {
+                $0.sourceIndex == continueToCourse.portalRoomSourceIndex
+            }
+        )
+        for portalIndex in continueToCourse.orderedPortalIndices {
+            let portal =
+                hostilePortalRooms[hostilePortalRoomIndex]
+                    .portals[portalIndex]
+            hostilePortalRooms[hostilePortalRoomIndex]
+                .portals[portalIndex].flags &= ~UInt32(1)
+            let connectedRoomIndex = try XCTUnwrap(
+                hostilePortalRooms.firstIndex {
+                    $0.sourceIndex == portal.connectedRoom
+                }
+            )
+            hostilePortalRooms[connectedRoomIndex]
+                .portals[portal.connectedPortal].flags &= ~UInt32(1)
+        }
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: replacing(level, rooms: hostilePortalRooms),
+                continuation: normal.continuation,
+                resumedAtTimestamp: 12.5
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var compatibleLesson = try XCTUnwrap(
+            level.trainingOpeningLesson
+        )
+        compatibleLesson.continueToCourse = nil
+        let compatibleLevel = replacing(
+            level,
+            trainingOpeningLesson: compatibleLesson
+        )
+        XCTAssertNoThrow(try compatibleLevel.validate())
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: compatibleLevel,
+                continuation: normal.continuation,
+                resumedAtTimestamp: 13
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+        let compatibleSimulation = try resumed(
+            repeatReturnDown.continuation,
+            contacting: 12_300,
+            at: 14,
+            level: compatibleLevel
+        )
+        let compatibleFrame = compatibleSimulation.update(
+            at: 14.05,
+            input: .zero
+        )
+        XCTAssertTrue(compatibleFrame.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(compatibleFrame.enabledPlayerControls, [.down])
+        let compatibleRoom = try XCTUnwrap(
+            compatibleSimulation.level.rooms.first {
+                $0.sourceIndex == continueToCourse.portalRoomSourceIndex
+            }
+        )
+        XCTAssertEqual(
+            continueToCourse.orderedPortalIndices.map {
+                compatibleRoom.portals[$0].flags
+            },
+            originalPortalFlags
+        )
+    }
+
+    @MainActor
     func testTrainingScript012RepeatsReturnDownInReleasedOrderAndRestores()
         throws
     {
@@ -263,6 +626,7 @@ final class WorldRenderingTests: XCTestCase {
             level.trainingOpeningLesson
         )
         compatibleLesson.repeatReturnDown = nil
+        compatibleLesson.continueToCourse = nil
         let compatibleLevel = replacing(
             level,
             trainingOpeningLesson: compatibleLesson
@@ -603,6 +967,7 @@ final class WorldRenderingTests: XCTestCase {
         )
         compatibleLesson.repeatReturnUp = nil
         compatibleLesson.repeatReturnDown = nil
+        compatibleLesson.continueToCourse = nil
         let compatibleLevel = replacing(
             level,
             trainingOpeningLesson: compatibleLesson
@@ -986,6 +1351,7 @@ final class WorldRenderingTests: XCTestCase {
         compatibleLesson.repeatReturnRight = nil
         compatibleLesson.repeatReturnUp = nil
         compatibleLesson.repeatReturnDown = nil
+        compatibleLesson.continueToCourse = nil
         let compatibleLevel = replacing(
             level,
             trainingOpeningLesson: compatibleLesson
@@ -1251,6 +1617,7 @@ final class WorldRenderingTests: XCTestCase {
         compatibleLesson.repeatReturnRight = nil
         compatibleLesson.repeatReturnUp = nil
         compatibleLesson.repeatReturnDown = nil
+        compatibleLesson.continueToCourse = nil
         let compatibleLevel = replacing(
             level,
             trainingOpeningLesson: compatibleLesson,
@@ -11082,6 +11449,7 @@ func makeTrainingScript003Level() -> Level {
         ("repeat.osf", 25),
         ("lright.osf", 19),
         ("udown.osf", 36),
+        ("proceed1.osf", 21),
     ].map { name, index in
         CanonicalVoiceClip(
             sourceName: name,
@@ -11205,6 +11573,18 @@ func makeTrainingScript003Level() -> Level {
                 instruction:
                     "Now Slide down until you return to the start position.",
                 soundLogicalName: "MenuBeepEnter"
+            ),
+            continueToCourse: .init(
+                startGoalObjectHandle: startGoalHandle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: model,
+                    objectType: 7
+                ),
+                portalRoomSourceIndex: 2,
+                orderedPortalIndices: [0, 1],
+                instruction:
+                    "Continue Sliding down to start the next step.",
+                voiceSourceName: "proceed1.osf"
             )
         ),
         voiceClips: clips,

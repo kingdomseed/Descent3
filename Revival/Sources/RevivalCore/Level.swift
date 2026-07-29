@@ -537,6 +537,15 @@ struct TrainingRepeatReturnDownLesson: Codable, Equatable, Sendable {
     let soundLogicalName: String
 }
 
+struct TrainingContinueToCourseLesson: Codable, Equatable, Sendable {
+    let startGoalObjectHandle: UInt32
+    let collisionRadius: Float
+    let portalRoomSourceIndex: Int
+    let orderedPortalIndices: [Int]
+    let instruction: String
+    let voiceSourceName: String
+}
+
 struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var forwardGoalObjectHandle: UInt32
     let welcomeDelay: Float
@@ -556,6 +565,7 @@ struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var repeatReturnRight: TrainingRepeatReturnRightLesson? = nil
     var repeatReturnUp: TrainingRepeatReturnUpLesson? = nil
     var repeatReturnDown: TrainingRepeatReturnDownLesson? = nil
+    var continueToCourse: TrainingContinueToCourseLesson? = nil
 }
 
 struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
@@ -1404,6 +1414,127 @@ func validateStockTrainingRepeatReturnDownPackage(
     else {
         throw LevelValidationError.invalidDependency(
             "Training Script 012 package"
+        )
+    }
+}
+
+func validateStockTrainingContinueToCoursePackage(
+    lesson: TrainingContinueToCourseLesson?,
+    startGoal: PlacedObject?,
+    presentation: ObjectPresentationReference?,
+    portalRoom: LevelRoom?,
+    connectedRooms: [Int: LevelRoom],
+    proceed1: CanonicalVoiceClip?
+) throws {
+    guard let lesson,
+          lesson.startGoalObjectHandle == 12_300,
+          lesson.collisionRadius == 10.052_409,
+          lesson.portalRoomSourceIndex == 2,
+          lesson.orderedPortalIndices == [0, 1],
+          lesson.instruction
+            == "Continue Sliding down to start the next step.",
+          lesson.voiceSourceName == "proceed1.osf",
+          startGoal?.type == 7,
+          startGoal?.storedID == 67,
+          startGoal?.definition?.storedIndex == 67,
+          startGoal?.definition?.referenceRuntimeIndex == 68,
+          startGoal?.definition?.sourceName == "Invisiblepowerup",
+          startGoal?.instanceName == "StartGoal",
+          startGoal?.flags == 36_864,
+          startGoal?.location == .room(1),
+          startGoal?.position
+            == .init(
+                x: 2_062.7678,
+                y: -134.19601,
+                z: 2_201.679
+            ),
+          startGoal?.orientation
+            == .init(
+                right: .init(x: -1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: -0),
+                forward: .init(x: -0, y: -0, z: -1)
+            ),
+          startGoal?.containsType == 255,
+          startGoal?.containsID == 0,
+          startGoal?.containsCount == 0,
+          startGoal?.lifeLeft == 0,
+          startGoal?.soundSource == nil,
+          startGoal?.inertScriptName == nil,
+          startGoal?.inertModuleName == nil,
+          startGoal?.lightmapSubmodels.isEmpty == true,
+          presentation?.primaryModel
+            == .init(
+                storedIndex: 6,
+                sourceName: "invisiblepowerup.OOF"
+            ),
+          presentation?.mediumModel == nil,
+          presentation?.lowModel == nil,
+          presentation?.dyingModel == nil,
+          presentation?.mediumDistance == nil,
+          presentation?.lowDistance == nil,
+          presentation?.isVisible == false,
+          let portalRoom,
+          portalRoom.name == "PortalRoom1",
+          portalRoom.sourceIndex == 2,
+          portalRoom.portals.count == 2,
+          portalRoom.faces.indices.contains(0),
+          portalRoom.faces.indices.contains(1),
+          portalRoom.portals[0].faceIndex == 0,
+          portalRoom.portals[0].connectedRoom == 1,
+          portalRoom.portals[0].connectedPortal == 0,
+          portalRoom.portals[0].flags & 1 != 0,
+          portalRoom.faces[0].texture
+            == .init(
+                storedIndex: 908,
+                sourceName: "Alien Force Field_1"
+            ),
+          portalRoom.portals[1].faceIndex == 1,
+          portalRoom.portals[1].connectedRoom == 3,
+          portalRoom.portals[1].connectedPortal == 0,
+          portalRoom.portals[1].flags & 1 != 0,
+          portalRoom.faces[1].texture
+            == .init(
+                storedIndex: 908,
+                sourceName: "Alien Force Field_1"
+            ),
+          let connectedRoomOne = connectedRooms[1],
+          connectedRoomOne.portals.indices.contains(0),
+          connectedRoomOne.faces.indices.contains(73),
+          connectedRoomOne.portals[0].faceIndex == 73,
+          connectedRoomOne.portals[0].connectedRoom == 2,
+          connectedRoomOne.portals[0].connectedPortal == 0,
+          connectedRoomOne.portals[0].flags & 1 != 0,
+          connectedRoomOne.faces[73].texture
+            == .init(
+                storedIndex: 908,
+                sourceName: "Alien Force Field_1"
+            ),
+          let connectedRoomThree = connectedRooms[3],
+          connectedRoomThree.portals.indices.contains(0),
+          connectedRoomThree.faces.indices.contains(0),
+          connectedRoomThree.portals[0].faceIndex == 0,
+          connectedRoomThree.portals[0].connectedRoom == 2,
+          connectedRoomThree.portals[0].connectedPortal == 1,
+          connectedRoomThree.portals[0].flags & 1 != 0,
+          connectedRoomThree.faces[0].texture
+            == .init(
+                storedIndex: 908,
+                sourceName: "Alien Force Field_1"
+            ),
+          proceed1?.sourceName.caseInsensitiveCompare("proceed1.osf")
+            == .orderedSame,
+          proceed1?.sourceEntryIndex == 21,
+          proceed1?.sampleRate == 22_050,
+          proceed1?.channelCount == 1,
+          proceed1?.frameCount == 120_753,
+          proceed1?.pcmSHA256
+            == "5eba5487d90f946a876eaa500d3a27e496fe280d9fadcd633b8f505c58ccb477",
+          proceed1?.sourceArchive == "missions/training.mn3",
+          proceed1?.sourceSHA256
+            == "9f869718d68d56902ee634b47a1f8cafa83f79036fe39216d190cebf0803081a"
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training Script 013 package"
         )
     }
 }
@@ -3078,6 +3209,74 @@ struct Level: Codable, Equatable, Sendable {
                     )
                 }
             }
+            if let continueToCourse = lesson.continueToCourse {
+                guard continueToCourse.collisionRadius.isFinite,
+                      continueToCourse.collisionRadius > 0,
+                      isNonempty(continueToCourse.instruction),
+                      isNonempty(continueToCourse.voiceSourceName),
+                      lesson.repeatReturnDown != nil,
+                      let returnUp = lesson.returnUp,
+                      continueToCourse.startGoalObjectHandle
+                        == returnUp.startGoalObjectHandle,
+                      continueToCourse.collisionRadius
+                        == returnUp.collisionRadius,
+                      continueToCourse.portalRoomSourceIndex == 2,
+                      continueToCourse.orderedPortalIndices == [0, 1],
+                      let target = objects.first(where: {
+                          $0.handle
+                            == continueToCourse.startGoalObjectHandle
+                      }),
+                      target.type == 7,
+                      let presentation = objectPresentations.first(where: {
+                          $0.objectHandle == target.handle && !$0.isVisible
+                      }),
+                      let model = models.first(where: {
+                          $0.source == presentation.primaryModel
+                      }),
+                      continueToCourse.collisionRadius
+                        == sourceObjectPresentationSize(
+                            model: model,
+                            objectType: target.type
+                        ),
+                      clipNames.contains(
+                          continueToCourse.voiceSourceName.lowercased()
+                      ),
+                      let portalRoom = rooms.first(where: {
+                          $0.sourceIndex
+                            == continueToCourse.portalRoomSourceIndex
+                      }),
+                      continueToCourse.orderedPortalIndices.allSatisfy({
+                          portalRoom.portals.indices.contains($0)
+                      }),
+                      continueToCourse.orderedPortalIndices.allSatisfy({
+                          portalIndex in
+                          let portal = portalRoom.portals[portalIndex]
+                          guard portalRoom.faces.indices.contains(
+                              portal.faceIndex
+                          ),
+                                let connectedRoom = rooms.first(where: {
+                                    $0.sourceIndex == portal.connectedRoom
+                                }),
+                                connectedRoom.portals.indices.contains(
+                                    portal.connectedPortal
+                                )
+                          else {
+                              return false
+                          }
+                          let reciprocal =
+                              connectedRoom.portals[portal.connectedPortal]
+                          return reciprocal.connectedRoom
+                                == portalRoom.sourceIndex
+                              && reciprocal.connectedPortal == portalIndex
+                              && connectedRoom.faces.indices.contains(
+                                  reciprocal.faceIndex
+                              )
+                      }) else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training Script 013 continue-to-course lesson"
+                    )
+                }
+            }
         }
         if let barrier = trainingGalleryBarrier {
             let oneShotFlag: UInt16 = 8
@@ -3932,6 +4131,10 @@ struct Level: Codable, Equatable, Sendable {
                 $0.sourceName.caseInsensitiveCompare("udown.osf")
                     == .orderedSame
             }
+            let proceed1 = voiceClips.first {
+                $0.sourceName.caseInsensitiveCompare("proceed1.osf")
+                    == .orderedSame
+            }
             let guidebotA = voiceClips.first {
                 $0.sourceName.caseInsensitiveCompare("guidebota.osf")
                     == .orderedSame
@@ -4062,6 +4265,32 @@ struct Level: Codable, Equatable, Sendable {
                     upGoal: upGoal,
                     presentation: upGoalPresentation,
                     menuBeep: menuBeep
+                )
+            }
+            if let continueToCourse =
+                    trainingOpeningLesson?.continueToCourse {
+                let startGoal = objects.first {
+                    $0.handle == continueToCourse.startGoalObjectHandle
+                }
+                let startGoalPresentation = objectPresentations.first {
+                    $0.objectHandle
+                        == continueToCourse.startGoalObjectHandle
+                }
+                let portalRoom = rooms.first {
+                    $0.sourceIndex
+                        == continueToCourse.portalRoomSourceIndex
+                }
+                try validateStockTrainingContinueToCoursePackage(
+                    lesson: continueToCourse,
+                    startGoal: startGoal,
+                    presentation: startGoalPresentation,
+                    portalRoom: portalRoom,
+                    connectedRooms: Dictionary(
+                        uniqueKeysWithValues: rooms.map {
+                            ($0.sourceIndex, $0)
+                        }
+                    ),
+                    proceed1: proceed1
                 )
             }
             if let repeatForward =
@@ -4376,6 +4605,7 @@ struct Level: Codable, Equatable, Sendable {
                             + (lesson.repeatForward == nil ? 0 : 1)
                             + (lesson.repeatReturnLeft == nil ? 0 : 1)
                             + (lesson.repeatReturnUp == nil ? 0 : 1)
+                            + (lesson.continueToCourse == nil ? 0 : 1)
                         : trainingFinalRoomEntryChain != nil
                             ? 11
                                 + (lesson.returnLeft == nil ? 0 : 1)
@@ -4385,6 +4615,7 @@ struct Level: Codable, Equatable, Sendable {
                                 + (lesson.repeatForward == nil ? 0 : 1)
                                 + (lesson.repeatReturnLeft == nil ? 0 : 1)
                                 + (lesson.repeatReturnUp == nil ? 0 : 1)
+                                + (lesson.continueToCourse == nil ? 0 : 1)
                         : (
                             trainingCameraMonitorChain == nil ? 5 : 10
                         )
@@ -4395,6 +4626,7 @@ struct Level: Codable, Equatable, Sendable {
                             + (lesson.repeatForward == nil ? 0 : 1)
                             + (lesson.repeatReturnLeft == nil ? 0 : 1)
                             + (lesson.repeatReturnUp == nil ? 0 : 1)
+                            + (lesson.continueToCourse == nil ? 0 : 1)
                   ),
                   guidebotA?.sourceEntryIndex == 4,
                   guidebotA?.sampleRate == 22_050,

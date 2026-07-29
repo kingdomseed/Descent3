@@ -430,6 +430,10 @@ final class EditorProjectTests: XCTestCase {
             "TrainingMission.cpp Script 012 / UpGoal handle 18441 / MenuBeepEnter"
         )
         XCTAssertEqual(
+            document.project.trainingContinueToCourseSourceDiagnostic,
+            "TrainingMission.cpp Script 013 / StartGoal handle 12300 / PortalRoom1 portals 0,1 / proceed1.osf"
+        )
+        XCTAssertEqual(
             document.project.trainingReturnRightSourceDiagnostic,
             "TrainingMission.cpp Script 004 / LeftGoal handle 12299 / return2.osf"
         )
@@ -498,6 +502,14 @@ final class EditorProjectTests: XCTestCase {
                 project: document.project,
                 selection: document.editorSelection
             ).contains(
+                "TrainingMission.cpp Script 013 / StartGoal handle 12300 / PortalRoom1 portals 0,1 / proceed1.osf"
+            )
+        )
+        XCTAssertTrue(
+            editorIdleStatusMessage(
+                project: document.project,
+                selection: document.editorSelection
+            ).contains(
                 "TrainingMission.cpp Script 007 / StartGoal handle 12300 / repeat.osf"
             )
         )
@@ -517,6 +529,33 @@ final class EditorProjectTests: XCTestCase {
                 "TrainingMission.cpp Script 003 / StartGoal handle 12300 / left1.osf"
             )
         )
+
+        try document.selectRoom(sourceIndex: 2)
+        for portalIndex in [0, 1] {
+            try document.selectPortal(portalIndex)
+            try document.setSelectedPortalRendersFaces(false)
+            XCTAssertEqual(
+                document.undoManager?.undoActionName,
+                "Set Portal Rendering"
+            )
+            document.undoManager?.undo()
+            let restoredRoom = try XCTUnwrap(
+                document.project.level.rooms.first {
+                    $0.sourceIndex == 2
+                }
+            )
+            XCTAssertNotEqual(
+                restoredRoom.portals[portalIndex].flags & 1,
+                0
+            )
+            document.undoManager?.redo()
+            let openedRoom = try XCTUnwrap(
+                document.project.level.rooms.first {
+                    $0.sourceIndex == 2
+                }
+            )
+            XCTAssertEqual(openedRoom.portals[portalIndex].flags & 1, 0)
+        }
 
         try document.rotateObjectQuarterTurn(handle: upGoal.handle)
         XCTAssertEqual(

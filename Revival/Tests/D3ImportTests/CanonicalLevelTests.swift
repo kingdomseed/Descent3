@@ -1,6 +1,175 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testScript013RequiresExactStartGoalPortalTopologyAndProceedVoice()
+        throws
+    {
+        let level = makeTrainingScript003Level()
+        let lesson = try XCTUnwrap(
+            level.trainingOpeningLesson?.continueToCourse
+        )
+        XCTAssertEqual(lesson.startGoalObjectHandle, 12_300)
+        XCTAssertEqual(lesson.portalRoomSourceIndex, 2)
+        XCTAssertEqual(lesson.orderedPortalIndices, [0, 1])
+        XCTAssertEqual(
+            lesson.instruction,
+            "Continue Sliding down to start the next step."
+        )
+        XCTAssertEqual(lesson.voiceSourceName, "proceed1.osf")
+        XCTAssertNoThrow(try level.validate())
+
+        var missingPredecessor = try XCTUnwrap(
+            level.trainingOpeningLesson
+        )
+        missingPredecessor.repeatReturnDown = nil
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 013 continue-to-course lesson"
+            ),
+            replacing(level, trainingOpeningLesson: missingPredecessor)
+        )
+
+        var hostileLesson = try XCTUnwrap(level.trainingOpeningLesson)
+        hostileLesson.continueToCourse = .init(
+            startGoalObjectHandle: lesson.startGoalObjectHandle,
+            collisionRadius: lesson.collisionRadius,
+            portalRoomSourceIndex: lesson.portalRoomSourceIndex,
+            orderedPortalIndices: [1, 0],
+            instruction: lesson.instruction,
+            voiceSourceName: lesson.voiceSourceName
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 013 continue-to-course lesson"
+            ),
+            replacing(level, trainingOpeningLesson: hostileLesson)
+        )
+
+        let portalRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex {
+                $0.sourceIndex == lesson.portalRoomSourceIndex
+            }
+        )
+        let portal = level.rooms[portalRoomIndex].portals[0]
+        let reciprocalRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex {
+                $0.sourceIndex == portal.connectedRoom
+            }
+        )
+        var hostileRooms = level.rooms
+        let reciprocal =
+            hostileRooms[reciprocalRoomIndex]
+                .portals[portal.connectedPortal]
+        hostileRooms[reciprocalRoomIndex]
+            .portals[portal.connectedPortal] = .init(
+                flags: reciprocal.flags,
+                faceIndex: reciprocal.faceIndex,
+                connectedRoom: reciprocal.connectedRoom,
+                connectedPortal: 1,
+                boundaryNodeIndex: reciprocal.boundaryNodeIndex,
+                pathPoint: reciprocal.pathPoint,
+                combineMaster: reciprocal.combineMaster
+            )
+        assertValidationError(
+            .nonreciprocalPortal(
+                room: portal.connectedRoom,
+                portal: portal.connectedPortal
+            ),
+            replacing(level, rooms: hostileRooms)
+        )
+
+        var compatibleLesson = try XCTUnwrap(
+            level.trainingOpeningLesson
+        )
+        compatibleLesson.continueToCourse = nil
+        XCTAssertNoThrow(
+            try replacing(
+                level,
+                trainingOpeningLesson: compatibleLesson
+            ).validate()
+        )
+    }
+
+    func testOwnedScript013PackageAdmissionRejectsHostileStockMutations()
+        throws
+    {
+        let fallbackPath =
+            "/tmp/revival-script013-final-import-green.rZvL1j/training.revival/levels/descent3.level.training-mission/level.json"
+        let path = ProcessInfo.processInfo.environment[
+            "REVIVAL_SCRIPT013_OWNED_LEVEL"
+        ] ?? fallbackPath
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw XCTSkip(
+                "requires the ignored exact-final owned Script 013 import"
+            )
+        }
+        let stockLevel = try JSONDecoder().decode(
+            Level.self,
+            from: Data(contentsOf: URL(fileURLWithPath: path))
+        )
+        XCTAssertNoThrow(try stockLevel.validate())
+
+        let lesson = try XCTUnwrap(stockLevel.trainingOpeningLesson)
+        let continueToCourse = try XCTUnwrap(lesson.continueToCourse)
+        var hostileLesson = lesson
+        hostileLesson.continueToCourse = .init(
+            startGoalObjectHandle: continueToCourse.startGoalObjectHandle,
+            collisionRadius: continueToCourse.collisionRadius,
+            portalRoomSourceIndex:
+                continueToCourse.portalRoomSourceIndex,
+            orderedPortalIndices: continueToCourse.orderedPortalIndices,
+            instruction: "\(continueToCourse.instruction) ",
+            voiceSourceName: continueToCourse.voiceSourceName
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 013 package"),
+            replacing(
+                stockLevel,
+                trainingOpeningLesson: hostileLesson
+            )
+        )
+
+        let portalRoomIndex = try XCTUnwrap(
+            stockLevel.rooms.firstIndex {
+                $0.sourceIndex
+                    == continueToCourse.portalRoomSourceIndex
+            }
+        )
+        var hostileRooms = stockLevel.rooms
+        hostileRooms[portalRoomIndex].portals[0].flags &= ~UInt32(1)
+        assertValidationError(
+            .invalidDependency("Training Script 013 package"),
+            replacing(
+                stockLevel,
+                rooms: hostileRooms,
+                surfacePhysics: stockLevel.surfacePhysics
+            )
+        )
+
+        let proceedIndex = try XCTUnwrap(
+            stockLevel.voiceClips.firstIndex {
+                $0.sourceName == continueToCourse.voiceSourceName
+            }
+        )
+        let proceed1 = stockLevel.voiceClips[proceedIndex]
+        var hostileVoices = stockLevel.voiceClips
+        hostileVoices[proceedIndex] = .init(
+            sourceName: proceed1.sourceName,
+            sourceEntryIndex: proceed1.sourceEntryIndex,
+            sampleRate: proceed1.sampleRate,
+            channelCount: proceed1.channelCount,
+            frameCount: proceed1.frameCount,
+            pcm16LittleEndian: proceed1.pcm16LittleEndian,
+            pcmSHA256: proceed1.pcmSHA256,
+            sourceArchive: proceed1.sourceArchive,
+            sourceSHA256: String(repeating: "0", count: 64)
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 013 package"),
+            replacing(stockLevel, voiceClips: hostileVoices)
+        )
+    }
+
     func testScript012RequiresExactHiddenUpGoalAndExistingMenuBeep() throws {
         let level = makeTrainingScript003Level()
         let lesson = try XCTUnwrap(
@@ -134,6 +303,7 @@ final class CanonicalLevelTests: XCTestCase {
             level.trainingOpeningLesson
         )
         compatibleLesson.repeatReturnDown = nil
+        compatibleLesson.continueToCourse = nil
         XCTAssertNoThrow(
             try replacing(
                 level,
