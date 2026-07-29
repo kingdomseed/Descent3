@@ -498,6 +498,9 @@ final class RevivalGameplayView: MTKView {
                     presentHUDMessages(event.hudMessages)
                 }
             )
+            if !event.trailingHUDMessages.isEmpty {
+                presentHUDMessages(event.trailingHUDMessages)
+            }
         }
     }
 
@@ -1054,7 +1057,9 @@ final class RevivalGameplayView: MTKView {
     nonisolated static func trainingMessageLineCount(
         for feedback: [TrainingOpeningFeedback]
     ) -> Int {
-        min(4, max(2, feedback.reduce(0) { $0 + $1.hudMessages.count }))
+        min(4, max(2, feedback.reduce(0) {
+            $0 + $1.hudMessages.count + $1.trailingHUDMessages.count
+        }))
     }
 
     nonisolated static func waveData(for clip: CanonicalVoiceClip) -> Data {

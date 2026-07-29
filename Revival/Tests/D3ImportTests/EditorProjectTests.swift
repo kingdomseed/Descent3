@@ -370,7 +370,7 @@ final class EditorProjectTests: XCTestCase {
             at: root,
             withIntermediateDirectories: false
         )
-        let immutableBase = makeTrainingScript003Level()
+        let immutableBase = makeTrainingScript015Level()
         try writeCanonicalPackage(immutableBase, to: candidate)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
@@ -395,6 +395,11 @@ final class EditorProjectTests: XCTestCase {
         let forwardGoal = try XCTUnwrap(
             document.project.level.objects.first {
                 $0.handle == 12_301
+            }
+        )
+        let finishCourse = try XCTUnwrap(
+            document.project.level.objects.first {
+                $0.handle == 6_150
             }
         )
         XCTAssertEqual(
@@ -436,6 +441,10 @@ final class EditorProjectTests: XCTestCase {
         XCTAssertEqual(
             document.project.trainingStartCourseSourceDiagnostic,
             "TrainingMission.cpp Script 014 / StartCourse handle 6147 / PortalRoom1 portal 1 / Intro1.osf"
+        )
+        XCTAssertEqual(
+            document.project.trainingFinishCourseSourceDiagnostic,
+            "TrainingMission.cpp Script 015 / FinishCourse handle 6150 / PortalRoom2 portals 0,1 / proceed2.osf"
         )
         XCTAssertEqual(
             document.project.trainingReturnRightSourceDiagnostic,
@@ -522,6 +531,14 @@ final class EditorProjectTests: XCTestCase {
                 project: document.project,
                 selection: document.editorSelection
             ).contains(
+                "TrainingMission.cpp Script 015 / FinishCourse handle 6150 / PortalRoom2 portals 0,1 / proceed2.osf"
+            )
+        )
+        XCTAssertTrue(
+            editorIdleStatusMessage(
+                project: document.project,
+                selection: document.editorSelection
+            ).contains(
                 "TrainingMission.cpp Script 007 / StartGoal handle 12300 / repeat.osf"
             )
         )
@@ -564,6 +581,32 @@ final class EditorProjectTests: XCTestCase {
             let openedRoom = try XCTUnwrap(
                 document.project.level.rooms.first {
                     $0.sourceIndex == 2
+                }
+            )
+            XCTAssertEqual(openedRoom.portals[portalIndex].flags & 1, 0)
+        }
+        try document.selectRoom(sourceIndex: 49)
+        for portalIndex in [0, 1] {
+            try document.selectPortal(portalIndex)
+            try document.setSelectedPortalRendersFaces(false)
+            XCTAssertEqual(
+                document.undoManager?.undoActionName,
+                "Set Portal Rendering"
+            )
+            document.undoManager?.undo()
+            let restoredRoom = try XCTUnwrap(
+                document.project.level.rooms.first {
+                    $0.sourceIndex == 49
+                }
+            )
+            XCTAssertNotEqual(
+                restoredRoom.portals[portalIndex].flags & 1,
+                0
+            )
+            document.undoManager?.redo()
+            let openedRoom = try XCTUnwrap(
+                document.project.level.rooms.first {
+                    $0.sourceIndex == 49
                 }
             )
             XCTAssertEqual(openedRoom.portals[portalIndex].flags & 1, 0)
@@ -672,6 +715,33 @@ final class EditorProjectTests: XCTestCase {
             }?.orientation,
             rotatedLeftGoalOrientation
         )
+        try document.rotateObjectQuarterTurn(handle: finishCourse.handle)
+        XCTAssertEqual(
+            document.undoManager?.undoActionName,
+            "Transform Object"
+        )
+        let rotatedFinishCourseOrientation =
+            document.project.level.objects.first {
+                $0.handle == finishCourse.handle
+            }?.orientation
+        XCTAssertNotEqual(
+            rotatedFinishCourseOrientation,
+            finishCourse.orientation
+        )
+        document.undoManager?.undo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == finishCourse.handle
+            }?.orientation,
+            finishCourse.orientation
+        )
+        document.undoManager?.redo()
+        XCTAssertEqual(
+            document.project.level.objects.first {
+                $0.handle == finishCourse.handle
+            }?.orientation,
+            rotatedFinishCourseOrientation
+        )
 
         let firstWrapper = try document.fileWrapper(
             ofType: RevivalProjectDocument.projectType
@@ -716,6 +786,12 @@ final class EditorProjectTests: XCTestCase {
             }?.orientation,
             leftGoal.orientation
         )
+        XCTAssertEqual(
+            immutableBase.objects.first {
+                $0.handle == finishCourse.handle
+            }?.orientation,
+            finishCourse.orientation
+        )
 
         let playSession = reopened.makePlaySession()
         reopened.commitPlaySession(playSession, renderingWorld: false)
@@ -758,6 +834,11 @@ final class EditorProjectTests: XCTestCase {
             playSession.level.trainingOpeningLesson?.repeatReturnUp?
                 .startGoalObjectHandle,
             startGoal.handle
+        )
+        XCTAssertEqual(
+            playSession.level.trainingOpeningLesson?.finishCourse?
+                .finishCourseObjectHandle,
+            finishCourse.handle
         )
         XCTAssertEqual(
             reopened.project.level.objects.first {

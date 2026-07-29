@@ -1,6 +1,301 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testScript015RequiresIndependentFinishCoursePortalsAndProceedVoice()
+        throws
+    {
+        let level = makeTrainingScript015Level()
+        let lesson = try XCTUnwrap(
+            level.trainingOpeningLesson?.finishCourse
+        )
+        XCTAssertEqual(lesson.finishCourseObjectHandle, 6_150)
+        XCTAssertEqual(lesson.collisionRadius, 10.052_409)
+        XCTAssertEqual(lesson.portalRoomSourceIndex, 49)
+        XCTAssertEqual(lesson.orderedPortalIndices, [0, 1])
+        XCTAssertEqual(lesson.successMessage, "Excellent!")
+        XCTAssertEqual(
+            lesson.instruction,
+            "Continue Sliding down to start the next step."
+        )
+        XCTAssertEqual(lesson.voiceSourceName, "proceed2.osf")
+        XCTAssertEqual(lesson.enabledControlMask, 32)
+        XCTAssertEqual(
+            level.objectPresentations.first {
+                $0.objectHandle == lesson.finishCourseObjectHandle
+            }?.isVisible,
+            false
+        )
+        XCTAssertNoThrow(try level.validate())
+
+        var independent = try XCTUnwrap(level.trainingOpeningLesson)
+        independent.continueToCourse = nil
+        independent.startCourse = nil
+        XCTAssertNoThrow(
+            try replacing(
+                level,
+                trainingOpeningLesson: independent
+            ).validate()
+        )
+
+        var hostileLesson = try XCTUnwrap(level.trainingOpeningLesson)
+        hostileLesson.finishCourse = .init(
+            finishCourseObjectHandle: lesson.finishCourseObjectHandle,
+            collisionRadius: lesson.collisionRadius,
+            portalRoomSourceIndex: lesson.portalRoomSourceIndex,
+            orderedPortalIndices: lesson.orderedPortalIndices,
+            successMessage: lesson.successMessage,
+            instruction: lesson.instruction,
+            voiceSourceName: lesson.voiceSourceName,
+            enabledControlMask: 33
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 015 finish-course lesson"
+            ),
+            replacing(
+                level,
+                trainingOpeningLesson: hostileLesson
+            )
+        )
+
+        var visiblePresentations = level.objectPresentations
+        let presentationIndex = try XCTUnwrap(
+            visiblePresentations.firstIndex {
+                $0.objectHandle == lesson.finishCourseObjectHandle
+            }
+        )
+        let presentation = visiblePresentations[presentationIndex]
+        visiblePresentations[presentationIndex] = .init(
+            objectHandle: presentation.objectHandle,
+            primaryModel: presentation.primaryModel,
+            mediumModel: presentation.mediumModel,
+            lowModel: presentation.lowModel,
+            dyingModel: presentation.dyingModel,
+            mediumDistance: presentation.mediumDistance,
+            lowDistance: presentation.lowDistance,
+            isVisible: true
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 015 finish-course lesson"
+            ),
+            replacing(
+                level,
+                objectPresentations: visiblePresentations
+            )
+        )
+
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 015 finish-course lesson"
+            ),
+            replacing(
+                level,
+                voiceClips: level.voiceClips.filter {
+                    $0.sourceName != lesson.voiceSourceName
+                }
+            )
+        )
+
+        let portalRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex {
+                $0.sourceIndex == lesson.portalRoomSourceIndex
+            }
+        )
+        let portal = level.rooms[portalRoomIndex].portals[0]
+        let connectedRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex {
+                $0.sourceIndex == portal.connectedRoom
+            }
+        )
+        var hostileRooms = level.rooms
+        let reciprocal =
+            hostileRooms[connectedRoomIndex]
+                .portals[portal.connectedPortal]
+        hostileRooms[connectedRoomIndex]
+            .portals[portal.connectedPortal] = .init(
+                flags: reciprocal.flags,
+                faceIndex: reciprocal.faceIndex,
+                connectedRoom: reciprocal.connectedRoom,
+                connectedPortal: 1
+            )
+        assertValidationError(
+            .nonreciprocalPortal(
+                room: portal.connectedRoom,
+                portal: portal.connectedPortal
+            ),
+            replacing(level, rooms: hostileRooms)
+        )
+
+        var olderObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(level)
+            ) as? [String: Any]
+        )
+        var olderOpening = try XCTUnwrap(
+            olderObject["trainingOpeningLesson"] as? [String: Any]
+        )
+        olderOpening.removeValue(forKey: "finishCourse")
+        olderObject["trainingOpeningLesson"] = olderOpening
+        let olderLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: olderObject)
+        )
+        XCTAssertNil(olderLevel.trainingOpeningLesson?.finishCourse)
+        XCTAssertNoThrow(try olderLevel.validate())
+    }
+
+    func testOwnedScript015PackageAdmissionRejectsHostileStockMutations()
+        throws
+    {
+        let fallbackPath =
+            "/tmp/revival-script015-final-import/training.revival/levels/descent3.level.training-mission/level.json"
+        let path = ProcessInfo.processInfo.environment[
+            "REVIVAL_SCRIPT015_OWNED_LEVEL"
+        ] ?? fallbackPath
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw XCTSkip(
+                "requires the ignored exact-final owned Script 015 import"
+            )
+        }
+        let stockLevel = try JSONDecoder().decode(
+            Level.self,
+            from: Data(contentsOf: URL(fileURLWithPath: path))
+        )
+        XCTAssertNoThrow(try stockLevel.validate())
+        let initialSimulation = PlayerSimulation(
+            level: stockLevel,
+            presentationReadyTimestamp: 0
+        )
+        var olderContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    initialSimulation.continuation
+                )
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            olderContinuationObject["schemaVersion"] as? Int,
+            7
+        )
+        var olderOpeningState = try XCTUnwrap(
+            olderContinuationObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        olderOpeningState.removeValue(
+            forKey: "finishCourseWasPresented"
+        )
+        olderContinuationObject["trainingOpeningState"] =
+            olderOpeningState
+        let olderContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: olderContinuationObject
+            )
+        )
+        XCTAssertNoThrow(
+            try PlayerSimulation(
+                level: stockLevel,
+                continuation: olderContinuation,
+                resumedAtTimestamp: 1
+            )
+        )
+
+        let opening = try XCTUnwrap(stockLevel.trainingOpeningLesson)
+        let finishCourse = try XCTUnwrap(opening.finishCourse)
+        var hostileLesson = opening
+        hostileLesson.finishCourse = .init(
+            finishCourseObjectHandle:
+                finishCourse.finishCourseObjectHandle,
+            collisionRadius: finishCourse.collisionRadius,
+            portalRoomSourceIndex:
+                finishCourse.portalRoomSourceIndex,
+            orderedPortalIndices: finishCourse.orderedPortalIndices,
+            successMessage: finishCourse.successMessage,
+            instruction: "\(finishCourse.instruction) ",
+            voiceSourceName: finishCourse.voiceSourceName,
+            enabledControlMask: finishCourse.enabledControlMask
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 015 package"),
+            replacing(
+                stockLevel,
+                trainingOpeningLesson: hostileLesson
+            )
+        )
+
+        var hostileObjects = stockLevel.objects
+        let objectIndex = try XCTUnwrap(
+            hostileObjects.firstIndex {
+                $0.handle == finishCourse.finishCourseObjectHandle
+            }
+        )
+        let stockObject = hostileObjects[objectIndex]
+        hostileObjects[objectIndex] = .init(
+            handle: stockObject.handle,
+            type: stockObject.type,
+            storedID: stockObject.storedID,
+            definition: stockObject.definition,
+            instanceName: stockObject.instanceName,
+            flags: stockObject.flags ^ 1,
+            doorShields: stockObject.doorShields,
+            location: stockObject.location,
+            position: stockObject.position,
+            orientation: stockObject.orientation,
+            containsType: stockObject.containsType,
+            containsID: stockObject.containsID,
+            containsCount: stockObject.containsCount,
+            lifeLeft: stockObject.lifeLeft,
+            soundSource: stockObject.soundSource,
+            inertScriptName: stockObject.inertScriptName,
+            inertModuleName: stockObject.inertModuleName,
+            lightmapSubmodels: stockObject.lightmapSubmodels
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 015 package"),
+            replacing(stockLevel, objects: hostileObjects)
+        )
+
+        let portalRoomIndex = try XCTUnwrap(
+            stockLevel.rooms.firstIndex {
+                $0.sourceIndex == finishCourse.portalRoomSourceIndex
+            }
+        )
+        var hostileRooms = stockLevel.rooms
+        hostileRooms[portalRoomIndex].portals[0].flags &= ~UInt32(1)
+        assertValidationError(
+            .invalidDependency("Training Script 015 package"),
+            replacing(
+                stockLevel,
+                rooms: hostileRooms,
+                surfacePhysics: stockLevel.surfacePhysics
+            )
+        )
+
+        let voiceIndex = try XCTUnwrap(
+            stockLevel.voiceClips.firstIndex {
+                $0.sourceName == finishCourse.voiceSourceName
+            }
+        )
+        let proceed2 = stockLevel.voiceClips[voiceIndex]
+        var hostileVoices = stockLevel.voiceClips
+        hostileVoices[voiceIndex] = .init(
+            sourceName: proceed2.sourceName,
+            sourceEntryIndex: proceed2.sourceEntryIndex,
+            sampleRate: proceed2.sampleRate,
+            channelCount: proceed2.channelCount,
+            frameCount: proceed2.frameCount,
+            pcm16LittleEndian: proceed2.pcm16LittleEndian,
+            pcmSHA256: proceed2.pcmSHA256,
+            sourceArchive: proceed2.sourceArchive,
+            sourceSHA256: String(repeating: "0", count: 64)
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 015 package"),
+            replacing(stockLevel, voiceClips: hostileVoices)
+        )
+    }
+
     func testScript014RequiresHiddenStartCoursePortalAndIntroVoice()
         throws
     {

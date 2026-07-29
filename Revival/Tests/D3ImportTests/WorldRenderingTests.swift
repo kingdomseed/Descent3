@@ -2,6 +2,347 @@ import XCTest
 
 final class WorldRenderingTests: XCTestCase {
     @MainActor
+    func testTrainingScript015FinishesCourseIndependentlyAndRestoresSilently()
+        throws
+    {
+        let level = makeTrainingScript015Level()
+        let finishCourse = try XCTUnwrap(
+            level.trainingOpeningLesson?.finishCourse
+        )
+
+        XCTAssertEqual(finishCourse.finishCourseObjectHandle, 6_150)
+        XCTAssertEqual(finishCourse.portalRoomSourceIndex, 49)
+        XCTAssertEqual(finishCourse.orderedPortalIndices, [0, 1])
+        XCTAssertEqual(finishCourse.enabledControlMask, 32)
+        XCTAssertEqual(finishCourse.successMessage, "Excellent!")
+        XCTAssertEqual(
+            finishCourse.instruction,
+            "Continue Sliding down to start the next step."
+        )
+        XCTAssertEqual(finishCourse.voiceSourceName, "proceed2.osf")
+
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 2_048 }
+        )
+        let finishIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == finishCourse.finishCourseObjectHandle
+            }
+        )
+        var objects = level.objects
+        objects[playerIndex].position = objects[finishIndex].position
+        objects[playerIndex].location = objects[finishIndex].location
+        var rooms = level.rooms
+        let portalRoomIndex = try XCTUnwrap(
+            rooms.firstIndex {
+                $0.sourceIndex == finishCourse.portalRoomSourceIndex
+            }
+        )
+        let portalRoomOneIndex = try XCTUnwrap(
+            rooms.firstIndex { $0.sourceIndex == 2 }
+        )
+        let portalRoomOneFlags = rooms[portalRoomOneIndex].portals.map(\.flags)
+        var originalPortalFlags: [UInt32] = []
+        var originalReciprocalFlags: [UInt32] = []
+        for (offset, portalIndex) in
+            finishCourse.orderedPortalIndices.enumerated()
+        {
+            let unrelated = UInt32(1) << UInt32(offset + 6)
+            rooms[portalRoomIndex].portals[portalIndex].flags |= unrelated
+            let portal = rooms[portalRoomIndex].portals[portalIndex]
+            let connectedIndex = try XCTUnwrap(
+                rooms.firstIndex { $0.sourceIndex == portal.connectedRoom }
+            )
+            rooms[connectedIndex]
+                .portals[portal.connectedPortal].flags |= unrelated << 2
+            originalPortalFlags.append(
+                rooms[portalRoomIndex].portals[portalIndex].flags
+            )
+            originalReciprocalFlags.append(
+                rooms[connectedIndex]
+                    .portals[portal.connectedPortal].flags
+            )
+        }
+        let baseLevel = replacing(level, rooms: rooms)
+        let contactLevel = replacing(
+            baseLevel,
+            rooms: rooms,
+            objects: objects
+        )
+        let simulation = PlayerSimulation(
+            level: contactLevel,
+            presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(at: 0.05, input: .zero)
+
+        XCTAssertEqual(
+            frame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Excellent!"],
+                    voiceSourceName: "proceed2.osf",
+                    voicePrecedesHUDMessages: false,
+                    trailingHUDMessages: [
+                        "Continue Sliding down to start the next step.",
+                    ]
+                ),
+            ]
+        )
+        XCTAssertEqual(frame.enabledPlayerControls, [.down])
+        XCTAssertEqual(frame.enabledPlayerControls.rawValue, 32)
+        let unchangedPortalRoomOne = try XCTUnwrap(
+            simulation.level.rooms.first { $0.sourceIndex == 2 }
+        )
+        XCTAssertEqual(
+            unchangedPortalRoomOne.portals.map(\.flags),
+            portalRoomOneFlags
+        )
+        let openedRoom = try XCTUnwrap(
+            simulation.level.rooms.first {
+                $0.sourceIndex == finishCourse.portalRoomSourceIndex
+            }
+        )
+        for (offset, portalIndex) in
+            finishCourse.orderedPortalIndices.enumerated()
+        {
+            let portal = openedRoom.portals[portalIndex]
+            XCTAssertEqual(
+                portal.flags,
+                originalPortalFlags[offset] & ~UInt32(1)
+            )
+            let connected = try XCTUnwrap(
+                simulation.level.rooms.first {
+                    $0.sourceIndex == portal.connectedRoom
+                }
+            )
+            XCTAssertEqual(
+                connected.portals[portal.connectedPortal].flags,
+                originalReciprocalFlags[offset] & ~UInt32(1)
+            )
+        }
+
+        var presentationOrder: [String] = []
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            frame.trainingOpeningFeedback,
+            attemptVoice: {
+                presentationOrder.append("voice:\($0)")
+            },
+            attemptSound: { _, _ in
+                XCTFail("Script 015 does not play a sound")
+            },
+            presentHUDMessages: {
+                presentationOrder.append(
+                    contentsOf: $0.map { "hud:\($0)" }
+                )
+            }
+        )
+        XCTAssertEqual(
+            presentationOrder,
+            [
+                "hud:Excellent!",
+                "voice:proceed2.osf",
+                "hud:Continue Sliding down to start the next step.",
+            ]
+        )
+
+        let restored = try PlayerSimulation(
+            level: baseLevel,
+            continuation: try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(simulation.continuation)
+            ),
+            resumedAtTimestamp: 1
+        )
+        let restoredFrame = restored.update(at: 1.05, input: .zero)
+        XCTAssertTrue(restoredFrame.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(restoredFrame.enabledPlayerControls.rawValue, 32)
+
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var hostileOpening = try XCTUnwrap(
+            continuationObject["trainingOpeningState"] as? [String: Any]
+        )
+        hostileOpening["enabledControls"] = 33
+        continuationObject["trainingOpeningState"] = hostileOpening
+        let hostile = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: continuationObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: baseLevel,
+                continuation: hostile,
+                resumedAtTimestamp: 2
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var compatibleLesson = try XCTUnwrap(
+            baseLevel.trainingOpeningLesson
+        )
+        compatibleLesson.finishCourse = nil
+        let compatibleLevel = replacing(
+            baseLevel,
+            trainingOpeningLesson: compatibleLesson
+        )
+        XCTAssertNoThrow(try compatibleLevel.validate())
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: compatibleLevel,
+                continuation: simulation.continuation,
+                resumedAtTimestamp: 2.5
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var laterStartObjects = baseLevel.objects
+        let laterStartIndex = try XCTUnwrap(
+            laterStartObjects.firstIndex { $0.handle == 6_147 }
+        )
+        laterStartObjects[laterStartIndex].position =
+            simulation.continuation.playerPosition
+        laterStartObjects[laterStartIndex].location =
+            simulation.continuation.playerLocation
+        let laterStart = try PlayerSimulation(
+            level: replacing(baseLevel, objects: laterStartObjects),
+            continuation: simulation.continuation,
+            resumedAtTimestamp: 3
+        )
+        let laterStartFrame = laterStart.update(
+            at: 3.05,
+            input: .zero
+        )
+        XCTAssertEqual(laterStartFrame.enabledPlayerControls.rawValue, 63)
+        let laterStartPortalRoomTwo = try XCTUnwrap(
+            laterStart.level.rooms.first { $0.sourceIndex == 49 }
+        )
+        XCTAssertTrue(
+            laterStartPortalRoomTwo.portals.allSatisfy { $0.flags & 1 == 0 }
+        )
+
+        var normalRooms = level.rooms
+        let normalPortalRoomOneIndex = try XCTUnwrap(
+            normalRooms.firstIndex { $0.sourceIndex == 2 }
+        )
+        let normalPortalZero =
+            normalRooms[normalPortalRoomOneIndex].portals[0]
+        normalRooms[normalPortalRoomOneIndex].portals[0].flags &= ~UInt32(1)
+        let normalPortalZeroConnectedIndex = try XCTUnwrap(
+            normalRooms.firstIndex {
+                $0.sourceIndex == normalPortalZero.connectedRoom
+            }
+        )
+        normalRooms[normalPortalZeroConnectedIndex]
+            .portals[normalPortalZero.connectedPortal].flags &= ~UInt32(1)
+        let startCourse = try XCTUnwrap(
+            level.trainingOpeningLesson?.startCourse
+        )
+        var normalObjects = level.objects
+        let normalPlayerIndex = try XCTUnwrap(
+            normalObjects.firstIndex { $0.handle == 2_048 }
+        )
+        let normalStartIndex = try XCTUnwrap(
+            normalObjects.firstIndex {
+                $0.handle == startCourse.startCourseObjectHandle
+            }
+        )
+        normalObjects[normalPlayerIndex].position =
+            normalObjects[normalStartIndex].position
+        normalObjects[normalPlayerIndex].location =
+            normalObjects[normalStartIndex].location
+        let roomThreeIndex = try XCTUnwrap(
+            normalRooms.firstIndex { $0.sourceIndex == 3 }
+        )
+        normalRooms[roomThreeIndex] = addingSourceContainmentShell(
+            to: normalRooms[roomThreeIndex],
+            center: normalObjects[normalStartIndex].position,
+            texture: level.surfacePhysics[0].texture,
+            halfExtent: 200
+        )
+        let normalStart = PlayerSimulation(
+            level: replacing(
+                level,
+                rooms: normalRooms,
+                objects: normalObjects
+            ),
+            presentationReadyTimestamp: 4
+        )
+        let normalStartFrame = normalStart.update(at: 4.05, input: .zero)
+        XCTAssertEqual(
+            normalStartFrame.enabledPlayerControls.rawValue,
+            63
+        )
+        var highBitContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(normalStart.continuation)
+            ) as? [String: Any]
+        )
+        var highBitOpening = try XCTUnwrap(
+            highBitContinuationObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        highBitOpening["enabledControls"] = 127
+        highBitContinuationObject["trainingOpeningState"] = highBitOpening
+        let highBitContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: highBitContinuationObject
+            )
+        )
+        var normalFinishObjects = level.objects
+        let normalFinishIndex = try XCTUnwrap(
+            normalFinishObjects.firstIndex {
+                $0.handle == finishCourse.finishCourseObjectHandle
+            }
+        )
+        normalFinishObjects[normalFinishIndex].position =
+            highBitContinuation.playerPosition
+        normalFinishObjects[normalFinishIndex].location =
+            highBitContinuation.playerLocation
+        let normalFinish = try PlayerSimulation(
+            level: replacing(
+                level,
+                rooms: normalRooms,
+                objects: normalFinishObjects
+            ),
+            continuation: highBitContinuation,
+            resumedAtTimestamp: 5
+        )
+        let normalFinishFrame = normalFinish.update(
+            at: 5.05,
+            input: .zero
+        )
+        XCTAssertEqual(
+            normalFinishFrame.enabledPlayerControls.rawValue,
+            32
+        )
+        let normalPortalRoomOne = try XCTUnwrap(
+            normalFinish.level.rooms.first { $0.sourceIndex == 2 }
+        )
+        XCTAssertEqual(normalPortalRoomOne.portals[0].flags & 1, 0)
+        XCTAssertNotEqual(normalPortalRoomOne.portals[1].flags & 1, 0)
+        let normalPortalRoomTwo = try XCTUnwrap(
+            normalFinish.level.rooms.first { $0.sourceIndex == 49 }
+        )
+        XCTAssertTrue(
+            normalPortalRoomTwo.portals.allSatisfy { $0.flags & 1 == 0 }
+        )
+    }
+
+    @MainActor
     func testTrainingScript014StartsCourseWithoutScript013AndRestoresSilently()
         throws
     {
@@ -9000,7 +9341,7 @@ final class WorldRenderingTests: XCTestCase {
                 hudMessages: ["Excellent!"],
                 voiceSourceName: "proceed6.osf",
                 voicePrecedesHUDMessages: true
-            ),
+            )
         ]
         var orderedPresentation: [String] = []
         RevivalGameplayView.presentTrainingFeedbackSequence(
@@ -11941,6 +12282,219 @@ func makeTrainingScript003Level() -> Level {
                 importVolume: 0.7
             ),
         ]
+    )
+}
+
+func makeTrainingScript015Level() -> Level {
+    var level = makeTrainingScript003Level()
+    let finishPosition = Vector3(
+        x: 2_062.5024,
+        y: -650.74756,
+        z: 2_206.0369
+    )
+    let invisibleDefinition = level.objects.first {
+        $0.handle == 6_147
+    }!.definition
+    level.objects.append(.init(
+        handle: 6_150,
+        type: 7,
+        storedID: 67,
+        definition: invisibleDefinition,
+        instanceName: "FinishCourse",
+        flags: 4_096,
+        doorShields: nil,
+        location: .room(50),
+        position: finishPosition,
+        orientation: .init(
+            right: .init(x: -1, y: 0, z: 0),
+            up: .init(x: 0, y: 1, z: -0),
+            forward: .init(x: -0, y: -0, z: -1)
+        ),
+        containsType: 255,
+        containsID: 0,
+        containsCount: 0,
+        lifeLeft: 0,
+        soundSource: nil,
+        inertScriptName: nil,
+        inertModuleName: nil,
+        lightmapSubmodels: []
+    ))
+    let invisibleModel = SourceResource(
+        storedIndex: 6,
+        sourceName: "finishcourse-invisiblepowerup.OOF"
+    )
+    let modelRadius: Float = 5.016_204_4
+    let finishModel = CanonicalModel(
+        source: invisibleModel,
+        collisionRadius: modelRadius,
+        submodels: [
+            .init(
+                sourceIndex: 0,
+                parentIndex: nil,
+                offset: .zero,
+                vertices: [
+                    .init(
+                        position: .init(x: -modelRadius, y: 0, z: 0),
+                        alpha: 1
+                    ),
+                    .init(
+                        position: .init(x: modelRadius, y: 0, z: 0),
+                        alpha: 1
+                    ),
+                ],
+                faces: [],
+                presentation: .standard
+            ),
+        ],
+        bounds: .init(
+            minimum: .init(x: -modelRadius, y: 0, z: 0),
+            maximum: .init(x: modelRadius, y: 0, z: 0)
+        ),
+        sourceArchive: level.source.profileFiles[0].relativePath,
+        sourceSHA256: String(repeating: "d", count: 64)
+    )
+    level.objectPresentations.append(.init(
+        objectHandle: 6_150,
+        primaryModel: invisibleModel,
+        mediumModel: nil,
+        lowModel: nil,
+        dyingModel: nil,
+        mediumDistance: nil,
+        lowDistance: nil,
+        isVisible: false
+    ))
+
+    let texture = level.surfacePhysics[0].texture
+    typealias PortalConnection = (
+        faceIndex: Int,
+        room: Int,
+        portal: Int,
+        reversesFace: Bool
+    )
+    func portalRoom(
+        sourceIndex: Int,
+        name: String?,
+        center: Vector3,
+        faceCount: Int,
+        connections: [PortalConnection]
+    ) -> LevelRoom {
+        let shell = makeSourceContainmentRoom(
+            center: center,
+            texture: texture,
+            sourceIndex: sourceIndex,
+            halfExtent: 200
+        )
+        var faces = shell.faces
+        while faces.count < faceCount {
+            faces.append(shell.faces[0])
+        }
+        let portals = connections.enumerated().map {
+            portalIndex, connection in
+            let face = shell.faces[0]
+            faces[connection.faceIndex] = .init(
+                corners: connection.reversesFace
+                    ? Array(face.corners.reversed())
+                    : face.corners,
+                flags: face.flags,
+                portalIndex: portalIndex,
+                texture: face.texture
+            )
+            return LevelPortal(
+                flags: 1,
+                faceIndex: connection.faceIndex,
+                connectedRoom: connection.room,
+                connectedPortal: connection.portal
+            )
+        }
+        return LevelRoom(
+            sourceIndex: sourceIndex,
+            name: name,
+            pathPoint: shell.pathPoint,
+            vertices: shell.vertices,
+            faces: faces,
+            portals: portals
+        )
+    }
+    level.rooms.append(portalRoom(
+        sourceIndex: 35,
+        name: nil,
+        center: finishPosition,
+        faceCount: 21,
+        connections: [(20, 49, 0, false)]
+    ))
+    level.rooms.append(portalRoom(
+        sourceIndex: 49,
+        name: "PortalRoom2",
+        center: finishPosition,
+        faceCount: 2,
+        connections: [
+            (1, 35, 0, true),
+            (0, 50, 0, false),
+        ]
+    ))
+    level.rooms.append(portalRoom(
+        sourceIndex: 50,
+        name: nil,
+        center: finishPosition,
+        faceCount: 1,
+        connections: [(0, 49, 1, true)]
+    ))
+
+    var lesson = level.trainingOpeningLesson!
+    lesson.finishCourse = .init(
+        finishCourseObjectHandle: 6_150,
+        collisionRadius: sourceObjectPresentationSize(
+            model: finishModel,
+            objectType: 7
+        ),
+        portalRoomSourceIndex: 49,
+        orderedPortalIndices: [0, 1],
+        successMessage: "Excellent!",
+        instruction: "Continue Sliding down to start the next step.",
+        voiceSourceName: "proceed2.osf",
+        enabledControlMask: 32
+    )
+    let pcm = Data(repeating: 0, count: 2)
+    let proceed2 = CanonicalVoiceClip(
+        sourceName: "proceed2.osf",
+        sourceEntryIndex: 22,
+        sampleRate: 22_050,
+        channelCount: 1,
+        frameCount: 1,
+        pcm16LittleEndian: pcm,
+        pcmSHA256: canonicalSHA256(pcm),
+        sourceArchive: "missions/training.mn3",
+        sourceSHA256: String(repeating: "c", count: 64)
+    )
+    let dependency = DependencyRecord(
+        category: "voice",
+        source: .init(
+            storedIndex: proceed2.sourceEntryIndex,
+            sourceName: proceed2.sourceName
+        ),
+        state: "canonical-pcm-imported",
+        provenance: "\(proceed2.sourceArchive) \(proceed2.sourceSHA256)"
+    )
+    let modelDependency = DependencyRecord(
+        category: "model",
+        source: invisibleModel,
+        state: "presentation-payload-imported",
+        provenance: "synthetic Script 015 fixture"
+    )
+    return replacing(
+        level,
+        rooms: level.rooms,
+        objects: level.objects,
+        models: level.models + [finishModel],
+        objectPresentations: level.objectPresentations,
+        trainingOpeningLesson: lesson,
+        voiceClips: level.voiceClips + [proceed2],
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current
+                + [modelDependency, dependency],
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
     )
 }
 

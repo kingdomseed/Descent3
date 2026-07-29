@@ -530,6 +530,7 @@ struct TrainingOpeningFeedback: Equatable, Sendable {
     let hudMessages: [String]
     let voiceSourceName: String
     let voicePrecedesHUDMessages: Bool
+    let trailingHUDMessages: [String]
     let soundSourceName: String?
     let soundEventVolume: Float?
 
@@ -537,12 +538,14 @@ struct TrainingOpeningFeedback: Equatable, Sendable {
         hudMessages: [String],
         voiceSourceName: String,
         voicePrecedesHUDMessages: Bool,
+        trailingHUDMessages: [String] = [],
         soundSourceName: String? = nil,
         soundEventVolume: Float? = nil
     ) {
         self.hudMessages = hudMessages
         self.voiceSourceName = voiceSourceName
         self.voicePrecedesHUDMessages = voicePrecedesHUDMessages
+        self.trailingHUDMessages = trailingHUDMessages
         self.soundSourceName = soundSourceName
         self.soundEventVolume = soundEventVolume
     }
@@ -917,6 +920,7 @@ private struct TrainingOpeningState: Codable, Equatable, Sendable {
     var repeatReturnDownWasPresented: Bool? = nil
     var continueToCourseWasPresented: Bool? = nil
     var startCourseWasPresented: Bool? = nil
+    var finishCourseWasPresented: Bool? = nil
     var enabledControls: PlayerControlMask = [.forward]
 }
 
@@ -1366,6 +1370,21 @@ final class PlayerSimulation {
                 throw PlayerSimulationContinuationError.invalidState
             }
             openTrainingContinueToCoursePortals(in: &continuationLevel)
+        }
+        if continuation.trainingOpeningState?
+            .finishCourseWasPresented == true
+        {
+            guard let finishCourse =
+                    continuationLevel.trainingOpeningLesson?.finishCourse,
+                  trainingFinishCoursePortalsHaveRenderState(
+                      in: continuationLevel,
+                      lesson: finishCourse,
+                      rendersFaces: true
+                  )
+            else {
+                throw PlayerSimulationContinuationError.invalidState
+            }
+            openTrainingFinishCoursePortals(in: &continuationLevel)
         }
         if continuation.trainingRobotGuidebotState?.robotWasDestroyed == true {
             let chain = continuationLevel.trainingRobotGuidebotChain!
@@ -1860,11 +1879,41 @@ final class PlayerSimulation {
                       else {
                           return false
                       }
-                      guard state.enabledControls.rawValue
-                              & startCourse.enabledControlMask
-                                == startCourse.enabledControlMask
+                      if state.finishCourseWasPresented == true {
+                          guard state.enabledControls.rawValue
+                                  == startCourse.enabledControlMask
+                              || state.enabledControls.rawValue == 32
+                          else {
+                              return false
+                          }
+                      } else {
+                          guard state.enabledControls.rawValue
+                                  & startCourse.enabledControlMask
+                                    == startCourse.enabledControlMask
+                          else {
+                              return false
+                          }
+                      }
+                  }
+                  if state.finishCourseWasPresented == true {
+                      guard let finishCourse =
+                              level.trainingOpeningLesson?.finishCourse
                       else {
                           return false
+                      }
+                      if state.startCourseWasPresented == true {
+                          guard state.enabledControls.rawValue
+                                  == finishCourse.enabledControlMask
+                              || state.enabledControls.rawValue == 63
+                          else {
+                              return false
+                          }
+                      } else {
+                          guard state.enabledControls.rawValue
+                                  == finishCourse.enabledControlMask
+                          else {
+                              return false
+                          }
                       }
                   }
                   return state.timerRemaining.isFinite
@@ -1905,8 +1954,11 @@ final class PlayerSimulation {
                             != nil)
                       && (state.startCourseWasPresented != true
                           || level.trainingOpeningLesson?.startCourse != nil)
+                      && (state.finishCourseWasPresented != true
+                          || level.trainingOpeningLesson?.finishCourse != nil)
                       && (
                           state.startCourseWasPresented == true
+                            || state.finishCourseWasPresented == true
                             || expectedControls.contains(
                                 state.enabledControls
                             )
@@ -1962,8 +2014,22 @@ final class PlayerSimulation {
                 throw PlayerSimulationContinuationError.invalidState
             }
         }
+        if let finishCourse =
+                continuationLevel.trainingOpeningLesson?.finishCourse,
+           continuation.trainingOpeningState?
+            .finishCourseWasPresented == true {
+            guard trainingFinishCoursePortalsHaveRenderState(
+                in: continuationLevel,
+                lesson: finishCourse,
+                rendersFaces: false
+            ) else {
+                throw PlayerSimulationContinuationError.invalidState
+            }
+        }
         var restoredOpeningState = continuation.trainingOpeningState
         if restoredOpeningState?.startCourseWasPresented == true,
+           !(restoredOpeningState?.finishCourseWasPresented == true
+                && restoredOpeningState?.enabledControls.rawValue == 32),
            let startCourse =
                 continuationLevel.trainingOpeningLesson?.startCourse {
             restoredOpeningState?.enabledControls.formUnion(
@@ -3179,6 +3245,7 @@ final class PlayerSimulation {
         var trainingForwardGoalWasReachedThisFrame = false
         var trainingStartGoalWasReachedThisFrame = false
         var trainingStartCourseWasReachedThisFrame = false
+        var trainingFinishCourseWasReachedThisFrame = false
         var trainingLeftGoalWasReachedThisFrame = false
         var trainingDownGoalWasReachedThisFrame = false
         var trainingGalleryWasCrossedThisFrame = false
@@ -3303,6 +3370,18 @@ final class PlayerSimulation {
                         trainingStartCourseWasReached(
                             in: level,
                             lesson: startCourse,
+                            playerStart: traceStart,
+                            playerEnd: trace.finalPosition,
+                            playerRadius: view.collisionRadius,
+                            visitedRoomSourceIndices:
+                                trace.visitedRoomSourceIndices
+                        )
+                }
+                if let finishCourse = lesson.finishCourse {
+                    trainingFinishCourseWasReachedThisFrame =
+                        trainingFinishCourseWasReached(
+                            in: level,
+                            lesson: finishCourse,
                             playerStart: traceStart,
                             playerEnd: trace.finalPosition,
                             playerRadius: view.collisionRadius,
@@ -3551,6 +3630,20 @@ final class PlayerSimulation {
                     trainingStartCourseWasReached(
                         in: level,
                         lesson: startCourse,
+                        playerStart: traceStart,
+                        playerEnd: trace.finalPosition,
+                        playerRadius: view.collisionRadius,
+                        visitedRoomSourceIndices:
+                            trace.visitedRoomSourceIndices
+                    )
+            }
+            if !trainingFinishCourseWasReachedThisFrame,
+               let finishCourse =
+                    level.trainingOpeningLesson?.finishCourse {
+                trainingFinishCourseWasReachedThisFrame =
+                    trainingFinishCourseWasReached(
+                        in: level,
+                        lesson: finishCourse,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
                         playerRadius: view.collisionRadius,
@@ -4247,6 +4340,21 @@ final class PlayerSimulation {
                     )
                 )
                 openingState.startCourseWasPresented = true
+            }
+            if openingState.finishCourseWasPresented != true,
+               trainingFinishCourseWasReachedThisFrame,
+               let finishCourse = lesson.finishCourse {
+                openingState.enabledControls = PlayerControlMask(
+                    rawValue: finishCourse.enabledControlMask
+                )
+                openTrainingFinishCoursePortals(in: &level)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [finishCourse.successMessage],
+                    voiceSourceName: finishCourse.voiceSourceName,
+                    voicePrecedesHUDMessages: false,
+                    trailingHUDMessages: [finishCourse.instruction]
+                ))
+                openingState.finishCourseWasPresented = true
             }
             if !openingState.welcomeWasPresented {
                 openingState.timerRemaining -= systemsFrameDuration
@@ -5516,6 +5624,40 @@ private func openTrainingContinueToCoursePortals(in level: inout Level) {
     }
 }
 
+private func trainingFinishCoursePortalsHaveRenderState(
+    in level: Level,
+    lesson: TrainingFinishCourseLesson,
+    rendersFaces: Bool
+) -> Bool {
+    lesson.orderedPortalIndices.allSatisfy { portalIndex in
+        trainingPortalPairHasRenderState(
+            in: level,
+            roomSourceIndex: lesson.portalRoomSourceIndex,
+            portalIndex: portalIndex,
+            rendersFaces: rendersFaces
+        )
+    }
+}
+
+private func openTrainingFinishCoursePortals(in level: inout Level) {
+    guard let lesson = level.trainingOpeningLesson?.finishCourse,
+          let roomIndex = level.rooms.firstIndex(where: {
+              $0.sourceIndex == lesson.portalRoomSourceIndex
+          })
+    else {
+        return
+    }
+    for portalIndex in lesson.orderedPortalIndices {
+        let portal = level.rooms[roomIndex].portals[portalIndex]
+        level.rooms[roomIndex].portals[portalIndex].flags &= ~UInt32(1)
+        let connectedRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        level.rooms[connectedRoomIndex]
+            .portals[portal.connectedPortal].flags &= ~UInt32(1)
+    }
+}
+
 private func trainingStartCoursePortalHasRenderState(
     in level: Level,
     lesson: TrainingStartCourseLesson,
@@ -5843,6 +5985,27 @@ private func trainingStartCourseWasReached(
 ) -> Bool {
     let target = level.objects.first {
         $0.handle == lesson.startCourseObjectHandle
+    }!
+    return trainingOpeningGoalWasReached(
+        target: target,
+        targetRadius: lesson.collisionRadius,
+        playerStart: playerStart,
+        playerEnd: playerEnd,
+        playerRadius: playerRadius,
+        visitedRoomSourceIndices: visitedRoomSourceIndices
+    )
+}
+
+private func trainingFinishCourseWasReached(
+    in level: Level,
+    lesson: TrainingFinishCourseLesson,
+    playerStart: Vector3,
+    playerEnd: Vector3,
+    playerRadius: Float,
+    visitedRoomSourceIndices: [Int]
+) -> Bool {
+    let target = level.objects.first {
+        $0.handle == lesson.finishCourseObjectHandle
     }!
     return trainingOpeningGoalWasReached(
         target: target,
