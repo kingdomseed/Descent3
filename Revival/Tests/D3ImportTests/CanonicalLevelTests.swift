@@ -1,6 +1,215 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testOwnedScript010PackageAdmissionRejectsHostileStockMutations()
+        throws
+    {
+        let fallbackPath =
+            "/tmp/revival-script010-final-import.3UeqAk/training.revival/levels/descent3.level.training-mission/level.json"
+        let path = ProcessInfo.processInfo.environment[
+            "REVIVAL_SCRIPT010_OWNED_LEVEL"
+        ] ?? fallbackPath
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw XCTSkip(
+                "requires the ignored exact-final owned Script 010 import"
+            )
+        }
+        let stockLevel = try JSONDecoder().decode(
+            Level.self,
+            from: Data(contentsOf: URL(fileURLWithPath: path))
+        )
+        XCTAssertNoThrow(try stockLevel.validate())
+
+        var hostileObjects = stockLevel.objects
+        let leftGoalIndex = try XCTUnwrap(
+            hostileObjects.firstIndex { $0.handle == 12_299 }
+        )
+        hostileObjects[leftGoalIndex].location = .room(2)
+        assertValidationError(
+            .invalidDependency("Training Script 010 package"),
+            replacing(stockLevel, objects: hostileObjects)
+        )
+
+        var hostileLesson = try XCTUnwrap(
+            stockLevel.trainingOpeningLesson
+        )
+        let repeatReturnRight = try XCTUnwrap(
+            hostileLesson.repeatReturnRight
+        )
+        hostileLesson.repeatReturnRight = .init(
+            leftGoalObjectHandle: repeatReturnRight.leftGoalObjectHandle,
+            collisionRadius: repeatReturnRight.collisionRadius,
+            instruction: "Wrong Script 010 instruction",
+            soundLogicalName: repeatReturnRight.soundLogicalName
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 010 package"),
+            replacing(
+                stockLevel,
+                trainingOpeningLesson: hostileLesson
+            )
+        )
+    }
+
+    func testScript010RequiresExactHiddenLeftGoalAndMenuBeep() throws {
+        let stockLevel = makeTrainingScript003Level()
+        let repeatReturnRight = try XCTUnwrap(
+            stockLevel.trainingOpeningLesson?.repeatReturnRight
+        )
+        XCTAssertEqual(repeatReturnRight.leftGoalObjectHandle, 12_299)
+        XCTAssertEqual(
+            repeatReturnRight.instruction,
+            "Now Slide right until you return to the start position."
+        )
+        XCTAssertEqual(repeatReturnRight.soundLogicalName, "MenuBeepEnter")
+        XCTAssertNoThrow(try stockLevel.validate())
+
+        let fixtureLeftGoal = try XCTUnwrap(
+            stockLevel.objects.first { $0.handle == 12_299 }
+        )
+        let stockLeftGoal = PlacedObject(
+            handle: 12_299,
+            type: 7,
+            storedID: 67,
+            definition: .init(
+                storedIndex: 67,
+                sourceName: "Invisiblepowerup",
+                referenceRuntimeIndex: 68
+            ),
+            instanceName: "LeftGoal",
+            flags: 4_352,
+            doorShields: nil,
+            location: .room(1),
+            position: .init(
+                x: 1_958.2805,
+                y: -131.22517,
+                z: 2_205.8071
+            ),
+            orientation: .init(
+                right: .init(x: -1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: 0),
+                forward: .init(x: 0, y: 0, z: -1)
+            ),
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: fixtureLeftGoal.soundSource,
+            inertScriptName: fixtureLeftGoal.inertScriptName,
+            inertModuleName: fixtureLeftGoal.inertModuleName,
+            lightmapSubmodels: fixtureLeftGoal.lightmapSubmodels
+        )
+        let stockPresentation = ObjectPresentationReference(
+            objectHandle: 12_299,
+            primaryModel: .init(
+                storedIndex: 6,
+                sourceName: "invisiblepowerup.OOF"
+            ),
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil,
+            isVisible: false
+        )
+        let fixtureMenuBeep = try XCTUnwrap(
+            stockLevel.soundClips.first {
+                $0.logicalName == "MenuBeepEnter"
+            }
+        )
+        let stockMenuBeep = CanonicalSoundClip(
+            logicalName: "MenuBeepEnter",
+            sourceName: "MenuBeepSelectC.wav",
+            sourceEntryIndex: 2_079,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 2_321,
+            pcm16LittleEndian: fixtureMenuBeep.pcm16LittleEndian,
+            pcmSHA256:
+                "050b01b05e33233f6486c89d18e897a6f219ed8ecd706d6022ef9fdf01383439",
+            sourceArchive: "d3.hog",
+            sourceSHA256:
+                "7176c7fe69ab31912d349065861a512f34f9649a117f6b3c97bee54b68ea2cea",
+            importVolume: 0.7
+        )
+        let stockRepeatReturnRight = TrainingRepeatReturnRightLesson(
+            leftGoalObjectHandle: 12_299,
+            collisionRadius: 10.052_409,
+            instruction:
+                "Now Slide right until you return to the start position.",
+            soundLogicalName: "MenuBeepEnter"
+        )
+        XCTAssertNoThrow(
+            try validateStockTrainingRepeatReturnRightPackage(
+                lesson: stockRepeatReturnRight,
+                leftGoal: stockLeftGoal,
+                presentation: stockPresentation,
+                menuBeep: stockMenuBeep
+            )
+        )
+
+        var hostileLeftGoal = stockLeftGoal
+        hostileLeftGoal.location = .room(2)
+        XCTAssertThrowsError(
+            try validateStockTrainingRepeatReturnRightPackage(
+                lesson: stockRepeatReturnRight,
+                leftGoal: hostileLeftGoal,
+                presentation: stockPresentation,
+                menuBeep: stockMenuBeep
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Script 010 package")
+            )
+        }
+        let hostileMenuBeep = CanonicalSoundClip(
+            logicalName: stockMenuBeep.logicalName,
+            sourceName: stockMenuBeep.sourceName,
+            sourceEntryIndex: stockMenuBeep.sourceEntryIndex,
+            sampleRate: stockMenuBeep.sampleRate,
+            channelCount: stockMenuBeep.channelCount,
+            frameCount: stockMenuBeep.frameCount,
+            pcm16LittleEndian: stockMenuBeep.pcm16LittleEndian,
+            pcmSHA256: stockMenuBeep.pcmSHA256,
+            sourceArchive: stockMenuBeep.sourceArchive,
+            sourceSHA256: stockMenuBeep.sourceSHA256,
+            importVolume: 1
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingRepeatReturnRightPackage(
+                lesson: stockRepeatReturnRight,
+                leftGoal: stockLeftGoal,
+                presentation: stockPresentation,
+                menuBeep: hostileMenuBeep
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Script 010 package")
+            )
+        }
+
+        var divergentLesson = try XCTUnwrap(
+            stockLevel.trainingOpeningLesson
+        )
+        divergentLesson.repeatReturnRight = .init(
+            leftGoalObjectHandle: 12_301,
+            collisionRadius: repeatReturnRight.collisionRadius,
+            instruction: repeatReturnRight.instruction,
+            soundLogicalName: repeatReturnRight.soundLogicalName
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 010 repeat-return-right lesson"
+            ),
+            replacing(
+                stockLevel,
+                trainingOpeningLesson: divergentLesson
+            )
+        )
+    }
+
     func testScript009RequiresExactHiddenStartGoalAndLRightVoice() throws {
         let stockLevel = makeTrainingScript003Level()
         let repeatReturnLeft = try XCTUnwrap(

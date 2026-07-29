@@ -516,6 +516,13 @@ struct TrainingRepeatReturnLeftLesson: Codable, Equatable, Sendable {
     let voiceSourceName: String
 }
 
+struct TrainingRepeatReturnRightLesson: Codable, Equatable, Sendable {
+    let leftGoalObjectHandle: UInt32
+    let collisionRadius: Float
+    let instruction: String
+    let soundLogicalName: String
+}
+
 struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var forwardGoalObjectHandle: UInt32
     let welcomeDelay: Float
@@ -532,6 +539,7 @@ struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var repeatForward: TrainingRepeatForwardLesson? = nil
     var repeatForwardGoal: TrainingRepeatForwardGoalLesson? = nil
     var repeatReturnLeft: TrainingRepeatReturnLeftLesson? = nil
+    var repeatReturnRight: TrainingRepeatReturnRightLesson? = nil
 }
 
 struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
@@ -1174,6 +1182,75 @@ func validateStockTrainingRepeatReturnLeftPackage(
     else {
         throw LevelValidationError.invalidDependency(
             "Training Script 009 package"
+        )
+    }
+}
+
+func validateStockTrainingRepeatReturnRightPackage(
+    lesson: TrainingRepeatReturnRightLesson?,
+    leftGoal: PlacedObject?,
+    presentation: ObjectPresentationReference?,
+    menuBeep: CanonicalSoundClip?
+) throws {
+    guard let lesson,
+          lesson.leftGoalObjectHandle == 12_299,
+          lesson.collisionRadius == 10.052_409,
+          lesson.instruction
+            == "Now Slide right until you return to the start position.",
+          lesson.soundLogicalName == "MenuBeepEnter",
+          leftGoal?.type == 7,
+          leftGoal?.storedID == 67,
+          leftGoal?.definition?.storedIndex == 67,
+          leftGoal?.definition?.referenceRuntimeIndex == 68,
+          leftGoal?.definition?.sourceName == "Invisiblepowerup",
+          leftGoal?.instanceName == "LeftGoal",
+          leftGoal?.flags == 4_352,
+          leftGoal?.location == .room(1),
+          leftGoal?.position
+            == .init(
+                x: 1_958.2805,
+                y: -131.22517,
+                z: 2_205.8071
+            ),
+          leftGoal?.orientation
+            == .init(
+                right: .init(x: -1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: 0),
+                forward: .init(x: 0, y: 0, z: -1)
+            ),
+          leftGoal?.containsType == 255,
+          leftGoal?.containsID == 0,
+          leftGoal?.containsCount == 0,
+          leftGoal?.lifeLeft == 0,
+          leftGoal?.soundSource == nil,
+          leftGoal?.inertScriptName == nil,
+          leftGoal?.inertModuleName == nil,
+          leftGoal?.lightmapSubmodels.isEmpty == true,
+          presentation?.primaryModel
+            == .init(
+                storedIndex: 6,
+                sourceName: "invisiblepowerup.OOF"
+            ),
+          presentation?.mediumModel == nil,
+          presentation?.lowModel == nil,
+          presentation?.dyingModel == nil,
+          presentation?.mediumDistance == nil,
+          presentation?.lowDistance == nil,
+          presentation?.isVisible == false,
+          menuBeep?.sourceName == "MenuBeepSelectC.wav",
+          menuBeep?.sourceEntryIndex == 2_079,
+          menuBeep?.sampleRate == 22_050,
+          menuBeep?.channelCount == 1,
+          menuBeep?.frameCount == 2_321,
+          menuBeep?.pcmSHA256
+            == "050b01b05e33233f6486c89d18e897a6f219ed8ecd706d6022ef9fdf01383439",
+          menuBeep?.sourceArchive == "d3.hog",
+          menuBeep?.sourceSHA256
+            == "7176c7fe69ab31912d349065861a512f34f9649a117f6b3c97bee54b68ea2cea",
+          menuBeep?.importVolume == 0.7
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training Script 010 package"
         )
     }
 }
@@ -2737,6 +2814,44 @@ struct Level: Codable, Equatable, Sendable {
                     )
                 }
             }
+            if let repeatReturnRight = lesson.repeatReturnRight {
+                let soundNames = Set(soundClips.flatMap {
+                    [$0.logicalName.lowercased(), $0.sourceName.lowercased()]
+                })
+                guard repeatReturnRight.collisionRadius.isFinite,
+                      repeatReturnRight.collisionRadius > 0,
+                      isNonempty(repeatReturnRight.instruction),
+                      isNonempty(repeatReturnRight.soundLogicalName),
+                      lesson.repeatReturnLeft != nil,
+                      let returnRight = lesson.returnRight,
+                      repeatReturnRight.leftGoalObjectHandle
+                        == returnRight.leftGoalObjectHandle,
+                      repeatReturnRight.collisionRadius
+                        == returnRight.collisionRadius,
+                      let target = objects.first(where: {
+                          $0.handle
+                            == repeatReturnRight.leftGoalObjectHandle
+                      }),
+                      target.type == 7,
+                      let presentation = objectPresentations.first(where: {
+                          $0.objectHandle == target.handle && !$0.isVisible
+                      }),
+                      let model = models.first(where: {
+                          $0.source == presentation.primaryModel
+                      }),
+                      repeatReturnRight.collisionRadius
+                        == sourceObjectPresentationSize(
+                            model: model,
+                            objectType: target.type
+                        ),
+                      soundNames.contains(
+                          repeatReturnRight.soundLogicalName.lowercased()
+                      ) else {
+                    throw LevelValidationError.invalidDependency(
+                        "Training Script 010 repeat-return-right lesson"
+                    )
+                }
+            }
         }
         if let barrier = trainingGalleryBarrier {
             let oneShotFlag: UInt16 = 8
@@ -3661,6 +3776,26 @@ struct Level: Codable, Equatable, Sendable {
                     startGoal: startGoal,
                     presentation: startGoalPresentation,
                     lright: lright
+                )
+            }
+            if let repeatReturnRight =
+                    trainingOpeningLesson?.repeatReturnRight {
+                let leftGoal = objects.first {
+                    $0.handle == repeatReturnRight.leftGoalObjectHandle
+                }
+                let leftGoalPresentation = objectPresentations.first {
+                    $0.objectHandle
+                        == repeatReturnRight.leftGoalObjectHandle
+                }
+                let menuBeep = soundClips.first {
+                    $0.logicalName.caseInsensitiveCompare("MenuBeepEnter")
+                        == .orderedSame
+                }
+                try validateStockTrainingRepeatReturnRightPackage(
+                    lesson: repeatReturnRight,
+                    leftGoal: leftGoal,
+                    presentation: leftGoalPresentation,
+                    menuBeep: menuBeep
                 )
             }
             if let repeatForward =
@@ -4601,6 +4736,7 @@ struct Level: Codable, Equatable, Sendable {
                 lesson.returnDown?.upGoalObjectHandle,
                 lesson.repeatForwardGoal?.forwardGoalObjectHandle,
                 lesson.repeatReturnLeft?.startGoalObjectHandle,
+                lesson.repeatReturnRight?.leftGoalObjectHandle,
             ]
             guard hiddenHandles.contains(presentation.objectHandle) else {
                 return presentation

@@ -980,6 +980,15 @@ func runD3Import(
                 ),
                 instruction: messages["GoLeft"]!,
                 voiceSourceName: "lright.osf"
+            ),
+            repeatReturnRight: .init(
+                leftGoalObjectHandle: leftGoal.handle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: leftGoalModel,
+                    objectType: leftGoal.type
+                ),
+                instruction: messages["GoRight"]!,
+                soundLogicalName: menuBeepPage.logicalName
             )
         ),
         voiceClips: [
