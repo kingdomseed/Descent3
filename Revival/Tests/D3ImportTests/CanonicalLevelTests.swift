@@ -1,6 +1,147 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testScript012RequiresExactHiddenUpGoalAndExistingMenuBeep() throws {
+        let level = makeTrainingScript003Level()
+        let lesson = try XCTUnwrap(
+            level.trainingOpeningLesson?.repeatReturnDown
+        )
+        XCTAssertEqual(lesson.upGoalObjectHandle, 18_441)
+        XCTAssertEqual(
+            lesson.instruction,
+            "Now Slide down until you return to the start position."
+        )
+        XCTAssertEqual(lesson.soundLogicalName, "MenuBeepEnter")
+        XCTAssertNoThrow(try level.validate())
+
+        var hostileLesson = try XCTUnwrap(level.trainingOpeningLesson)
+        hostileLesson.repeatReturnDown = .init(
+            upGoalObjectHandle: 999_999,
+            collisionRadius: lesson.collisionRadius,
+            instruction: lesson.instruction,
+            soundLogicalName: lesson.soundLogicalName
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 012 repeat-return-down lesson"
+            ),
+            replacing(level, trainingOpeningLesson: hostileLesson)
+        )
+
+        var missingPredecessor = try XCTUnwrap(
+            level.trainingOpeningLesson
+        )
+        missingPredecessor.repeatReturnUp = nil
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 012 repeat-return-down lesson"
+            ),
+            replacing(level, trainingOpeningLesson: missingPredecessor)
+        )
+
+        let stockUpGoal = PlacedObject(
+            handle: 18_441,
+            type: 7,
+            storedID: 67,
+            definition: .init(
+                storedIndex: 67,
+                sourceName: "Invisiblepowerup",
+                referenceRuntimeIndex: 68
+            ),
+            instanceName: "UpGoal",
+            flags: 4_352,
+            doorShields: nil,
+            location: .room(1),
+            position: .init(
+                x: 2_060.6682,
+                y: -25.897_497,
+                z: 2_204.6843
+            ),
+            orientation: .init(
+                right: .init(x: -1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: -0),
+                forward: .init(x: -0, y: -0, z: -1)
+            ),
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        )
+        let stockPresentation = ObjectPresentationReference(
+            objectHandle: 18_441,
+            primaryModel: .init(
+                storedIndex: 6,
+                sourceName: "invisiblepowerup.OOF"
+            ),
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil,
+            isVisible: false
+        )
+        let stockMenuBeep = CanonicalSoundClip(
+            logicalName: "MenuBeepEnter",
+            sourceName: "MenuBeepSelectC.wav",
+            sourceEntryIndex: 2_079,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 2_321,
+            pcm16LittleEndian: Data(),
+            pcmSHA256:
+                "050b01b05e33233f6486c89d18e897a6f219ed8ecd706d6022ef9fdf01383439",
+            sourceArchive: "d3.hog",
+            sourceSHA256:
+                "7176c7fe69ab31912d349065861a512f34f9649a117f6b3c97bee54b68ea2cea",
+            importVolume: 0.7
+        )
+        let stockLesson = TrainingRepeatReturnDownLesson(
+            upGoalObjectHandle: 18_441,
+            collisionRadius: 10.052_409,
+            instruction:
+                "Now Slide down until you return to the start position.",
+            soundLogicalName: "MenuBeepEnter"
+        )
+        XCTAssertNoThrow(
+            try validateStockTrainingRepeatReturnDownPackage(
+                lesson: stockLesson,
+                upGoal: stockUpGoal,
+                presentation: stockPresentation,
+                menuBeep: stockMenuBeep
+            )
+        )
+        var hostileUpGoal = stockUpGoal
+        hostileUpGoal.location = .room(2)
+        XCTAssertThrowsError(
+            try validateStockTrainingRepeatReturnDownPackage(
+                lesson: stockLesson,
+                upGoal: hostileUpGoal,
+                presentation: stockPresentation,
+                menuBeep: stockMenuBeep
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Script 012 package")
+            )
+        }
+
+        var compatibleLesson = try XCTUnwrap(
+            level.trainingOpeningLesson
+        )
+        compatibleLesson.repeatReturnDown = nil
+        XCTAssertNoThrow(
+            try replacing(
+                level,
+                trainingOpeningLesson: compatibleLesson
+            ).validate()
+        )
+    }
+
     func testOwnedScript011PackageAdmissionRejectsHostileStockMutations()
         throws
     {

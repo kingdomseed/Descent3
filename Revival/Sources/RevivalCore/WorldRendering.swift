@@ -531,17 +531,20 @@ struct TrainingOpeningFeedback: Equatable, Sendable {
     let voiceSourceName: String
     let voicePrecedesHUDMessages: Bool
     let soundSourceName: String?
+    let soundEventVolume: Float?
 
     init(
         hudMessages: [String],
         voiceSourceName: String,
         voicePrecedesHUDMessages: Bool,
-        soundSourceName: String? = nil
+        soundSourceName: String? = nil,
+        soundEventVolume: Float? = nil
     ) {
         self.hudMessages = hudMessages
         self.voiceSourceName = voiceSourceName
         self.voicePrecedesHUDMessages = voicePrecedesHUDMessages
         self.soundSourceName = soundSourceName
+        self.soundEventVolume = soundEventVolume
     }
 }
 
@@ -911,6 +914,7 @@ private struct TrainingOpeningState: Codable, Equatable, Sendable {
     var repeatReturnLeftWasPresented: Bool? = nil
     var repeatReturnRightWasPresented: Bool? = nil
     var repeatReturnUpWasPresented: Bool? = nil
+    var repeatReturnDownWasPresented: Bool? = nil
     var enabledControls: PlayerControlMask = [.forward]
 }
 
@@ -1804,13 +1808,26 @@ final class PlayerSimulation {
                   if state.repeatReturnUpWasPresented == true {
                       guard state.repeatReturnRightWasPresented == true,
                             state.rightGoalWasReached == true,
-                            state.upGoalWasReached == true else {
+                            state.upGoalWasReached == true,
+                            state.downGoalWasReached == true else {
                           return false
                       }
                       expectedControls = expectedControls.map { controls in
                           var controls = controls
                           controls.remove(.right)
                           controls.insert(.up)
+                          return controls
+                      }
+                  }
+                  if state.repeatReturnDownWasPresented == true {
+                      guard state.repeatReturnUpWasPresented == true,
+                            state.downGoalWasReached == true else {
+                          return false
+                      }
+                      expectedControls = expectedControls.map { controls in
+                          var controls = controls
+                          controls.remove(.up)
+                          controls.insert(.down)
                           return controls
                       }
                   }
@@ -1843,6 +1860,9 @@ final class PlayerSimulation {
                             != nil)
                       && (state.repeatReturnUpWasPresented != true
                           || level.trainingOpeningLesson?.repeatReturnUp
+                            != nil)
+                      && (state.repeatReturnDownWasPresented != true
+                          || level.trainingOpeningLesson?.repeatReturnDown
                             != nil)
                       && expectedControls.contains(state.enabledControls)
               }) ?? true,
@@ -3187,7 +3207,12 @@ final class PlayerSimulation {
                                 trace.visitedRoomSourceIndices
                         )
                 }
-                if trainingOpeningState?.downGoalWasReached != true,
+                if trainingOpeningState?.downGoalWasReached != true
+                    || (
+                        trainingOpeningState?
+                            .repeatReturnDownWasPresented != true
+                        && lesson.repeatReturnDown != nil
+                    ),
                    let returnDown = lesson.returnDown {
                     trainingDownGoalWasReachedThisFrame =
                         trainingDownGoalWasReached(
@@ -3418,7 +3443,15 @@ final class PlayerSimulation {
                     )
             }
             if !trainingDownGoalWasReachedThisFrame,
-               trainingOpeningState?.downGoalWasReached != true,
+               (
+                   trainingOpeningState?.downGoalWasReached != true
+                    || (
+                        trainingOpeningState?
+                            .repeatReturnDownWasPresented != true
+                        && level.trainingOpeningLesson?
+                            .repeatReturnDown != nil
+                    )
+               ),
                let returnDown = level.trainingOpeningLesson?.returnDown {
                 trainingDownGoalWasReachedThisFrame =
                     trainingDownGoalWasReached(
@@ -4042,6 +4075,21 @@ final class PlayerSimulation {
                     voicePrecedesHUDMessages: true
                 ))
                 openingState.repeatReturnUpWasPresented = true
+            }
+            if openingState.repeatReturnDownWasPresented != true,
+               openingState.repeatReturnUpWasPresented == true,
+               trainingDownGoalWasReachedThisFrame,
+               let repeatReturnDown = lesson.repeatReturnDown {
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [repeatReturnDown.instruction],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false,
+                    soundSourceName: repeatReturnDown.soundLogicalName,
+                    soundEventVolume: 1
+                ))
+                openingState.enabledControls.remove(.up)
+                openingState.enabledControls.insert(.down)
+                openingState.repeatReturnDownWasPresented = true
             }
             if !openingState.welcomeWasPresented {
                 openingState.timerRemaining -= systemsFrameDuration

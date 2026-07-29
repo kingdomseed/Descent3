@@ -999,6 +999,15 @@ func runD3Import(
                 ),
                 instruction: messages["GoUp"]!,
                 voiceSourceName: "udown.osf"
+            ),
+            repeatReturnDown: .init(
+                upGoalObjectHandle: upGoal.handle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: upGoalModel,
+                    objectType: upGoal.type
+                ),
+                instruction: messages["GoDown"]!,
+                soundLogicalName: menuBeepPage.logicalName
             )
         ),
         voiceClips: [

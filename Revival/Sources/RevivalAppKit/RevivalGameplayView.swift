@@ -428,7 +428,11 @@ final class RevivalGameplayView: MTKView {
                 try self.playTrainingVoice(named: $0, from: voiceClips)
             },
             attemptSound: {
-                try self.playTrainingSound(named: $0, from: soundClips)
+                try self.playTrainingSound(
+                    named: $0,
+                    eventVolume: $1,
+                    from: soundClips
+                )
             },
             presentHUDMessages: { messages in
                 presentedHUDMessages.append(contentsOf: messages)
@@ -463,7 +467,7 @@ final class RevivalGameplayView: MTKView {
     static func presentTrainingFeedbackSequence(
         _ feedback: [TrainingOpeningFeedback],
         attemptVoice: (String) throws -> Void,
-        attemptSound: (String) throws -> Void,
+        attemptSound: (String, Float?) throws -> Void,
         presentHUDMessages: ([String]) -> Void
     ) {
         let selectedVoiceIndex = feedback.indices.last {
@@ -485,7 +489,10 @@ final class RevivalGameplayView: MTKView {
                             event.soundSourceName else {
                         return
                     }
-                    try attemptSound(soundSourceName)
+                    try attemptSound(
+                        soundSourceName,
+                        event.soundEventVolume
+                    )
                 },
                 presentHUDMessages: {
                     presentHUDMessages(event.hudMessages)
@@ -496,6 +503,7 @@ final class RevivalGameplayView: MTKView {
 
     private func playTrainingSound(
         named soundSourceName: String,
+        eventVolume: Float?,
         from soundClips: [CanonicalSoundClip]
     ) throws {
         do {
@@ -514,7 +522,7 @@ final class RevivalGameplayView: MTKView {
             }
             let player = try AVAudioPlayer(data: Self.waveData(for: clip))
             trainingSoundPlayers.append(player)
-            player.volume = clip.importVolume
+            player.volume = clip.importVolume * (eventVolume ?? 1)
             player.prepareToPlay()
             guard player.play() else {
                 throw TrainingOpeningPresentationError.soundPlaybackFailed(
