@@ -422,6 +422,10 @@ final class EditorProjectTests: XCTestCase {
             "TrainingMission.cpp Script 010 / LeftGoal handle 12299 / MenuBeepEnter"
         )
         XCTAssertEqual(
+            document.project.trainingRepeatReturnUpSourceDiagnostic,
+            "TrainingMission.cpp Script 011 / StartGoal handle 12300 / udown.osf"
+        )
+        XCTAssertEqual(
             document.project.trainingReturnRightSourceDiagnostic,
             "TrainingMission.cpp Script 004 / LeftGoal handle 12299 / return2.osf"
         )
@@ -467,6 +471,14 @@ final class EditorProjectTests: XCTestCase {
                 selection: document.editorSelection
             ).contains(
                 "TrainingMission.cpp Script 010 / LeftGoal handle 12299 / MenuBeepEnter"
+            )
+        )
+        XCTAssertTrue(
+            editorIdleStatusMessage(
+                project: document.project,
+                selection: document.editorSelection
+            ).contains(
+                "TrainingMission.cpp Script 011 / StartGoal handle 12300 / udown.osf"
             )
         )
         XCTAssertTrue(
@@ -678,6 +690,11 @@ final class EditorProjectTests: XCTestCase {
             playSession.level.trainingOpeningLesson?.repeatReturnRight?
                 .leftGoalObjectHandle,
             leftGoal.handle
+        )
+        XCTAssertEqual(
+            playSession.level.trainingOpeningLesson?.repeatReturnUp?
+                .startGoalObjectHandle,
+            startGoal.handle
         )
         XCTAssertEqual(
             reopened.project.level.objects.first {

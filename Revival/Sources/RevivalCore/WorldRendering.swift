@@ -910,6 +910,7 @@ private struct TrainingOpeningState: Codable, Equatable, Sendable {
     var repeatForwardGoalWasPresented: Bool? = nil
     var repeatReturnLeftWasPresented: Bool? = nil
     var repeatReturnRightWasPresented: Bool? = nil
+    var repeatReturnUpWasPresented: Bool? = nil
     var enabledControls: PlayerControlMask = [.forward]
 }
 
@@ -1800,6 +1801,19 @@ final class PlayerSimulation {
                           return controls
                       }
                   }
+                  if state.repeatReturnUpWasPresented == true {
+                      guard state.repeatReturnRightWasPresented == true,
+                            state.rightGoalWasReached == true,
+                            state.upGoalWasReached == true else {
+                          return false
+                      }
+                      expectedControls = expectedControls.map { controls in
+                          var controls = controls
+                          controls.remove(.right)
+                          controls.insert(.up)
+                          return controls
+                      }
+                  }
                   return state.timerRemaining.isFinite
                       && (
                           state.welcomeWasPresented
@@ -1826,6 +1840,9 @@ final class PlayerSimulation {
                             != nil)
                       && (state.repeatReturnRightWasPresented != true
                           || level.trainingOpeningLesson?.repeatReturnRight
+                            != nil)
+                      && (state.repeatReturnUpWasPresented != true
+                          || level.trainingOpeningLesson?.repeatReturnUp
                             != nil)
                       && expectedControls.contains(state.enabledControls)
               }) ?? true,
@@ -4012,6 +4029,19 @@ final class PlayerSimulation {
                 openingState.enabledControls.remove(.left)
                 openingState.enabledControls.insert(.right)
                 openingState.repeatReturnRightWasPresented = true
+            }
+            if openingState.repeatReturnUpWasPresented != true,
+               openingState.repeatReturnRightWasPresented == true,
+               trainingStartGoalWasReachedThisFrame,
+               let repeatReturnUp = lesson.repeatReturnUp {
+                openingState.enabledControls.remove(.right)
+                openingState.enabledControls.insert(.up)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [repeatReturnUp.instruction],
+                    voiceSourceName: repeatReturnUp.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                ))
+                openingState.repeatReturnUpWasPresented = true
             }
             if !openingState.welcomeWasPresented {
                 openingState.timerRemaining -= systemsFrameDuration

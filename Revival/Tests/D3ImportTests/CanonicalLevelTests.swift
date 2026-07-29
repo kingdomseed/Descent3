@@ -1,6 +1,224 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testOwnedScript011PackageAdmissionRejectsHostileStockMutations()
+        throws
+    {
+        let fallbackPath =
+            "/tmp/revival-script011-final-import.FPw5aQ/training.revival/levels/descent3.level.training-mission/level.json"
+        let path = ProcessInfo.processInfo.environment[
+            "REVIVAL_SCRIPT011_OWNED_LEVEL"
+        ] ?? fallbackPath
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw XCTSkip(
+                "requires the ignored exact-final owned Script 011 import"
+            )
+        }
+        let stockLevel = try JSONDecoder().decode(
+            Level.self,
+            from: Data(contentsOf: URL(fileURLWithPath: path))
+        )
+        XCTAssertNoThrow(try stockLevel.validate())
+
+        var hostileLesson = try XCTUnwrap(
+            stockLevel.trainingOpeningLesson
+        )
+        let repeatReturnUp = try XCTUnwrap(
+            hostileLesson.repeatReturnUp
+        )
+        hostileLesson.repeatReturnUp = .init(
+            startGoalObjectHandle: repeatReturnUp.startGoalObjectHandle,
+            collisionRadius: repeatReturnUp.collisionRadius,
+            instruction: "Wrong Script 011 instruction",
+            voiceSourceName: repeatReturnUp.voiceSourceName
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 011 package"),
+            replacing(
+                stockLevel,
+                trainingOpeningLesson: hostileLesson
+            )
+        )
+
+        var hostileVoices = stockLevel.voiceClips
+        let udownIndex = try XCTUnwrap(
+            hostileVoices.firstIndex {
+                $0.sourceName.caseInsensitiveCompare("udown.osf")
+                    == .orderedSame
+            }
+        )
+        let udown = hostileVoices[udownIndex]
+        hostileVoices[udownIndex] = .init(
+            sourceName: udown.sourceName,
+            sourceEntryIndex: udown.sourceEntryIndex,
+            sampleRate: udown.sampleRate,
+            channelCount: udown.channelCount,
+            frameCount: udown.frameCount,
+            pcm16LittleEndian: udown.pcm16LittleEndian,
+            pcmSHA256: udown.pcmSHA256,
+            sourceArchive: udown.sourceArchive,
+            sourceSHA256: String(repeating: "0", count: 64)
+        )
+        assertValidationError(
+            .invalidDependency("Training Script 011 package"),
+            replacing(stockLevel, voiceClips: hostileVoices)
+        )
+    }
+
+    func testScript011RequiresExactHiddenStartGoalAndUDownVoice() throws {
+        let stockLevel = makeTrainingScript003Level()
+        let repeatReturnUp = try XCTUnwrap(
+            stockLevel.trainingOpeningLesson?.repeatReturnUp
+        )
+        XCTAssertEqual(repeatReturnUp.startGoalObjectHandle, 12_300)
+        XCTAssertEqual(
+            repeatReturnUp.instruction,
+            "Now Slide up  until you stop."
+        )
+        XCTAssertEqual(repeatReturnUp.voiceSourceName, "udown.osf")
+        XCTAssertNoThrow(try stockLevel.validate())
+
+        let fixtureStartGoal = try XCTUnwrap(
+            stockLevel.objects.first { $0.handle == 12_300 }
+        )
+        let stockStartGoal = PlacedObject(
+            handle: 12_300,
+            type: 7,
+            storedID: 67,
+            definition: .init(
+                storedIndex: 67,
+                sourceName: "Invisiblepowerup",
+                referenceRuntimeIndex: 68
+            ),
+            instanceName: "StartGoal",
+            flags: 36_864,
+            doorShields: nil,
+            location: .room(1),
+            position: .init(
+                x: 2_062.7678,
+                y: -134.19601,
+                z: 2_201.679
+            ),
+            orientation: .init(
+                right: .init(x: -1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: -0),
+                forward: .init(x: -0, y: -0, z: -1)
+            ),
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: fixtureStartGoal.soundSource,
+            inertScriptName: fixtureStartGoal.inertScriptName,
+            inertModuleName: fixtureStartGoal.inertModuleName,
+            lightmapSubmodels: fixtureStartGoal.lightmapSubmodels
+        )
+        let stockPresentation = ObjectPresentationReference(
+            objectHandle: 12_300,
+            primaryModel: .init(
+                storedIndex: 6,
+                sourceName: "invisiblepowerup.OOF"
+            ),
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil,
+            isVisible: false
+        )
+        let fixtureUDown = try XCTUnwrap(
+            stockLevel.voiceClips.first {
+                $0.sourceName == "udown.osf"
+            }
+        )
+        let stockUDown = CanonicalVoiceClip(
+            sourceName: "udown.osf",
+            sourceEntryIndex: 36,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 37_257,
+            pcm16LittleEndian: fixtureUDown.pcm16LittleEndian,
+            pcmSHA256:
+                "e54d74f7e18603ad90015cef1e7c15cce693e35a394be4a0a45943c07740af2a",
+            sourceArchive: "missions/training.mn3",
+            sourceSHA256:
+                "f9596f8edb16be0821bb7b846b81432b27aa95f08ac621f1ac1f15eb1279aa43"
+        )
+        let stockLesson = TrainingRepeatReturnUpLesson(
+            startGoalObjectHandle: 12_300,
+            collisionRadius: 10.052_409,
+            instruction: "Now Slide up  until you stop.",
+            voiceSourceName: "udown.osf"
+        )
+        XCTAssertNoThrow(
+            try validateStockTrainingRepeatReturnUpPackage(
+                lesson: stockLesson,
+                startGoal: stockStartGoal,
+                presentation: stockPresentation,
+                udown: stockUDown
+            )
+        )
+
+        var hostileStartGoal = stockStartGoal
+        hostileStartGoal.location = .room(2)
+        XCTAssertThrowsError(
+            try validateStockTrainingRepeatReturnUpPackage(
+                lesson: stockLesson,
+                startGoal: hostileStartGoal,
+                presentation: stockPresentation,
+                udown: stockUDown
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Script 011 package")
+            )
+        }
+        let hostileUDown = CanonicalVoiceClip(
+            sourceName: stockUDown.sourceName,
+            sourceEntryIndex: stockUDown.sourceEntryIndex,
+            sampleRate: stockUDown.sampleRate,
+            channelCount: stockUDown.channelCount,
+            frameCount: stockUDown.frameCount,
+            pcm16LittleEndian: stockUDown.pcm16LittleEndian,
+            pcmSHA256: stockUDown.pcmSHA256,
+            sourceArchive: stockUDown.sourceArchive,
+            sourceSHA256: String(repeating: "0", count: 64)
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingRepeatReturnUpPackage(
+                lesson: stockLesson,
+                startGoal: stockStartGoal,
+                presentation: stockPresentation,
+                udown: hostileUDown
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Script 011 package")
+            )
+        }
+
+        var divergentLesson = try XCTUnwrap(
+            stockLevel.trainingOpeningLesson
+        )
+        divergentLesson.repeatReturnUp = .init(
+            startGoalObjectHandle: 12_301,
+            collisionRadius: repeatReturnUp.collisionRadius,
+            instruction: repeatReturnUp.instruction,
+            voiceSourceName: repeatReturnUp.voiceSourceName
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Script 011 repeat-return-up lesson"
+            ),
+            replacing(
+                stockLevel,
+                trainingOpeningLesson: divergentLesson
+            )
+        )
+    }
+
     func testOwnedScript010PackageAdmissionRejectsHostileStockMutations()
         throws
     {

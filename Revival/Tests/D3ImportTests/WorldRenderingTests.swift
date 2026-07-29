@@ -2,6 +2,347 @@ import XCTest
 
 final class WorldRenderingTests: XCTestCase {
     @MainActor
+    func testTrainingScript011RepeatsReturnUpInReleasedOrderAndRestores()
+        throws
+    {
+        let level = makeTrainingScript003Level()
+        let repeatReturnUp = try XCTUnwrap(
+            level.trainingOpeningLesson?.repeatReturnUp
+        )
+        XCTAssertEqual(repeatReturnUp.startGoalObjectHandle, 12_300)
+        XCTAssertEqual(
+            repeatReturnUp.instruction,
+            "Now Slide up  until you stop."
+        )
+        XCTAssertEqual(repeatReturnUp.voiceSourceName, "udown.osf")
+        let startGoalPresentation = try XCTUnwrap(
+            level.objectPresentations.first {
+                $0.objectHandle == repeatReturnUp.startGoalObjectHandle
+            }
+        )
+        let startGoalModel = try XCTUnwrap(
+            level.models.first {
+                $0.source == startGoalPresentation.primaryModel
+            }
+        )
+        XCTAssertEqual(
+            repeatReturnUp.collisionRadius,
+            sourceObjectPresentationSize(
+                model: startGoalModel,
+                objectType: 7
+            )
+        )
+
+        let player = try XCTUnwrap(
+            level.objects.first { $0.handle == 2_048 }
+        )
+        let goalHandles: [UInt32] = [
+            12_301,
+            12_300,
+            12_299,
+            18_441,
+        ]
+        func contacting(
+            _ handle: UInt32,
+            at position: Vector3
+        ) throws -> Level {
+            var objects = level.objects
+            for goalHandle in goalHandles {
+                let index = try XCTUnwrap(
+                    objects.firstIndex { $0.handle == goalHandle }
+                )
+                objects[index].position = goalHandle == handle
+                    ? position
+                    : .init(
+                        x: position.x + 100,
+                        y: position.y,
+                        z: position.z
+                    )
+                objects[index].location = .room(1)
+            }
+            let roomIndex = try XCTUnwrap(
+                level.rooms.firstIndex { $0.sourceIndex == 1 }
+            )
+            var rooms = level.rooms
+            rooms[roomIndex] = makeSourceContainmentRoom(
+                center: position,
+                texture: level.surfacePhysics[0].texture,
+                sourceIndex: 1,
+                halfExtent: 200
+            )
+            return replacing(level, rooms: rooms, objects: objects)
+        }
+        func resumed(
+            _ continuation: PlayerSimulationContinuation,
+            contacting handle: UInt32,
+            at timestamp: Double,
+            level resumedLevel: Level? = nil
+        ) throws -> PlayerSimulation {
+            let contactLevel = try contacting(
+                handle,
+                at: continuation.playerPosition
+            )
+            return try PlayerSimulation(
+                level: resumedLevel.map {
+                    replacing(
+                        contactLevel,
+                        trainingOpeningLesson: $0.trainingOpeningLesson
+                    )
+                } ?? contactLevel,
+                continuation: continuation,
+                resumedAtTimestamp: timestamp
+            )
+        }
+        func advance(
+            _ continuation: PlayerSimulationContinuation,
+            contacting handle: UInt32,
+            at timestamp: Double
+        ) throws -> PlayerSimulation {
+            let simulation = try resumed(
+                continuation,
+                contacting: handle,
+                at: timestamp
+            )
+            _ = simulation.update(at: timestamp + 0.1, input: .zero)
+            return simulation
+        }
+
+        let firstForward = PlayerSimulation(
+            level: try contacting(12_301, at: player.position),
+            presentationReadyTimestamp: 0
+        )
+        _ = firstForward.update(at: 0.1, input: .zero)
+        let firstLeftGoal = try advance(
+            firstForward.continuation,
+            contacting: 12_299,
+            at: 1
+        )
+        let returnUp = try advance(
+            firstLeftGoal.continuation,
+            contacting: 12_300,
+            at: 2
+        )
+        let returnDown = try advance(
+            returnUp.continuation,
+            contacting: 18_441,
+            at: 3
+        )
+        let repeatForward = try advance(
+            returnDown.continuation,
+            contacting: 12_300,
+            at: 4
+        )
+        let repeatForwardGoal = try advance(
+            repeatForward.continuation,
+            contacting: 12_301,
+            at: 5
+        )
+        let repeatReturnLeft = try advance(
+            repeatForwardGoal.continuation,
+            contacting: 12_300,
+            at: 6
+        )
+        let repeatReturnRight = try advance(
+            repeatReturnLeft.continuation,
+            contacting: 12_299,
+            at: 7
+        )
+        let normalReturn = try resumed(
+            repeatReturnRight.continuation,
+            contacting: 12_300,
+            at: 8
+        )
+        let normalFrame = normalReturn.update(at: 8.1, input: .zero)
+        XCTAssertEqual(
+            normalFrame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Now Slide up  until you stop."],
+                    voiceSourceName: "udown.osf",
+                    voicePrecedesHUDMessages: true
+                ),
+            ]
+        )
+        XCTAssertEqual(normalFrame.enabledPlayerControls, [.up])
+        XCTAssertFalse(
+            normalReturn.update(at: 8.2, input: .zero)
+                .trainingOpeningFeedback.contains {
+                    $0.voiceSourceName == "udown.osf"
+                }
+        )
+
+        let restored = try resumed(
+            try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(normalReturn.continuation)
+            ),
+            contacting: 12_300,
+            at: 9
+        )
+        let restoredFrame = restored.update(at: 9.1, input: .zero)
+        XCTAssertFalse(
+            restoredFrame.trainingOpeningFeedback.contains {
+                $0.voiceSourceName == "udown.osf"
+                    || $0.hudMessages.contains(
+                        "Now Slide up  until you stop."
+                    )
+            }
+        )
+        XCTAssertEqual(restoredFrame.enabledPlayerControls, [.up])
+
+        let earlyDown = PlayerSimulation(
+            level: try contacting(18_441, at: player.position),
+            presentationReadyTimestamp: 10
+        )
+        _ = earlyDown.update(at: 10.1, input: .zero)
+        let earlyRepeat = try advance(
+            earlyDown.continuation,
+            contacting: 12_300,
+            at: 11
+        )
+        let earlyForward = try advance(
+            earlyRepeat.continuation,
+            contacting: 12_301,
+            at: 12
+        )
+        let earlyReturnLeft = try advance(
+            earlyForward.continuation,
+            contacting: 12_300,
+            at: 13
+        )
+        let earlyReturnRight = try advance(
+            earlyReturnLeft.continuation,
+            contacting: 12_299,
+            at: 14
+        )
+        let sharedStartGoal = try resumed(
+            earlyReturnRight.continuation,
+            contacting: 12_300,
+            at: 15
+        )
+        let sharedFrame = sharedStartGoal.update(at: 15.1, input: .zero)
+        XCTAssertEqual(
+            sharedFrame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Excellent!"],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false
+                ),
+                .init(
+                    hudMessages: ["Now Slide up  until you stop."],
+                    voiceSourceName: "up1.osf",
+                    voicePrecedesHUDMessages: true
+                ),
+                .init(
+                    hudMessages: ["Now Slide up  until you stop."],
+                    voiceSourceName: "udown.osf",
+                    voicePrecedesHUDMessages: true
+                ),
+            ]
+        )
+        XCTAssertEqual(sharedFrame.enabledPlayerControls, [.up])
+        var presentationOrder: [String] = []
+        var retainedVoice: String?
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            sharedFrame.trainingOpeningFeedback,
+            attemptVoice: {
+                retainedVoice = $0
+                presentationOrder.append("voice:\($0)")
+            },
+            attemptSound: { presentationOrder.append("sound:\($0)") },
+            presentHUDMessages: {
+                presentationOrder.append(contentsOf: $0.map { "hud:\($0)" })
+            }
+        )
+        XCTAssertEqual(
+            presentationOrder,
+            [
+                "hud:Excellent!",
+                "hud:Now Slide up  until you stop.",
+                "voice:udown.osf",
+                "hud:Now Slide up  until you stop.",
+            ]
+        )
+        XCTAssertEqual(retainedVoice, "udown.osf")
+
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(normalReturn.continuation)
+            ) as? [String: Any]
+        )
+        for (key, value) in [
+            ("repeatReturnRightWasPresented", false),
+            ("rightGoalWasReached", false),
+            ("upGoalWasReached", false),
+            ("enabledControls", 8),
+        ] as [(String, Any)] {
+            var hostileObject = continuationObject
+            var hostileOpening = try XCTUnwrap(
+                hostileObject["trainingOpeningState"] as? [String: Any]
+            )
+            hostileOpening[key] = value
+            hostileObject["trainingOpeningState"] = hostileOpening
+            let hostile = try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: hostileObject
+                )
+            )
+            XCTAssertThrowsError(
+                try PlayerSimulation(
+                    level: level,
+                    continuation: hostile,
+                    resumedAtTimestamp: 16
+                )
+            ) {
+                XCTAssertEqual(
+                    $0 as? PlayerSimulationContinuationError,
+                    .invalidState
+                )
+            }
+        }
+
+        var compatibleLesson = try XCTUnwrap(
+            level.trainingOpeningLesson
+        )
+        compatibleLesson.repeatReturnUp = nil
+        let compatibleLevel = replacing(
+            level,
+            trainingOpeningLesson: compatibleLesson
+        )
+        XCTAssertNoThrow(try compatibleLevel.validate())
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: compatibleLevel,
+                continuation: normalReturn.continuation,
+                resumedAtTimestamp: 16.5
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+        let compatibleSimulation = try resumed(
+            repeatReturnRight.continuation,
+            contacting: 12_300,
+            at: 17,
+            level: compatibleLevel
+        )
+        let compatibleFrame = compatibleSimulation.update(
+            at: 17.1,
+            input: .zero
+        )
+        XCTAssertFalse(
+            compatibleFrame.trainingOpeningFeedback.contains {
+                $0.voiceSourceName == "udown.osf"
+            }
+        )
+        XCTAssertEqual(compatibleFrame.enabledPlayerControls, [.right])
+    }
+
+    @MainActor
     func testTrainingScript010RepeatsReturnRightInReleasedOrderAndRestores()
         throws
     {
@@ -345,6 +686,7 @@ final class WorldRenderingTests: XCTestCase {
             level.trainingOpeningLesson
         )
         compatibleLesson.repeatReturnRight = nil
+        compatibleLesson.repeatReturnUp = nil
         let compatibleLevel = replacing(
             level,
             trainingOpeningLesson: compatibleLesson
@@ -606,6 +948,7 @@ final class WorldRenderingTests: XCTestCase {
         )
         compatibleLesson.repeatReturnLeft = nil
         compatibleLesson.repeatReturnRight = nil
+        compatibleLesson.repeatReturnUp = nil
         let compatibleLevel = replacing(
             level,
             trainingOpeningLesson: compatibleLesson,
@@ -10421,6 +10764,7 @@ func makeTrainingScript003Level() -> Level {
         ("return3.osf", 30),
         ("repeat.osf", 25),
         ("lright.osf", 19),
+        ("udown.osf", 36),
     ].map { name, index in
         CanonicalVoiceClip(
             sourceName: name,
@@ -10525,6 +10869,15 @@ func makeTrainingScript003Level() -> Level {
                 instruction:
                     "Now Slide right until you return to the start position.",
                 soundLogicalName: "MenuBeepEnter"
+            ),
+            repeatReturnUp: .init(
+                startGoalObjectHandle: startGoalHandle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: model,
+                    objectType: 7
+                ),
+                instruction: "Now Slide up  until you stop.",
+                voiceSourceName: "udown.osf"
             )
         ),
         voiceClips: clips,
