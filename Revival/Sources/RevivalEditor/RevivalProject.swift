@@ -592,6 +592,13 @@ struct RevivalProject: Equatable, Sendable {
         }
         return "TrainingMission.cpp Script 015 / \(target.instanceName ?? "FinishCourse") handle \(target.handle) / PortalRoom2 portals 0,1 / proceed2.osf"
     }
+    var trainingDodgeAttemptSourceDiagnostic: String? {
+        guard level.trainingDodgeAttempt != nil else {
+            return nil
+        }
+        return
+            "TrainingMission.cpp Scripts 033,016,017,018,020 / StartDodge 4106 / DoneDodgeingGoal 12302 / DodgeTurrett 8199 / FlashLight-1 4120 / PortalRoom2+3 portals 0,1 / intro2.osf+almost.osf+proceed3.osf"
+    }
     var trainingGalleryBarrierSourceDiagnostic: String? {
         level.trainingGalleryBarrier.map {
             "TrainingMission.cpp Script 032 / \($0.triggerName)"

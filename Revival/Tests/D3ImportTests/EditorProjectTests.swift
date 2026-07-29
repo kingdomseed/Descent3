@@ -370,7 +370,7 @@ final class EditorProjectTests: XCTestCase {
             at: root,
             withIntermediateDirectories: false
         )
-        let immutableBase = makeTrainingScript015Level()
+        let immutableBase = makeTrainingDodgeAttemptLevel()
         try writeCanonicalPackage(immutableBase, to: candidate)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
@@ -445,6 +445,10 @@ final class EditorProjectTests: XCTestCase {
         XCTAssertEqual(
             document.project.trainingFinishCourseSourceDiagnostic,
             "TrainingMission.cpp Script 015 / FinishCourse handle 6150 / PortalRoom2 portals 0,1 / proceed2.osf"
+        )
+        XCTAssertEqual(
+            document.project.trainingDodgeAttemptSourceDiagnostic,
+            "TrainingMission.cpp Scripts 033,016,017,018,020 / StartDodge 4106 / DoneDodgeingGoal 12302 / DodgeTurrett 8199 / FlashLight-1 4120 / PortalRoom2+3 portals 0,1 / intro2.osf+almost.osf+proceed3.osf"
         )
         XCTAssertEqual(
             document.project.trainingReturnRightSourceDiagnostic,
@@ -532,6 +536,14 @@ final class EditorProjectTests: XCTestCase {
                 selection: document.editorSelection
             ).contains(
                 "TrainingMission.cpp Script 015 / FinishCourse handle 6150 / PortalRoom2 portals 0,1 / proceed2.osf"
+            )
+        )
+        XCTAssertTrue(
+            editorIdleStatusMessage(
+                project: document.project,
+                selection: document.editorSelection
+            ).contains(
+                "TrainingMission.cpp Scripts 033,016,017,018,020 / StartDodge 4106"
             )
         )
         XCTAssertTrue(

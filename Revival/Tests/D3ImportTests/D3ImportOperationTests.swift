@@ -60,6 +60,23 @@ final class D3ImportOperationTests: XCTestCase {
             rotating.submodels[1].presentation,
             .rotate(rate: 1, axis: .init(x: 0, y: 1, z: 0))
         )
+        let turret = try parseReachedOutrageModel(
+            makeReachedOOFFixture(
+                properties: "$fov=90.0,8.0,10.0\r\n"
+            ),
+            sourceName: "Synthetic.OOF",
+            sourceArchive: "d3.hog",
+            textureResources: [texture]
+        )
+        XCTAssertEqual(
+            turret.submodels[1].presentation,
+            .turret(
+                fieldOfView: 0.125,
+                rotationsPerSecond: 0.125,
+                thinkInterval: 10,
+                axis: .init(x: 0, y: 1, z: 0)
+            )
+        )
         for properties in ["$thruster=1, 0.5, 0.25, 2"] {
             XCTAssertThrowsError(
                 try parseReachedOutrageModel(
@@ -156,6 +173,10 @@ final class D3ImportOperationTests: XCTestCase {
             index: 0
         )
 
+        XCTAssertEqual(
+            gunpoint.localPosition,
+            .init(x: 1, y: 2, z: 3)
+        )
         XCTAssertEqual(gunpoint.position, .init(x: 101, y: 2, z: 3))
         XCTAssertEqual(gunpoint.forward, .init(x: 0, y: 0, z: -1))
     }

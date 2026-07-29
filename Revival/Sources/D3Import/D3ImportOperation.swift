@@ -447,6 +447,11 @@ func runD3Import(
     )
     let returnMarkerLightPresentation =
         returnMarkerLightPage.genericLight!
+    let dodgeTurretPage = try resolveRetailGenericModelPage(
+        table: tableData,
+        overlay: overlayData,
+        name: "Hangturret"
+    )
     let reachedModelNames = Set([
         reachedPages.ship.primaryModelName,
         reachedPages.ship.mediumModelName,
@@ -470,6 +475,10 @@ func runD3Import(
         cloakPage.primaryModelName,
         cloakPage.mediumModelName,
         cloakPage.lowModelName,
+            dodgeTurretPage.primaryModelName,
+            dodgeTurretPage.mediumModelName,
+            dodgeTurretPage.lowModelName,
+            "RedLaser.OOF",
     ].compactMap { $0 })
     let sortedModelNames = reachedModelNames.sorted {
         $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
@@ -593,7 +602,9 @@ func runD3Import(
                 return nil
             }
             page = ship
-        } else if object.handle == 6_180 || object.handle == 6_150,
+        } else if object.handle == 6_180 || object.handle == 6_150
+            || object.handle == 4_106
+            || object.handle == 12_302,
                   object.definition?.sourceName.caseInsensitiveCompare(
                       generic.name
                   ) == .orderedSame {
@@ -639,6 +650,12 @@ func runD3Import(
             ) == .orderedSame
         {
             page = cloakPage
+        } else  if object.handle == 8_199,
+            object.definition?.sourceName.caseInsensitiveCompare(
+                dodgeTurretPage.name
+            ) == .orderedSame
+        {
+            page = dodgeTurretPage
         } else {
             return nil
         }
@@ -651,15 +668,17 @@ func runD3Import(
             mediumDistance: page.mediumDistance,
             lowDistance: page.lowDistance,
             isVisible: object.handle != 6_180 && object.handle != 6_150
+                && object.handle != 4_106
+                && object.handle != 12_302
         )
     }
-    precondition(reachedObjectPresentations.count == 22)
+    precondition(reachedObjectPresentations.count == 25)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 17)
+    precondition(deferredRoomObjects.count == 14)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -975,6 +994,9 @@ func runD3Import(
         "proceed1.osf",
         "Intro1.osf",
         "Proceed2.osf",
+        "Intro2.osf",
+        "Almost.osf",
+        "Proceed3.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -1026,6 +1048,36 @@ func runD3Import(
         sourceArchive: d3File.relativePath,
         sourceSHA256: canonicalSHA256(menuBeepPayload),
         importVolume: menuBeepPage.importVolume
+    )
+    func reachedSoundClip(named name: String) throws -> CanonicalSoundClip {
+        let page = try resolveRetailSoundPage(
+            table: tableData,
+            overlay: overlayData,
+            named: name
+        )
+        let entry = d3Archive.uniqueEntry(named: page.sourceName)
+        let entryIndex = d3Archive.entries.firstIndex(of: entry)!
+        let payload = d3.data.subdata(in: entry.payloadRange)
+        let decoded = try decodeReachedPCM16WAV(payload)
+        return .init(
+            logicalName: page.logicalName,
+            sourceName: page.sourceName,
+            sourceEntryIndex: entryIndex,
+            sampleRate: decoded.sampleRate,
+            channelCount: decoded.channelCount,
+            frameCount: decoded.frameCount,
+            pcm16LittleEndian: decoded.pcm16LittleEndian,
+            pcmSHA256: canonicalSHA256(decoded.pcm16LittleEndian),
+            sourceArchive: d3File.relativePath,
+            sourceSHA256: canonicalSHA256(payload),
+            importVolume: page.importVolume
+        )
+    }
+    let dodgeFireSoundClip = try reachedSoundClip(
+        named: "WpmLaserBlueFire"
+    )
+    let dodgeImpactSoundClip = try reachedSoundClip(
+        named: "LazorHitshrt"
     )
     let openingLevel = playerLevel.addingTrainingOpeningLesson(
         .init(
@@ -1182,8 +1234,13 @@ func runD3Import(
             voiceClips[19],
             voiceClips[20],
             voiceClips[21],
+            voiceClips[22],
+            voiceClips[23],
+            voiceClips[24],
         ],
-        soundClips: [menuBeepClip]
+        soundClips: [menuBeepClip,
+            dodgeFireSoundClip,
+            dodgeImpactSoundClip,]
     )
     let galleryTrigger = openingLevel.triggers.first {
         $0.name.caseInsensitiveCompare("Portal2") == .orderedSame
@@ -2036,11 +2093,236 @@ func runD3Import(
         ),
         voiceClip: voiceClips[11]
     )
-    let level = finalBotsLevel.addingTrainingFinalGoalChain(.init(
+    var level = finalBotsLevel.addingTrainingFinalGoalChain(.init(
         goalObjectHandle: finalGoal.handle,
         goalRoomSourceIndex: 17,
         goalObjectFlags: finalGoal.flags,
         goalCollisionRadius: invisiblePowerupModel.collisionRadius
+        ))
+    let startDodge = level.objects.first {
+        $0.handle == 4_106
+    }!
+    let doneDodgeingGoal = level.objects.first {
+        $0.handle == 12_302
+    }!
+    let dodgeTurret = level.objects.first {
+        $0.handle == 8_199
+    }!
+    let dodgeMarker = level.objects.first {
+        $0.handle == 4_120
+    }!
+    let portalRoomThree = level.rooms.first {
+        $0.sourceIndex == 36
+    }!
+    let dodgeTurretModelSource =
+        modelSources[dodgeTurretPage.primaryModelName.lowercased()]!
+    let dodgeTurretModel = level.models.first {
+        $0.source == dodgeTurretModelSource
+    }!
+    let dodgeTurretPayload =
+        modelPayloadByName[
+            dodgeTurretPage.primaryModelName.lowercased()
+        ]!.data
+    let dodgeGunpointZero = try reachedOutrageModelGunpoint(
+        dodgeTurretPayload,
+        index: 0
+    )
+    let dodgeGunpointOne = try reachedOutrageModelGunpoint(
+        dodgeTurretPayload,
+        index: 1
+    )
+    let dodgeAimGunpoint = try reachedOutrageModelGunpoint(
+        dodgeTurretPayload,
+        index: 2
+    )
+    let dodgeTurretJoints: [TrainingDodgeTurretDefinition.Joint] =
+        dodgeTurretModel.submodels.compactMap { submodel in
+            guard let parent = submodel.parentIndex,
+                case .turret(
+                    let
+                        fieldOfView,
+                    let
+                        rotationsPerSecond,
+                    let
+                        thinkInterval,
+                    let
+                        axis
+                ) = submodel.presentation
+            else {
+                return nil
+            }
+            return .init(
+                submodelIndex: submodel.sourceIndex,
+                parentSubmodelIndex: parent,
+                rotationAxis: axis,
+                fieldOfView: fieldOfView,
+                rotationsPerSecond: rotationsPerSecond,
+                thinkInterval: thinkInterval
+            )
+        }
+    precondition(
+        startDodge.type == 7
+            && startDodge.storedID == 67
+            && startDodge.definition?.sourceName == "Invisiblepowerup"
+            && startDodge.definition?.referenceRuntimeIndex == 68
+            && startDodge.instanceName == "StartDodge"
+            && startDodge.flags == 4_096
+            && startDodge.location == .room(35)
+            && startDodge.position
+                == .init(
+                    x: 2_061.8765,
+                    y: -752.8663,
+                    z: 2_199.4517
+                )
+            && doneDodgeingGoal.type == 7
+            && doneDodgeingGoal.storedID == 67
+            && doneDodgeingGoal.definition == startDodge.definition
+            && doneDodgeingGoal.instanceName == "DoneDodgeingGoal"
+            && doneDodgeingGoal.flags == 4_096
+            && doneDodgeingGoal.location == .room(35)
+            && doneDodgeingGoal.position
+                == .init(
+                    x: 2_061.31,
+                    y: -755.9523,
+                    z: 2_421.182
+                )
+            && dodgeTurret.type == 2
+            && dodgeTurret.storedID == 115
+            && dodgeTurret.definition?.sourceName == "Hangturret"
+            && dodgeTurret.instanceName == "DodgeTurrett"
+            && dodgeTurret.flags == 5_120
+            && dodgeTurret.location == .room(35)
+            && dodgeMarker.type == 11
+            && dodgeMarker.storedID == 205
+            && dodgeMarker.instanceName == "FlashLight-1"
+            && dodgeMarker.location == .room(36)
+            && portalRoomThree.name == "PortalRoom3"
+            && portalRoomThree.portals.count == 2
+            && portalRoomThree.portals[0].connectedRoom == 35
+            && portalRoomThree.portals[0].connectedPortal == 1
+            && portalRoomThree.portals[1].connectedRoom == 37
+            && portalRoomThree.portals[1].connectedPortal == 0
+            && dodgeTurretPage.primaryModelName == "securityturret.OOF"
+            && dodgeTurretModel.sourceSHA256
+                == "41c69958947ddc7673ddfe2ffb6f559c6892eafed8b759a02b47c05b22f137e4"
+            && dodgeGunpointZero.localPosition
+                == .init(
+                    x: 1.706_505_8,
+                    y: -2.224_015_2,
+                    z: 2.190_463_5
+                )
+            && dodgeGunpointOne.localPosition
+                == .init(
+                    x: 0.457_947_73,
+                    y: -2.224_015_2,
+                    z: 2.190_463_5
+                )
+            && dodgeGunpointZero.parentSubmodelIndex == 2
+            && dodgeGunpointOne.parentSubmodelIndex == 2
+            && dodgeAimGunpoint.parentSubmodelIndex == 2
+            && dodgeTurretJoints == [
+                .init(
+                    submodelIndex: 1,
+                    parentSubmodelIndex: 0,
+                    rotationAxis: .init(x: 0, y: -1, z: 0),
+                    fieldOfView: 0.5,
+                    rotationsPerSecond: 0.125,
+                    thinkInterval: 10
+                ),
+                .init(
+                    submodelIndex: 2,
+                    parentSubmodelIndex: 1,
+                    rotationAxis: .init(
+                        x: 1,
+                        y: -3.410_774_8e-16,
+                        z: -4.371_139e-8
+                    ),
+                    fieldOfView: 0.125,
+                    rotationsPerSecond: 0.125,
+                    thinkInterval: 10
+                ),
+            ]
+            && dodgeAimGunpoint.localPosition
+                == .init(
+                    x: 1.085_584_6,
+                    y: -2.224_015_2,
+                    z: 2.190_463_5
+                )
+    )
+    level.trainingDodgeAttempt = .init(
+        startDodgeObjectHandle: startDodge.handle,
+        startDodgeCollisionRadius: sourceObjectPresentationSize(
+            model: invisiblePowerupModel,
+            objectType: startDodge.type
+        ),
+        doneDodgeingGoalObjectHandle: doneDodgeingGoal.handle,
+        doneDodgeingGoalCollisionRadius: sourceObjectPresentationSize(
+            model: invisiblePowerupModel,
+            objectType: doneDodgeingGoal.type
+        ),
+        dodgeTurretObjectHandle: dodgeTurret.handle,
+        flashLightObjectHandle: dodgeMarker.handle,
+        triggerDelay: 10,
+        successDelay: 20,
+        almostDoneDelay: 14,
+        portalRoomTwoSourceIndex: portalRoomTwo.sourceIndex,
+        portalRoomThreeSourceIndex: portalRoomThree.sourceIndex,
+        orderedPortalIndices: [0, 1],
+        disabledControlMask: 3,
+        enabledDodgeControlMask: 60,
+        successControlMask: 3,
+        introduction: messages["DodgeIntro"]!,
+        instruction: messages["Dodge30"]!,
+        hitInstruction: messages["KeepDodging"]!,
+        almostDoneInstruction: messages["AlmostDoneDodge"]!,
+        successMessage: messages["GoodJob"]!,
+        leaveInstruction: messages["LeaveDodge"]!,
+        introductionVoiceSourceName: "intro2.osf",
+        almostDoneVoiceSourceName: "almost.osf",
+        successVoiceSourceName: "proceed3.osf",
+        restoredPlayerShields: 100,
+        successMarkerLightDistance: 50,
+        markerLightPresentation: .init(
+            primaryColor: .init(x: 0.2, y: 1, z: 0.2),
+            secondaryColor:
+                returnMarkerLightPresentation.secondaryColor,
+            timeInterval: returnMarkerLightPresentation.timeInterval,
+            flickerDistance:
+                returnMarkerLightPresentation.flickerDistance,
+            directionalDot:
+                returnMarkerLightPresentation.directionalDot,
+            flags: returnMarkerLightPresentation.flags,
+            timebits: returnMarkerLightPresentation.timebits,
+            angle: returnMarkerLightPresentation.angle,
+            lightingRenderType:
+                returnMarkerLightPresentation.lightingRenderType
+        ),
+        turret: .init(
+            model: dodgeTurretModelSource,
+            collisionRadius: 5.402_855_4,
+            fieldOfViewDot: -1,
+            maximumTargetDistance: 1_000,
+            fireAlignmentDot: 0.93,
+            fixedLeadAccuracy: 0.81,
+            fireWait: 1,
+            gunpoints: [
+                dodgeGunpointZero.localPosition,
+                dodgeGunpointOne.localPosition,
+            ],
+            aimingGunpoint: dodgeAimGunpoint.localPosition,
+            gunpointForward: dodgeGunpointZero.forward,
+            gunpointParentSubmodelIndex:
+                dodgeGunpointZero.parentSubmodelIndex,
+            joints: dodgeTurretJoints,
+            projectileSourceName: "Laser Level 1 - Red",
+            projectileModel:
+                modelSources["redlaser.oof"]!,
+            fireSoundSourceName: "WpmLaserBlueFire",
+            impactSoundSourceName: "LazorHitshrt",
+            projectileDamage: 6.75,
+            projectileRadius: 0.5,
+            projectileSpeed: 200,
+            projectileLifetime: 5
     ))
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
@@ -2141,6 +2423,11 @@ func parseTrainingMessages(_ data: Data) throws -> [String: String] {
         "Repeat",
         "ContinueToCourse",
         "CourseInstructions",
+            "DodgeIntro",
+            "Dodge30",
+            "KeepDodging",
+            "AlmostDoneDodge",
+            "LeaveDodge",
     ].allSatisfy({ messages[$0] != nil }) else {
         throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
     }

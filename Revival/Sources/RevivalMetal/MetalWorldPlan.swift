@@ -116,6 +116,9 @@ private func makeMetalWorldPlan(
         startRoomSourceIndex: startRoomSourceIndex,
         excludedObjectHandle: nil
     ).map(makeMetalWorldDraw)
+    let preparedDodgeProjectileDraws =
+        extractPreparedTrainingDodgeProjectileDrawItems(level)
+        .map(makeMetalWorldDraw)
     let preparedRoomIndexByIdentity = Dictionary(
         uniqueKeysWithValues: preparedRoomDraws.enumerated().map {
             (MetalRoomDrawIdentity($0.element), $0.offset)
@@ -141,6 +144,7 @@ private func makeMetalWorldPlan(
         preparedRoomDraws
         + preparedObjectDraws
         + preparedObjectDraws
+        + preparedDodgeProjectileDraws
     let draws = activeDrawIndices.map { preparedDraws[$0] }
     let lightCoronaStates = extraction.lightCoronas.map {
         MetalLightCoronaState(corona: $0, scalar: 0)
@@ -174,6 +178,9 @@ func updateMetalWorldPlan(
     presentationFrame: MetalPresentationFrame? = nil,
     trainingCameraMonitor: TrainingCameraMonitorFrame? = nil,
     trainingCloak: TrainingCloakFrame? = nil,
+    trainingDodgeTurretAngles: [Float] = [],
+    trainingDodgeProjectiles: [TrainingDodgeProjectileFrame] = [],
+    trainingDodgeMarkerLightDistance: Float? = nil,
     trainingGuidebotReturnMarkerLightDistance: Float? = nil,
     trainingLastRoomMarkerLightDistance: Float? = nil,
     trainingFinalBotsMarkerLightDistance: Float? = nil
@@ -187,6 +194,10 @@ func updateMetalWorldPlan(
         presentationFrame: presentationFrame,
         trainingCameraMonitor: trainingCameraMonitor,
         trainingCloak: trainingCloak,
+        trainingDodgeTurretAngles: trainingDodgeTurretAngles,
+        trainingDodgeProjectiles: trainingDodgeProjectiles,
+        trainingDodgeMarkerLightDistance:
+            trainingDodgeMarkerLightDistance,
         trainingGuidebotReturnMarkerLightDistance:
             trainingGuidebotReturnMarkerLightDistance,
         trainingLastRoomMarkerLightDistance:
@@ -210,6 +221,9 @@ func updateMetalWorldPlan(
         presentationFrame: presentationFrame,
         trainingCameraMonitor: nil,
         trainingCloak: nil,
+        trainingDodgeTurretAngles: [],
+        trainingDodgeProjectiles: [],
+        trainingDodgeMarkerLightDistance: nil,
         trainingGuidebotReturnMarkerLightDistance: nil,
         trainingLastRoomMarkerLightDistance: nil,
         trainingFinalBotsMarkerLightDistance: nil
@@ -225,6 +239,9 @@ private func updateMetalWorldPlan(
     presentationFrame: MetalPresentationFrame?,
     trainingCameraMonitor: TrainingCameraMonitorFrame?,
     trainingCloak: TrainingCloakFrame?,
+    trainingDodgeTurretAngles: [Float],
+    trainingDodgeProjectiles: [TrainingDodgeProjectileFrame],
+    trainingDodgeMarkerLightDistance: Float?,
     trainingGuidebotReturnMarkerLightDistance: Float?,
     trainingLastRoomMarkerLightDistance: Float?,
     trainingFinalBotsMarkerLightDistance: Float?
@@ -235,11 +252,18 @@ private func updateMetalWorldPlan(
         startRoomSourceIndex: startRoomSourceIndex,
         excludedObjectHandle: excludedObjectHandle,
         presentationGameTime:
-            presentationFrame?.systemsGameTime ?? 0
+            presentationFrame?.systemsGameTime ?? 0,
+        trainingDodgeTurretAngles: trainingDodgeTurretAngles
     )
     let opaqueRoomDraws = extraction.opaqueDrawItems.map(makeMetalWorldDraw)
     let translucentRoomDraws = extraction.translucentDrawItems.map(makeMetalWorldDraw)
     let objectDraws = extraction.modelDrawItems.map(makeMetalWorldDraw)
+    let dodgeProjectileDraws =
+        extractTrainingDodgeProjectileDrawItems(
+            level,
+            projectiles: trainingDodgeProjectiles,
+            camera: camera
+        ).map(makeMetalWorldDraw)
     let roomIndexByIdentity = Dictionary(
         uniqueKeysWithValues: prepared.preparedDraws.enumerated()
             .filter { $0.element.objectHandle == nil }
@@ -256,11 +280,15 @@ private func updateMetalWorldPlan(
     let objectIndices = objectDraws.map {
         objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
     }
+    let dodgeProjectileIndices = dodgeProjectileDraws.map {
+        objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
+    }
     var updatedPreparedDraws = prepared.preparedDraws
     let translucentIndices = translucentRoomDraws.map {
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
-    let activeDrawIndices = opaqueIndices + objectIndices + translucentIndices
+    let activeDrawIndices = opaqueIndices + objectIndices
+        + dodgeProjectileIndices + translucentIndices
     let auxiliaryExtraction = try trainingCameraMonitor.map {
         try extractWorldForRendering(
             level,
@@ -270,7 +298,9 @@ private func updateMetalWorldPlan(
                 level.trainingCameraMonitorChain?
                     .securityCameraObjectHandle,
             presentationGameTime:
-                presentationFrame?.systemsGameTime ?? 0
+                presentationFrame?.systemsGameTime ?? 0,
+            trainingDodgeTurretAngles:
+                trainingDodgeTurretAngles
         )
     }
     let auxiliaryOpaque = auxiliaryExtraction?.opaqueDrawItems
@@ -319,6 +349,12 @@ private func updateMetalWorldPlan(
     for (index, draw) in zip(opaqueIndices, opaqueRoomDraws) {
         updatedPreparedDraws[index] = draw
     }
+    for (index, draw) in zip(
+        dodgeProjectileIndices,
+        dodgeProjectileDraws
+    ) {
+        updatedPreparedDraws[index] = draw
+    }
     for (index, draw) in zip(translucentIndices, translucentRoomDraws) {
         updatedPreparedDraws[index] = draw
     }
@@ -333,6 +369,32 @@ private func updateMetalWorldPlan(
         auxiliaryTranslucent
     ) {
         updatedPreparedDraws[index] = draw
+    }
+    if let distance = trainingDodgeMarkerLightDistance,
+        distance > 0,
+        let dodge = level.trainingDodgeAttempt,
+        let marker = level.objects.first(where: {
+            $0.handle == dodge.flashLightObjectHandle
+        }),
+        let gameTime = presentationFrame?.systemsGameTime
+    {
+        let light = sourceTrainingMarkerLight(
+            dodge.markerLightPresentation,
+            gameTime: gameTime
+        )
+        if light.distanceScale > 0 {
+            for index in Set(
+                activeDrawIndices + auxiliaryActiveDrawIndices
+            ) {
+                updatedPreparedDraws[index] =
+                    applyingTrainingMarkerLight(
+                        to: updatedPreparedDraws[index],
+                        position: marker.position,
+                        distance: distance * light.distanceScale,
+                        color: light.color
+                    )
+            }
+        }
     }
     if let distance = trainingGuidebotReturnMarkerLightDistance,
        distance > 0,

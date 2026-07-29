@@ -1364,8 +1364,32 @@ func reachedOutrageModelReferencedTextureSlotIndices(_ data: Data) throws -> Set
 
 struct ReachedModelGunpoint: Equatable, Sendable {
     let parentSubmodelIndex: Int
+    let localPosition: Vector3
     let position: Vector3
     let forward: Vector3
+
+    init(
+        parentSubmodelIndex: Int,
+        position: Vector3,
+        forward: Vector3
+    ) {
+        self.parentSubmodelIndex = parentSubmodelIndex
+        localPosition = position
+        self.position = position
+        self.forward = forward
+    }
+
+    init(
+        parentSubmodelIndex: Int,
+        localPosition: Vector3,
+        position: Vector3,
+        forward: Vector3
+    ) {
+        self.parentSubmodelIndex = parentSubmodelIndex
+        self.localPosition = localPosition
+        self.position = position
+        self.forward = forward
+    }
 }
 
 func reachedOutrageModelGunpoint(
@@ -1419,6 +1443,7 @@ func reachedOutrageModelGunpoint(
                 if gunpointIndex == index {
                     rawGunpoint = .init(
                         parentSubmodelIndex: parent,
+                        localPosition: position,
                         position: position,
                         forward: forward
                     )
@@ -1454,6 +1479,7 @@ func reachedOutrageModelGunpoint(
     }
     return .init(
         parentSubmodelIndex: rawGunpoint.parentSubmodelIndex,
+        localPosition: rawGunpoint.localPosition,
         position: addModelVectors(accumulated, rawGunpoint.position),
         forward: .init(
             x: rawGunpoint.forward.x / magnitude,
@@ -1572,6 +1598,26 @@ func parseReachedOutrageModel(
                 )
             }
             presentation = .rotate(rate: rate, axis: axis)
+        } else if case .turret(
+            let
+                fieldOfView,
+            let
+                rotationsPerSecond,
+            let
+                thinkInterval,
+            _
+        ) = submodel.presentation {
+            guard let axis = rotationAxes[submodel.sourceIndex] else {
+                throw OutrageModelImportError.missingChunk(
+                    "RANI turret axis"
+                )
+            }
+            presentation = .turret(
+                fieldOfView: fieldOfView,
+                rotationsPerSecond: rotationsPerSecond,
+                thinkInterval: thinkInterval,
+                axis: axis
+            )
         } else {
             presentation = submodel.presentation
         }
@@ -1709,6 +1755,31 @@ private func parseSubmodelPresentation(_ properties: String) throws -> ModelSubm
     let lower = properties.lowercased()
     if lower == "$custom" { return .custom }
     if lower.hasPrefix("$facing") { return .facing }
+    if lower.hasPrefix("$fov=") {
+        let values = properties.dropFirst("$fov=".count)
+            .split(separator: ",")
+            .compactMap {
+                Float(
+                    $0.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                )
+            }
+        guard values.count == 3,
+            values.allSatisfy(\.isFinite),
+            (0...360).contains(values[0]),
+            values[1] > 0,
+            values[2] >= 0
+        else {
+            throw OutrageModelImportError.invalidString
+        }
+        return .turret(
+            fieldOfView: values[0] / 720,
+            rotationsPerSecond: 1 / values[1],
+            thinkInterval: values[2],
+            axis: .zero
+        )
+    }
     if lower.hasPrefix("$rotate="),
        let rate = Float(
            lower.dropFirst("$rotate=".count)

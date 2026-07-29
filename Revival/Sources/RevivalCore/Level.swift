@@ -567,6 +567,69 @@ struct TrainingFinishCourseLesson: Codable, Equatable, Sendable {
     let enabledControlMask: UInt32
 }
 
+struct TrainingDodgeTurretDefinition: Codable, Equatable, Sendable {
+    struct Joint: Codable, Equatable, Sendable {
+        let submodelIndex: Int
+        let parentSubmodelIndex: Int
+        let rotationAxis: Vector3
+        let fieldOfView: Float
+        let rotationsPerSecond: Float
+        let thinkInterval: Float
+    }
+
+    let model: SourceResource
+    let collisionRadius: Float
+    let fieldOfViewDot: Float
+    let maximumTargetDistance: Float
+    let fireAlignmentDot: Float
+    let fixedLeadAccuracy: Float
+    let fireWait: Float
+    let gunpoints: [Vector3]
+    let aimingGunpoint: Vector3
+    let gunpointForward: Vector3
+    let gunpointParentSubmodelIndex: Int
+    let joints: [Joint]
+    let projectileSourceName: String
+    let projectileModel: SourceResource
+    let fireSoundSourceName: String
+    let impactSoundSourceName: String
+    let projectileDamage: Float
+    let projectileRadius: Float
+    let projectileSpeed: Float
+    let projectileLifetime: Float
+}
+
+struct TrainingDodgeAttempt: Codable, Equatable, Sendable {
+    let startDodgeObjectHandle: UInt32
+    let startDodgeCollisionRadius: Float
+    let doneDodgeingGoalObjectHandle: UInt32
+    let doneDodgeingGoalCollisionRadius: Float
+    let dodgeTurretObjectHandle: UInt32
+    let flashLightObjectHandle: UInt32
+    let triggerDelay: Float
+    let successDelay: Float
+    let almostDoneDelay: Float
+    let portalRoomTwoSourceIndex: Int
+    let portalRoomThreeSourceIndex: Int
+    let orderedPortalIndices: [Int]
+    let disabledControlMask: UInt32
+    let enabledDodgeControlMask: UInt32
+    let successControlMask: UInt32
+    let introduction: String
+    let instruction: String
+    let hitInstruction: String
+    let almostDoneInstruction: String
+    let successMessage: String
+    let leaveInstruction: String
+    let introductionVoiceSourceName: String
+    let almostDoneVoiceSourceName: String
+    let successVoiceSourceName: String
+    let restoredPlayerShields: Float
+    let successMarkerLightDistance: Float
+    let markerLightPresentation: TrainingMarkerLightPresentation
+    let turret: TrainingDodgeTurretDefinition
+}
+
 struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var forwardGoalObjectHandle: UInt32
     let welcomeDelay: Float
@@ -1785,6 +1848,188 @@ func validateStockTrainingFinishCoursePackage(
     }
 }
 
+func validateStockTrainingDodgeAttemptPackage(
+    _ dodge: TrainingDodgeAttempt?,
+    level: Level
+) throws {
+    let turretModel = dodge.flatMap { definition in
+        level.models.first {
+            $0.source == definition.turret.model
+        }
+    }
+    let projectileModel = dodge.flatMap { definition in
+        level.models.first {
+            $0.source == definition.turret.projectileModel
+        }
+    }
+    let intro = level.voiceClips.first {
+        $0.sourceName == "intro2.osf"
+    }
+    let almost = level.voiceClips.first {
+        $0.sourceName == "almost.osf"
+    }
+    let proceed = level.voiceClips.first {
+        $0.sourceName == "proceed3.osf"
+    }
+    let fire = level.soundClips.first {
+        $0.logicalName == "WpmLaserBlueFire"
+    }
+    let impact = level.soundClips.first {
+        $0.logicalName == "LazorHitshrt"
+    }
+    guard let dodge,
+        level.objects.first(where: {
+            $0.handle == dodge.startDodgeObjectHandle
+        })?.definition?.referenceRuntimeIndex == 68,
+        level.objects.first(where: {
+            $0.handle == dodge.doneDodgeingGoalObjectHandle
+        })?.definition?.referenceRuntimeIndex == 68,
+        dodge.turret.collisionRadius == 5.402_855_4,
+        dodge.turret.fieldOfViewDot == -1,
+        dodge.turret.maximumTargetDistance == 1_000,
+        dodge.turret.fireAlignmentDot == 0.93,
+        dodge.turret.fixedLeadAccuracy == 0.81,
+        dodge.turret.fireWait == 1,
+        dodge.turret.gunpoints == [
+            .init(
+                x: 1.706_505_8,
+                y: -2.224_015_2,
+                z: 2.190_463_5
+            ),
+            .init(
+                x: 0.457_947_73,
+                y: -2.224_015_2,
+                z: 2.190_463_5
+            ),
+        ],
+        dodge.turret.aimingGunpoint
+            == .init(
+                x: 1.085_584_6,
+                y: -2.224_015_2,
+                z: 2.190_463_5
+            ),
+        dodge.turret.gunpointForward
+            == .init(x: 0, y: -0.707_105_7, z: 0.707_107_84),
+        dodge.turret.gunpointParentSubmodelIndex == 2,
+        dodge.turret.joints == [
+            .init(
+                submodelIndex: 1,
+                parentSubmodelIndex: 0,
+                rotationAxis: .init(x: 0, y: -1, z: 0),
+                fieldOfView: 0.5,
+                rotationsPerSecond: 0.125,
+                thinkInterval: 10
+            ),
+            .init(
+                submodelIndex: 2,
+                parentSubmodelIndex: 1,
+                rotationAxis: .init(
+                    x: 1,
+                    y: -3.410_774_8e-16,
+                    z: -4.371_139e-8
+                ),
+                fieldOfView: 0.125,
+                rotationsPerSecond: 0.125,
+                thinkInterval: 10
+            ),
+        ],
+        dodge.turret.projectileSourceName == "Laser Level 1 - Red",
+        dodge.turret.projectileDamage == 6.75,
+        dodge.turret.projectileRadius == 0.5,
+        dodge.turret.projectileSpeed == 200,
+        dodge.turret.projectileLifetime == 5,
+        dodge.turret.fireSoundSourceName == "WpmLaserBlueFire",
+        dodge.turret.impactSoundSourceName == "LazorHitshrt",
+        turretModel?.collisionRadius == 5.552_946,
+        turretModel?.submodels.count == 3,
+        turretModel?.submodels[1].parentIndex == 0,
+        turretModel?.submodels[1].offset
+            == .init(
+                x: -0.079_373_36,
+                y: -1.241_355_9,
+                z: 0.097_942_59
+            ),
+        turretModel?.submodels[1].presentation
+            == .turret(
+                fieldOfView: 0.5,
+                rotationsPerSecond: 0.125,
+                thinkInterval: 10,
+                axis: .init(x: 0, y: -1, z: 0)
+            ),
+        turretModel?.submodels[2].parentIndex == 1,
+        turretModel?.submodels[2].offset
+            == .init(
+                x: -1.132_905,
+                y: -1.353_618_6,
+                z: 0.311_014_4
+            ),
+        turretModel?.submodels[2].presentation
+            == .turret(
+                fieldOfView: 0.125,
+                rotationsPerSecond: 0.125,
+                thinkInterval: 10,
+                axis: .init(
+                    x: 1,
+                    y: -3.410_774_8e-16,
+                    z: -4.371_139e-8
+                )
+            ),
+        turretModel?.sourceSHA256
+            == "41c69958947ddc7673ddfe2ffb6f559c6892eafed8b759a02b47c05b22f137e4",
+        projectileModel?.collisionRadius == 4.878_135,
+        projectileModel?.sourceSHA256
+            == "67e6ff8f84fbcbc60b33a61b222e04be6cfbd4b53ad367ac14f82cca2a76a1ab",
+        intro?.sampleRate == 22_050,
+        intro?.channelCount == 1,
+        intro?.frameCount == 419_497,
+        intro?.pcmSHA256
+            == "c43858617c694a1c41dbcc2b9b0c31e0b0f73ff7e33423ef3b80bcf501ef9def",
+        intro?.sourceArchive == "missions/training.mn3",
+        intro?.sourceSHA256
+            == "46d1947fad72e9fb33bd6e912bf45fc7f20e5095f27b8a0516f24e2a8077f880",
+        almost?.sampleRate == 22_050,
+        almost?.channelCount == 1,
+        almost?.frameCount == 68_977,
+        almost?.pcmSHA256
+            == "4d90c15e4c1f9a22fb9b4a3808739d6eecd8590b688b10a84abe7bf641ef8017",
+        almost?.sourceArchive == "missions/training.mn3",
+        almost?.sourceSHA256
+            == "2f40177e347bb942bbacb3a54fc8ba5a91410132fdaf79e69fca862f2c4d8d93",
+        proceed?.sampleRate == 22_050,
+        proceed?.channelCount == 1,
+        proceed?.frameCount == 149_913,
+        proceed?.pcmSHA256
+            == "abc67c37d716253959d0ec615b364b6ff59b896179fc3f93256be3870ed3dabd",
+        proceed?.sourceArchive == "missions/training.mn3",
+        proceed?.sourceSHA256
+            == "3f7050b78bce76e370847b89e824b11db618f1b2d7c0d35de2f579e8edb67460",
+        fire?.sourceName == "LaserAHitB.wav",
+        fire?.sampleRate == 22_050,
+        fire?.channelCount == 1,
+        fire?.frameCount == 22_048,
+        fire?.pcmSHA256
+            == "150811e7fee88f8ad68a7cff7eb64c1a3cbaa89ba3a5a3330debf2a1f5e0c84a",
+        fire?.sourceArchive == "d3.hog",
+        fire?.sourceSHA256
+            == "c76cb4a9608b4e57613c1b5438dcbd9af4618ad87c57f0c747de61aa7f810208",
+        fire?.importVolume == 1,
+        impact?.sourceName == "Lazor1Hit.wav",
+        impact?.sampleRate == 22_050,
+        impact?.channelCount == 1,
+        impact?.frameCount == 17_728,
+        impact?.pcmSHA256
+            == "8b5154fa71e2fded239c6415ba4d77511a90bb4ab72aed8ea2e3bd231cf52b99",
+        impact?.sourceArchive == "d3.hog",
+        impact?.sourceSHA256
+            == "7fe72d116e223068a55af61e6484f3604d6f07e6ae8d3ff3d5ca83016660f470",
+        impact?.importVolume == 0.200_000_02
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training timed dodge stock package"
+        )
+    }
+}
+
 func validateStockTrainingFinalRoomEntryPackage(
     chain: TrainingFinalRoomEntryChain?,
     intro7: CanonicalVoiceClip?
@@ -2540,6 +2785,12 @@ enum ModelSubmodelPresentation: Codable, Equatable, Sendable {
     case custom
     case facing
     case rotate(rate: Float, axis: Vector3)
+    case turret(
+        fieldOfView: Float,
+        rotationsPerSecond: Float,
+        thinkInterval: Float,
+        axis: Vector3
+    )
     case glow(color: Vector3, size: Float)
 }
 
@@ -2680,6 +2931,7 @@ struct Level: Codable, Equatable, Sendable {
     let defaultPlayerBinding: DefaultPlayerBinding?
     var objectPresentations: [ObjectPresentationReference]
     var trainingOpeningLesson: TrainingOpeningLesson?
+    var trainingDodgeAttempt: TrainingDodgeAttempt? = nil
     let trainingGalleryBarrier: TrainingGalleryBarrier?
     let trainingRobotGuidebotChain: TrainingRobotGuidebotChain?
     let trainingCameraMonitorChain: TrainingCameraMonitorChain?
@@ -2730,6 +2982,7 @@ struct Level: Codable, Equatable, Sendable {
         defaultPlayerBinding: DefaultPlayerBinding? = nil,
         objectPresentations: [ObjectPresentationReference] = [],
         trainingOpeningLesson: TrainingOpeningLesson? = nil,
+        trainingDodgeAttempt: TrainingDodgeAttempt? = nil,
         trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
         trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
         trainingCameraMonitorChain: TrainingCameraMonitorChain? = nil,
@@ -2775,6 +3028,7 @@ struct Level: Codable, Equatable, Sendable {
         self.defaultPlayerBinding = defaultPlayerBinding
         self.objectPresentations = objectPresentations
         self.trainingOpeningLesson = trainingOpeningLesson
+        self.trainingDodgeAttempt = trainingDodgeAttempt
         self.trainingGalleryBarrier = trainingGalleryBarrier
         self.trainingRobotGuidebotChain = trainingRobotGuidebotChain
         self.trainingCameraMonitorChain = trainingCameraMonitorChain
@@ -2870,10 +3124,13 @@ struct Level: Codable, Equatable, Sendable {
             materials: presentationMaterials,
             objects: objects,
             source: source,
-            dynamicallyPresentedModelNames:
+            dynamicallyPresentedModelNames: (
                 trainingRobotGuidebotChain == nil
                     ? []
-                    : ["Buddybot.oof"]
+                    : ["Buddybot.oof"])
+                + (trainingDodgeAttempt.map {
+                    [$0.turret.projectileModel.sourceName]
+                } ?? [])
         )
         guard rooms.count <= 400,
               rooms.allSatisfy({ (0..<400).contains($0.sourceIndex) }) else {
@@ -3654,6 +3911,312 @@ struct Level: Codable, Equatable, Sendable {
                         "Training Script 015 finish-course lesson"
                     )
                 }
+            }
+        }
+        if let dodge = trainingDodgeAttempt {
+            let clipNames = Set(
+                voiceClips.map {
+                    $0.sourceName.lowercased()
+                })
+            let soundNames = Set(
+                soundClips.flatMap {
+                    [$0.logicalName.lowercased(), $0.sourceName.lowercased()]
+                })
+            let requiredClips = [
+                dodge.introductionVoiceSourceName,
+                dodge.almostDoneVoiceSourceName,
+                dodge.successVoiceSourceName,
+            ]
+            let start = objects.first {
+                $0.handle == dodge.startDodgeObjectHandle
+            }
+            let done = objects.first {
+                $0.handle == dodge.doneDodgeingGoalObjectHandle
+            }
+            let turret = objects.first {
+                $0.handle == dodge.dodgeTurretObjectHandle
+            }
+            let marker = objects.first {
+                $0.handle == dodge.flashLightObjectHandle
+            }
+            let portalRooms = [
+                dodge.portalRoomTwoSourceIndex,
+                dodge.portalRoomThreeSourceIndex,
+            ].compactMap { sourceIndex in
+                rooms.first { $0.sourceIndex == sourceIndex }
+            }
+            let expectedPortalConnections: [Int: [(room: Int, portal: Int)]] = [
+                49: [(35, 0), (50, 0)],
+                36: [(35, 1), (37, 0)],
+            ]
+            let portalsAreReciprocal =
+                portalRooms.count == 2
+                && portalRooms.allSatisfy { room in
+                    guard let expectedConnections =
+                            expectedPortalConnections[room.sourceIndex]
+                    else {
+                        return false
+                    }
+                    return dodge.orderedPortalIndices.allSatisfy { index in
+                        guard expectedConnections.indices.contains(index),
+                            room.portals.indices.contains(index),
+                            room.faces.indices.contains(
+                                room.portals[index].faceIndex
+                            ),
+                            let connected = rooms.first(where: {
+                                $0.sourceIndex
+                                    == room.portals[index].connectedRoom
+                            }),
+                            connected.portals.indices.contains(
+                                room.portals[index].connectedPortal
+                            )
+                        else {
+                            return false
+                        }
+                        let reciprocal = connected.portals[
+                            room.portals[index].connectedPortal
+                        ]
+                        let expected = expectedConnections[index]
+                        return room.portals[index].connectedRoom
+                                == expected.room
+                            && room.portals[index].connectedPortal
+                                == expected.portal
+                            && room.portals[index].flags & 1 == 1
+                            && reciprocal.flags & 1 == 1
+                            && reciprocal.connectedRoom == room.sourceIndex
+                            && reciprocal.connectedPortal == index
+                            && connected.faces.indices.contains(
+                                reciprocal.faceIndex
+                            )
+                    }
+                }
+            guard dodge.startDodgeObjectHandle == 4_106,
+                dodge.startDodgeCollisionRadius == 10.052_409,
+                dodge.doneDodgeingGoalObjectHandle == 12_302,
+                dodge.doneDodgeingGoalCollisionRadius == 10.052_409,
+                dodge.dodgeTurretObjectHandle == 8_199,
+                dodge.flashLightObjectHandle == 4_120,
+                dodge.triggerDelay == 10,
+                dodge.successDelay == 20,
+                dodge.almostDoneDelay == 14,
+                dodge.portalRoomTwoSourceIndex == 49,
+                dodge.portalRoomThreeSourceIndex == 36,
+                dodge.orderedPortalIndices == [0, 1],
+                dodge.disabledControlMask == 3,
+                dodge.enabledDodgeControlMask == 60,
+                dodge.successControlMask == 3,
+                dodge.introduction
+                    == "Next you are going to practice dodging.",
+                dodge.instruction
+                    == "To complete this step, dodge the turrett fire for 20 seconds.",
+                dodge.hitInstruction
+                    == "Oops, you were hit! Keep moving!",
+                dodge.almostDoneInstruction
+                    == "You are almost done! Keep up the good work!",
+                dodge.successMessage == "Excellent!",
+                dodge.leaveInstruction
+                    == "Now using your sliding skills, proceed forward to the flashing green light.",
+                dodge.introductionVoiceSourceName == "intro2.osf",
+                dodge.almostDoneVoiceSourceName == "almost.osf",
+                dodge.successVoiceSourceName == "proceed3.osf",
+                dodge.restoredPlayerShields == 100,
+                dodge.successMarkerLightDistance == 50,
+                dodge.markerLightPresentation
+                    == .init(
+                        primaryColor: .init(x: 0.2, y: 1, z: 0.2),
+                        secondaryColor: .zero,
+                        timeInterval: 0.5,
+                        flickerDistance: 0.2,
+                        directionalDot: 0,
+                        flags: 4,
+                        timebits: .max,
+                        angle: 0,
+                        lightingRenderType: 2
+                    ),
+                requiredClips.allSatisfy({
+                    clipNames.contains($0.lowercased())
+                }),
+                start?.type == 7,
+                start?.storedID == 67,
+                start?.definition?.storedIndex == 67,
+                start?.definition?.sourceName == "Invisiblepowerup",
+                start?.instanceName == "StartDodge",
+                start?.flags == 4_096,
+                start?.location == .room(35),
+                start?.position
+                    == .init(
+                        x: 2_061.8765,
+                        y: -752.8663,
+                        z: 2_199.4517
+                    ),
+                start?.orientation
+                    == .init(
+                        right: .init(x: -1, y: 0, z: 0),
+                        up: .init(x: 0, y: 1, z: 0),
+                        forward: .init(x: 0, y: 0, z: -1)
+                    ),
+                start?.containsType == 255,
+                start?.containsID == 0,
+                start?.containsCount == 0,
+                start?.lifeLeft == 0,
+                start?.soundSource == nil,
+                start?.inertScriptName == nil,
+                start?.inertModuleName == nil,
+                done?.type == 7,
+                done?.storedID == 67,
+                done?.definition == start?.definition,
+                done?.instanceName == "DoneDodgeingGoal",
+                done?.flags == 4_096,
+                done?.location == .room(35),
+                done?.position
+                    == .init(
+                        x: 2_061.31,
+                        y: -755.9523,
+                        z: 2_421.182
+                    ),
+                done?.orientation == start?.orientation,
+                done?.containsType == 255,
+                done?.containsID == 0,
+                done?.containsCount == 0,
+                done?.lifeLeft == 0,
+                done?.soundSource == nil,
+                done?.inertScriptName == nil,
+                done?.inertModuleName == nil,
+                turret?.type == 2,
+                turret?.storedID == 115,
+                turret?.definition?.storedIndex == 115,
+                turret?.definition?.sourceName == "Hangturret",
+                turret?.instanceName == "DodgeTurrett",
+                turret?.flags == 5_120,
+                turret?.location == .room(35),
+                turret?.position
+                    == .init(
+                        x: 2_061.69,
+                        y: -701.7448,
+                        z: 2_356.2942
+                    ),
+                turret?.orientation
+                    == .init(
+                        right: .init(
+                            x: -1,
+                            y: -0.000_013_950_893,
+                            z: -0.000_097_655_844
+                        ),
+                        up: .init(
+                            x: -0.000_013_950_893,
+                            y: 1,
+                            z: -0.000_000_001_362_392
+                        ),
+                        forward: .init(
+                            x: 0.000_097_655_844,
+                            y: -0.000_000_000_000_005_722_752,
+                            z: -1
+                        )
+                    ),
+                turret?.containsType == 255,
+                turret?.containsID == 0,
+                turret?.containsCount == 0,
+                turret?.lifeLeft == 0,
+                turret?.soundSource == nil,
+                turret?.inertScriptName == nil,
+                turret?.inertModuleName == nil,
+                marker?.type == 11,
+                marker?.storedID == 205,
+                marker?.definition?.storedIndex == 205,
+                marker?.definition?.sourceName == "Blinking Red Light-DM",
+                marker?.instanceName == "FlashLight-1",
+                marker?.location == .room(36),
+                marker?.position
+                    == .init(
+                        x: 2_061.6824,
+                        y: -745.7475,
+                        z: 2_441.2942
+                    ),
+                marker?.orientation
+                    == .init(
+                        right: .init(
+                            x: 0.000_097_656_244,
+                            y: 0,
+                            z: -1
+                        ),
+                        up: .init(
+                            x: 0.000_012_207_031,
+                            y: -1,
+                            z: 0.000_000_001_192_092_9
+                        ),
+                        forward: .init(
+                            x: -1,
+                            y: -0.000_012_207_031,
+                            z: -0.000_097_656_244
+                        )
+                    ),
+                marker?.flags == 4_096,
+                marker?.containsType == 255,
+                marker?.containsID == 0,
+                marker?.containsCount == 0,
+                marker?.lifeLeft == 0,
+                marker?.soundSource == nil,
+                marker?.inertScriptName == nil,
+                marker?.inertModuleName == nil,
+                objectPresentations.contains(where: {
+                    $0.objectHandle == dodge.startDodgeObjectHandle
+                        && !$0.isVisible
+                }),
+                objectPresentations.contains(where: {
+                    $0.objectHandle
+                        == dodge.doneDodgeingGoalObjectHandle
+                        && !$0.isVisible
+                }),
+                objectPresentations.contains(where: {
+                    $0.objectHandle == dodge.dodgeTurretObjectHandle
+                        && $0.primaryModel == dodge.turret.model
+                }),
+                models.contains(where: {
+                    $0.source == dodge.turret.model
+                }),
+                models.contains(where: {
+                    $0.source == dodge.turret.projectileModel
+                }),
+                dodge.turret.model.sourceName
+                    == "securityturret.OOF",
+                dodge.turret.projectileModel.sourceName
+                    == "RedLaser.OOF",
+                models.first(where: {
+                    $0.source == dodge.turret.model
+                })?.collisionRadius == 5.552_946,
+                models.first(where: {
+                    $0.source == dodge.turret.projectileModel
+                })?.collisionRadius == 4.878_135,
+                soundNames.contains(
+                    dodge.turret.fireSoundSourceName.lowercased()
+                ),
+                soundNames.contains(
+                    dodge.turret.impactSoundSourceName.lowercased()
+                ),
+                dodge.turret.collisionRadius.isFinite,
+                dodge.turret.joints.count == 2,
+                dodge.turret.gunpointParentSubmodelIndex >= 0,
+                dodge.turret.collisionRadius > 0,
+                dodge.turret.fieldOfViewDot.isFinite,
+                (-1...1).contains(dodge.turret.fieldOfViewDot),
+                dodge.turret.maximumTargetDistance.isFinite,
+                dodge.turret.maximumTargetDistance > 0,
+                dodge.turret.fireAlignmentDot == 0.93,
+                dodge.turret.fireWait.isFinite,
+                dodge.turret.fireWait > 0,
+                dodge.turret.projectileDamage.isFinite,
+                dodge.turret.projectileDamage > 0,
+                dodge.turret.projectileRadius.isFinite,
+                dodge.turret.projectileRadius > 0,
+                dodge.turret.projectileSpeed.isFinite,
+                dodge.turret.projectileSpeed > 0,
+                dodge.turret.projectileLifetime.isFinite,
+                dodge.turret.projectileLifetime > 0,
+                portalsAreReciprocal
+            else {
+                throw LevelValidationError.invalidDependency(
+                    "Training timed dodge attempt"
+                )
             }
         }
         if let barrier = trainingGalleryBarrier {
@@ -4739,6 +5302,12 @@ struct Level: Codable, Equatable, Sendable {
                     proceed2: proceed2
                 )
             }
+            if trainingDodgeAttempt != nil {
+                try validateStockTrainingDodgeAttemptPackage(
+                    trainingDodgeAttempt,
+                    level: self
+                )
+            }
             if let repeatForward =
                     trainingOpeningLesson?.repeatForward {
                 let startGoal = objects.first {
@@ -5029,6 +5598,8 @@ struct Level: Codable, Equatable, Sendable {
                     )
                 }
             }
+            let dodgeVoiceCount =
+                trainingDodgeAttempt == nil ? 0 : 3
             guard let barrier = trainingGalleryBarrier,
                   barrier.triggerName == "Portal2",
                   barrier.triggerRoomSourceIndex == 38,
@@ -5079,7 +5650,8 @@ struct Level: Codable, Equatable, Sendable {
                             + (lesson.continueToCourse == nil ? 0 : 1)
                             + (lesson.startCourse == nil ? 0 : 1)
                             + (lesson.finishCourse == nil ? 0 : 1)
-                  ),
+                    )
+                    + dodgeVoiceCount,
                   guidebotA?.sourceEntryIndex == 4,
                   guidebotA?.sampleRate == 22_050,
                   guidebotA?.channelCount == 1,
@@ -7781,6 +8353,28 @@ private func validateModels(
                       rate > 0,
                       magnitudeSquared.isFinite,
                       abs(magnitudeSquared - 1) <= 0.000_1 else {
+                    throw LevelValidationError.invalidModel("\(model.source.sourceName): presentation")
+                }
+            case .turret(
+                let
+                    fieldOfView,
+                let
+                    rotationsPerSecond,
+                let
+                    thinkInterval,
+                let
+                    axis
+            ):
+                let magnitudeSquared = dot(axis, axis)
+                guard fieldOfView.isFinite,
+                    (0...0.5).contains(fieldOfView),
+                    rotationsPerSecond.isFinite,
+                    rotationsPerSecond > 0,
+                    thinkInterval.isFinite,
+                    (0...10).contains(thinkInterval),
+                    magnitudeSquared.isFinite,
+                    abs(magnitudeSquared - 1) <= 0.000_1
+                else {
                     throw LevelValidationError.invalidModel("\(model.source.sourceName): presentation")
                 }
             case .standard, .custom, .facing:

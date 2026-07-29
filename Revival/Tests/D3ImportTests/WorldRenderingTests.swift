@@ -2,6 +2,560 @@ import XCTest
 
 final class WorldRenderingTests: XCTestCase {
     @MainActor
+    func testTimedDodgeUsesRealTurretHitAndReleasedTimerOrder() throws {
+        var level = makeTrainingDodgeAttemptLevel()
+        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            })
+        let start = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == dodge.startDodgeObjectHandle
+            })
+        level.objects[playerIndex].location = start.location
+        level.objects[playerIndex].position = start.position
+
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var frame = simulation.update(at: 0.1, input: .zero)
+        XCTAssertEqual(frame.enabledPlayerControls.rawValue, 60)
+        XCTAssertEqual(
+            frame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [dodge.introduction],
+                    voiceSourceName:
+                        dodge.introductionVoiceSourceName,
+                    voicePrecedesHUDMessages: true
+                )
+            ]
+        )
+        let closedPortalRoomTwo = try XCTUnwrap(
+            simulation.level.rooms.first {
+                $0.sourceIndex == dodge.portalRoomTwoSourceIndex
+            }
+        )
+        XCTAssertTrue(
+            dodge.orderedPortalIndices.allSatisfy {
+                closedPortalRoomTwo.portals[$0].flags & 1 != 0
+            }
+        )
+
+        var timestamp = 0.1
+        var sawInstruction = false
+        var realHitCount = 0
+        for _ in 0..<160 {
+            timestamp += 0.1
+            frame = simulation.update(at: timestamp, input: .zero)
+            sawInstruction =
+                sawInstruction
+                || frame.trainingOpeningFeedback.contains {
+                    $0.hudMessages == [dodge.instruction]
+                }
+            realHitCount += frame.trainingOpeningFeedback.count {
+                $0.hudMessages == [dodge.hitInstruction]
+            }
+            if sawInstruction && realHitCount >= 2 { break }
+        }
+        XCTAssertTrue(sawInstruction)
+        XCTAssertGreaterThanOrEqual(realHitCount, 2)
+        XCTAssertEqual(frame.shields, 100)
+
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        let dodgeState = try XCTUnwrap(
+            continuationObject["trainingDodgeAttemptState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(dodgeState["script033Count"] as? Int, 1)
+        XCTAssertEqual(dodgeState["script016Count"] as? Int, 1)
+        XCTAssertEqual(dodgeState["script017Count"] as? Int, 0)
+        XCTAssertGreaterThanOrEqual(
+            dodgeState["script018Count"] as? Int ?? 0,
+            2
+        )
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: simulation.continuation,
+            resumedAtTimestamp: timestamp + 1
+        )
+        let restoredFrame = restored.update(
+            at: timestamp + 1.1,
+            input: .zero
+        )
+        XCTAssertTrue(restoredFrame.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(restoredFrame.shields, 100)
+
+        var hostileContinuationObject = continuationObject
+        var hostileDodgeState = dodgeState
+        hostileDodgeState["turretAngles"] = [2, 0]
+        hostileContinuationObject["trainingDodgeAttemptState"] =
+            hostileDodgeState
+        let hostileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: hostileContinuationObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileContinuation,
+                resumedAtTimestamp: timestamp + 2
+            )
+        )
+
+        hostileDodgeState = dodgeState
+        hostileDodgeState["projectiles"] = [
+            [
+                "roomSourceIndex": 35,
+                "position": [
+                    "x": 2_061.69,
+                    "y": -701.7448,
+                    "z": 2_356.2942,
+                ],
+                "velocity": ["x": 0, "y": 0, "z": 0],
+                "lifeRemaining": 1,
+            ]
+        ]
+        hostileContinuationObject["trainingDodgeAttemptState"] =
+            hostileDodgeState
+        let hostileProjectileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: hostileContinuationObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileProjectileContinuation,
+                resumedAtTimestamp: timestamp + 2
+            )
+        )
+    }
+
+    @MainActor
+    func testTimedDodgeMovementReachesAlmostDoneAndSuccess() throws {
+        var level = makeTrainingDodgeAttemptLevel()
+        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let dodgeRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex {
+                $0.sourceIndex == 35
+            })
+        let dodgeRoomVertices = level.rooms[dodgeRoomIndex].vertices
+        let dodgeRoomCenter = Vector3(
+            x: dodgeRoomVertices.map(\.x).reduce(0, +)
+                / Float(dodgeRoomVertices.count),
+            y: dodgeRoomVertices.map(\.y).reduce(0, +)
+                / Float(dodgeRoomVertices.count),
+            z: dodgeRoomVertices.map(\.z).reduce(0, +)
+                / Float(dodgeRoomVertices.count)
+        )
+        level.rooms[dodgeRoomIndex].vertices =
+            level.rooms[dodgeRoomIndex].vertices.map {
+                .init(
+                    x: dodgeRoomCenter.x
+                        + ($0.x - dodgeRoomCenter.x) * 100,
+                    y: dodgeRoomCenter.y
+                        + ($0.y - dodgeRoomCenter.y) * 100,
+                    z: dodgeRoomCenter.z
+                        + ($0.z - dodgeRoomCenter.z) * 100
+                )
+            }
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            })
+        let start = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == dodge.startDodgeObjectHandle
+            })
+        level.objects[playerIndex].location = start.location
+        level.objects[playerIndex].position = start.position
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        var timestamp = 0.0
+        var fireCount = 0
+        var sawInstruction = false
+        var sawAlmostDone = false
+        var sawSuccess = false
+        var successFrame: PlayerSimulationFrame?
+        for _ in 0..<500 {
+            timestamp += 0.1
+            let input: InputSnapshot =
+                sawInstruction ? .init(sideways: 1) : .zero
+            let frame = simulation.update(at: timestamp, input: input)
+            sawInstruction =
+                sawInstruction
+                || frame.trainingOpeningFeedback.contains {
+                    $0.hudMessages == [dodge.instruction]
+                }
+            fireCount += frame.trainingOpeningFeedback.count {
+                $0.soundSourceName
+                    == dodge.turret.fireSoundSourceName
+            }
+            sawAlmostDone =
+                sawAlmostDone
+                || frame.trainingOpeningFeedback.contains {
+                    $0.hudMessages == [dodge.almostDoneInstruction]
+                        && $0.voiceSourceName
+                            == dodge.almostDoneVoiceSourceName
+                }
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.hudMessages
+                    == [dodge.successMessage, dodge.leaveInstruction]
+                    && $0.voiceSourceName
+                        == dodge.successVoiceSourceName
+            }) {
+                sawSuccess = true
+                successFrame = frame
+                break
+            }
+        }
+
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        let dodgeState = try XCTUnwrap(
+            continuationObject["trainingDodgeAttemptState"]
+                as? [String: Any]
+        )
+        XCTAssertGreaterThan(fireCount, 0)
+        XCTAssertTrue(sawInstruction)
+        XCTAssertTrue(sawAlmostDone)
+        XCTAssertTrue(sawSuccess, "final dodge state: \(dodgeState)")
+        XCTAssertEqual(
+            successFrame?.trainingDodgeMarkerLightDistance,
+            50
+        )
+        XCTAssertEqual(successFrame?.enabledPlayerControls.rawValue, 63)
+        let portalRoomThree = try XCTUnwrap(
+            simulation.level.rooms.first {
+                $0.sourceIndex == dodge.portalRoomThreeSourceIndex
+            }
+        )
+        XCTAssertTrue(
+            dodge.orderedPortalIndices.allSatisfy {
+                portalRoomThree.portals[$0].flags & 1 == 0
+            }
+        )
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var hostileDodgeState = try XCTUnwrap(
+            hostileObject["trainingDodgeAttemptState"] as? [String: Any]
+        )
+        hostileObject["playerLocation"] = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(start.location)
+        )
+        hostileObject["playerPosition"] = [
+            "x": dodgeRoomCenter.x,
+            "y": dodgeRoomCenter.y,
+            "z": dodgeRoomCenter.z,
+        ]
+        hostileObject["playerOrientation"] =
+            try JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(start.orientation)
+            )
+        let restorableContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertNoThrow(
+            try PlayerSimulation(
+                level: level,
+                continuation: restorableContinuation,
+                resumedAtTimestamp: timestamp + 1
+            )
+        )
+
+        hostileDodgeState["script033Count"] = 0
+        hostileObject["trainingDodgeAttemptState"] = hostileDodgeState
+        let hostileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileContinuation,
+                resumedAtTimestamp: timestamp + 1
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
+    @MainActor
+    func testTimedDodgeContinuationRejectsCounterAboveReleasedMaximum()
+        throws
+    {
+        var level = makeTrainingDodgeAttemptLevel()
+        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            }
+        )
+        let start = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == dodge.startDodgeObjectHandle
+            }
+        )
+        level.objects[playerIndex].location = start.location
+        level.objects[playerIndex].position = start.position
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var timestamp: TimeInterval = 0.1
+        _ = simulation.update(at: timestamp, input: .zero)
+        var sawInstruction = false
+        for _ in 0..<110 {
+            timestamp += 0.1
+            let frame = simulation.update(at: timestamp, input: .zero)
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.hudMessages == [dodge.instruction]
+            }) {
+                sawInstruction = true
+                break
+            }
+        }
+        XCTAssertTrue(sawInstruction)
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var dodgeState = try XCTUnwrap(
+            continuationObject["trainingDodgeAttemptState"]
+                as? [String: Any]
+        )
+        dodgeState["script018Count"] = 100_001
+        continuationObject["trainingDodgeAttemptState"] = dodgeState
+        let hostile = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: continuationObject
+            )
+        )
+
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostile,
+                resumedAtTimestamp: timestamp + 1
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
+    @MainActor
+    func testTimedDodgeRestoreKeepsForwardAndReverseDisabled()
+        throws
+    {
+        var level = makeTrainingDodgeAttemptLevel()
+        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let startCourse = try XCTUnwrap(
+            level.trainingOpeningLesson?.startCourse
+        )
+        let startDodgeIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == dodge.startDodgeObjectHandle
+            }
+        )
+        let startCourseIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == startCourse.startCourseObjectHandle
+            }
+        )
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            }
+        )
+        level.objects[playerIndex].location =
+            level.objects[startCourseIndex].location
+        level.objects[playerIndex].position =
+            level.objects[startCourseIndex].position
+        let startCourseRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex { $0.sourceIndex == 3 }
+        )
+        level.rooms[startCourseRoomIndex] = addingSourceContainmentShell(
+            to: level.rooms[startCourseRoomIndex],
+            center: level.objects[startCourseIndex].position,
+            texture: level.surfacePhysics[0].texture,
+            halfExtent: 200
+        )
+
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let startCourseFrame = simulation.update(at: 0.1, input: .zero)
+        XCTAssertEqual(
+            startCourseFrame.enabledPlayerControls.rawValue & 63,
+            63
+        )
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        continuationObject["playerLocation"] =
+            try JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    level.objects[startDodgeIndex].location
+                )
+            )
+        continuationObject["playerPosition"] =
+            try JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    level.objects[startDodgeIndex].position
+                )
+            )
+        let movedToDodge = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: continuationObject
+            )
+        )
+        let atDodge = try PlayerSimulation(
+            level: level,
+            continuation: movedToDodge,
+            resumedAtTimestamp: 1
+        )
+        let contactFrame = atDodge.update(at: 1.1, input: .zero)
+        XCTAssertEqual(contactFrame.enabledPlayerControls.rawValue & 63, 60)
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: atDodge.continuation,
+            resumedAtTimestamp: 2
+        )
+        let restoredFrame = restored.update(at: 2.1, input: .zero)
+        XCTAssertEqual(
+            restoredFrame.enabledPlayerControls.rawValue & 63,
+            60
+        )
+    }
+
+    @MainActor
+    func testTimedDodgeTimersStartWithTheirFullDurations() throws {
+        var level = makeTrainingDodgeAttemptLevel()
+        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            }
+        )
+        let start = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == dodge.startDodgeObjectHandle
+            }
+        )
+        level.objects[playerIndex].location = start.location
+        level.objects[playerIndex].position = start.position
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        var timestamp: TimeInterval = 0.1
+        _ = simulation.update(at: timestamp, input: .zero)
+        var dodgeState = try encodedDodgeState(simulation.continuation)
+        XCTAssertEqual(
+            try XCTUnwrap(dodgeState["triggerTimerRemaining"] as? Double),
+            Double(dodge.triggerDelay),
+            accuracy: 0.000_001
+        )
+
+        var sawInstruction = false
+        for _ in 0..<110 {
+            timestamp += 0.1
+            let frame = simulation.update(at: timestamp, input: .zero)
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.hudMessages == [dodge.instruction]
+            }) {
+                sawInstruction = true
+                dodgeState = try encodedDodgeState(
+                    simulation.continuation
+                )
+                XCTAssertEqual(
+                    try XCTUnwrap(
+                        dodgeState["almostDoneTimerRemaining"]
+                            as? Double
+                    ),
+                    Double(dodge.almostDoneDelay),
+                    accuracy: 0.000_001
+                )
+                XCTAssertEqual(
+                    try XCTUnwrap(
+                        dodgeState["successTimerRemaining"] as? Double
+                    ),
+                    Double(dodge.successDelay),
+                    accuracy: 0.000_001
+                )
+                break
+            }
+        }
+        XCTAssertTrue(sawInstruction)
+
+        var sawRealHit = false
+        for _ in 0..<160 {
+            timestamp += 0.1
+            let frame = simulation.update(at: timestamp, input: .zero)
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.hudMessages == [dodge.hitInstruction]
+            }) {
+                sawRealHit = true
+                dodgeState = try encodedDodgeState(
+                    simulation.continuation
+                )
+                XCTAssertEqual(
+                    try XCTUnwrap(
+                        dodgeState["almostDoneTimerRemaining"]
+                            as? Double
+                    ),
+                    Double(dodge.almostDoneDelay),
+                    accuracy: 0.000_001
+                )
+                XCTAssertEqual(
+                    try XCTUnwrap(
+                        dodgeState["successTimerRemaining"] as? Double
+                    ),
+                    Double(dodge.successDelay),
+                    accuracy: 0.000_001
+                )
+                break
+            }
+        }
+        XCTAssertTrue(sawRealHit)
+    }
+
+    @MainActor
     func testTrainingScript015FinishesCourseIndependentlyAndRestoresSilently()
         throws
     {
@@ -12496,6 +13050,674 @@ func makeTrainingScript015Level() -> Level {
                 level.dependencyManifest.historicalEagerBaseline
         )
     )
+}
+
+private func encodedDodgeState(
+    _ continuation: PlayerSimulationContinuation
+) throws -> [String: Any] {
+    let continuationObject = try XCTUnwrap(
+        JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(continuation)
+        ) as? [String: Any]
+    )
+    return try XCTUnwrap(
+        continuationObject["trainingDodgeAttemptState"]
+            as? [String: Any]
+    )
+}
+
+func makeTrainingDodgeAttemptLevel() -> Level {
+    var level = makeTrainingScript015Level()
+    let invisibleDefinition = level.objects.first {
+        $0.handle == 6_150
+    }!.definition
+    let identity = Matrix3(
+        right: .init(x: -1, y: 0, z: 0),
+        up: .init(x: 0, y: 1, z: 0),
+        forward: .init(x: 0, y: 0, z: -1)
+    )
+    level.objects.append(contentsOf: [
+        .init(
+            handle: 4_106,
+            type: 7,
+            storedID: 67,
+            definition: invisibleDefinition,
+            instanceName: "StartDodge",
+            flags: 4_096,
+            doorShields: nil,
+            location: .room(35),
+            position: .init(
+                x: 2_061.8765,
+                y: -752.8663,
+                z: 2_199.4517
+            ),
+            orientation: identity,
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        ),
+        .init(
+            handle: 12_302,
+            type: 7,
+            storedID: 67,
+            definition: invisibleDefinition,
+            instanceName: "DoneDodgeingGoal",
+            flags: 4_096,
+            doorShields: nil,
+            location: .room(35),
+            position: .init(
+                x: 2_061.31,
+                y: -755.9523,
+                z: 2_421.182
+            ),
+            orientation: identity,
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        ),
+        .init(
+            handle: 8_199,
+            type: 2,
+            storedID: 115,
+            definition: .init(
+                storedIndex: 115,
+                sourceName: "Hangturret"
+            ),
+            instanceName: "DodgeTurrett",
+            flags: 5_120,
+            doorShields: nil,
+            location: .room(35),
+            position: .init(
+                x: 2_061.69,
+                y: -701.7448,
+                z: 2_356.2942
+            ),
+            orientation: .init(
+                right: .init(
+                    x: -1,
+                    y: -0.000_013_950_893,
+                    z: -0.000_097_655_844
+                ),
+                up: .init(
+                    x: -0.000_013_950_893,
+                    y: 1,
+                    z: -0.000_000_001_362_392
+                ),
+                forward: .init(
+                    x: 0.000_097_655_844,
+                    y: -0.000_000_000_000_005_722_752,
+                    z: -1
+                )
+            ),
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        ),
+        .init(
+            handle: 4_120,
+            type: 11,
+            storedID: 205,
+            definition: .init(
+                storedIndex: 205,
+                sourceName: "Blinking Red Light-DM"
+            ),
+            instanceName: "FlashLight-1",
+            flags: 4_096,
+            doorShields: nil,
+            location: .room(36),
+            position: .init(
+                x: 2_061.6824,
+                y: -745.7475,
+                z: 2_441.2942
+            ),
+            orientation: .init(
+                right: .init(
+                    x: 0.000_097_656_244,
+                    y: 0,
+                    z: -1
+                ),
+                up: .init(
+                    x: 0.000_012_207_031,
+                    y: -1,
+                    z: 0.000_000_001_192_092_9
+                ),
+                forward: .init(
+                    x: -1,
+                    y: -0.000_012_207_031,
+                    z: -0.000_097_656_244
+                )
+            ),
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        ),
+    ])
+
+    let invisibleModel = level.objectPresentations.first {
+        $0.objectHandle == 6_150
+    }!.primaryModel
+    let turretModel = SourceResource(
+        storedIndex: 115,
+        sourceName: "securityturret.OOF"
+    )
+    let projectileModel = SourceResource(
+        storedIndex: 57,
+        sourceName: "RedLaser.OOF"
+    )
+    let modelTemplate = level.models[0]
+    let submodelTemplate = modelTemplate.submodels[0]
+    let outerOffset = Vector3(
+        x: -0.079_373_36,
+        y: -1.241_355_9,
+        z: 0.097_942_59
+    )
+    let headOffset = Vector3(
+        x: -1.132_905,
+        y: -1.353_618_6,
+        z: 0.311_014_4
+    )
+    let turretSubmodels: [ModelSubmodel] = [
+        .init(
+            sourceIndex: 0,
+            parentIndex: nil,
+            offset: .zero,
+            vertices: submodelTemplate.vertices,
+            faces: submodelTemplate.faces,
+            presentation: .standard
+        ),
+        .init(
+            sourceIndex: 1,
+            parentIndex: 0,
+            offset: outerOffset,
+            vertices: submodelTemplate.vertices,
+            faces: submodelTemplate.faces,
+            presentation: .turret(
+                fieldOfView: 0.5,
+                rotationsPerSecond: 0.125,
+                thinkInterval: 10,
+                axis: .init(x: 0, y: -1, z: 0)
+            )
+        ),
+        .init(
+            sourceIndex: 2,
+            parentIndex: 1,
+            offset: headOffset,
+            vertices: submodelTemplate.vertices,
+            faces: submodelTemplate.faces,
+            presentation: .turret(
+                fieldOfView: 0.125,
+                rotationsPerSecond: 0.125,
+                thinkInterval: 10,
+                axis: .init(
+                    x: 1,
+                    y: -3.410_774_8e-16,
+                    z: -4.371_139e-8
+                )
+            )
+        ),
+    ]
+    let turretPoints = turretSubmodels.flatMap { submodel in
+        let offset: Vector3
+        switch submodel.sourceIndex {
+        case 1:
+            offset = outerOffset
+        case 2:
+            offset = .init(
+                x: outerOffset.x + headOffset.x,
+                y: outerOffset.y + headOffset.y,
+                z: outerOffset.z + headOffset.z
+            )
+        default:
+            offset = .zero
+        }
+        return submodel.vertices.map {
+            Vector3(
+                x: offset.x + $0.position.x,
+                y: offset.y + $0.position.y,
+                z: offset.z + $0.position.z
+            )
+        }
+    }
+    let turretBounds = ModelBounds(
+        minimum: .init(
+            x: turretPoints.map(\.x).min()!,
+            y: turretPoints.map(\.y).min()!,
+            z: turretPoints.map(\.z).min()!
+        ),
+        maximum: .init(
+            x: turretPoints.map(\.x).max()!,
+            y: turretPoints.map(\.y).max()!,
+            z: turretPoints.map(\.z).max()!
+        )
+    )
+    let turretCanonicalModel = CanonicalModel(
+        source: turretModel,
+        collisionRadius: 5.552_946,
+        submodels: turretSubmodels,
+        bounds: turretBounds,
+        sourceArchive: modelTemplate.sourceArchive,
+        sourceSHA256: String(repeating: "8", count: 64)
+    )
+    let projectileCanonicalModel = CanonicalModel(
+        source: projectileModel,
+        collisionRadius: 4.878_135,
+        submodels: modelTemplate.submodels,
+        bounds: modelTemplate.bounds,
+        sourceArchive: modelTemplate.sourceArchive,
+        sourceSHA256: String(repeating: "7", count: 64)
+    )
+    level = replacing(
+        level,
+        models:
+            level.models
+            + [turretCanonicalModel, projectileCanonicalModel]
+    )
+    level.objectPresentations.append(contentsOf: [
+        .init(
+            objectHandle: 4_106,
+            primaryModel: invisibleModel,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil,
+            isVisible: false
+        ),
+        .init(
+            objectHandle: 12_302,
+            primaryModel: invisibleModel,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil,
+            isVisible: false
+        ),
+        .init(
+            objectHandle: 8_199,
+            primaryModel: turretModel,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil
+        ),
+    ])
+
+    let room35Index = level.rooms.firstIndex {
+        $0.sourceIndex == 35
+    }!
+    var room35 = level.rooms[room35Index]
+    let room35Face = room35.faces[0]
+    room35.faces.append(
+        .init(
+            corners: room35Face.corners,
+            flags: room35Face.flags,
+            portalIndex: room35.portals.count,
+            texture: room35Face.texture,
+            lightmapInfoIndex: room35Face.lightmapInfoIndex,
+            allowsLightCorona: room35Face.allowsLightCorona,
+            lightMultiple: room35Face.lightMultiple,
+            special: room35Face.special
+        ))
+    room35.portals.append(
+        .init(
+            flags: 1,
+            faceIndex: room35.faces.count - 1,
+            connectedRoom: 36,
+            connectedPortal: 0
+        ))
+    level.rooms[room35Index] = room35
+    let texture = level.surfacePhysics[0].texture
+    func room(
+        sourceIndex: Int,
+        name: String?,
+        connections: [(room: Int, portal: Int)]
+    ) -> LevelRoom {
+        let shell = makeSourceContainmentRoom(
+            center: .init(x: 2_061.68, y: -745.75, z: 2_441.29),
+            texture: texture,
+            sourceIndex: sourceIndex,
+            halfExtent: 100
+        )
+        var faces = shell.faces
+        while faces.count < connections.count {
+            faces.append(shell.faces[0])
+        }
+        let portals = connections.enumerated().map { index, connection in
+            let face = faces[index]
+            faces[index] = .init(
+                corners: face.corners,
+                flags: face.flags,
+                portalIndex: index,
+                texture: face.texture,
+                lightmapInfoIndex: face.lightmapInfoIndex,
+                allowsLightCorona: face.allowsLightCorona,
+                lightMultiple: face.lightMultiple,
+                special: face.special
+            )
+            return LevelPortal(
+                flags: 1,
+                faceIndex: index,
+                connectedRoom: connection.room,
+                connectedPortal: connection.portal
+            )
+        }
+        return .init(
+            sourceIndex: sourceIndex,
+            name: name,
+            pathPoint: shell.pathPoint,
+            vertices: shell.vertices,
+            faces: faces,
+            portals: portals
+        )
+    }
+    level.rooms.append(
+        room(
+            sourceIndex: 36,
+            name: "PortalRoom3",
+            connections: [(35, 1), (37, 0)]
+        ))
+    level.rooms.append(
+        room(
+            sourceIndex: 37,
+            name: nil,
+            connections: [(36, 1)]
+        ))
+    func matchReciprocalPortalGeometry(
+        sourceRoomSourceIndex: Int,
+        sourcePortalIndex: Int,
+        connectedRoomSourceIndex: Int,
+        connectedPortalIndex: Int
+    ) {
+        let sourceRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == sourceRoomSourceIndex
+        }!
+        let connectedRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == connectedRoomSourceIndex
+        }!
+        let sourcePortal =
+            level.rooms[sourceRoomIndex].portals[sourcePortalIndex]
+        let sourceFace =
+            level.rooms[sourceRoomIndex].faces[sourcePortal.faceIndex]
+        let reciprocalPoints = sourceFace.corners.reversed().map {
+            level.rooms[sourceRoomIndex].vertices[$0.vertexIndex]
+        }
+        let connectedPortal =
+            level.rooms[connectedRoomIndex]
+            .portals[connectedPortalIndex]
+        let connectedFace =
+            level.rooms[connectedRoomIndex]
+            .faces[connectedPortal.faceIndex]
+        let firstVertex =
+            level.rooms[connectedRoomIndex].vertices.count
+        level.rooms[connectedRoomIndex].vertices.append(
+            contentsOf: reciprocalPoints
+        )
+        let corners = reciprocalPoints.indices.map { index in
+            let template = connectedFace.corners[
+                index % connectedFace.corners.count
+            ]
+            return FaceCorner(
+                vertexIndex: firstVertex + index,
+                u: template.u,
+                v: template.v,
+                alpha: template.alpha,
+                lightmapU: template.lightmapU,
+                lightmapV: template.lightmapV
+            )
+        }
+        level.rooms[connectedRoomIndex]
+            .faces[connectedPortal.faceIndex] = .init(
+                corners: corners,
+                flags: connectedFace.flags,
+                portalIndex: connectedFace.portalIndex,
+                texture: connectedFace.texture,
+                lightmapInfoIndex:
+                    connectedFace.lightmapInfoIndex,
+                allowsLightCorona:
+                    connectedFace.allowsLightCorona,
+                lightMultiple: connectedFace.lightMultiple,
+                special: connectedFace.special
+            )
+    }
+    matchReciprocalPortalGeometry(
+        sourceRoomSourceIndex: 35,
+        sourcePortalIndex: 1,
+        connectedRoomSourceIndex: 36,
+        connectedPortalIndex: 0
+    )
+    matchReciprocalPortalGeometry(
+        sourceRoomSourceIndex: 36,
+        sourcePortalIndex: 1,
+        connectedRoomSourceIndex: 37,
+        connectedPortalIndex: 0
+    )
+
+    let pcm = Data(repeating: 0, count: 2)
+    let dodgeVoices = ["intro2.osf", "almost.osf", "proceed3.osf"]
+        .enumerated().map { index, name in
+            CanonicalVoiceClip(
+                sourceName: name,
+                sourceEntryIndex: 100 + index,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: pcm,
+                pcmSHA256: canonicalSHA256(pcm),
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: String(repeating: "9", count: 64)
+            )
+        }
+    let dodgeSounds = [
+        ("WpmLaserBlueFire", "LaserAHitB.wav"),
+        ("LazorHitshrt", "Lazor1Hit.wav"),
+    ].enumerated().map { index, value in
+        CanonicalSoundClip(
+            logicalName: value.0,
+            sourceName: value.1,
+            sourceEntryIndex: 200 + index,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 1,
+            pcm16LittleEndian: pcm,
+            pcmSHA256: canonicalSHA256(pcm),
+            sourceArchive: level.source.profileFiles[0].relativePath,
+            sourceSHA256: String(repeating: "6", count: 64),
+            importVolume: 1
+        )
+    }
+    level = replacing(
+        level,
+        voiceClips: level.voiceClips + dodgeVoices,
+        soundClips: level.soundClips + dodgeSounds,
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current
+                + [
+                    .init(
+                        category: "object-definition",
+                        source: .init(
+                            storedIndex: 115,
+                            sourceName: "Hangturret"
+                        ),
+                        state: "identity-recorded",
+                        provenance: "synthetic timed dodge fixture"
+                    ),
+                    .init(
+                        category: "object-definition",
+                        source: .init(
+                            storedIndex: 205,
+                            sourceName: "Blinking Red Light-DM"
+                        ),
+                        state: "identity-recorded",
+                        provenance: "synthetic timed dodge fixture"
+                    ),
+                    .init(
+                        category: "model",
+                        source: turretModel,
+                        state: "presentation-payload-imported",
+                        provenance: "synthetic timed dodge fixture"
+                    ),
+                    .init(
+                        category: "model",
+                        source: projectileModel,
+                        state: "presentation-payload-imported",
+                        provenance: "synthetic timed dodge fixture"
+                    ),
+                ]
+                + dodgeVoices.map {
+                    .init(
+                        category: "voice",
+                        source: .init(
+                            storedIndex: $0.sourceEntryIndex,
+                            sourceName: $0.sourceName
+                        ),
+                        state: "canonical-pcm-imported",
+                        provenance:
+                            "\($0.sourceArchive) \($0.sourceSHA256)"
+                    )
+                }
+                + dodgeSounds.map {
+                    .init(
+                        category: "sound",
+                        source: .init(
+                            storedIndex: $0.sourceEntryIndex,
+                            sourceName: $0.sourceName
+                        ),
+                        state: "canonical-pcm-imported",
+                        provenance:
+                            "\($0.sourceArchive) \($0.sourceSHA256)"
+                    )
+                },
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
+    level.trainingDodgeAttempt = .init(
+        startDodgeObjectHandle: 4_106,
+        startDodgeCollisionRadius: 10.052_409,
+        doneDodgeingGoalObjectHandle: 12_302,
+        doneDodgeingGoalCollisionRadius: 10.052_409,
+        dodgeTurretObjectHandle: 8_199,
+        flashLightObjectHandle: 4_120,
+        triggerDelay: 10,
+        successDelay: 20,
+        almostDoneDelay: 14,
+        portalRoomTwoSourceIndex: 49,
+        portalRoomThreeSourceIndex: 36,
+        orderedPortalIndices: [0, 1],
+        disabledControlMask: 3,
+        enabledDodgeControlMask: 60,
+        successControlMask: 3,
+        introduction: "Next you are going to practice dodging.",
+        instruction:
+            "To complete this step, dodge the turrett fire for 20 seconds.",
+        hitInstruction: "Oops, you were hit! Keep moving!",
+        almostDoneInstruction:
+            "You are almost done! Keep up the good work!",
+        successMessage: "Excellent!",
+        leaveInstruction:
+            "Now using your sliding skills, proceed forward to the flashing green light.",
+        introductionVoiceSourceName: "intro2.osf",
+        almostDoneVoiceSourceName: "almost.osf",
+        successVoiceSourceName: "proceed3.osf",
+        restoredPlayerShields: 100,
+        successMarkerLightDistance: 50,
+        markerLightPresentation: .init(
+            primaryColor: .init(x: 0.2, y: 1, z: 0.2),
+            secondaryColor: .zero,
+            timeInterval: 0.5,
+            flickerDistance: 0.2,
+            directionalDot: 0,
+            flags: 4,
+            timebits: .max,
+            angle: 0,
+            lightingRenderType: 2
+        ),
+        turret: .init(
+            model: turretModel,
+            collisionRadius: 5.402_855_4,
+            fieldOfViewDot: -1,
+            maximumTargetDistance: 1_000,
+            fireAlignmentDot: 0.93,
+            fixedLeadAccuracy: 0.81,
+            fireWait: 1,
+            gunpoints: [
+                .init(
+                    x: 1.706_505_8,
+                    y: -2.224_015_2,
+                    z: 2.190_463_5
+                ),
+                .init(
+                    x: 0.457_947_73,
+                    y: -2.224_015_2,
+                    z: 2.190_463_5
+                ),
+            ],
+            aimingGunpoint: .init(
+                x: 1.085_584_6,
+                y: -2.224_015_2,
+                z: 2.190_463_5
+            ),
+            gunpointForward: .init(
+                x: 0,
+                y: -0.707_105_7,
+                z: 0.707_107_84
+            ),
+            gunpointParentSubmodelIndex: 2,
+            joints: [
+                .init(
+                    submodelIndex: 1,
+                    parentSubmodelIndex: 0,
+                    rotationAxis: .init(x: 0, y: -1, z: 0),
+                    fieldOfView: 0.5,
+                    rotationsPerSecond: 0.125,
+                    thinkInterval: 10
+                ),
+                .init(
+                    submodelIndex: 2,
+                    parentSubmodelIndex: 1,
+                    rotationAxis: .init(
+                        x: 1,
+                        y: -3.410_774_8e-16,
+                        z: -4.371_139e-8
+                    ),
+                    fieldOfView: 0.125,
+                    rotationsPerSecond: 0.125,
+                    thinkInterval: 10
+                ),
+            ],
+            projectileSourceName: "Laser Level 1 - Red",
+            projectileModel: projectileModel,
+            fireSoundSourceName: "WpmLaserBlueFire",
+            impactSoundSourceName: "LazorHitshrt",
+            projectileDamage: 6.75,
+            projectileRadius: 0.5,
+            projectileSpeed: 200,
+            projectileLifetime: 5
+        )
+    )
+    return level
 }
 
 func makeTrainingRobotGuidebotLevel() -> Level {

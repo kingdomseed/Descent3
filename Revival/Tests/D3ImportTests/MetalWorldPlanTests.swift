@@ -1,6 +1,72 @@
 import XCTest
 
 final class MetalWorldPlanTests: XCTestCase {
+    func testTimedDodgeAnglesProjectilesAndMarkerReachRetainedMetalPlan()
+        throws
+    {
+        var level = makeTrainingDodgeAttemptLevel()
+        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            })
+        let start = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == dodge.startDodgeObjectHandle
+            })
+        level.objects[playerIndex].location = start.location
+        level.objects[playerIndex].position = start.position
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var frame = simulation.update(at: 0.1, input: .zero)
+        var timestamp = 0.1
+        for _ in 0..<180 where frame.trainingDodgeProjectiles.isEmpty {
+            timestamp += 0.1
+            frame = simulation.update(at: timestamp, input: .zero)
+        }
+        XCTAssertFalse(frame.trainingDodgeProjectiles.isEmpty)
+        XCTAssertTrue(
+            frame.trainingDodgeTurretAngles.contains {
+                $0 != 0
+            })
+
+        let initial = try makeMetalWorldPlan(
+            level: simulation.level,
+            playerView: frame.playerView
+        )
+        let initialTurretVertices = initial.draws.filter {
+            $0.objectHandle == dodge.dodgeTurretObjectHandle
+        }.flatMap(\.vertices)
+        let updated = try updateMetalWorldPlan(
+            initial,
+            level: simulation.level,
+            playerView: frame.playerView,
+            presentationFrame: .init(
+                systemsFrameDuration: frame.systemsFrameDuration,
+                systemsGameTime: frame.systemsGameTime
+            ),
+            trainingDodgeTurretAngles:
+                frame.trainingDodgeTurretAngles,
+            trainingDodgeProjectiles:
+                frame.trainingDodgeProjectiles,
+            trainingDodgeMarkerLightDistance:
+                frame.trainingDodgeMarkerLightDistance
+        )
+        let updatedTurretVertices = updated.draws.filter {
+            $0.objectHandle == dodge.dodgeTurretObjectHandle
+        }.flatMap(\.vertices)
+        XCTAssertNotEqual(
+            updatedTurretVertices,
+            initialTurretVertices
+        )
+        XCTAssertTrue(
+            updated.draws.contains {
+                $0.objectHandle == UInt32.max
+                    && $0.model == dodge.turret.projectileModel
+            })
+    }
     func testScript034MarkerDistanceLightsReachedMetalWorld() throws {
         var level = makeTrainingCloakPickupLevel()
         let playerView = defaultPlayerView(in: level)

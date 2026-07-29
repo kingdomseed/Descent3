@@ -443,6 +443,10 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let enabledPlayerControls: PlayerControlMask
     let showsEnabledPlayerControls: Bool
     let trainingOpeningFeedback: [TrainingOpeningFeedback]
+    let shields: Float
+    let trainingDodgeMarkerLightDistance: Float?
+    let trainingDodgeTurretAngles: [Float]
+    let trainingDodgeProjectiles: [TrainingDodgeProjectileFrame]
     let trainingGalleryMarkerLightDistance: Float?
     let trainingGuidebotReturnMarkerLightDistance: Float?
     let trainingGuidebot: TrainingGuidebotFrame?
@@ -452,6 +456,13 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingLastRoomMarkerLightDistance: Float?
     let trainingFinalBotsMarkerLightDistance: Float?
     let trainingFinalGoal: TrainingFinalGoalFrame?
+}
+
+struct TrainingDodgeProjectileFrame: Equatable, Sendable {
+    let position: Vector3
+    let velocity: Vector3
+    let roomSourceIndex: Int
+    let model: SourceResource
 }
 
 enum TrainingEndLevelState: String, Codable, Equatable, Sendable {
@@ -1078,6 +1089,41 @@ private struct TrainingLaserProjectileState:
     var lifeRemaining: Float
 }
 
+private struct TrainingDodgeProjectileState:
+    Codable, Equatable, Sendable
+{
+    var roomSourceIndex: Int
+    var position: Vector3
+    let velocity: Vector3
+    var lifeRemaining: Float
+}
+
+private struct TrainingDodgeAttemptState:
+    Codable, Equatable, Sendable
+{
+    var script033Count = 0
+    var script016Count = 0
+    var script017Count = 0
+    var script018Count = 0
+    var script020Count = 0
+    var triggerTimerRemaining: Float?
+    var successTimerRemaining: Float?
+    var almostDoneTimerRemaining: Float?
+    var turretIsPowered = false
+    var nextFireTime: Float = 0
+    var firingMaskIndex = 0
+    var turretAngles: [Float] = [0, 0]
+    var turretDirections: [Int] = [0, 0]
+    var retainedTargetPosition: Vector3?
+    var lastVisibleTargetTime: Float = -14
+    var nextVisibilityCheckTime: Float = 0
+    var seesTarget = false
+    var awareness: Float = 0
+    var weaponSpeed: Float = 0
+    var projectiles: [TrainingDodgeProjectileState] = []
+    var markerLightDistance: Float = 0
+}
+
 struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     let schemaVersion: Int
     let levelKey: String
@@ -1097,7 +1143,9 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     let afterburnerMagnitude: Float
     let wiggleFalloff: Float
     let lastThrustTime: Float
+    fileprivate let shields: Float?
     fileprivate let trainingOpeningState: TrainingOpeningState?
+    fileprivate let trainingDodgeAttemptState: TrainingDodgeAttemptState?
     fileprivate let trainingGalleryBarrierState: TrainingGalleryBarrierState?
     fileprivate let trainingRobotGuidebotState: TrainingRobotGuidebotState?
     fileprivate let trainingCameraMonitorState: TrainingCameraMonitorState?
@@ -1163,6 +1211,7 @@ final class PlayerSimulation {
     private(set) var afterburnerFuel: Float = 5
     private(set) var afterburnerIsActive = false
     private(set) var energy: Float = 100
+    private(set) var shields: Float = 100
     private(set) var trainingSessionOutcome: TrainingSessionOutcome?
     private(set) var afterburnerMagnitude: Float = 0
     private(set) var wiggleFalloff: Float = 0
@@ -1172,6 +1221,7 @@ final class PlayerSimulation {
     private var pauseDepth = 0
     private var pauseTimestamp: Double?
     private var trainingOpeningState: TrainingOpeningState?
+    private var trainingDodgeAttemptState: TrainingDodgeAttemptState?
     private var trainingGalleryBarrierState: TrainingGalleryBarrierState?
     private var trainingRobotGuidebotState: TrainingRobotGuidebotState?
     private var trainingCameraMonitorState: TrainingCameraMonitorState?
@@ -1205,6 +1255,9 @@ final class PlayerSimulation {
         lastTimestamp = presentationReadyTimestamp
         trainingOpeningState = level.trainingOpeningLesson.map {
             TrainingOpeningState(timerRemaining: $0.welcomeDelay)
+        }
+        trainingDodgeAttemptState = level.trainingDodgeAttempt.map {
+            _ in TrainingDodgeAttemptState()
         }
         trainingGalleryBarrierState = level.trainingGalleryBarrier.map {
             TrainingGalleryBarrierState(
@@ -1315,6 +1368,16 @@ final class PlayerSimulation {
             ?? level.trainingFinalGoalChain.map {
                 _ in TrainingFinalGoalState()
             }
+        let restoredDodgeAttemptState =
+            continuation.trainingDodgeAttemptState
+            ?? level.trainingDodgeAttempt.map {
+                _ in TrainingDodgeAttemptState()
+            }
+        let dodgeAttemptIsActive =
+            restoredDodgeAttemptState?.script033Count == 1
+            && restoredDodgeAttemptState?.script017Count == 0
+        let dodgeAttemptHasSucceeded =
+            restoredDodgeAttemptState?.script017Count == 1
         let restoredLastBot1DeathState =
             continuation.trainingLastBot1DeathState
             ?? level.trainingLastBot1DeathChain.map {
@@ -1883,6 +1946,11 @@ final class PlayerSimulation {
                           guard state.enabledControls.rawValue
                                   == startCourse.enabledControlMask
                               || state.enabledControls.rawValue == 32
+                              || (
+                                  dodgeAttemptHasSucceeded
+                                    && state.enabledControls.rawValue & 63
+                                        == 63
+                              )
                           else {
                               return false
                           }
@@ -1890,6 +1958,11 @@ final class PlayerSimulation {
                           guard state.enabledControls.rawValue
                                   & startCourse.enabledControlMask
                                     == startCourse.enabledControlMask
+                                  || (
+                                      dodgeAttemptIsActive
+                                        && state.enabledControls.rawValue & 63
+                                            == 60
+                                  )
                           else {
                               return false
                           }
@@ -1905,12 +1978,22 @@ final class PlayerSimulation {
                           guard state.enabledControls.rawValue
                                   == finishCourse.enabledControlMask
                               || state.enabledControls.rawValue == 63
+                              || (
+                                  dodgeAttemptHasSucceeded
+                                    && state.enabledControls.rawValue & 63
+                                        == 63
+                              )
                           else {
                               return false
                           }
                       } else {
                           guard state.enabledControls.rawValue
                                   == finishCourse.enabledControlMask
+                              || (
+                                  dodgeAttemptHasSucceeded
+                                    && state.enabledControls.rawValue & 63
+                                        == 63
+                              )
                           else {
                               return false
                           }
@@ -1959,6 +2042,12 @@ final class PlayerSimulation {
                       && (
                           state.startCourseWasPresented == true
                             || state.finishCourseWasPresented == true
+                            || (dodgeAttemptIsActive
+                                && state.enabledControls.rawValue & 63
+                                    == 60)
+                            || (dodgeAttemptHasSucceeded
+                                && state.enabledControls.rawValue & 63
+                                    == 63)
                             || expectedControls.contains(
                                 state.enabledControls
                             )
@@ -2028,6 +2117,7 @@ final class PlayerSimulation {
         }
         var restoredOpeningState = continuation.trainingOpeningState
         if restoredOpeningState?.startCourseWasPresented == true,
+           !dodgeAttemptIsActive,
            !(restoredOpeningState?.finishCourseWasPresented == true
                 && restoredOpeningState?.enabledControls.rawValue == 32),
            let startCourse =
@@ -2038,7 +2128,40 @@ final class PlayerSimulation {
                 )
             )
         }
+        guard
+            validTrainingDodgeAttemptContinuation(
+                restoredDodgeAttemptState,
+                shields: continuation.shields ?? 100,
+                level: continuationLevel
+            )
+        else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
         var restoredLevel = continuationLevel
+        if restoredDodgeAttemptState?.script033Count == 1 {
+            setTrainingDodgePortalRenderState(
+                in: &restoredLevel,
+                roomSourceIndex:
+                    restoredLevel.trainingDodgeAttempt!
+                    .portalRoomTwoSourceIndex,
+                portalIndices:
+                    restoredLevel.trainingDodgeAttempt!
+                    .orderedPortalIndices,
+                rendersFaces: true
+            )
+        }
+        if restoredDodgeAttemptState?.script017Count == 1 {
+            setTrainingDodgePortalRenderState(
+                in: &restoredLevel,
+                roomSourceIndex:
+                    restoredLevel.trainingDodgeAttempt!
+                    .portalRoomThreeSourceIndex,
+                portalIndices:
+                    restoredLevel.trainingDodgeAttempt!
+                    .orderedPortalIndices,
+                rendersFaces: false
+            )
+        }
         let binding = restoredLevel.defaultPlayerBinding!
         let objectIndex = restoredLevel.objects.firstIndex {
             $0.handle == binding.objectHandle
@@ -2056,11 +2179,13 @@ final class PlayerSimulation {
         afterburnerFuel = continuation.afterburnerFuel
         afterburnerIsActive = continuation.afterburnerIsActive
         energy = continuation.energy
+        shields = continuation.shields ?? 100
         afterburnerMagnitude = continuation.afterburnerMagnitude
         wiggleFalloff = continuation.wiggleFalloff
         lastThrustTime = continuation.lastThrustTime
         lastTimestamp = resumedAtTimestamp
         trainingOpeningState = restoredOpeningState
+        trainingDodgeAttemptState = restoredDodgeAttemptState
         trainingGalleryBarrierState =
             continuation.trainingGalleryBarrierState
         trainingRobotGuidebotState =
@@ -2130,7 +2255,9 @@ final class PlayerSimulation {
             afterburnerMagnitude: afterburnerMagnitude,
             wiggleFalloff: wiggleFalloff,
             lastThrustTime: lastThrustTime,
+            shields: shields,
             trainingOpeningState: trainingOpeningState,
+            trainingDodgeAttemptState: trainingDodgeAttemptState,
             trainingGalleryBarrierState:
                 trainingGalleryBarrierState,
             trainingRobotGuidebotState:
@@ -3748,6 +3875,434 @@ final class PlayerSimulation {
         )
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
+        if var dodgeState = trainingDodgeAttemptState,
+            let dodge = level.trainingDodgeAttempt
+        {
+            let triggerTimerConsumesFrame =
+                dodgeState.triggerTimerRemaining != nil
+            var almostDoneTimerConsumesFrame =
+                dodgeState.almostDoneTimerRemaining != nil
+            var successTimerConsumesFrame =
+                dodgeState.successTimerRemaining != nil
+            let player = level.objects[movedPlayerIndex]
+            let turret = level.objects.first {
+                $0.handle == dodge.dodgeTurretObjectHandle
+            }!
+
+            if dodgeState.turretIsPowered,
+                dodgeState.script017Count == 0,
+                case .room(let turretRoom) = turret.location,
+                case .room(let playerRoom) = player.location
+            {
+                let connectedRooms = reciprocalPortalComponent(
+                    rooms: level.rooms,
+                    startRoomSourceIndex: turretRoom
+                )
+                let targetDistance = vectorDistance(
+                    turret.position,
+                    player.position
+                )
+                let crossRoomLimit: Float =
+                    dodgeState.awareness > 0 ? 720 : 450
+                let targetIsEligible =
+                    connectedRooms.contains(playerRoom)
+                    && (playerRoom == turretRoom
+                        || targetDistance <= crossRoomLimit)
+                if !targetIsEligible {
+                    dodgeState.seesTarget = false
+                } else if systemsGameTime
+                    - dodgeState.lastVisibleTargetTime > 0.35,
+                    systemsGameTime
+                        >= dodgeState.nextVisibilityCheckTime
+                {
+                    let visibility = traceIndoorMovement(
+                        in: level,
+                        startRoom: turretRoom,
+                        start: turret.position,
+                        end: player.position,
+                        radius: 0
+                    )
+                    // Visibility scheduling uses the deterministic midpoint
+                    // of the released 0.135...0.165 interval until replay/RNG
+                    // authority is selected.
+                    dodgeState.nextVisibilityCheckTime =
+                        systemsGameTime + 0.15
+                    if case .noHit = visibility.outcome {
+                        let targetDirection = normalized(
+                            player.position - turret.position
+                        )
+                        let closingSpeed =
+                            dodgeState.weaponSpeed
+                            - dot(targetDirection, velocity)
+                        if dodgeState.weaponSpeed > 0,
+                            closingSpeed > 0
+                        {
+                            dodgeState.retainedTargetPosition =
+                                player.position
+                                + velocity
+                                * (targetDistance
+                                    / closingSpeed
+                                    * dodge.turret
+                                    .fixedLeadAccuracy)
+                        } else {
+                            dodgeState.retainedTargetPosition =
+                                player.position
+                        }
+                        dodgeState.lastVisibleTargetTime =
+                            systemsGameTime
+                        dodgeState.seesTarget = true
+                        dodgeState.awareness = max(
+                            dodgeState.awareness,
+                            60
+                        )
+                    }
+                }
+                let visibleAge =
+                    systemsGameTime
+                    - dodgeState.lastVisibleTargetTime
+                if let retainedTarget =
+                    dodgeState.retainedTargetPosition,
+                    dodgeState.awareness > 15,
+                    visibleAge < 4
+                {
+                    for jointIndex in dodge.turret.joints.indices {
+                        let joint = dodge.turret.joints[jointIndex]
+                        let still =
+                            dodgeState.turretAngles[jointIndex]
+                        let right = constrainedTrainingTurretAngle(
+                            still
+                                - systemsFrameDuration
+                                * joint.rotationsPerSecond,
+                            fieldOfView: joint.fieldOfView,
+                            movesRight: true
+                        )
+                        let left = constrainedTrainingTurretAngle(
+                            still
+                                + systemsFrameDuration
+                                * joint.rotationsPerSecond,
+                            fieldOfView: joint.fieldOfView,
+                            movesRight: false
+                        )
+                        var candidates = dodgeState.turretAngles
+                        candidates[jointIndex] = still
+                        let stillDot = trainingDodgeAimDot(
+                            level: level,
+                            dodge: dodge,
+                            turret: turret,
+                            angles: candidates,
+                            target: retainedTarget
+                        )
+                        candidates[jointIndex] = right
+                        let rightDot = trainingDodgeAimDot(
+                            level: level,
+                            dodge: dodge,
+                            turret: turret,
+                            angles: candidates,
+                            target: retainedTarget
+                        )
+                        candidates[jointIndex] = left
+                        let leftDot = trainingDodgeAimDot(
+                            level: level,
+                            dodge: dodge,
+                            turret: turret,
+                            angles: candidates,
+                            target: retainedTarget
+                        )
+                        var bestAngle = still
+                        var bestDot = stillDot
+                        if rightDot > bestDot {
+                            bestAngle = right
+                            bestDot = rightDot
+                        }
+                        if leftDot > bestDot {
+                            bestAngle = left
+                        }
+                        dodgeState.turretAngles[jointIndex] =
+                            bestAngle
+                        dodgeState.turretDirections[jointIndex] =
+                            rightDot > leftDot ? 1 : 2
+                    }
+
+                    let aim = trainingDodgeGunTransform(
+                        level: level,
+                        dodge: dodge,
+                        turret: turret,
+                        angles: dodgeState.turretAngles,
+                        restPosition: dodge.turret.aimingGunpoint
+                    )
+                    let aimDirection = normalized(
+                        retainedTarget - aim.position
+                    )
+                    if visibleAge < 2,
+                        dot(aim.forward, aimDirection)
+                            >= dodge.turret.fireAlignmentDot,
+                        systemsGameTime >= dodgeState.nextFireTime
+                    {
+                        let fire = trainingDodgeGunTransform(
+                            level: level,
+                            dodge: dodge,
+                            turret: turret,
+                            angles: dodgeState.turretAngles,
+                            restPosition: dodge.turret.gunpoints[
+                                dodgeState.firingMaskIndex
+                            ]
+                        )
+                        let muzzleTrace = traceIndoorMovement(
+                            in: level,
+                            startRoom: turretRoom,
+                            start: turret.position,
+                            end: fire.position,
+                            radius: 0
+                        )
+                        if case .noHit = muzzleTrace.outcome {
+                            dodgeState.projectiles.append(
+                                .init(
+                                    roomSourceIndex: turretRoom,
+                                    position: fire.position,
+                                    velocity:
+                                        fire.forward
+                                        * dodge.turret.projectileSpeed,
+                                    lifeRemaining:
+                                        dodge.turret.projectileLifetime
+                                ))
+                            trainingOpeningFeedback.append(
+                                .init(
+                                    hudMessages: [],
+                                    voiceSourceName: "",
+                                    voicePrecedesHUDMessages: true,
+                                    soundSourceName:
+                                        dodge.turret.fireSoundSourceName
+                                ))
+                        }
+                        let scheduledFireTime =
+                            dodgeState.nextFireTime
+                        let continuousWindow = max(
+                            dodge.turret.fireWait,
+                            systemsFrameDuration * 1.5
+                        )
+                        dodgeState.nextFireTime =
+                            systemsGameTime - scheduledFireTime
+                                <= continuousWindow
+                            ? scheduledFireTime
+                                + dodge.turret.fireWait
+                            : systemsGameTime
+                                + dodge.turret.fireWait
+                        dodgeState.firingMaskIndex =
+                            (dodgeState.firingMaskIndex + 1)
+                            % dodge.turret.gunpoints.count
+                        dodgeState.weaponSpeed =
+                            dodge.turret.projectileSpeed
+                    }
+                }
+            }
+
+            var survivingProjectiles: [TrainingDodgeProjectileState] = []
+            for var projectile in dodgeState.projectiles {
+                let end =
+                    projectile.position
+                    + projectile.velocity * systemsFrameDuration
+                let trace = traceIndoorMovement(
+                    in: level,
+                    startRoom: projectile.roomSourceIndex,
+                    start: projectile.position,
+                    end: end,
+                    radius: dodge.turret.projectileRadius
+                )
+                let playerHit = segmentSphereHitFraction(
+                    start: projectile.position,
+                    end: end,
+                    center: player.position,
+                    radius:
+                        dodge.turret.projectileRadius
+                        + view.collisionRadius
+                )
+                let traceFraction =
+                    vectorDistance(
+                        projectile.position,
+                        end
+                    ) > 0
+                    ? vectorDistance(
+                        projectile.position,
+                        trace.finalPosition
+                    ) / vectorDistance(projectile.position, end)
+                    : 1
+                if let playerHit,
+                    playerHit <= traceFraction + 0.000_1
+                {
+                    shields -= dodge.turret.projectileDamage
+                    trainingOpeningFeedback.append(
+                        .init(
+                            hudMessages: [],
+                            voiceSourceName: "",
+                            voicePrecedesHUDMessages: true,
+                            soundSourceName:
+                                dodge.turret.impactSoundSourceName
+                        ))
+                    continue
+                }
+                guard case .noHit = trace.outcome else { continue }
+                projectile.position = trace.finalPosition
+                projectile.roomSourceIndex =
+                    trace.containingRoomSourceIndex
+                projectile.lifeRemaining -= systemsFrameDuration
+                if projectile.lifeRemaining > 0 {
+                    survivingProjectiles.append(projectile)
+                }
+            }
+            dodgeState.projectiles = survivingProjectiles
+
+            if dodgeState.script033Count < 1,
+                case .room(35) = player.location,
+                let startDodge = level.objects.first(where: {
+                    $0.handle == dodge.startDodgeObjectHandle
+                }),
+                segmentSphereHitFraction(
+                    start: object.position,
+                    end: player.position,
+                    center: startDodge.position,
+                    radius:
+                        dodge.startDodgeCollisionRadius
+                        + view.collisionRadius
+                ) != nil
+            {
+                if var openingState = trainingOpeningState {
+                    let raw = openingState.enabledControls.rawValue
+                    openingState.enabledControls = .init(
+                        rawValue: (raw & ~dodge.disabledControlMask)
+                            | dodge.enabledDodgeControlMask
+                    )
+                    trainingOpeningState = openingState
+                }
+                setTrainingDodgePortalRenderState(
+                    in: &level,
+                    roomSourceIndex: dodge.portalRoomTwoSourceIndex,
+                    portalIndices: dodge.orderedPortalIndices,
+                    rendersFaces: true
+                )
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [dodge.introduction],
+                        voiceSourceName:
+                            dodge.introductionVoiceSourceName,
+                        voicePrecedesHUDMessages: true
+                    ))
+                dodgeState.triggerTimerRemaining = dodge.triggerDelay
+                dodgeState.script033Count += 1
+            }
+
+            if shields < dodge.restoredPlayerShields,
+                dodgeState.script016Count > 0,
+                dodgeState.script017Count == 0
+            {
+                dodgeState.almostDoneTimerRemaining =
+                    dodge.almostDoneDelay
+                dodgeState.successTimerRemaining = dodge.successDelay
+                almostDoneTimerConsumesFrame = false
+                successTimerConsumesFrame = false
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [dodge.hitInstruction],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: true
+                    ))
+                shields = dodge.restoredPlayerShields
+                if dodgeState.script018Count
+                    < trainingScriptActionCounterMaximum
+                {
+                    dodgeState.script018Count += 1
+                }
+            }
+
+            if var timer = dodgeState.triggerTimerRemaining {
+                if triggerTimerConsumesFrame {
+                    timer -= systemsFrameDuration
+                }
+                if timer <= 0.000_001,
+                    dodgeState.script016Count < 1
+                {
+                    dodgeState.triggerTimerRemaining = nil
+                    shields = dodge.restoredPlayerShields
+                    trainingOpeningFeedback.append(
+                        .init(
+                            hudMessages: [dodge.instruction],
+                            voiceSourceName: "",
+                            voicePrecedesHUDMessages: true
+                        ))
+                    dodgeState.successTimerRemaining =
+                        dodge.successDelay
+                    dodgeState.almostDoneTimerRemaining =
+                        dodge.almostDoneDelay
+                    dodgeState.turretIsPowered = true
+                    dodgeState.nextFireTime = systemsGameTime
+                    dodgeState.script016Count += 1
+                } else {
+                    dodgeState.triggerTimerRemaining = timer
+                }
+            }
+            if var timer = dodgeState.almostDoneTimerRemaining {
+                if almostDoneTimerConsumesFrame {
+                    timer -= systemsFrameDuration
+                }
+                if timer <= 0.000_001 {
+                    dodgeState.almostDoneTimerRemaining = nil
+                    trainingOpeningFeedback.append(
+                        .init(
+                            hudMessages: [dodge.almostDoneInstruction],
+                            voiceSourceName:
+                                dodge.almostDoneVoiceSourceName,
+                            voicePrecedesHUDMessages: true
+                        ))
+                    if dodgeState.script020Count
+                        < trainingScriptActionCounterMaximum
+                    {
+                        dodgeState.script020Count += 1
+                    }
+                } else {
+                    dodgeState.almostDoneTimerRemaining = timer
+                }
+            }
+            if var timer = dodgeState.successTimerRemaining {
+                if successTimerConsumesFrame {
+                    timer -= systemsFrameDuration
+                }
+                if timer <= 0.000_001,
+                    dodgeState.script017Count < 1
+                {
+                    dodgeState.successTimerRemaining = nil
+                    dodgeState.markerLightDistance =
+                        dodge.successMarkerLightDistance
+                    setTrainingDodgePortalRenderState(
+                        in: &level,
+                        roomSourceIndex:
+                            dodge.portalRoomThreeSourceIndex,
+                        portalIndices: dodge.orderedPortalIndices,
+                        rendersFaces: false
+                    )
+                    dodgeState.turretIsPowered = false
+                    if var openingState = trainingOpeningState {
+                        openingState.enabledControls.formUnion(
+                            .init(
+                                rawValue: dodge.successControlMask
+                            ))
+                        trainingOpeningState = openingState
+                    }
+                    trainingOpeningFeedback.append(
+                        .init(
+                            hudMessages: [
+                                dodge.successMessage,
+                                dodge.leaveInstruction,
+                            ],
+                            voiceSourceName:
+                                dodge.successVoiceSourceName,
+                            voicePrecedesHUDMessages: true
+                        ))
+                    dodgeState.script017Count += 1
+                } else {
+                    dodgeState.successTimerRemaining = timer
+                }
+            }
+            trainingDodgeAttemptState = dodgeState
+        }
         var trainingLastRoomWasTriggeredThisFrame = false
         var trainingFinalBotsWasTriggeredThisFrame = false
         if trainingFinalGoalWasHitThisFrame,
@@ -4485,6 +5040,21 @@ final class PlayerSimulation {
                             ?? (trainingOpeningState != nil)
                     ),
             trainingOpeningFeedback: trainingOpeningFeedback,
+            shields: shields,
+            trainingDodgeMarkerLightDistance:
+                trainingDodgeAttemptState?.markerLightDistance,
+            trainingDodgeTurretAngles:
+                trainingDodgeAttemptState?.turretAngles ?? [],
+            trainingDodgeProjectiles:
+                trainingDodgeAttemptState?.projectiles.map {
+                    .init(
+                        position: $0.position,
+                        velocity: $0.velocity,
+                        roomSourceIndex: $0.roomSourceIndex,
+                        model: level.trainingDodgeAttempt!
+                            .turret.projectileModel
+                    )
+                } ?? [],
             trainingGalleryMarkerLightDistance:
                 trainingGalleryBarrierState?.markerLightDistance,
             trainingGuidebotReturnMarkerLightDistance:
@@ -4544,7 +5114,7 @@ final class PlayerSimulation {
             // Player damage, death, and restore ownership are later Phase 5
             // islands. The current normal Training path retains its source
             // initial ratings and has no admitted death or restore transition.
-            shields: 100,
+            shields: shields,
             energy: energy,
             deaths: 0,
             restores: 0,
@@ -4812,6 +5382,277 @@ private func validTrainingGalleryBarrierContinuation(
         ? 0
         : barrier.openMarkerLightDistance
     return state.markerLightDistance == expectedDistance
+}
+
+private func validTrainingDodgeAttemptContinuation(
+    _ state: TrainingDodgeAttemptState?,
+    shields: Float,
+    level: Level
+) -> Bool {
+    guard let dodge = level.trainingDodgeAttempt else {
+        return state == nil && shields.isFinite && shields >= 0
+    }
+    guard let state,
+        shields.isFinite,
+        shields >= 0,
+        state.script033Count == 0 || state.script033Count == 1,
+        state.script016Count == 0 || state.script016Count == 1,
+        state.script017Count == 0 || state.script017Count == 1,
+        (0...trainingScriptActionCounterMaximum).contains(
+            state.script018Count
+        ),
+        (0...trainingScriptActionCounterMaximum).contains(
+            state.script020Count
+        ),
+        state.markerLightDistance.isFinite,
+        state.markerLightDistance
+            == (state.script017Count == 1
+                ? dodge.successMarkerLightDistance : 0),
+        state.firingMaskIndex >= 0,
+        state.firingMaskIndex < dodge.turret.gunpoints.count,
+        state.nextFireTime.isFinite,
+        state.nextFireTime >= 0,
+        state.turretAngles.count == dodge.turret.joints.count,
+        state.turretAngles.allSatisfy({
+            $0.isFinite && $0 >= 0 && $0 <= 1
+        }),
+        state.turretDirections.count == dodge.turret.joints.count,
+        state.turretDirections.allSatisfy({
+            (0...2).contains($0)
+        }),
+        state.retainedTargetPosition.map({
+            $0.x.isFinite && $0.y.isFinite && $0.z.isFinite
+        }) ?? true,
+        state.lastVisibleTargetTime.isFinite,
+        state.lastVisibleTargetTime >= -14,
+        state.nextVisibilityCheckTime.isFinite,
+        state.nextVisibilityCheckTime >= 0,
+        state.weaponSpeed == 0
+            || state.weaponSpeed == dodge.turret.projectileSpeed,
+        state.awareness.isFinite,
+        (0...100).contains(state.awareness),
+        state.triggerTimerRemaining.map({
+            $0.isFinite && $0 > 0 && $0 <= dodge.triggerDelay
+        }) ?? true,
+        state.successTimerRemaining.map({
+            $0.isFinite && $0 > 0 && $0 <= dodge.successDelay
+        }) ?? true,
+        state.almostDoneTimerRemaining.map({
+            $0.isFinite && $0 > 0 && $0 <= dodge.almostDoneDelay
+        }) ?? true,
+        state.projectiles.count
+            <= trainingDodgeProjectilePresentationCapacity,
+        state.projectiles.allSatisfy({ projectile in
+            level.rooms.contains {
+                $0.sourceIndex == projectile.roomSourceIndex
+            }
+                && projectile.position.x.isFinite
+                && projectile.position.y.isFinite
+                && projectile.position.z.isFinite
+                && projectile.velocity.x.isFinite
+                && projectile.velocity.y.isFinite
+                && projectile.velocity.z.isFinite
+                && abs(
+                    dot(
+                        projectile.velocity,
+                        projectile.velocity
+                    ).squareRoot()
+                        - dodge.turret.projectileSpeed
+                ) <= 0.001
+                && projectile.lifeRemaining.isFinite
+                && projectile.lifeRemaining > 0
+                && projectile.lifeRemaining
+                    <= dodge.turret.projectileLifetime
+        })
+    else {
+        return false
+    }
+    if state.script018Count > 0 && state.script016Count == 0 {
+        return false
+    }
+    if state.script020Count > state.script018Count + 1
+        || (state.script020Count > 0
+            && state.script016Count == 0)
+    {
+        return false
+    }
+    if state.seesTarget,
+        state.retainedTargetPosition == nil
+            || state.awareness < 60
+    {
+        return false
+    }
+    if state.script017Count == 1 {
+        return state.script033Count == 1
+            && state.script016Count == 1
+            && !state.turretIsPowered
+            && state.successTimerRemaining == nil
+            && state.almostDoneTimerRemaining == nil
+    }
+    if state.script016Count == 1 {
+        return state.script033Count == 1
+            && state.triggerTimerRemaining == nil
+            && state.successTimerRemaining != nil
+            && state.turretIsPowered
+            && shields == dodge.restoredPlayerShields
+    }
+    guard state.script018Count == 0,
+        state.script020Count == 0,
+        !state.turretIsPowered,
+        state.successTimerRemaining == nil,
+        state.almostDoneTimerRemaining == nil,
+        state.nextFireTime == 0,
+        state.firingMaskIndex == 0,
+        state.turretAngles.allSatisfy({ $0 == 0 }),
+        state.turretDirections.allSatisfy({ $0 == 0 }),
+        state.retainedTargetPosition == nil,
+        state.lastVisibleTargetTime == -14,
+        state.nextVisibilityCheckTime == 0,
+        !state.seesTarget,
+        state.awareness == 0,
+        state.weaponSpeed == 0,
+        state.projectiles.isEmpty,
+        shields == dodge.restoredPlayerShields
+    else {
+        return false
+    }
+    return state.script033Count == 0
+        ? state.triggerTimerRemaining == nil
+        : state.triggerTimerRemaining != nil
+}
+
+private struct TrainingDodgeGunTransform {
+    let position: Vector3
+    let forward: Vector3
+}
+
+private func constrainedTrainingTurretAngle(
+    _ value: Float,
+    fieldOfView: Float,
+    movesRight: Bool
+) -> Float {
+    var wrapped = value
+    while wrapped < 0 { wrapped += 1 }
+    while wrapped > 1 { wrapped -= 1 }
+    guard fieldOfView < 0.5 else { return wrapped }
+    let maximum = 1 - fieldOfView
+    if wrapped > fieldOfView && wrapped < maximum {
+        return movesRight ? maximum : fieldOfView
+    }
+    return wrapped
+}
+
+private func trainingDodgeGunTransform(
+    level: Level,
+    dodge: TrainingDodgeAttempt,
+    turret: PlacedObject,
+    angles: [Float],
+    restPosition: Vector3
+) -> TrainingDodgeGunTransform {
+    let model = level.models.first {
+        $0.source == dodge.turret.model
+    }!
+    var chain: [Int] = []
+    var current: Int? =
+        dodge.turret.gunpointParentSubmodelIndex
+    while let index = current {
+        chain.append(index)
+        current = model.submodels[index].parentIndex
+    }
+    chain.reverse()
+
+    let identity = Matrix3(
+        right: .init(x: 1, y: 0, z: 0),
+        up: .init(x: 0, y: 1, z: 0),
+        forward: .init(x: 0, y: 0, z: 1)
+    )
+    var origin = Vector3.zero
+    var orientation = identity
+    for index in chain {
+        let submodel = model.submodels[index]
+        origin =
+            origin
+            + transform(
+                submodel.offset,
+                by: orientation
+            )
+        guard
+            let jointIndex = dodge.turret.joints.firstIndex(
+                where: { $0.submodelIndex == index }
+            )
+        else {
+            continue
+        }
+        let joint = dodge.turret.joints[jointIndex]
+        let angle = angles[jointIndex] * 2 * Float.pi
+        let localOrientation = Matrix3(
+            right: rotate(
+                .init(x: 1, y: 0, z: 0),
+                around: joint.rotationAxis,
+                angle: angle
+            ),
+            up: rotate(
+                .init(x: 0, y: 1, z: 0),
+                around: joint.rotationAxis,
+                angle: angle
+            ),
+            forward: rotate(
+                .init(x: 0, y: 0, z: 1),
+                around: joint.rotationAxis,
+                angle: angle
+            )
+        )
+        orientation = .init(
+            right: transform(
+                localOrientation.right,
+                by: orientation
+            ),
+            up: transform(
+                localOrientation.up,
+                by: orientation
+            ),
+            forward: transform(
+                localOrientation.forward,
+                by: orientation
+            )
+        )
+    }
+    let modelPoint =
+        origin
+        + transform(
+            restPosition,
+            by: orientation
+        )
+    return .init(
+        position:
+            turret.position
+            + transform(modelPoint, by: turret.orientation),
+        forward: normalized(
+            transform(
+                transform(dodge.turret.gunpointForward, by: orientation),
+                by: turret.orientation
+            ))
+    )
+}
+
+private func trainingDodgeAimDot(
+    level: Level,
+    dodge: TrainingDodgeAttempt,
+    turret: PlacedObject,
+    angles: [Float],
+    target: Vector3
+) -> Float {
+    let aim = trainingDodgeGunTransform(
+        level: level,
+        dodge: dodge,
+        turret: turret,
+        angles: angles,
+        restPosition: dodge.turret.aimingGunpoint
+    )
+    return dot(
+        aim.forward,
+        normalized(target - aim.position)
+    )
 }
 
 private func validTrainingRobotGuidebotContinuation(
@@ -5586,6 +6427,35 @@ private func closeTrainingGalleryBarrier(in level: inout Level) {
         }!
         level.rooms[connectedRoomIndex]
             .portals[portal.connectedPortal].flags |= 1
+    }
+}
+
+private func setTrainingDodgePortalRenderState(
+    in level: inout Level,
+    roomSourceIndex: Int,
+    portalIndices: [Int],
+    rendersFaces: Bool
+) {
+    let roomIndex = level.rooms.firstIndex {
+        $0.sourceIndex == roomSourceIndex
+    }!
+    for portalIndex in portalIndices {
+        let portal = level.rooms[roomIndex].portals[portalIndex]
+        if rendersFaces {
+            level.rooms[roomIndex].portals[portalIndex].flags |= 1
+        } else {
+            level.rooms[roomIndex].portals[portalIndex].flags &= ~UInt32(1)
+        }
+        let connectedRoomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == portal.connectedRoom
+        }!
+        if rendersFaces {
+            level.rooms[connectedRoomIndex]
+                .portals[portal.connectedPortal].flags |= 1
+        } else {
+            level.rooms[connectedRoomIndex]
+                .portals[portal.connectedPortal].flags &= ~UInt32(1)
+        }
     }
 }
 
@@ -6777,7 +7647,8 @@ func extractWorldForRendering(
     camera: RoomCamera,
     startRoomSourceIndex: Int,
     excludedObjectHandle: UInt32?,
-    presentationGameTime: Float = 0
+    presentationGameTime: Float = 0,
+    trainingDodgeTurretAngles: [Float] = []
 ) throws -> WorldRenderExtraction {
     let visibility = try extractSourceVisibleWorld(
         level,
@@ -6844,7 +7715,9 @@ func extractWorldForRendering(
         startRoomSourceIndex: startRoomSourceIndex,
         visibility: visibility,
         excludedObjectHandle: excludedObjectHandle,
-        presentationGameTime: presentationGameTime
+        presentationGameTime: presentationGameTime,
+        trainingDodgeTurretAngles:
+            trainingDodgeTurretAngles
     )
     return WorldRenderExtraction(
         visibleRoomSourceIndices: visibility.visibleRoomSourceIndices,
@@ -6863,7 +7736,8 @@ private func extractObjectPresentation(
     startRoomSourceIndex: Int,
     visibility: SourceVisibleWorld,
     excludedObjectHandle: UInt32?,
-    presentationGameTime: Float
+    presentationGameTime: Float,
+    trainingDodgeTurretAngles: [Float]
 ) -> (handles: [UInt32], drawItems: [ModelDrawItem]) {
     guard !level.objectPresentations.isEmpty else { return ([], []) }
     let presentationByHandle = Dictionary(
@@ -6916,7 +7790,19 @@ private func extractObjectPresentation(
                 model: $0.model,
                 materialByTexture: materialByTexture,
                 camera: camera,
-                presentationGameTime: presentationGameTime
+                presentationGameTime: presentationGameTime,
+                turretAnglesBySubmodel:
+                    $0.object.handle
+                    == level.trainingDodgeAttempt?
+                    .dodgeTurretObjectHandle
+                    ? Dictionary(
+                        uniqueKeysWithValues: zip(
+                            level.trainingDodgeAttempt!.turret.joints.map(
+                                \.submodelIndex
+                            ),
+                            trainingDodgeTurretAngles
+                        ))
+                    : [:]
             )
         }
     )
@@ -7026,7 +7912,8 @@ private struct ModelSubmodelTransform {
 
 private func modelSubmodelTransforms(
     _ model: CanonicalModel,
-    presentationGameTime: Float
+    presentationGameTime: Float,
+    turretAnglesBySubmodel: [Int: Float] = [:]
 ) -> [ModelSubmodelTransform] {
     precondition(
         presentationGameTime.isFinite && presentationGameTime >= 0
@@ -7049,6 +7936,29 @@ private func modelSubmodelTransforms(
         if case let .rotate(rate, axis) = submodel.presentation {
             let turns = presentationGameTime / rate
             let angle = (turns - floor(turns)) * 2 * Float.pi
+            localOrientation = .init(
+                right: rotate(
+                    .init(x: 1, y: 0, z: 0),
+                    around: axis,
+                    angle: angle
+                ),
+                up: rotate(
+                    .init(x: 0, y: 1, z: 0),
+                    around: axis,
+                    angle: angle
+                ),
+                forward: rotate(
+                    .init(x: 0, y: 0, z: 1),
+                    around: axis,
+                    angle: angle
+                )
+            )
+        } else if case .turret(_, _, _, let axis) = submodel.presentation,
+            let turns = turretAnglesBySubmodel[
+                submodel.sourceIndex
+            ]
+        {
+            let angle = turns * 2 * Float.pi
             localOrientation = .init(
                 right: rotate(
                     .init(x: 1, y: 0, z: 0),
@@ -7112,6 +8022,7 @@ private func makeModelDrawItems(
     materialByTexture: [SourceResource: PresentationMaterial],
     camera: RoomCamera,
     presentationGameTime: Float = 0,
+    turretAnglesBySubmodel: [Int: Float] = [:],
     cullBackfaces: Bool = true
 ) -> [ModelDrawItem] {
     guard case let .room(roomSourceIndex) = object.location else {
@@ -7119,7 +8030,8 @@ private func makeModelDrawItems(
     }
     let transforms = modelSubmodelTransforms(
         model,
-        presentationGameTime: presentationGameTime
+        presentationGameTime: presentationGameTime,
+        turretAnglesBySubmodel: turretAnglesBySubmodel
     )
     let view = CameraView(camera)
     var opaque: [ModelDrawItem] = []
@@ -7189,7 +8101,7 @@ private func makeModelDrawItems(
             continue
         }
         switch submodel.presentation {
-        case .standard, .rotate:
+        case .standard, .rotate, .turret:
             break
         case .custom, .facing, .glow:
             continue
@@ -7257,6 +8169,99 @@ private func makeModelDrawItems(
         }
     }
     return opaque + alpha
+}
+
+private let trainingDodgeProjectilePresentationCapacity = 8
+private let trainingScriptActionCounterMaximum = 100_000
+
+func extractPreparedTrainingDodgeProjectileDrawItems(
+    _ level: Level
+) -> [ModelDrawItem] {
+    guard let dodge = level.trainingDodgeAttempt,
+        let turret = level.objects.first(where: {
+            $0.handle == dodge.dodgeTurretObjectHandle
+        }),
+        case .room(let roomSourceIndex) = turret.location
+    else {
+        return []
+    }
+    return extractTrainingDodgeProjectileDrawItems(
+        level,
+        projectiles: (0..<trainingDodgeProjectilePresentationCapacity)
+            .map { _ in
+                .init(
+                    position: turret.position,
+                    velocity:
+                        turret.orientation.forward
+                        * dodge.turret.projectileSpeed,
+                    roomSourceIndex: roomSourceIndex,
+                    model: dodge.turret.projectileModel
+                )
+            },
+        camera: .trainingRoom3
+    )
+}
+
+func extractTrainingDodgeProjectileDrawItems(
+    _ level: Level,
+    projectiles: [TrainingDodgeProjectileFrame],
+    camera: RoomCamera
+) -> [ModelDrawItem] {
+    guard let dodge = level.trainingDodgeAttempt,
+        let model = level.models.first(where: {
+            $0.source == dodge.turret.projectileModel
+        })
+    else {
+        return []
+    }
+    precondition(
+        projectiles.count <= trainingDodgeProjectilePresentationCapacity
+    )
+    let materialByTexture = Dictionary(
+        uniqueKeysWithValues: level.presentationMaterials.map {
+            ($0.texture, $0)
+        }
+    )
+    return projectiles.enumerated().flatMap { slot, projectile in
+        let forward = normalized(projectile.velocity)
+        let referenceUp =
+            abs(forward.y) < 0.99
+            ? Vector3(x: 0, y: 1, z: 0)
+            : Vector3(x: 1, y: 0, z: 0)
+        let right = normalized(cross(referenceUp, forward))
+        let up = cross(forward, right)
+        let object = PlacedObject(
+            handle: UInt32.max - UInt32(slot),
+            type: 5,
+            storedID: 0,
+            definition: nil,
+            instanceName: nil,
+            flags: 0,
+            doorShields: nil,
+            location: .room(projectile.roomSourceIndex),
+            position: projectile.position,
+            orientation: .init(
+                right: right,
+                up: up,
+                forward: forward
+            ),
+            containsType: 0,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        )
+        return makeModelDrawItems(
+            object: object,
+            model: model,
+            materialByTexture: materialByTexture,
+            camera: camera,
+            cullBackfaces: false
+        )
+    }
 }
 
 private func accumulatedModelOffsets(_ model: CanonicalModel) -> [Vector3] {
