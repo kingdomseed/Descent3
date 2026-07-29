@@ -1,0 +1,89 @@
+Revival/Tests/D3ImportTests/EditorProjectTests.swift
+  s_500d9a1a62c6e7::t_a9152cbc66b7e3 373,445-447
+  s_500d9a1a62c6e7::t_c1a2839301f476 448
+  s_500d9a1a62c6e7::t_87d76616e8ccab 400-404,529-536,588-613,718-744,789-794,838-842
+docs/revival/source-translation-ledger.md
+  s_500d9a1a62c6e7::t_ba95579e57789b 1279-1298,1302
+  s_500d9a1a62c6e7::t_445f45e8b803bb 1299
+  s_500d9a1a62c6e7::t_ce1e970f475550 1300
+  s_c503f7c0529e13::t_44dc1ea81e3872 1301
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_500d9a1a62c6e7::t_10cd893b856e93 8,23-282,284,286-287,305-311,313,315-320,322-323,328,330-342
+  s_500d9a1a62c6e7::t_fbd76516825b9b 288-304,312,314,321
+  s_500d9a1a62c6e7::t_5df6a7b421a4d6 12368-12373,12379
+  s_500d9a1a62c6e7::t_0453dfb6d9f71c 12337-12340
+  s_500d9a1a62c6e7::t_1d5bc19aba82cd 12324,12478-12483,12493-12494
+  s_500d9a1a62c6e7::t_c3220410246266 5-7,9-22,343-344
+  s_500d9a1a62c6e7::t_7d15f74c3a8c38 12393,12395-12397,12421,12423,12428,12430-12433,12440
+  s_500d9a1a62c6e7::t_70928fb5427972 283,285,324-327,329
+  s_500d9a1a62c6e7::t_43985a0f6db019 12326-12336,12341-12355,12446-12449
+  s_500d9a1a62c6e7::t_a5cbf01e84bfd9 9344
+  s_500d9a1a62c6e7::t_e3eafd7fe614e9 12288-12321,12356-12367,12374-12378,12380-12392,12394,12398-12420,12422,12424-12427,12429,12434-12439,12441-12445,12450-12477,12484-12487,12489-12492,12495-12500
+  s_500d9a1a62c6e7::t_9139194539b7f9 12322-12323,12325,12488
+  s_500d9a1a62c6e7::t_223531f5619c2a 4
+Revival/Sources/RevivalCore/Level.swift
+  s_500d9a1a62c6e7::t_8ceb96a6560573 559-569,591
+  s_500d9a1a62c6e7::t_0e2c24f7f4fcf4 4520-4523,4717-4739,4741
+  s_500d9a1a62c6e7::t_f5fbdd9f1adb36 5056,5068,5081
+  s_500d9a1a62c6e7::t_dddfa00c0d8dc2 5696
+  s_500d9a1a62c6e7::t_98889e3b8bff46 3594-3657
+  s_500d9a1a62c6e7::t_4c9412fdc28b79 1665-1787
+  s_500d9a1a62c6e7::t_d00d8f3e18c57b 4740
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_500d9a1a62c6e7::t_8ceb96a6560573 533,541,548
+  s_500d9a1a62c6e7::t_4b8e589faba969 5627-5660,5999-6008,6018
+  s_500d9a1a62c6e7::t_84c6c49ec595a1 3248,3380-3391,3640-3653,4344-4357
+  s_500d9a1a62c6e7::t_58dedab9723bd6 923,1374-1388,1882-1900,1904-1917,1957-1958,1961,2017-2028,2031-2032,4358
+  s_500d9a1a62c6e7::t_38d24f54b47839 6009-6011,6015-6017
+  s_500d9a1a62c6e7::t_cf9c9e369a5129 6019
+  s_500d9a1a62c6e7::t_95226bbd287b90 6012-6014
+docs/revival/verification.md
+  s_c503f7c0529e13::t_00d2d97ac9e49d 79
+  s_c503f7c0529e13::t_3ce944f798b6fc 78
+Revival/Sources/RevivalAppKit/RevivalGameplayView.swift
+  s_500d9a1a62c6e7::t_1f7dcb8acf9063 501-503
+  s_500d9a1a62c6e7::t_d7eed59e35690e 1060-1062
+Revival/Sources/RevivalEditor/RevivalEditorWindowController.swift
+  s_500d9a1a62c6e7::t_e07f641e269997 1030
+docs/revival/functional-completeness-ledger.md
+  s_500d9a1a62c6e7::t_685a6cface3420 379-384,386
+  s_500d9a1a62c6e7::t_23289c9ca5e74a 378,385
+Revival/Sources/D3Import/D3ImportOperation.swift
+  s_500d9a1a62c6e7::t_3b66d84b88d167 727-730,755-760,764-766,776-783,916-953,977,1157-1169
+  s_500d9a1a62c6e7::t_475c2adec7cf95 1184
+  s_500d9a1a62c6e7::t_075fa176befcbc 596,653,656,662
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_b96bf8b5004031 22,24-25,27-29,31,65-67,201,239
+  s_c503f7c0529e13::t_9ac83779be9a52 23
+  s_c503f7c0529e13::t_70b4278139387b 240
+Revival/Sources/RevivalEditor/RevivalProject.swift
+  s_500d9a1a62c6e7::t_c1a2839301f476 585-594
+Revival/Tests/D3ImportTests/CanonicalLevelTests.swift
+  s_500d9a1a62c6e7::t_cedca19aaafddc 4-128,146-165,203-232,254-298
+  s_500d9a1a62c6e7::t_a2500f95850c8a 233-253
+  s_500d9a1a62c6e7::t_d0d77464cb29d3 129-145,166-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "fc94224f7409b4cb9bf6c683a733fc1960f7a286",
+  "prompts": {},
+  "sessions": {
+    "s_500d9a1a62c6e7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019facc7-21af-7890-88f6-a863cb011835",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
