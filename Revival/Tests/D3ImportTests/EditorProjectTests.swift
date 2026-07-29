@@ -2,6 +2,48 @@ import AppKit
 import XCTest
 
 final class EditorProjectTests: XCTestCase {
+    @MainActor
+    func testManeuverFollowDiagnosticKeepsStockPathsReadOnlyAndSurfacesFailure()
+        throws
+    {
+        let level = makeTrainingManeuverFollowLevel()
+        let project = try makeProject(importedBase: level)
+        XCTAssertEqual(
+            project.trainingManeuverFollowSourceDiagnostic,
+            "TrainingMission.cpp Scripts 021,022,024,023,025,026 / ManuverRoomCenter 2063 / FollowBot1 8200 / stock read-only FollowLoop1 path 0 nodes 13 flags 0x900104 + GoToDie path 1 nodes 1 flags 0x1100 / slot 0 priority 3 / runtime path failure: invalidPath|movementBlocked"
+        )
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(at: 0.1, input: .zero)
+        XCTAssertEqual(
+            project.trainingManeuverFollowRuntimeDiagnostic(
+                frame: frame
+            ),
+            "\(project.trainingManeuverFollowSourceDiagnostic!) / active path none node 0 room 37 failure none"
+        )
+        let selection = try RevivalEditorSelection(
+            roomSourceIndex: 37,
+            in: level
+        )
+        XCTAssertTrue(
+            editorIdleStatusMessage(
+                project: project,
+                selection: selection
+            ).contains(
+                project.trainingManeuverFollowSourceDiagnostic!
+            )
+        )
+        XCTAssertEqual(
+            editorPlayStatusMessage(
+                project: project,
+                frame: frame
+            ),
+            "Playing a separately owned complete-level copy. Use W/S to thrust and A/D to slide.\nRuntime: \(project.trainingManeuverFollowRuntimeDiagnostic(frame: frame)!)"
+        )
+    }
+
     func testEditorSelectionValidatesRoomFaceAndPortalAgainstCanonicalLevel() throws {
         let level = makeConnectedRoomProjectLevel()
 

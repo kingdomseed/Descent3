@@ -1046,6 +1046,7 @@ struct RetailModelPageSelection: Equatable, Sendable {
     let lowDistance: Float?
     let shipDefinition: RetailShipDefinition?
     let genericLight: RetailGenericLightDefinition?
+    let genericAI: RetailGenericAIDefinition?
 }
 
 struct RetailShipDefinition: Equatable, Sendable {
@@ -1064,6 +1065,18 @@ struct RetailGenericLightDefinition: Equatable, Sendable {
     let timebits: UInt32
     let angle: UInt8
     let lightingRenderType: UInt8
+}
+
+struct RetailGenericAIDefinition: Equatable, Sendable {
+    let objectSize: Float
+    let flags: UInt32
+    let movementType: UInt8
+    let fieldOfView: Float
+    let maximumVelocity: Float
+    let maximumDeltaVelocity: Float
+    let maximumTurnRate: Float
+    let maximumDeltaTurnRate: Float
+    let circleDistance: Float
 }
 
 struct ReachedObjectModelPages: Equatable, Sendable {
@@ -1163,7 +1176,8 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                             presentationSize: presentationSize,
                             physics: physics
                         ),
-                        genericLight: nil
+                        genericLight: nil,
+                        genericAI: nil
                     )
                 )
             } else {
@@ -1185,7 +1199,7 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                 let mediumDistance = try cursor.readFloat()
                 let lowDistance = try cursor.readFloat()
                 try cursor.skip(68)
-                _ = try cursor.readFloat()
+                let objectSize = try cursor.readFloat()
                 _ = try cursor.readFloat()
                 let primaryColor = Vector3(
                     x: try cursor.readFloat(),
@@ -1204,9 +1218,25 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                 let timebits = try cursor.readUInt32()
                 let angle = try cursor.readUInt8()
                 let lightingRenderType = try cursor.readUInt8()
+                _ = try cursor.readInt32()
+                _ = try cursor.readUInt32()
+                let aiFlags = try cursor.readUInt32()
+                _ = try cursor.readUInt8()
+                _ = try cursor.readUInt8()
+                let movementType = try cursor.readUInt8()
+                _ = try cursor.readUInt8()
+                let fieldOfView = try cursor.readFloat()
+                let maximumVelocity = try cursor.readFloat()
+                let maximumDeltaVelocity = try cursor.readFloat()
+                let maximumTurnRate = try cursor.readFloat()
+                _ = try cursor.readUInt32()
+                let maximumDeltaTurnRate = try cursor.readFloat()
+                let circleDistance = try cursor.readFloat()
                 guard version >= 1,
                       mediumDistance.isFinite,
                       lowDistance.isFinite,
+                      objectSize.isFinite,
+                      objectSize > 0,
                       primaryColor.x.isFinite,
                       primaryColor.y.isFinite,
                       primaryColor.z.isFinite,
@@ -1215,7 +1245,13 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                       secondaryColor.z.isFinite,
                       timeInterval.isFinite,
                       flickerDistance.isFinite,
-                      directionalDot.isFinite else {
+                      directionalDot.isFinite,
+                      fieldOfView.isFinite,
+                      maximumVelocity.isFinite,
+                      maximumDeltaVelocity.isFinite,
+                      maximumTurnRate.isFinite,
+                      maximumDeltaTurnRate.isFinite,
+                      circleDistance.isFinite else {
                     throw RetailTextureTableError.unsupportedPresentation(name)
                 }
                 pages.append(
@@ -1238,6 +1274,19 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                             timebits: timebits,
                             angle: angle,
                             lightingRenderType: lightingRenderType
+                        ),
+                        genericAI: .init(
+                            objectSize: objectSize,
+                            flags: aiFlags,
+                            movementType: movementType,
+                            fieldOfView: fieldOfView,
+                            maximumVelocity: maximumVelocity,
+                            maximumDeltaVelocity:
+                                maximumDeltaVelocity,
+                            maximumTurnRate: maximumTurnRate,
+                            maximumDeltaTurnRate:
+                                maximumDeltaTurnRate,
+                            circleDistance: circleDistance
                         )
                     )
                 )

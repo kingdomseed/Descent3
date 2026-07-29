@@ -611,6 +611,56 @@ struct TrainingDodgeExitLesson: Codable, Equatable, Sendable {
     let voiceSourceName: String
 }
 
+struct TrainingFollowBotDefinition: Codable, Equatable, Sendable {
+    let model: SourceResource
+    let collisionRadius: Float
+    let maximumVelocity: Float
+    let maximumDeltaVelocity: Float
+    let maximumTurnRate: Float
+    let maximumDeltaTurnRate: Float
+    let circleDistance: Float
+}
+
+struct TrainingManeuverFollowLesson: Codable, Equatable, Sendable {
+    let maneuverObjectHandle: UInt32
+    let maneuverCollisionRadius: Float
+    let flashLightObjectHandle: UInt32
+    let portalRoomSourceIndex: Int
+    let orderedPortalIndices: [Int]
+    let headingControlMask: UInt32
+    let pitchControlMask: UInt32
+    let bankControlMask: UInt32
+    let rotationalControlMask: UInt32
+    let weaponControlMask: UInt32
+    let headingDuration: Float
+    let pitchDuration: Float
+    let bankDuration: Float
+    let followDuration: Float
+    let followBotObjectHandle: UInt32
+    let friendlyTeamFlags: UInt32
+    let followPathIndex: Int
+    let followPathGoalFlags: UInt32
+    let destroyPathIndex: Int
+    let destroyPathGoalFlags: UInt32
+    let goalSlot: Int
+    let goalPriority: Int
+    let maneuverIntroduction: String
+    let headingInstruction: String
+    let successMessage: String
+    let pitchInstruction: String
+    let bankInstruction: String
+    let followIntroduction: String
+    let followInstruction: String
+    let weaponsEnabledInstruction: String
+    let destroyInstruction: String
+    let headingVoiceSourceName: String
+    let pitchVoiceSourceName: String
+    let bankVoiceSourceName: String
+    let followVoiceSourceName: String
+    let weaponVoiceSourceName: String
+    let followBot: TrainingFollowBotDefinition
+}
+
 struct TrainingDodgeAttempt: Codable, Equatable, Sendable {
     let startDodgeObjectHandle: UInt32
     let startDodgeCollisionRadius: Float
@@ -641,6 +691,7 @@ struct TrainingDodgeAttempt: Codable, Equatable, Sendable {
     let markerLightPresentation: TrainingMarkerLightPresentation
     let turret: TrainingDodgeTurretDefinition
     var dodgeExit: TrainingDodgeExitLesson? = nil
+    var maneuverFollow: TrainingManeuverFollowLesson? = nil
 }
 
 struct TrainingOpeningLesson: Codable, Equatable, Sendable {
@@ -2072,6 +2123,268 @@ func validateStockTrainingDodgeAttemptPackage(
                 "Training Script 019 stock package"
             )
         }
+    }
+    if let lesson = dodge.maneuverFollow {
+        try validateStockTrainingManeuverFollowPackage(
+            lesson,
+            dodge: dodge,
+            level: level
+        )
+    }
+}
+
+func validateStockTrainingManeuverFollowPackage(
+    _ lesson: TrainingManeuverFollowLesson,
+    dodge: TrainingDodgeAttempt,
+    level: Level
+) throws {
+    let maneuver = level.objects.first {
+        $0.handle == lesson.maneuverObjectHandle
+    }
+    let followBot = level.objects.first {
+        $0.handle == lesson.followBotObjectHandle
+    }
+    let presentation = level.objectPresentations.first {
+        $0.objectHandle == lesson.followBotObjectHandle
+    }
+    let model = level.models.first {
+        $0.source == lesson.followBot.model
+    }
+    let pathsSHA256 = canonicalSHA256(
+        try canonicalJSONData(level.paths)
+    )
+    let roomBySourceIndex = Dictionary(
+        uniqueKeysWithValues: level.rooms.map {
+            ($0.sourceIndex, $0)
+        }
+    )
+    let portalRoom = roomBySourceIndex[
+        lesson.portalRoomSourceIndex
+    ]
+    let reciprocalConnections = lesson.orderedPortalIndices.compactMap {
+        portalIndex -> (Int, Int)? in
+        guard let portalRoom,
+              portalRoom.portals.indices.contains(portalIndex)
+        else {
+            return nil
+        }
+        let portal = portalRoom.portals[portalIndex]
+        guard let reciprocalRoom =
+                roomBySourceIndex[portal.connectedRoom],
+              reciprocalRoom.portals.indices.contains(
+                  portal.connectedPortal
+              ),
+              reciprocalRoom.portals[portal.connectedPortal]
+                .connectedRoom == lesson.portalRoomSourceIndex,
+              reciprocalRoom.portals[portal.connectedPortal]
+                .connectedPortal == portalIndex
+        else {
+            return nil
+        }
+        return (
+            portal.connectedRoom,
+            portal.connectedPortal
+        )
+    }
+    let requiredVoices = [
+        lesson.headingVoiceSourceName,
+        lesson.pitchVoiceSourceName,
+        lesson.bankVoiceSourceName,
+        lesson.followVoiceSourceName,
+        lesson.weaponVoiceSourceName,
+    ]
+    guard lesson.maneuverObjectHandle == 2_063,
+          lesson.maneuverCollisionRadius == 10.052_409,
+          lesson.flashLightObjectHandle
+            == dodge.flashLightObjectHandle,
+          lesson.portalRoomSourceIndex == 36,
+          lesson.orderedPortalIndices == [1, 0],
+          reciprocalConnections.map(\.0) == [37, 35],
+          reciprocalConnections.map(\.1) == [0, 1],
+          lesson.headingControlMask == 768,
+          lesson.pitchControlMask == 192,
+          lesson.bankControlMask == 3_072,
+          lesson.rotationalControlMask == 4_032,
+          lesson.weaponControlMask == 12_288,
+          lesson.headingDuration == 20,
+          lesson.pitchDuration == 12,
+          lesson.bankDuration == 15,
+          lesson.followDuration == 20,
+          lesson.followBotObjectHandle == 8_200,
+          lesson.friendlyTeamFlags == 65_536,
+          lesson.followPathIndex == 0,
+          lesson.followPathGoalFlags == 9_437_444,
+          lesson.destroyPathIndex == 1,
+          lesson.destroyPathGoalFlags == 4_352,
+          lesson.goalSlot == 0,
+          lesson.goalPriority == 3,
+          lesson.maneuverIntroduction
+            == "Now you are going to learn the other controls, which are pitch, heading and bank.",
+          lesson.headingInstruction
+            == "Now your heading controls are enabled. Try them out by rotating to the left and right.",
+          lesson.successMessage == "Excellent!",
+          lesson.pitchInstruction
+            == "Now your pitch controls are enabled. Try them out by pitching up and down.",
+          lesson.bankInstruction
+            == "Now your bank controls are enabled. Try them out by banking to the left and right.",
+          lesson.followIntroduction
+            == "Now you will use the rotational skills you just learned to follow one of the two robots that are circling this room",
+          lesson.followInstruction
+            == "Keep one of the robots on your screen for 20 seconds using only your rotational controls to complete this step.",
+          lesson.weaponsEnabledInstruction
+            == "Now your weapons have been enabled. There is a primary and a secondary.",
+          lesson.destroyInstruction == "Now, destroy the robot.",
+          requiredVoices == [
+              "intro3.osf",
+              "pitch.osf",
+              "bank.osf",
+              "follow.osf",
+              "intro4.osf",
+          ],
+          requiredVoices.allSatisfy({ sourceName in
+              guard let voice = level.voiceClips.first(where: {
+                  $0.sourceName == sourceName
+              }),
+                    voice.sampleRate == 22_050,
+                    voice.channelCount == 1,
+                    voice.pcm16LittleEndian.count
+                        == voice.frameCount * 2,
+                    voice.sourceArchive == "missions/training.mn3"
+              else {
+                  return false
+              }
+              switch sourceName {
+              case "intro3.osf":
+                  return voice.sourceEntryIndex == 12
+                    && voice.frameCount == 340_641
+                    && voice.pcmSHA256
+                        == "66aa8390a210046b75a9c60fbdcff9b10acb8ba1e0b5bd650dd8f46e137ba119"
+                    && voice.sourceSHA256
+                        == "d2632c6e360d1d683c381c86155c7d8280a9880f4a8e6554e1884e82cff35036"
+              case "pitch.osf":
+                  return voice.sourceEntryIndex == 20
+                    && voice.frameCount == 160_393
+                    && voice.pcmSHA256
+                        == "a717bd60b81636c17980a5ec742b44d60e091e0c768719b2d8bfd0713d29761b"
+                    && voice.sourceSHA256
+                        == "6b238a3d0301fcf34046c458632bb6fc88efeb26caa79dac5bce01c5c0ce6773"
+              case "bank.osf":
+                  return voice.sourceEntryIndex == 1
+                    && voice.frameCount == 180_229
+                    && voice.pcmSHA256
+                        == "32d6968a855f0bc5a5e50da9cf57faf40089264d9777f6abb1e2f398b0f317da"
+                    && voice.sourceSHA256
+                        == "97949ad89610d02f8eb027c06daf8dc388e9d3159cc10fed85d62c6aaf7df703"
+              case "follow.osf":
+                  return voice.sourceEntryIndex == 3
+                    && voice.frameCount == 163_749
+                    && voice.pcmSHA256
+                        == "92f90622166a1d27858510a2d3d1b0a5f1cf4d2690e204752927ca3bb4ff69a9"
+                    && voice.sourceSHA256
+                        == "6ec65e7e1aa1a6a5ec6c28b67e2c3f714925deaa4d910a152ec8d6f6ad908b5f"
+              case "intro4.osf":
+                  return voice.sourceEntryIndex == 13
+                    && voice.frameCount == 750_221
+                    && voice.pcmSHA256
+                        == "2b874c0f3c704f3f029cac8d0ace36578b5141fc93aabc52ae2d9231975670ed"
+                    && voice.sourceSHA256
+                        == "325b1bcf073a24042836fca4fb6b1e1fcb4975a3cc3c3b3560db86b06af36b9e"
+              default:
+                  return false
+              }
+          }),
+          maneuver?.type == 7,
+          maneuver?.storedID == 67,
+          maneuver?.definition?.storedIndex == 67,
+          maneuver?.definition?.referenceRuntimeIndex == 68,
+          maneuver?.definition?.sourceName == "Invisiblepowerup",
+          maneuver?.instanceName == "ManuverRoomCenter",
+          maneuver?.flags == 4_096,
+          maneuver?.location == .room(37),
+          maneuver?.position
+            == .init(
+                x: 2_061.7336,
+                y: -755.4103,
+                z: 2_566.1135
+            ),
+          maneuver?.orientation
+            == .init(
+                right: .init(x: -1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: 0),
+                forward: .init(x: 0, y: 0, z: -1)
+            ),
+          maneuver?.containsType == 255,
+          maneuver?.containsID == 0,
+          maneuver?.containsCount == 0,
+          maneuver?.lifeLeft == 0,
+          maneuver?.soundSource == nil,
+          maneuver?.inertScriptName == nil,
+          maneuver?.inertModuleName == nil,
+          maneuver?.lightmapSubmodels.isEmpty == true,
+          followBot?.type == 2,
+          followBot?.storedID == 106,
+          followBot?.definition?.storedIndex == 106,
+          followBot?.definition?.sourceName
+            == "RAS1 Light Security Flyer",
+          followBot?.instanceName == "FollowBot1",
+          followBot?.flags == 5_121,
+          followBot?.location == .room(37),
+          followBot?.position
+            == .init(
+                x: 2_059.3496,
+                y: -723.2588,
+                z: 2_469.1072
+            ),
+          followBot?.orientation
+            == .init(
+                right: .init(
+                    x: -0.999_645_05,
+                    y: -0.010_065_023,
+                    z: 0.024_667_98
+                ),
+                up: .init(
+                    x: -0.008_759_673,
+                    y: 0.998_584_4,
+                    z: 0.052_465_245
+                ),
+                forward: .init(
+                    x: -0.025_161_121,
+                    y: 0.052_230_537,
+                    z: -0.998_318_1
+                )
+            ),
+          followBot?.containsType == 255,
+          followBot?.containsID == 0,
+          followBot?.containsCount == 0,
+          followBot?.lifeLeft == 0,
+          followBot?.soundSource == nil,
+          followBot?.inertScriptName == nil,
+          followBot?.inertModuleName == nil,
+          followBot?.lightmapSubmodels.isEmpty == true,
+          presentation?.primaryModel == lesson.followBot.model,
+          presentation?.mediumModel == nil,
+          presentation?.lowModel == nil,
+          presentation?.dyingModel == nil,
+          presentation?.isVisible == true,
+          model?.source.sourceName == "gyro.OOF",
+          model?.collisionRadius == 3.841_456_2,
+          model?.sourceArchive == "d3.hog",
+          model?.sourceSHA256
+            == "896cc33ba0c7ec00fd2fd693a0e8f10868a47076eda0b7914cc90a790e87eb61",
+          lesson.followBot.collisionRadius == 4.576_441_8,
+          lesson.followBot.maximumVelocity == 40,
+          lesson.followBot.maximumDeltaVelocity == 80,
+          lesson.followBot.maximumTurnRate == 12_000,
+          lesson.followBot.maximumDeltaTurnRate == 16_000,
+          lesson.followBot.circleDistance == 25,
+          level.paths.indices.contains(lesson.followPathIndex),
+          level.paths.indices.contains(lesson.destroyPathIndex),
+          pathsSHA256
+            == "56997a7e05b017a65778bd48badf453f72bdf5f3f34d60fbd1d6cd8b4fdcdbe5"
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training Scripts 021-026 stock package"
+        )
     }
 }
 
@@ -5665,7 +5978,8 @@ struct Level: Codable, Equatable, Sendable {
                 }
             }
             let dodgeVoiceCount = trainingDodgeAttempt.map {
-                $0.dodgeExit == nil ? 3 : 4
+                ($0.dodgeExit == nil ? 3 : 4)
+                    + ($0.maneuverFollow == nil ? 0 : 5)
             } ?? 0
             guard let barrier = trainingGalleryBarrier,
                   barrier.triggerName == "Portal2",

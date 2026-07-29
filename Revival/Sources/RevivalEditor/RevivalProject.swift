@@ -603,6 +603,29 @@ struct RevivalProject: Equatable, Sendable {
         return
             "TrainingMission.cpp Scripts 033,016,017,018,020 / StartDodge 4106 / DoneDodgeingGoal 12302 / DodgeTurrett 8199 / FlashLight-1 4120 / PortalRoom2+3 portals 0,1 / intro2.osf+almost.osf+proceed3.osf"
     }
+    var trainingManeuverFollowSourceDiagnostic: String? {
+        guard let lesson =
+                level.trainingDodgeAttempt?.maneuverFollow,
+              level.paths.indices.contains(lesson.followPathIndex),
+              level.paths.indices.contains(lesson.destroyPathIndex)
+        else {
+            return nil
+        }
+        let followPath = level.paths[lesson.followPathIndex]
+        let destroyPath = level.paths[lesson.destroyPathIndex]
+        return
+            "TrainingMission.cpp Scripts 021,022,024,023,025,026 / ManuverRoomCenter \(lesson.maneuverObjectHandle) / FollowBot1 \(lesson.followBotObjectHandle) / stock read-only \(followPath.name) path \(lesson.followPathIndex) nodes \(followPath.nodes.count) flags 0x\(String(lesson.followPathGoalFlags, radix: 16)) + \(destroyPath.name) path \(lesson.destroyPathIndex) nodes \(destroyPath.nodes.count) flags 0x\(String(lesson.destroyPathGoalFlags, radix: 16)) / slot \(lesson.goalSlot) priority \(lesson.goalPriority) / runtime path failure: invalidPath|movementBlocked"
+    }
+    func trainingManeuverFollowRuntimeDiagnostic(
+        frame: PlayerSimulationFrame
+    ) -> String? {
+        guard let source = trainingManeuverFollowSourceDiagnostic,
+              let followBot = frame.trainingFollowBot else {
+            return nil
+        }
+        return
+            "\(source) / active path \(followBot.activePathIndex.map { String($0) } ?? "none") node \(followBot.pathNodeIndex) room \(followBot.roomSourceIndex) failure \(followBot.pathFailure?.rawValue ?? "none")"
+    }
     var trainingGalleryBarrierSourceDiagnostic: String? {
         level.trainingGalleryBarrier.map {
             "TrainingMission.cpp Script 032 / \($0.triggerName)"

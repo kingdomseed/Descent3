@@ -447,6 +447,7 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingDodgeMarkerLightDistance: Float?
     let trainingDodgeTurretAngles: [Float]
     let trainingDodgeProjectiles: [TrainingDodgeProjectileFrame]
+    let trainingFollowBot: TrainingFollowBotFrame?
     let trainingGalleryMarkerLightDistance: Float?
     let trainingGuidebotReturnMarkerLightDistance: Float?
     let trainingGuidebot: TrainingGuidebotFrame?
@@ -456,6 +457,30 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingLastRoomMarkerLightDistance: Float?
     let trainingFinalBotsMarkerLightDistance: Float?
     let trainingFinalGoal: TrainingFinalGoalFrame?
+}
+
+enum TrainingFollowBotPathFailure: String, Codable, Equatable, Sendable {
+    case invalidPath
+    case movementBlocked
+}
+
+struct TrainingFollowBotFrame: Equatable, Sendable {
+    let isPowered: Bool
+    let teamFlags: UInt32
+    let roomSourceIndex: Int
+    let position: Vector3
+    let orientation: Matrix3
+    let velocity: Vector3
+    let activePathIndex: Int?
+    let pathNodeIndex: Int
+    let objectTimerRemaining: Float?
+    let pathFailure: TrainingFollowBotPathFailure?
+    let script021Count: Int
+    let script022Count: Int
+    let script024Count: Int
+    let script023Count: Int
+    let script025Count: Int
+    let script026Count: Int
 }
 
 struct TrainingDodgeProjectileFrame: Equatable, Sendable {
@@ -1125,6 +1150,49 @@ private struct TrainingDodgeAttemptState:
     var markerLightDistance: Float = 0
 }
 
+private struct TrainingManeuverFollowState:
+    Codable, Equatable, Sendable
+{
+    var script021Count = 0
+    var script022Count = 0
+    var script024Count = 0
+    var script023Count = 0
+    var script025Count = 0
+    var script026Count = 0
+    var levelTimerRemaining: Float?
+    var objectTimerRemaining: Float?
+    var followBotIsPowered = false
+    var followBotTeamFlags: UInt32 = 0
+    var roomSourceIndex: Int
+    var position: Vector3
+    var orientation: Matrix3
+    var velocity = Vector3.zero
+    var activePathIndex: Int?
+    var pathNodeIndex = 0
+    var pathFailure: TrainingFollowBotPathFailure?
+
+    var frame: TrainingFollowBotFrame {
+        .init(
+            isPowered: followBotIsPowered,
+            teamFlags: followBotTeamFlags,
+            roomSourceIndex: roomSourceIndex,
+            position: position,
+            orientation: orientation,
+            velocity: velocity,
+            activePathIndex: activePathIndex,
+            pathNodeIndex: pathNodeIndex,
+            objectTimerRemaining: objectTimerRemaining,
+            pathFailure: pathFailure,
+            script021Count: script021Count,
+            script022Count: script022Count,
+            script024Count: script024Count,
+            script023Count: script023Count,
+            script025Count: script025Count,
+            script026Count: script026Count
+        )
+    }
+}
+
 struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     let schemaVersion: Int
     let levelKey: String
@@ -1147,6 +1215,8 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     fileprivate let shields: Float?
     fileprivate let trainingOpeningState: TrainingOpeningState?
     fileprivate let trainingDodgeAttemptState: TrainingDodgeAttemptState?
+    fileprivate let trainingManeuverFollowState:
+        TrainingManeuverFollowState?
     fileprivate let trainingGalleryBarrierState: TrainingGalleryBarrierState?
     fileprivate let trainingRobotGuidebotState: TrainingRobotGuidebotState?
     fileprivate let trainingCameraMonitorState: TrainingCameraMonitorState?
@@ -1223,6 +1293,8 @@ final class PlayerSimulation {
     private var pauseTimestamp: Double?
     private var trainingOpeningState: TrainingOpeningState?
     private var trainingDodgeAttemptState: TrainingDodgeAttemptState?
+    private var trainingManeuverFollowState:
+        TrainingManeuverFollowState?
     private var trainingGalleryBarrierState: TrainingGalleryBarrierState?
     private var trainingRobotGuidebotState: TrainingRobotGuidebotState?
     private var trainingCameraMonitorState: TrainingCameraMonitorState?
@@ -1260,6 +1332,22 @@ final class PlayerSimulation {
         trainingDodgeAttemptState = level.trainingDodgeAttempt.map {
             _ in TrainingDodgeAttemptState()
         }
+        trainingManeuverFollowState =
+            level.trainingDodgeAttempt?.maneuverFollow.flatMap { lesson in
+                level.objects.first(where: {
+                    $0.handle == lesson.followBotObjectHandle
+                }).flatMap { object in
+                    guard case let .room(roomSourceIndex) = object.location
+                    else {
+                        return nil
+                    }
+                    return TrainingManeuverFollowState(
+                        roomSourceIndex: roomSourceIndex,
+                        position: object.position,
+                        orientation: object.orientation
+                    )
+                }
+            }
         trainingGalleryBarrierState = level.trainingGalleryBarrier.map {
             TrainingGalleryBarrierState(
                 markerLightDistance:
@@ -1373,6 +1461,24 @@ final class PlayerSimulation {
             continuation.trainingDodgeAttemptState
             ?? level.trainingDodgeAttempt.map {
                 _ in TrainingDodgeAttemptState()
+            }
+        let restoredManeuverFollowState =
+            continuation.trainingManeuverFollowState
+            ?? level.trainingDodgeAttempt?.maneuverFollow.flatMap {
+                lesson in
+                level.objects.first(where: {
+                    $0.handle == lesson.followBotObjectHandle
+                }).flatMap { object in
+                    guard case let .room(roomSourceIndex) = object.location
+                    else {
+                        return nil
+                    }
+                    return TrainingManeuverFollowState(
+                        roomSourceIndex: roomSourceIndex,
+                        position: object.position,
+                        orientation: object.orientation
+                    )
+                }
             }
         let dodgeAttemptIsActive =
             restoredDodgeAttemptState?.script033Count == 1
@@ -1954,6 +2060,32 @@ final class PlayerSimulation {
                       return dodgeAttemptHasSucceeded
                           && (lowBits == 3 || lowBits == 63)
                   }()
+                  let maneuverControlMaskIsReachable: Bool = {
+                      guard let followState =
+                              restoredManeuverFollowState,
+                            followState.script021Count > 0,
+                            let lesson =
+                              level.trainingDodgeAttempt?
+                                .maneuverFollow
+                      else {
+                          return false
+                      }
+                      let expected: UInt32
+                      if followState.script026Count > 0 {
+                          expected =
+                              lesson.rotationalControlMask
+                              | lesson.weaponControlMask
+                      } else if followState.script023Count > 0 {
+                          expected = lesson.rotationalControlMask
+                      } else if followState.script024Count > 0 {
+                          expected = lesson.bankControlMask
+                      } else if followState.script022Count > 0 {
+                          expected = lesson.pitchControlMask
+                      } else {
+                          expected = lesson.headingControlMask
+                      }
+                      return state.enabledControls.rawValue == expected
+                  }()
                   if state.startCourseWasPresented == true {
                       guard let startCourse =
                               level.trainingOpeningLesson?.startCourse
@@ -1969,6 +2101,7 @@ final class PlayerSimulation {
                                     && state.enabledControls.rawValue == 63
                               )
                               || dodgeExitControlMaskIsReachable
+                              || maneuverControlMaskIsReachable
                           else {
                               return false
                           }
@@ -1981,6 +2114,7 @@ final class PlayerSimulation {
                                         && state.enabledControls.rawValue == 60
                                   )
                                   || dodgeExitControlMaskIsReachable
+                                  || maneuverControlMaskIsReachable
                           else {
                               return false
                           }
@@ -2001,6 +2135,7 @@ final class PlayerSimulation {
                                     && state.enabledControls.rawValue == 63
                               )
                               || dodgeExitControlMaskIsReachable
+                              || maneuverControlMaskIsReachable
                           else {
                               return false
                           }
@@ -2012,6 +2147,7 @@ final class PlayerSimulation {
                                     && state.enabledControls.rawValue == 63
                               )
                               || dodgeExitControlMaskIsReachable
+                              || maneuverControlMaskIsReachable
                           else {
                               return false
                           }
@@ -2065,6 +2201,7 @@ final class PlayerSimulation {
                             || (dodgeAttemptHasSucceeded
                                 && state.enabledControls.rawValue == 63)
                             || dodgeExitControlMaskIsReachable
+                            || maneuverControlMaskIsReachable
                             || expectedControls.contains(
                                 state.enabledControls
                             )
@@ -2136,6 +2273,7 @@ final class PlayerSimulation {
         if restoredOpeningState?.startCourseWasPresented == true,
            !dodgeAttemptIsActive,
            !dodgeExitWasReached,
+           restoredManeuverFollowState?.script021Count ?? 0 == 0,
            !(restoredOpeningState?.finishCourseWasPresented == true
                 && restoredOpeningState?.enabledControls.rawValue == 32),
            let startCourse =
@@ -2149,10 +2287,17 @@ final class PlayerSimulation {
         guard
             validTrainingDodgeAttemptContinuation(
                 restoredDodgeAttemptState,
+                maneuverState: restoredManeuverFollowState,
                 shields: continuation.shields ?? 100,
                 level: continuationLevel
             )
         else {
+            throw PlayerSimulationContinuationError.invalidState
+        }
+        guard validTrainingManeuverFollowContinuation(
+            restoredManeuverFollowState,
+            level: continuationLevel
+        ) else {
             throw PlayerSimulationContinuationError.invalidState
         }
         var restoredLevel = continuationLevel
@@ -2190,6 +2335,29 @@ final class PlayerSimulation {
                 rendersFaces: false
             )
         }
+        if restoredManeuverFollowState?.script021Count ?? 0 > 0,
+           let lesson =
+                restoredLevel.trainingDodgeAttempt?.maneuverFollow
+        {
+            setTrainingDodgePortalRenderState(
+                in: &restoredLevel,
+                roomSourceIndex: lesson.portalRoomSourceIndex,
+                portalIndices: lesson.orderedPortalIndices,
+                rendersFaces: true
+            )
+        }
+        if let state = restoredManeuverFollowState,
+           let lesson =
+                restoredLevel.trainingDodgeAttempt?.maneuverFollow,
+           let objectIndex = restoredLevel.objects.firstIndex(where: {
+               $0.handle == lesson.followBotObjectHandle
+           }) {
+            restoredLevel.objects[objectIndex].location =
+                .room(state.roomSourceIndex)
+            restoredLevel.objects[objectIndex].position = state.position
+            restoredLevel.objects[objectIndex].orientation =
+                state.orientation
+        }
         let binding = restoredLevel.defaultPlayerBinding!
         let objectIndex = restoredLevel.objects.firstIndex {
             $0.handle == binding.objectHandle
@@ -2214,6 +2382,7 @@ final class PlayerSimulation {
         lastTimestamp = resumedAtTimestamp
         trainingOpeningState = restoredOpeningState
         trainingDodgeAttemptState = restoredDodgeAttemptState
+        trainingManeuverFollowState = restoredManeuverFollowState
         trainingGalleryBarrierState =
             continuation.trainingGalleryBarrierState
         trainingRobotGuidebotState =
@@ -2286,6 +2455,8 @@ final class PlayerSimulation {
             shields: shields,
             trainingOpeningState: trainingOpeningState,
             trainingDodgeAttemptState: trainingDodgeAttemptState,
+            trainingManeuverFollowState:
+                trainingManeuverFollowState,
             trainingGalleryBarrierState:
                 trainingGalleryBarrierState,
             trainingRobotGuidebotState:
@@ -2322,6 +2493,192 @@ final class PlayerSimulation {
                 trainingFinalBotsCompletionState,
             trainingFinalGoalState: trainingFinalGoalState
         )
+    }
+
+    private func assignTrainingFollowBotPath(
+        _ pathIndex: Int,
+        state: inout TrainingManeuverFollowState
+    ) {
+        guard level.paths.indices.contains(pathIndex),
+              !level.paths[pathIndex].nodes.isEmpty
+        else {
+            state.activePathIndex = nil
+            state.pathNodeIndex = 0
+            state.velocity = .zero
+            state.pathFailure = .invalidPath
+            return
+        }
+        state.activePathIndex = pathIndex
+        state.pathNodeIndex = 0
+        state.pathFailure = nil
+    }
+
+    private func advanceTrainingFollowBot(duration: Float) {
+        guard duration > 0,
+              var state = trainingManeuverFollowState,
+              state.followBotIsPowered,
+              let lesson =
+                level.trainingDodgeAttempt?.maneuverFollow,
+              let pathIndex = state.activePathIndex,
+              level.paths.indices.contains(pathIndex)
+        else {
+            return
+        }
+        let path = level.paths[pathIndex]
+        guard path.nodes.indices.contains(state.pathNodeIndex) else {
+            state.activePathIndex = nil
+            state.pathNodeIndex = 0
+            state.velocity = .zero
+            state.pathFailure = .invalidPath
+            trainingManeuverFollowState = state
+            return
+        }
+        func passedNode(_ nodeIndex: Int, at position: Vector3) -> Bool {
+            let node = path.nodes[nodeIndex]
+            let direction: Vector3
+            if nodeIndex > 0 {
+                direction =
+                    node.position - path.nodes[nodeIndex - 1].position
+            } else if path.nodes.count > 1 {
+                direction = path.nodes[1].position - node.position
+            } else {
+                direction = node.forward
+            }
+            return dot(position - node.position, direction) >= 0
+        }
+        let movementNode = path.nodes[state.pathNodeIndex]
+        var completesAfterMovement = false
+        if path.nodes.count > 1 {
+            while passedNode(
+                state.pathNodeIndex,
+                at: state.position
+            ) {
+                if state.pathNodeIndex + 1 < path.nodes.count {
+                    state.pathNodeIndex += 1
+                } else if pathIndex == lesson.followPathIndex {
+                    state.pathNodeIndex = 0
+                    break
+                } else {
+                    completesAfterMovement = true
+                    break
+                }
+            }
+        }
+        let movementStart = state.position
+        let remaining = movementNode.position - movementStart
+        let distance = sqrt(dot(remaining, remaining))
+        let desiredVelocity =
+            distance > 0
+            ? remaining / distance
+                * lesson.followBot.maximumVelocity
+            : Vector3.zero
+        let velocityDelta = desiredVelocity - state.velocity
+        let deltaMagnitude = sqrt(dot(velocityDelta, velocityDelta))
+        let maximumDelta =
+            lesson.followBot.maximumDeltaVelocity * duration
+        if deltaMagnitude > maximumDelta, deltaMagnitude > 0 {
+            state.velocity = state.velocity
+                + velocityDelta / deltaMagnitude * maximumDelta
+        } else {
+            state.velocity = desiredVelocity
+        }
+        let trace = traceIndoorMovement(
+            in: level,
+            startRoom: state.roomSourceIndex,
+            start: state.position,
+            end: state.position + state.velocity * duration,
+            radius: lesson.followBot.collisionRadius
+        )
+        state.position = trace.finalPosition
+        state.roomSourceIndex = trace.containingRoomSourceIndex
+        if path.nodes.count == 1,
+           pathIndex != lesson.followPathIndex,
+           dot(
+               movementStart - movementNode.position,
+               state.position - movementNode.position
+           ) <= 0 {
+            completesAfterMovement = true
+        }
+        if case .wallHit = trace.outcome {
+            state.velocity = .zero
+            state.pathFailure = .movementBlocked
+        } else {
+            state.pathFailure = nil
+        }
+        if pathIndex == lesson.followPathIndex {
+            var targetOrientation = state.orientation
+            var shouldTurn = true
+            if state.pathNodeIndex > 0 {
+                let currentNode = path.nodes[state.pathNodeIndex]
+                let previousNode =
+                    path.nodes[state.pathNodeIndex - 1]
+                let line =
+                    currentNode.position - previousNode.position
+                let lineLength = sqrt(dot(line, line))
+                let projection = dot(
+                    movementStart - previousNode.position,
+                    line / lineLength
+                )
+                if projection > lineLength {
+                    shouldTurn = false
+                } else if projection > 0 {
+                    let currentScale = projection / lineLength
+                    let previousScale = 1 - currentScale
+                    targetOrientation =
+                        sourceOrientation(
+                            forward:
+                                currentNode.forward * currentScale
+                                + previousNode.forward
+                                    * previousScale,
+                            up:
+                                currentNode.up * currentScale
+                                + previousNode.up * previousScale
+                        )
+                }
+            }
+            if shouldTurn {
+                state.orientation =
+                    trainingTurnedTowardMatrix(
+                        state.orientation,
+                        target: targetOrientation,
+                        maximumTurnRate:
+                            lesson.followBot.maximumTurnRate,
+                        duration: duration
+                    )
+            }
+        } else {
+            state.orientation =
+                trainingTurnedTowardDirection(
+                    state.orientation,
+                    velocity: state.velocity,
+                    maximumTurnRate:
+                        lesson.followBot.maximumTurnRate,
+                    duration: duration
+                )
+        }
+        if completesAfterMovement {
+            state.activePathIndex = nil
+            state.pathNodeIndex = 0
+            state.velocity = .zero
+        }
+        trainingManeuverFollowState = state
+        restoreTrainingFollowBotPresentation()
+    }
+
+    private func restoreTrainingFollowBotPresentation() {
+        guard let state = trainingManeuverFollowState,
+              let lesson =
+                level.trainingDodgeAttempt?.maneuverFollow,
+              let objectIndex = level.objects.firstIndex(where: {
+                  $0.handle == lesson.followBotObjectHandle
+              })
+        else {
+            return
+        }
+        level.objects[objectIndex].location =
+            .room(state.roomSourceIndex)
+        level.objects[objectIndex].position = state.position
+        level.objects[objectIndex].orientation = state.orientation
     }
 
     private func deployTrainingGuidebot(
@@ -3901,6 +4258,7 @@ final class PlayerSimulation {
             player: level.objects[movedPlayerIndex],
             playerRadius: ship.presentationSize * 0.8
         )
+        advanceTrainingFollowBot(duration: systemsFrameDuration)
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
         if var dodgeState = trainingDodgeAttemptState,
@@ -3912,6 +4270,12 @@ final class PlayerSimulation {
                 dodgeState.almostDoneTimerRemaining != nil
             var successTimerConsumesFrame =
                 dodgeState.successTimerRemaining != nil
+            let maneuverLevelTimerConsumesFrame =
+                trainingManeuverFollowState?.levelTimerRemaining
+                    != nil
+            let followObjectTimerConsumesFrame =
+                trainingManeuverFollowState?.objectTimerRemaining
+                    != nil
             let player = level.objects[movedPlayerIndex]
             let turret = level.objects.first {
                 $0.handle == dodge.dodgeTurretObjectHandle
@@ -4262,6 +4626,54 @@ final class PlayerSimulation {
                     )
             }
 
+            if var maneuverState = trainingManeuverFollowState,
+               let lesson = dodge.maneuverFollow,
+               maneuverState.script021Count < 1,
+               dodgeState.script020Count > 0,
+               case .room(37) = player.location,
+               let maneuver = level.objects.first(where: {
+                   $0.handle == lesson.maneuverObjectHandle
+               }),
+               segmentSphereHitFraction(
+                   start: object.position,
+                   end: player.position,
+                   center: maneuver.position,
+                   radius:
+                       lesson.maneuverCollisionRadius
+                       + view.collisionRadius
+               ) != nil
+            {
+                dodgeState.markerLightDistance = 0
+                if var openingState = trainingOpeningState {
+                    openingState.enabledControls = .init(
+                        rawValue: lesson.headingControlMask
+                    )
+                    trainingOpeningState = openingState
+                }
+                setTrainingDodgePortalRenderState(
+                    in: &level,
+                    roomSourceIndex: lesson.portalRoomSourceIndex,
+                    portalIndices: lesson.orderedPortalIndices,
+                    rendersFaces: true
+                )
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [
+                            lesson.maneuverIntroduction,
+                        ],
+                        voiceSourceName:
+                            lesson.headingVoiceSourceName,
+                        voicePrecedesHUDMessages: false,
+                        trailingHUDMessages: [
+                            lesson.headingInstruction,
+                        ]
+                    ))
+                maneuverState.levelTimerRemaining =
+                    lesson.headingDuration
+                maneuverState.script021Count += 1
+                trainingManeuverFollowState = maneuverState
+            }
+
             if shields < dodge.restoredPlayerShields,
                 dodgeState.script016Count > 0,
                 dodgeState.script017Count == 0
@@ -4372,6 +4784,184 @@ final class PlayerSimulation {
                 } else {
                     dodgeState.successTimerRemaining = timer
                 }
+            }
+            if var maneuverState = trainingManeuverFollowState,
+               let lesson = dodge.maneuverFollow
+            {
+                var followObjectTimerWasRestarted = false
+                if maneuverState.script023Count > 0,
+                   maneuverState.script026Count == 0
+                {
+                    let followBotDirection =
+                        maneuverState.position - player.position
+                    let followBotIsVisible =
+                        dot(followBotDirection, followBotDirection)
+                            > 0.000_001
+                        && Double(
+                            dot(
+                                player.orientation.forward,
+                                normalized(followBotDirection)
+                            )
+                        ) > cos(Double.pi / 4)
+                    if !followBotIsVisible {
+                        maneuverState.objectTimerRemaining =
+                            lesson.followDuration
+                        followObjectTimerWasRestarted = true
+                    }
+                    if maneuverState.script025Count
+                        < trainingScriptActionCounterMaximum
+                    {
+                        maneuverState.script025Count += 1
+                    }
+                }
+
+                if var timer = maneuverState.levelTimerRemaining {
+                    if maneuverLevelTimerConsumesFrame {
+                        timer -= systemsFrameDuration
+                    }
+                    if timer <= 0.000_001 {
+                        maneuverState.levelTimerRemaining = nil
+                        // TrainingMission.cpp keeps the released level-timer
+                        // handler order 023, 024, 022.
+                        if maneuverState.script023Count < 1,
+                           maneuverState.script024Count > 0
+                        {
+                            if var openingState =
+                                    trainingOpeningState
+                            {
+                                openingState.enabledControls =
+                                    .init(
+                                        rawValue:
+                                            lesson
+                                            .rotationalControlMask
+                                    )
+                                trainingOpeningState = openingState
+                            }
+                            trainingOpeningFeedback.append(
+                                .init(
+                                    hudMessages: [
+                                        lesson.followIntroduction,
+                                        lesson.followInstruction,
+                                    ],
+                                    voiceSourceName:
+                                        lesson.followVoiceSourceName,
+                                    voicePrecedesHUDMessages: false
+                                ))
+                            maneuverState.followBotIsPowered = true
+                            maneuverState.followBotTeamFlags =
+                                lesson.friendlyTeamFlags
+                            maneuverState.objectTimerRemaining =
+                                lesson.followDuration
+                            assignTrainingFollowBotPath(
+                                lesson.followPathIndex,
+                                state: &maneuverState
+                            )
+                            maneuverState.script023Count += 1
+                        }
+                        if maneuverState.script024Count < 1,
+                           maneuverState.script022Count > 0
+                        {
+                            if var openingState =
+                                    trainingOpeningState
+                            {
+                                openingState.enabledControls =
+                                    .init(
+                                        rawValue:
+                                            lesson.bankControlMask
+                                    )
+                                trainingOpeningState = openingState
+                            }
+                            trainingOpeningFeedback.append(
+                                .init(
+                                    hudMessages: [
+                                        lesson.bankInstruction,
+                                    ],
+                                    voiceSourceName:
+                                        lesson.bankVoiceSourceName,
+                                    voicePrecedesHUDMessages: false
+                                ))
+                            maneuverState.levelTimerRemaining =
+                                lesson.bankDuration
+                            maneuverState.script024Count += 1
+                        }
+                        if maneuverState.script022Count < 1,
+                           maneuverState.script021Count > 0
+                        {
+                            if var openingState =
+                                    trainingOpeningState
+                            {
+                                openingState.enabledControls =
+                                    .init(
+                                        rawValue:
+                                            lesson.pitchControlMask
+                                    )
+                                trainingOpeningState = openingState
+                            }
+                            trainingOpeningFeedback.append(
+                                .init(
+                                    hudMessages: [
+                                        lesson.successMessage,
+                                        lesson.pitchInstruction,
+                                    ],
+                                    voiceSourceName:
+                                        lesson.pitchVoiceSourceName,
+                                    voicePrecedesHUDMessages: false
+                                ))
+                            maneuverState.levelTimerRemaining =
+                                lesson.pitchDuration
+                            maneuverState.script022Count += 1
+                        }
+                    } else {
+                        maneuverState.levelTimerRemaining = timer
+                    }
+                }
+
+                if var timer = maneuverState.objectTimerRemaining {
+                    if followObjectTimerConsumesFrame,
+                       !followObjectTimerWasRestarted {
+                        timer -= systemsFrameDuration
+                    }
+                    if timer <= 0.000_001 {
+                        maneuverState.objectTimerRemaining = nil
+                        if maneuverState.script025Count > 0 {
+                            if var openingState =
+                                    trainingOpeningState
+                            {
+                                openingState.enabledControls.formUnion(
+                                    .init(
+                                        rawValue:
+                                            lesson.weaponControlMask
+                                    ))
+                                trainingOpeningState = openingState
+                            }
+                            assignTrainingFollowBotPath(
+                                lesson.destroyPathIndex,
+                                state: &maneuverState
+                            )
+                            trainingOpeningFeedback.append(
+                                .init(
+                                    hudMessages: [
+                                        lesson.successMessage,
+                                        lesson.weaponsEnabledInstruction,
+                                    ],
+                                    voiceSourceName:
+                                        lesson.weaponVoiceSourceName,
+                                    voicePrecedesHUDMessages: false,
+                                    trailingHUDMessages: [
+                                        lesson.destroyInstruction,
+                                    ]
+                                ))
+                            maneuverState.script026Count = min(
+                                maneuverState.script026Count + 1,
+                                trainingScriptActionCounterMaximum
+                            )
+                        }
+                    } else {
+                        maneuverState.objectTimerRemaining = timer
+                    }
+                }
+                trainingManeuverFollowState = maneuverState
+                restoreTrainingFollowBotPresentation()
             }
             trainingDodgeAttemptState = dodgeState
         }
@@ -5127,6 +5717,8 @@ final class PlayerSimulation {
                             .turret.projectileModel
                     )
                 } ?? [],
+            trainingFollowBot:
+                trainingManeuverFollowState?.frame,
             trainingGalleryMarkerLightDistance:
                 trainingGalleryBarrierState?.markerLightDistance,
             trainingGuidebotReturnMarkerLightDistance:
@@ -5456,8 +6048,129 @@ private func validTrainingGalleryBarrierContinuation(
     return state.markerLightDistance == expectedDistance
 }
 
+private func validTrainingManeuverFollowContinuation(
+    _ state: TrainingManeuverFollowState?,
+    level: Level
+) -> Bool {
+    guard let lesson =
+            level.trainingDodgeAttempt?.maneuverFollow,
+          let followBot = level.objects.first(where: {
+              $0.handle == lesson.followBotObjectHandle
+          }),
+          case let .room(followBotRoomSourceIndex) =
+              followBot.location,
+          let followBotRoom = level.rooms.first(where: {
+              $0.sourceIndex == followBotRoomSourceIndex
+          })
+    else {
+        return state == nil
+    }
+    guard let state else { return false }
+    let levelTimerIsValid: Bool = {
+        let maximum: Float?
+        if state.script021Count == 0
+            || state.script023Count > 0
+        {
+            maximum = nil
+        } else if state.script024Count > 0 {
+            maximum = lesson.bankDuration
+        } else if state.script022Count > 0 {
+            maximum = lesson.pitchDuration
+        } else {
+            maximum = lesson.headingDuration
+        }
+        guard let maximum else {
+            return state.levelTimerRemaining == nil
+        }
+        guard let timer = state.levelTimerRemaining else {
+            return false
+        }
+        return timer.isFinite && timer > 0 && timer <= maximum
+    }()
+    let objectTimerIsValid: Bool = {
+        guard state.script023Count > 0,
+              state.script026Count == 0 else {
+            return state.objectTimerRemaining == nil
+        }
+        guard let timer = state.objectTimerRemaining else {
+            return false
+        }
+        return timer.isFinite
+            && timer > 0
+            && timer <= lesson.followDuration
+    }()
+    let velocityMagnitude = sqrt(dot(state.velocity, state.velocity))
+    guard [
+              state.script021Count,
+              state.script022Count,
+              state.script024Count,
+              state.script023Count,
+              state.script025Count,
+              state.script026Count,
+          ].allSatisfy({
+              (0...trainingScriptActionCounterMaximum).contains($0)
+          }),
+          state.script021Count <= 1,
+          state.script022Count <= 1,
+          state.script024Count <= 1,
+          state.script023Count <= 1,
+          state.script026Count <= 1,
+          state.script022Count <= state.script021Count,
+          state.script024Count <= state.script022Count,
+          state.script023Count <= state.script024Count,
+          state.script026Count == 0 || state.script025Count > 0,
+          levelTimerIsValid,
+          objectTimerIsValid,
+          state.roomSourceIndex == followBotRoomSourceIndex,
+          isCanonicalRigidTransform(
+              position: state.position,
+              orientation: state.orientation
+          ),
+          sourceConvexRoomContains(
+              state.position,
+              in: followBotRoom
+          ),
+          state.velocity.x.isFinite,
+          state.velocity.y.isFinite,
+          state.velocity.z.isFinite,
+          velocityMagnitude.isFinite,
+          velocityMagnitude
+            <= lesson.followBot.maximumVelocity + 0.001,
+          state.activePathIndex.map({
+              $0 == lesson.followPathIndex
+                || $0 == lesson.destroyPathIndex
+          }) ?? true,
+          state.pathNodeIndex >= 0,
+          state.activePathIndex.map({
+              level.paths[$0].nodes.indices.contains(
+                  state.pathNodeIndex
+              )
+          }) ?? (state.pathNodeIndex == 0),
+          state.followBotTeamFlags == 0
+            || state.followBotTeamFlags == lesson.friendlyTeamFlags
+    else {
+        return false
+    }
+    if state.script023Count == 0 {
+        return state.script025Count == 0
+            && state.script026Count == 0
+            && !state.followBotIsPowered
+            && state.followBotTeamFlags == 0
+            && state.activePathIndex == nil
+    }
+    return state.followBotIsPowered
+        && state.followBotTeamFlags == lesson.friendlyTeamFlags
+        && (
+            state.script026Count == 0
+                ? state.activePathIndex == lesson.followPathIndex
+                : state.activePathIndex == lesson.destroyPathIndex
+                    || state.activePathIndex == nil
+        )
+}
+
 private func validTrainingDodgeAttemptContinuation(
     _ state: TrainingDodgeAttemptState?,
+    maneuverState: TrainingManeuverFollowState?,
     shields: Float,
     level: Level
 ) -> Bool {
@@ -5481,7 +6194,9 @@ private func validTrainingDodgeAttemptContinuation(
         ),
         state.markerLightDistance.isFinite,
         state.markerLightDistance
-            == (state.script017Count == 1
+            == (maneuverState?.script021Count ?? 0 > 0
+                ? 0
+                : state.script017Count == 1
                 || state.script019Count == 1
                 ? dodge.successMarkerLightDistance : 0),
         state.firingMaskIndex >= 0,
@@ -5544,6 +6259,10 @@ private func validTrainingDodgeAttemptContinuation(
         return false
     }
     if state.script019Count == 1 && dodge.dodgeExit == nil {
+        return false
+    }
+    if maneuverState?.script021Count ?? 0 > 0,
+       state.script020Count == 0 {
         return false
     }
     if state.script018Count > 0 && state.script016Count == 0 {
@@ -7271,6 +7990,26 @@ private func sourceMatrixMultiply(_ lhs: Matrix3, _ rhs: Matrix3) -> Matrix3 {
     )
 }
 
+private func sourceTransposed(_ matrix: Matrix3) -> Matrix3 {
+    Matrix3(
+        right: Vector3(
+            x: matrix.right.x,
+            y: matrix.up.x,
+            z: matrix.forward.x
+        ),
+        up: Vector3(
+            x: matrix.right.y,
+            y: matrix.up.y,
+            z: matrix.forward.y
+        ),
+        forward: Vector3(
+            x: matrix.right.z,
+            y: matrix.up.z,
+            z: matrix.forward.z
+        )
+    )
+}
+
 private func sourceTransform(_ value: Vector3, by matrix: Matrix3) -> Vector3 {
     Vector3(
         x: matrix.right.x * value.x
@@ -8827,6 +9566,136 @@ private func normalized(_ value: Vector3) -> Vector3 {
     let magnitude = sqrt(dot(value, value))
     precondition(magnitude > 0, "camera basis vectors must be nonzero")
     return value / magnitude
+}
+
+private func sourceOrientation(
+    forward targetForward: Vector3,
+    up targetUp: Vector3
+) -> Matrix3 {
+    let forward = normalized(targetForward)
+    let right = normalized(cross(targetUp, forward))
+    return .init(
+        right: right,
+        up: normalized(cross(forward, right)),
+        forward: forward
+    )
+}
+
+private func trainingTurnedTowardMatrix(
+    _ orientation: Matrix3,
+    target: Matrix3,
+    maximumTurnRate: Float,
+    duration: Float
+) -> Matrix3 {
+    let relative = sourceMatrixMultiply(
+        sourceTransposed(orientation),
+        target
+    )
+    let angles = sourceExtractAngles(relative)
+    let bankDistance = Float(
+        angles.roll > 32_768
+            ? 65_536 - angles.roll : angles.roll
+    )
+    let headingDistance = Float(
+        angles.yaw > 32_768
+            ? 65_536 - angles.yaw : angles.yaw
+    )
+    let pitchDistance = Float(
+        angles.pitch > 32_768
+            ? 65_536 - angles.pitch : angles.pitch
+    )
+    let distance = Vector3(
+        x: bankDistance,
+        y: headingDistance,
+        z: pitchDistance
+    )
+    let angleMagnitude = sqrt(dot(distance, distance))
+    let maximumAngle = maximumTurnRate * duration
+    if angleMagnitude <= maximumAngle {
+        return sourceOrthogonalized(target)
+    }
+
+    let scale = angleMagnitude > 0
+        ? maximumAngle / angleMagnitude : 0
+    func scaledAngle(
+        _ original: Int,
+        distance: Float
+    ) -> Int16 {
+        let scaled = distance * scale
+        let sourceValue = original > 32_768
+            ? Int(65_535 - scaled) : Int(scaled)
+        return Int16(
+            bitPattern: UInt16(truncatingIfNeeded: sourceValue)
+        )
+    }
+    let increment = sourceRotationMatrix(
+        pitch: scaledAngle(
+            angles.pitch,
+            distance: pitchDistance
+        ),
+        yaw: scaledAngle(
+            angles.yaw,
+            distance: headingDistance
+        ),
+        roll: scaledAngle(
+            angles.roll,
+            distance: bankDistance
+        )
+    )
+    return sourceOrthogonalized(
+        sourceMatrixMultiply(orientation, increment)
+    )
+}
+
+private func trainingTurnedTowardDirection(
+    _ orientation: Matrix3,
+    velocity: Vector3,
+    maximumTurnRate: Float,
+    duration: Float
+) -> Matrix3 {
+    let speed = sqrt(dot(velocity, velocity))
+    guard speed > 0.1 else { return orientation }
+    let target = velocity / speed
+    let cosine = max(
+        -1,
+        min(1, dot(orientation.forward, target))
+    )
+    guard cosine < 0.999_85 else { return orientation }
+    let angle = acos(cosine)
+    let maximumAngle =
+        maximumTurnRate * duration * (2 * Float.pi / 65_536)
+    let forward: Vector3
+    if angle <= maximumAngle {
+        forward = target
+    } else {
+        let sine = sin(angle)
+        if abs(sine) <= 0.000_001 {
+            forward = normalized(
+                orientation.forward * cos(maximumAngle)
+                    + orientation.right * sin(maximumAngle)
+            )
+        } else {
+            let blend = maximumAngle / angle
+            forward = normalized(
+                orientation.forward
+                    * (sin((1 - blend) * angle) / sine)
+                    + target * (sin(blend * angle) / sine)
+            )
+        }
+    }
+    var right = cross(orientation.up, forward)
+    if dot(right, right) <= 0.000_001 {
+        right = orientation.right
+    } else {
+        right = normalized(right)
+    }
+    return sourceOrthogonalized(
+        .init(
+            right: right,
+            up: cross(forward, right),
+            forward: forward
+        )
+    )
 }
 
 private func - (lhs: Vector3, rhs: Vector3) -> Vector3 {

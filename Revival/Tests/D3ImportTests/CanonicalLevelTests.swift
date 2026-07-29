@@ -1,6 +1,157 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testSchemaElevenLeavesTrainingManeuverFollowOptionalForOlderPackages()
+        throws
+    {
+        let current = makeTrainingManeuverFollowLevel()
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(current)
+            ) as? [String: Any]
+        )
+        var hostileObject = object
+        var hostileDodge = try XCTUnwrap(
+            hostileObject["trainingDodgeAttempt"]
+                as? [String: Any]
+        )
+        var hostileLesson = try XCTUnwrap(
+            hostileDodge["maneuverFollow"] as? [String: Any]
+        )
+        hostileLesson["headingControlMask"] = 769
+        hostileDodge["maneuverFollow"] = hostileLesson
+        hostileObject["trainingDodgeAttempt"] = hostileDodge
+        var dodge = try XCTUnwrap(
+            object["trainingDodgeAttempt"] as? [String: Any]
+        )
+        dodge.removeValue(forKey: "maneuverFollow")
+        object["trainingDodgeAttempt"] = dodge
+        let level = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+        XCTAssertNil(
+            level.trainingDodgeAttempt?.maneuverFollow
+        )
+        XCTAssertNoThrow(try level.validate())
+
+        let hostile = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(
+                withJSONObject: hostileObject
+            )
+        )
+        let hostileDodgeAttempt = try XCTUnwrap(
+            hostile.trainingDodgeAttempt
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingManeuverFollowPackage(
+                try XCTUnwrap(
+                    hostileDodgeAttempt.maneuverFollow
+                ),
+                dodge: hostileDodgeAttempt,
+                level: hostile
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency(
+                    "Training Scripts 021-026 stock package"
+                )
+            )
+        }
+    }
+
+    func testManeuverFollowLessonRequiresExactStockCarrierPathsAndActions()
+        throws
+    {
+        let level = makeTrainingManeuverFollowLevel()
+        let lesson = try XCTUnwrap(
+            level.trainingDodgeAttempt?.maneuverFollow
+        )
+
+        XCTAssertEqual(lesson.maneuverObjectHandle, 2_063)
+        XCTAssertEqual(lesson.orderedPortalIndices, [1, 0])
+        XCTAssertEqual(lesson.headingControlMask, 768)
+        XCTAssertEqual(lesson.pitchControlMask, 192)
+        XCTAssertEqual(lesson.bankControlMask, 3_072)
+        XCTAssertEqual(lesson.rotationalControlMask, 4_032)
+        XCTAssertEqual(lesson.weaponControlMask, 12_288)
+        XCTAssertEqual(lesson.followBotObjectHandle, 8_200)
+        XCTAssertEqual(lesson.followPathGoalFlags, 0x90_01_04)
+        XCTAssertEqual(lesson.destroyPathGoalFlags, 0x11_00)
+        XCTAssertEqual(level.paths[0].name, "FollowLoop1")
+        XCTAssertEqual(level.paths[0].nodes.count, 13)
+        XCTAssertEqual(level.paths[1].name, "GoToDie")
+        XCTAssertEqual(level.paths[1].nodes.count, 1)
+        XCTAssertEqual(
+            canonicalSHA256(try canonicalJSONData(level.paths)),
+            "56997a7e05b017a65778bd48badf453f72bdf5f3f34d60fbd1d6cd8b4fdcdbe5"
+        )
+        XCTAssertEqual(lesson.followBot.collisionRadius, 4.576_441_8)
+        XCTAssertEqual(lesson.followBot.maximumVelocity, 40)
+        XCTAssertEqual(lesson.followBot.maximumDeltaVelocity, 80)
+        XCTAssertEqual(lesson.followBot.maximumTurnRate, 12_000)
+        XCTAssertEqual(
+            lesson.followBot.maximumDeltaTurnRate,
+            16_000
+        )
+        XCTAssertEqual(lesson.followBot.circleDistance, 25)
+        let bot = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == lesson.followBotObjectHandle
+            }
+        )
+        XCTAssertEqual(bot.flags, 5_121)
+        XCTAssertEqual(bot.location, .room(37))
+        XCTAssertEqual(bot.definition?.sourceName, "RAS1 Light Security Flyer")
+    }
+
+    func testOwnedManeuverFollowPackageAdmissionPinsStockBoundary()
+        throws
+    {
+        let path = try XCTUnwrap(
+            ProcessInfo.processInfo.environment[
+                "REVIVAL_MANEUVER_FOLLOW_OWNED_LEVEL"
+            ],
+            "requires the ignored exact-final owned Script 026 level"
+        )
+        let level = try JSONDecoder().decode(
+            Level.self,
+            from: Data(contentsOf: URL(fileURLWithPath: path))
+        )
+        XCTAssertNoThrow(try level.validate())
+        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let lesson = try XCTUnwrap(dodge.maneuverFollow)
+        XCTAssertNoThrow(
+            try validateStockTrainingManeuverFollowPackage(
+                lesson,
+                dodge: dodge,
+                level: level
+            )
+        )
+        XCTAssertEqual(
+            level.voiceClips.filter {
+                [
+                    "intro3.osf",
+                    "pitch.osf",
+                    "bank.osf",
+                    "follow.osf",
+                    "intro4.osf",
+                ].contains($0.sourceName)
+            }.map(\.sourceEntryIndex),
+            [12, 20, 1, 3, 13]
+        )
+        XCTAssertEqual(lesson.followBot.maximumVelocity, 40)
+        XCTAssertEqual(lesson.followBot.maximumDeltaVelocity, 80)
+        XCTAssertEqual(lesson.followBot.maximumTurnRate, 12_000)
+        XCTAssertEqual(
+            lesson.followBot.maximumDeltaTurnRate,
+            16_000
+        )
+        XCTAssertEqual(lesson.followBot.circleDistance, 25)
+    }
+
     func testScript019DodgeExitRequiresExactStockBindingsAndMedia() throws {
         let level = makeTrainingDodgeAttemptLevel()
         let dodge = try XCTUnwrap(level.trainingDodgeAttempt)

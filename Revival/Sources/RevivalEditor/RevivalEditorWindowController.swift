@@ -731,6 +731,14 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                             level: simulation.level,
                             frame: frame
                         )
+                        self.setStatus(
+                            editorPlayStatusMessage(
+                                project:
+                                    self.projectDocument.project,
+                                frame: frame
+                            ),
+                            isError: false
+                        )
                     } catch {
                         renderer.setFrameUpdate(nil)
                         self.setStatus(error.localizedDescription, isError: true)
@@ -1029,6 +1037,7 @@ func editorIdleStatusMessage(
         project.trainingStartCourseSourceDiagnostic,
         project.trainingFinishCourseSourceDiagnostic,
         project.trainingDodgeAttemptSourceDiagnostic,
+        project.trainingManeuverFollowSourceDiagnostic,
         project.trainingGalleryBarrierSourceDiagnostic,
         project.trainingRobotGuidebotSourceDiagnostic,
         project.trainingGuidebotReturnSourceDiagnostic,
@@ -1051,6 +1060,20 @@ func editorIdleStatusMessage(
     ].compactMap { $0 }
     guard !sourceDiagnostics.isEmpty else { return status }
     return "\(status)\nSource: \(sourceDiagnostics.joined(separator: "; "))"
+}
+
+func editorPlayStatusMessage(
+    project: RevivalProject,
+    frame: PlayerSimulationFrame
+) -> String {
+    let status =
+        "Playing a separately owned complete-level copy. Use W/S to thrust and A/D to slide."
+    guard let diagnostic =
+            project.trainingManeuverFollowRuntimeDiagnostic(frame: frame)
+    else {
+        return status
+    }
+    return "\(status)\nRuntime: \(diagnostic)"
 }
 
 func indoorMovementDiagnosticMessage(_ trace: IndoorMovementTrace) -> String {

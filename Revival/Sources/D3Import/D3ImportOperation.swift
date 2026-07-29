@@ -621,6 +621,7 @@ func runD3Import(
                     || object.handle == 2_083 {
             page = destroyRobotPage
         } else if object.handle == 4_112
+                    || object.handle == 8_200
                     || object.handle == 2_074
                     || object.handle == 2_075
                     || object.handle == 2_077
@@ -672,13 +673,13 @@ func runD3Import(
                 && object.handle != 12_302
         )
     }
-    precondition(reachedObjectPresentations.count == 25)
+    precondition(reachedObjectPresentations.count == 26)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 14)
+    precondition(deferredRoomObjects.count == 13)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -998,6 +999,11 @@ func runD3Import(
         "Almost.osf",
         "Proceed3.osf",
         "Proceed4.osf",
+        "Intro3.osf",
+        "Pitch.osf",
+        "Bank.osf",
+        "Follow.osf",
+        "Intro4.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -1239,6 +1245,11 @@ func runD3Import(
             voiceClips[23],
             voiceClips[24],
             voiceClips[25],
+            voiceClips[26],
+            voiceClips[27],
+            voiceClips[28],
+            voiceClips[29],
+            voiceClips[30],
         ],
         soundClips: [menuBeepClip,
             dodgeFireSoundClip,
@@ -2340,6 +2351,128 @@ func runD3Import(
         instruction: messages["KeepMovingOutofDodging"]!,
         voiceSourceName: "proceed4.osf"
     )
+    let maneuverCenter = level.objects.first {
+        $0.handle == 2_063
+    }!
+    let followBot = level.objects.first {
+        $0.handle == 8_200
+    }!
+    let followBotPresentation = level.objectPresentations.first {
+        $0.objectHandle == followBot.handle
+    }!
+    let followBotModel = level.models.first {
+        $0.source == followBotPresentation.primaryModel
+    }!
+    let followBotAI = destroyRobotPage.genericAI!
+    precondition(
+        maneuverCenter.type == 7
+            && maneuverCenter.storedID == 67
+            && maneuverCenter.definition == startDodge.definition
+            && maneuverCenter.instanceName == "ManuverRoomCenter"
+            && maneuverCenter.flags == 4_096
+            && maneuverCenter.location == .room(37)
+            && maneuverCenter.position
+                == .init(
+                    x: 2_061.7336,
+                    y: -755.4103,
+                    z: 2_566.1135
+                )
+            && followBot.type == 2
+            && followBot.storedID == 106
+            && followBot.definition?.sourceName
+                == "RAS1 Light Security Flyer"
+            && followBot.instanceName == "FollowBot1"
+            && followBot.flags == 5_121
+            && followBot.location == .room(37)
+            && followBot.position
+                == .init(
+                    x: 2_059.3496,
+                    y: -723.2588,
+                    z: 2_469.1072
+                )
+            && followBot.orientation
+                == .init(
+                    right: .init(
+                        x: -0.999_645_05,
+                        y: -0.010_065_023,
+                        z: 0.024_667_98
+                    ),
+                    up: .init(
+                        x: -0.008_759_673,
+                        y: 0.998_584_4,
+                        z: 0.052_465_245
+                    ),
+                    forward: .init(
+                        x: -0.025_161_121,
+                        y: 0.052_230_537,
+                        z: -0.998_318_1
+                    )
+                )
+            && followBotModel.source.sourceName == "gyro.OOF"
+            && followBotModel.sourceSHA256
+                == "896cc33ba0c7ec00fd2fd693a0e8f10868a47076eda0b7914cc90a790e87eb61"
+            && level.paths.count == 2
+            && level.paths[0].name == "FollowLoop1"
+            && level.paths[0].nodes.count == 13
+            && level.paths[0].nodes.allSatisfy {
+                $0.location == .room(37)
+            }
+            && level.paths[1].name == "GoToDie"
+            && level.paths[1].nodes.count == 1
+            && level.paths[1].nodes[0].location == .room(37)
+            && followBotAI.objectSize == 4.576_441_8
+    )
+    level.trainingDodgeAttempt?.maneuverFollow = .init(
+        maneuverObjectHandle: maneuverCenter.handle,
+        maneuverCollisionRadius: sourceObjectPresentationSize(
+            model: invisiblePowerupModel,
+            objectType: maneuverCenter.type
+        ),
+        flashLightObjectHandle: dodgeMarker.handle,
+        portalRoomSourceIndex: portalRoomThree.sourceIndex,
+        orderedPortalIndices: [1, 0],
+        headingControlMask: 768,
+        pitchControlMask: 192,
+        bankControlMask: 3_072,
+        rotationalControlMask: 4_032,
+        weaponControlMask: 12_288,
+        headingDuration: 20,
+        pitchDuration: 12,
+        bankDuration: 15,
+        followDuration: 20,
+        followBotObjectHandle: followBot.handle,
+        friendlyTeamFlags: 65_536,
+        followPathIndex: 0,
+        followPathGoalFlags: 9_437_444,
+        destroyPathIndex: 1,
+        destroyPathGoalFlags: 4_352,
+        goalSlot: 0,
+        goalPriority: 3,
+        maneuverIntroduction: messages["ManuverIntro"]!,
+        headingInstruction: messages["HeadingIntro"]!,
+        successMessage: messages["GoodJob"]!,
+        pitchInstruction: messages["PitchIntro"]!,
+        bankInstruction: messages["BankIntro"]!,
+        followIntroduction: messages["FollowIntro"]!,
+        followInstruction: messages["FollowInstructions"]!,
+        weaponsEnabledInstruction: messages["WeaponsEnabled"]!,
+        destroyInstruction: messages["DestroyFollowbot"]!,
+        headingVoiceSourceName: "intro3.osf",
+        pitchVoiceSourceName: "pitch.osf",
+        bankVoiceSourceName: "bank.osf",
+        followVoiceSourceName: "follow.osf",
+        weaponVoiceSourceName: "intro4.osf",
+        followBot: .init(
+            model: followBotModel.source,
+            collisionRadius: followBotAI.objectSize,
+            maximumVelocity: followBotAI.maximumVelocity,
+            maximumDeltaVelocity: followBotAI.maximumDeltaVelocity,
+            maximumTurnRate: followBotAI.maximumTurnRate,
+            maximumDeltaTurnRate:
+                followBotAI.maximumDeltaTurnRate,
+            circleDistance: followBotAI.circleDistance
+        )
+    )
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
     precondition(
@@ -2445,6 +2578,14 @@ func parseTrainingMessages(_ data: Data) throws -> [String: String] {
             "AlmostDoneDodge",
             "LeaveDodge",
             "KeepMovingOutofDodging",
+            "ManuverIntro",
+            "HeadingIntro",
+            "PitchIntro",
+            "BankIntro",
+            "FollowIntro",
+            "FollowInstructions",
+            "WeaponsEnabled",
+            "DestroyFollowbot",
     ].allSatisfy({ messages[$0] != nil }) else {
         throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
     }

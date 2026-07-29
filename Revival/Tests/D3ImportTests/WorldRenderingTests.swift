@@ -2,6 +2,935 @@ import XCTest
 
 final class WorldRenderingTests: XCTestCase {
     @MainActor
+    func testScripts021Through026PreserveReleasedOrderVisibilityAndMotion()
+        throws
+    {
+        var level = makeTrainingManeuverFollowLevel()
+        let lesson = try XCTUnwrap(
+            level.trainingDodgeAttempt?.maneuverFollow
+        )
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            }
+        )
+        let maneuver = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == lesson.maneuverObjectHandle
+            }
+        )
+        level.objects[playerIndex].location = maneuver.location
+        level.objects[playerIndex].position = maneuver.position
+        level.objects[playerIndex].orientation = maneuver.orientation
+        let roomIndex = try XCTUnwrap(
+            level.rooms.firstIndex { $0.sourceIndex == 37 }
+        )
+        let originalRoom = level.rooms[roomIndex]
+        let containmentRoom = makeSourceContainmentRoom(
+            center: maneuver.position,
+            texture: level.surfacePhysics[0].texture,
+            sourceIndex: originalRoom.sourceIndex,
+            halfExtent: 500
+        )
+        var containmentFaces = containmentRoom.faces
+        let containmentPortals = originalRoom.portals.enumerated().map {
+            portalIndex,
+            portal in
+            let face = containmentFaces[portalIndex]
+            containmentFaces[portalIndex] = .init(
+                corners: face.corners,
+                flags: face.flags,
+                portalIndex: portalIndex,
+                texture: face.texture,
+                lightmapInfoIndex: face.lightmapInfoIndex,
+                allowsLightCorona: face.allowsLightCorona,
+                lightMultiple: face.lightMultiple,
+                special: face.special
+            )
+            return LevelPortal(
+                flags: portal.flags,
+                faceIndex: portalIndex,
+                connectedRoom: portal.connectedRoom,
+                connectedPortal: portal.connectedPortal,
+                boundaryNodeIndex: portal.boundaryNodeIndex,
+                pathPoint: portal.pathPoint,
+                combineMaster: portal.combineMaster
+            )
+        }
+        level.rooms[roomIndex] = replacing(
+            originalRoom,
+            vertices: containmentRoom.vertices,
+            faces: containmentFaces,
+            portals: containmentPortals
+        )
+        let followBotObject = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == lesson.followBotObjectHandle
+            }
+        )
+        XCTAssertTrue(
+            isCanonicalRigidTransform(
+                position: followBotObject.position,
+                orientation: followBotObject.orientation
+            )
+        )
+        XCTAssertTrue(
+            sourceConvexRoomContains(
+                followBotObject.position,
+                in: level.rooms[roomIndex]
+            )
+        )
+
+        let seed = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(seed.continuation)
+            ) as? [String: Any]
+        )
+        var dodgeState = try XCTUnwrap(
+            continuationObject["trainingDodgeAttemptState"]
+                as? [String: Any]
+        )
+        dodgeState["script033Count"] = 1
+        dodgeState["script016Count"] = 1
+        dodgeState["script017Count"] = 1
+        dodgeState["script018Count"] = 0
+        dodgeState["script020Count"] = 1
+        dodgeState["triggerTimerRemaining"] = nil
+        dodgeState["successTimerRemaining"] = nil
+        dodgeState["almostDoneTimerRemaining"] = nil
+        dodgeState["turretIsPowered"] = false
+        dodgeState["markerLightDistance"] = 50
+        continuationObject["trainingDodgeAttemptState"] = dodgeState
+        var openingState = try XCTUnwrap(
+            continuationObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        openingState["enabledControls"] = 63
+        openingState["timerRemaining"] = Float(1_000)
+        openingState["welcomeWasPresented"] = false
+        continuationObject["trainingOpeningState"] = openingState
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: continuationObject
+            )
+        )
+        let simulation = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 0
+        )
+
+        let heading = simulation.update(at: 0.1, input: .zero)
+        XCTAssertEqual(heading.enabledPlayerControls.rawValue, 768)
+        XCTAssertEqual(heading.trainingDodgeMarkerLightDistance, 0)
+        XCTAssertEqual(
+            heading.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [lesson.maneuverIntroduction],
+                    voiceSourceName:
+                        lesson.headingVoiceSourceName,
+                    voicePrecedesHUDMessages: false,
+                    trailingHUDMessages: [
+                        lesson.headingInstruction,
+                    ]
+                ),
+            ]
+        )
+        var headingPresentationOrder: [String] = []
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            heading.trainingOpeningFeedback,
+            attemptVoice: {
+                headingPresentationOrder.append("voice:\($0)")
+            },
+            attemptSound: { _, _ in
+                XCTFail("Script 021 does not play a sound event")
+            },
+            presentHUDMessages: {
+                headingPresentationOrder.append(
+                    contentsOf: $0.map { "hud:\($0)" }
+                )
+            }
+        )
+        XCTAssertEqual(
+            headingPresentationOrder,
+            [
+                "hud:\(lesson.maneuverIntroduction)",
+                "voice:\(lesson.headingVoiceSourceName)",
+                "hud:\(lesson.headingInstruction)",
+            ]
+        )
+        XCTAssertEqual(heading.trainingFollowBot?.script021Count, 1)
+        let closedPortalRoom = try XCTUnwrap(
+            simulation.level.rooms.first {
+                $0.sourceIndex == lesson.portalRoomSourceIndex
+            }
+        )
+        for portalIndex in lesson.orderedPortalIndices {
+            let portal = closedPortalRoom.portals[portalIndex]
+            XCTAssertEqual(portal.flags & 1, 1)
+            let reciprocal = try XCTUnwrap(
+                simulation.level.rooms.first {
+                    $0.sourceIndex == portal.connectedRoom
+                }
+            ).portals[portal.connectedPortal]
+            XCTAssertEqual(reciprocal.flags & 1, 1)
+        }
+
+        var earlyManeuverObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var earlyManeuverOpening = try XCTUnwrap(
+            earlyManeuverObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        earlyManeuverOpening["startCourseWasPresented"] = true
+        earlyManeuverOpening["finishCourseWasPresented"] = true
+        earlyManeuverObject["trainingOpeningState"] =
+            earlyManeuverOpening
+        let earlyManeuverRestore = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: earlyManeuverObject
+                )
+            ),
+            resumedAtTimestamp: 0.1
+        ).update(at: 0.1, input: .zero)
+        XCTAssertEqual(
+            earlyManeuverRestore.enabledPlayerControls.rawValue,
+            lesson.headingControlMask,
+            "Script 021 remains exact when source-valid history skips Script 019"
+        )
+
+        let headingContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var stalledHeadingObject = headingContinuationObject
+        var stalledHeadingState = try XCTUnwrap(
+            stalledHeadingObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        stalledHeadingState.removeValue(
+            forKey: "levelTimerRemaining"
+        )
+        stalledHeadingObject["trainingManeuverFollowState"] =
+            stalledHeadingState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: stalledHeadingObject
+                    )
+                ),
+                resumedAtTimestamp: 0.1
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var missingPredecessorObject = headingContinuationObject
+        var missingPredecessorDodge = try XCTUnwrap(
+            missingPredecessorObject["trainingDodgeAttemptState"]
+                as? [String: Any]
+        )
+        missingPredecessorDodge["script020Count"] = 0
+        missingPredecessorObject["trainingDodgeAttemptState"] =
+            missingPredecessorDodge
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: missingPredecessorObject
+                    )
+                ),
+                resumedAtTimestamp: 0.1
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var wrongRoomObject = headingContinuationObject
+        var wrongRoomState = try XCTUnwrap(
+            wrongRoomObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        wrongRoomState["roomSourceIndex"] = 35
+        wrongRoomObject["trainingManeuverFollowState"] =
+            wrongRoomState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: wrongRoomObject
+                    )
+                ),
+                resumedAtTimestamp: 0.1
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var outsideRoomObject = headingContinuationObject
+        var outsideRoomState = try XCTUnwrap(
+            outsideRoomObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        outsideRoomState["position"] = [
+            "x": maneuver.position.x + 1_000,
+            "y": maneuver.position.y,
+            "z": maneuver.position.z,
+        ]
+        outsideRoomObject["trainingManeuverFollowState"] =
+            outsideRoomState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: outsideRoomObject
+                    )
+                ),
+                resumedAtTimestamp: 0.1
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var excessiveVelocityObject = headingContinuationObject
+        var excessiveVelocityState = try XCTUnwrap(
+            excessiveVelocityObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        excessiveVelocityState["velocity"] = [
+            "x": lesson.followBot.maximumVelocity + 1,
+            "y": Float.zero,
+            "z": Float.zero,
+        ]
+        excessiveVelocityObject["trainingManeuverFollowState"] =
+            excessiveVelocityState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: excessiveVelocityObject
+                    )
+                ),
+                resumedAtTimestamp: 0.1
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        _ = simulation.update(at: 20.1, input: .zero)
+        let pitch = simulation.update(at: 20.2, input: .zero)
+        XCTAssertEqual(pitch.enabledPlayerControls.rawValue, 192)
+        XCTAssertEqual(
+            pitch.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [
+                        lesson.successMessage,
+                        lesson.pitchInstruction,
+                    ],
+                    voiceSourceName: lesson.pitchVoiceSourceName,
+                    voicePrecedesHUDMessages: false
+                ),
+            ]
+        )
+        XCTAssertEqual(pitch.trainingFollowBot?.script022Count, 1)
+
+        _ = simulation.update(at: 32.2, input: .zero)
+        let bank = simulation.update(at: 32.3, input: .zero)
+        XCTAssertEqual(bank.enabledPlayerControls.rawValue, 3_072)
+        XCTAssertEqual(
+            bank.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [lesson.bankInstruction],
+                    voiceSourceName: lesson.bankVoiceSourceName,
+                    voicePrecedesHUDMessages: false
+                ),
+            ]
+        )
+        XCTAssertEqual(bank.trainingFollowBot?.script024Count, 1)
+
+        _ = simulation.update(at: 47.3, input: .zero)
+        let follow = simulation.update(at: 47.4, input: .zero)
+        XCTAssertEqual(follow.enabledPlayerControls.rawValue, 4_032)
+        XCTAssertEqual(
+            follow.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [
+                        lesson.followIntroduction,
+                        lesson.followInstruction,
+                    ],
+                    voiceSourceName: lesson.followVoiceSourceName,
+                    voicePrecedesHUDMessages: false
+                ),
+            ]
+        )
+        XCTAssertEqual(follow.trainingFollowBot?.script023Count, 1)
+        XCTAssertEqual(
+            follow.trainingFollowBot?.teamFlags,
+            lesson.friendlyTeamFlags
+        )
+        XCTAssertEqual(
+            follow.trainingFollowBot?.activePathIndex,
+            lesson.followPathIndex
+        )
+        XCTAssertEqual(
+            follow.trainingFollowBot?.objectTimerRemaining,
+            lesson.followDuration
+        )
+
+        let followPath = level.paths[lesson.followPathIndex]
+        let firstNode = followPath.nodes[0]
+        let secondNode = followPath.nodes[1]
+        let firstSegmentDelta = Vector3(
+            x: secondNode.position.x - firstNode.position.x,
+            y: secondNode.position.y - firstNode.position.y,
+            z: secondNode.position.z - firstNode.position.z
+        )
+        let firstSegmentLengthSquared =
+            firstSegmentDelta.x * firstSegmentDelta.x
+            + firstSegmentDelta.y * firstSegmentDelta.y
+            + firstSegmentDelta.z * firstSegmentDelta.z
+        let firstSegmentLength = sqrt(firstSegmentLengthSquared)
+        let firstSegment = Vector3(
+            x: firstSegmentDelta.x / firstSegmentLength,
+            y: firstSegmentDelta.y / firstSegmentLength,
+            z: firstSegmentDelta.z / firstSegmentLength
+        )
+        func testMagnitude(_ value: Vector3) -> Float {
+            sqrt(
+                value.x * value.x
+                    + value.y * value.y
+                    + value.z * value.z
+            )
+        }
+        func testNormalized(_ value: Vector3) -> Vector3 {
+            let magnitude = testMagnitude(value)
+            return .init(
+                x: value.x / magnitude,
+                y: value.y / magnitude,
+                z: value.z / magnitude
+            )
+        }
+        func testCross(_ lhs: Vector3, _ rhs: Vector3) -> Vector3 {
+            .init(
+                x: lhs.y * rhs.z - lhs.z * rhs.y,
+                y: lhs.z * rhs.x - lhs.x * rhs.z,
+                z: lhs.x * rhs.y - lhs.y * rhs.x
+            )
+        }
+        func testDot(_ lhs: Vector3, _ rhs: Vector3) -> Float {
+            lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z
+        }
+        let firstNodeForward = testNormalized(firstNode.forward)
+        let firstNodeRight = testNormalized(
+            testCross(firstNode.up, firstNodeForward)
+        )
+        let firstNodeUp = testNormalized(
+            testCross(firstNodeForward, firstNodeRight)
+        )
+        var loopTransitionObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        loopTransitionObject["frameDuration"] = 0.1
+        var loopTransitionState = try XCTUnwrap(
+            loopTransitionObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        let loopTransitionStart = Vector3(
+            x: firstNode.position.x + firstSegment.x * 0.1,
+            y: firstNode.position.y + firstSegment.y * 0.1,
+            z: firstNode.position.z + firstSegment.z * 0.1
+        )
+        loopTransitionState["position"] = [
+            "x": loopTransitionStart.x,
+            "y": loopTransitionStart.y,
+            "z": loopTransitionStart.z,
+        ]
+        loopTransitionState["velocity"] = [
+            "x": Float.zero,
+            "y": Float.zero,
+            "z": Float.zero,
+        ]
+        loopTransitionState["orientation"] = [
+            "right": [
+                "x": firstNodeRight.x,
+                "y": firstNodeRight.y,
+                "z": firstNodeRight.z,
+            ],
+            "up": [
+                "x": firstNodeUp.x,
+                "y": firstNodeUp.y,
+                "z": firstNodeUp.z,
+            ],
+            "forward": [
+                "x": firstNodeForward.x,
+                "y": firstNodeForward.y,
+                "z": firstNodeForward.z,
+            ],
+        ]
+        loopTransitionState["turnRate"] =
+            lesson.followBot.maximumTurnRate
+        loopTransitionObject["trainingManeuverFollowState"] =
+            loopTransitionState
+        let loopTransitionSimulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: loopTransitionObject
+                )
+            ),
+            resumedAtTimestamp: 47.4
+        )
+        let loopTransition = loopTransitionSimulation.update(
+            at: 47.4,
+            input: .zero
+        )
+        let loopTransitionEnd = try XCTUnwrap(
+            loopTransition.trainingFollowBot?.position
+        )
+        XCTAssertEqual(
+            loopTransition.trainingFollowBot?.pathNodeIndex,
+            1
+        )
+        let loopTransitionDisplacement = Vector3(
+            x: loopTransitionEnd.x - loopTransitionStart.x,
+            y: loopTransitionEnd.y - loopTransitionStart.y,
+            z: loopTransitionEnd.z - loopTransitionStart.z
+        )
+        let loopTransitionProjectionX =
+            loopTransitionDisplacement.x * firstSegment.x
+        let loopTransitionProjectionY =
+            loopTransitionDisplacement.y * firstSegment.y
+        let loopTransitionProjectionZ =
+            loopTransitionDisplacement.z * firstSegment.z
+        let loopTransitionProjection =
+            loopTransitionProjectionX
+            + loopTransitionProjectionY
+            + loopTransitionProjectionZ
+        XCTAssertLessThan(
+            loopTransitionProjection,
+            0,
+            "the crossing frame retains movement toward the released current node"
+        )
+        XCTAssertGreaterThan(
+            testDot(
+                try XCTUnwrap(
+                    loopTransition.trainingFollowBot?
+                        .orientation.forward
+                ),
+                firstNodeForward
+            ),
+            0.999_9,
+            "path-node orientation interpolates from the prior authored basis"
+        )
+        _ = loopTransitionSimulation.update(
+            at: 47.5,
+            input: .zero
+        )
+        _ = loopTransitionSimulation.update(
+            at: 47.6,
+            input: .zero
+        )
+        let nextNodeMotion = loopTransitionSimulation.update(
+            at: 47.7,
+            input: .zero
+        )
+        let nextNodePosition = try XCTUnwrap(
+            nextNodeMotion.trainingFollowBot?.position
+        )
+        let nextNodeDisplacement = Vector3(
+            x: nextNodePosition.x - loopTransitionEnd.x,
+            y: nextNodePosition.y - loopTransitionEnd.y,
+            z: nextNodePosition.z - loopTransitionEnd.z
+        )
+        XCTAssertGreaterThan(
+            testDot(nextNodeDisplacement, firstSegment),
+            0,
+            "the frame after transition steers toward the released next node"
+        )
+
+        var strictBoundaryObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        strictBoundaryObject["frameDuration"] = 0
+        let strictPlayerPosition = try XCTUnwrap(
+            strictBoundaryObject["playerPosition"] as? [String: Any]
+        )
+        var strictManeuverState = try XCTUnwrap(
+            strictBoundaryObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        strictManeuverState["position"] = [
+            "x": try XCTUnwrap(strictPlayerPosition["x"] as? NSNumber)
+                .floatValue + 10,
+            "y": try XCTUnwrap(strictPlayerPosition["y"] as? NSNumber)
+                .floatValue,
+            "z": try XCTUnwrap(strictPlayerPosition["z"] as? NSNumber)
+                .floatValue - 10,
+        ]
+        strictManeuverState["velocity"] = [
+            "x": Float.zero,
+            "y": Float.zero,
+            "z": Float.zero,
+        ]
+        strictManeuverState["objectTimerRemaining"] = 1
+        strictBoundaryObject["trainingManeuverFollowState"] =
+            strictManeuverState
+        let strictBoundary = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: strictBoundaryObject
+                )
+            ),
+            resumedAtTimestamp: 47.4
+        ).update(at: 47.4, input: .zero)
+        XCTAssertEqual(
+            strictBoundary.trainingFollowBot?.objectTimerRemaining,
+            lesson.followDuration,
+            "exactly 45 degrees is outside the released strict 90-degree cone"
+        )
+        XCTAssertEqual(
+            strictBoundary.trainingFollowBot?.script025Count,
+            1
+        )
+
+        let beforeMotion = try XCTUnwrap(
+            follow.trainingFollowBot?.position
+        )
+        let moved = simulation.update(at: 47.5, input: .zero)
+        XCTAssertNotEqual(
+            moved.trainingFollowBot?.position,
+            beforeMotion
+        )
+        XCTAssertEqual(
+            moved.trainingFollowBot?.script025Count,
+            1
+        )
+        var expiryObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        expiryObject["frameDuration"] = 0
+        let expiryPlayerPosition = try XCTUnwrap(
+            expiryObject["playerPosition"] as? [String: Any]
+        )
+        var expiryManeuverState = try XCTUnwrap(
+            expiryObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        expiryManeuverState["position"] = [
+            "x": try XCTUnwrap(expiryPlayerPosition["x"] as? NSNumber)
+                .floatValue,
+            "y": try XCTUnwrap(expiryPlayerPosition["y"] as? NSNumber)
+                .floatValue,
+            "z": try XCTUnwrap(expiryPlayerPosition["z"] as? NSNumber)
+                .floatValue - 10,
+        ]
+        expiryManeuverState["velocity"] = [
+            "x": Float.zero,
+            "y": Float.zero,
+            "z": Float.zero,
+        ]
+        expiryManeuverState["script025Count"] = 0
+        expiryManeuverState["objectTimerRemaining"] = 0.000_001
+        expiryObject["trainingManeuverFollowState"] =
+            expiryManeuverState
+        let weaponsSimulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: expiryObject
+                )
+            ),
+            resumedAtTimestamp: 47.5
+        )
+        let weapons = weaponsSimulation.update(
+            at: 47.5,
+            input: .zero
+        )
+        XCTAssertEqual(
+            weapons.enabledPlayerControls.rawValue,
+            4_032 | 12_288
+        )
+        XCTAssertEqual(
+            weapons.trainingFollowBot?.activePathIndex,
+            lesson.destroyPathIndex
+        )
+        XCTAssertEqual(
+            weapons.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [
+                        lesson.successMessage,
+                        lesson.weaponsEnabledInstruction,
+                    ],
+                    voiceSourceName:
+                        lesson.weaponVoiceSourceName,
+                    voicePrecedesHUDMessages: false,
+                    trailingHUDMessages: [
+                        lesson.destroyInstruction,
+                    ]
+                ),
+            ]
+        )
+        var weaponsPresentationOrder: [String] = []
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            weapons.trainingOpeningFeedback,
+            attemptVoice: {
+                weaponsPresentationOrder.append("voice:\($0)")
+            },
+            attemptSound: { _, _ in
+                XCTFail("Script 026 does not play a sound event")
+            },
+            presentHUDMessages: {
+                weaponsPresentationOrder.append(
+                    contentsOf: $0.map { "hud:\($0)" }
+                )
+            }
+        )
+        XCTAssertEqual(
+            weaponsPresentationOrder,
+            [
+                "hud:\(lesson.successMessage)",
+                "hud:\(lesson.weaponsEnabledInstruction)",
+                "voice:\(lesson.weaponVoiceSourceName)",
+                "hud:\(lesson.destroyInstruction)",
+            ]
+        )
+        XCTAssertEqual(weapons.trainingFollowBot?.script026Count, 1)
+        XCTAssertEqual(weapons.trainingFollowBot?.script025Count, 1)
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: weaponsSimulation.continuation,
+            resumedAtTimestamp: 100
+        )
+        let silent = restored.update(at: 100.1, input: .zero)
+        XCTAssertTrue(silent.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(
+            silent.trainingFollowBot?.activePathIndex,
+            lesson.destroyPathIndex
+        )
+
+        let destroyNode =
+            level.paths[lesson.destroyPathIndex].nodes[0]
+        var completionObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    weaponsSimulation.continuation
+                )
+            ) as? [String: Any]
+        )
+        completionObject["frameDuration"] = 0.1
+        var completionState = try XCTUnwrap(
+            completionObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        completionState["position"] = [
+            "x": destroyNode.position.x - 1,
+            "y": destroyNode.position.y,
+            "z": destroyNode.position.z,
+        ]
+        completionState["velocity"] = [
+            "x": Float(lesson.followBot.maximumVelocity),
+            "y": Float.zero,
+            "z": Float.zero,
+        ]
+        completionObject["trainingManeuverFollowState"] =
+            completionState
+        let completedPath = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: completionObject
+                )
+            ),
+            resumedAtTimestamp: 100
+        ).update(at: 100, input: .zero)
+        XCTAssertNil(
+            completedPath.trainingFollowBot?.activePathIndex
+        )
+        XCTAssertGreaterThanOrEqual(
+            try XCTUnwrap(
+                completedPath.trainingFollowBot?.position.x
+            ),
+            destroyNode.position.x
+        )
+
+        var destroyTurnObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    weaponsSimulation.continuation
+                )
+            ) as? [String: Any]
+        )
+        destroyTurnObject["frameDuration"] = 0.1
+        var destroyTurnState = try XCTUnwrap(
+            destroyTurnObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        destroyTurnState["position"] = [
+            "x": destroyNode.position.x - 10,
+            "y": destroyNode.position.y,
+            "z": destroyNode.position.z,
+        ]
+        destroyTurnState["orientation"] = [
+            "right": [
+                "x": Float(1),
+                "y": Float.zero,
+                "z": Float.zero,
+            ],
+            "up": [
+                "x": Float.zero,
+                "y": Float(1),
+                "z": Float.zero,
+            ],
+            "forward": [
+                "x": Float.zero,
+                "y": Float.zero,
+                "z": Float(1),
+            ],
+        ]
+        destroyTurnState["velocity"] = [
+            "x": Float.zero,
+            "y": Float.zero,
+            "z": Float.zero,
+        ]
+        destroyTurnState["turnRate"] = Float.zero
+        destroyTurnObject["trainingManeuverFollowState"] =
+            destroyTurnState
+        let destroyTurn = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: destroyTurnObject
+                )
+            ),
+            resumedAtTimestamp: 100
+        ).update(at: 100, input: .zero)
+        XCTAssertGreaterThan(
+            try XCTUnwrap(
+                destroyTurn.trainingFollowBot?
+                    .orientation.forward.x
+            ),
+            0.1,
+            "GoToDie uses the released direct maximum-turn-rate cap without a delta-rate ramp"
+        )
+
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    weaponsSimulation.continuation
+                )
+            ) as? [String: Any]
+        )
+        var hostileManeuverState = try XCTUnwrap(
+            hostileObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        hostileManeuverState["objectTimerRemaining"] = 1
+        hostileObject["trainingManeuverFollowState"] =
+            hostileManeuverState
+        let hostileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: hostileObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileContinuation,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var impossibleOrderObject = continuationObject
+        var impossibleOrderState = try XCTUnwrap(
+            impossibleOrderObject["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        impossibleOrderState["script025Count"] = 1
+        impossibleOrderObject["trainingManeuverFollowState"] =
+            impossibleOrderState
+        let impossibleOrder = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: impossibleOrderObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: impossibleOrder,
+                resumedAtTimestamp: 100
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
+    @MainActor
     func testScript019EarlyContactOpensExitOnceAndRestoresSilently()
         throws
     {
@@ -14235,6 +15164,355 @@ func makeTrainingDodgeAttemptLevel() -> Level {
         voiceSourceName: "proceed4.osf"
     )
     return level
+}
+
+func makeTrainingManeuverFollowLevel() -> Level {
+    var level = makeTrainingDodgeAttemptLevel()
+    let invisibleDefinition = level.objects.first {
+        $0.handle == 6_150
+    }!.definition
+    let invisibleModel = level.objectPresentations.first {
+        $0.objectHandle == 6_150
+    }!.primaryModel
+    let identity = Matrix3(
+        right: .init(x: -1, y: 0, z: 0),
+        up: .init(x: 0, y: 1, z: 0),
+        forward: .init(x: 0, y: 0, z: -1)
+    )
+    let followBotOrientation = Matrix3(
+        right: .init(
+            x: -0.999_645_05,
+            y: -0.010_065_023,
+            z: 0.024_667_98
+        ),
+        up: .init(
+            x: -0.008_759_673,
+            y: 0.998_584_4,
+            z: 0.052_465_245
+        ),
+        forward: .init(
+            x: -0.025_161_121,
+            y: 0.052_230_537,
+            z: -0.998_318_1
+        )
+    )
+    level.objects.append(contentsOf: [
+        .init(
+            handle: 2_063,
+            type: 7,
+            storedID: 67,
+            definition: invisibleDefinition,
+            instanceName: "ManuverRoomCenter",
+            flags: 4_096,
+            doorShields: nil,
+            location: .room(37),
+            position: .init(
+                x: 2_061.7336,
+                y: -755.4103,
+                z: 2_566.1135
+            ),
+            orientation: identity,
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        ),
+        .init(
+            handle: 8_200,
+            type: 2,
+            storedID: 106,
+            definition: .init(
+                storedIndex: 106,
+                sourceName: "RAS1 Light Security Flyer"
+            ),
+            instanceName: "FollowBot1",
+            flags: 5_121,
+            doorShields: nil,
+            location: .room(37),
+            position: .init(
+                x: 2_059.3496,
+                y: -723.2588,
+                z: 2_469.1072
+            ),
+            orientation: followBotOrientation,
+            containsType: 255,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        ),
+    ])
+    let gyro = SourceResource(
+        storedIndex: 106,
+        sourceName: "gyro.OOF"
+    )
+    let template = level.models[0]
+    level = replacing(
+        level,
+        source: replacing(
+            level.source,
+            profileFiles: level.source.profileFiles + [
+                .init(
+                    relativePath: "d3.hog",
+                    byteCount: 1,
+                    sha256: String(repeating: "d", count: 64)
+                ),
+            ]
+        ),
+        paths: [
+            .init(
+                name: "FollowLoop1",
+                flags: 0,
+                nodes: [
+                    pathNode(
+                        2_092.3477, -723.2839, 2_475.0989,
+                        -0.999_637_8, -0.010_080_075, 0.024_955_332,
+                        -0.008_759_689_5, 0.998_584_33, 0.052_465_282
+                    ),
+                    pathNode(
+                        2_120.8862, -725.230_83, 2_516.9202,
+                        0.443_545_25, -0.043_143_31, 0.895_213,
+                        -0.008_759_731, 0.998_584_33, 0.052_465_245
+                    ),
+                    pathNode(
+                        2_132.2334, -727.802_37, 2_567.7603,
+                        -0.155_969_68, -0.053_189_583, 0.986_328_7,
+                        -0.008_759_797, 0.998_584_33, 0.052_465_29
+                    ),
+                    pathNode(
+                        2_105.4128, -729.7712, 2_600.7546,
+                        -0.652_316_63, -0.045_472_786, 0.756_581_25,
+                        -0.008_759_798_5, 0.998_584_33, 0.052_465_282
+                    ),
+                    pathNode(
+                        2_078.9663, -731.614_75, 2_631.4287,
+                        -0.652_316_63, -0.045_472_786, 0.756_581_25,
+                        -0.008_759_798_5, 0.998_584_33, 0.052_465_282
+                    ),
+                    pathNode(
+                        2_046.4663, -731.9499, 2_632.3801,
+                        -0.996_973_45, -0.004_668_452, -0.077_602_65,
+                        -0.008_759_799, 0.998_584_4, 0.052_465_282
+                    ),
+                    pathNode(
+                        2_023.0117, -731.8655, 2_626.8577,
+                        -0.805_366_2, 0.024_053_827, -0.592_289_3,
+                        -0.008_759_8, 0.998_584_33, 0.052_465_275
+                    ),
+                    pathNode(
+                        2_007.6753, -730.662_84, 2_601.4045,
+                        -0.364_299_4, 0.045_674_63, -0.930_161_2,
+                        -0.008_759_801, 0.998_584_4, 0.052_465_275
+                    ),
+                    pathNode(
+                        2_003.6691, -729.142, 2_571.789,
+                        0.080_688_6, 0.053_002_07, -0.995_329_2,
+                        -0.008_759_827, 0.998_584_33, 0.052_465_275
+                    ),
+                    pathNode(
+                        1_987.4816, -726.8468, 2_525.4,
+                        -0.352_754_15, 0.046_008_28, -0.934_584_26,
+                        -0.008_759_827, 0.998_584_33, 0.052_465_267
+                    ),
+                    pathNode(
+                        2_005.9342, -725.277_34, 2_498.6106,
+                        0.646_923_4, 0.045_667_43, -0.761_186_3,
+                        -0.008_759_825, 0.998_584_4, 0.052_465_27
+                    ),
+                    pathNode(
+                        2_035.6516, -724.0875, 2_480.9272,
+                        0.931_484_94, 0.027_230_46, -0.362_759_32,
+                        -0.008_759_825, 0.998_584_33, 0.052_465_27
+                    ),
+                    pathNode(
+                        2_068.726, -723.599_37, 2_477.1624,
+                        0.994_420_6, 0.003_183_510_4, 0.105_440_035,
+                        -0.008_759_849, 0.998_584_33, 0.052_465_554
+                    ),
+                ]
+            ),
+            .init(
+                name: "GoToDie",
+                flags: 0,
+                nodes: [
+                    pathNode(
+                        2_126.0396, -731.692_57, 2_555.0505,
+                        -0.968_044_1, -0.248_761_6, 0.031_754_155,
+                        -0.249_600_16, 0.968_002_9, -0.025_886_48
+                    ),
+                ]
+            ),
+        ],
+        models: level.models + [
+            .init(
+                source: gyro,
+                collisionRadius: 3.841_456_2,
+                submodels: template.submodels,
+                bounds: template.bounds,
+                sourceArchive: "d3.hog",
+                sourceSHA256:
+                    "896cc33ba0c7ec00fd2fd693a0e8f10868a47076eda0b7914cc90a790e87eb61"
+            ),
+        ],
+        objectPresentations: level.objectPresentations + [
+            .init(
+                objectHandle: 2_063,
+                primaryModel: invisibleModel,
+                mediumModel: nil,
+                lowModel: nil,
+                dyingModel: nil,
+                mediumDistance: nil,
+                lowDistance: nil,
+                isVisible: false
+            ),
+            .init(
+                objectHandle: 8_200,
+                primaryModel: gyro,
+                mediumModel: nil,
+                lowModel: nil,
+                dyingModel: nil,
+                mediumDistance: nil,
+                lowDistance: nil
+            ),
+        ]
+    )
+    let pcm = Data(repeating: 0, count: 2)
+    let voices = [
+        "intro3.osf", "pitch.osf", "bank.osf", "follow.osf", "intro4.osf",
+    ].enumerated().map { index, sourceName in
+        CanonicalVoiceClip(
+            sourceName: sourceName,
+            sourceEntryIndex: 300 + index,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 1,
+            pcm16LittleEndian: pcm,
+            pcmSHA256: canonicalSHA256(pcm),
+            sourceArchive: "missions/training.mn3",
+            sourceSHA256: String(repeating: "a", count: 64)
+        )
+    }
+    level = replacing(
+        level,
+        voiceClips: level.voiceClips + voices,
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current + [
+                .init(
+                    category: "object-definition",
+                    source: .init(
+                        storedIndex: 106,
+                        sourceName: "RAS1 Light Security Flyer"
+                    ),
+                    state: "identity-recorded",
+                    provenance: "synthetic maneuver-follow fixture"
+                ),
+                .init(
+                    category: "model",
+                    source: gyro,
+                    state: "presentation-payload-imported",
+                    provenance: "synthetic maneuver-follow fixture"
+                ),
+            ] + voices.map {
+                .init(
+                    category: "voice",
+                    source: .init(
+                        storedIndex: $0.sourceEntryIndex,
+                        sourceName: $0.sourceName
+                    ),
+                    state: "canonical-pcm-imported",
+                    provenance: "synthetic maneuver-follow fixture"
+                )
+            },
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
+    level.trainingDodgeAttempt?.maneuverFollow = .init(
+        maneuverObjectHandle: 2_063,
+        maneuverCollisionRadius: 10.052_409,
+        flashLightObjectHandle: 4_120,
+        portalRoomSourceIndex: 36,
+        orderedPortalIndices: [1, 0],
+        headingControlMask: 768,
+        pitchControlMask: 192,
+        bankControlMask: 3_072,
+        rotationalControlMask: 4_032,
+        weaponControlMask: 12_288,
+        headingDuration: 20,
+        pitchDuration: 12,
+        bankDuration: 15,
+        followDuration: 20,
+        followBotObjectHandle: 8_200,
+        friendlyTeamFlags: 65_536,
+        followPathIndex: 0,
+        followPathGoalFlags: 9_437_444,
+        destroyPathIndex: 1,
+        destroyPathGoalFlags: 4_352,
+        goalSlot: 0,
+        goalPriority: 3,
+        maneuverIntroduction:
+            "Now you are going to learn the other controls, which are pitch, heading and bank.",
+        headingInstruction:
+            "Now your heading controls are enabled. Try them out by rotating to the left and right.",
+        successMessage: "Excellent!",
+        pitchInstruction:
+            "Now your pitch controls are enabled. Try them out by pitching up and down.",
+        bankInstruction:
+            "Now your bank controls are enabled. Try them out by banking to the left and right.",
+        followIntroduction:
+            "Now you will use the rotational skills you just learned to follow one of the two robots that are circling this room",
+        followInstruction:
+            "Keep one of the robots on your screen for 20 seconds using only your rotational controls to complete this step.",
+        weaponsEnabledInstruction:
+            "Now your weapons have been enabled. There is a primary and a secondary.",
+        destroyInstruction: "Now, destroy the robot.",
+        headingVoiceSourceName: "intro3.osf",
+        pitchVoiceSourceName: "pitch.osf",
+        bankVoiceSourceName: "bank.osf",
+        followVoiceSourceName: "follow.osf",
+        weaponVoiceSourceName: "intro4.osf",
+        followBot: .init(
+            model: gyro,
+            collisionRadius: 4.576_441_8,
+            maximumVelocity: 40,
+            maximumDeltaVelocity: 80,
+            maximumTurnRate: 12_000,
+            maximumDeltaTurnRate: 16_000,
+            circleDistance: 25
+        )
+    )
+    return level
+}
+
+private func pathNode(
+    _ x: Float,
+    _ y: Float,
+    _ z: Float,
+    _ forwardX: Float,
+    _ forwardY: Float,
+    _ forwardZ: Float,
+    _ upX: Float,
+    _ upY: Float,
+    _ upZ: Float
+) -> GamePathNode {
+    .init(
+        position: .init(x: x, y: y, z: z),
+        location: .room(37),
+        flags: 0,
+        forward: .init(
+            x: forwardX,
+            y: forwardY,
+            z: forwardZ
+        ),
+        up: .init(x: upX, y: upY, z: upZ)
+    )
 }
 
 func makeTrainingRobotGuidebotLevel() -> Level {
