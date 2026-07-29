@@ -11,6 +11,8 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoUp=Up
             GoDown=Down
             Repeat=Repeat
+            ContinueToCourse=Continue
+            CourseInstructions=Course
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoLeft)) {
             XCTAssertEqual(
@@ -28,6 +30,8 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoUp=Up
             GoDown=Down
             Repeat=Repeat
+            ContinueToCourse=Continue
+            CourseInstructions=Course
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoRight)) {
             XCTAssertEqual(
@@ -45,6 +49,8 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoRight=Right
             GoDown=Down
             Repeat=Repeat
+            ContinueToCourse=Continue
+            CourseInstructions=Course
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoUp)) {
             XCTAssertEqual(
@@ -62,6 +68,8 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoRight=Right
             GoUp=Up
             Repeat=Repeat
+            ContinueToCourse=Continue
+            CourseInstructions=Course
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingGoDown)) {
             XCTAssertEqual(
@@ -79,6 +87,8 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoRight=Right
             GoUp=Up
             GoDown=Down
+            ContinueToCourse=Continue
+            CourseInstructions=Course
             """.utf8)
         XCTAssertThrowsError(try parseTrainingMessages(missingRepeat)) {
             XCTAssertEqual(
@@ -97,6 +107,8 @@ final class PreparedRetailProfileTests: XCTestCase {
             GoUp=Now Slide up  until you stop.
             GoDown=Now Slide down until you return to the start position.
             Repeat=Let's repeat the exercise we just did.
+            ContinueToCourse=Continue Sliding down to start the next step.
+            CourseInstructions=Now, manuever through this tunnel using the sliding skills you just learned.
             """.utf8)
         XCTAssertEqual(
             try parseTrainingMessages(complete)["GoDown"],

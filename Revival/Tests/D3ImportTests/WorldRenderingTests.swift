@@ -2,6 +2,217 @@ import XCTest
 
 final class WorldRenderingTests: XCTestCase {
     @MainActor
+    func testTrainingScript014StartsCourseWithoutScript013AndRestoresSilently()
+        throws
+    {
+        let level = makeTrainingScript003Level()
+        let startCourse = try XCTUnwrap(
+            level.trainingOpeningLesson?.startCourse
+        )
+        XCTAssertEqual(startCourse.startCourseObjectHandle, 6_147)
+        XCTAssertEqual(startCourse.portalRoomSourceIndex, 2)
+        XCTAssertEqual(startCourse.portalIndex, 1)
+        XCTAssertEqual(
+            startCourse.instruction,
+            "Now, manuever through this tunnel using the sliding skills you just learned."
+        )
+        XCTAssertEqual(startCourse.voiceSourceName, "intro1.osf")
+
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 2_048 }
+        )
+        let startCourseIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == startCourse.startCourseObjectHandle
+            }
+        )
+        var objects = level.objects
+        objects[playerIndex].position = objects[startCourseIndex].position
+        objects[playerIndex].location = objects[startCourseIndex].location
+
+        let portalRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex {
+                $0.sourceIndex == startCourse.portalRoomSourceIndex
+            }
+        )
+        var rooms = level.rooms
+        let portal = rooms[portalRoomIndex].portals[startCourse.portalIndex]
+        let reciprocalRoomIndex = try XCTUnwrap(
+            rooms.firstIndex { $0.sourceIndex == portal.connectedRoom }
+        )
+        rooms[portalRoomIndex].portals[startCourse.portalIndex].flags |= 0x40
+        rooms[reciprocalRoomIndex]
+            .portals[portal.connectedPortal].flags |= 0x80
+        let startCourseRoomIndex = try XCTUnwrap(
+            rooms.firstIndex { $0.sourceIndex == 3 }
+        )
+        rooms[startCourseRoomIndex] = addingSourceContainmentShell(
+            to: rooms[startCourseRoomIndex],
+            center: objects[startCourseIndex].position,
+            texture: level.surfacePhysics[0].texture,
+            halfExtent: 200
+        )
+        let baseLevel = replacing(level, rooms: rooms)
+        let contactLevel = replacing(
+            baseLevel,
+            rooms: rooms,
+            objects: objects
+        )
+        let simulation = PlayerSimulation(
+            level: contactLevel,
+            presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(at: 0.05, input: .zero)
+
+        XCTAssertEqual(
+            frame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [startCourse.instruction],
+                    voiceSourceName: startCourse.voiceSourceName,
+                    voicePrecedesHUDMessages: false
+                ),
+            ]
+        )
+        XCTAssertEqual(
+            frame.enabledPlayerControls.rawValue,
+            UInt32(63)
+        )
+        let closedRoom = try XCTUnwrap(
+            simulation.level.rooms.first {
+                $0.sourceIndex == startCourse.portalRoomSourceIndex
+            }
+        )
+        XCTAssertEqual(
+            closedRoom.portals[startCourse.portalIndex].flags & 0x41,
+            0x41
+        )
+        let closedPortal = closedRoom.portals[startCourse.portalIndex]
+        let closedReciprocalRoom = try XCTUnwrap(
+            simulation.level.rooms.first {
+                $0.sourceIndex == closedPortal.connectedRoom
+            }
+        )
+        XCTAssertEqual(
+            closedReciprocalRoom
+                .portals[closedPortal.connectedPortal].flags & 0x81,
+            0x81
+        )
+        XCTAssertNotEqual(closedRoom.portals[0].flags & 1, 0)
+
+        var presentationOrder: [String] = []
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            frame.trainingOpeningFeedback,
+            attemptVoice: {
+                presentationOrder.append("voice:\($0)")
+            },
+            attemptSound: { _, _ in
+                XCTFail("Script 014 does not play a sound")
+            },
+            presentHUDMessages: {
+                presentationOrder.append(
+                    contentsOf: $0.map { "hud:\($0)" }
+                )
+            }
+        )
+        XCTAssertEqual(
+            presentationOrder,
+            [
+                "hud:\(startCourse.instruction)",
+                "voice:intro1.osf",
+            ]
+        )
+
+        let restored = try PlayerSimulation(
+            level: baseLevel,
+            continuation: try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONEncoder().encode(simulation.continuation)
+            ),
+            resumedAtTimestamp: 1
+        )
+        let restoredFrame = restored.update(at: 1.05, input: .zero)
+        XCTAssertTrue(restoredFrame.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(restoredFrame.enabledPlayerControls.rawValue, 63)
+
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var hostileObject = continuationObject
+        var hostileOpening = try XCTUnwrap(
+            hostileObject["trainingOpeningState"] as? [String: Any]
+        )
+        hostileOpening["enabledControls"] = 62
+        hostileObject["trainingOpeningState"] = hostileOpening
+        let hostile = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: baseLevel,
+                continuation: hostile,
+                resumedAtTimestamp: 2
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var preservedObject = continuationObject
+        var preservedOpening = try XCTUnwrap(
+            preservedObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        preservedOpening["enabledControls"] = 127
+        preservedObject["trainingOpeningState"] = preservedOpening
+        let preserved = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: preservedObject
+            )
+        )
+        let preservedSimulation = try PlayerSimulation(
+            level: baseLevel,
+            continuation: preserved,
+            resumedAtTimestamp: 2.5
+        )
+        XCTAssertEqual(
+            preservedSimulation.update(
+                at: 2.55,
+                input: .zero
+            ).enabledPlayerControls.rawValue,
+            127
+        )
+
+        var compatibleLesson = try XCTUnwrap(
+            baseLevel.trainingOpeningLesson
+        )
+        compatibleLesson.startCourse = nil
+        let compatibleLevel = replacing(
+            baseLevel,
+            trainingOpeningLesson: compatibleLesson
+        )
+        XCTAssertNoThrow(try compatibleLevel.validate())
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: compatibleLevel,
+                continuation: simulation.continuation,
+                resumedAtTimestamp: 3
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
+    @MainActor
     func testTrainingScript013OpensPortalRoomOneThenRestoresSilently()
         throws
     {
@@ -224,6 +435,112 @@ final class WorldRenderingTests: XCTestCase {
                 originalReciprocalFlags[offset] & ~UInt32(1)
             )
         }
+
+        let startCourse = try XCTUnwrap(
+            level.trainingOpeningLesson?.startCourse
+        )
+        var courseObjects = level.objects
+        let courseIndex = try XCTUnwrap(
+            courseObjects.firstIndex {
+                $0.handle == startCourse.startCourseObjectHandle
+            }
+        )
+        courseObjects[courseIndex].position =
+            normal.continuation.playerPosition
+        courseObjects[courseIndex].location =
+            normal.continuation.playerLocation
+        let normalCourse = try PlayerSimulation(
+            level: replacing(
+                level,
+                rooms: try contacting(
+                    startCourse.startCourseObjectHandle,
+                    at: normal.continuation.playerPosition
+                ).rooms,
+                objects: courseObjects
+            ),
+            continuation: normal.continuation,
+            resumedAtTimestamp: 10.5
+        )
+        let normalCourseFrame = normalCourse.update(
+            at: 10.55,
+            input: .zero
+        )
+        XCTAssertEqual(
+            normalCourseFrame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: [startCourse.instruction],
+                    voiceSourceName: startCourse.voiceSourceName,
+                    voicePrecedesHUDMessages: false
+                ),
+            ]
+        )
+        XCTAssertEqual(
+            normalCourseFrame.enabledPlayerControls.rawValue,
+            63
+        )
+        let normalCoursePortalRoom = try XCTUnwrap(
+            normalCourse.level.rooms.first {
+                $0.sourceIndex == startCourse.portalRoomSourceIndex
+            }
+        )
+        XCTAssertEqual(normalCoursePortalRoom.portals[0].flags & 1, 0)
+        XCTAssertNotEqual(
+            normalCoursePortalRoom.portals[startCourse.portalIndex]
+                .flags & 1,
+            0
+        )
+        var normalCourseContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(normal.continuation)
+            ) as? [String: Any]
+        )
+        var normalCourseOpening = try XCTUnwrap(
+            normalCourseContinuationObject["trainingOpeningState"]
+                as? [String: Any]
+        )
+        normalCourseOpening["startCourseWasPresented"] = true
+        normalCourseOpening["enabledControls"] = 63
+        normalCourseContinuationObject["trainingOpeningState"] =
+            normalCourseOpening
+        let restoredNormalCourse = try PlayerSimulation(
+            level: try contacting(
+                12_300,
+                at: normal.continuation.playerPosition
+            ),
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: normalCourseContinuationObject
+                )
+            ),
+            resumedAtTimestamp: 10.75
+        )
+        let restoredNormalCourseFrame = restoredNormalCourse.update(
+            at: 10.8,
+            input: .zero
+        )
+        XCTAssertTrue(
+            restoredNormalCourseFrame.trainingOpeningFeedback.isEmpty
+        )
+        XCTAssertEqual(
+            restoredNormalCourseFrame.enabledPlayerControls.rawValue,
+            63
+        )
+        let restoredNormalCoursePortalRoom = try XCTUnwrap(
+            restoredNormalCourse.level.rooms.first {
+                $0.sourceIndex == startCourse.portalRoomSourceIndex
+            }
+        )
+        XCTAssertEqual(
+            restoredNormalCoursePortalRoom.portals[0].flags & 1,
+            0
+        )
+        XCTAssertNotEqual(
+            restoredNormalCoursePortalRoom
+                .portals[startCourse.portalIndex].flags & 1,
+            0
+        )
 
         let restored = try PlayerSimulation(
             level: try contacting(
@@ -11438,6 +11755,13 @@ func makeTrainingScript003Level() -> Level {
     let upGoalModel = level.models.first {
         $0.source == upGoalPresentation.primaryModel
     }!
+    let startCourseHandle: UInt32 = 6_147
+    let startCoursePresentation = level.objectPresentations.first {
+        $0.objectHandle == startCourseHandle
+    }!
+    let startCourseModel = level.models.first {
+        $0.source == startCoursePresentation.primaryModel
+    }!
     let pcm = Data(repeating: 0, count: 2)
     let clips = [
         ("welcome.osf", 38),
@@ -11450,6 +11774,7 @@ func makeTrainingScript003Level() -> Level {
         ("lright.osf", 19),
         ("udown.osf", 36),
         ("proceed1.osf", 21),
+        ("intro1.osf", 10),
     ].map { name, index in
         CanonicalVoiceClip(
             sourceName: name,
@@ -11585,6 +11910,19 @@ func makeTrainingScript003Level() -> Level {
                 instruction:
                     "Continue Sliding down to start the next step.",
                 voiceSourceName: "proceed1.osf"
+            ),
+            startCourse: .init(
+                startCourseObjectHandle: startCourseHandle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: startCourseModel,
+                    objectType: 7
+                ),
+                portalRoomSourceIndex: 2,
+                portalIndex: 1,
+                instruction:
+                    "Now, manuever through this tunnel using the sliding skills you just learned.",
+                voiceSourceName: "intro1.osf",
+                enabledControlMask: 63
             )
         ),
         voiceClips: clips,

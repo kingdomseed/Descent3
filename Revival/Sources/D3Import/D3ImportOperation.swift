@@ -720,6 +720,10 @@ func runD3Import(
     let upGoal = playerLevel.objects.first {
         $0.instanceName?.caseInsensitiveCompare("UpGoal") == .orderedSame
     }!
+    let startCourse = playerLevel.objects.first {
+        $0.instanceName?.caseInsensitiveCompare("StartCourse")
+            == .orderedSame
+    }!
     let startGoalPresentation = playerLevel.objectPresentations.first {
         $0.objectHandle == startGoal.handle
     }!
@@ -737,6 +741,12 @@ func runD3Import(
     }!
     let upGoalModel = playerLevel.models.first {
         $0.source == upGoalPresentation.primaryModel
+    }!
+    let startCoursePresentation = playerLevel.objectPresentations.first {
+        $0.objectHandle == startCourse.handle
+    }!
+    let startCourseModel = playerLevel.models.first {
+        $0.source == startCoursePresentation.primaryModel
     }!
     let portalRoomOne = playerLevel.rooms.first {
         $0.name?.caseInsensitiveCompare("PortalRoom1") == .orderedSame
@@ -844,6 +854,44 @@ func runD3Import(
                     storedIndex: 6,
                     sourceName: "invisiblepowerup.OOF"
                 )
+            && startCourse.handle == 6_147
+            && startCourse.type == 7
+            && startCourse.storedID == 67
+            && startCourse.definition?.storedIndex == 67
+            && startCourse.definition?.referenceRuntimeIndex == 68
+            && startCourse.definition?.sourceName == "Invisiblepowerup"
+            && startCourse.instanceName == "StartCourse"
+            && startCourse.flags == 4_096
+            && startCourse.location == .room(3)
+            && startCourse.position
+                == .init(
+                    x: 2_061.4604,
+                    y: -230.09009,
+                    z: 2_203.0276
+                )
+            && startCourse.orientation
+                == .init(
+                    right: .init(x: -1, y: 0, z: 0),
+                    up: .init(x: 0, y: 1, z: -0),
+                    forward: .init(x: -0, y: -0, z: -1)
+                )
+            && startCourse.containsType == 255
+            && startCourse.containsID == 0
+            && startCourse.containsCount == 0
+            && startCourse.lifeLeft == 0
+            && startCourse.soundSource == nil
+            && startCourse.inertScriptName == nil
+            && startCourse.inertModuleName == nil
+            && startCourse.lightmapSubmodels.isEmpty
+            && startCoursePresentation.primaryModel
+                == .init(
+                    storedIndex: 6,
+                    sourceName: "invisiblepowerup.OOF"
+                )
+            && sourceObjectPresentationSize(
+                model: startCourseModel,
+                objectType: startCourse.type
+            ) == 10.052_409
     )
     let voiceNames = [
         "Welcome.osf",
@@ -866,6 +914,7 @@ func runD3Import(
         "lright.osf",
         "udown.osf",
         "proceed1.osf",
+        "Intro1.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -1033,6 +1082,18 @@ func runD3Import(
                 orderedPortalIndices: [0, 1],
                 instruction: messages["ContinueToCourse"]!,
                 voiceSourceName: "proceed1.osf"
+            ),
+            startCourse: .init(
+                startCourseObjectHandle: startCourse.handle,
+                collisionRadius: sourceObjectPresentationSize(
+                    model: startCourseModel,
+                    objectType: startCourse.type
+                ),
+                portalRoomSourceIndex: portalRoomOne.sourceIndex,
+                portalIndex: 1,
+                instruction: messages["CourseInstructions"]!,
+                voiceSourceName: "intro1.osf",
+                enabledControlMask: 63
             )
         ),
         voiceClips: [
@@ -1046,6 +1107,7 @@ func runD3Import(
             voiceClips[17],
             voiceClips[18],
             voiceClips[19],
+            voiceClips[20],
         ],
         soundClips: [menuBeepClip]
     )
@@ -2003,6 +2065,8 @@ func parseTrainingMessages(_ data: Data) throws -> [String: String] {
         "GoUp",
         "GoDown",
         "Repeat",
+        "ContinueToCourse",
+        "CourseInstructions",
     ].allSatisfy({ messages[$0] != nil }) else {
         throw D3ImportOperationError.missingPresentationAsset("TrainingMission.msg")
     }
