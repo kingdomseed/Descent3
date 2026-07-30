@@ -91,6 +91,7 @@ final class RevivalGameplayView: MTKView {
     private var trainingResultIsPresented = false
     private var trainingResultPresentedAt: TimeInterval?
     private var pendingTrainingResultKeyAcknowledgement = false
+    private var trainingGuidebotGoalWasSelected = false
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -583,6 +584,41 @@ final class RevivalGameplayView: MTKView {
         releaseMouse()
     }
 
+    func presentTrainingGuidebotGoalMenu() -> Bool {
+        trainingGuidebotGoalWasSelected = false
+        let menu = Self.trainingGuidebotGoalMenu(
+            target: self,
+            action: #selector(selectTrainingGuidebotGoal)
+        )
+        let eventMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: .keyDown
+        ) { event in
+            guard Self.cancelsTrainingGuidebotGoalMenu(
+                keyCode: event.keyCode
+            ) else {
+                return event
+            }
+            menu.cancelTracking()
+            return nil
+        }
+        defer {
+            if let eventMonitor {
+                NSEvent.removeMonitor(eventMonitor)
+            }
+        }
+        menu.popUp(
+            positioning: nil,
+            at: NSPoint(x: bounds.midX, y: bounds.midY),
+            in: self
+        )
+        return trainingGuidebotGoalWasSelected
+    }
+
+    @objc private func selectTrainingGuidebotGoal(_ sender: NSMenuItem) {
+        guard sender.tag == 3 else { return }
+        trainingGuidebotGoalWasSelected = true
+    }
+
     func presentTrainingContentReadyState(completedLevelName: String) {
         NSObject.cancelPreviousPerformRequests(
             withTarget: self,
@@ -686,6 +722,29 @@ final class RevivalGameplayView: MTKView {
         gameplayIsActive: Bool
     ) -> Bool {
         gameplayIsActive && keyCode == 118
+    }
+
+    static func trainingGuidebotGoalMenu(
+        target: AnyObject?,
+        action: Selector?
+    ) -> NSMenu {
+        let menu = NSMenu(title: "GB Command Menu")
+        let item = NSMenuItem(
+            title: "1. Get to Camera Monitor",
+            action: action,
+            keyEquivalent: "1"
+        )
+        item.target = target
+        item.tag = 3
+        item.keyEquivalentModifierMask = []
+        menu.addItem(item)
+        return menu
+    }
+
+    nonisolated static func cancelsTrainingGuidebotGoalMenu(
+        keyCode: UInt16
+    ) -> Bool {
+        keyCode == 118 || keyCode == 53
     }
 
     nonisolated static func requestsInventoryUse(

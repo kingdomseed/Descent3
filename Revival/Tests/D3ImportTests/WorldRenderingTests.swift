@@ -928,6 +928,7 @@ final class WorldRenderingTests: XCTestCase {
                 .invalidState
             )
         }
+
     }
 
     @MainActor
@@ -1365,6 +1366,7 @@ final class WorldRenderingTests: XCTestCase {
                 .invalidState
             )
         }
+
     }
 
     @MainActor
@@ -6896,6 +6898,368 @@ final class WorldRenderingTests: XCTestCase {
             )]
         )
         XCTAssertEqual(deployed.enabledPlayerControls, .all)
+    }
+
+    func testScript060ActiveGoalCommandReachesCameraMonitorThenReturnsToLivePlayer()
+        throws
+    {
+        var level = makeTrainingRASBot1DeathLevel()
+        let playerIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        let pickupIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == 6_167
+        })
+        let player = level.objects[playerIndex]
+        let pickupPosition = Vector3(
+            x: player.position.x + player.orientation.forward.x * 120,
+            y: player.position.y + player.orientation.forward.y * 120,
+            z: player.position.z + player.orientation.forward.z * 120
+        )
+        let roomCenter = Vector3(
+            x: player.position.x + player.orientation.forward.x * 60,
+            y: player.position.y + player.orientation.forward.y * 60,
+            z: player.position.z + player.orientation.forward.z * 60
+        )
+        level.rooms.append(
+            makeSourceContainmentRoom(
+                center: roomCenter,
+                texture: level.surfacePhysics[0].texture,
+                sourceIndex: 39,
+                halfExtent: 200
+            )
+        )
+        level.objects[playerIndex].location = .room(39)
+        level.objects[pickupIndex].location = .room(39)
+        level.objects[pickupIndex].position = pickupPosition
+
+        let seed = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = seed.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(seed.continuation)
+            ) as? [String: Any]
+        )
+        var galleryState = try XCTUnwrap(
+            continuationObject["trainingGalleryBarrierState"]
+                as? [String: Any]
+        )
+        galleryState["wasTriggered"] = true
+        galleryState["markerLightDistance"] = 0
+        continuationObject["trainingGalleryBarrierState"] = galleryState
+        var robotState = try XCTUnwrap(
+            continuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        robotState["guidebotContinuationWasPresented"] = true
+        robotState["controlsWereRestored"] = true
+        continuationObject["trainingRobotGuidebotState"] = robotState
+        let reachedContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: continuationObject
+            )
+        )
+        var unknownGoalLevel = level
+        let cameraGoalIndex = try XCTUnwrap(
+            unknownGoalLevel.goals.firstIndex {
+                $0.name == "Locate the Camera Monitor"
+            }
+        )
+        let cameraGoal = unknownGoalLevel.goals[cameraGoalIndex]
+        unknownGoalLevel.goals[cameraGoalIndex] = LevelGoal(
+            status: cameraGoal.status | 0x0000_0020,
+            priority: cameraGoal.priority,
+            list: cameraGoal.list,
+            name: cameraGoal.name,
+            itemName: cameraGoal.itemName,
+            description: cameraGoal.description,
+            completionMessage: cameraGoal.completionMessage,
+            items: cameraGoal.items
+        )
+        let unknownGoalSimulation = try PlayerSimulation(
+            level: unknownGoalLevel,
+            continuation: reachedContinuation,
+            resumedAtTimestamp: 100
+        )
+        XCTAssertFalse(
+            unknownGoalSimulation.trainingGuidebotGoalCommandIsAvailable
+        )
+        XCTAssertTrue(
+            unknownGoalSimulation.update(
+                at: 100.1,
+                input: .init(
+                    requestsTrainingGuidebotActiveGoal: true
+                )
+            ).trainingOpeningFeedback.isEmpty
+        )
+
+        var earlierUnknownGoalLevel = level
+        earlierUnknownGoalLevel.goals.insert(
+            LevelGoal(
+                status: 0x0000_0004 | 0x0000_0020,
+                priority: cameraGoal.priority - 1,
+                list: cameraGoal.list,
+                name: "Earlier Unknown Goal",
+                itemName: "Unknown",
+                description: "",
+                completionMessage: "",
+                items: cameraGoal.items
+            ),
+            at: cameraGoalIndex
+        )
+        let earlierUnknownGoalSimulation = try PlayerSimulation(
+            level: earlierUnknownGoalLevel,
+            continuation: reachedContinuation,
+            resumedAtTimestamp: 100
+        )
+        XCTAssertFalse(
+            earlierUnknownGoalSimulation
+                .trainingGuidebotGoalCommandIsAvailable
+        )
+        XCTAssertTrue(
+            earlierUnknownGoalSimulation.update(
+                at: 100.1,
+                input: .init(
+                    requestsTrainingGuidebotActiveGoal: true
+                )
+            ).trainingOpeningFeedback.isEmpty
+        )
+
+        let reached = try PlayerSimulation(
+            level: level,
+            continuation: reachedContinuation,
+            resumedAtTimestamp: 100
+        )
+
+        XCTAssertTrue(reached.trainingGuidebotGoalCommandIsAvailable)
+        let accepted = reached.update(
+            at: 100.1,
+            input: .init(requestsTrainingGuidebotActiveGoal: true)
+        )
+        XCTAssertEqual(accepted.trainingOpeningFeedback, [
+            .init(
+                hudMessages: ["GB: On my way!"],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "GBotAcceptOrder.wav"
+            ),
+        ])
+        XCTAssertEqual(
+            accepted.trainingGuidebot?.destination,
+            pickupPosition
+        )
+
+        var pickupContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(reached.continuation)
+            ) as? [String: Any]
+        )
+        pickupContinuationObject["playerPosition"] = [
+            "x": Double(pickupPosition.x),
+            "y": Double(pickupPosition.y),
+            "z": Double(pickupPosition.z),
+        ]
+        let pickupBeforeArrival = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: pickupContinuationObject
+                )
+            ),
+            resumedAtTimestamp: 150
+        )
+        let pickupFrame = pickupBeforeArrival.update(
+            at: 150.1,
+            input: .zero
+        )
+        XCTAssertTrue(
+            pickupFrame.trainingOpeningFeedback.contains {
+                $0.hudMessages == [
+                    "Excellent.  You now have the Camera Monitor.  Press the Use Inventory key to activate it!",
+                ]
+            }
+        )
+        let heldContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    pickupBeforeArrival.continuation
+                )
+            ) as? [String: Any]
+        )
+        let heldRobotState = try XCTUnwrap(
+            heldContinuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        let heldGuidebot = try XCTUnwrap(
+            heldRobotState["guidebot"] as? [String: Any]
+        )
+        XCTAssertEqual(heldGuidebot["task"] as? String, "activeGoal")
+        XCTAssertNoThrow(
+            try PlayerSimulation(
+                level: level,
+                continuation: pickupBeforeArrival.continuation,
+                resumedAtTimestamp: 160
+            )
+        )
+
+        var arrival: PlayerSimulationFrame?
+        var beforeArrival = accepted
+        for frameIndex in 2...80 {
+            let frame = reached.update(
+                at: 100 + Double(frameIndex) * 0.1,
+                input: .zero
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.hudMessages
+                    == ["GB: I am at the goal, coming back to get you."]
+            }) {
+                arrival = frame
+                break
+            }
+            beforeArrival = frame
+        }
+        let returned = try XCTUnwrap(arrival)
+        XCTAssertEqual(returned.trainingOpeningFeedback, [
+            .init(
+                hudMessages: [
+                    "GB: I am at the goal, coming back to get you.",
+                ],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "GBotAcceptOrder.wav"
+            ),
+        ])
+        let guidebotAtGoal = try XCTUnwrap(
+            beforeArrival.trainingGuidebot?.position
+        )
+        let goalDelta = Vector3(
+            x: guidebotAtGoal.x - pickupPosition.x,
+            y: guidebotAtGoal.y - pickupPosition.y,
+            z: guidebotAtGoal.z - pickupPosition.z
+        )
+        let centerDistance = sqrt(
+            goalDelta.x * goalDelta.x
+                + goalDelta.y * goalDelta.y
+                + goalDelta.z * goalDelta.z
+        )
+        XCTAssertGreaterThan(centerDistance, 20)
+        XCTAssertLessThanOrEqual(
+            centerDistance,
+            20 + 5.659_440_5 + 2 + 0.1
+        )
+        XCTAssertEqual(
+            returned.trainingGuidebot?.destination,
+            returned.playerView.camera.position
+        )
+        XCTAssertNotNil(returned.trainingGuidebot)
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: reached.continuation,
+            resumedAtTimestamp: 200
+        )
+        let silentRestore = restored.update(at: 200.1, input: .zero)
+        XCTAssertTrue(silentRestore.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(
+            silentRestore.trainingGuidebot?.destination,
+            silentRestore.playerView.camera.position
+        )
+        XCTAssertNotNil(silentRestore.trainingGuidebot)
+
+        let followingLivePlayer = restored.update(
+            at: 200.2,
+            input: .init(forward: 1)
+        )
+        XCTAssertEqual(
+            followingLivePlayer.trainingGuidebot?.destination,
+            followingLivePlayer.playerView.camera.position
+        )
+        XCTAssertEqual(restored.continuation.schemaVersion, 7)
+        XCTAssertNoThrow(
+            try PlayerSimulation(
+                level: level,
+                continuation: restored.continuation,
+                resumedAtTimestamp: 300
+            )
+        )
+
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(restored.continuation)
+            ) as? [String: Any]
+        )
+        var hostileRobotState = try XCTUnwrap(
+            hostileObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        var hostileGuidebot = try XCTUnwrap(
+            hostileRobotState["guidebot"] as? [String: Any]
+        )
+        var hostileDestination = try XCTUnwrap(
+            hostileGuidebot["destination"] as? [String: Any]
+        )
+        hostileDestination["x"] =
+            (hostileDestination["x"] as? Double ?? 0) + 1
+        hostileGuidebot["destination"] = hostileDestination
+        hostileRobotState["guidebot"] = hostileGuidebot
+        hostileObject["trainingRobotGuidebotState"] = hostileRobotState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: hostileObject
+                    )
+                ),
+                resumedAtTimestamp: 400
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var missingArrivalObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(restored.continuation)
+            ) as? [String: Any]
+        )
+        var missingArrivalRobotState = try XCTUnwrap(
+            missingArrivalObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        missingArrivalRobotState.removeValue(
+            forKey: "activeGoalWasReached"
+        )
+        missingArrivalObject["trainingRobotGuidebotState"] =
+            missingArrivalRobotState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: missingArrivalObject
+                    )
+                ),
+                resumedAtTimestamp: 500
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
     }
 
     func testCameraMonitorPickupUseAndTimedViewContinueOnceAcrossReload() throws {
@@ -13250,6 +13614,51 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertFalse(
             playerInput.snapshot(frameDuration: 0.1)
                 .deploysTrainingGuidebot
+        )
+    }
+
+    @MainActor
+    func testScript060UsesOneNativeGuidebotGoalMenuAndPausedOneShotCommand() {
+        let menu = RevivalGameplayView.trainingGuidebotGoalMenu(
+            target: nil,
+            action: nil
+        )
+        XCTAssertEqual(menu.title, "GB Command Menu")
+        XCTAssertEqual(menu.items.count, 1)
+        XCTAssertEqual(menu.items[0].title, "1. Get to Camera Monitor")
+        XCTAssertEqual(menu.items[0].keyEquivalent, "1")
+        XCTAssertTrue(menu.items[0].keyEquivalentModifierMask.isEmpty)
+        XCTAssertEqual(menu.items[0].tag, 3)
+        XCTAssertTrue(
+            RevivalGameplayView.cancelsTrainingGuidebotGoalMenu(
+                keyCode: 118
+            )
+        )
+        XCTAssertTrue(
+            RevivalGameplayView.cancelsTrainingGuidebotGoalMenu(
+                keyCode: 53
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.cancelsTrainingGuidebotGoalMenu(
+                keyCode: 18
+            )
+        )
+
+        var input = PlayerInputState(rampDuration: 0)
+        input.setHeld(.init(forward: 1))
+        input.setGameplayActive(false, simulation: nil, at: 1)
+        input.requestTrainingGuidebotActiveGoal()
+        XCTAssertEqual(input.snapshot(frameDuration: 0.1), .zero)
+        input.setGameplayActive(true, simulation: nil, at: 2)
+        input.requestTrainingGuidebotActiveGoal()
+        XCTAssertTrue(
+            input.snapshot(frameDuration: 0.1)
+                .requestsTrainingGuidebotActiveGoal
+        )
+        XCTAssertFalse(
+            input.snapshot(frameDuration: 0.1)
+                .requestsTrainingGuidebotActiveGoal
         )
     }
 

@@ -310,7 +310,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             [weak self] in self?.playerInput.setController($0)
         }
         metalView.guidebotDeployRequested = {
-            [weak self] in self?.playerInput.requestGuidebotDeployment()
+            [weak self] in self?.requestGuidebotAction()
         }
         metalView.primaryFireRequested = {
             [weak self] in self?.playerInput.requestPrimaryFire()
@@ -453,6 +453,36 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         )
         gameplayView.setGameplayActive(true)
         window?.makeFirstResponder(gameplayView)
+    }
+
+    private func requestGuidebotAction() {
+        guard let simulation = playSimulation,
+              simulation.trainingGuidebotGoalCommandIsAvailable
+        else {
+            playerInput.requestGuidebotDeployment()
+            return
+        }
+        playerInput.setGameplayActive(
+            false,
+            simulation: simulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+        gameplayView.clearInput()
+        let selected = gameplayView.presentTrainingGuidebotGoalMenu()
+        let active =
+            playSimulation === simulation
+            && window?.isKeyWindow == true
+        playerInput.setGameplayActive(
+            active,
+            simulation: simulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+        gameplayView.setGameplayActive(active)
+        if active {
+            window?.makeFirstResponder(gameplayView)
+        }
+        guard selected, active else { return }
+        playerInput.requestTrainingGuidebotActiveGoal()
     }
 
     @objc private func commitRoomName(_ sender: Any?) {

@@ -370,7 +370,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                 [weak self] in self?.playerInput.setController($0)
             }
             gameplayView.guidebotDeployRequested = {
-                [weak self] in self?.playerInput.requestGuidebotDeployment()
+                [weak self] in self?.requestGuidebotAction()
             }
             gameplayView.primaryFireRequested = {
                 [weak self] in self?.playerInput.requestPrimaryFire()
@@ -410,6 +410,26 @@ private final class RevivalMacApplicationDelegate: NSObject,
             at: ProcessInfo.processInfo.systemUptime
         )
         gameplayView?.setGameplayActive(active && simulation != nil)
+    }
+
+    private func requestGuidebotAction() {
+        guard let simulation,
+              simulation.trainingGuidebotGoalCommandIsAvailable,
+              let gameplayView
+        else {
+            playerInput.requestGuidebotDeployment()
+            return
+        }
+        playerInput.setGameplayActive(
+            false,
+            simulation: simulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+        gameplayView.clearInput()
+        let selected = gameplayView.presentTrainingGuidebotGoalMenu()
+        updateGameplayActivity()
+        guard selected, playerInput.gameplayIsActive else { return }
+        playerInput.requestTrainingGuidebotActiveGoal()
     }
 
     private func acknowledgeTrainingResult() {
