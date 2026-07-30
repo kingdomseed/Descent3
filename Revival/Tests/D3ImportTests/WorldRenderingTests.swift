@@ -6266,6 +6266,279 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(afterRestore.trainingGalleryMarkerLightDistance, 0)
     }
 
+    func testScript029ThenPortal2RunsScript032OnceAndRestoresLaterState() throws {
+        let level = makeTrainingRobotGuidebotLevel()
+        try level.validate()
+        XCTAssertNil(level.trainingDodgeAttempt)
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        simulation.destroyTrainingRobot(handle: 4_112)
+        assertTrainingGalleryBarrier(
+            level: simulation.level,
+            rendersFaces: false
+        )
+        var timestamp = 0.0
+        var script029Frame: PlayerSimulationFrame?
+        for frameIndex in 1...30 {
+            timestamp = Double(frameIndex) * 0.1
+            let frame = simulation.update(
+                at: timestamp,
+                input: .zero
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "proceed5.osf"
+            }) {
+                script029Frame = frame
+                break
+            }
+        }
+        let script029 = try XCTUnwrap(script029Frame)
+        XCTAssertEqual(
+            script029.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Excellent!",
+                    "Now go through the open doorway, and into the next room.",
+                ],
+                voiceSourceName: "proceed5.osf",
+                voicePrecedesHUDMessages: false
+            )]
+        )
+        XCTAssertEqual(script029.enabledPlayerControls, .all)
+        XCTAssertEqual(script029.trainingGalleryMarkerLightDistance, 50)
+
+        var script032Frame: PlayerSimulationFrame?
+        for _ in 1...20 {
+            timestamp += 0.1
+            let frame = simulation.update(
+                at: timestamp,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebota.osf"
+            }) {
+                script032Frame = frame
+                break
+            }
+        }
+        let script032 = try XCTUnwrap(script032Frame)
+        XCTAssertEqual(
+            script032.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Excellent!",
+                    "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
+                ],
+                voiceSourceName: "guidebota.osf",
+                voicePrecedesHUDMessages: true
+            )]
+        )
+        XCTAssertEqual(
+            level.trainingGalleryBarrier?.orderedPortalIndices,
+            [1, 0]
+        )
+        XCTAssertEqual(
+            script032.enabledPlayerControls,
+            PlayerControlMask(rawValue: 0)
+        )
+        XCTAssertEqual(script032.trainingGalleryMarkerLightDistance, 0)
+        XCTAssertNil(script032.trainingGuidebot)
+        XCTAssertFalse(simulation.level.objectPresentations.contains {
+            $0.objectHandle
+                == level.trainingRobotGuidebotChain?.guidebotObjectHandle
+                && $0.isVisible
+        })
+        assertTrainingGalleryBarrier(
+            level: simulation.level,
+            rendersFaces: true
+        )
+
+        let continuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: continuationData
+        )
+        let repeated = simulation.update(
+            at: timestamp + 0.1,
+            input: .init(forward: 1)
+        )
+        XCTAssertTrue(repeated.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(
+            repeated.enabledPlayerControls,
+            PlayerControlMask(rawValue: 0)
+        )
+        XCTAssertNil(repeated.trainingGuidebot)
+
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 100
+        )
+        assertTrainingGalleryBarrier(
+            level: restored.level,
+            rendersFaces: true
+        )
+        let afterRestore = restored.update(
+            at: 100.1,
+            input: .init(forward: 1)
+        )
+        XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(
+            afterRestore.enabledPlayerControls,
+            PlayerControlMask(rawValue: 0)
+        )
+        XCTAssertEqual(afterRestore.trainingGalleryMarkerLightDistance, 0)
+        XCTAssertNil(afterRestore.trainingGuidebot)
+
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: continuationData)
+                as? [String: Any]
+        )
+        var hostileRobotState = try XCTUnwrap(
+            hostileObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        hostileRobotState["controlsWereRestored"] = true
+        hostileObject["trainingRobotGuidebotState"] = hostileRobotState
+        let staleRestoredControls = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: staleRestoredControls,
+                resumedAtTimestamp: 200
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        hostileRobotState["controlsWereRestored"] = false
+        hostileObject["trainingRobotGuidebotState"] = hostileRobotState
+        var hostileGalleryState = try XCTUnwrap(
+            hostileObject["trainingGalleryBarrierState"]
+                as? [String: Any]
+        )
+        hostileGalleryState["markerLightDistance"] = 50
+        hostileObject["trainingGalleryBarrierState"] = hostileGalleryState
+        let staleOpenMarker = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: staleOpenMarker,
+                resumedAtTimestamp: 300
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
+    func testScript036AfterScript060RestoresItsLaterBarrierState() throws {
+        let level = makeTrainingRobotGuidebotLevel()
+        try level.validate()
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+
+        var timestamp = 0.0
+        for frameIndex in 1...20 {
+            timestamp = Double(frameIndex) * 0.1
+            let frame = simulation.update(
+                at: timestamp,
+                input: .init(forward: 1)
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebota.osf"
+            }) {
+                break
+            }
+        }
+        let script060 = simulation.update(
+            at: timestamp + 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        XCTAssertTrue(script060.trainingOpeningFeedback.contains {
+            $0.voiceSourceName == "guidebotb.osf"
+        })
+        XCTAssertEqual(script060.trainingGalleryMarkerLightDistance, 0)
+        assertTrainingGalleryBarrier(
+            level: simulation.level,
+            rendersFaces: true
+        )
+
+        simulation.destroyTrainingRobot(handle: 4_112)
+        let continuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: continuationData)
+                as? [String: Any]
+        )
+        let galleryState = try XCTUnwrap(
+            continuationObject["trainingGalleryBarrierState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(galleryState["markerLightDistance"] as? Double, 50)
+        let robotState = try XCTUnwrap(
+            continuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(robotState["controlsWereRestored"] as? Bool, true)
+        assertTrainingGalleryBarrier(
+            level: simulation.level,
+            rendersFaces: false
+        )
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: continuationData
+        )
+        var restorationLevel = level
+        let restoredRoomIndex = try XCTUnwrap(
+            restorationLevel.rooms.firstIndex {
+                $0.sourceIndex == script060.playerView.roomSourceIndex
+            }
+        )
+        restorationLevel.rooms[restoredRoomIndex] =
+            addingSourceContainmentShell(
+                to: restorationLevel.rooms[restoredRoomIndex],
+                center: script060.playerView.camera.position,
+                texture: restorationLevel.surfacePhysics[0].texture,
+                halfExtent: 500
+            )
+        let restored = try PlayerSimulation(
+            level: restorationLevel,
+            continuation: continuation,
+            resumedAtTimestamp: 100
+        )
+        assertTrainingGalleryBarrier(
+            level: restored.level,
+            rendersFaces: false
+        )
+        let afterRestore = restored.update(
+            at: 100.1,
+            input: .zero
+        )
+        XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(afterRestore.enabledPlayerControls, .all)
+        XCTAssertEqual(afterRestore.trainingGalleryMarkerLightDistance, 50)
+    }
+
     func testTrainingRobotDestructionAndGuidebotDeploymentContinueGalleryOnce() throws {
         let level = makeTrainingRobotGuidebotLevel()
         try level.validate()

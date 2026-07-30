@@ -2586,7 +2586,15 @@ final class PlayerSimulation {
                 handle: chain.destroyRobotObjectHandle,
                 isVisible: false
             )
-            openTrainingGalleryBarrier(in: &restoredLevel)
+            if continuation.trainingGalleryBarrierState?
+                .wasTriggered == true,
+               continuation.trainingGalleryBarrierState?
+                .markerLightDistance == 0
+            {
+                closeTrainingGalleryBarrier(in: &restoredLevel)
+            } else {
+                openTrainingGalleryBarrier(in: &restoredLevel)
+            }
         }
         let binding = restoredLevel.defaultPlayerBinding!
         let objectIndex = restoredLevel.objects.firstIndex {
@@ -5850,6 +5858,10 @@ final class PlayerSimulation {
             ))
             galleryState.markerLightDistance = 0
             closeTrainingGalleryBarrier(in: &level)
+            if var robotState = trainingRobotGuidebotState {
+                robotState.controlsWereRestored = false
+                trainingRobotGuidebotState = robotState
+            }
             galleryState.wasTriggered = true
             trainingGalleryBarrierState = galleryState
         }
@@ -6744,8 +6756,17 @@ private func validTrainingGalleryBarrierContinuation(
           state.markerLightDistance.isFinite else {
         return false
     }
-    let expectedDistance =
+    let robotDestructionIsLater =
         robotGuidebotState?.robotWasDestroyed == true
+            && robotGuidebotState?.controlsWereRestored == true
+            && (
+                robotGuidebotState?
+                    .guidebotContinuationWasPresented != true
+                    || state.markerLightDistance
+                        == barrier.openMarkerLightDistance
+            )
+    let expectedDistance =
+        robotDestructionIsLater
             ? barrier.openMarkerLightDistance
             : state.wasTriggered
             || trainingGalleryBarrierRendersFaces(
@@ -7485,8 +7506,13 @@ private func validTrainingRobotGuidebotContinuation(
                   )
           }) ?? true,
           state.controlsWereRestored
-            == (state.robotWasDestroyed
-                || state.guidebotContinuationWasPresented),
+            ? state.robotWasDestroyed
+                || state.guidebotContinuationWasPresented
+            : !state.guidebotContinuationWasPresented
+                && (
+                    !state.robotWasDestroyed
+                        || galleryState?.wasTriggered == true
+                ),
           state.enabledControlHUDIsVisible
             != state.destructionFeedbackWasPresented
     else {
