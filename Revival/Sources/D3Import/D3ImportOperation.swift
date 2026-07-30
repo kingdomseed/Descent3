@@ -452,6 +452,19 @@ func runD3Import(
         overlay: overlayData,
         name: "Hangturret"
     )
+    let blueLaserWeapon = try resolveRetailWeaponPresentation(
+        table: tableData,
+        overlay: overlayData,
+        named: "Laser Level 2 - Blue"
+    )
+    precondition(
+        blueLaserWeapon.name == "Laser Level 2 - Blue"
+            && blueLaserWeapon.hudImageName
+                == "SuperLaserHUD.ogf"
+            && blueLaserWeapon.fireImageName
+                .caseInsensitiveCompare("bluelaser.OOF")
+                == .orderedSame
+    )
     let reachedModelNames = Set([
         reachedPages.ship.primaryModelName,
         reachedPages.ship.mediumModelName,
@@ -479,10 +492,16 @@ func runD3Import(
             dodgeTurretPage.mediumModelName,
             dodgeTurretPage.lowModelName,
             "RedLaser.OOF",
+            blueLaserWeapon.fireImageName,
     ].compactMap { $0 })
-    let sortedModelNames = reachedModelNames.sorted {
-        $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
-    }
+    let sortedModelNames = reachedModelNames.filter {
+        $0.caseInsensitiveCompare(
+            blueLaserWeapon.fireImageName
+        ) != .orderedSame
+    }.sorted {
+        $0.localizedCaseInsensitiveCompare($1)
+            == .orderedAscending
+    } + [blueLaserWeapon.fireImageName]
     var modelPayloadByName: [String: (data: Data, archive: String)] = [:]
     var textureNamesByModel: [String: [String]] = [:]
     var referencedTextureSlotsByModel: [String: Set<Int>] = [:]
@@ -621,6 +640,7 @@ func runD3Import(
                     || object.handle == 2_083 {
             page = destroyRobotPage
         } else if object.handle == 4_112
+                    || object.handle == 4_113
                     || object.handle == 8_200
                     || object.handle == 2_074
                     || object.handle == 2_075
@@ -671,15 +691,17 @@ func runD3Import(
             isVisible: object.handle != 6_180 && object.handle != 6_150
                 && object.handle != 4_106
                 && object.handle != 12_302
+                && object.handle != 4_112
+                && object.handle != 4_113
         )
     }
-    precondition(reachedObjectPresentations.count == 26)
+    precondition(reachedObjectPresentations.count == 27)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 13)
+    precondition(deferredRoomObjects.count == 12)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -1004,6 +1026,7 @@ func runD3Import(
         "Bank.osf",
         "Follow.osf",
         "Intro4.osf",
+        "Kill1.osf",
     ]
     let voiceClips = try voiceNames.map { name -> CanonicalVoiceClip in
         let entry = trainingArchive.uniqueEntry(named: name)
@@ -1250,6 +1273,7 @@ func runD3Import(
             voiceClips[28],
             voiceClips[29],
             voiceClips[30],
+            voiceClips[31],
         ],
         soundClips: [menuBeepClip,
             dodgeFireSoundClip,
@@ -2473,6 +2497,72 @@ func runD3Import(
             circleDistance: followBotAI.circleDistance
         )
     )
+    let destroyBot2 = level.objects.first {
+        $0.handle == 4_112
+    }!
+    let destroyBot1 = level.objects.first {
+        $0.handle == 4_113
+    }!
+    let blueLaserModel =
+        modelSources[
+            blueLaserWeapon.fireImageName.lowercased()
+        ]!
+    precondition(
+        destroyBot2.type == 2
+            && destroyBot2.storedID == 106
+            && destroyBot2.definition?.sourceName
+                == "RAS1 Light Security Flyer"
+            && destroyBot2.instanceName == "DestroyBot2"
+            && destroyBot2.flags == 5_121
+            && destroyBot2.location == .room(37)
+            && destroyBot2.position
+                == .init(
+                    x: 2_121.0835,
+                    y: -787.4891,
+                    z: 2_556.6667
+                )
+            && destroyBot1.type == 2
+            && destroyBot1.storedID == 106
+            && destroyBot1.definition?.sourceName
+                == "RAS1 Light Security Flyer"
+            && destroyBot1.instanceName == "DestroyBot1"
+            && destroyBot1.flags == 5_121
+            && destroyBot1.location == .room(37)
+            && destroyBot1.position
+                == .init(
+                    x: 1_998.6289,
+                    y: -789.663_15,
+                    z: 2_556.2332
+                )
+            && level.objectPresentations.first {
+                $0.objectHandle == destroyBot2.handle
+            }?.isVisible == false
+            && level.objectPresentations.first {
+                $0.objectHandle == destroyBot1.handle
+            }?.isVisible == false
+            && level.models.first {
+                $0.source == blueLaserModel
+            }?.sourceSHA256
+                == "717a9a2ac254eba76c7992fc834e3a5bc3992f86674af972afd9cf0c2967b31b"
+    )
+    level.trainingDodgeAttempt?.maneuverFollow?
+        .destructionHandoff = .init(
+            followBotObjectHandle: followBot.handle,
+            destroyBot2ObjectHandle: destroyBot2.handle,
+            destroyBot1ObjectHandle: destroyBot1.handle,
+            combat: .stockTraining,
+            projectileModel: blueLaserModel,
+            destructionDelay: 2,
+            levelTimerID: 11,
+            movingTeamFlags: 65_536,
+            movingPathIndex: 0,
+            movingPathGoalFlags: 8_392_960,
+            goalID: -1,
+            goalPriority: 3,
+            successMessage: messages["GoodJob"]!,
+            movingInstruction: messages["Movingbotintro"]!,
+            voiceSourceName: "kill1.osf"
+        )
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
     precondition(

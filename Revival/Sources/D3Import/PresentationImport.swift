@@ -966,6 +966,81 @@ private func parseRetailSoundPages(
     return pages
 }
 
+struct RetailWeaponPresentationSelection:
+    Equatable, Sendable
+{
+    let storedIndex: Int
+    let name: String
+    let hudImageName: String
+    let fireImageName: String
+}
+
+func resolveRetailWeaponPresentation(
+    table: Data,
+    overlay: Data,
+    named name: String
+) throws -> RetailWeaponPresentationSelection {
+    let base = try parseRetailWeaponPresentations(table)
+    let replacements =
+        try parseRetailWeaponPresentations(overlay)
+    var merged = Dictionary(
+        uniqueKeysWithValues: base.map {
+            ($0.name.lowercased(), $0)
+        }
+    )
+    for replacement in replacements {
+        let key = replacement.name.lowercased()
+        merged[key] = replacement
+    }
+    guard let selection = merged[name.lowercased()] else {
+        throw RetailTextureTableError.missingName(name)
+    }
+    return selection
+}
+
+private func parseRetailWeaponPresentations(
+    _ data: Data
+) throws -> [RetailWeaponPresentationSelection] {
+    var offset = 0
+    var weaponIndex = 0
+    var pages: [RetailWeaponPresentationSelection] = []
+    while offset < data.count {
+        guard data.count - offset >= 5 else {
+            throw RetailTextureTableError.truncated
+        }
+        let type = data[offset]
+        let length = Int(
+            readTableUInt32(data, at: offset + 1)
+        )
+        guard length >= 4,
+              length - 4 <= data.count - offset - 5 else {
+            throw RetailTextureTableError.invalidPageLength
+        }
+        if type == 2 {
+            var cursor = RetailPageCursor(
+                Data(
+                    data[
+                        (offset + 5)..<(offset + 1 + length)
+                    ]
+                )
+            )
+            guard try cursor.readUInt16() == 8 else {
+                throw RetailTextureTableError
+                    .invalidPageLength
+            }
+            pages.append(.init(
+                storedIndex: weaponIndex,
+                name: try cursor.readCString(),
+                hudImageName: try cursor.readCString(),
+                fireImageName: try cursor.readCString()
+            ))
+            weaponIndex += 1
+        }
+        offset += 1 + length
+    }
+    return pages
+}
+
 private func readTableUInt32(_ data: Data, at offset: Int) -> UInt32 {
     UInt32(data[offset])
         | UInt32(data[offset + 1]) << 8

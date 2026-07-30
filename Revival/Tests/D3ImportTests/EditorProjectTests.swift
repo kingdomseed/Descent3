@@ -3,6 +3,19 @@ import XCTest
 
 final class EditorProjectTests: XCTestCase {
     @MainActor
+    func testMovingTargetHandoffExtendsReadOnlySourceDiagnostic()
+        throws
+    {
+        let level = makeTrainingMovingTargetHandoffLevel()
+        let project = try makeProject(importedBase: level)
+
+        XCTAssertEqual(
+            project.trainingManeuverFollowSourceDiagnostic,
+            "TrainingMission.cpp Scripts 021,022,024,023,025,026,031,037,027 / ManuverRoomCenter 2063 / FollowBot1 8200 / DestroyBot2 4112 ghosted / DestroyBot1 4113 ghosted then visible / timer 11 = 2.0s / stock read-only FollowLoop1 path 0 nodes 13 flags 0x801100 + GoToDie path 1 nodes 1 flags 0x1100 / goal -1 priority 3 / Laser Level 2 - Blue via bluelaser.OOF / runtime path failure: invalidPath|movementBlocked"
+        )
+    }
+
+    @MainActor
     func testManeuverFollowDiagnosticKeepsStockPathsReadOnlyAndSurfacesFailure()
         throws
     {
@@ -4229,7 +4242,7 @@ private func assertTrainingGuidebotReturnBarrierRendering(
     }
 }
 
-private func makeProject(importedBase: Level) throws -> RevivalProject {
+func makeProject(importedBase: Level) throws -> RevivalProject {
     let root = FileManager.default.temporaryDirectory
         .appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)

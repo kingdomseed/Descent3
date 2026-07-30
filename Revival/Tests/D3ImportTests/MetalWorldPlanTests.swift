@@ -1,6 +1,64 @@
 import XCTest
 
 final class MetalWorldPlanTests: XCTestCase {
+    func testFollowBotBlueLaserUsesRetainedObjectDrawPath() throws {
+        let level = makeTrainingMovingTargetHandoffLevel()
+        let handoff = try XCTUnwrap(
+            level.trainingDodgeAttempt?.maneuverFollow?
+                .destructionHandoff
+        )
+        let playerView = defaultPlayerView(in: level)
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            playerView: playerView
+        )
+        let projectile = TrainingBlueLaserProjectileFrame(
+            position: playerView.camera.position,
+            velocity: .init(
+                x: 0,
+                y: 0,
+                z: handoff.combat.projectileSpeed
+            ),
+            roomSourceIndex: playerView.roomSourceIndex,
+            model: handoff.projectileModel
+        )
+        let updated = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            playerView: playerView,
+            trainingPrimaryProjectiles: [projectile]
+        )
+        let expectedVertexPositions =
+            extractTrainingBlueLaserDrawItems(
+                level,
+                projectiles: [projectile],
+                camera: playerView.camera
+            ).flatMap {
+                $0.vertices.map(\.position)
+            }
+        let actualVertexPositions = updated.draws.filter {
+            $0.objectHandle == UInt32.max - 40
+                && $0.model == handoff.projectileModel
+        }.flatMap {
+            $0.vertices.map {
+                Vector3(
+                    x: $0.position.x,
+                    y: $0.position.y,
+                    z: $0.position.z
+                )
+            }
+        }
+
+        XCTAssertTrue(updated.draws.contains {
+            $0.objectHandle == UInt32.max - 40
+                && $0.model == handoff.projectileModel
+        })
+        XCTAssertEqual(
+            actualVertexPositions,
+            expectedVertexPositions
+        )
+    }
+
     func testTimedDodgeAnglesProjectilesAndMarkerReachRetainedMetalPlan()
         throws
     {

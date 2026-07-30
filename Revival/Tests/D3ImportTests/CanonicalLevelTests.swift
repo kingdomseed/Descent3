@@ -1,6 +1,186 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testSchemaElevenRequiresExactFollowBotDestructionHandoff()
+        throws
+    {
+        let level = makeTrainingMovingTargetHandoffLevel()
+        let lesson = try XCTUnwrap(
+            level.trainingDodgeAttempt?.maneuverFollow
+        )
+        let handoff = try XCTUnwrap(lesson.destructionHandoff)
+
+        XCTAssertEqual(handoff.followBotObjectHandle, 8_200)
+        XCTAssertEqual(handoff.destroyBot2ObjectHandle, 4_112)
+        XCTAssertEqual(handoff.destroyBot1ObjectHandle, 4_113)
+        XCTAssertEqual(handoff.combat, .stockTraining)
+        XCTAssertEqual(handoff.projectileModel.sourceName, "bluelaser.OOF")
+        XCTAssertEqual(handoff.destructionDelay, 2)
+        XCTAssertEqual(handoff.levelTimerID, 11)
+        XCTAssertEqual(handoff.movingTeamFlags, 65_536)
+        XCTAssertEqual(handoff.movingPathIndex, 0)
+        XCTAssertEqual(handoff.movingPathGoalFlags, 0x80_11_00)
+        XCTAssertEqual(handoff.goalID, -1)
+        XCTAssertEqual(handoff.goalPriority, 3)
+        XCTAssertEqual(handoff.successMessage, "Excellent!")
+        XCTAssertEqual(
+            handoff.movingInstruction,
+            "Now destroy 2 more robots. This time they will be moving."
+        )
+        XCTAssertEqual(handoff.voiceSourceName, "kill1.osf")
+        XCTAssertFalse(
+            try XCTUnwrap(
+                level.objectPresentations.first {
+                    $0.objectHandle == handoff.destroyBot2ObjectHandle
+                }
+            ).isVisible
+        )
+        XCTAssertFalse(
+            try XCTUnwrap(
+                level.objectPresentations.first {
+                    $0.objectHandle == handoff.destroyBot1ObjectHandle
+                }
+            ).isVisible
+        )
+        XCTAssertNoThrow(try level.validate())
+    }
+
+    func testOwnedFollowBotHandoffRejectsHostileRetailProvenance()
+        throws
+    {
+        let fallbackPath =
+            "/tmp/revival-followbot-handoff-visibility-corrected-import-3/training.revival/levels/descent3.level.training-mission/level.json"
+        let path = ProcessInfo.processInfo.environment[
+            "REVIVAL_FOLLOWBOT_HANDOFF_OWNED_LEVEL"
+        ] ?? fallbackPath
+        let stockLevel = try JSONDecoder().decode(
+            Level.self,
+            from: Data(contentsOf: URL(fileURLWithPath: path))
+        )
+        XCTAssertNoThrow(try stockLevel.validate())
+        let handoff = try XCTUnwrap(
+            stockLevel.trainingDodgeAttempt?.maneuverFollow?
+                .destructionHandoff
+        )
+        XCTAssertEqual(handoff.projectileModel.storedIndex, 16)
+        XCTAssertEqual(
+            stockLevel.models.first {
+                $0.source == handoff.projectileModel
+            }?.sourceSHA256,
+            "717a9a2ac254eba76c7992fc834e3a5bc3992f86674af972afd9cf0c2967b31b"
+        )
+        XCTAssertEqual(
+            stockLevel.voiceClips.first {
+                $0.sourceName == handoff.voiceSourceName
+            }?.pcmSHA256,
+            "0b1eae26d812929a08faa05efde07926dc4a96ac3873320b6f39805f69877b06"
+        )
+
+        var authoredLevel = stockLevel
+        let authoredDestroyBot1Index = try XCTUnwrap(
+            authoredLevel.objects.firstIndex {
+                $0.handle == handoff.destroyBot1ObjectHandle
+            }
+        )
+        let authoredPosition =
+            authoredLevel.objects[authoredDestroyBot1Index].position
+        authoredLevel.objects[authoredDestroyBot1Index].position =
+            .init(
+                x: authoredPosition.x + 0.25,
+                y: authoredPosition.y,
+                z: authoredPosition.z
+            )
+        XCTAssertNoThrow(try authoredLevel.validateForAuthoring())
+
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(stockLevel)
+            ) as? [String: Any]
+        )
+        var hostileVoices = try XCTUnwrap(
+            hostileObject["voiceClips"] as? [[String: Any]]
+        )
+        let killIndex = try XCTUnwrap(
+            hostileVoices.firstIndex {
+                ($0["sourceName"] as? String) == "kill1.osf"
+            }
+        )
+        hostileVoices[killIndex]["sourceSHA256"] = String(repeating: "0", count: 64)
+        hostileObject["voiceClips"] = hostileVoices
+        let hostileVoiceLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Scripts 031,037,027 stock package"
+            ),
+            hostileVoiceLevel
+        )
+
+        hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(stockLevel)
+            ) as? [String: Any]
+        )
+        hostileVoices = try XCTUnwrap(
+            hostileObject["voiceClips"] as? [[String: Any]]
+        )
+        let hostilePCMString = try XCTUnwrap(
+            hostileVoices[killIndex]["pcm16LittleEndian"] as? String
+        )
+        var hostilePCM = try XCTUnwrap(
+            Data(base64Encoded: hostilePCMString)
+        )
+        hostilePCM[hostilePCM.startIndex] ^= 0xff
+        hostileVoices[killIndex]["pcm16LittleEndian"] =
+            hostilePCM.base64EncodedString()
+        hostileVoices[killIndex]["pcmSHA256"] =
+            canonicalSHA256(hostilePCM)
+        hostileObject["voiceClips"] = hostileVoices
+        let hostilePCMLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Scripts 031,037,027 stock package"
+            ),
+            hostilePCMLevel
+        )
+
+        hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(stockLevel)
+            ) as? [String: Any]
+        )
+        var hostileObjects = try XCTUnwrap(
+            hostileObject["objects"] as? [[String: Any]]
+        )
+        let destroyBot1Index = try XCTUnwrap(
+            hostileObjects.firstIndex {
+                ($0["handle"] as? UInt32) == 4_113
+                    || ($0["handle"] as? Int) == 4_113
+            }
+        )
+        hostileObjects[destroyBot1Index]["orientation"] = [
+            "right": ["x": 1, "y": 0, "z": 0],
+            "up": ["x": 0, "y": 1, "z": 0],
+            "forward": ["x": 0, "y": 0, "z": 1],
+        ]
+        hostileObject["objects"] = hostileObjects
+        let hostilePoseLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        assertValidationError(
+            .invalidDependency(
+                "Training Scripts 031,037,027 stock package"
+            ),
+            hostilePoseLevel
+        )
+    }
+
     func testSchemaElevenLeavesTrainingManeuverFollowOptionalForOlderPackages()
         throws
     {

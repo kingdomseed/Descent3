@@ -621,6 +621,26 @@ struct TrainingFollowBotDefinition: Codable, Equatable, Sendable {
     let circleDistance: Float
 }
 
+struct TrainingFollowBotDestructionHandoff:
+    Codable, Equatable, Sendable
+{
+    let followBotObjectHandle: UInt32
+    let destroyBot2ObjectHandle: UInt32
+    let destroyBot1ObjectHandle: UInt32
+    let combat: TrainingRobotCombatDefinition
+    let projectileModel: SourceResource
+    let destructionDelay: Float
+    let levelTimerID: Int
+    let movingTeamFlags: UInt32
+    let movingPathIndex: Int
+    let movingPathGoalFlags: UInt32
+    let goalID: Int
+    let goalPriority: Int
+    let successMessage: String
+    let movingInstruction: String
+    let voiceSourceName: String
+}
+
 struct TrainingManeuverFollowLesson: Codable, Equatable, Sendable {
     let maneuverObjectHandle: UInt32
     let maneuverCollisionRadius: Float
@@ -659,6 +679,7 @@ struct TrainingManeuverFollowLesson: Codable, Equatable, Sendable {
     let followVoiceSourceName: String
     let weaponVoiceSourceName: String
     let followBot: TrainingFollowBotDefinition
+    var destructionHandoff: TrainingFollowBotDestructionHandoff? = nil
 }
 
 struct TrainingDodgeAttempt: Codable, Equatable, Sendable {
@@ -2386,6 +2407,223 @@ func validateStockTrainingManeuverFollowPackage(
             "Training Scripts 021-026 stock package"
         )
     }
+    if let handoff = lesson.destructionHandoff {
+        try validateStockTrainingFollowBotDestructionHandoff(
+            handoff,
+            lesson: lesson,
+            level: level
+        )
+    }
+}
+
+func validateStockTrainingFollowBotDestructionHandoff(
+    _ handoff: TrainingFollowBotDestructionHandoff,
+    lesson: TrainingManeuverFollowLesson,
+    level: Level
+) throws {
+    try validateTrainingFollowBotDestructionHandoff(
+        handoff,
+        lesson: lesson,
+        level: level
+    )
+    let followBot = level.objects.first {
+        $0.handle == handoff.followBotObjectHandle
+    }
+    let destroyBot2 = level.objects.first {
+        $0.handle == handoff.destroyBot2ObjectHandle
+    }
+    let destroyBot1 = level.objects.first {
+        $0.handle == handoff.destroyBot1ObjectHandle
+    }
+    let destroyBot2Presentation = level.objectPresentations.first {
+        $0.objectHandle == handoff.destroyBot2ObjectHandle
+    }
+    let destroyBot1Presentation = level.objectPresentations.first {
+        $0.objectHandle == handoff.destroyBot1ObjectHandle
+    }
+    let projectileModel = level.models.first {
+        $0.source == handoff.projectileModel
+    }
+    let voice = level.voiceClips.first {
+        $0.sourceName == handoff.voiceSourceName
+    }
+    guard handoff.followBotObjectHandle
+            == lesson.followBotObjectHandle,
+          handoff.destroyBot2ObjectHandle == 4_112,
+          handoff.destroyBot1ObjectHandle == 4_113,
+          handoff.combat == .stockTraining,
+          handoff.projectileModel.sourceName
+            .caseInsensitiveCompare("bluelaser.OOF")
+            == .orderedSame,
+          handoff.destructionDelay == 2,
+          handoff.levelTimerID == 11,
+          handoff.movingTeamFlags == 65_536,
+          handoff.movingPathIndex == lesson.followPathIndex,
+          handoff.movingPathGoalFlags == 8_392_960,
+          handoff.goalID == -1,
+          handoff.goalPriority == 3,
+          handoff.successMessage == "Excellent!",
+          handoff.movingInstruction
+            == "Now destroy 2 more robots. This time they will be moving.",
+          handoff.voiceSourceName == "kill1.osf",
+          followBot?.handle == 8_200,
+          followBot?.storedID == 106,
+          followBot?.location == .room(37),
+          destroyBot2?.type == 2,
+          destroyBot2?.storedID == 106,
+          destroyBot2?.definition?.sourceName
+            == "RAS1 Light Security Flyer",
+          destroyBot2?.instanceName == "DestroyBot2",
+          destroyBot2?.flags == 5_121,
+          destroyBot2?.location == .room(37),
+          destroyBot2?.position
+            == .init(
+                x: 2_121.0835,
+                y: -787.4891,
+                z: 2_556.6667
+            ),
+          destroyBot2?.orientation
+            == .init(
+                right: .init(
+                    x: 0.060_053_87,
+                    y: -0.047_255_82,
+                    z: -0.997_076
+                ),
+                up: .init(
+                    x: 0.142_230_26,
+                    y: 0.989_091_93,
+                    z: -0.038_310_897
+                ),
+                forward: .init(
+                    x: 0.988_010_17,
+                    y: -0.139_513_64,
+                    z: 0.066_12
+                )
+            ),
+          destroyBot1?.type == 2,
+          destroyBot1?.storedID == 106,
+          destroyBot1?.definition?.sourceName
+            == "RAS1 Light Security Flyer",
+          destroyBot1?.instanceName == "DestroyBot1",
+          destroyBot1?.flags == 5_121,
+          destroyBot1?.location == .room(37),
+          destroyBot1?.position
+            == .init(
+                x: 1_998.6289,
+                y: -789.663_15,
+                z: 2_556.2332
+            ),
+          destroyBot1?.orientation
+            == .init(
+                right: .init(
+                    x: -0.004_710_059,
+                    y: 0.044_023_126,
+                    z: 0.999_019_44
+                ),
+                up: .init(
+                    x: -0.180_763_14,
+                    y: 0.982_535_3,
+                    z: -0.044_148_97
+                ),
+                forward: .init(
+                    x: -0.983_515_4,
+                    y: -0.180_793_82,
+                    z: 0.003_329_959
+                )
+            ),
+          destroyBot2Presentation?.primaryModel
+            == lesson.followBot.model,
+          destroyBot2Presentation?.isVisible == false,
+          destroyBot1Presentation?.primaryModel
+            == lesson.followBot.model,
+          destroyBot1Presentation?.isVisible == false,
+          projectileModel?.sourceArchive == "d3.hog",
+          projectileModel?.collisionRadius == 4.920_813,
+          projectileModel?.sourceSHA256
+            == "717a9a2ac254eba76c7992fc834e3a5bc3992f86674af972afd9cf0c2967b31b",
+          voice?.sourceEntryIndex == 17,
+          voice?.sampleRate == 22_050,
+          voice?.channelCount == 1,
+          voice?.frameCount == 172_565,
+          voice?.pcm16LittleEndian.count
+            == (voice?.frameCount ?? -1) * 2,
+          voice?.pcmSHA256
+            == "0b1eae26d812929a08faa05efde07926dc4a96ac3873320b6f39805f69877b06",
+          voice?.sourceArchive == "missions/training.mn3",
+          voice?.sourceSHA256
+            == "d2ea757ac472b40781ce62a7dbd45649e3abce3f4884edf1303048e3cf36be7e"
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training Scripts 031,037,027 stock package"
+        )
+    }
+}
+
+func validateTrainingFollowBotDestructionHandoff(
+    _ handoff: TrainingFollowBotDestructionHandoff,
+    lesson: TrainingManeuverFollowLesson,
+    level: Level
+) throws {
+    let handles = [
+        handoff.followBotObjectHandle,
+        handoff.destroyBot2ObjectHandle,
+        handoff.destroyBot1ObjectHandle,
+    ]
+    let objectsByHandle = Dictionary(
+        uniqueKeysWithValues: level.objects.map {
+            ($0.handle, $0)
+        }
+    )
+    let presentationsByHandle = Dictionary(
+        uniqueKeysWithValues: level.objectPresentations.map {
+            ($0.objectHandle, $0)
+        }
+    )
+    guard Set(handles).count == handles.count,
+          handoff.followBotObjectHandle
+            == lesson.followBotObjectHandle,
+          handles.allSatisfy({ objectsByHandle[$0] != nil }),
+          handles.allSatisfy({
+              presentationsByHandle[$0]?.primaryModel
+                == lesson.followBot.model
+          }),
+          presentationsByHandle[
+            handoff.destroyBot2ObjectHandle
+          ]?.isVisible == false,
+          presentationsByHandle[
+            handoff.destroyBot1ObjectHandle
+          ]?.isVisible == false,
+          handoff.combat == .stockTraining,
+          level.models.contains(where: {
+              $0.source == handoff.projectileModel
+          }),
+          handoff.projectileModel.sourceName
+            .caseInsensitiveCompare("bluelaser.OOF")
+            == .orderedSame,
+          handoff.destructionDelay == 2,
+          handoff.levelTimerID == 11,
+          handoff.movingTeamFlags == 65_536,
+          handoff.movingPathIndex == lesson.followPathIndex,
+          level.paths.indices.contains(
+            handoff.movingPathIndex
+          ),
+          handoff.movingPathGoalFlags == 8_392_960,
+          handoff.goalID == -1,
+          handoff.goalPriority == 3,
+          handoff.successMessage == "Excellent!",
+          handoff.movingInstruction
+            == "Now destroy 2 more robots. This time they will be moving.",
+          handoff.voiceSourceName == "kill1.osf",
+          level.voiceClips.contains(where: {
+              $0.sourceName.caseInsensitiveCompare(
+                  handoff.voiceSourceName
+              ) == .orderedSame
+          })
+    else {
+        throw LevelValidationError.invalidDependency(
+            "Training Scripts 031,037,027 handoff"
+        )
+    }
 }
 
 func validateStockTrainingFinalRoomEntryPackage(
@@ -2556,7 +2794,8 @@ func validateStockTrainingRobotGuidebotPresentation(
     chain: TrainingRobotGuidebotChain,
     modelSources: [SourceResource],
     objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
+    objectPresentations: [ObjectPresentationReference],
+    destroyRobotIsInitiallyVisible: Bool = true
 ) throws {
     let buddybotModels = modelSources.filter {
         $0.sourceName.caseInsensitiveCompare("Buddybot.oof") == .orderedSame
@@ -2588,6 +2827,7 @@ func validateStockTrainingRobotGuidebotPresentation(
                   && $0.mediumDistance == nil
                   && $0.lowDistance == nil
                   && $0.isVisible
+                    == destroyRobotIsInitiallyVisible
           }) else {
         throw LevelValidationError.invalidDependency(
             "Training robot and Guidebot presentation"
@@ -3489,6 +3729,10 @@ struct Level: Codable, Equatable, Sendable {
                 + (trainingDodgeAttempt.map {
                     [$0.turret.projectileModel.sourceName]
                 } ?? [])
+                + (trainingDodgeAttempt?.maneuverFollow?
+                    .destructionHandoff.map {
+                        [$0.projectileModel.sourceName]
+                    } ?? [])
         )
         guard rooms.count <= 400,
               rooms.allSatisfy({ (0..<400).contains($0.sourceIndex) }) else {
@@ -4595,6 +4839,14 @@ struct Level: Codable, Equatable, Sendable {
             else {
                 throw LevelValidationError.invalidDependency(
                     "Training timed dodge attempt"
+                )
+            }
+            if let lesson = dodge.maneuverFollow,
+               let handoff = lesson.destructionHandoff {
+                try validateTrainingFollowBotDestructionHandoff(
+                    handoff,
+                    lesson: lesson,
+                    level: self
                 )
             }
         }
@@ -5980,6 +6232,11 @@ struct Level: Codable, Equatable, Sendable {
             let dodgeVoiceCount = trainingDodgeAttempt.map {
                 ($0.dodgeExit == nil ? 3 : 4)
                     + ($0.maneuverFollow == nil ? 0 : 5)
+                    + (
+                        $0.maneuverFollow?
+                            .destructionHandoff == nil
+                            ? 0 : 1
+                    )
             } ?? 0
             guard let barrier = trainingGalleryBarrier,
                   barrier.triggerName == "Portal2",
@@ -6056,7 +6313,10 @@ struct Level: Codable, Equatable, Sendable {
                 chain: trainingRobotGuidebotChain!,
                 modelSources: models.map(\.source),
                 objects: objects,
-                objectPresentations: objectPresentations
+                objectPresentations: objectPresentations,
+                destroyRobotIsInitiallyVisible:
+                    trainingDodgeAttempt?.maneuverFollow?
+                        .destructionHandoff == nil
             )
             if trainingCameraMonitorChain != nil {
                 try validateStockTrainingCameraMonitorPackage(

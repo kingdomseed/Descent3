@@ -119,6 +119,9 @@ private func makeMetalWorldPlan(
     let preparedDodgeProjectileDraws =
         extractPreparedTrainingDodgeProjectileDrawItems(level)
         .map(makeMetalWorldDraw)
+    let preparedBlueLaserDraws =
+        extractPreparedTrainingBlueLaserDrawItems(level)
+        .map(makeMetalWorldDraw)
     let preparedRoomIndexByIdentity = Dictionary(
         uniqueKeysWithValues: preparedRoomDraws.enumerated().map {
             (MetalRoomDrawIdentity($0.element), $0.offset)
@@ -145,6 +148,7 @@ private func makeMetalWorldPlan(
         + preparedObjectDraws
         + preparedObjectDraws
         + preparedDodgeProjectileDraws
+        + preparedBlueLaserDraws
     let draws = activeDrawIndices.map { preparedDraws[$0] }
     let lightCoronaStates = extraction.lightCoronas.map {
         MetalLightCoronaState(corona: $0, scalar: 0)
@@ -180,6 +184,8 @@ func updateMetalWorldPlan(
     trainingCloak: TrainingCloakFrame? = nil,
     trainingDodgeTurretAngles: [Float] = [],
     trainingDodgeProjectiles: [TrainingDodgeProjectileFrame] = [],
+    trainingPrimaryProjectiles:
+        [TrainingBlueLaserProjectileFrame] = [],
     trainingDodgeMarkerLightDistance: Float? = nil,
     trainingGuidebotReturnMarkerLightDistance: Float? = nil,
     trainingLastRoomMarkerLightDistance: Float? = nil,
@@ -196,6 +202,8 @@ func updateMetalWorldPlan(
         trainingCloak: trainingCloak,
         trainingDodgeTurretAngles: trainingDodgeTurretAngles,
         trainingDodgeProjectiles: trainingDodgeProjectiles,
+        trainingPrimaryProjectiles:
+            trainingPrimaryProjectiles,
         trainingDodgeMarkerLightDistance:
             trainingDodgeMarkerLightDistance,
         trainingGuidebotReturnMarkerLightDistance:
@@ -223,6 +231,7 @@ func updateMetalWorldPlan(
         trainingCloak: nil,
         trainingDodgeTurretAngles: [],
         trainingDodgeProjectiles: [],
+        trainingPrimaryProjectiles: [],
         trainingDodgeMarkerLightDistance: nil,
         trainingGuidebotReturnMarkerLightDistance: nil,
         trainingLastRoomMarkerLightDistance: nil,
@@ -241,6 +250,8 @@ private func updateMetalWorldPlan(
     trainingCloak: TrainingCloakFrame?,
     trainingDodgeTurretAngles: [Float],
     trainingDodgeProjectiles: [TrainingDodgeProjectileFrame],
+    trainingPrimaryProjectiles:
+        [TrainingBlueLaserProjectileFrame],
     trainingDodgeMarkerLightDistance: Float?,
     trainingGuidebotReturnMarkerLightDistance: Float?,
     trainingLastRoomMarkerLightDistance: Float?,
@@ -264,6 +275,12 @@ private func updateMetalWorldPlan(
             projectiles: trainingDodgeProjectiles,
             camera: camera
         ).map(makeMetalWorldDraw)
+    let blueLaserDraws =
+        extractTrainingBlueLaserDrawItems(
+            level,
+            projectiles: trainingPrimaryProjectiles,
+            camera: camera
+        ).map(makeMetalWorldDraw)
     let roomIndexByIdentity = Dictionary(
         uniqueKeysWithValues: prepared.preparedDraws.enumerated()
             .filter { $0.element.objectHandle == nil }
@@ -283,12 +300,18 @@ private func updateMetalWorldPlan(
     let dodgeProjectileIndices = dodgeProjectileDraws.map {
         objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
     }
+    let blueLaserIndices = blueLaserDraws.map {
+        objectIndicesByIdentity[
+            MetalModelDrawIdentity($0)
+        ]!.first!.offset
+    }
     var updatedPreparedDraws = prepared.preparedDraws
     let translucentIndices = translucentRoomDraws.map {
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
     let activeDrawIndices = opaqueIndices + objectIndices
-        + dodgeProjectileIndices + translucentIndices
+        + dodgeProjectileIndices + blueLaserIndices
+        + translucentIndices
     let auxiliaryExtraction = try trainingCameraMonitor.map {
         try extractWorldForRendering(
             level,
@@ -352,6 +375,12 @@ private func updateMetalWorldPlan(
     for (index, draw) in zip(
         dodgeProjectileIndices,
         dodgeProjectileDraws
+    ) {
+        updatedPreparedDraws[index] = draw
+    }
+    for (index, draw) in zip(
+        blueLaserIndices,
+        blueLaserDraws
     ) {
         updatedPreparedDraws[index] = draw
     }
