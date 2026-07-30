@@ -1,0 +1,51 @@
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_2668ad2fb445a6::t_333b64846ec78e 7834,7866-7875,7877-7882,7895-7904,7906-7910,7922-8193,8387-8393
+  s_2668ad2fb445a6::t_80eb47d265febd 7256,7261-7274,7276-7283,7360-7366,7809-7810,7820-7832,7876
+  s_2668ad2fb445a6::t_01b16536e547d5 7186-7188,7863
+  s_2668ad2fb445a6::t_ddc36e3372bcde 7838-7861
+  s_2668ad2fb445a6::t_c92539f94b033a 7253-7255,7257-7260,7275
+  s_2668ad2fb445a6::t_f811876a249be0 19498-19503
+  s_2668ad2fb445a6::t_629f4e5f6164c3 7892-7894,7911
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_2668ad2fb445a6::t_4c06d1cd1af680 2433-2434,2577-2590,3325,3331,3333-3334,3336-3362,3661,3723-3742,4260,6004-6006,6762,6818,6895,6941-6951,6973,7012-7013,7065,7071-7093
+  s_2668ad2fb445a6::t_4bcd776845b8ba 128-130,132,7095
+  s_2668ad2fb445a6::t_6833e3d0b27f33 7094
+docs/revival/functional-completeness-ledger.md
+  s_2668ad2fb445a6::t_9aeb0c8db1daa7 414-421
+  s_2668ad2fb445a6::t_d4d6a1c310382c 26,28,198,204
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_c952e70d33f655 22-25,29,31,66-67,201
+  s_c503f7c0529e13::t_606672849e01e7 251
+  s_c503f7c0529e13::t_fb7578633979b7 27-28
+  s_c503f7c0529e13::t_4954b6fcc1c9fc 65
+  s_c503f7c0529e13::t_d298450c2c1f1d 252
+docs/revival/behavior-system.md
+  s_2668ad2fb445a6::t_cf7d04afc5a0ef 23
+docs/revival/source-translation-ledger.md
+  s_2668ad2fb445a6::t_49987353fd19bb 1464-1480,1483
+  s_2668ad2fb445a6::t_28f01825ea0391 1481-1482
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "edc70f840444b5d6bbb7cbc348fd5d259621aee1",
+  "prompts": {},
+  "sessions": {
+    "s_2668ad2fb445a6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fb0d1-9fa2-7560-ad52-c50fd65b4dac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
