@@ -7167,6 +7167,11 @@ final class WorldRenderingTests: XCTestCase {
             level.trainingDodgeAttempt?.maneuverFollow
         )
         let handoff = try XCTUnwrap(lesson.destructionHandoff)
+        let destroyBot2Initial = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == handoff.destroyBot2ObjectHandle
+            }
+        )
         let project = try makeProject(importedBase: level)
         level = replacing(
             level,
@@ -7348,7 +7353,7 @@ final class WorldRenderingTests: XCTestCase {
         maneuverState.removeValue(forKey: "activePathIndex")
         continuationObject["trainingManeuverFollowState"] =
             maneuverState
-        let simulation = try PlayerSimulation(
+        var simulation = try PlayerSimulation(
             level: level,
             continuation: JSONDecoder().decode(
                 PlayerSimulationContinuation.self,
@@ -7550,6 +7555,328 @@ final class WorldRenderingTests: XCTestCase {
             + destroyBot1AfterMotion.orientation.forward.z
                 * movingDirection.z
         XCTAssertGreaterThan(movedAlignment, initialAlignment)
+
+        var oldSchemaSeven = continuationAfterHandoff
+        var oldSchemaSevenManeuver = try XCTUnwrap(
+            oldSchemaSeven["trainingManeuverFollowState"]
+                as? [String: Any]
+        )
+        var oldSchemaSevenDestruction = try XCTUnwrap(
+            oldSchemaSevenManeuver["destruction"]
+                as? [String: Any]
+        )
+        oldSchemaSevenDestruction.removeValue(
+            forKey: "destroyBot1Destruction"
+        )
+        oldSchemaSevenManeuver["destruction"] =
+            oldSchemaSevenDestruction
+        oldSchemaSeven["trainingManeuverFollowState"] =
+            oldSchemaSevenManeuver
+        let oldSchemaSevenSimulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: oldSchemaSeven
+                )
+            ),
+            resumedAtTimestamp: 150
+        )
+        let oldSchemaSevenFrame = oldSchemaSevenSimulation.update(
+            at: 150.25,
+            input: .zero
+        )
+        XCTAssertTrue(
+            oldSchemaSevenFrame.trainingOpeningFeedback.isEmpty
+        )
+        XCTAssertEqual(
+            oldSchemaSevenFrame.trainingMovingTarget?.objectHandle,
+            handoff.destroyBot1ObjectHandle
+        )
+
+        func restoringAim(
+            _ source: PlayerSimulation,
+            at target: PlacedObject,
+            timestamp: Double
+        ) throws -> PlayerSimulation {
+            var aimedContinuation = try XCTUnwrap(
+                JSONSerialization.jsonObject(
+                    with: JSONEncoder().encode(source.continuation)
+                ) as? [String: Any]
+            )
+            aimedContinuation["playerLocation"] = [
+                "room": ["_0": 37],
+            ]
+            aimedContinuation["playerPosition"] = [
+                "x": target.position.x
+                    - target.orientation.forward.x * 10,
+                "y": target.position.y
+                    - target.orientation.forward.y * 10,
+                "z": target.position.z
+                    - target.orientation.forward.z * 10,
+            ]
+            aimedContinuation["playerOrientation"] = [
+                "right": [
+                    "x": target.orientation.right.x,
+                    "y": target.orientation.right.y,
+                    "z": target.orientation.right.z,
+                ],
+                "up": [
+                    "x": target.orientation.up.x,
+                    "y": target.orientation.up.y,
+                    "z": target.orientation.up.z,
+                ],
+                "forward": [
+                    "x": target.orientation.forward.x,
+                    "y": target.orientation.forward.y,
+                    "z": target.orientation.forward.z,
+                ],
+            ]
+            aimedContinuation["velocity"] = [
+                "x": 0,
+                "y": 0,
+                "z": 0,
+            ]
+            aimedContinuation["angularVelocity"] = [
+                "x": 0,
+                "y": 0,
+                "z": 0,
+            ]
+            return try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: aimedContinuation
+                    )
+                ),
+                resumedAtTimestamp: timestamp
+            )
+        }
+
+        timestamp = 200
+        for _ in 0..<4 {
+            simulation = try restoringAim(
+                simulation,
+                at: try XCTUnwrap(
+                    simulation.level.objects.first {
+                        $0.handle == handoff.destroyBot1ObjectHandle
+                    }
+                ),
+                timestamp: timestamp
+            )
+            timestamp += 0.25
+            frame = simulation.update(
+                at: timestamp,
+                input: .init(firesPrimaryWeapon: true)
+            )
+        }
+        XCTAssertFalse(simulation.level.objects.contains {
+            $0.handle == handoff.destroyBot1ObjectHandle
+        })
+        XCTAssertTrue(simulation.level.objects.contains {
+            $0.handle == handoff.destroyBot2ObjectHandle
+        })
+        XCTAssertTrue(frame.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(
+            frame.trainingMovingTarget?.objectHandle,
+            handoff.destroyBot2ObjectHandle
+        )
+        XCTAssertEqual(
+            frame.trainingMovingTarget?.activePathIndex,
+            handoff.movingPathIndex
+        )
+        XCTAssertEqual(
+            project.trainingManeuverFollowRuntimeDiagnostic(
+                frame: frame
+            ),
+            "\(project.trainingManeuverFollowSourceDiagnostic!) / active moving target DestroyBot2 path \(handoff.movingPathIndex) node \(frame.trainingMovingTarget!.pathNodeIndex) room 37 failure none"
+        )
+        var script028Continuation = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var script028Maneuver = try XCTUnwrap(
+            script028Continuation[
+                "trainingManeuverFollowState"
+            ] as? [String: Any]
+        )
+        var script028Destruction = try XCTUnwrap(
+            script028Maneuver["destruction"] as? [String: Any]
+        )
+        let destroyBot1Destruction = try XCTUnwrap(
+            script028Destruction["destroyBot1Destruction"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(
+            destroyBot1Destruction["destroyBot1Shields"] as? Double,
+            -5
+        )
+        XCTAssertEqual(
+            destroyBot1Destruction["destroyBot1WasDestroyed"] as? Bool,
+            true
+        )
+        XCTAssertEqual(
+            destroyBot1Destruction["script028Count"] as? Int,
+            1
+        )
+        XCTAssertEqual(
+            script028Destruction["destroyBot2IsVisible"] as? Bool,
+            true
+        )
+
+        let destroyBot2BeforeMotion = try XCTUnwrap(
+            simulation.level.objects.first {
+                $0.handle == handoff.destroyBot2ObjectHandle
+            }
+        )
+        XCTAssertEqual(
+            destroyBot2BeforeMotion.position,
+            destroyBot2Initial.position
+        )
+        XCTAssertEqual(
+            destroyBot2BeforeMotion.orientation,
+            destroyBot2Initial.orientation
+        )
+        timestamp += 0.25
+        frame = simulation.update(at: timestamp, input: .zero)
+        let destroyBot2AfterMotion = try XCTUnwrap(
+            simulation.level.objects.first {
+                $0.handle == handoff.destroyBot2ObjectHandle
+            }
+        )
+        XCTAssertNotEqual(
+            destroyBot2AfterMotion.position,
+            destroyBot2BeforeMotion.position
+        )
+
+        let script028Restored = try PlayerSimulation(
+            level: level,
+            continuation: simulation.continuation,
+            resumedAtTimestamp: 300
+        )
+        let script028Silent = script028Restored.update(
+            at: 300.25,
+            input: .zero
+        )
+        XCTAssertTrue(script028Silent.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(
+            script028Silent.trainingMovingTarget?.objectHandle,
+            handoff.destroyBot2ObjectHandle
+        )
+
+        simulation = script028Restored
+        timestamp = 400
+        for _ in 0..<4 {
+            simulation = try restoringAim(
+                simulation,
+                at: try XCTUnwrap(
+                    simulation.level.objects.first {
+                        $0.handle == handoff.destroyBot2ObjectHandle
+                    }
+                ),
+                timestamp: timestamp
+            )
+            timestamp += 0.25
+            _ = simulation.update(
+                at: timestamp,
+                input: .init(firesPrimaryWeapon: true)
+            )
+        }
+        XCTAssertTrue(simulation.level.objects.contains {
+            $0.handle == handoff.destroyBot2ObjectHandle
+        })
+        script028Continuation = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        let guidebotState = try XCTUnwrap(
+            script028Continuation["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(
+            guidebotState["robotShields"] as? Double,
+            Double(handoff.combat.robotShields)
+        )
+
+        script028Maneuver = try XCTUnwrap(
+            script028Continuation[
+                "trainingManeuverFollowState"
+            ] as? [String: Any]
+        )
+        script028Destruction = try XCTUnwrap(
+            script028Maneuver["destruction"] as? [String: Any]
+        )
+        var hostileScript028 = script028Continuation
+        var hostileScript028Maneuver = script028Maneuver
+        var hostileScript028Destruction = script028Destruction
+        var hostileDestroyBot1Destruction =
+            destroyBot1Destruction
+        hostileDestroyBot1Destruction["script028Count"] = 0
+        hostileScript028Destruction["destroyBot1Destruction"] =
+            hostileDestroyBot1Destruction
+        hostileScript028Maneuver["destruction"] =
+            hostileScript028Destruction
+        hostileScript028["trainingManeuverFollowState"] =
+            hostileScript028Maneuver
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: hostileScript028
+                    )
+                ),
+                resumedAtTimestamp: 500
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var hostileDestroyBot2Motion = script028Continuation
+        var hostileDestroyBot2Maneuver = script028Maneuver
+        var hostileDestroyBot2Destruction = script028Destruction
+        var hostileDestroyBot2State = destroyBot1Destruction
+        var hostileDestroyBot2PathMotion = try XCTUnwrap(
+            hostileDestroyBot2State["destroyBot2Motion"]
+                as? [String: Any]
+        )
+        hostileDestroyBot2PathMotion["position"] = [
+            "x": 0,
+            "y": 0,
+            "z": 0,
+        ]
+        hostileDestroyBot2State["destroyBot2Motion"] =
+            hostileDestroyBot2PathMotion
+        hostileDestroyBot2Destruction["destroyBot1Destruction"] =
+            hostileDestroyBot2State
+        hostileDestroyBot2Maneuver["destruction"] =
+            hostileDestroyBot2Destruction
+        hostileDestroyBot2Motion["trainingManeuverFollowState"] =
+            hostileDestroyBot2Maneuver
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: hostileDestroyBot2Motion
+                    )
+                ),
+                resumedAtTimestamp: 500
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
 
         var hostileEarlyDeath = continuationObject
         var hostileManeuver = try XCTUnwrap(

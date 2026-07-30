@@ -500,6 +500,7 @@ struct TrainingBlueLaserProjectileFrame: Equatable, Sendable {
 }
 
 struct TrainingMovingTargetFrame: Equatable, Sendable {
+    let objectHandle: UInt32
     let roomSourceIndex: Int
     let activePathIndex: Int
     let pathNodeIndex: Int
@@ -1222,6 +1223,15 @@ private struct TrainingAuthoredPathMotion:
     var pathFailure: TrainingFollowBotPathFailure?
 }
 
+private struct TrainingDestroyBot1DestructionState:
+    Codable, Equatable, Sendable
+{
+    var destroyBot1Shields: Float
+    var destroyBot1WasDestroyed = false
+    var script028Count = 0
+    var destroyBot2Motion: TrainingAuthoredPathMotion
+}
+
 private struct TrainingFollowBotDestructionState:
     Codable, Equatable, Sendable
 {
@@ -1236,8 +1246,32 @@ private struct TrainingFollowBotDestructionState:
     var destroyBot2TeamFlags: UInt32 = 0
     var destroyBot1TeamFlags: UInt32 = 0
     var destroyBot1Motion: TrainingAuthoredPathMotion
+    var destroyBot1Destruction:
+        TrainingDestroyBot1DestructionState? = nil
 
-    var movingTargetFrame: TrainingMovingTargetFrame? {
+    func movingTargetFrame(
+        handoff: TrainingFollowBotDestructionHandoff
+    ) -> TrainingMovingTargetFrame? {
+        if let destroyBot1Destruction,
+           destroyBot1Destruction.script028Count > 0,
+           destroyBot2IsVisible,
+           let activePathIndex =
+            destroyBot1Destruction.destroyBot2Motion.activePathIndex
+        {
+            return .init(
+                objectHandle: handoff.destroyBot2ObjectHandle,
+                roomSourceIndex:
+                    destroyBot1Destruction.destroyBot2Motion
+                        .roomSourceIndex,
+                activePathIndex: activePathIndex,
+                pathNodeIndex:
+                    destroyBot1Destruction.destroyBot2Motion
+                        .pathNodeIndex,
+                pathFailure:
+                    destroyBot1Destruction.destroyBot2Motion
+                        .pathFailure
+            )
+        }
         guard script027Count > 0,
               destroyBot1IsVisible,
               let activePathIndex =
@@ -1246,6 +1280,7 @@ private struct TrainingFollowBotDestructionState:
             return nil
         }
         return .init(
+            objectHandle: handoff.destroyBot1ObjectHandle,
             roomSourceIndex: destroyBot1Motion.roomSourceIndex,
             activePathIndex: activePathIndex,
             pathNodeIndex: destroyBot1Motion.pathNodeIndex,
@@ -1285,6 +1320,27 @@ private func initialTrainingManeuverFollowState(
         )
     }
     return state
+}
+
+private func initialTrainingDestroyBot1DestructionState(
+    level: Level,
+    handoff: TrainingFollowBotDestructionHandoff
+) -> TrainingDestroyBot1DestructionState? {
+    guard let destroyBot2 = level.objects.first(where: {
+        $0.handle == handoff.destroyBot2ObjectHandle
+    }),
+          case let .room(roomSourceIndex) = destroyBot2.location
+    else {
+        return nil
+    }
+    return .init(
+        destroyBot1Shields: handoff.combat.robotShields,
+        destroyBot2Motion: .init(
+            roomSourceIndex: roomSourceIndex,
+            position: destroyBot2.position,
+            orientation: destroyBot2.orientation
+        )
+    )
 }
 
 struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
@@ -2384,6 +2440,23 @@ final class PlayerSimulation {
         ) else {
             throw PlayerSimulationContinuationError.invalidState
         }
+        if (
+            restoredManeuverFollowState?.destruction?
+                .script027Count ?? 0
+        ) > 0,
+           restoredManeuverFollowState?.destruction?
+            .destroyBot1Destruction == nil,
+           let handoff =
+                continuationLevel.trainingDodgeAttempt?
+                    .maneuverFollow?.destructionHandoff
+        {
+            restoredManeuverFollowState?.destruction?
+                .destroyBot1Destruction =
+                    initialTrainingDestroyBot1DestructionState(
+                        level: continuationLevel,
+                        handoff: handoff
+                    )
+        }
         var restoredLevel = continuationLevel
         if restoredDodgeAttemptState?.script033Count == 1 {
             setTrainingDodgePortalRenderState(
@@ -2466,7 +2539,13 @@ final class PlayerSimulation {
                     handle: handoff.destroyBot1ObjectHandle,
                     isVisible: destruction.destroyBot1IsVisible
                 )
-                if let objectIndex =
+                if destruction.destroyBot1Destruction?
+                    .destroyBot1WasDestroyed == true
+                {
+                    restoredLevel.objects.removeAll {
+                        $0.handle == handoff.destroyBot1ObjectHandle
+                    }
+                } else if let objectIndex =
                     restoredLevel.objects.firstIndex(where: {
                         $0.handle
                             == handoff.destroyBot1ObjectHandle
@@ -2480,6 +2559,22 @@ final class PlayerSimulation {
                         destruction.destroyBot1Motion.position
                     restoredLevel.objects[objectIndex].orientation =
                         destruction.destroyBot1Motion.orientation
+                }
+                if let destroyBot2Motion =
+                    destruction.destroyBot1Destruction?
+                        .destroyBot2Motion,
+                   let objectIndex =
+                    restoredLevel.objects.firstIndex(where: {
+                        $0.handle
+                            == handoff.destroyBot2ObjectHandle
+                    })
+                {
+                    restoredLevel.objects[objectIndex].location =
+                        .room(destroyBot2Motion.roomSourceIndex)
+                    restoredLevel.objects[objectIndex].position =
+                        destroyBot2Motion.position
+                    restoredLevel.objects[objectIndex].orientation =
+                        destroyBot2Motion.orientation
                 }
             }
         }
@@ -2694,37 +2789,57 @@ final class PlayerSimulation {
         restoreTrainingFollowBotPresentation()
     }
 
-    private func advanceTrainingDestroyBot1(duration: Float) {
+    private func advanceTrainingMovingTarget(duration: Float) {
         guard duration > 0,
               var state = trainingManeuverFollowState,
               var destruction = state.destruction,
-              destruction.destroyBot1IsVisible,
               let lesson =
                 level.trainingDodgeAttempt?.maneuverFollow,
               let handoff = lesson.destructionHandoff
         else {
             return
         }
-        advanceTrainingAuthoredPath(
-            &destruction.destroyBot1Motion,
-            duration: duration,
-            definition: lesson.followBot,
-            loopingPathIndex: handoff.movingPathIndex,
-            orientsToPathNodes: false
-        )
+        let activeHandle: UInt32
+        if var destroyBot1Destruction =
+            destruction.destroyBot1Destruction,
+           destroyBot1Destruction.script028Count > 0,
+           destruction.destroyBot2IsVisible
+        {
+            advanceTrainingAuthoredPath(
+                &destroyBot1Destruction.destroyBot2Motion,
+                duration: duration,
+                definition: lesson.followBot,
+                loopingPathIndex: handoff.movingPathIndex,
+                orientsToPathNodes: false
+            )
+            destruction.destroyBot1Destruction =
+                destroyBot1Destruction
+            activeHandle = handoff.destroyBot2ObjectHandle
+        } else if destruction.destroyBot1IsVisible {
+            advanceTrainingAuthoredPath(
+                &destruction.destroyBot1Motion,
+                duration: duration,
+                definition: lesson.followBot,
+                loopingPathIndex: handoff.movingPathIndex,
+                orientsToPathNodes: false
+            )
+            activeHandle = handoff.destroyBot1ObjectHandle
+        } else {
+            return
+        }
         state.destruction = destruction
         trainingManeuverFollowState = state
         if let objectIndex = level.objects.firstIndex(where: {
-            $0.handle == handoff.destroyBot1ObjectHandle
+            $0.handle == activeHandle
         }) {
+            let motion = activeHandle == handoff.destroyBot1ObjectHandle
+                ? destruction.destroyBot1Motion
+                : destruction.destroyBot1Destruction!
+                    .destroyBot2Motion
             level.objects[objectIndex].location =
-                .room(
-                    destruction.destroyBot1Motion.roomSourceIndex
-                )
-            level.objects[objectIndex].position =
-                destruction.destroyBot1Motion.position
-            level.objects[objectIndex].orientation =
-                destruction.destroyBot1Motion.orientation
+                .room(motion.roomSourceIndex)
+            level.objects[objectIndex].position = motion.position
+            level.objects[objectIndex].orientation = motion.orientation
         }
     }
 
@@ -3386,6 +3501,59 @@ final class PlayerSimulation {
         trainingManeuverFollowState = maneuverState
     }
 
+    private func destroyTrainingDestroyBot1(isDying: Bool) {
+        guard isDying,
+              let lesson =
+                level.trainingDodgeAttempt?.maneuverFollow,
+              let handoff = lesson.destructionHandoff,
+              var maneuverState = trainingManeuverFollowState,
+              var destruction = maneuverState.destruction,
+              destruction.script027Count > 0,
+              var destroyBot1Destruction =
+                destruction.destroyBot1Destruction,
+              !destroyBot1Destruction.destroyBot1WasDestroyed,
+              level.objects.contains(where: {
+                  $0.handle == handoff.destroyBot1ObjectHandle
+              })
+        else {
+            return
+        }
+        level.objects.removeAll {
+            $0.handle == handoff.destroyBot1ObjectHandle
+        }
+        setObjectPresentationVisibility(
+            in: &level,
+            handle: handoff.destroyBot1ObjectHandle,
+            isVisible: false
+        )
+        destroyBot1Destruction.destroyBot1WasDestroyed = true
+        destroyBot1Destruction.destroyBot1Shields = min(
+            destroyBot1Destruction.destroyBot1Shields,
+            -0.000_001
+        )
+        if destroyBot1Destruction.script028Count < 1 {
+            destruction.destroyBot1IsVisible = false
+            destruction.destroyBot2IsVisible = true
+            setObjectPresentationVisibility(
+                in: &level,
+                handle: handoff.destroyBot2ObjectHandle,
+                isVisible: true
+            )
+            assignTrainingAuthoredPath(
+                handoff.movingPathIndex,
+                motion: &destroyBot1Destruction.destroyBot2Motion
+            )
+            destroyBot1Destruction.script028Count = min(
+                destroyBot1Destruction.script028Count + 1,
+                trainingScriptActionCounterMaximum
+            )
+        }
+        destruction.destroyBot1Destruction =
+            destroyBot1Destruction
+        maneuverState.destruction = destruction
+        trainingManeuverFollowState = maneuverState
+    }
+
     func update(at timestamp: Double, input: InputSnapshot) -> PlayerSimulationFrame {
         precondition(timestamp.isFinite && timestamp >= lastTimestamp)
         precondition(pauseDepth == 0)
@@ -3453,6 +3621,7 @@ final class PlayerSimulation {
             preconditionFailure("The Slice 10 player simulation is indoor.")
         }
         var followBotTimer11StartedThisFrame = false
+        var destroyBot2PathStartedThisFrame = false
         if var state = trainingRobotGuidebotState,
            let chain = level.trainingRobotGuidebotChain {
             let combat = chain.combat
@@ -3481,6 +3650,9 @@ final class PlayerSimulation {
             var maneuverState = trainingManeuverFollowState
             var followBotDestructionState =
                 maneuverState?.destruction
+            var destroyBot1DestructionState =
+                followBotDestructionState?
+                    .destroyBot1Destruction
             let handoff =
                 level.trainingDodgeAttempt?.maneuverFollow?
                     .destructionHandoff
@@ -3496,13 +3668,24 @@ final class PlayerSimulation {
                     $0.handle == handoff.followBotObjectHandle
                 }
             }
+            let destroyBot1: PlacedObject? = handoff.flatMap {
+                handoff in
+                guard followBotDestructionState?
+                        .script027Count ?? 0 > 0,
+                      followBotDestructionState?
+                        .destroyBot1IsVisible == true,
+                      destroyBot1DestructionState?
+                        .destroyBot1WasDestroyed == false
+                else {
+                    return nil
+                }
+                return level.objects.first {
+                    $0.handle == handoff.destroyBot1ObjectHandle
+                }
+            }
             let robot = level.objects.first {
                 $0.handle == chain.destroyRobotObjectHandle
-                    && (
-                        handoff == nil
-                            || followBotDestructionState?
-                                .destroyBot2IsVisible == true
-                    )
+                    && handoff == nil
             }
             let rasBot1Chain = level.trainingRASBot1DeathChain
             let rasBot1 = rasBot1Chain.flatMap { rasBot1Chain in
@@ -3607,6 +3790,26 @@ final class PlayerSimulation {
                         start: projectile.position,
                         end: end,
                         center: followBot.position,
+                        radius:
+                            handoff.combat.projectileRadius
+                                + handoff.combat
+                                    .robotCollisionRadius
+                    )
+                }
+                let destroyBot1Hit = destroyBot1.flatMap {
+                    destroyBot1 -> Float? in
+                    guard destroyBot1.location
+                            == SpatialLocation.room(
+                                projectile.roomSourceIndex
+                            ),
+                          let handoff
+                    else {
+                        return nil
+                    }
+                    return segmentSphereHitFraction(
+                        start: projectile.position,
+                        end: end,
+                        center: destroyBot1.position,
                         radius:
                             handoff.combat.projectileRadius
                                 + handoff.combat
@@ -3842,6 +4045,9 @@ final class PlayerSimulation {
                    }) ?? true,
                    followBotHit.map({
                        nearestRASBotHit.fraction < $0
+                   }) ?? true,
+                   destroyBot1Hit.map({
+                       nearestRASBotHit.fraction < $0
                    }) ?? true {
                     if nearestRASBotHit.handle
                         == rasBot1Chain?.robotObjectHandle {
@@ -3886,9 +4092,26 @@ final class PlayerSimulation {
                    robotHit.map({ followBotHit < $0 }) ?? true,
                    nearestRASBotHit.map({
                        followBotHit < $0.fraction
+                   }) ?? true,
+                   destroyBot1Hit.map({
+                       followBotHit < $0
                    }) ?? true {
                     followBotDestructionState?
                         .followBotShields -=
+                            handoff!.combat.projectileDamage
+                    continue
+                }
+                if let destroyBot1Hit,
+                   destroyBot1Hit <= traceFraction + 0.000_1,
+                   robotHit.map({ destroyBot1Hit < $0 }) ?? true,
+                   nearestRASBotHit.map({
+                       destroyBot1Hit < $0.fraction
+                   }) ?? true,
+                   followBotHit.map({
+                       destroyBot1Hit < $0
+                   }) ?? true {
+                    destroyBot1DestructionState?
+                        .destroyBot1Shields -=
                             handoff!.combat.projectileDamage
                     continue
                 }
@@ -3910,6 +4133,11 @@ final class PlayerSimulation {
                 followBotDestructionState.map {
                     !$0.followBotWasDestroyed
                         && $0.followBotShields < 0
+                } ?? false
+            let destroyBot1WasKilled =
+                destroyBot1DestructionState.map {
+                    !$0.destroyBot1WasDestroyed
+                        && $0.destroyBot1Shields < 0
                 } ?? false
             let robotWasKilled =
                 !state.robotWasDestroyed && state.robotShields < 0
@@ -3959,12 +4187,19 @@ final class PlayerSimulation {
             trainingLastBot3DeathState = lastBot3State
             trainingLastBot4DeathState = lastBot4State
             trainingLastBot5DeathState = lastBot5State
+            followBotDestructionState?
+                .destroyBot1Destruction =
+                    destroyBot1DestructionState
             maneuverState?.destruction =
                 followBotDestructionState
             trainingManeuverFollowState = maneuverState
             if followBotWasKilled {
                 destroyTrainingFollowBot(isDying: true)
                 followBotTimer11StartedThisFrame = true
+            }
+            if destroyBot1WasKilled {
+                destroyTrainingDestroyBot1(isDying: true)
+                destroyBot2PathStartedThisFrame = true
             }
             if robotWasKilled {
                 destroyTrainingRobot(handle: chain.destroyRobotObjectHandle)
@@ -4582,7 +4817,9 @@ final class PlayerSimulation {
             playerRadius: ship.presentationSize * 0.8
         )
         advanceTrainingFollowBot(duration: systemsFrameDuration)
-        advanceTrainingDestroyBot1(duration: systemsFrameDuration)
+        if !destroyBot2PathStartedThisFrame {
+            advanceTrainingMovingTarget(duration: systemsFrameDuration)
+        }
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
         if var dodgeState = trainingDodgeAttemptState,
@@ -5293,6 +5530,11 @@ final class PlayerSimulation {
                                 &destruction
                                 .destroyBot1Motion
                         )
+                        destruction.destroyBot1Destruction =
+                            initialTrainingDestroyBot1DestructionState(
+                                level: level,
+                                handoff: handoff
+                            )
                         destruction.script027Count = min(
                             destruction.script027Count + 1,
                             trainingScriptActionCounterMaximum
@@ -6122,8 +6364,13 @@ final class PlayerSimulation {
             trainingFollowBot:
                 trainingManeuverFollowState?.frame,
             trainingMovingTarget:
-                trainingManeuverFollowState?
-                    .destruction?.movingTargetFrame,
+                level.trainingDodgeAttempt?.maneuverFollow?
+                    .destructionHandoff.flatMap { handoff in
+                        trainingManeuverFollowState?
+                            .destruction?.movingTargetFrame(
+                                handoff: handoff
+                            )
+                    },
             trainingGalleryMarkerLightDistance:
                 trainingGalleryBarrierState?.markerLightDistance,
             trainingGuidebotReturnMarkerLightDistance:
@@ -6581,6 +6828,73 @@ private func validTrainingManeuverFollowContinuation(
         )
 }
 
+private func validTrainingDestroyBot1DestructionContinuation(
+    _ state: TrainingDestroyBot1DestructionState?,
+    script027Count: Int,
+    lesson: TrainingManeuverFollowLesson,
+    handoff: TrainingFollowBotDestructionHandoff,
+    level: Level
+) -> Bool {
+    guard let state else {
+        return true
+    }
+    guard script027Count > 0,
+          let destroyBot2 = level.objects.first(where: {
+              $0.handle == handoff.destroyBot2ObjectHandle
+          }),
+          case let .room(initialRoom) = destroyBot2.location,
+          let destroyBot2Room = level.rooms.first(where: {
+              $0.sourceIndex == initialRoom
+          }),
+          (0...trainingScriptActionCounterMaximum).contains(
+              state.script028Count
+          ),
+          state.script028Count <= 1,
+          state.destroyBot1Shields.isFinite,
+          state.destroyBot1Shields <= handoff.combat.robotShields,
+          state.destroyBot1WasDestroyed
+            == (state.destroyBot1Shields < 0),
+          state.destroyBot1WasDestroyed
+            == (state.script028Count > 0),
+          isCanonicalRigidTransform(
+              position: state.destroyBot2Motion.position,
+              orientation: state.destroyBot2Motion.orientation
+          ),
+          state.destroyBot2Motion.velocity.x.isFinite,
+          state.destroyBot2Motion.velocity.y.isFinite,
+          state.destroyBot2Motion.velocity.z.isFinite,
+          sqrt(dot(
+              state.destroyBot2Motion.velocity,
+              state.destroyBot2Motion.velocity
+          )) <= lesson.followBot.maximumVelocity + 0.001,
+          state.destroyBot2Motion.roomSourceIndex == initialRoom,
+          state.destroyBot2Motion.pathNodeIndex >= 0,
+          state.destroyBot2Motion.activePathIndex.map({
+              $0 == handoff.movingPathIndex
+                && level.paths[$0].nodes.indices.contains(
+                    state.destroyBot2Motion.pathNodeIndex
+                )
+          }) ?? (state.destroyBot2Motion.pathNodeIndex == 0)
+    else {
+        return false
+    }
+    return state.script028Count > 0
+        ? state.destroyBot2Motion.activePathIndex
+            == handoff.movingPathIndex
+            && sourceConvexRoomContains(
+                state.destroyBot2Motion.position,
+                in: destroyBot2Room
+            )
+        : state.destroyBot1Shields >= 0
+            && state.destroyBot2Motion.activePathIndex == nil
+            && state.destroyBot2Motion.position
+                == destroyBot2.position
+            && state.destroyBot2Motion.orientation
+                == destroyBot2.orientation
+            && state.destroyBot2Motion.velocity == .zero
+            && state.destroyBot2Motion.pathFailure == nil
+}
+
 private func validTrainingFollowBotDestructionContinuation(
     _ state: TrainingFollowBotDestructionState?,
     maneuverState: TrainingManeuverFollowState,
@@ -6619,9 +6933,19 @@ private func validTrainingFollowBotDestructionContinuation(
             == (state.followBotShields < 0),
           state.followBotWasDestroyed
             == (state.script037Count > 0),
-          state.destroyBot2IsVisible == false,
+          state.destroyBot2IsVisible
+            == ((
+                state.destroyBot1Destruction?
+                    .script028Count ?? 0
+            ) > 0),
           state.destroyBot1IsVisible
-            == (state.script027Count > 0),
+            == (
+                state.script027Count > 0
+                    && (
+                        state.destroyBot1Destruction?
+                            .script028Count ?? 0
+                    ) == 0
+            ),
           state.destroyBot2TeamFlags
             == (state.script027Count > 0
                 ? handoff.movingTeamFlags
@@ -6659,7 +6983,14 @@ private func validTrainingFollowBotDestructionContinuation(
               level.paths[$0].nodes.indices.contains(
                   state.destroyBot1Motion.pathNodeIndex
               )
-          }) ?? (state.destroyBot1Motion.pathNodeIndex == 0)
+          }) ?? (state.destroyBot1Motion.pathNodeIndex == 0),
+          validTrainingDestroyBot1DestructionContinuation(
+              state.destroyBot1Destruction,
+              script027Count: state.script027Count,
+              lesson: lesson,
+              handoff: handoff,
+              level: level
+          )
     else {
         return false
     }

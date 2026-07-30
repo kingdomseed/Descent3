@@ -11,7 +11,7 @@ final class EditorProjectTests: XCTestCase {
 
         XCTAssertEqual(
             project.trainingManeuverFollowSourceDiagnostic,
-            "TrainingMission.cpp Scripts 021,022,024,023,025,026,031,037,027 / ManuverRoomCenter 2063 / FollowBot1 8200 / DestroyBot2 4112 ghosted / DestroyBot1 4113 ghosted then visible / timer 11 = 2.0s / stock read-only FollowLoop1 path 0 nodes 13 flags 0x801100 + GoToDie path 1 nodes 1 flags 0x1100 / goal -1 priority 3 / Laser Level 2 - Blue via bluelaser.OOF / runtime path failure: invalidPath|movementBlocked"
+            "TrainingMission.cpp Scripts 021,022,024,023,025,026,031,037,027,028 / ManuverRoomCenter 2063 / FollowBot1 8200 / DestroyBot1 4113 then DestroyBot2 4112 / timer 11 = 2.0s / stock read-only FollowLoop1 path 0 nodes 13 flags 0x801100 + GoToDie path 1 nodes 1 flags 0x1100 / goal -1 priority 3 / Laser Level 2 - Blue via bluelaser.OOF / runtime path failure: invalidPath|movementBlocked"
         )
     }
 

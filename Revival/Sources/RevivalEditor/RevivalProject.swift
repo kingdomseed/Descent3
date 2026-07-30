@@ -615,7 +615,7 @@ struct RevivalProject: Equatable, Sendable {
         let destroyPath = level.paths[lesson.destroyPathIndex]
         if let handoff = lesson.destructionHandoff {
             return
-                "TrainingMission.cpp Scripts 021,022,024,023,025,026,031,037,027 / ManuverRoomCenter \(lesson.maneuverObjectHandle) / FollowBot1 \(handoff.followBotObjectHandle) / DestroyBot2 \(handoff.destroyBot2ObjectHandle) ghosted / DestroyBot1 \(handoff.destroyBot1ObjectHandle) ghosted then visible / timer \(handoff.levelTimerID) = \(handoff.destructionDelay)s / stock read-only \(followPath.name) path \(handoff.movingPathIndex) nodes \(followPath.nodes.count) flags 0x\(String(handoff.movingPathGoalFlags, radix: 16)) + \(destroyPath.name) path \(lesson.destroyPathIndex) nodes \(destroyPath.nodes.count) flags 0x\(String(lesson.destroyPathGoalFlags, radix: 16)) / goal \(handoff.goalID) priority \(handoff.goalPriority) / \(handoff.combat.projectileSourceName) via \(handoff.projectileModel.sourceName) / runtime path failure: invalidPath|movementBlocked"
+                "TrainingMission.cpp Scripts 021,022,024,023,025,026,031,037,027,028 / ManuverRoomCenter \(lesson.maneuverObjectHandle) / FollowBot1 \(handoff.followBotObjectHandle) / DestroyBot1 \(handoff.destroyBot1ObjectHandle) then DestroyBot2 \(handoff.destroyBot2ObjectHandle) / timer \(handoff.levelTimerID) = \(handoff.destructionDelay)s / stock read-only \(followPath.name) path \(handoff.movingPathIndex) nodes \(followPath.nodes.count) flags 0x\(String(handoff.movingPathGoalFlags, radix: 16)) + \(destroyPath.name) path \(lesson.destroyPathIndex) nodes \(destroyPath.nodes.count) flags 0x\(String(lesson.destroyPathGoalFlags, radix: 16)) / goal \(handoff.goalID) priority \(handoff.goalPriority) / \(handoff.combat.projectileSourceName) via \(handoff.projectileModel.sourceName) / runtime path failure: invalidPath|movementBlocked"
         }
         return
             "TrainingMission.cpp Scripts 021,022,024,023,025,026 / ManuverRoomCenter \(lesson.maneuverObjectHandle) / FollowBot1 \(lesson.followBotObjectHandle) / stock read-only \(followPath.name) path \(lesson.followPathIndex) nodes \(followPath.nodes.count) flags 0x\(String(lesson.followPathGoalFlags, radix: 16)) + \(destroyPath.name) path \(lesson.destroyPathIndex) nodes \(destroyPath.nodes.count) flags 0x\(String(lesson.destroyPathGoalFlags, radix: 16)) / slot \(lesson.goalSlot) priority \(lesson.goalPriority) / runtime path failure: invalidPath|movementBlocked"
@@ -627,8 +627,11 @@ struct RevivalProject: Equatable, Sendable {
             return nil
         }
         if let movingTarget = frame.trainingMovingTarget {
+            let movingTargetName = level.objects.first {
+                $0.handle == movingTarget.objectHandle
+            }?.instanceName ?? "moving target \(movingTarget.objectHandle)"
             return
-                "\(source) / active moving target DestroyBot1 path \(movingTarget.activePathIndex) node \(movingTarget.pathNodeIndex) room \(movingTarget.roomSourceIndex) failure \(movingTarget.pathFailure?.rawValue ?? "none")"
+                "\(source) / active moving target \(movingTargetName) path \(movingTarget.activePathIndex) node \(movingTarget.pathNodeIndex) room \(movingTarget.roomSourceIndex) failure \(movingTarget.pathFailure?.rawValue ?? "none")"
         }
         guard let followBot = frame.trainingFollowBot else {
             return nil
