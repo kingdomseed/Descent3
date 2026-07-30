@@ -7183,8 +7183,9 @@ final class WorldRenderingTests: XCTestCase {
                 destroyRobotFlags: 5_121,
                 destructionDelay: 2,
                 destructionMessage: "Excellent!",
-                exitInstruction: "",
-                destructionVoiceSourceName: "",
+                exitInstruction:
+                    "Now go through the open doorway, and into the next room.",
+                destructionVoiceSourceName: "proceed5.osf",
                 deployedGuidebotObjectType: 2,
                 deployedGuidebotMessage: "",
                 deployedGuidebotVoiceSourceName: "",
@@ -7248,6 +7249,37 @@ final class WorldRenderingTests: XCTestCase {
             vertices: containment.vertices,
             faces: faces,
             portals: portals
+        )
+        let galleryRoomIndex = try XCTUnwrap(
+            level.rooms.firstIndex { $0.sourceIndex == 2 }
+        )
+        for portalIndex in [1, 0] {
+            level.rooms[galleryRoomIndex]
+                .portals[portalIndex].flags |= 1
+            let portal =
+                level.rooms[galleryRoomIndex].portals[portalIndex]
+            let reciprocalRoomIndex = try XCTUnwrap(
+                level.rooms.firstIndex {
+                    $0.sourceIndex == portal.connectedRoom
+                }
+            )
+            level.rooms[reciprocalRoomIndex]
+                .portals[portal.connectedPortal].flags |= 1
+        }
+        level = replacing(
+            level,
+            trainingGalleryBarrier: .init(
+                triggerName: "Portal2",
+                triggerRoomSourceIndex: 37,
+                triggerFaceIndex: 0,
+                barrierRoomSourceIndex: 2,
+                orderedPortalIndices: [1, 0],
+                markerLightObjectHandle: 6_163,
+                openMarkerLightDistance: 50,
+                successMessage: "Excellent!",
+                guidebotInstruction: "",
+                voiceSourceName: ""
+            )
         )
         let destroyBot1Index = try XCTUnwrap(
             level.objects.firstIndex {
@@ -7325,6 +7357,13 @@ final class WorldRenderingTests: XCTestCase {
         openingState["timerRemaining"] = Float(1_000)
         continuationObject["trainingOpeningState"] =
             openingState
+        var galleryState = try XCTUnwrap(
+            continuationObject["trainingGalleryBarrierState"]
+                as? [String: Any]
+        )
+        galleryState["markerLightDistance"] = 0
+        continuationObject["trainingGalleryBarrierState"] =
+            galleryState
         var dodgeState = try XCTUnwrap(
             continuationObject["trainingDodgeAttemptState"]
                 as? [String: Any]
@@ -7765,10 +7804,10 @@ final class WorldRenderingTests: XCTestCase {
             script028Silent.trainingMovingTarget?.objectHandle,
             handoff.destroyBot2ObjectHandle
         )
-
         simulation = script028Restored
         timestamp = 400
-        for _ in 0..<4 {
+        var movingTargetPlan: MetalWorldPlan?
+        for volleyIndex in 0..<4 {
             simulation = try restoringAim(
                 simulation,
                 at: try XCTUnwrap(
@@ -7778,14 +7817,68 @@ final class WorldRenderingTests: XCTestCase {
                 ),
                 timestamp: timestamp
             )
+            if volleyIndex == 3 {
+                let prepared = try makeMetalWorldPlan(
+                    level: simulation.level,
+                    playerView: defaultPlayerView(
+                        in: simulation.level
+                    )
+                )
+                XCTAssertTrue(prepared.draws.contains {
+                    $0.objectHandle
+                        == handoff.destroyBot2ObjectHandle
+                })
+                movingTargetPlan = prepared
+            }
             timestamp += 0.25
-            _ = simulation.update(
+            frame = simulation.update(
                 at: timestamp,
                 input: .init(firesPrimaryWeapon: true)
             )
+            if volleyIndex == 2 {
+                XCTAssertTrue(simulation.level.objects.contains {
+                    $0.handle
+                        == handoff.destroyBot2ObjectHandle
+                })
+                let threeVolleyContinuation = try XCTUnwrap(
+                    JSONSerialization.jsonObject(
+                        with: JSONEncoder().encode(
+                            simulation.continuation
+                        )
+                    ) as? [String: Any]
+                )
+                let threeVolleyRobotState = try XCTUnwrap(
+                    threeVolleyContinuation[
+                        "trainingRobotGuidebotState"
+                    ] as? [String: Any]
+                )
+                XCTAssertEqual(
+                    threeVolleyRobotState[
+                        "robotShields"
+                    ] as? Double,
+                    10
+                )
+            }
         }
-        XCTAssertTrue(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.level.objects.contains {
             $0.handle == handoff.destroyBot2ObjectHandle
+        })
+        XCTAssertTrue(frame.trainingOpeningFeedback.isEmpty)
+        XCTAssertNil(frame.trainingMovingTarget)
+        XCTAssertEqual(frame.enabledPlayerControls, .all)
+        XCTAssertTrue(frame.showsEnabledPlayerControls)
+        XCTAssertEqual(frame.trainingGalleryMarkerLightDistance, 50)
+        assertTrainingGalleryBarrier(
+            level: simulation.level,
+            rendersFaces: false
+        )
+        let destroyedTargetPlan = try updateMetalWorldPlan(
+            try XCTUnwrap(movingTargetPlan),
+            level: simulation.level,
+            playerView: frame.playerView
+        )
+        XCTAssertFalse(destroyedTargetPlan.draws.contains {
+            $0.objectHandle == handoff.destroyBot2ObjectHandle
         })
         script028Continuation = try XCTUnwrap(
             JSONSerialization.jsonObject(
@@ -7796,9 +7889,26 @@ final class WorldRenderingTests: XCTestCase {
             script028Continuation["trainingRobotGuidebotState"]
                 as? [String: Any]
         )
+        XCTAssertEqual(guidebotState["robotShields"] as? Double, -5)
         XCTAssertEqual(
-            guidebotState["robotShields"] as? Double,
-            Double(handoff.combat.robotShields)
+            guidebotState["robotWasDestroyed"] as? Bool,
+            true
+        )
+        XCTAssertEqual(
+            guidebotState["destructionTimerRemaining"] as? Double,
+            2
+        )
+        XCTAssertEqual(
+            guidebotState["destructionFeedbackWasPresented"] as? Bool,
+            false
+        )
+        XCTAssertEqual(
+            guidebotState["controlsWereRestored"] as? Bool,
+            true
+        )
+        XCTAssertEqual(
+            guidebotState["enabledControlHUDIsVisible"] as? Bool,
+            true
         )
 
         script028Maneuver = try XCTUnwrap(
@@ -7809,6 +7919,278 @@ final class WorldRenderingTests: XCTestCase {
         script028Destruction = try XCTUnwrap(
             script028Maneuver["destruction"] as? [String: Any]
         )
+        XCTAssertEqual(
+            script028Destruction["destroyBot2IsVisible"] as? Bool,
+            false
+        )
+        let postDeathDestroyBot1State = try XCTUnwrap(
+            script028Destruction["destroyBot1Destruction"]
+                as? [String: Any]
+        )
+        let postDeathDestroyBot2Motion = try XCTUnwrap(
+            postDeathDestroyBot1State["destroyBot2Motion"]
+                as? [String: Any]
+        )
+        XCTAssertNil(postDeathDestroyBot2Motion["activePathIndex"])
+        XCTAssertEqual(
+            postDeathDestroyBot2Motion["pathNodeIndex"] as? Int,
+            0
+        )
+        XCTAssertEqual(
+            postDeathDestroyBot2Motion["velocity"] as? [String: Double],
+            ["x": 0, "y": 0, "z": 0]
+        )
+
+        let pendingTimerSimulation = try PlayerSimulation(
+            level: level,
+            continuation: simulation.continuation,
+            resumedAtTimestamp: 500
+        )
+        XCTAssertFalse(pendingTimerSimulation.level.objects.contains {
+            $0.handle == handoff.destroyBot2ObjectHandle
+        })
+        assertTrainingGalleryBarrier(
+            level: pendingTimerSimulation.level,
+            rendersFaces: false
+        )
+        var timerFrame = pendingTimerSimulation.update(
+            at: 500.25,
+            input: .zero
+        )
+        XCTAssertTrue(timerFrame.trainingOpeningFeedback.isEmpty)
+        var pendingTimerObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    pendingTimerSimulation.continuation
+                )
+            ) as? [String: Any]
+        )
+        var pendingTimerState = try XCTUnwrap(
+            pendingTimerObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(
+            pendingTimerState["destructionTimerRemaining"] as? Double,
+            1.75
+        )
+        for tick in 2...7 {
+            timerFrame = pendingTimerSimulation.update(
+                at: 500 + Double(tick) * 0.25,
+                input: .zero
+            )
+            XCTAssertTrue(timerFrame.trainingOpeningFeedback.isEmpty)
+        }
+        timerFrame = pendingTimerSimulation.update(
+            at: 502,
+            input: .zero
+        )
+        XCTAssertEqual(
+            timerFrame.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Excellent!",
+                    "Now go through the open doorway, and into the next room.",
+                ],
+                voiceSourceName: "proceed5.osf",
+                voicePrecedesHUDMessages: false
+            )]
+        )
+        XCTAssertFalse(timerFrame.showsEnabledPlayerControls)
+        let oneShotFrame = pendingTimerSimulation.update(
+            at: 502.25,
+            input: .zero
+        )
+        XCTAssertTrue(oneShotFrame.trainingOpeningFeedback.isEmpty)
+        XCTAssertFalse(oneShotFrame.showsEnabledPlayerControls)
+        pendingTimerObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    pendingTimerSimulation.continuation
+                )
+            ) as? [String: Any]
+        )
+        pendingTimerState = try XCTUnwrap(
+            pendingTimerObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        XCTAssertNil(
+            pendingTimerState["destructionTimerRemaining"]
+        )
+        XCTAssertEqual(
+            pendingTimerState["destructionFeedbackWasPresented"]
+                as? Bool,
+            true
+        )
+        XCTAssertEqual(
+            pendingTimerState["enabledControlHUDIsVisible"] as? Bool,
+            false
+        )
+
+        let presentedTimerSimulation = try PlayerSimulation(
+            level: level,
+            continuation: pendingTimerSimulation.continuation,
+            resumedAtTimestamp: 600
+        )
+        let presentedTimerFrame = presentedTimerSimulation.update(
+            at: 600.25,
+            input: .zero
+        )
+        XCTAssertTrue(
+            presentedTimerFrame.trainingOpeningFeedback.isEmpty
+        )
+        XCTAssertFalse(
+            presentedTimerFrame.showsEnabledPlayerControls
+        )
+        XCTAssertNil(presentedTimerFrame.trainingMovingTarget)
+        XCTAssertFalse(presentedTimerSimulation.level.objects.contains {
+            $0.handle == handoff.destroyBot2ObjectHandle
+        })
+        assertTrainingGalleryBarrier(
+            level: presentedTimerSimulation.level,
+            rendersFaces: false
+        )
+
+        var hostileTimerAfterFeedback = pendingTimerObject
+        var hostileTimerAfterFeedbackState = pendingTimerState
+        hostileTimerAfterFeedbackState[
+            "destructionTimerRemaining"
+        ] = 1
+        hostileTimerAfterFeedback[
+            "trainingRobotGuidebotState"
+        ] = hostileTimerAfterFeedbackState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: hostileTimerAfterFeedback
+                    )
+                ),
+                resumedAtTimestamp: 650
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var hostileScript029Without036 =
+            continuationAfterHandoff
+        var hostileScript029State = try XCTUnwrap(
+            hostileScript029Without036[
+                "trainingRobotGuidebotState"
+            ] as? [String: Any]
+        )
+        hostileScript029State[
+            "destructionFeedbackWasPresented"
+        ] = true
+        hostileScript029State[
+            "enabledControlHUDIsVisible"
+        ] = false
+        hostileScript029Without036[
+            "trainingRobotGuidebotState"
+        ] = hostileScript029State
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject:
+                            hostileScript029Without036
+                    )
+                ),
+                resumedAtTimestamp: 650
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var hostileDeathBeforeScript028 =
+            continuationAfterHandoff
+        var hostileEarlyRobotState = try XCTUnwrap(
+            hostileDeathBeforeScript028[
+                "trainingRobotGuidebotState"
+            ] as? [String: Any]
+        )
+        hostileEarlyRobotState["robotWasDestroyed"] = true
+        hostileEarlyRobotState["robotShields"] = -5
+        hostileEarlyRobotState["controlsWereRestored"] = true
+        hostileEarlyRobotState[
+            "destructionTimerRemaining"
+        ] = 2
+        hostileDeathBeforeScript028[
+            "trainingRobotGuidebotState"
+        ] = hostileEarlyRobotState
+        var hostileEarlyGalleryState = try XCTUnwrap(
+            hostileDeathBeforeScript028[
+                "trainingGalleryBarrierState"
+            ] as? [String: Any]
+        )
+        hostileEarlyGalleryState["markerLightDistance"] = 50
+        hostileDeathBeforeScript028[
+            "trainingGalleryBarrierState"
+        ] = hostileEarlyGalleryState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject:
+                            hostileDeathBeforeScript028
+                    )
+                ),
+                resumedAtTimestamp: 650
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var hostileVisibleDestroyedBot = script028Continuation
+        var hostileVisibleManeuver = script028Maneuver
+        var hostileVisibleDestruction = script028Destruction
+        hostileVisibleDestruction["destroyBot2IsVisible"] = true
+        var hostileVisibleDestroyBot1 =
+            postDeathDestroyBot1State
+        var hostileVisibleMotion = postDeathDestroyBot2Motion
+        hostileVisibleMotion["activePathIndex"] =
+            handoff.movingPathIndex
+        hostileVisibleDestroyBot1["destroyBot2Motion"] =
+            hostileVisibleMotion
+        hostileVisibleDestruction["destroyBot1Destruction"] =
+            hostileVisibleDestroyBot1
+        hostileVisibleManeuver["destruction"] =
+            hostileVisibleDestruction
+        hostileVisibleDestroyedBot[
+            "trainingManeuverFollowState"
+        ] = hostileVisibleManeuver
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject:
+                            hostileVisibleDestroyedBot
+                    )
+                ),
+                resumedAtTimestamp: 650
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
         var hostileScript028 = script028Continuation
         var hostileScript028Maneuver = script028Maneuver
         var hostileScript028Destruction = script028Destruction
@@ -8002,9 +8384,13 @@ final class WorldRenderingTests: XCTestCase {
         )
         let silent = restored.update(at: 100.25, input: .zero)
         XCTAssertTrue(silent.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(
-            silent.trainingMovingTarget?.activePathIndex,
-            handoff.movingPathIndex
+        XCTAssertNil(silent.trainingMovingTarget)
+        XCTAssertFalse(restored.level.objects.contains {
+            $0.handle == handoff.destroyBot2ObjectHandle
+        })
+        assertTrainingGalleryBarrier(
+            level: restored.level,
+            rendersFaces: false
         )
     }
 
@@ -19109,8 +19495,12 @@ private func assertTrainingGalleryBarrier(
     file: StaticString = #filePath,
     line: UInt = #line
 ) {
-    let room = level.rooms.first { $0.sourceIndex == 2 }!
-    for portal in room.portals {
+    let barrier = level.trainingGalleryBarrier!
+    let room = level.rooms.first {
+        $0.sourceIndex == barrier.barrierRoomSourceIndex
+    }!
+    for portalIndex in barrier.orderedPortalIndices {
+        let portal = room.portals[portalIndex]
         XCTAssertEqual(
             portal.flags & 1 != 0,
             rendersFaces,

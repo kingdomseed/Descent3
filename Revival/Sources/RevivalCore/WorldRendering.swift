@@ -125,10 +125,11 @@ func trainingPlayerControlMask(
     controlsWereRestored: Bool,
     openingControls: PlayerControlMask?
 ) -> PlayerControlMask {
+    if controlsWereRestored {
+        return .all
+    }
     if galleryWasTriggered {
-        return controlsWereRestored
-            ? .all
-            : PlayerControlMask(rawValue: 0)
+        return PlayerControlMask(rawValue: 0)
     }
     return openingControls ?? .all
 }
@@ -1698,13 +1699,6 @@ final class PlayerSimulation {
             }
             openTrainingFinishCoursePortals(in: &continuationLevel)
         }
-        if continuation.trainingRobotGuidebotState?.robotWasDestroyed == true {
-            let chain = continuationLevel.trainingRobotGuidebotChain!
-            continuationLevel.objects.removeAll {
-                $0.handle == chain.destroyRobotObjectHandle
-            }
-            openTrainingGalleryBarrier(in: &continuationLevel)
-        }
         if let cameraState = continuation.trainingCameraMonitorState,
            let chain = continuationLevel.trainingCameraMonitorChain {
             if cameraState.isHeld || cameraState.wasUsed {
@@ -2436,6 +2430,8 @@ final class PlayerSimulation {
         }
         guard validTrainingManeuverFollowContinuation(
             restoredManeuverFollowState,
+            robotGuidebotState:
+                continuation.trainingRobotGuidebotState,
             level: continuationLevel
         ) else {
             throw PlayerSimulationContinuationError.invalidState
@@ -2577,6 +2573,20 @@ final class PlayerSimulation {
                         destroyBot2Motion.orientation
                 }
             }
+        }
+        if continuation.trainingRobotGuidebotState?
+            .robotWasDestroyed == true
+        {
+            let chain = restoredLevel.trainingRobotGuidebotChain!
+            restoredLevel.objects.removeAll {
+                $0.handle == chain.destroyRobotObjectHandle
+            }
+            setObjectPresentationVisibility(
+                in: &restoredLevel,
+                handle: chain.destroyRobotObjectHandle,
+                isVisible: false
+            )
+            openTrainingGalleryBarrier(in: &restoredLevel)
         }
         let binding = restoredLevel.defaultPlayerBinding!
         let objectIndex = restoredLevel.objects.firstIndex {
@@ -3312,18 +3322,44 @@ final class PlayerSimulation {
         else {
             return
         }
-        level.objects.removeAll { $0.handle == handle }
-        openTrainingGalleryBarrier(in: &level)
+        state.destructionTimerRemaining = chain.destructionDelay
         if var galleryState = trainingGalleryBarrierState {
             galleryState.markerLightDistance =
                 level.trainingGalleryBarrier!.openMarkerLightDistance
             trainingGalleryBarrierState = galleryState
         }
-        state.robotWasDestroyed = true
-        state.robotShields = min(state.robotShields, -0.000_001)
+        openTrainingGalleryBarrier(in: &level)
         state.controlsWereRestored = true
-        state.destructionTimerRemaining = chain.destructionDelay
+        state.robotShields = min(state.robotShields, -0.000_001)
+        state.robotWasDestroyed = true
         trainingRobotGuidebotState = state
+
+        if let handoff =
+                level.trainingDodgeAttempt?.maneuverFollow?
+                    .destructionHandoff,
+           handle == handoff.destroyBot2ObjectHandle,
+           var maneuverState = trainingManeuverFollowState,
+           var destruction = maneuverState.destruction,
+           var destroyBot1Destruction =
+                destruction.destroyBot1Destruction
+        {
+            destruction.destroyBot2IsVisible = false
+            destroyBot1Destruction.destroyBot2Motion.velocity = .zero
+            destroyBot1Destruction.destroyBot2Motion.activePathIndex =
+                nil
+            destroyBot1Destruction.destroyBot2Motion.pathNodeIndex = 0
+            destroyBot1Destruction.destroyBot2Motion.pathFailure = nil
+            destruction.destroyBot1Destruction =
+                destroyBot1Destruction
+            maneuverState.destruction = destruction
+            trainingManeuverFollowState = maneuverState
+        }
+        setObjectPresentationVisibility(
+            in: &level,
+            handle: handle,
+            isVisible: false
+        )
+        level.objects.removeAll { $0.handle == handle }
     }
 
     func destroyTrainingRASBot1(handle: UInt32) {
@@ -3622,6 +3658,7 @@ final class PlayerSimulation {
         }
         var followBotTimer11StartedThisFrame = false
         var destroyBot2PathStartedThisFrame = false
+        var destructionTimer12StartedThisFrame = false
         if var state = trainingRobotGuidebotState,
            let chain = level.trainingRobotGuidebotChain {
             let combat = chain.combat
@@ -3683,9 +3720,26 @@ final class PlayerSimulation {
                     $0.handle == handoff.destroyBot1ObjectHandle
                 }
             }
-            let robot = level.objects.first {
-                $0.handle == chain.destroyRobotObjectHandle
-                    && handoff == nil
+            let robot = level.objects.first { robot in
+                guard robot.handle
+                        == chain.destroyRobotObjectHandle
+                else {
+                    return false
+                }
+                guard let handoff else {
+                    return true
+                }
+                return robot.handle
+                        == handoff.destroyBot2ObjectHandle
+                    && destroyBot1DestructionState?
+                        .script028Count ?? 0 > 0
+                    && destroyBot1DestructionState?
+                        .destroyBot1WasDestroyed == true
+                    && followBotDestructionState?
+                        .destroyBot2IsVisible == true
+                    && destroyBot1DestructionState?
+                        .destroyBot2Motion.activePathIndex
+                        == handoff.movingPathIndex
             }
             let rasBot1Chain = level.trainingRASBot1DeathChain
             let rasBot1 = rasBot1Chain.flatMap { rasBot1Chain in
@@ -4203,6 +4257,7 @@ final class PlayerSimulation {
             }
             if robotWasKilled {
                 destroyTrainingRobot(handle: chain.destroyRobotObjectHandle)
+                destructionTimer12StartedThisFrame = true
             }
             if rasBot1WasKilled {
                 destroyTrainingRASBot1(
@@ -5946,7 +6001,9 @@ final class PlayerSimulation {
             }
             if var timer = state.destructionTimerRemaining,
                !state.destructionFeedbackWasPresented {
-                timer -= systemsFrameDuration
+                if !destructionTimer12StartedThisFrame {
+                    timer -= systemsFrameDuration
+                }
                 if timer <= 0.000_001 {
                     trainingOpeningFeedback.append(.init(
                         hudMessages: [
@@ -6702,6 +6759,7 @@ private func validTrainingGalleryBarrierContinuation(
 
 private func validTrainingManeuverFollowContinuation(
     _ state: TrainingManeuverFollowState?,
+    robotGuidebotState: TrainingRobotGuidebotState?,
     level: Level
 ) -> Bool {
     guard let lesson =
@@ -6757,6 +6815,7 @@ private func validTrainingManeuverFollowContinuation(
             state.destruction,
             maneuverState: state,
             lesson: lesson,
+            robotGuidebotState: robotGuidebotState,
             level: level
         )
     guard [
@@ -6833,6 +6892,7 @@ private func validTrainingDestroyBot1DestructionContinuation(
     script027Count: Int,
     lesson: TrainingManeuverFollowLesson,
     handoff: TrainingFollowBotDestructionHandoff,
+    robotGuidebotState: TrainingRobotGuidebotState?,
     level: Level
 ) -> Bool {
     guard let state else {
@@ -6878,6 +6938,17 @@ private func validTrainingDestroyBot1DestructionContinuation(
     else {
         return false
     }
+    if robotGuidebotState?.robotWasDestroyed == true {
+        return state.script028Count > 0
+            && state.destroyBot2Motion.activePathIndex == nil
+            && state.destroyBot2Motion.pathNodeIndex == 0
+            && state.destroyBot2Motion.velocity == .zero
+            && state.destroyBot2Motion.pathFailure == nil
+            && sourceConvexRoomContains(
+                state.destroyBot2Motion.position,
+                in: destroyBot2Room
+            )
+    }
     return state.script028Count > 0
         ? state.destroyBot2Motion.activePathIndex
             == handoff.movingPathIndex
@@ -6899,6 +6970,7 @@ private func validTrainingFollowBotDestructionContinuation(
     _ state: TrainingFollowBotDestructionState?,
     maneuverState: TrainingManeuverFollowState,
     lesson: TrainingManeuverFollowLesson,
+    robotGuidebotState: TrainingRobotGuidebotState?,
     level: Level
 ) -> Bool {
     guard let handoff = lesson.destructionHandoff else {
@@ -6937,7 +7009,8 @@ private func validTrainingFollowBotDestructionContinuation(
             == ((
                 state.destroyBot1Destruction?
                     .script028Count ?? 0
-            ) > 0),
+            ) > 0
+                && robotGuidebotState?.robotWasDestroyed != true),
           state.destroyBot1IsVisible
             == (
                 state.script027Count > 0
@@ -6989,9 +7062,35 @@ private func validTrainingFollowBotDestructionContinuation(
               script027Count: state.script027Count,
               lesson: lesson,
               handoff: handoff,
+              robotGuidebotState: robotGuidebotState,
               level: level
           )
     else {
+        return false
+    }
+    if let destroyBot1Destruction =
+            state.destroyBot1Destruction
+    {
+        if robotGuidebotState?.robotWasDestroyed == true {
+            guard destroyBot1Destruction.script028Count > 0,
+                  destroyBot1Destruction
+                    .destroyBot1WasDestroyed else {
+                return false
+            }
+        } else if destroyBot1Destruction.script028Count == 0 {
+            guard robotGuidebotState?.robotShields
+                    == level.trainingRobotGuidebotChain?
+                        .combat.robotShields else {
+                return false
+            }
+        } else {
+            guard let robotGuidebotState,
+                  !robotGuidebotState.robotWasDestroyed,
+                  robotGuidebotState.robotShields >= 0 else {
+                return false
+            }
+        }
+    } else if robotGuidebotState?.robotWasDestroyed == true {
         return false
     }
     return state.script027Count > 0
