@@ -1,0 +1,49 @@
+docs/revival/behavior-system.md
+  s_22bcf288d82718::t_23bb7e7796dd4e 23
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_22bcf288d82718::t_e7ff6cfc689c90 2589-2590,2593-2597,5861-5864,6759,6761,6768-6769,7509-7515
+  s_22bcf288d82718::t_dc70ce6ac5c243 2591-2592,6762-6767
+docs/revival/source-translation-ledger.md
+  s_22bcf288d82718::t_23bb7e7796dd4e 1497,1501
+  s_22bcf288d82718::t_abdbe413cd6e46 1504
+  s_22bcf288d82718::t_018dd8ba585d1b 1484-1496,1498-1500,1505
+  s_22bcf288d82718::t_c6949a9f0ca96f 1502-1503
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_22bcf288d82718::t_713f110cdd25d6 6511-6523,6525
+  s_22bcf288d82718::t_e7ff6cfc689c90 6314
+  s_22bcf288d82718::t_7021bbb954ce32 6269-6313,6315-6450
+  s_22bcf288d82718::t_e89d8df10432e5 6451-6485,6503-6508,6510,6524,6526-6541
+  s_22bcf288d82718::t_3e26b4b2cf4cf7 6486-6502,6509
+docs/revival/functional-completeness-ledger.md
+  s_22bcf288d82718::t_018dd8ba585d1b 204,422-426,428-429
+  s_22bcf288d82718::t_23bb7e7796dd4e 202,427
+  s_22bcf288d82718::t_0d3ac92be46dc1 430
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_3a3ce457f844a7 28
+  s_c503f7c0529e13::t_b1ac88bf45608b 22-24,27,29,31,65-67,201,253
+  s_c503f7c0529e13::t_af642a7d348ca9 254
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "7c0b314049fa813c32179aaeee5bfe4f772c8f12",
+  "prompts": {},
+  "sessions": {
+    "s_22bcf288d82718": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fb113-b38f-7bc1-be90-68688c01797d",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
