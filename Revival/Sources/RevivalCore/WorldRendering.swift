@@ -1073,6 +1073,15 @@ private struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
     var guidebot: TrainingGuidebotRuntimeState?
     var guidebotContinuationWasPresented = false
     var activeGoalWasReached: Bool? = nil
+    var guidebotMode: TrainingGuidebotMode? = nil
+    var guidebotModeTime: Float? = nil
+    var nextAmbientTime: Float? = nil
+    var timeUntilNextPlayerVisibilityCheck: Float? = nil
+    var timeUntilNextFlare: Float? = nil
+    var nextPowerupCheckTime: Float? = nil
+    var lastMessageSoundTime: Float? = nil
+    var returnTime: Float? = nil
+    var returnGreetingWasPresented: Bool? = nil
     var returnWasRequested = false
     var guidebotEnteredShip = false
     var arrivalFeedbackWasPresented = false
@@ -1169,11 +1178,18 @@ private enum TrainingGuidebotTask: String, Codable, Equatable, Sendable {
     case outbound
     case activeGoal
     case returnToPlayer
+    case escortPlayer
     case returnToShip
+}
+
+private enum TrainingGuidebotMode: String, Codable, Equatable, Sendable {
+    case birth
+    case ambient
 }
 
 private enum TrainingGuidebotAdvanceEvent: Equatable {
     case reachedActiveGoal
+    case returnedToPlayer
     case enteredShip
 }
 
@@ -1452,6 +1468,7 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     let afterburnerMagnitude: Float
     let wiggleFalloff: Float
     let lastThrustTime: Float
+    fileprivate let authoritativeRandomState: UInt32?
     fileprivate let shields: Float?
     fileprivate let trainingOpeningState: TrainingOpeningState?
     fileprivate let trainingDodgeAttemptState: TrainingDodgeAttemptState?
@@ -1529,6 +1546,7 @@ final class PlayerSimulation {
 
     private var lastTimestamp: Double
     private var lastThrustTime: Float = 0
+    private var authoritativeRandomState: UInt32
     private var pauseDepth = 0
     private var pauseTimestamp: Double?
     private var trainingOpeningState: TrainingOpeningState?
@@ -1558,10 +1576,15 @@ final class PlayerSimulation {
     private var trainingFinalGoalState: TrainingFinalGoalState?
     private var trainingPostLevelResult: TrainingPostLevelResult?
 
-    init(level: Level, presentationReadyTimestamp: Double) {
+    init(
+        level: Level,
+        presentationReadyTimestamp: Double,
+        authoritativeRandomSeed: UInt32 = 1
+    ) {
         precondition(presentationReadyTimestamp.isFinite)
         precondition(level.defaultPlayerBinding != nil)
         self.level = level
+        authoritativeRandomState = authoritativeRandomSeed
         let binding = level.defaultPlayerBinding!
         let ship = level.shipDefinitions.first { $0.source == binding.ship }!
         angularVelocity = ship.physics.initialAngularVelocity
@@ -1591,7 +1614,10 @@ final class PlayerSimulation {
             )
         }
         trainingRobotGuidebotState = level.trainingRobotGuidebotChain.map {
-            TrainingRobotGuidebotState(robotShields: $0.combat.robotShields)
+            TrainingRobotGuidebotState(
+                robotShields: $0.combat.robotShields,
+                lastMessageSoundTime: 0
+            )
         }
         trainingCameraMonitorState = level.trainingCameraMonitorChain.map {
             _ in TrainingCameraMonitorState()
@@ -1662,6 +1688,48 @@ final class PlayerSimulation {
         guard continuation.levelKey == level.levelKey,
               continuation.levelSHA256 == level.source.levelSHA256 else {
             throw PlayerSimulationContinuationError.levelIdentityMismatch
+        }
+        let hasPersistedAuthoritativeRandomState =
+            continuation.authoritativeRandomState != nil
+        authoritativeRandomState =
+            continuation.authoritativeRandomState ?? 1
+        var restoredRobotGuidebotState =
+            continuation.trainingRobotGuidebotState
+        if var state = restoredRobotGuidebotState {
+            let hasReachedTimingState =
+                state.guidebotMode != nil
+                || state.guidebotModeTime != nil
+                || state.nextAmbientTime != nil
+                || state.timeUntilNextPlayerVisibilityCheck != nil
+                || state.timeUntilNextFlare != nil
+                || state.nextPowerupCheckTime != nil
+                || state.lastMessageSoundTime != nil
+                || state.returnTime != nil
+                || state.returnGreetingWasPresented != nil
+            if hasReachedTimingState
+                && !hasPersistedAuthoritativeRandomState
+            {
+                throw PlayerSimulationContinuationError.invalidState
+            }
+            if (state.guidebot != nil || state.guidebotEnteredShip),
+               state.guidebotMode == nil {
+                guard !hasPersistedAuthoritativeRandomState,
+                      !hasReachedTimingState,
+                      state.guidebot?.task != .escortPlayer
+                else {
+                    throw PlayerSimulationContinuationError.invalidState
+                }
+                state.guidebotMode = .ambient
+                state.guidebotModeTime = 0
+                state.nextAmbientTime = continuation.gameTime + 1
+                state.timeUntilNextPlayerVisibilityCheck = 0.5
+                state.timeUntilNextFlare = 3
+                state.nextPowerupCheckTime = continuation.gameTime + 2
+                state.lastMessageSoundTime = continuation.gameTime
+                state.returnTime = continuation.gameTime
+                state.returnGreetingWasPresented = false
+                restoredRobotGuidebotState = state
+            }
         }
         let restoredCloakPickupState =
             continuation.trainingCloakPickupState
@@ -2087,15 +2155,16 @@ final class PlayerSimulation {
             validTrainingGalleryBarrierContinuation(
                 continuation.trainingGalleryBarrierState,
             robotGuidebotState:
-                continuation.trainingRobotGuidebotState,
+                restoredRobotGuidebotState,
             level: continuationLevel
         ),
         validTrainingRobotGuidebotContinuation(
-            continuation.trainingRobotGuidebotState,
+            restoredRobotGuidebotState,
             galleryState: continuation.trainingGalleryBarrierState,
             cameraState: continuation.trainingCameraMonitorState,
             playerLocation: continuation.playerLocation,
             playerPosition: continuation.playerPosition,
+            gameTime: continuation.gameTime,
             level: routeAllocationLevel
         ) else {
             throw PlayerSimulationContinuationError.invalidState
@@ -2522,7 +2591,7 @@ final class PlayerSimulation {
         guard validTrainingManeuverFollowContinuation(
             restoredManeuverFollowState,
             robotGuidebotState:
-                continuation.trainingRobotGuidebotState,
+                restoredRobotGuidebotState,
             level: continuationLevel
         ) else {
             throw PlayerSimulationContinuationError.invalidState
@@ -2715,7 +2784,7 @@ final class PlayerSimulation {
         trainingGalleryBarrierState =
             continuation.trainingGalleryBarrierState
         trainingRobotGuidebotState =
-            continuation.trainingRobotGuidebotState
+            restoredRobotGuidebotState
         trainingCameraMonitorState =
             continuation.trainingCameraMonitorState
         trainingKillbotEntryState =
@@ -2781,6 +2850,7 @@ final class PlayerSimulation {
             afterburnerMagnitude: afterburnerMagnitude,
             wiggleFalloff: wiggleFalloff,
             lastThrustTime: lastThrustTime,
+            authoritativeRandomState: authoritativeRandomState,
             shields: shields,
             trainingOpeningState: trainingOpeningState,
             trainingDodgeAttemptState: trainingDodgeAttemptState,
@@ -3122,6 +3192,158 @@ final class PlayerSimulation {
         trainingCameraMonitorActiveGoalTarget() != nil
     }
 
+    private func nextAuthoritativeRandomValue() -> UInt32 {
+        authoritativeRandomState =
+            authoritativeRandomState &* 214_013 &+ 2_531_011
+        return (authoritativeRandomState >> 16) & 0x7fff
+    }
+
+    private func nextAuthoritativeRandomFraction() -> Float {
+        Float(nextAuthoritativeRandomValue()) / 32_767
+    }
+
+    private func reinitializeTrainingGuidebotAmbient(
+        at gameTime: Float,
+        state: inout TrainingRobotGuidebotState
+    ) {
+        state.nextAmbientTime = gameTime + 1
+        _ = nextAuthoritativeRandomValue() % 6
+    }
+
+    private func setTrainingGuidebotMode(
+        _ mode: TrainingGuidebotMode,
+        at gameTime: Float,
+        state: inout TrainingRobotGuidebotState
+    ) {
+        state.guidebotMode = mode
+        state.guidebotModeTime = 0
+        state.timeUntilNextFlare =
+            3 + nextAuthoritativeRandomFraction()
+        state.timeUntilNextPlayerVisibilityCheck =
+            0.5 + 0.5 * nextAuthoritativeRandomFraction()
+        state.returnTime = gameTime
+        switch mode {
+        case .birth:
+            state.nextAmbientTime = gameTime + 1.2
+        case .ambient:
+            reinitializeTrainingGuidebotAmbient(
+                at: gameTime,
+                state: &state
+            )
+        }
+    }
+
+    private func advanceTrainingGuidebotTiming(
+        duration: Float,
+        gameTime: Float
+    ) {
+        guard duration > 0,
+              var state = trainingRobotGuidebotState,
+              let guidebot = state.guidebot,
+              guidebot.task != .escortPlayer,
+              guidebot.task != .returnToShip,
+              let mode = state.guidebotMode,
+              var modeTime = state.guidebotModeTime
+        else {
+            return
+        }
+
+        if mode == .ambient,
+           (state.nextPowerupCheckTime ?? 0) <= gameTime {
+            state.nextPowerupCheckTime =
+                gameTime + 2 + nextAuthoritativeRandomFraction()
+        }
+
+        modeTime += duration
+        state.guidebotModeTime = modeTime
+        if mode == .birth {
+            if modeTime > 1.2 {
+                setTrainingGuidebotMode(
+                    .ambient,
+                    at: gameTime,
+                    state: &state
+                )
+            }
+            trainingRobotGuidebotState = state
+            return
+        }
+
+        if gameTime > (state.nextAmbientTime ?? gameTime + 1) {
+            reinitializeTrainingGuidebotAmbient(
+                at: gameTime,
+                state: &state
+            )
+        }
+
+        var visibility =
+            (state.timeUntilNextPlayerVisibilityCheck ?? 0.5)
+                - duration
+        if visibility <= 0 {
+            visibility =
+                0.5 + 0.5 * nextAuthoritativeRandomFraction()
+        }
+        state.timeUntilNextPlayerVisibilityCheck = visibility
+
+        var flare = (state.timeUntilNextFlare ?? 3) - duration
+        if flare <= 0 {
+            flare = 3 + nextAuthoritativeRandomFraction()
+        }
+        state.timeUntilNextFlare = flare
+        trainingRobotGuidebotState = state
+    }
+
+    private func trainingGuidebotFeedback(
+        _ message: String,
+        requestedSoundSourceName: String?,
+        at gameTime: Float
+    ) -> TrainingOpeningFeedback {
+        var state = trainingRobotGuidebotState!
+        var soundSourceName: String?
+        if (state.lastMessageSoundTime ?? 0) + 2.5 < gameTime {
+            state.lastMessageSoundTime = gameTime
+            soundSourceName = requestedSoundSourceName
+        }
+        trainingRobotGuidebotState = state
+        return .init(
+            hudMessages: [message],
+            voiceSourceName: "",
+            voicePrecedesHUDMessages: true,
+            soundSourceName: soundSourceName
+        )
+    }
+
+    private func completeTrainingGuidebotReturn(
+        at gameTime: Float
+    ) -> TrainingOpeningFeedback? {
+        guard var state = trainingRobotGuidebotState,
+              state.guidebot?.task == .escortPlayer,
+              state.returnGreetingWasPresented != true
+        else {
+            return nil
+        }
+        var feedback: TrainingOpeningFeedback?
+        if state.activeGoalWasReached == true {
+            let greeting = nextAuthoritativeRandomValue() % 100 > 50
+                ? "GB: Come on!"
+                : "GB: Let's go!"
+            trainingRobotGuidebotState = state
+            feedback = trainingGuidebotFeedback(
+                greeting,
+                requestedSoundSourceName:
+                    level.trainingCameraMonitorChain?.returnToShip?
+                        .greetingSoundSourceName,
+                at: gameTime
+            )
+            state = trainingRobotGuidebotState!
+        }
+        state.timeUntilNextFlare =
+            3 + nextAuthoritativeRandomFraction()
+        state.returnTime = gameTime
+        state.returnGreetingWasPresented = true
+        trainingRobotGuidebotState = state
+        return feedback
+    }
+
     private func trainingCameraMonitorActiveGoalTarget()
         -> PlacedObject?
     {
@@ -3129,6 +3351,7 @@ final class PlayerSimulation {
               state.guidebotContinuationWasPresented,
               state.guidebotIsDeployed,
               !state.guidebotEnteredShip,
+              state.guidebotMode == .ambient,
               state.guidebot?.task == .outbound,
               let cameraState = trainingCameraMonitorState,
               !cameraState.isHeld,
@@ -3141,7 +3364,9 @@ final class PlayerSimulation {
         return target
     }
 
-    private func requestTrainingGuidebotActiveGoal()
+    private func requestTrainingGuidebotActiveGoal(
+        at gameTime: Float
+    )
         -> TrainingOpeningFeedback?
     {
         guard let target = trainingCameraMonitorActiveGoalTarget(),
@@ -3155,12 +3380,6 @@ final class PlayerSimulation {
         else {
             return nil
         }
-        let acknowledgement = TrainingOpeningFeedback(
-            hudMessages: ["GB: On my way!"],
-            voiceSourceName: "",
-            voicePrecedesHUDMessages: true,
-            soundSourceName: soundSourceName
-        )
         let startForward = normalized(
             guidebot.velocity == .zero
                 ? guidebot.orientation.forward
@@ -3191,12 +3410,17 @@ final class PlayerSimulation {
         state.activeGoalWasReached = false
         state.guidebot = guidebot
         trainingRobotGuidebotState = state
-        return acknowledgement
+        return trainingGuidebotFeedback(
+            "GB: On my way!",
+            requestedSoundSourceName: soundSourceName,
+            at: gameTime
+        )
     }
 
     private func deployTrainingGuidebot(
         from player: PlacedObject,
-        playerVelocity: Vector3
+        playerVelocity: Vector3,
+        gameTime: Float
     ) {
         guard var state = trainingRobotGuidebotState,
               !state.guidebotIsDeployed,
@@ -3253,6 +3477,16 @@ final class PlayerSimulation {
             routeDestination: destination,
             routeDestinationRoomSourceIndex: roomSourceIndex
         )
+        state.nextPowerupCheckTime =
+            state.nextPowerupCheckTime ?? 0
+        state.lastMessageSoundTime =
+            state.lastMessageSoundTime ?? 0
+        state.returnGreetingWasPresented = false
+        setTrainingGuidebotMode(
+            .birth,
+            at: gameTime,
+            state: &state
+        )
         trainingRobotGuidebotState = state
         restoreTrainingGuidebotPresentation()
     }
@@ -3298,6 +3532,15 @@ final class PlayerSimulation {
               var guidebot = state.guidebot,
               let definition = level.trainingRobotGuidebotChain?.guidebot
         else {
+            return nil
+        }
+        if guidebot.task == .escortPlayer {
+            guidebot.velocity = .zero
+            guidebot.destination = player.position
+            guidebot.activeSteeringMode = .stopped
+            state.guidebot = guidebot
+            trainingRobotGuidebotState = state
+            restoreTrainingGuidebotPresentation()
             return nil
         }
         if guidebot.task == .returnToPlayer
@@ -3389,6 +3632,8 @@ final class PlayerSimulation {
         case .returnToPlayer:
             goalCircleDistance =
                 30 + definition.collisionRadius + playerRadius + 0.1
+        case .escortPlayer:
+            goalCircleDistance = definition.goalCircleDistance
         }
         let reachedGoal =
             isFinalRoutePoint
@@ -3472,6 +3717,16 @@ final class PlayerSimulation {
             trainingRobotGuidebotState = state
             restoreTrainingGuidebotPresentation()
             return .reachedActiveGoal
+        }
+        if guidebot.task == .returnToPlayer, reachedGoal {
+            guidebot.velocity = .zero
+            guidebot.destination = player.position
+            guidebot.activeSteeringMode = .stopped
+            guidebot.task = .escortPlayer
+            state.guidebot = guidebot
+            trainingRobotGuidebotState = state
+            restoreTrainingGuidebotPresentation()
+            return .returnedToPlayer
         }
         if guidebot.task == .returnToShip,
            case let .room(playerRoomSourceIndex) = player.location,
@@ -3892,12 +4147,18 @@ final class PlayerSimulation {
                 guidebotReturnWasRequestedThisFrame =
                     requestTrainingGuidebotReturn(to: object)
             } else {
-                deployTrainingGuidebot(from: object, playerVelocity: velocity)
+                deployTrainingGuidebot(
+                    from: object,
+                    playerVelocity: velocity,
+                    gameTime: systemsGameTime
+                )
             }
         }
         if input.requestsTrainingGuidebotActiveGoal {
             guidebotActiveGoalFeedback =
-                requestTrainingGuidebotActiveGoal()
+                requestTrainingGuidebotActiveGoal(
+                    at: systemsGameTime
+                )
         }
         let ship = level.shipDefinitions.first { $0.source == binding.ship }!
         guard case let .room(startRoom) = object.location else {
@@ -5113,6 +5374,10 @@ final class PlayerSimulation {
         }!
         level.objects[movedPlayerIndex].position = position
         level.objects[movedPlayerIndex].location = .room(roomSourceIndex)
+        advanceTrainingGuidebotTiming(
+            duration: systemsFrameDuration,
+            gameTime: systemsGameTime
+        )
         let guidebotAdvanceEvent = advanceTrainingGuidebot(
             duration: systemsFrameDuration,
             player: level.objects[movedPlayerIndex],
@@ -5133,14 +5398,19 @@ final class PlayerSimulation {
            let soundSourceName =
                 level.trainingCameraMonitorChain?.returnToShip?
                     .returnSoundSourceName {
-            trainingOpeningFeedback.append(.init(
-                hudMessages: [
+            trainingOpeningFeedback.append(
+                trainingGuidebotFeedback(
                     "GB: I am at the goal, coming back to get you.",
-                ],
-                voiceSourceName: "",
-                voicePrecedesHUDMessages: true,
-                soundSourceName: soundSourceName
-            ))
+                    requestedSoundSourceName: soundSourceName,
+                    at: systemsGameTime
+                )
+            )
+        }
+        if guidebotAdvanceEvent == .returnedToPlayer,
+           let greeting = completeTrainingGuidebotReturn(
+               at: systemsGameTime
+           ) {
+            trainingOpeningFeedback.append(greeting)
         }
         if var dodgeState = trainingDodgeAttemptState,
             let dodge = level.trainingDodgeAttempt
@@ -6037,12 +6307,13 @@ final class PlayerSimulation {
             let chain = level.trainingCameraMonitorChain?.returnToShip
         {
             trainingOpeningFeedback.append(
-                .init(
-                    hudMessages: [chain.returnMessage],
-                voiceSourceName: "",
-                voicePrecedesHUDMessages: true,
-                soundSourceName: chain.returnSoundSourceName
-            ))
+                trainingGuidebotFeedback(
+                    chain.returnMessage,
+                    requestedSoundSourceName:
+                        chain.returnSoundSourceName,
+                    at: systemsGameTime
+                )
+            )
         }
         if guidebotEnteredShipThisFrame,
            let chain = level.trainingCameraMonitorChain?.returnToShip {
@@ -7678,6 +7949,7 @@ private func validTrainingRobotGuidebotContinuation(
     cameraState: TrainingCameraMonitorState?,
     playerLocation: SpatialLocation,
     playerPosition: Vector3,
+    gameTime: Float,
     level: Level
 ) -> Bool {
     guard let chain = level.trainingRobotGuidebotChain else {
@@ -7777,6 +8049,57 @@ private func validTrainingRobotGuidebotContinuation(
     else {
         return false
     }
+    let hasAnyGuidebotTiming =
+        state.guidebotMode != nil
+        || state.guidebotModeTime != nil
+        || state.nextAmbientTime != nil
+        || state.timeUntilNextPlayerVisibilityCheck != nil
+        || state.timeUntilNextFlare != nil
+        || state.nextPowerupCheckTime != nil
+        || state.returnTime != nil
+        || state.returnGreetingWasPresented != nil
+    if state.guidebot != nil
+        || state.guidebotEnteredShip
+        || hasAnyGuidebotTiming
+    {
+        guard state.guidebotMode != nil,
+              let modeTime = state.guidebotModeTime,
+              modeTime.isFinite,
+              modeTime >= 0,
+              let nextAmbientTime = state.nextAmbientTime,
+              nextAmbientTime.isFinite,
+              nextAmbientTime >= 0,
+              let visibility =
+                state.timeUntilNextPlayerVisibilityCheck,
+              visibility.isFinite,
+              visibility > 0,
+              visibility <= 1,
+              let flare = state.timeUntilNextFlare,
+              flare.isFinite,
+              flare > 0,
+              flare <= 4,
+              let nextPowerupTime = state.nextPowerupCheckTime,
+              nextPowerupTime.isFinite,
+              nextPowerupTime >= 0,
+              let lastSoundTime = state.lastMessageSoundTime,
+              lastSoundTime.isFinite,
+              lastSoundTime >= 0,
+              lastSoundTime <= gameTime,
+              let returnTime = state.returnTime,
+              returnTime.isFinite,
+              returnTime >= 0,
+              state.returnGreetingWasPresented != nil
+        else {
+            return false
+        }
+    } else if let lastSoundTime = state.lastMessageSoundTime,
+              (
+                !lastSoundTime.isFinite
+                    || lastSoundTime < 0
+                    || lastSoundTime > gameTime
+              ) {
+        return false
+    }
     if state.guidebotContinuationWasPresented
         && (
             (!state.guidebotIsDeployed && !state.guidebotEnteredShip)
@@ -7821,6 +8144,7 @@ private func validTrainingRobotGuidebotContinuation(
         case .returnToPlayer:
             guard state.guidebotContinuationWasPresented,
                   state.activeGoalWasReached == true,
+                  state.returnGreetingWasPresented == false,
                   cameraState?.script058WasPresented == false,
                   !state.returnWasRequested,
                   !state.guidebotEnteredShip,
@@ -7832,9 +8156,30 @@ private func validTrainingRobotGuidebotContinuation(
             else {
                 return false
             }
+        case .escortPlayer:
+            guard state.guidebotContinuationWasPresented,
+                  state.activeGoalWasReached == true,
+                  state.returnGreetingWasPresented == true,
+                  state.guidebotMode == .ambient,
+                  !state.returnWasRequested,
+                  !state.guidebotEnteredShip,
+                  cameraState?.script058WasPresented == false,
+                  guidebot.destination == playerPosition,
+                  let flare = state.timeUntilNextFlare,
+                  flare >= 3,
+                  flare <= 4
+            else {
+                return false
+            }
         case .returnToShip:
             break
         }
+        if guidebot.task != .escortPlayer,
+           state.returnGreetingWasPresented == true {
+            return false
+        }
+    } else if state.returnGreetingWasPresented == true {
+        return false
     }
     if state.guidebotEnteredShip {
         guard !state.guidebotIsDeployed,

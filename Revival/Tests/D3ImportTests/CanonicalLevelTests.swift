@@ -3683,6 +3683,7 @@ final class CanonicalLevelTests: XCTestCase {
                 openMarkerLightDistance: 50,
                 returnMessage: "GB: Returning to ship.",
                 returnSoundSourceName: "GBotAcceptOrder.wav",
+                greetingSoundSourceName: "GBotGreetB.wav",
                 arrivalMessage: "GB: Entering ship!",
                 successMessage: "Excellent!",
                 successVoiceSourceName: "proceed6.osf",
@@ -3799,6 +3800,21 @@ final class CanonicalLevelTests: XCTestCase {
                 "47e38dfcb285be1b8d19d59929fef1b1122c1772a0cca2e6fe2b1721e5876b17",
             importVolume: 0.45
         )
+        let greetingSound = CanonicalSoundClip(
+            logicalName: "GBotGreetB1",
+            sourceName: "GBotGreetB.wav",
+            sourceEntryIndex: 1_268,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 16_046,
+            pcm16LittleEndian: Data(),
+            pcmSHA256:
+                "ec585e440bb7cc07550cd9402b6b1dc69831dd00ade8052572a5cb2383fcb2fe",
+            sourceArchive: "d3.hog",
+            sourceSHA256:
+                "5e2aee56e77e39592295759705671c37259ff8ca8cc9357ebac1bb38d7c004ca",
+            importVolume: 1
+        )
         let presentation = ObjectPresentationReference(
             objectHandle: 6_167,
             primaryModel: .init(
@@ -3831,6 +3847,7 @@ final class CanonicalLevelTests: XCTestCase {
                 guidebotF: guidebotF,
                 pickupSound: pickupSound,
                 returnSound: returnSound,
+                greetingSound: greetingSound,
                 objects: stockObjects,
                 objectPresentations: [presentation]
             )
@@ -3860,6 +3877,40 @@ final class CanonicalLevelTests: XCTestCase {
                 proceed6: proceed6,
                 pickupSound: pickupSound,
                 returnSound: hostileReturnSound,
+                greetingSound: greetingSound,
+                objects: stockObjects,
+                objectPresentations: [presentation]
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Camera Monitor package")
+            )
+        }
+        let hostileGreetingSound = CanonicalSoundClip(
+            logicalName: greetingSound.logicalName,
+            sourceName: greetingSound.sourceName,
+            sourceEntryIndex: greetingSound.sourceEntryIndex,
+            sampleRate: greetingSound.sampleRate,
+            channelCount: greetingSound.channelCount,
+            frameCount: greetingSound.frameCount,
+            pcm16LittleEndian: greetingSound.pcm16LittleEndian,
+            pcmSHA256: greetingSound.pcmSHA256,
+            sourceArchive: greetingSound.sourceArchive,
+            sourceSHA256: String(repeating: "0", count: 64),
+            importVolume: greetingSound.importVolume
+        )
+        XCTAssertThrowsError(
+            try validateStockTrainingCameraMonitorPackage(
+                chain: chain,
+                guidebotC: guidebotC,
+                guidebotD: guidebotD,
+                proceed6: proceed6,
+                intro6: intro6,
+                guidebotF: guidebotF,
+                pickupSound: pickupSound,
+                returnSound: returnSound,
+                greetingSound: hostileGreetingSound,
                 objects: stockObjects,
                 objectPresentations: [presentation]
             )
@@ -4089,6 +4140,105 @@ final class CanonicalLevelTests: XCTestCase {
             XCTAssertEqual(
                 $0 as? LevelValidationError,
                 .invalidDependency("Training Camera Monitor chain")
+            )
+        }
+    }
+
+    func testSchemaElevenDefaultsMissingGuidebotGreetingBinding()
+        throws
+    {
+        let level = makeTrainingRASBot1DeathLevel()
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(level)
+            ) as? [String: Any]
+        )
+        var camera = try XCTUnwrap(
+            object["trainingCameraMonitorChain"]
+                as? [String: Any]
+        )
+        var returnChain = try XCTUnwrap(
+            camera["returnToShip"] as? [String: Any]
+        )
+        returnChain.removeValue(
+            forKey: "greetingSoundSourceName"
+        )
+        camera["returnToShip"] = returnChain
+        object["trainingCameraMonitorChain"] = camera
+
+        let decoded = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+        XCTAssertEqual(decoded.schemaVersion, 11)
+        XCTAssertNil(
+            decoded.trainingCameraMonitorChain?.returnToShip?
+                .greetingSoundSourceName
+        )
+        XCTAssertNoThrow(try decoded.validate())
+    }
+
+    func testOwnedGuidebotGreetingPackagePinsCoupledSoundBoundary()
+        throws
+    {
+        let path = try XCTUnwrap(
+            ProcessInfo.processInfo.environment[
+                "REVIVAL_GUIDEBOT_GREETING_OWNED_LEVEL"
+            ],
+            "requires the ignored exact-final owned Guidebot level"
+        )
+        let level = try JSONDecoder().decode(
+            Level.self,
+            from: Data(contentsOf: URL(fileURLWithPath: path))
+        )
+        XCTAssertNoThrow(try level.validate())
+        XCTAssertEqual(
+            level.trainingCameraMonitorChain?.returnToShip?
+                .greetingSoundSourceName,
+            "GBotGreetB.wav"
+        )
+        let greeting = try XCTUnwrap(level.soundClips.first {
+            $0.logicalName == "GBotGreetB1"
+        })
+        XCTAssertEqual(greeting.sourceName, "GBotGreetB.wav")
+        XCTAssertEqual(greeting.sourceEntryIndex, 1_268)
+        XCTAssertEqual(greeting.sampleRate, 22_050)
+        XCTAssertEqual(greeting.channelCount, 1)
+        XCTAssertEqual(greeting.frameCount, 16_046)
+        XCTAssertEqual(greeting.importVolume, 1)
+        XCTAssertEqual(
+            greeting.sourceSHA256,
+            "5e2aee56e77e39592295759705671c37259ff8ca8cc9357ebac1bb38d7c004ca"
+        )
+        XCTAssertEqual(
+            greeting.pcmSHA256,
+            "ec585e440bb7cc07550cd9402b6b1dc69831dd00ade8052572a5cb2383fcb2fe"
+        )
+
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(level)
+            ) as? [String: Any]
+        )
+        var sounds = try XCTUnwrap(
+            hostileObject["soundClips"] as? [[String: Any]]
+        )
+        let greetingIndex = try XCTUnwrap(sounds.firstIndex {
+            ($0["logicalName"] as? String) == "GBotGreetB1"
+        })
+        sounds[greetingIndex]["sourceSHA256"] =
+            String(repeating: "0", count: 64)
+        hostileObject["soundClips"] = sounds
+        let hostile = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(
+                withJSONObject: hostileObject
+            )
+        )
+        XCTAssertThrowsError(try hostile.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training Camera Monitor package")
             )
         }
     }

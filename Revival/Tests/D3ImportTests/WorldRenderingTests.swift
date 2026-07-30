@@ -7262,6 +7262,556 @@ final class WorldRenderingTests: XCTestCase {
         }
     }
 
+    func testGuidebotReturnCompletionUsesPersistedAuthoritativeStreamAndCoupledGreetingFlareDraw()
+        throws
+    {
+        let initialRandomState: UInt32 = 0x1357_9BDF
+        func nextReleasedRandomState(_ state: UInt32) -> UInt32 {
+            state &* 214_013 &+ 2_531_011
+        }
+        func releasedRandomValue(_ state: UInt32) -> UInt32 {
+            (state >> 16) & 0x7fff
+        }
+        func randomState(
+            in continuation: PlayerSimulationContinuation
+        ) throws -> UInt32? {
+            let object = try XCTUnwrap(
+                JSONSerialization.jsonObject(
+                    with: JSONEncoder().encode(continuation)
+                ) as? [String: Any]
+            )
+            return (object["authoritativeRandomState"] as? NSNumber)?
+                .uint32Value
+        }
+        func guidebotState(
+            in continuation: PlayerSimulationContinuation
+        ) throws -> [String: Any] {
+            let object = try XCTUnwrap(
+                JSONSerialization.jsonObject(
+                    with: JSONEncoder().encode(continuation)
+                ) as? [String: Any]
+            )
+            return try XCTUnwrap(
+                object["trainingRobotGuidebotState"]
+                    as? [String: Any]
+            )
+        }
+        func restore(
+            _ continuation: PlayerSimulationContinuation,
+            at timestamp: Double,
+            checkpoint: String,
+            level: Level
+        ) throws -> PlayerSimulation {
+            do {
+                return try PlayerSimulation(
+                    level: level,
+                    continuation: continuation,
+                    resumedAtTimestamp: timestamp
+                )
+            } catch {
+                XCTFail(
+                    "\(checkpoint) continuation was rejected: \(error)"
+                )
+                throw error
+            }
+        }
+
+        var unboundLevel = makeTrainingRASBot1DeathLevel()
+        let playerIndex = try XCTUnwrap(unboundLevel.objects.firstIndex {
+            $0.handle == unboundLevel.defaultPlayerBinding?.objectHandle
+        })
+        let pickupIndex = try XCTUnwrap(unboundLevel.objects.firstIndex {
+            $0.handle == 6_167
+        })
+        let player = unboundLevel.objects[playerIndex]
+        let pickupPosition = Vector3(
+            x: player.position.x
+                + player.orientation.forward.x * 300,
+            y: player.position.y
+                + player.orientation.forward.y * 300,
+            z: player.position.z
+                + player.orientation.forward.z * 300
+        )
+        unboundLevel.objects[pickupIndex].location = player.location
+        unboundLevel.objects[pickupIndex].position = pickupPosition
+
+        var levelObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(unboundLevel)
+            ) as? [String: Any]
+        )
+        var cameraChain = try XCTUnwrap(
+            levelObject["trainingCameraMonitorChain"]
+                as? [String: Any]
+        )
+        var returnChain = try XCTUnwrap(
+            cameraChain["returnToShip"] as? [String: Any]
+        )
+        returnChain["greetingSoundSourceName"] = "GBotGreetB.wav"
+        cameraChain["returnToShip"] = returnChain
+        levelObject["trainingCameraMonitorChain"] = cameraChain
+        let boundLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: levelObject)
+        )
+        let greetingResource = SourceResource(
+            storedIndex: 1_268,
+            sourceName: "GBotGreetB.wav"
+        )
+        let greetingPCM = Data(repeating: 0, count: 2)
+        let greetingClip = CanonicalSoundClip(
+            logicalName: "GBotGreetB1",
+            sourceName: greetingResource.sourceName,
+            sourceEntryIndex: greetingResource.storedIndex,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 1,
+            pcm16LittleEndian: greetingPCM,
+            pcmSHA256: canonicalSHA256(greetingPCM),
+            sourceArchive: "d3.hog",
+            sourceSHA256: String(repeating: "6", count: 64),
+            importVolume: 1
+        )
+        let profileFiles = boundLevel.source.profileFiles.contains {
+            $0.relativePath == "d3.hog"
+        } ? boundLevel.source.profileFiles : boundLevel.source.profileFiles + [
+            .init(
+                relativePath: "d3.hog",
+                byteCount: 194_030_423,
+                sha256:
+                    "a0f1cb2c1a73da828a5fd4e80d6544b63da04e177dc2b894d9e6418296bc24c6"
+            ),
+        ]
+        let admittedLevel = replacing(
+            boundLevel,
+            source: replacing(
+                boundLevel.source,
+                profileFiles: profileFiles
+            ),
+            soundClips: boundLevel.soundClips + [greetingClip],
+            dependencyManifest: .init(
+                current: boundLevel.dependencyManifest.current + [
+                    .init(
+                        category: "sound",
+                        source: greetingResource,
+                        state: "canonical-pcm-imported",
+                        provenance: "synthetic canonical fixture"
+                    ),
+                ],
+                historicalEagerBaseline:
+                    boundLevel.dependencyManifest
+                        .historicalEagerBaseline
+            )
+        )
+        try admittedLevel.validate()
+        var level = admittedLevel
+        let routeRoomCenter = Vector3(
+            x: player.position.x
+                + player.orientation.forward.x * 150,
+            y: player.position.y
+                + player.orientation.forward.y * 150,
+            z: player.position.z
+                + player.orientation.forward.z * 150
+        )
+        level.rooms.append(
+            makeSourceContainmentRoom(
+                center: routeRoomCenter,
+                texture: level.surfacePhysics[0].texture,
+                sourceIndex: 39,
+                halfExtent: 400
+            )
+        )
+        level.objects[playerIndex].location = .room(39)
+        level.objects[pickupIndex].location = .room(39)
+
+        let newSession = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var startObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(newSession.continuation)
+            ) as? [String: Any]
+        )
+        startObject["gameTime"] = 30.0
+        startObject["authoritativeRandomState"] =
+            NSNumber(value: initialRandomState)
+        var galleryState = try XCTUnwrap(
+            startObject["trainingGalleryBarrierState"]
+                as? [String: Any]
+        )
+        galleryState["wasTriggered"] = true
+        galleryState["markerLightDistance"] = 0
+        startObject["trainingGalleryBarrierState"] = galleryState
+        let start = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: startObject)
+        )
+        let simulation = try restore(
+            start,
+            at: 100,
+            checkpoint: "new-session seed",
+            level: level
+        )
+
+        let deployed = simulation.update(
+            at: 100.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        XCTAssertEqual(
+            deployed.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
+                ],
+                voiceSourceName: "guidebotb.osf",
+                voicePrecedesHUDMessages: true
+            )]
+        )
+        let afterBirthFlare = nextReleasedRandomState(initialRandomState)
+        let afterBirthVisibility =
+            nextReleasedRandomState(afterBirthFlare)
+        XCTAssertEqual(
+            try randomState(in: simulation.continuation),
+            afterBirthVisibility,
+            "F4 birth must consume SetMode's flare and visibility draws."
+        )
+
+        XCTAssertFalse(simulation.trainingGuidebotGoalCommandIsAvailable)
+        let rejectedDuringBirth = simulation.update(
+            at: 100.2,
+            input: .init(requestsTrainingGuidebotActiveGoal: true)
+        )
+        XCTAssertTrue(rejectedDuringBirth.trainingOpeningFeedback.isEmpty)
+
+        let afterAmbientFlare =
+            nextReleasedRandomState(afterBirthVisibility)
+        let afterAmbientVisibility =
+            nextReleasedRandomState(afterAmbientFlare)
+        let afterAmbientDirection =
+            nextReleasedRandomState(afterAmbientVisibility)
+        let afterFirstPowerupSchedule =
+            nextReleasedRandomState(afterAmbientDirection)
+        var sawAmbientTransition = false
+        var checkedFirstAmbientFrame = false
+        var timestamp = 100.2
+        for _ in 0..<50 where !checkedFirstAmbientFrame {
+            timestamp += 0.1
+            _ = simulation.update(at: timestamp, input: .zero)
+            let state = try guidebotState(
+                in: simulation.continuation
+            )
+            if !sawAmbientTransition,
+               state["guidebotMode"] as? String == "ambient" {
+                sawAmbientTransition = true
+                XCTAssertEqual(
+                    try randomState(in: simulation.continuation),
+                    afterAmbientDirection,
+                    "Birth-to-ambient SetMode must consume flare, visibility, then direction."
+                )
+            } else if sawAmbientTransition {
+                checkedFirstAmbientFrame = true
+                XCTAssertEqual(
+                    try randomState(in: simulation.continuation),
+                    afterFirstPowerupSchedule,
+                    "The first reached ambient frame must schedule the due powerup check before later timers."
+                )
+            }
+        }
+        XCTAssertTrue(sawAmbientTransition)
+        XCTAssertTrue(checkedFirstAmbientFrame)
+        XCTAssertTrue(simulation.trainingGuidebotGoalCommandIsAvailable)
+
+        timestamp += 0.1
+        let accepted = simulation.update(
+            at: timestamp,
+            input: .init(requestsTrainingGuidebotActiveGoal: true)
+        )
+        XCTAssertEqual(accepted.trainingOpeningFeedback, [
+            .init(
+                hudMessages: ["GB: On my way!"],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "GBotAcceptOrder.wav"
+            ),
+        ])
+
+        var sawActiveGoalArrival = false
+        var resumedSimulation: PlayerSimulation?
+        var greetingFrame: PlayerSimulationFrame?
+        var resumedGreetingFrame: PlayerSimulationFrame?
+        var greetingCount = 0
+
+        for _ in 0..<300 {
+            timestamp += 0.1
+            let frame = simulation.update(at: timestamp, input: .zero)
+
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.hudMessages
+                    == ["GB: I am at the goal, coming back to get you."]
+            }) {
+                sawActiveGoalArrival = true
+                resumedSimulation = try restore(
+                    simulation.continuation,
+                    at: timestamp,
+                    checkpoint: "physical active-goal arrival",
+                    level: level
+                )
+            }
+
+            var resumedFrame: PlayerSimulationFrame?
+            if let resumedSimulation,
+               sawActiveGoalArrival,
+               !frame.trainingOpeningFeedback.contains(where: {
+                   $0.hudMessages
+                       == ["GB: I am at the goal, coming back to get you."]
+               }) {
+                resumedFrame = resumedSimulation.update(
+                    at: timestamp,
+                    input: .zero
+                )
+                XCTAssertEqual(
+                    resumedFrame?.trainingGuidebot,
+                    frame.trainingGuidebot
+                )
+                XCTAssertEqual(
+                    resumedFrame?.trainingOpeningFeedback,
+                    frame.trainingOpeningFeedback
+                )
+            }
+
+            let greetings = frame.trainingOpeningFeedback.filter {
+                $0.hudMessages == ["GB: Come on!"]
+                    || $0.hudMessages == ["GB: Let's go!"]
+            }
+            greetingCount += greetings.count
+            if let greeting = greetings.first {
+                greetingFrame = frame
+                resumedGreetingFrame = resumedFrame
+                XCTAssertEqual(
+                    greeting.soundSourceName,
+                    "GBotGreetB.wav"
+                )
+                break
+            }
+        }
+
+        XCTAssertTrue(sawActiveGoalArrival)
+        XCTAssertEqual(greetingCount, 1)
+        guard let greetingFrame else {
+            XCTFail(
+                "Physical circle-30 completion did not present the coupled Guidebot greeting."
+            )
+            return
+        }
+        XCTAssertEqual(
+            resumedGreetingFrame?.trainingOpeningFeedback,
+            greetingFrame.trainingOpeningFeedback
+        )
+        XCTAssertNotNil(greetingFrame.trainingGuidebot)
+
+        let completedContinuation = simulation.continuation
+        let completedRandomState = try XCTUnwrap(
+            try randomState(in: completedContinuation)
+        )
+        let greetingRandomState =
+            (completedRandomState &- 2_531_011) &* 0xB9B3_3155
+        let expectedGreeting =
+            releasedRandomValue(greetingRandomState) % 100 > 50
+            ? "GB: Come on!"
+            : "GB: Let's go!"
+        XCTAssertEqual(
+            greetingFrame.trainingOpeningFeedback.filter {
+                $0.hudMessages == ["GB: Come on!"]
+                    || $0.hudMessages == ["GB: Let's go!"]
+            }.map(\.hudMessages),
+            [[expectedGreeting]]
+        )
+        let completedState = try guidebotState(
+            in: completedContinuation
+        )
+        let completedGuidebot = try XCTUnwrap(
+            completedState["guidebot"] as? [String: Any]
+        )
+        XCTAssertEqual(
+            completedGuidebot["task"] as? String,
+            "escortPlayer"
+        )
+        XCTAssertEqual(
+            completedState["returnGreetingWasPresented"] as? Bool,
+            true
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                (completedState["returnTime"] as? NSNumber)?
+                    .floatValue
+            ),
+            greetingFrame.systemsGameTime,
+            accuracy: 0.000_1
+        )
+        let nextFlareDelay = try XCTUnwrap(
+            (completedState["timeUntilNextFlare"] as? NSNumber)?
+                .floatValue
+        )
+        XCTAssertEqual(
+            nextFlareDelay,
+            3
+                + Float(releasedRandomValue(completedRandomState))
+                    / 32_767,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            try randomState(
+                in: try XCTUnwrap(resumedSimulation).continuation
+            ),
+            completedRandomState,
+            "Save/restore must preserve the same event-driven stream consumption."
+        )
+
+        let afterCompletion = simulation.update(
+            at: timestamp + 0.1,
+            input: .zero
+        )
+        XCTAssertTrue(afterCompletion.trainingOpeningFeedback.isEmpty)
+        XCTAssertNotNil(afterCompletion.trainingGuidebot)
+        XCTAssertEqual(
+            try randomState(in: simulation.continuation),
+            completedRandomState,
+            "The packet stops before any later flare or ambient draw."
+        )
+
+        let restored = try restore(
+            completedContinuation,
+            at: 500,
+            checkpoint: "completed return",
+            level: level
+        )
+        let silent = restored.update(at: 500.1, input: .zero)
+        XCTAssertTrue(silent.trainingOpeningFeedback.isEmpty)
+        XCTAssertNotNil(silent.trainingGuidebot)
+        XCTAssertEqual(
+            try randomState(in: restored.continuation),
+            completedRandomState
+        )
+
+        var legacyObject = startObject
+        legacyObject.removeValue(forKey: "authoritativeRandomState")
+        var legacyRobotState = try XCTUnwrap(
+            legacyObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        for key in [
+            "guidebotMode",
+            "guidebotModeTime",
+            "nextAmbientTime",
+            "timeUntilNextPlayerVisibilityCheck",
+            "timeUntilNextFlare",
+            "nextPowerupCheckTime",
+            "lastMessageSoundTime",
+            "returnTime",
+            "returnGreetingWasPresented",
+        ] {
+            legacyRobotState.removeValue(forKey: key)
+        }
+        legacyObject["trainingRobotGuidebotState"] =
+            legacyRobotState
+        XCTAssertNoThrow(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: legacyObject
+                    )
+                ),
+                resumedAtTimestamp: 600
+            )
+        )
+
+        var missingStreamObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(completedContinuation)
+            ) as? [String: Any]
+        )
+        missingStreamObject.removeValue(
+            forKey: "authoritativeRandomState"
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: missingStreamObject
+                    )
+                ),
+                resumedAtTimestamp: 700
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var orphanedCooldownObject = legacyObject
+        var orphanedCooldownState = try XCTUnwrap(
+            orphanedCooldownObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        orphanedCooldownState["lastMessageSoundTime"] = 29.0
+        orphanedCooldownObject["trainingRobotGuidebotState"] =
+            orphanedCooldownState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: orphanedCooldownObject
+                    )
+                ),
+                resumedAtTimestamp: 800
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var futureCooldownObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(completedContinuation)
+            ) as? [String: Any]
+        )
+        var futureCooldownState = try XCTUnwrap(
+            futureCooldownObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        futureCooldownState["lastMessageSoundTime"] =
+            completedContinuation.gameTime + 1
+        futureCooldownObject["trainingRobotGuidebotState"] =
+            futureCooldownState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: futureCooldownObject
+                    )
+                ),
+                resumedAtTimestamp: 900
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
     func testCameraMonitorPickupUseAndTimedViewContinueOnceAcrossReload() throws {
         let level = makeTrainingCameraMonitorLevel()
         try level.validate()
@@ -7412,12 +7962,22 @@ final class WorldRenderingTests: XCTestCase {
             at: 0.3,
             input: .init(deploysTrainingGuidebot: true)
         )
+        let returnRandomState = try XCTUnwrap(
+            (
+                try XCTUnwrap(
+                    JSONSerialization.jsonObject(
+                        with: JSONEncoder().encode(
+                            simulation.continuation
+                        )
+                    ) as? [String: Any]
+                )["authoritativeRandomState"] as? NSNumber
+            )?.uint32Value
+        )
         XCTAssertEqual(requested.trainingOpeningFeedback, [
             .init(
                 hudMessages: ["GB: Returning to ship."],
                 voiceSourceName: "",
-                voicePrecedesHUDMessages: true,
-                soundSourceName: "GBotAcceptOrder.wav"
+                voicePrecedesHUDMessages: true
             ),
         ])
         var completed: PlayerSimulationFrame?
@@ -7460,6 +8020,22 @@ final class WorldRenderingTests: XCTestCase {
                 == level.trainingRobotGuidebotChain?.guidebotObjectHandle
                 && $0.isVisible
         })
+        let completedRandomState = try XCTUnwrap(
+            (
+                try XCTUnwrap(
+                    JSONSerialization.jsonObject(
+                        with: JSONEncoder().encode(
+                            simulation.continuation
+                        )
+                    ) as? [String: Any]
+                )["authoritativeRandomState"] as? NSNumber
+            )?.uint32Value
+        )
+        XCTAssertEqual(
+            completedRandomState,
+            returnRandomState,
+            "The deferred return-to-ship branch must not consume the authoritative stream."
+        )
         let postReturnF4 = simulation.update(
             at: Double(script058.gameTime) + 0.1,
             input: .init(deploysTrainingGuidebot: true)
@@ -7486,6 +8062,46 @@ final class WorldRenderingTests: XCTestCase {
         assertTrainingGuidebotReturnBarrier(
             level: restored.level,
             rendersFaces: false
+        )
+
+        var legacyTerminalObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(continuation)
+            ) as? [String: Any]
+        )
+        legacyTerminalObject.removeValue(
+            forKey: "authoritativeRandomState"
+        )
+        var legacyTerminalState = try XCTUnwrap(
+            legacyTerminalObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        for key in [
+            "guidebotMode",
+            "guidebotModeTime",
+            "nextAmbientTime",
+            "timeUntilNextPlayerVisibilityCheck",
+            "timeUntilNextFlare",
+            "nextPowerupCheckTime",
+            "lastMessageSoundTime",
+            "returnTime",
+            "returnGreetingWasPresented",
+        ] {
+            legacyTerminalState.removeValue(forKey: key)
+        }
+        legacyTerminalObject["trainingRobotGuidebotState"] =
+            legacyTerminalState
+        XCTAssertNoThrow(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: legacyTerminalObject
+                    )
+                ),
+                resumedAtTimestamp: 200
+            )
         )
     }
 

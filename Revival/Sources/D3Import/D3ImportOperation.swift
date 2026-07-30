@@ -1510,6 +1510,22 @@ func runD3Import(
         in: returnSoundEntry.payloadRange
     )
     let returnSound = try decodeReachedPCM16WAV(returnSoundPayload)
+    let greetingSoundPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "GBotGreetB1"
+    )
+    let greetingSoundEntry = d3Archive.uniqueEntry(
+        named: greetingSoundPage.sourceName
+    )
+    let greetingSoundEntryIndex =
+        d3Archive.entries.firstIndex(of: greetingSoundEntry)!
+    let greetingSoundPayload = d3.data.subdata(
+        in: greetingSoundEntry.payloadRange
+    )
+    let greetingSound = try decodeReachedPCM16WAV(
+        greetingSoundPayload
+    )
     let invulnerabilityOnSoundPage = try resolveRetailSoundPage(
         table: tableData,
         overlay: overlayData,
@@ -1612,6 +1628,8 @@ func runD3Import(
                 openMarkerLightDistance: 50,
                 returnMessage: "GB: Returning to ship.",
                 returnSoundSourceName: returnSoundPage.sourceName,
+                greetingSoundSourceName:
+                    greetingSoundPage.sourceName,
                 arrivalMessage: "GB: Entering ship!",
                 successMessage: messages["GoodJob"]!,
                 successVoiceSourceName: "proceed6.osf",
@@ -1661,6 +1679,21 @@ func runD3Import(
                 sourceArchive: d3File.relativePath,
                 sourceSHA256: canonicalSHA256(returnSoundPayload),
                 importVolume: returnSoundPage.importVolume
+            ),
+            .init(
+                logicalName: greetingSoundPage.logicalName,
+                sourceName: greetingSoundPage.sourceName,
+                sourceEntryIndex: greetingSoundEntryIndex,
+                sampleRate: greetingSound.sampleRate,
+                channelCount: greetingSound.channelCount,
+                frameCount: greetingSound.frameCount,
+                pcm16LittleEndian: greetingSound.pcm16LittleEndian,
+                pcmSHA256: canonicalSHA256(
+                    greetingSound.pcm16LittleEndian
+                ),
+                sourceArchive: d3File.relativePath,
+                sourceSHA256: canonicalSHA256(greetingSoundPayload),
+                importVolume: greetingSoundPage.importVolume
             ),
         ]
         )

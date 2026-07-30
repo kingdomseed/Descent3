@@ -828,6 +828,7 @@ struct TrainingGuidebotReturnChain: Codable, Equatable, Sendable {
     let openMarkerLightDistance: Float
     let returnMessage: String
     let returnSoundSourceName: String
+    let greetingSoundSourceName: String?
     let arrivalMessage: String
     let successMessage: String
     let successVoiceSourceName: String
@@ -841,6 +842,7 @@ struct TrainingGuidebotReturnChain: Codable, Equatable, Sendable {
         openMarkerLightDistance: Float,
         returnMessage: String,
         returnSoundSourceName: String,
+        greetingSoundSourceName: String? = nil,
         arrivalMessage: String,
         successMessage: String,
         successVoiceSourceName: String,
@@ -853,6 +855,7 @@ struct TrainingGuidebotReturnChain: Codable, Equatable, Sendable {
         self.openMarkerLightDistance = openMarkerLightDistance
         self.returnMessage = returnMessage
         self.returnSoundSourceName = returnSoundSourceName
+        self.greetingSoundSourceName = greetingSoundSourceName
         self.arrivalMessage = arrivalMessage
         self.successMessage = successMessage
         self.successVoiceSourceName = successVoiceSourceName
@@ -3048,6 +3051,7 @@ func validateStockTrainingCameraMonitorPackage(
     guidebotF: CanonicalVoiceClip? = nil,
     pickupSound: CanonicalSoundClip?,
     returnSound: CanonicalSoundClip? = nil,
+    greetingSound: CanonicalSoundClip? = nil,
     objects: [PlacedObject],
     objectPresentations: [ObjectPresentationReference]
 ) throws {
@@ -3095,6 +3099,8 @@ func validateStockTrainingCameraMonitorPackage(
                 openMarkerLightDistance: 50,
                 returnMessage: "GB: Returning to ship.",
                 returnSoundSourceName: "GBotAcceptOrder.wav",
+                greetingSoundSourceName:
+                    chain.returnToShip?.greetingSoundSourceName,
                 arrivalMessage: "GB: Entering ship!",
                 successMessage: "Excellent!",
                 successVoiceSourceName: "proceed6.osf",
@@ -3185,6 +3191,24 @@ func validateStockTrainingCameraMonitorPackage(
           returnSound?.sourceSHA256
             == "47e38dfcb285be1b8d19d59929fef1b1122c1772a0cca2e6fe2b1721e5876b17",
           returnSound?.importVolume == 0.45,
+          (
+              chain.returnToShip?.greetingSoundSourceName == nil
+                  && greetingSound == nil
+              || chain.returnToShip?.greetingSoundSourceName
+                    == "GBotGreetB.wav"
+                  && greetingSound?.logicalName == "GBotGreetB1"
+                  && greetingSound?.sourceName == "GBotGreetB.wav"
+                  && greetingSound?.sourceEntryIndex == 1_268
+                  && greetingSound?.sampleRate == 22_050
+                  && greetingSound?.channelCount == 1
+                  && greetingSound?.frameCount == 16_046
+                  && greetingSound?.pcmSHA256
+                    == "ec585e440bb7cc07550cd9402b6b1dc69831dd00ade8052572a5cb2383fcb2fe"
+                  && greetingSound?.sourceArchive == "d3.hog"
+                  && greetingSound?.sourceSHA256
+                    == "5e2aee56e77e39592295759705671c37259ff8ca8cc9357ebac1bb38d7c004ca"
+                  && greetingSound?.importVolume == 1
+          ),
           objects.contains(where: {
               $0.handle == 6_167
                   && $0.type == 7
@@ -5071,6 +5095,11 @@ struct Level: Codable, Equatable, Sendable {
                     && soundNames.contains(
                         returnChain.returnSoundSourceName.lowercased()
                     )
+                    && (
+                        returnChain.greetingSoundSourceName.map {
+                            soundNames.contains($0.lowercased())
+                        } ?? true
+                    )
                     && isNonempty(returnChain.returnMessage)
                     && isNonempty(returnChain.arrivalMessage)
                     && isNonempty(returnChain.successMessage)
@@ -6331,6 +6360,9 @@ struct Level: Codable, Equatable, Sendable {
                     },
                     returnSound: soundClips.first {
                         $0.logicalName == "GBotAcceptOrder1"
+                    },
+                    greetingSound: soundClips.first {
+                        $0.logicalName == "GBotGreetB1"
                     },
                     objects: objects,
                     objectPresentations: objectPresentations
