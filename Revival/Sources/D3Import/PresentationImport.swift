@@ -1008,6 +1008,10 @@ struct RetailWeaponPresentationSelection:
     let particleLifetime: Float
     let particleSize: Float
     let weaponFlags: UInt32
+    let timeoutSpawnName: String
+    let timeoutSpawnCount: Int
+    let alternateSpawnName: String
+    let alternateSpawnChance: Int
     let customSize: Float
     let modelPageSize: Float
     let mass: Float
@@ -1016,6 +1020,9 @@ struct RetailWeaponPresentationSelection:
     let coefficientOfRestitution: Float
     let speed: Float
     let lifetime: Float
+    let explosionTextureName: String
+    let explosionLifetime: Float
+    let explosionSize: Float
     let lightDistance: Float
     let lightPresentation: TrainingMarkerLightPresentation
 }
@@ -1081,11 +1088,11 @@ private func parseRetailWeaponPresentations(
             let particleLifetime = try cursor.readFloat()
             let particleSize = try cursor.readFloat()
             let weaponFlags = try cursor.readUInt32()
+            let timeoutSpawnName = try cursor.readCString(allowEmpty: true)
+            let timeoutSpawnCount = Int(try cursor.readUInt8())
             _ = try cursor.readCString(allowEmpty: true)
-            _ = try cursor.readUInt8()
-            _ = try cursor.readCString(allowEmpty: true)
-            _ = try cursor.readCString(allowEmpty: true)
-            _ = try cursor.readUInt8()
+            let alternateSpawnName = try cursor.readCString(allowEmpty: true)
+            let alternateSpawnChance = Int(try cursor.readUInt8())
             _ = try cursor.readFloat()
             _ = try cursor.readFloat()
             _ = try cursor.readFloat()
@@ -1110,9 +1117,9 @@ private func parseRetailWeaponPresentations(
             _ = try cursor.readFloat()
             _ = try cursor.readUInt8()
             _ = try cursor.readFloat()
-            _ = try cursor.readCString(allowEmpty: true)
-            _ = try cursor.readFloat()
-            _ = try cursor.readFloat()
+            let explosionTextureName = try cursor.readCString(allowEmpty: true)
+            let explosionLifetime = try cursor.readFloat()
+            let explosionSize = try cursor.readFloat()
             for _ in 0..<7 { _ = try cursor.readFloat() }
             let lifetime = try cursor.readFloat()
             let lightDistance = try cursor.readFloat()
@@ -1152,6 +1159,10 @@ private func parseRetailWeaponPresentations(
                 particleLifetime: particleLifetime,
                 particleSize: particleSize,
                 weaponFlags: weaponFlags,
+                timeoutSpawnName: timeoutSpawnName,
+                timeoutSpawnCount: timeoutSpawnCount,
+                alternateSpawnName: alternateSpawnName,
+                alternateSpawnChance: alternateSpawnChance,
                 customSize: customSize,
                 modelPageSize: modelPageSize,
                 mass: mass,
@@ -1161,6 +1172,9 @@ private func parseRetailWeaponPresentations(
                     coefficientOfRestitution,
                 speed: speed,
                 lifetime: lifetime,
+                explosionTextureName: explosionTextureName,
+                explosionLifetime: explosionLifetime,
+                explosionSize: explosionSize,
                 lightDistance: lightDistance,
                 lightPresentation: .init(
                     primaryColor: primaryColor,

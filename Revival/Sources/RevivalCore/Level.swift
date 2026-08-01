@@ -1128,6 +1128,32 @@ struct TrainingGuidebotYellowFlareDefinition:
     let particleInterval: Float
     let particleSize: Float
     let particleLifetime: Float
+    var timeout: TrainingGuidebotYellowFlareTimeoutDefinition? = nil
+}
+
+struct TrainingGuidebotYellowFlareTimeoutDefinition:
+    Codable, Equatable, Sendable
+{
+    let explosionTexture: SourceResource
+    let explosionLifetime: Float
+    let explosionSize: Float
+    let childSource: SourceResource
+    let childTexture: SourceResource
+    let childCount: Int
+    let childWeaponFlags: UInt32
+    let childPhysicsFlags: UInt32
+    let childCollisionRadius: Float
+    let childSpeed: Float
+    let childLifetime: Float
+    let childMass: Float
+    let childDrag: Float
+    let childCoefficientOfRestitution: Float
+    let childLightDistance: Float
+    let childLightPresentation: TrainingMarkerLightPresentation
+    let childParticleCount: Int
+    let childParticleInterval: Float
+    let childParticleSize: Float
+    let childParticleLifetime: Float
 }
 
 extension TrainingRobotCombatDefinition {
@@ -1334,6 +1360,51 @@ func validateStockTrainingRobotGuidebotPackage(
                             == Float(0.2).bitPattern
                           && flare.particleLifetime.bitPattern
                             == Float(0.3).bitPattern
+                          && (
+                              flare.timeout == nil
+                                  || flare.timeout.map { timeout in
+                                      timeout.explosionTexture == .init(
+                                          storedIndex: 900,
+                                          sourceName: "FlarePuff"
+                                      )
+                                          && timeout.explosionLifetime == 0.2
+                                          && timeout.explosionSize == 2
+                                          && timeout.childSource == .init(
+                                              storedIndex: 54,
+                                              sourceName: "YellowFlareSparks"
+                                          )
+                                          && timeout.childTexture == .init(
+                                              storedIndex: 878,
+                                              sourceName: "yellowspark"
+                                          )
+                                          && timeout.childCount == 9
+                                          && timeout.childWeaponFlags == 1_056
+                                          && timeout.childPhysicsFlags
+                                            == 2_556_032
+                                          && timeout.childCollisionRadius == 0.2
+                                          && timeout.childSpeed == 17
+                                          && timeout.childLifetime == 0.2
+                                          && timeout.childMass == 0.1
+                                          && timeout.childDrag == 0.1
+                                          && timeout.childCoefficientOfRestitution == 1
+                                          && timeout.childLightDistance == 6
+                                          && timeout.childLightPresentation == .init(
+                                              primaryColor: .init(x: 1, y: 1, z: 0.5),
+                                              secondaryColor: .zero,
+                                              timeInterval: 0,
+                                              flickerDistance: 0,
+                                              directionalDot: 0,
+                                              flags: 0,
+                                              timebits: 0,
+                                              angle: 0,
+                                              lightingRenderType: 0
+                                          )
+                                          && timeout.childParticleCount == 25
+                                          && timeout.childParticleInterval == 0.04
+                                          && timeout.childParticleSize == 0.3
+                                          && timeout.childParticleLifetime == 0.3
+                                  } == true
+                          )
                   } == true
                   && flareSound?.logicalName == "Flare"
                   && flareSound?.sourceName == "Flare.wav"
@@ -7386,6 +7457,31 @@ struct Level: Codable, Equatable, Sendable {
                         "manage/weaponpage.cpp:653-901; viseffect.cpp:899-933"
                 ))
             }
+            if let timeout = flare.timeout {
+                dependencies.append(.init(
+                    category: "weapon-definition",
+                    source: timeout.childSource,
+                    state: "canonical-page-bound",
+                    provenance:
+                        "manage/weaponpage.cpp:653-901; Descent3/WeaponFire.cpp:3162-3201"
+                ))
+                for texture in [
+                    timeout.explosionTexture,
+                    timeout.childTexture,
+                ] where !dependencyManifest.current.contains(where: {
+                    $0.category == "texture" && $0.source == texture
+                }) && !dependencies.contains(where: {
+                    $0.category == "texture" && $0.source == texture
+                }) {
+                    dependencies.append(.init(
+                        category: "texture",
+                        source: texture,
+                        state: "presentation-payload-imported",
+                        provenance:
+                            "manage/weaponpage.cpp:653-901; Descent3/WeaponFire.cpp:3058-3201"
+                    ))
+                }
+            }
         }
         let player = objects.first {
             $0.handle == defaultPlayerBinding?.objectHandle
@@ -8290,6 +8386,9 @@ struct Level: Codable, Equatable, Sendable {
             .union(
                 trainingRobotGuidebotChain?.yellowFlare.map {
                     [$0.particleTexture]
+                        + ($0.timeout.map {
+                            [$0.explosionTexture, $0.childTexture]
+                        } ?? [])
                 } ?? []
             )
         guard Set(presentationMaterials.map(\.texture)) == requiredTextures else {

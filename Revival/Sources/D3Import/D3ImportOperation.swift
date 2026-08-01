@@ -470,6 +470,11 @@ func runD3Import(
         overlay: overlayData,
         named: "Yellow flare"
     )
+    let yellowFlareSparkWeapon = try resolveRetailWeaponPresentation(
+        table: tableData,
+        overlay: overlayData,
+        named: yellowFlareWeapon.timeoutSpawnName
+    )
     precondition(
         yellowFlareWeapon.storedIndex == 3
             && yellowFlareWeapon.hudImageName == "Armeye.ogf"
@@ -482,6 +487,10 @@ func runD3Import(
             && yellowFlareWeapon.particleSize.bitPattern
                 == Float(0.2).bitPattern
             && yellowFlareWeapon.weaponFlags == 0x8001_0000
+            && yellowFlareWeapon.timeoutSpawnName == "YellowFlareSparks"
+            && yellowFlareWeapon.timeoutSpawnCount == 9
+            && yellowFlareWeapon.alternateSpawnName.isEmpty
+            && yellowFlareWeapon.alternateSpawnChance == 0
             && yellowFlareWeapon.customSize == 0.1
             && yellowFlareWeapon.modelPageSize.bitPattern
                 == 0x405f_d5ea
@@ -491,6 +500,9 @@ func runD3Import(
             && yellowFlareWeapon.coefficientOfRestitution == 1
             && yellowFlareWeapon.speed == 100
             && yellowFlareWeapon.lifetime == 15
+            && yellowFlareWeapon.explosionTextureName == "FlarePuff"
+            && yellowFlareWeapon.explosionLifetime == 0.2
+            && yellowFlareWeapon.explosionSize == 2
             && yellowFlareWeapon.lightDistance == 35
             && yellowFlareWeapon.lightPresentation == .init(
                 primaryColor: .init(x: 1, y: 1, z: 0.8),
@@ -500,6 +512,41 @@ func runD3Import(
                 directionalDot: 0,
                 flags: 16,
                 timebits: UInt32.max,
+                angle: 0,
+                lightingRenderType: 0
+            )
+            && yellowFlareSparkWeapon.storedIndex == 54
+            && yellowFlareSparkWeapon.name == "YellowFlareSparks"
+            && yellowFlareSparkWeapon.fireImageName == "yellowspark.oaf"
+            && yellowFlareSparkWeapon.particleName == "yellowspark"
+            && yellowFlareSparkWeapon.particleCount == 25
+            && yellowFlareSparkWeapon.particleLifetime == 0.3
+            && yellowFlareSparkWeapon.particleSize == 0.3
+            && yellowFlareSparkWeapon.weaponFlags == 1_056
+            && yellowFlareSparkWeapon.timeoutSpawnName.isEmpty
+            && yellowFlareSparkWeapon.timeoutSpawnCount == 0
+            && yellowFlareSparkWeapon.alternateSpawnName.isEmpty
+            && yellowFlareSparkWeapon.alternateSpawnChance == 0
+            && yellowFlareSparkWeapon.customSize == 0
+            && yellowFlareSparkWeapon.modelPageSize == 0.2
+            && yellowFlareSparkWeapon.mass == 0.1
+            && yellowFlareSparkWeapon.drag == 0.1
+            && yellowFlareSparkWeapon.physicsFlags == 2_556_032
+            && yellowFlareSparkWeapon.coefficientOfRestitution == 1
+            && yellowFlareSparkWeapon.speed == 17
+            && yellowFlareSparkWeapon.lifetime == 0.2
+            && yellowFlareSparkWeapon.explosionTextureName == "yellowspark"
+            && yellowFlareSparkWeapon.explosionLifetime == 0.2
+            && yellowFlareSparkWeapon.explosionSize == 0.07
+            && yellowFlareSparkWeapon.lightDistance == 6
+            && yellowFlareSparkWeapon.lightPresentation == .init(
+                primaryColor: .init(x: 1, y: 1, z: 0.5),
+                secondaryColor: .zero,
+                timeInterval: 0,
+                flickerDistance: 0,
+                directionalDot: 0,
+                flags: 0,
+                timebits: 0,
                 angle: 0,
                 lightingRenderType: 0
             )
@@ -1510,7 +1557,47 @@ func runD3Import(
                     1 / Float(yellowFlareWeapon.particleCount),
                 particleSize: yellowFlareWeapon.particleSize,
                 particleLifetime:
-                    yellowFlareWeapon.particleLifetime
+                    yellowFlareWeapon.particleLifetime,
+                timeout: .init(
+                    explosionTexture: modelTextureByName[
+                        yellowFlareWeapon.explosionTextureName.lowercased()
+                    ]!,
+                    explosionLifetime:
+                        yellowFlareWeapon.explosionLifetime,
+                    explosionSize: yellowFlareWeapon.explosionSize,
+                    childSource: .init(
+                        storedIndex: yellowFlareSparkWeapon.storedIndex,
+                        sourceName: yellowFlareSparkWeapon.name
+                    ),
+                    childTexture: modelTextureByName[
+                        yellowFlareSparkWeapon.particleName.lowercased()
+                    ]!,
+                    childCount: yellowFlareWeapon.timeoutSpawnCount,
+                    childWeaponFlags:
+                        yellowFlareSparkWeapon.weaponFlags,
+                    childPhysicsFlags:
+                        yellowFlareSparkWeapon.physicsFlags,
+                    childCollisionRadius:
+                        yellowFlareSparkWeapon.modelPageSize,
+                    childSpeed: yellowFlareSparkWeapon.speed,
+                    childLifetime: yellowFlareSparkWeapon.lifetime,
+                    childMass: yellowFlareSparkWeapon.mass,
+                    childDrag: yellowFlareSparkWeapon.drag,
+                    childCoefficientOfRestitution:
+                        yellowFlareSparkWeapon.coefficientOfRestitution,
+                    childLightDistance:
+                        yellowFlareSparkWeapon.lightDistance,
+                    childLightPresentation:
+                        yellowFlareSparkWeapon.lightPresentation,
+                    childParticleCount:
+                        yellowFlareSparkWeapon.particleCount,
+                    childParticleInterval:
+                        1 / Float(yellowFlareSparkWeapon.particleCount),
+                    childParticleSize:
+                        yellowFlareSparkWeapon.particleSize,
+                    childParticleLifetime:
+                        yellowFlareSparkWeapon.particleLifetime
+                )
             ),
             combat: .stockTraining,
             guidebot: .stockTraining

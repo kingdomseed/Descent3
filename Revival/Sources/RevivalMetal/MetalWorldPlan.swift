@@ -127,6 +127,12 @@ private func makeMetalWorldPlan(
         .map(makeMetalWorldDraw)
     let preparedYellowFlareParticleDraws =
         makePreparedTrainingGuidebotYellowFlareParticleDraws(level)
+    let preparedYellowFlareTimeoutExplosionDraws =
+        makePreparedTrainingGuidebotYellowFlareTimeoutExplosionDraws(level)
+    let preparedYellowFlareTimeoutSparkDraws =
+        makePreparedTrainingGuidebotYellowFlareTimeoutSparkDraws(level)
+    let preparedYellowFlareTimeoutSparkParticleDraws =
+        makePreparedTrainingGuidebotYellowFlareTimeoutSparkParticleDraws(level)
     let preparedRoomIndexByIdentity = Dictionary(
         uniqueKeysWithValues: preparedRoomDraws.enumerated().map {
             (MetalRoomDrawIdentity($0.element), $0.offset)
@@ -156,6 +162,9 @@ private func makeMetalWorldPlan(
         + preparedBlueLaserDraws
         + preparedYellowFlareDraws
         + preparedYellowFlareParticleDraws
+        + preparedYellowFlareTimeoutExplosionDraws
+        + preparedYellowFlareTimeoutSparkDraws
+        + preparedYellowFlareTimeoutSparkParticleDraws
     let draws = activeDrawIndices.map { preparedDraws[$0] }
     let lightCoronaStates = extraction.lightCoronas.map {
         MetalLightCoronaState(corona: $0, scalar: 0)
@@ -197,6 +206,12 @@ func updateMetalWorldPlan(
         [TrainingGuidebotYellowFlareFrame] = [],
     trainingGuidebotYellowFlareParticles:
         [TrainingGuidebotYellowFlareParticleFrame] = [],
+    trainingGuidebotYellowFlareTimeoutExplosions:
+        [TrainingGuidebotYellowFlareParticleFrame] = [],
+    trainingGuidebotYellowFlareTimeoutSparks:
+        [TrainingGuidebotYellowFlareTimeoutSparkFrame] = [],
+    trainingGuidebotYellowFlareTimeoutSparkParticles:
+        [TrainingGuidebotYellowFlareParticleFrame] = [],
     trainingDodgeMarkerLightDistance: Float? = nil,
     trainingGuidebotReturnMarkerLightDistance: Float? = nil,
     trainingLastRoomMarkerLightDistance: Float? = nil,
@@ -219,6 +234,12 @@ func updateMetalWorldPlan(
             trainingGuidebotYellowFlares,
         trainingGuidebotYellowFlareParticles:
             trainingGuidebotYellowFlareParticles,
+        trainingGuidebotYellowFlareTimeoutExplosions:
+            trainingGuidebotYellowFlareTimeoutExplosions,
+        trainingGuidebotYellowFlareTimeoutSparks:
+            trainingGuidebotYellowFlareTimeoutSparks,
+        trainingGuidebotYellowFlareTimeoutSparkParticles:
+            trainingGuidebotYellowFlareTimeoutSparkParticles,
         trainingDodgeMarkerLightDistance:
             trainingDodgeMarkerLightDistance,
         trainingGuidebotReturnMarkerLightDistance:
@@ -249,6 +270,9 @@ func updateMetalWorldPlan(
         trainingPrimaryProjectiles: [],
         trainingGuidebotYellowFlares: [],
         trainingGuidebotYellowFlareParticles: [],
+        trainingGuidebotYellowFlareTimeoutExplosions: [],
+        trainingGuidebotYellowFlareTimeoutSparks: [],
+        trainingGuidebotYellowFlareTimeoutSparkParticles: [],
         trainingDodgeMarkerLightDistance: nil,
         trainingGuidebotReturnMarkerLightDistance: nil,
         trainingLastRoomMarkerLightDistance: nil,
@@ -272,6 +296,12 @@ private func updateMetalWorldPlan(
     trainingGuidebotYellowFlares:
         [TrainingGuidebotYellowFlareFrame],
     trainingGuidebotYellowFlareParticles:
+        [TrainingGuidebotYellowFlareParticleFrame],
+    trainingGuidebotYellowFlareTimeoutExplosions:
+        [TrainingGuidebotYellowFlareParticleFrame],
+    trainingGuidebotYellowFlareTimeoutSparks:
+        [TrainingGuidebotYellowFlareTimeoutSparkFrame],
+    trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame],
     trainingDodgeMarkerLightDistance: Float?,
     trainingGuidebotReturnMarkerLightDistance: Float?,
@@ -314,6 +344,49 @@ private func updateMetalWorldPlan(
             particles: trainingGuidebotYellowFlareParticles,
             camera: camera
         )
+    let yellowFlareTimeoutExplosionDraws =
+        makeTrainingGuidebotYellowFlareQuadDraws(
+            level,
+            particles: trainingGuidebotYellowFlareTimeoutExplosions,
+            camera: camera,
+            capacity:
+                trainingGuidebotYellowFlareTimeoutExplosionPresentationCapacity,
+            handleBase: UInt32.max - 3_000
+        )
+    let yellowFlareTimeoutSparkDraws =
+        makeTrainingGuidebotYellowFlareQuadDraws(
+            level,
+            particles: trainingGuidebotYellowFlareTimeoutSparks.map {
+                .init(
+                    roomSourceIndex: $0.roomSourceIndex,
+                    position: $0.position,
+                    size: $0.collisionRadius,
+                    lifeRemaining: $0.lifeRemaining,
+                    lifetime:
+                        level.trainingRobotGuidebotChain!.yellowFlare!
+                            .timeout!.childLifetime,
+                    sourceSize: $0.collisionRadius,
+                    sourceLifetime:
+                        level.trainingRobotGuidebotChain!.yellowFlare!
+                            .timeout!.childLifetime,
+                    texture: $0.texture
+                )
+            },
+            camera: camera,
+            capacity:
+                trainingGuidebotYellowFlareTimeoutSparkPresentationCapacity,
+            handleBase: UInt32.max - 4_000
+        )
+    let yellowFlareTimeoutSparkParticleDraws =
+        makeTrainingGuidebotYellowFlareQuadDraws(
+            level,
+            particles:
+                trainingGuidebotYellowFlareTimeoutSparkParticles,
+            camera: camera,
+            capacity:
+                trainingGuidebotYellowFlareTimeoutSparkParticlePresentationCapacity,
+            handleBase: UInt32.max - 5_000
+        )
     let roomIndexByIdentity = Dictionary(
         uniqueKeysWithValues: prepared.preparedDraws.enumerated()
             .filter { $0.element.objectHandle == nil }
@@ -349,6 +422,24 @@ private func updateMetalWorldPlan(
                 MetalModelDrawIdentity($0)
             ]!.first!.offset
         }
+    let yellowFlareTimeoutExplosionIndices =
+        yellowFlareTimeoutExplosionDraws.map {
+            objectIndicesByIdentity[
+                MetalModelDrawIdentity($0)
+            ]!.first!.offset
+        }
+    let yellowFlareTimeoutSparkIndices =
+        yellowFlareTimeoutSparkDraws.map {
+            objectIndicesByIdentity[
+                MetalModelDrawIdentity($0)
+            ]!.first!.offset
+        }
+    let yellowFlareTimeoutSparkParticleIndices =
+        yellowFlareTimeoutSparkParticleDraws.map {
+            objectIndicesByIdentity[
+                MetalModelDrawIdentity($0)
+            ]!.first!.offset
+        }
     var updatedPreparedDraws = prepared.preparedDraws
     let translucentIndices = translucentRoomDraws.map {
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
@@ -356,6 +447,9 @@ private func updateMetalWorldPlan(
     let activeDrawIndices = opaqueIndices + objectIndices
         + dodgeProjectileIndices + blueLaserIndices
         + yellowFlareIndices + yellowFlareParticleIndices
+        + yellowFlareTimeoutExplosionIndices
+        + yellowFlareTimeoutSparkIndices
+        + yellowFlareTimeoutSparkParticleIndices
         + translucentIndices
     let auxiliaryExtraction = try trainingCameraMonitor.map {
         try extractWorldForRendering(
@@ -438,6 +532,24 @@ private func updateMetalWorldPlan(
     for (index, draw) in zip(
         yellowFlareParticleIndices,
         yellowFlareParticleDraws
+    ) {
+        updatedPreparedDraws[index] = draw
+    }
+    for (index, draw) in zip(
+        yellowFlareTimeoutExplosionIndices,
+        yellowFlareTimeoutExplosionDraws
+    ) {
+        updatedPreparedDraws[index] = draw
+    }
+    for (index, draw) in zip(
+        yellowFlareTimeoutSparkIndices,
+        yellowFlareTimeoutSparkDraws
+    ) {
+        updatedPreparedDraws[index] = draw
+    }
+    for (index, draw) in zip(
+        yellowFlareTimeoutSparkParticleIndices,
+        yellowFlareTimeoutSparkParticleDraws
     ) {
         updatedPreparedDraws[index] = draw
     }
@@ -576,6 +688,24 @@ private func updateMetalWorldPlan(
                     distance: flare.lightDistance,
                     color: color
                 )
+        }
+    }
+    for spark in trainingGuidebotYellowFlareTimeoutSparks
+    where spark.lightDistance > 0 {
+        let color = SIMD3<Float>(
+            spark.lightPresentation.primaryColor.x,
+            spark.lightPresentation.primaryColor.y,
+            spark.lightPresentation.primaryColor.z
+        )
+        for index in Set(
+            activeDrawIndices + auxiliaryActiveDrawIndices
+        ) {
+            updatedPreparedDraws[index] = applyingTrainingMarkerLight(
+                to: updatedPreparedDraws[index],
+                position: spark.position,
+                distance: spark.lightDistance,
+                color: color
+            )
         }
     }
     let coronaPresentation = presentationFrame.map {
@@ -1123,36 +1253,129 @@ private func makePreparedTrainingGuidebotYellowFlareParticleDraws(
     )
 }
 
+private func makePreparedTrainingGuidebotYellowFlareTimeoutExplosionDraws(
+    _ level: Level
+) -> [MetalWorldDraw] {
+    makePreparedTrainingGuidebotYellowFlareTimeoutQuadDraws(
+        level,
+        count: trainingGuidebotYellowFlareTimeoutExplosionPresentationCapacity,
+        texture: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
+            .explosionTexture,
+        size: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
+            .explosionSize,
+        lifetime: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
+            .explosionLifetime,
+        handleBase: UInt32.max - 3_000
+    )
+}
+
+private func makePreparedTrainingGuidebotYellowFlareTimeoutSparkDraws(
+    _ level: Level
+) -> [MetalWorldDraw] {
+    makePreparedTrainingGuidebotYellowFlareTimeoutQuadDraws(
+        level,
+        count: trainingGuidebotYellowFlareTimeoutSparkPresentationCapacity,
+        texture: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
+            .childTexture,
+        size: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
+            .childCollisionRadius,
+        lifetime: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
+            .childLifetime,
+        handleBase: UInt32.max - 4_000
+    )
+}
+
+private func makePreparedTrainingGuidebotYellowFlareTimeoutSparkParticleDraws(
+    _ level: Level
+) -> [MetalWorldDraw] {
+    makePreparedTrainingGuidebotYellowFlareTimeoutQuadDraws(
+        level,
+        count:
+            trainingGuidebotYellowFlareTimeoutSparkParticlePresentationCapacity,
+        texture: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
+            .childTexture,
+        size: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
+            .childParticleSize,
+        lifetime: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
+            .childParticleLifetime,
+        handleBase: UInt32.max - 5_000
+    )
+}
+
+private func makePreparedTrainingGuidebotYellowFlareTimeoutQuadDraws(
+    _ level: Level,
+    count: Int,
+    texture: SourceResource?,
+    size: Float?,
+    lifetime: Float?,
+    handleBase: UInt32
+) -> [MetalWorldDraw] {
+    guard let texture, let size, let lifetime,
+          let guidebot = level.objects.first(where: {
+              $0.handle
+                == level.trainingRobotGuidebotChain?
+                    .guidebotObjectHandle
+          }),
+          case let .room(roomSourceIndex) = guidebot.location else {
+        return []
+    }
+    return makeTrainingGuidebotYellowFlareQuadDraws(
+        level,
+        particles: (0..<count).map { _ in .init(
+            roomSourceIndex: roomSourceIndex,
+            position: guidebot.position,
+            size: size,
+            lifeRemaining: lifetime,
+            lifetime: lifetime,
+            sourceSize: size,
+            sourceLifetime: lifetime,
+            texture: texture
+        ) },
+        camera: .trainingRoom3,
+        capacity: count,
+        handleBase: handleBase
+    )
+}
+
 private func makeTrainingGuidebotYellowFlareParticleDraws(
     _ level: Level,
     particles: [TrainingGuidebotYellowFlareParticleFrame],
     camera: RoomCamera
 ) -> [MetalWorldDraw] {
-    guard let definition =
-            level.trainingRobotGuidebotChain?.yellowFlare,
-          let material = level.presentationMaterials.first(where: {
-              $0.texture == definition.particleTexture
-          }) else {
-        return []
-    }
-    precondition(
-        particles.count
-            <= trainingGuidebotYellowFlareParticlePresentationCapacity
+    makeTrainingGuidebotYellowFlareQuadDraws(
+        level,
+        particles: particles,
+        camera: camera,
+        capacity: trainingGuidebotYellowFlareParticlePresentationCapacity,
+        handleBase: UInt32.max - 2_000
     )
+}
+
+private func makeTrainingGuidebotYellowFlareQuadDraws(
+    _ level: Level,
+    particles: [TrainingGuidebotYellowFlareParticleFrame],
+    camera: RoomCamera,
+    capacity: Int,
+    handleBase: UInt32
+) -> [MetalWorldDraw] {
+    precondition(particles.count <= capacity)
     let cameraForward = normalized(
         subtract(camera.target, camera.position)
     )
     let right = normalized(cross3(cameraForward, camera.up))
     let up = normalized(cross3(right, cameraForward))
-    let blendOpacity: Float
-    switch material.blend {
-    case .opaque:
-        blendOpacity = 1
-    case let .sourceAlpha(opacity),
-         let .additiveSourceAlpha(opacity):
-        blendOpacity = Float(opacity) / 255
-    }
     return particles.enumerated().map { slot, particle in
+        let material = level.presentationMaterials.first {
+            $0.texture == particle.texture
+        }!
+        let blendOpacity: Float
+        switch material.blend {
+        case .opaque:
+            blendOpacity = 1
+        case let .sourceAlpha(opacity),
+             let .additiveSourceAlpha(opacity):
+            blendOpacity = Float(opacity) / 255
+        }
         let rightExtent = multiplied(right, particle.size)
         let aspect = Float(material.image.height)
             / Float(material.image.width)
@@ -1174,7 +1397,7 @@ private func makeTrainingGuidebotYellowFlareParticleDraws(
         return MetalWorldDraw(
             roomSourceIndex: particle.roomSourceIndex,
             faceIndex: 0,
-            objectHandle: UInt32.max - 2_000 - UInt32(slot),
+            objectHandle: handleBase - UInt32(slot),
             model: nil,
             submodelIndex: nil,
             texture: particle.texture,

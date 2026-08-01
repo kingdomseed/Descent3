@@ -7909,6 +7909,53 @@ final class WorldRenderingTests: XCTestCase {
         func nextState(_ state: UInt32) -> UInt32 {
             state &* 214_013 &+ 2_531_011
         }
+        func expectedMotion(
+            position: Vector3,
+            velocity: Vector3,
+            duration: Float
+        ) -> (position: Vector3, velocity: Vector3) {
+            let mass: Float = 0.1
+            let drag: Float = 0.1
+            let force = Vector3(
+                x: 0,
+                y: level.metadata.gravity * mass,
+                z: 0
+            )
+            func component(
+                _ position: Float,
+                _ velocity: Float,
+                _ force: Float
+            ) -> (Float, Float) {
+                let position = Double(position)
+                let velocity = Double(velocity)
+                let force = Double(force)
+                let mass = Double(mass)
+                let drag = Double(drag)
+                let duration = Double(duration)
+                let terminalVelocity = force / drag
+                let massOverDrag = mass / drag
+                let decay = exp(-(drag / mass) * duration)
+                return (
+                    Float(
+                        position + terminalVelocity * duration
+                            + massOverDrag
+                                * (velocity - terminalVelocity)
+                                * (1 - decay)
+                    ),
+                    Float(
+                        (velocity - terminalVelocity) * decay
+                            + terminalVelocity
+                    )
+                )
+            }
+            let x = component(position.x, velocity.x, force.x)
+            let y = component(position.y, velocity.y, force.y)
+            let z = component(position.z, velocity.z, force.z)
+            return (
+                .init(x: x.0, y: y.0, z: z.0),
+                .init(x: x.1, y: y.1, z: z.1)
+            )
+        }
         func continuationObject(
             _ continuation: PlayerSimulationContinuation
         ) throws -> [String: Any] {
@@ -8374,6 +8421,38 @@ final class WorldRenderingTests: XCTestCase {
             $0.soundSourceName == "Flare.wav"
         })
 
+        var exactZeroObject = try continuationObject(nearWall.continuation)
+        exactZeroObject["frameDuration"] = 0.01
+        var exactZeroState = try XCTUnwrap(
+            exactZeroObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        exactZeroState["timeUntilNextFlare"] = 3.5
+        exactZeroState["yellowFlareParticles"] = []
+        var exactZeroFlares = try XCTUnwrap(
+            exactZeroState["yellowFlares"] as? [[String: Any]]
+        )
+        exactZeroFlares[0]["lifeRemaining"] = 0.01
+        exactZeroFlares[0]["lastParticleDropTime"] =
+            exactZeroObject["gameTime"]
+        exactZeroState["yellowFlares"] = exactZeroFlares
+        exactZeroObject["trainingRobotGuidebotState"] = exactZeroState
+        let exactZero = try PlayerSimulation(
+            level: eligible.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: exactZeroObject)
+            ),
+            resumedAtTimestamp: 21.5
+        )
+        let exactZeroFrame = exactZero.update(at: 21.51, input: .zero)
+        XCTAssertEqual(
+            try XCTUnwrap(exactZeroFrame.trainingGuidebotYellowFlares.only)
+                .lifeRemaining,
+            0,
+            accuracy: 0.000_001
+        )
+
         var expiryObject = try continuationObject(nearWall.continuation)
         expiryObject["frameDuration"] = 0.01
         var expiryState = try XCTUnwrap(
@@ -8385,6 +8464,12 @@ final class WorldRenderingTests: XCTestCase {
         var expiringFlares = try XCTUnwrap(
             expiryState["yellowFlares"] as? [[String: Any]]
         )
+        expiringFlares[0]["position"] = [
+            "x": roomCenter.x,
+            "y": roomCenter.y,
+            "z": roomCenter.z,
+        ]
+        expiringFlares[0]["velocity"] = ["x": 0, "y": 0, "z": 0]
         expiringFlares[0]["lifeRemaining"] = 0.005
         expiringFlares[0]["lastParticleDropTime"] = 0
         expiryState["yellowFlares"] = expiringFlares
@@ -8409,11 +8494,133 @@ final class WorldRenderingTests: XCTestCase {
             expiredFrame.trainingGuidebotYellowFlareParticles.count,
             1
         )
+        let timeoutExplosion = try XCTUnwrap(
+            expiredFrame.trainingGuidebotYellowFlareTimeoutExplosions.only
+        )
+        XCTAssertEqual(timeoutExplosion.texture.sourceName, "FlarePuff")
+        XCTAssertEqual(timeoutExplosion.size, 2)
+        XCTAssertEqual(timeoutExplosion.lifetime, 0.2)
+        XCTAssertEqual(timeoutExplosion.lifeRemaining, 0.2)
+        XCTAssertEqual(timeoutExplosion.position, roomCenter)
+        XCTAssertEqual(
+            expiredFrame.trainingGuidebotYellowFlareTimeoutSparks
+                .map(\.sourceAttemptIndex),
+            Array(0..<9)
+        )
+        XCTAssertEqual(
+            expiredFrame.trainingGuidebotYellowFlareTimeoutSparks
+                .map(\.sourceObjectSlot),
+            [17, 8, 41, 42, 43, 44, 45, 46, 47]
+        )
+        XCTAssertEqual(
+            expiredFrame.trainingGuidebotYellowFlareTimeoutSparks
+                .filter(\.receivedControlOnCreationFrame)
+                .map(\.sourceAttemptIndex),
+            [0, 2, 3, 4, 5, 6, 7, 8]
+        )
+        XCTAssertEqual(
+            expiredFrame.trainingGuidebotYellowFlareTimeoutSparks
+                .map(\.lifeRemaining),
+            [0.19, 0.2, 0.19, 0.19, 0.19, 0.19, 0.19, 0.19, 0.19]
+        )
+        XCTAssertTrue(
+            expiredFrame.trainingGuidebotYellowFlareTimeoutSparks
+                .allSatisfy { $0.lightDistance == 6 }
+        )
+        let centerSpark = try XCTUnwrap(
+            expiredFrame.trainingGuidebotYellowFlareTimeoutSparks.first {
+                $0.sourceAttemptIndex == 0
+            }
+        )
+        let centerOrigin = Vector3(
+            x: roomCenter.x + centerSpark.orientation.forward.x * 0.05,
+            y: roomCenter.y + centerSpark.orientation.forward.y * 0.05,
+            z: roomCenter.z + centerSpark.orientation.forward.z * 0.05
+        )
+        let centerInitialVelocity = Vector3(
+            x: centerSpark.orientation.forward.x * 17,
+            y: centerSpark.orientation.forward.y * 17,
+            z: centerSpark.orientation.forward.z * 17
+        )
+        let centerExpected = expectedMotion(
+            position: centerOrigin,
+            velocity: centerInitialVelocity,
+            duration: 0.01
+        )
+        XCTAssertEqual(centerSpark.position.x, centerExpected.position.x)
+        XCTAssertEqual(centerSpark.position.y, centerExpected.position.y)
+        XCTAssertEqual(centerSpark.position.z, centerExpected.position.z)
+        XCTAssertEqual(centerSpark.velocity.x, centerExpected.velocity.x)
+        XCTAssertEqual(centerSpark.velocity.y, centerExpected.velocity.y)
+        XCTAssertEqual(centerSpark.velocity.z, centerExpected.velocity.z)
+        let lowerSlotSpark = try XCTUnwrap(
+            expiredFrame.trainingGuidebotYellowFlareTimeoutSparks.first {
+                $0.sourceObjectSlot == 8
+            }
+        )
+        XCTAssertEqual(lowerSlotSpark.position, centerOrigin)
+        XCTAssertEqual(
+            lowerSlotSpark.velocity,
+            .init(
+                x: lowerSlotSpark.orientation.forward.x * 17,
+                y: lowerSlotSpark.orientation.forward.y * 17,
+                z: lowerSlotSpark.orientation.forward.z * 17
+            )
+        )
+        XCTAssertEqual(
+            expiredFrame.trainingGuidebotYellowFlareTimeoutSparkParticles
+                .count,
+            8
+        )
+        let timeoutPlan = try updateMetalWorldPlan(
+            try makeMetalWorldPlan(
+                level: expiry.level,
+                playerView: expiredFrame.playerView
+            ),
+            level: expiry.level,
+            playerView: expiredFrame.playerView,
+            trainingGuidebotYellowFlareParticles:
+                expiredFrame.trainingGuidebotYellowFlareParticles,
+            trainingGuidebotYellowFlareTimeoutExplosions:
+                expiredFrame.trainingGuidebotYellowFlareTimeoutExplosions,
+            trainingGuidebotYellowFlareTimeoutSparks:
+                expiredFrame.trainingGuidebotYellowFlareTimeoutSparks,
+            trainingGuidebotYellowFlareTimeoutSparkParticles:
+                expiredFrame
+                    .trainingGuidebotYellowFlareTimeoutSparkParticles
+        )
+        XCTAssertTrue(timeoutPlan.draws.contains {
+            $0.texture?.sourceName == "FlarePuff"
+                && $0.objectHandle == UInt32.max - 3_000
+        })
+        XCTAssertEqual(
+            timeoutPlan.draws.filter {
+                guard let handle = $0.objectHandle else { return false }
+                return handle <= UInt32.max - 4_000
+                    && handle > UInt32.max - 4_009
+            }.count,
+            9
+        )
+        XCTAssertTrue(timeoutPlan.draws.contains { draw in
+            guard let handle = draw.objectHandle,
+                  handle <= UInt32.max - 4_000,
+                  handle > UInt32.max - 4_009 else {
+                return false
+            }
+            return draw.vertices.contains {
+                $0.dynamicLight.x > 0
+                    || $0.dynamicLight.y > 0
+                    || $0.dynamicLight.z > 0
+            }
+        })
         XCTAssertEqual(
             try randomState(in: expiry.continuation),
-            (0..<6).reduce(expiryInitialRandomState) {
+            (0..<54).reduce(expiryInitialRandomState) {
                 state, _ in nextState(state)
             }
+        )
+        let postExpiryRandomState = try randomState(
+            in: expiry.continuation
         )
         XCTAssertFalse(expiredFrame.trainingOpeningFeedback.contains {
             $0.soundSourceName == "Flare.wav"
@@ -8430,9 +8637,336 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertTrue(
             expiredRestoreFrame.trainingGuidebotYellowFlares.isEmpty
         )
+        XCTAssertEqual(
+            expiredRestoreFrame
+                .trainingGuidebotYellowFlareTimeoutExplosions.count,
+            1
+        )
+        XCTAssertEqual(
+            expiredRestoreFrame
+                .trainingGuidebotYellowFlareTimeoutSparks.count,
+            9
+        )
+        XCTAssertEqual(
+            expiredRestoreFrame
+                .trainingGuidebotYellowFlareTimeoutSparkParticles.count,
+            9
+        )
+        XCTAssertEqual(
+            try randomState(in: expiredRestore.continuation),
+            (0..<6).reduce(postExpiryRandomState) {
+                state, _ in nextState(state)
+            }
+        )
+        XCTAssertTrue(
+            expiredRestoreFrame
+                .trainingGuidebotYellowFlareTimeoutSparks
+                .allSatisfy { $0.lightDistance == 6 }
+        )
+        let restoredCenterSpark = try XCTUnwrap(
+            expiredRestoreFrame
+                .trainingGuidebotYellowFlareTimeoutSparks.first {
+                    $0.sourceAttemptIndex == 0
+                }
+        )
+        let restoredCenterExpected = expectedMotion(
+            position: centerSpark.position,
+            velocity: centerSpark.velocity,
+            duration: 0.01
+        )
+        XCTAssertEqual(
+            restoredCenterSpark.position.x,
+            restoredCenterExpected.position.x
+        )
+        XCTAssertEqual(
+            restoredCenterSpark.position.y,
+            restoredCenterExpected.position.y
+        )
+        XCTAssertEqual(
+            restoredCenterSpark.position.z,
+            restoredCenterExpected.position.z
+        )
+        XCTAssertEqual(
+            restoredCenterSpark.velocity.x,
+            restoredCenterExpected.velocity.x
+        )
+        XCTAssertEqual(
+            restoredCenterSpark.velocity.y,
+            restoredCenterExpected.velocity.y
+        )
+        XCTAssertEqual(
+            restoredCenterSpark.velocity.z,
+            restoredCenterExpected.velocity.z
+        )
         XCTAssertFalse(expiredRestoreFrame.trainingOpeningFeedback.contains {
             $0.soundSourceName == "Flare.wav"
         })
+        let boundedTimeoutRandomState = try randomState(
+            in: expiredRestore.continuation
+        )
+        let boundedTimeoutFrame = expiredRestore.update(
+            at: 23.02,
+            input: .zero
+        )
+        XCTAssertEqual(
+            boundedTimeoutFrame
+                .trainingGuidebotYellowFlareTimeoutExplosions,
+            expiredRestoreFrame
+                .trainingGuidebotYellowFlareTimeoutExplosions
+        )
+        XCTAssertEqual(
+            boundedTimeoutFrame
+                .trainingGuidebotYellowFlareTimeoutSparks,
+            expiredRestoreFrame
+                .trainingGuidebotYellowFlareTimeoutSparks
+        )
+        XCTAssertEqual(
+            boundedTimeoutFrame
+                .trainingGuidebotYellowFlareTimeoutSparkParticles,
+            expiredRestoreFrame
+                .trainingGuidebotYellowFlareTimeoutSparkParticles
+        )
+        XCTAssertEqual(
+            try randomState(in: expiredRestore.continuation),
+            boundedTimeoutRandomState
+        )
+
+        var hostileChildLightObject = try continuationObject(
+            expiredRestore.continuation
+        )
+        var hostileChildLightState = try XCTUnwrap(
+            hostileChildLightObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        var hostileChildLightSparks = try XCTUnwrap(
+            hostileChildLightState["yellowFlareTimeoutSparks"]
+                as? [[String: Any]]
+        )
+        hostileChildLightSparks[0]["presentedLightDistance"] = 8
+        hostileChildLightState["yellowFlareTimeoutSparks"] =
+            hostileChildLightSparks
+        hostileChildLightObject["trainingRobotGuidebotState"] =
+            hostileChildLightState
+        XCTAssertThrowsError(try PlayerSimulation(
+            level: eligible.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: hostileChildLightObject
+                )
+            ),
+            resumedAtTimestamp: 23.02
+        )) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var incompleteTimeoutObject = try continuationObject(
+            expiry.continuation
+        )
+        var incompleteTimeoutState = try XCTUnwrap(
+            incompleteTimeoutObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        incompleteTimeoutState.removeValue(
+            forKey: "yellowFlareTimeoutSparkParticles"
+        )
+        incompleteTimeoutObject["trainingRobotGuidebotState"] =
+            incompleteTimeoutState
+        XCTAssertThrowsError(try PlayerSimulation(
+            level: eligible.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: incompleteTimeoutObject
+                )
+            ),
+            resumedAtTimestamp: 23
+        )) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var duplicateTimeoutObject = try continuationObject(
+            expiry.continuation
+        )
+        var duplicateTimeoutState = try XCTUnwrap(
+            duplicateTimeoutObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        var duplicateSparks = try XCTUnwrap(
+            duplicateTimeoutState["yellowFlareTimeoutSparks"]
+                as? [[String: Any]]
+        )
+        duplicateSparks.append(try XCTUnwrap(duplicateSparks.first))
+        duplicateTimeoutState["yellowFlareTimeoutSparks"] =
+            duplicateSparks
+        duplicateTimeoutObject["trainingRobotGuidebotState"] =
+            duplicateTimeoutState
+        XCTAssertThrowsError(try PlayerSimulation(
+            level: eligible.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: duplicateTimeoutObject
+                )
+            ),
+            resumedAtTimestamp: 23
+        )) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var missingTimeoutObject = try continuationObject(
+            expiry.continuation
+        )
+        var missingTimeoutState = try XCTUnwrap(
+            missingTimeoutObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        var missingSparks = try XCTUnwrap(
+            missingTimeoutState["yellowFlareTimeoutSparks"]
+                as? [[String: Any]]
+        )
+        missingSparks.removeLast()
+        missingTimeoutState["yellowFlareTimeoutSparks"] =
+            missingSparks
+        missingTimeoutObject["trainingRobotGuidebotState"] =
+            missingTimeoutState
+        XCTAssertThrowsError(try PlayerSimulation(
+            level: eligible.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: missingTimeoutObject
+                )
+            ),
+            resumedAtTimestamp: 23
+        )) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var legacyTimeoutObject = try continuationObject(
+            expiry.continuation
+        )
+        var legacyTimeoutState = try XCTUnwrap(
+            legacyTimeoutObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        legacyTimeoutState.removeValue(
+            forKey: "yellowFlareTimeoutExplosions"
+        )
+        legacyTimeoutState.removeValue(
+            forKey: "yellowFlareTimeoutSparks"
+        )
+        legacyTimeoutState.removeValue(
+            forKey: "yellowFlareTimeoutSparkParticles"
+        )
+        legacyTimeoutState.removeValue(
+            forKey: "yellowFlareTimeoutReachedFollowingFrame"
+        )
+        legacyTimeoutObject["trainingRobotGuidebotState"] =
+            legacyTimeoutState
+        let legacyTimeoutRestore = try PlayerSimulation(
+            level: eligible.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: legacyTimeoutObject
+                )
+            ),
+            resumedAtTimestamp: 23
+        )
+        let legacyTimeoutFrame = legacyTimeoutRestore.update(
+            at: 23.01,
+            input: .zero
+        )
+        XCTAssertTrue(
+            legacyTimeoutFrame
+                .trainingGuidebotYellowFlareTimeoutExplosions.isEmpty
+        )
+        XCTAssertTrue(
+            legacyTimeoutFrame
+                .trainingGuidebotYellowFlareTimeoutSparks.isEmpty
+        )
+
+        var parentOnlyLevelObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(eligible.level)
+            ) as? [String: Any]
+        )
+        var parentOnlyChain = try XCTUnwrap(
+            parentOnlyLevelObject["trainingRobotGuidebotChain"]
+                as? [String: Any]
+        )
+        var parentOnlyFlare = try XCTUnwrap(
+            parentOnlyChain["yellowFlare"] as? [String: Any]
+        )
+        parentOnlyFlare.removeValue(forKey: "timeout")
+        parentOnlyChain["yellowFlare"] = parentOnlyFlare
+        parentOnlyLevelObject["trainingRobotGuidebotChain"] =
+            parentOnlyChain
+        let parentOnlyLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(
+                withJSONObject: parentOnlyLevelObject
+            )
+        )
+        var parentOnlyObject = expiryObject
+        var parentOnlyState = try XCTUnwrap(
+            parentOnlyObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        parentOnlyState.removeValue(
+            forKey: "yellowFlareTimeoutExplosions"
+        )
+        parentOnlyState.removeValue(
+            forKey: "yellowFlareTimeoutSparks"
+        )
+        parentOnlyState.removeValue(
+            forKey: "yellowFlareTimeoutSparkParticles"
+        )
+        parentOnlyState.removeValue(
+            forKey: "yellowFlareTimeoutReachedFollowingFrame"
+        )
+        parentOnlyObject["trainingRobotGuidebotState"] =
+            parentOnlyState
+        let parentOnlyRestore = try PlayerSimulation(
+            level: parentOnlyLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: parentOnlyObject
+                )
+            ),
+            resumedAtTimestamp: 24
+        )
+        let parentOnlyFrame = parentOnlyRestore.update(
+            at: 24.01,
+            input: .zero
+        )
+        XCTAssertTrue(parentOnlyFrame.trainingGuidebotYellowFlares.isEmpty)
+        XCTAssertTrue(
+            parentOnlyFrame
+                .trainingGuidebotYellowFlareTimeoutExplosions.isEmpty
+        )
+        XCTAssertTrue(
+            parentOnlyFrame
+                .trainingGuidebotYellowFlareTimeoutSparks.isEmpty
+        )
+        XCTAssertTrue(
+            parentOnlyFrame
+                .trainingGuidebotYellowFlareTimeoutSparkParticles.isEmpty
+        )
 
         var compatibleLevelObject = try XCTUnwrap(
             JSONSerialization.jsonObject(
@@ -20084,6 +20618,21 @@ func makeTrainingGuidebotYellowFlareLevel() -> Level {
         sourceSHA256:
             "eabf95db1e5c17235b65a7b938081d40e44736456112acbc4a1ff99126051194"
     )
+    let explosionTexture = SourceResource(
+        storedIndex: 900,
+        sourceName: "FlarePuff"
+    )
+    let explosionMaterial = PresentationMaterial(
+        texture: explosionTexture,
+        bitmapSourceName: "FlarePuff.oaf",
+        image: templateMaterial.image,
+        blend: .additiveSourceAlpha(opacity: 102),
+        lightmapBlend: .none,
+        waterProcedural: nil,
+        sourceArchive: templateMaterial.sourceArchive,
+        sourceSHA256:
+            "9416910ac344a0e3a9dd35ef596300147b7014972c73974a88546351ca92835c"
+    )
     let pcm = Data(repeating: 0, count: 2)
     let sound = CanonicalSoundClip(
         logicalName: "Flare",
@@ -20097,6 +20646,41 @@ func makeTrainingGuidebotYellowFlareLevel() -> Level {
         sourceArchive: templateModel.sourceArchive,
         sourceSHA256: String(repeating: "f", count: 64),
         importVolume: 0.300_000_07
+    )
+    let timeout = TrainingGuidebotYellowFlareTimeoutDefinition(
+        explosionTexture: explosionTexture,
+        explosionLifetime: 0.2,
+        explosionSize: 2,
+        childSource: .init(
+            storedIndex: 54,
+            sourceName: "YellowFlareSparks"
+        ),
+        childTexture: particleTexture,
+        childCount: 9,
+        childWeaponFlags: 1_056,
+        childPhysicsFlags: 2_556_032,
+        childCollisionRadius: 0.2,
+        childSpeed: 17,
+        childLifetime: 0.2,
+        childMass: 0.1,
+        childDrag: 0.1,
+        childCoefficientOfRestitution: 1,
+        childLightDistance: 6,
+        childLightPresentation: .init(
+            primaryColor: .init(x: 1, y: 1, z: 0.5),
+            secondaryColor: .zero,
+            timeInterval: 0,
+            flickerDistance: 0,
+            directionalDot: 0,
+            flags: 0,
+            timebits: 0,
+            angle: 0,
+            lightingRenderType: 0
+        ),
+        childParticleCount: 25,
+        childParticleInterval: 0.04,
+        childParticleSize: 0.3,
+        childParticleLifetime: 0.3
     )
     let yellowFlare = TrainingGuidebotYellowFlareDefinition(
         source: .init(storedIndex: 3, sourceName: "Yellow flare"),
@@ -20127,7 +20711,8 @@ func makeTrainingGuidebotYellowFlareLevel() -> Level {
         particleCount: 25,
         particleInterval: 0.04,
         particleSize: 0.2,
-        particleLifetime: 0.3
+        particleLifetime: 0.3,
+        timeout: timeout
     )
     let boundChain = TrainingRobotGuidebotChain(
         destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
@@ -20171,6 +20756,18 @@ func makeTrainingGuidebotYellowFlareLevel() -> Level {
             provenance: "synthetic Yellow flare fixture"
         ),
         .init(
+            category: "weapon-definition",
+            source: timeout.childSource,
+            state: "canonical-page-bound",
+            provenance: "synthetic Yellow flare timeout fixture"
+        ),
+        .init(
+            category: "texture",
+            source: explosionTexture,
+            state: "presentation-payload-imported",
+            provenance: "synthetic Yellow flare timeout fixture"
+        ),
+        .init(
             category: "sound",
             source: .init(
                 storedIndex: sound.sourceEntryIndex,
@@ -20183,7 +20780,8 @@ func makeTrainingGuidebotYellowFlareLevel() -> Level {
     return replacing(
         level,
         presentationMaterials:
-            level.presentationMaterials + [particleMaterial],
+            level.presentationMaterials
+                + [particleMaterial, explosionMaterial],
         models: level.models + [flareModel],
         trainingRobotGuidebotChain: boundChain,
         soundClips: level.soundClips + [sound],
