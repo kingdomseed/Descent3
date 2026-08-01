@@ -1,0 +1,57 @@
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_29c35be118215e::t_34727765caf662 8276-8297
+  s_29c35be118215e::t_96be2fe40f61d7 8222-8235
+  s_29c35be118215e::t_1b1964ac53b5b9 8199-8221,8236-8275
+  s_29c35be118215e::t_07d8296ddc9372 8520,8529,8534
+  s_29c35be118215e::t_bbf1fe040a282a 8482-8491,8510-8519,8521-8528,8530-8533,8535,8557-8568,8587-8655
+docs/revival/source-translation-ledger.md
+  s_29c35be118215e::t_340ffdddd296cf 1668
+  s_29c35be118215e::t_fe32e38a17cfef 1670
+  s_29c35be118215e::t_528082ab5b95ac 1671
+  s_c503f7c0529e13::t_700f45a47c0a1c 198,1662,1669
+  s_29c35be118215e::t_57d9fc5346ab5d 191,197
+  s_29c35be118215e::t_7e8433ebd9ac24 1649-1660,1663-1667,1672-1674
+  s_29c35be118215e::t_f4947440ee65a0 1661
+docs/revival/content-pipeline.md
+  s_29c35be118215e::t_1b1beecae3636d 114-115
+Revival/Sources/D3Import/D3ImportOperation.swift
+  s_29c35be118215e::t_bbf1fe040a282a 1112-1129,1367,1371-1372
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_29c35be118215e::t_2fd68fecd08aa1 3538,3556
+  s_29c35be118215e::t_bbf1fe040a282a 3534,3550-3555,3558-3563,4192,4219,5473-5474
+  s_29c35be118215e::t_f6d6cd362ae96c 3557,5475
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_b5a531a7cbe236 261-264
+  s_c503f7c0529e13::t_18e00be27751ec 22-25,27-29,65-67
+  s_c503f7c0529e13::t_6ad1ce7431ea75 201
+docs/revival/functional-completeness-ledger.md
+  s_29c35be118215e::t_63bbf77b8bcb7c 29,43,61,263
+Revival/Sources/RevivalAppKit/RevivalGameplayView.swift
+  s_29c35be118215e::t_37ada85953c0bb 501
+Revival/Sources/RevivalCore/Level.swift
+  s_29c35be118215e::t_bbf1fe040a282a 767,1216-1217,1233-1249,5016-5022,5050-5051,6366-6369,7117-7118,7145-7156,7231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "1278da71723c51b4e9a0fc05090b0484247f041a",
+  "prompts": {},
+  "sessions": {
+    "s_29c35be118215e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fbd10-52de-70a1-b03e-73da3a90db7b",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
