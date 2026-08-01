@@ -8125,12 +8125,12 @@ final class WorldRenderingTests: XCTestCase {
             returnRandomState,
             "The deferred return-to-ship branch must not consume the authoritative stream."
         )
-        let postReturnF4 = simulation.update(
+        let postReturnFrame = simulation.update(
             at: Double(script058.gameTime) + 0.1,
-            input: .init(deploysTrainingGuidebot: true)
+            input: .zero
         )
-        XCTAssertNil(postReturnF4.trainingGuidebot)
-        XCTAssertTrue(postReturnF4.trainingOpeningFeedback.isEmpty)
+        XCTAssertNil(postReturnFrame.trainingGuidebot)
+        XCTAssertTrue(postReturnFrame.trainingOpeningFeedback.isEmpty)
 
         let continuation = try JSONDecoder().decode(
             PlayerSimulationContinuation.self,
@@ -8192,6 +8192,333 @@ final class WorldRenderingTests: XCTestCase {
                 resumedAtTimestamp: 200
             )
         )
+    }
+
+    @MainActor
+    func testInShipReleaseGuidebotCommandReusesBirthAfterScript039() throws {
+        let level = makeTrainingKillbotEntryLevel()
+        try level.validate()
+        let initialSimulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var initialContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(initialSimulation.continuation)
+            ) as? [String: Any]
+        )
+        var initialGalleryState = try XCTUnwrap(
+            initialContinuationObject["trainingGalleryBarrierState"]
+                as? [String: Any]
+        )
+        initialGalleryState["wasTriggered"] = true
+        initialGalleryState["markerLightDistance"] = 0
+        initialContinuationObject["trainingGalleryBarrierState"] =
+            initialGalleryState
+        let gallerySimulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: initialContinuationObject
+                )
+            ),
+            resumedAtTimestamp: 0
+        )
+        gallerySimulation.destroyTrainingRobot(handle: 4_112)
+        var readyContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(gallerySimulation.continuation)
+            ) as? [String: Any]
+        )
+        var readyRobotState = try XCTUnwrap(
+            readyContinuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        readyRobotState.removeValue(forKey: "destructionTimerRemaining")
+        readyRobotState["destructionFeedbackWasPresented"] = true
+        readyRobotState["enabledControlHUDIsVisible"] = false
+        readyContinuationObject["trainingRobotGuidebotState"] =
+            readyRobotState
+        let simulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: readyContinuationObject
+                )
+            ),
+            resumedAtTimestamp: 0
+        )
+
+        var timestamp = 0.1
+        _ = simulation.update(
+            at: timestamp,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        timestamp += 0.1
+        _ = simulation.update(
+            at: timestamp,
+            input: .init(usesInventory: true)
+        )
+        timestamp += 0.1
+        _ = simulation.update(
+            at: timestamp,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        for _ in 1...100 {
+            timestamp += 0.1
+            let frame = simulation.update(at: timestamp, input: .zero)
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "proceed6.osf"
+            }) {
+                break
+            }
+        }
+        timestamp += 0.1
+        let portalEntry = simulation.update(
+            at: timestamp,
+            input: .init(forward: 1)
+        )
+        XCTAssertTrue(portalEntry.trainingOpeningFeedback.contains(where: {
+            $0.voiceSourceName == "intro6.osf"
+        }))
+        var script039: PlayerSimulationFrame?
+        for _ in 1...130 {
+            timestamp += 0.1
+            let frame = simulation.update(at: timestamp, input: .zero)
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "guidebotf.osf"
+            }) {
+                script039 = frame
+                break
+            }
+        }
+        let script039Frame = try XCTUnwrap(script039)
+        XCTAssertTrue(simulation.trainingGuidebotReleaseCommandIsAvailable)
+
+        let menu = RevivalGameplayView.trainingGuidebotReleaseMenu(
+            target: nil,
+            action: nil
+        )
+        XCTAssertEqual(menu.title, "GB Command Menu")
+        XCTAssertEqual(menu.items.count, 1)
+        XCTAssertEqual(menu.items[0].title, "1. Release Guidebot")
+        XCTAssertEqual(menu.items[0].keyEquivalent, "1")
+        XCTAssertTrue(menu.items[0].keyEquivalentModifierMask.isEmpty)
+        XCTAssertEqual(menu.items[0].tag, 0)
+        XCTAssertTrue(
+            RevivalGameplayView.cancelsTrainingGuidebotReleaseMenu(
+                keyCode: 118
+            )
+        )
+        XCTAssertTrue(
+            RevivalGameplayView.cancelsTrainingGuidebotReleaseMenu(
+                keyCode: 53
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.cancelsTrainingGuidebotReleaseMenu(
+                keyCode: 18
+            )
+        )
+
+        let canonicalPlayer = try XCTUnwrap(level.objects.first {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        var releaseContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        releaseContinuationObject["playerPosition"] = [
+            "x": canonicalPlayer.position.x,
+            "y": canonicalPlayer.position.y,
+            "z": canonicalPlayer.position.z,
+        ]
+        releaseContinuationObject["playerLocation"] = try JSONSerialization
+            .jsonObject(with: JSONEncoder().encode(canonicalPlayer.location))
+        releaseContinuationObject["playerOrientation"] = [
+            "right": [
+                "x": canonicalPlayer.orientation.right.x,
+                "y": canonicalPlayer.orientation.right.y,
+                "z": canonicalPlayer.orientation.right.z,
+            ],
+            "up": [
+                "x": canonicalPlayer.orientation.up.x,
+                "y": canonicalPlayer.orientation.up.y,
+                "z": canonicalPlayer.orientation.up.z,
+            ],
+            "forward": [
+                "x": canonicalPlayer.orientation.forward.x,
+                "y": canonicalPlayer.orientation.forward.y,
+                "z": canonicalPlayer.orientation.forward.z,
+            ],
+        ]
+        releaseContinuationObject["velocity"] = [
+            "x": Float.zero,
+            "y": Float.zero,
+            "z": Float.zero,
+        ]
+        releaseContinuationObject["frameDuration"] = Float.zero
+        let releaseSimulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: releaseContinuationObject
+                )
+            ),
+            resumedAtTimestamp: 100
+        )
+        XCTAssertTrue(
+            releaseSimulation.trainingGuidebotReleaseCommandIsAvailable
+        )
+        let player = try XCTUnwrap(releaseSimulation.level.objects.first {
+            $0.handle
+                == releaseSimulation.level.defaultPlayerBinding?.objectHandle
+        })
+        let inheritedVelocity = releaseSimulation.continuation.velocity
+        let feedbackCountBeforeRelease =
+            script039Frame.trainingOpeningFeedback.count
+        let released = releaseSimulation.update(
+            at: 100.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        let guidebot = try XCTUnwrap(released.trainingGuidebot)
+        XCTAssertEqual(guidebot.spawnPosition, player.position)
+        XCTAssertEqual(guidebot.orientation, player.orientation)
+        XCTAssertEqual(
+            guidebot.spawnVelocity,
+            Vector3(
+                x: inheritedVelocity.x
+                    + player.orientation.forward.x * 40,
+                y: inheritedVelocity.y
+                    + player.orientation.forward.y * 40,
+                z: inheritedVelocity.z
+                    + player.orientation.forward.z * 40
+            )
+        )
+        XCTAssertTrue(released.trainingOpeningFeedback.isEmpty)
+        XCTAssertFalse(
+            releaseSimulation.trainingGuidebotReleaseCommandIsAvailable
+        )
+        XCTAssertTrue(releaseSimulation.level.objectPresentations.contains {
+            $0.objectHandle
+                == level.trainingRobotGuidebotChain?.guidebotObjectHandle
+                && $0.isVisible
+        })
+        let releasedContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(releaseSimulation.continuation)
+            ) as? [String: Any]
+        )
+        let releasedState = try XCTUnwrap(
+            releasedContinuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        let releasedGuidebot = try XCTUnwrap(
+            releasedState["guidebot"] as? [String: Any]
+        )
+        XCTAssertEqual(releasedGuidebot["task"] as? String, "outbound")
+        XCTAssertEqual(
+            script039Frame.trainingOpeningFeedback.count,
+            feedbackCountBeforeRelease
+        )
+
+        let continuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONEncoder().encode(releaseSimulation.continuation)
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 100
+        )
+        let silent = restored.update(at: 100.1, input: .zero)
+        XCTAssertNotNil(silent.trainingGuidebot)
+        XCTAssertTrue(silent.trainingOpeningFeedback.isEmpty)
+
+        var mismatchedPlayerObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(continuation)
+            ) as? [String: Any]
+        )
+        var mismatchedPlayerPosition = try XCTUnwrap(
+            mismatchedPlayerObject["playerPosition"] as? [String: Any]
+        )
+        mismatchedPlayerPosition["x"] = try XCTUnwrap(
+            mismatchedPlayerPosition["x"] as? Double
+        ) + 10
+        mismatchedPlayerObject["playerPosition"] =
+            mismatchedPlayerPosition
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: mismatchedPlayerObject
+                    )
+                ),
+                resumedAtTimestamp: 200
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var hostileObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(continuation)
+            ) as? [String: Any]
+        )
+        var hostileState = try XCTUnwrap(
+            hostileObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        var hostileGuidebot = try XCTUnwrap(
+            hostileState["guidebot"] as? [String: Any]
+        )
+        func offsetX(_ key: String, in object: inout [String: Any])
+            throws
+        {
+            var value = try XCTUnwrap(object[key] as? [String: Any])
+            value["x"] = try XCTUnwrap(value["x"] as? Double) + 10_000
+            object[key] = value
+        }
+        for key in [
+            "spawnPosition",
+            "allocationStartPosition",
+            "position",
+            "destination",
+            "routeDestination",
+        ] {
+            try offsetX(key, in: &hostileGuidebot)
+        }
+        var hostileRoute = try XCTUnwrap(
+            hostileGuidebot["route"] as? [String: Any]
+        )
+        var hostilePoints = try XCTUnwrap(
+            hostileRoute["points"] as? [[String: Any]]
+        )
+        hostilePoints[0]["x"] = try XCTUnwrap(
+            hostilePoints[0]["x"] as? Double
+        ) + 10_000
+        hostileRoute["points"] = hostilePoints
+        hostileGuidebot["route"] = hostileRoute
+        hostileState["guidebot"] = hostileGuidebot
+        hostileObject["trainingRobotGuidebotState"] = hostileState
+        XCTAssertThrowsError(try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: hostileObject)
+            ),
+            resumedAtTimestamp: 200
+        ))
     }
 
     func testKillbotEntryClosesPortalRoom5AndRunsTimedInstructionAcrossReload()

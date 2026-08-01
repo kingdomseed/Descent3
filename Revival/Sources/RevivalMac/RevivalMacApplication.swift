@@ -437,7 +437,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
               simulation.trainingGuidebotReturnToShipCommandIsAvailable,
               let gameplayView
         else {
-            playerInput.requestGuidebotDeployment()
+            requestTrainingGuidebotReleaseOrDeployment()
             return
         }
         playerInput.setGameplayActive(
@@ -448,6 +448,26 @@ private final class RevivalMacApplicationDelegate: NSObject,
         gameplayView.clearInput()
         let selected =
             gameplayView.presentTrainingGuidebotReturnToShipMenu()
+        updateGameplayActivity()
+        guard selected, playerInput.gameplayIsActive else { return }
+        playerInput.requestGuidebotDeployment()
+    }
+
+    private func requestTrainingGuidebotReleaseOrDeployment() {
+        guard let simulation,
+              simulation.trainingGuidebotReleaseCommandIsAvailable,
+              let gameplayView
+        else {
+            playerInput.requestGuidebotDeployment()
+            return
+        }
+        playerInput.setGameplayActive(
+            false,
+            simulation: simulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+        gameplayView.clearInput()
+        let selected = gameplayView.presentTrainingGuidebotReleaseMenu()
         updateGameplayActivity()
         guard selected, playerInput.gameplayIsActive else { return }
         playerInput.requestGuidebotDeployment()
