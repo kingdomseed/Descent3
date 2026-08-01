@@ -3192,6 +3192,25 @@ final class PlayerSimulation {
         trainingCameraMonitorActiveGoalTarget() != nil
     }
 
+    var trainingGuidebotReturnToShipCommandIsAvailable: Bool {
+        guard level.trainingCameraMonitorChain?.returnToShip != nil,
+              let guidebotState = trainingRobotGuidebotState,
+              guidebotState.guidebotContinuationWasPresented,
+              guidebotState.guidebotIsDeployed,
+              !guidebotState.guidebotEnteredShip,
+              guidebotState.guidebotMode == .ambient,
+              guidebotState.guidebot?.task == .escortPlayer,
+              !guidebotState.returnWasRequested,
+              let cameraState = trainingCameraMonitorState,
+              !cameraState.isHeld,
+              cameraState.wasUsed,
+              !cameraState.script058WasPresented
+        else {
+            return false
+        }
+        return true
+    }
+
     private func nextAuthoritativeRandomValue() -> UInt32 {
         authoritativeRandomState =
             authoritativeRandomState &* 214_013 &+ 2_531_011

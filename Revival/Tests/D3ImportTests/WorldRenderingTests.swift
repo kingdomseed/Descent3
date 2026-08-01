@@ -7609,6 +7609,9 @@ final class WorldRenderingTests: XCTestCase {
             greetingFrame.trainingOpeningFeedback
         )
         XCTAssertNotNil(greetingFrame.trainingGuidebot)
+        XCTAssertFalse(
+            simulation.trainingGuidebotReturnToShipCommandIsAvailable
+        )
 
         let completedContinuation = simulation.continuation
         let completedRandomState = try XCTUnwrap(
@@ -7692,6 +7695,92 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(
             try randomState(in: restored.continuation),
             completedRandomState
+        )
+
+        var returnCommandObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(completedContinuation)
+            ) as? [String: Any]
+        )
+        returnCommandObject["playerLocation"] = [
+            "room": ["_0": 39],
+        ]
+        returnCommandObject["playerPosition"] = [
+            "x": pickupPosition.x,
+            "y": pickupPosition.y,
+            "z": pickupPosition.z,
+        ]
+        var returnCommandRobotState = try XCTUnwrap(
+            returnCommandObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        var returnCommandGuidebot = try XCTUnwrap(
+            returnCommandRobotState["guidebot"] as? [String: Any]
+        )
+        returnCommandGuidebot["destination"] = [
+            "x": pickupPosition.x,
+            "y": pickupPosition.y,
+            "z": pickupPosition.z,
+        ]
+        returnCommandRobotState["guidebot"] = returnCommandGuidebot
+        returnCommandObject["trainingRobotGuidebotState"] =
+            returnCommandRobotState
+        let returnCommandSimulation = try restore(
+            JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: returnCommandObject
+                )
+            ),
+            at: 550,
+            checkpoint: "post-Script-059 return command",
+            level: level
+        )
+        _ = returnCommandSimulation.update(at: 550.1, input: .zero)
+        XCTAssertFalse(
+            returnCommandSimulation
+                .trainingGuidebotReturnToShipCommandIsAvailable
+        )
+        let usedCameraMonitor = returnCommandSimulation.update(
+            at: 550.2,
+            input: .init(usesInventory: true)
+        )
+        XCTAssertEqual(
+            usedCameraMonitor.trainingOpeningFeedback,
+            [.init(
+                hudMessages: [
+                    "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
+                ],
+                voiceSourceName: "guidebotd.osf",
+                voicePrecedesHUDMessages: true
+            )]
+        )
+        XCTAssertTrue(
+            returnCommandSimulation
+                .trainingGuidebotReturnToShipCommandIsAvailable
+        )
+        for frameIndex in 3...30 {
+            _ = returnCommandSimulation.update(
+                at: 550 + Double(frameIndex) * 0.1,
+                input: .zero
+            )
+        }
+        let requestedReturn = returnCommandSimulation.update(
+            at: 553.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        XCTAssertEqual(
+            requestedReturn.trainingOpeningFeedback,
+            [.init(
+                hudMessages: ["GB: Returning to ship."],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "GBotAcceptOrder.wav"
+            )]
+        )
+        XCTAssertFalse(
+            returnCommandSimulation
+                .trainingGuidebotReturnToShipCommandIsAvailable
         )
 
         var legacyObject = startObject
@@ -14275,6 +14364,52 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertFalse(
             input.snapshot(frameDuration: 0.1)
                 .requestsTrainingGuidebotActiveGoal
+        )
+    }
+
+    @MainActor
+    func testScript059UsesOneNativeGuidebotReturnMenuAndPausedContextualCommand()
+    {
+        let menu = RevivalGameplayView.trainingGuidebotReturnToShipMenu(
+            target: nil,
+            action: nil
+        )
+        XCTAssertEqual(menu.title, "GB Command Menu")
+        XCTAssertEqual(menu.items.count, 1)
+        XCTAssertEqual(menu.items[0].title, "1. Return to ship")
+        XCTAssertEqual(menu.items[0].keyEquivalent, "1")
+        XCTAssertTrue(menu.items[0].keyEquivalentModifierMask.isEmpty)
+        XCTAssertEqual(menu.items[0].tag, 43)
+        XCTAssertTrue(
+            RevivalGameplayView.cancelsTrainingGuidebotReturnToShipMenu(
+                keyCode: 118
+            )
+        )
+        XCTAssertTrue(
+            RevivalGameplayView.cancelsTrainingGuidebotReturnToShipMenu(
+                keyCode: 53
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.cancelsTrainingGuidebotReturnToShipMenu(
+                keyCode: 18
+            )
+        )
+
+        var input = PlayerInputState(rampDuration: 0)
+        input.setHeld(.init(forward: 1))
+        input.setGameplayActive(false, simulation: nil, at: 1)
+        input.requestGuidebotDeployment()
+        XCTAssertEqual(input.snapshot(frameDuration: 0.1), .zero)
+        input.setGameplayActive(true, simulation: nil, at: 2)
+        input.requestGuidebotDeployment()
+        XCTAssertTrue(
+            input.snapshot(frameDuration: 0.1)
+                .deploysTrainingGuidebot
+        )
+        XCTAssertFalse(
+            input.snapshot(frameDuration: 0.1)
+                .deploysTrainingGuidebot
         )
     }
 

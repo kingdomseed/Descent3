@@ -92,6 +92,7 @@ final class RevivalGameplayView: MTKView {
     private var trainingResultPresentedAt: TimeInterval?
     private var pendingTrainingResultKeyAcknowledgement = false
     private var trainingGuidebotGoalWasSelected = false
+    private var trainingGuidebotReturnToShipWasSelected = false
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -619,6 +620,43 @@ final class RevivalGameplayView: MTKView {
         trainingGuidebotGoalWasSelected = true
     }
 
+    func presentTrainingGuidebotReturnToShipMenu() -> Bool {
+        trainingGuidebotReturnToShipWasSelected = false
+        let menu = Self.trainingGuidebotReturnToShipMenu(
+            target: self,
+            action: #selector(selectTrainingGuidebotReturnToShip)
+        )
+        let eventMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: .keyDown
+        ) { event in
+            guard Self.cancelsTrainingGuidebotReturnToShipMenu(
+                keyCode: event.keyCode
+            ) else {
+                return event
+            }
+            menu.cancelTracking()
+            return nil
+        }
+        defer {
+            if let eventMonitor {
+                NSEvent.removeMonitor(eventMonitor)
+            }
+        }
+        menu.popUp(
+            positioning: nil,
+            at: NSPoint(x: bounds.midX, y: bounds.midY),
+            in: self
+        )
+        return trainingGuidebotReturnToShipWasSelected
+    }
+
+    @objc private func selectTrainingGuidebotReturnToShip(
+        _ sender: NSMenuItem
+    ) {
+        guard sender.tag == 43 else { return }
+        trainingGuidebotReturnToShipWasSelected = true
+    }
+
     func presentTrainingContentReadyState(completedLevelName: String) {
         NSObject.cancelPreviousPerformRequests(
             withTarget: self,
@@ -741,7 +779,30 @@ final class RevivalGameplayView: MTKView {
         return menu
     }
 
+    static func trainingGuidebotReturnToShipMenu(
+        target: AnyObject?,
+        action: Selector?
+    ) -> NSMenu {
+        let menu = NSMenu(title: "GB Command Menu")
+        let item = NSMenuItem(
+            title: "1. Return to ship",
+            action: action,
+            keyEquivalent: "1"
+        )
+        item.target = target
+        item.tag = 43
+        item.keyEquivalentModifierMask = []
+        menu.addItem(item)
+        return menu
+    }
+
     nonisolated static func cancelsTrainingGuidebotGoalMenu(
+        keyCode: UInt16
+    ) -> Bool {
+        keyCode == 118 || keyCode == 53
+    }
+
+    nonisolated static func cancelsTrainingGuidebotReturnToShipMenu(
         keyCode: UInt16
     ) -> Bool {
         keyCode == 118 || keyCode == 53

@@ -459,7 +459,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         guard let simulation = playSimulation,
               simulation.trainingGuidebotGoalCommandIsAvailable
         else {
-            playerInput.requestGuidebotDeployment()
+            requestTrainingGuidebotReturnToShipOrDeployment()
             return
         }
         playerInput.setGameplayActive(
@@ -483,6 +483,37 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         }
         guard selected, active else { return }
         playerInput.requestTrainingGuidebotActiveGoal()
+    }
+
+    private func requestTrainingGuidebotReturnToShipOrDeployment() {
+        guard let simulation = playSimulation,
+              simulation.trainingGuidebotReturnToShipCommandIsAvailable
+        else {
+            playerInput.requestGuidebotDeployment()
+            return
+        }
+        playerInput.setGameplayActive(
+            false,
+            simulation: simulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+        gameplayView.clearInput()
+        let selected =
+            gameplayView.presentTrainingGuidebotReturnToShipMenu()
+        let active =
+            playSimulation === simulation
+            && window?.isKeyWindow == true
+        playerInput.setGameplayActive(
+            active,
+            simulation: simulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+        gameplayView.setGameplayActive(active)
+        if active {
+            window?.makeFirstResponder(gameplayView)
+        }
+        guard selected, active else { return }
+        playerInput.requestGuidebotDeployment()
     }
 
     @objc private func commitRoomName(_ sender: Any?) {
