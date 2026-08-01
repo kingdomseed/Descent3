@@ -87,6 +87,7 @@ final class RevivalGameplayView: MTKView {
     private var pilotProfileIDs: [UUID] = []
     private var trainingVoicePlayer: AVAudioPlayer?
     private var trainingSoundPlayers: [AVAudioPlayer] = []
+    private var trainingGuidebotAmbientEnginePlayer: AVAudioPlayer?
     private var trainingMessageExpiresAt: Float?
     private var trainingResultIsPresented = false
     private var trainingResultPresentedAt: TimeInterval?
@@ -325,6 +326,7 @@ final class RevivalGameplayView: MTKView {
             trainingVoicePlayer = nil
             trainingSoundPlayers.forEach { $0.stop() }
             trainingSoundPlayers.removeAll()
+            stopTrainingGuidebotAmbientEngine()
             cameraMonitorBorder.isHidden = true
         }
     }
@@ -332,7 +334,9 @@ final class RevivalGameplayView: MTKView {
     func presentTrainingOpening(
         frame: PlayerSimulationFrame,
         voiceClips: [CanonicalVoiceClip],
-        soundClips: [CanonicalSoundClip] = []
+        soundClips: [CanonicalSoundClip] = [],
+        guidebotAmbientEngineSoundSourceName: String? = nil,
+        rooms: [LevelRoom] = []
     ) throws {
         if let finalGoal = frame.trainingFinalGoal {
             trainingMessageLabel.stringValue = ""
@@ -347,6 +351,7 @@ final class RevivalGameplayView: MTKView {
             trainingVoicePlayer = nil
             trainingSoundPlayers.forEach { $0.stop() }
             trainingSoundPlayers.removeAll()
+            stopTrainingGuidebotAmbientEngine()
             trainingEndLevelLabel.stringValue =
                 Self.trainingPostLevelResultText(
                     finalGoal.postLevelResult
@@ -404,6 +409,12 @@ final class RevivalGameplayView: MTKView {
         } else {
             invulnerabilityMonitorRing.isHidden = true
         }
+        updateTrainingGuidebotAmbientEngine(
+            frame: frame,
+            soundSourceName: guidebotAmbientEngineSoundSourceName,
+            soundClips: soundClips,
+            rooms: rooms
+        )
         guard !voiceClips.isEmpty else {
             trainingMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
@@ -541,6 +552,296 @@ final class RevivalGameplayView: MTKView {
                 soundSourceName
             )
         }
+    }
+
+    private func updateTrainingGuidebotAmbientEngine(
+        frame: PlayerSimulationFrame,
+        soundSourceName: String?,
+        soundClips: [CanonicalSoundClip],
+        rooms: [LevelRoom]
+    ) {
+        guard frame.trainingGuidebotAmbientEngineIsActive,
+              let soundSourceName,
+              let mix = Self.trainingGuidebotAmbientEngineSpatialMix(
+                frame: frame,
+                rooms: rooms
+              ),
+              let clip = soundClips.first(where: {
+                  $0.sourceName.caseInsensitiveCompare(soundSourceName)
+                    == .orderedSame
+                    || $0.logicalName.caseInsensitiveCompare(soundSourceName)
+                        == .orderedSame
+              }) else {
+            stopTrainingGuidebotAmbientEngine()
+            return
+        }
+
+        if let player = trainingGuidebotAmbientEnginePlayer {
+            player.volume = clip.importVolume * mix.volumeScale
+            player.pan = mix.pan
+            if !player.isPlaying, !player.play() {
+                player.stop()
+                trainingGuidebotAmbientEnginePlayer = nil
+            }
+            return
+        }
+
+        do {
+            let player = try AVAudioPlayer(data: Self.waveData(for: clip))
+            player.numberOfLoops = -1
+            player.volume = clip.importVolume * mix.volumeScale
+            player.pan = mix.pan
+            player.prepareToPlay()
+            guard player.play() else { return }
+            trainingGuidebotAmbientEnginePlayer = player
+        } catch {
+            trainingGuidebotAmbientEnginePlayer = nil
+        }
+    }
+
+    private func stopTrainingGuidebotAmbientEngine() {
+        trainingGuidebotAmbientEnginePlayer?.stop()
+        trainingGuidebotAmbientEnginePlayer = nil
+    }
+
+    static func trainingGuidebotAmbientEngineSpatialMix(
+        frame: PlayerSimulationFrame,
+        rooms: [LevelRoom]
+    ) -> (volumeScale: Float, pan: Float)? {
+        guard frame.trainingGuidebotAmbientEngineIsActive,
+              let guidebot = frame.trainingGuidebot else {
+            return nil
+        }
+        return trainingGuidebotAmbientEngineSpatialMix(
+            sourcePosition: guidebot.position,
+            sourceRoomSourceIndex: guidebot.roomSourceIndex,
+            listener: frame.playerView,
+            rooms: rooms
+        )
+    }
+
+    static func trainingGuidebotAmbientEngineSpatialMix(
+        sourcePosition: Vector3,
+        sourceRoomSourceIndex: Int,
+        listener: PlayerView,
+        rooms: [LevelRoom]
+    ) -> (volumeScale: Float, pan: Float)? {
+        let camera = listener.camera
+        guard let routed = trainingGuidebotAmbientEngineSpatialRoute(
+            sourcePosition: sourcePosition,
+            sourceRoomSourceIndex: sourceRoomSourceIndex,
+            listener: listener,
+            rooms: rooms
+        ) else {
+            return nil
+        }
+        let distance = routed.distance
+        let direction = routed.direction
+        let forward = Vector3(
+            x: camera.target.x - camera.position.x,
+            y: camera.target.y - camera.position.y,
+            z: camera.target.z - camera.position.z
+        )
+        let right = Vector3(
+            x: camera.up.y * forward.z - camera.up.z * forward.y,
+            y: camera.up.z * forward.x - camera.up.x * forward.z,
+            z: camera.up.x * forward.y - camera.up.y * forward.x
+        )
+        let rightLength = (
+            right.x * right.x + right.y * right.y + right.z * right.z
+        ).squareRoot()
+        let pan = rightLength > 0
+            ? max(-1, min(1,
+                (direction.x * right.x
+                    + direction.y * right.y
+                    + direction.z * right.z) / rightLength
+            ))
+            : 0
+        let volumeScale: Float
+        if distance >= 100 {
+            volumeScale = 0
+        } else if distance > 10 {
+            volumeScale = 1 - (distance - 10) / 90
+        } else {
+            volumeScale = 1
+        }
+        return (volumeScale * routed.doorVolumeScale, pan)
+    }
+
+    private static func trainingGuidebotAmbientEngineSpatialRoute(
+        sourcePosition: Vector3,
+        sourceRoomSourceIndex: Int,
+        listener: PlayerView,
+        rooms: [LevelRoom]
+    ) -> (
+        distance: Float,
+        direction: Vector3,
+        doorVolumeScale: Float
+    )? {
+        let roomBySourceIndex = Dictionary(
+            uniqueKeysWithValues: rooms.map { ($0.sourceIndex, $0) }
+        )
+        guard roomBySourceIndex[sourceRoomSourceIndex] != nil,
+              roomBySourceIndex[listener.roomSourceIndex] != nil else {
+            return nil
+        }
+        let listenerPosition = listener.camera.position
+        let directOffset = difference(sourcePosition, listenerPosition)
+        if sourceRoomSourceIndex == listener.roomSourceIndex {
+            let distance = length(directOffset)
+            return (
+                distance,
+                normalizedAmbientEngineDirection(
+                    directOffset,
+                    fallback: difference(
+                        listener.camera.target,
+                        listenerPosition
+                    )
+                ),
+                1
+            )
+        }
+
+        var pending = [sourceRoomSourceIndex]
+        var predecessor: [Int: Int] = [:]
+        var visited: Set<Int> = [sourceRoomSourceIndex]
+        while !pending.isEmpty
+            && !visited.contains(listener.roomSourceIndex) {
+            let roomSourceIndex = pending.removeFirst()
+            let room = roomBySourceIndex[roomSourceIndex]!
+            for (portalIndex, portal) in room.portals.enumerated() {
+                guard let destination = roomBySourceIndex[
+                    portal.connectedRoom
+                ],
+                    destination.portals.indices.contains(
+                        portal.connectedPortal
+                    )
+                else {
+                    continue
+                }
+                let reciprocal = destination.portals[
+                    portal.connectedPortal
+                ]
+                guard reciprocal.connectedRoom == roomSourceIndex,
+                      reciprocal.connectedPortal == portalIndex,
+                      visited.insert(destination.sourceIndex).inserted
+                else {
+                    continue
+                }
+                predecessor[destination.sourceIndex] = roomSourceIndex
+                pending.append(destination.sourceIndex)
+            }
+        }
+        guard visited.contains(listener.roomSourceIndex) else { return nil }
+        var route = [listener.roomSourceIndex]
+        while route.last != sourceRoomSourceIndex {
+            guard let prior = predecessor[route.last!] else { return nil }
+            route.append(prior)
+        }
+        route.reverse()
+
+        if route.count == 2 {
+            let distance = length(directOffset)
+            return (
+                distance,
+                normalizedAmbientEngineDirection(
+                    directOffset,
+                    fallback: difference(
+                        listener.camera.target,
+                        listenerPosition
+                    )
+                ),
+                1
+            )
+        }
+
+        var points = [sourcePosition]
+        var listenerPortalPoint: Vector3?
+        for (roomSourceIndex, nextRoomSourceIndex) in zip(
+            route,
+            route.dropFirst()
+        ) {
+            guard let portalIndex = roomBySourceIndex[roomSourceIndex]?
+                .portals.firstIndex(where: {
+                    $0.connectedRoom == nextRoomSourceIndex
+                }),
+                let portal = roomBySourceIndex[roomSourceIndex]?
+                    .portals[portalIndex],
+                let destination = roomBySourceIndex[nextRoomSourceIndex],
+                destination.portals.indices.contains(
+                    portal.connectedPortal
+                )
+            else {
+                return nil
+            }
+            let reciprocal = destination.portals[portal.connectedPortal]
+            points.append(portal.pathPoint)
+            points.append(reciprocal.pathPoint)
+            if nextRoomSourceIndex == listener.roomSourceIndex {
+                listenerPortalPoint = reciprocal.pathPoint
+            }
+        }
+        points.append(listenerPosition)
+        var distance: Float = 0
+        for (start, end) in zip(points, points.dropFirst()) {
+            distance += length(difference(end, start))
+        }
+        var doorVolumeScale: Float = 1
+        for roomSourceIndex in route.dropFirst().dropLast() {
+            guard let door = roomBySourceIndex[roomSourceIndex]?.door else {
+                continue
+            }
+            doorVolumeScale *= door.position == 0
+                ? 0.2
+                : 0.6 + 0.4 * door.position
+        }
+        let directionOffset = difference(
+            listenerPortalPoint ?? sourcePosition,
+            listenerPosition
+        )
+        return (
+            distance,
+            normalizedAmbientEngineDirection(
+                directionOffset,
+                fallback: difference(
+                    listener.camera.target,
+                    listenerPosition
+                )
+            ),
+            doorVolumeScale
+        )
+    }
+
+    private static func normalizedAmbientEngineDirection(
+        _ vector: Vector3,
+        fallback: Vector3
+    ) -> Vector3 {
+        let vectorLength = length(vector)
+        if vectorLength > 0 { return scaled(vector, by: 1 / vectorLength) }
+        let fallbackLength = length(fallback)
+        return fallbackLength > 0
+            ? scaled(fallback, by: 1 / fallbackLength)
+            : .init(x: 0, y: 0, z: 1)
+    }
+
+    private static func difference(_ lhs: Vector3, _ rhs: Vector3) -> Vector3 {
+        .init(x: lhs.x - rhs.x, y: lhs.y - rhs.y, z: lhs.z - rhs.z)
+    }
+
+    private static func scaled(_ vector: Vector3, by scale: Float) -> Vector3 {
+        .init(
+            x: vector.x * scale,
+            y: vector.y * scale,
+            z: vector.z * scale
+        )
+    }
+
+    private static func length(_ vector: Vector3) -> Float {
+        (
+            vector.x * vector.x
+                + vector.y * vector.y
+                + vector.z * vector.z
+        ).squareRoot()
     }
 
     private func playTrainingVoice(

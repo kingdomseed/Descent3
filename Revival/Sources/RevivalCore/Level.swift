@@ -765,6 +765,7 @@ struct TrainingRobotGuidebotChain: Codable, Equatable, Sendable {
     let deployedGuidebotMessage: String
     let deployedGuidebotVoiceSourceName: String
     var releaseSoundSourceName: String? = nil
+    var ambientEngineSoundSourceName: String? = nil
     let combat: TrainingRobotCombatDefinition
     let guidebot: TrainingGuidebotDefinition
 }
@@ -1214,7 +1215,8 @@ func validateStockTrainingRobotGuidebotPackage(
     chain: TrainingRobotGuidebotChain?,
     guidebotB: CanonicalVoiceClip?,
     proceed5: CanonicalVoiceClip?,
-    releaseSound: CanonicalSoundClip? = nil
+    releaseSound: CanonicalSoundClip? = nil,
+    ambientEngineSound: CanonicalSoundClip? = nil
 ) throws {
     guard let chain,
           chain.destroyRobotObjectHandle == 4_112,
@@ -1246,6 +1248,23 @@ func validateStockTrainingRobotGuidebotPackage(
                     && releaseSound?.sourceSHA256
                         == "ae030e17bd5fc5724b7b3aac6604299005d35adffc0b5d9620430d191e1ef288"
                     && releaseSound?.importVolume == 0.5
+          ),
+          (
+              chain.ambientEngineSoundSourceName == nil
+                  || chain.ambientEngineSoundSourceName == "GBotEngineB.wav"
+                    && ambientEngineSound?.logicalName == "GBotEngineB1"
+                    && ambientEngineSound?.sourceName == "GBotEngineB.wav"
+                    && ambientEngineSound?.sourceEntryIndex == 1_262
+                    && ambientEngineSound?.sampleRate == 22_050
+                    && ambientEngineSound?.channelCount == 1
+                    && ambientEngineSound?.frameCount == 8_080
+                    && ambientEngineSound?.pcm16LittleEndian.count == 16_160
+                    && ambientEngineSound?.pcmSHA256
+                        == "2a9c63eb02ea72e256cbaff7e87c575cce415ad11ef1d753123fe8a97b7da528"
+                    && ambientEngineSound?.sourceArchive == "d3.hog"
+                    && ambientEngineSound?.sourceSHA256
+                        == "35eaf843ad66e61a1f5c46f68ced68d5fbec8580dc8e1c8d115e374349f5a96f"
+                    && ambientEngineSound?.importVolume == 0.1
           ),
           chain.combat == .stockTraining,
           chain.guidebot == .stockTraining,
@@ -5020,6 +5039,10 @@ struct Level: Codable, Equatable, Sendable {
                 chain.releaseSoundSourceName.map {
                     soundNames.contains($0.lowercased())
                 } ?? true
+            let ambientEngineSoundIsResolved =
+                chain.ambientEngineSoundSourceName.map {
+                    soundNames.contains($0.lowercased())
+                } ?? true
             guard trainingGalleryBarrier != nil,
                   chain.destructionDelay.isFinite,
                   chain.destructionDelay > 0,
@@ -5048,7 +5071,8 @@ struct Level: Codable, Equatable, Sendable {
                   clipNames.contains(
                     chain.deployedGuidebotVoiceSourceName.lowercased()
                   ),
-                  releaseSoundIsResolved else {
+                  releaseSoundIsResolved,
+                  ambientEngineSoundIsResolved else {
                 throw LevelValidationError.invalidDependency(
                     "Training robot Guidebot chain"
                 )
@@ -6366,6 +6390,9 @@ struct Level: Codable, Equatable, Sendable {
                 proceed5: proceed5,
                 releaseSound: soundClips.first {
                     $0.logicalName == "GBExpulsionA"
+                },
+                ambientEngineSound: soundClips.first {
+                    $0.logicalName == "GBotEngineB1"
                 }
             )
             try validateStockTrainingRobotGuidebotPresentation(

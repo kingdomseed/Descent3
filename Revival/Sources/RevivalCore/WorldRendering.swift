@@ -472,6 +472,7 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingGalleryMarkerLightDistance: Float?
     let trainingGuidebotReturnMarkerLightDistance: Float?
     let trainingGuidebot: TrainingGuidebotFrame?
+    let trainingGuidebotAmbientEngineIsActive: Bool
     let trainingCameraMonitor: TrainingCameraMonitorFrame?
     let trainingInvulnerabilityRemaining: Float?
     let trainingCloak: TrainingCloakFrame?
@@ -659,6 +660,7 @@ enum TrainingGuidebotSteeringMode:
 
 struct TrainingGuidebotFrame: Equatable, Sendable {
     let spawnPosition: Vector3
+    let roomSourceIndex: Int
     let position: Vector3
     let orientation: Matrix3
     let spawnVelocity: Vector3
@@ -1216,6 +1218,7 @@ private struct TrainingGuidebotRuntimeState:
     var frame: TrainingGuidebotFrame {
         .init(
             spawnPosition: spawnPosition,
+            roomSourceIndex: roomSourceIndex,
             position: position,
             orientation: orientation,
             spawnVelocity: spawnVelocity,
@@ -7060,6 +7063,14 @@ final class PlayerSimulation {
                         .returnMarkerLightDistance,
             trainingGuidebot:
                 trainingRobotGuidebotState?.guidebot?.frame,
+            trainingGuidebotAmbientEngineIsActive:
+                trainingRobotGuidebotState.map { state in
+                    state.guidebotIsDeployed
+                        && !state.guidebotEnteredShip
+                        && state.guidebot != nil
+                        && state.guidebotMode == .ambient
+                        && (state.guidebotModeTime ?? 0) > 0
+                } ?? false,
             trainingCameraMonitor: cameraMonitorFrame,
             trainingInvulnerabilityRemaining:
                 trainingInvulnerabilityPickupState?.remainingDuration,
@@ -8105,6 +8116,12 @@ private func validTrainingRobotGuidebotContinuation(
                                 && $0.roomSourceIndex
                                     == $0.route.roomSourceIndices.first
                         )
+                        || validTrainingGuidebotReleaseOutboundPosition(
+                            guidebot: $0,
+                            mode: state.guidebotMode,
+                            cameraState: cameraState,
+                            level: level
+                        )
                   )
                   && $0.velocity.x.isFinite
                   && $0.velocity.y.isFinite
@@ -8134,6 +8151,12 @@ private func validTrainingRobotGuidebotContinuation(
                           level: level,
                           collisionRadius: chain.guidebot.collisionRadius
                       )
+                        || validTrainingGuidebotReleaseOutboundPosition(
+                            guidebot: $0,
+                            mode: state.guidebotMode,
+                            cameraState: cameraState,
+                            level: level
+                        )
                         || (
                             cameraState?.script058WasPresented == true
                                 && state.guidebotMode == .birth
@@ -8349,6 +8372,47 @@ private func validTrainingRobotGuidebotContinuation(
         return false
     }
     return true
+}
+
+private func validTrainingGuidebotReleaseOutboundPosition(
+    guidebot: TrainingGuidebotRuntimeState,
+    mode: TrainingGuidebotMode?,
+    cameraState: TrainingCameraMonitorState?,
+    level: Level
+) -> Bool {
+    guard cameraState?.script058WasPresented == true,
+          mode == .ambient,
+          guidebot.task == .outbound,
+          guidebot.roomSourceIndex
+            == guidebot.route.roomSourceIndices.first,
+          guidebot.route.mode == .direct,
+          guidebot.route.points == [guidebot.destination],
+          guidebot.routeFailure == nil,
+          guidebot.route.roomSourceIndices
+            == [guidebot.routeDestinationRoomSourceIndex],
+          guidebot.route.nodeReferences.isEmpty,
+          guidebot.spawnPosition == guidebot.allocationStartPosition,
+          let room = level.rooms.first(where: {
+              $0.sourceIndex == guidebot.roomSourceIndex
+          }),
+          sourceConvexRoomContains(
+              guidebot.allocationStartPosition,
+              in: room
+          )
+    else {
+        return false
+    }
+    let segment = guidebot.destination - guidebot.allocationStartPosition
+    let segmentLengthSquared = dot(segment, segment)
+    guard segmentLengthSquared > 0 else {
+        return guidebot.position == guidebot.allocationStartPosition
+    }
+    let offset = guidebot.position - guidebot.allocationStartPosition
+    let progress = dot(offset, segment) / segmentLengthSquared
+    let residual = offset - segment * progress
+    return progress >= 0
+        && progress <= 1
+        && dot(residual, residual) <= 0.000_001
 }
 
 private func validTrainingCameraMonitorContinuation(

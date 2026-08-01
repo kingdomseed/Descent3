@@ -227,6 +227,14 @@ final class D3ImportOperationTests: XCTestCase {
         )
         XCTAssertEqual(resolved.logicalName, "PupC1")
         XCTAssertEqual(resolved.sourceName, "PupC.wav")
+        XCTAssertEqual(resolved.flags, 0)
+        XCTAssertEqual(resolved.loopStart, 0)
+        XCTAssertEqual(resolved.loopEnd, 0)
+        XCTAssertEqual(resolved.outerConeVolume, 360)
+        XCTAssertEqual(resolved.innerConeAngle, 360)
+        XCTAssertEqual(resolved.outerConeAngle, 360)
+        XCTAssertEqual(resolved.maximumDistance, 1_000)
+        XCTAssertEqual(resolved.minimumDistance, 0)
         XCTAssertEqual(resolved.importVolume, 0.75)
 
         let decoded = try decodeReachedPCM16WAV(

@@ -882,6 +882,14 @@ struct RetailSoundPageSelection: Equatable, Sendable {
     let storedIndex: Int
     let logicalName: String
     let sourceName: String
+    let flags: Int32
+    let loopStart: Int32
+    let loopEnd: Int32
+    let outerConeVolume: Float
+    let innerConeAngle: Int32
+    let outerConeAngle: Int32
+    let maximumDistance: Float
+    let minimumDistance: Float
     let importVolume: Float
 }
 
@@ -906,6 +914,14 @@ func resolveRetailSoundPage(
             storedIndex: storedIndex,
             logicalName: replacement.logicalName,
             sourceName: replacement.sourceName,
+            flags: replacement.flags,
+            loopStart: replacement.loopStart,
+            loopEnd: replacement.loopEnd,
+            outerConeVolume: replacement.outerConeVolume,
+            innerConeAngle: replacement.innerConeAngle,
+            outerConeAngle: replacement.outerConeAngle,
+            maximumDistance: replacement.maximumDistance,
+            minimumDistance: replacement.minimumDistance,
             importVolume: replacement.importVolume
         )
     }
@@ -940,14 +956,14 @@ private func parseRetailSoundPages(
             }
             let logicalName = try cursor.readCString()
             let sourceName = try cursor.readCString()
-            _ = try cursor.readInt32()
-            _ = try cursor.readInt32()
-            _ = try cursor.readInt32()
-            _ = try cursor.readFloat()
-            _ = try cursor.readInt32()
-            _ = try cursor.readInt32()
-            _ = try cursor.readFloat()
-            _ = try cursor.readFloat()
+            let flags = try cursor.readInt32()
+            let loopStart = try cursor.readInt32()
+            let loopEnd = try cursor.readInt32()
+            let outerConeVolume = try cursor.readFloat()
+            let innerConeAngle = try cursor.readInt32()
+            let outerConeAngle = try cursor.readInt32()
+            let maximumDistance = try cursor.readFloat()
+            let minimumDistance = try cursor.readFloat()
             let importVolume = try cursor.readFloat()
             try cursor.requireEnd()
             guard importVolume.isFinite, importVolume >= 0 else {
@@ -957,6 +973,14 @@ private func parseRetailSoundPages(
                 storedIndex: soundIndex,
                 logicalName: logicalName,
                 sourceName: sourceName,
+                flags: flags,
+                loopStart: loopStart,
+                loopEnd: loopEnd,
+                outerConeVolume: outerConeVolume,
+                innerConeAngle: innerConeAngle,
+                outerConeAngle: outerConeAngle,
+                maximumDistance: maximumDistance,
+                minimumDistance: minimumDistance,
                 importVolume: importVolume
             ))
             soundIndex += 1

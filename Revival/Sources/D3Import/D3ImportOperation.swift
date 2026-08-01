@@ -1127,6 +1127,38 @@ func runD3Import(
                 == "ae030e17bd5fc5724b7b3aac6604299005d35adffc0b5d9620430d191e1ef288"
             && guidebotReleaseSoundClip.importVolume == 0.5
     )
+    let guidebotAmbientEngineSoundPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "GBotEngineB1"
+    )
+    let guidebotAmbientEngineSoundClip = try reachedSoundClip(
+        named: "GBotEngineB1"
+    )
+    precondition(
+        guidebotAmbientEngineSoundPage.storedIndex == 197
+            && guidebotAmbientEngineSoundPage.flags == 165
+            && guidebotAmbientEngineSoundPage.loopStart == 0
+            && guidebotAmbientEngineSoundPage.loopEnd == 8_079
+            && guidebotAmbientEngineSoundPage.outerConeVolume == 1
+            && guidebotAmbientEngineSoundPage.innerConeAngle == 360
+            && guidebotAmbientEngineSoundPage.outerConeAngle == 360
+            && guidebotAmbientEngineSoundPage.maximumDistance == 100
+            && guidebotAmbientEngineSoundPage.minimumDistance == 10
+            && guidebotAmbientEngineSoundClip.logicalName == "GBotEngineB1"
+            && guidebotAmbientEngineSoundClip.sourceName == "GBotEngineB.wav"
+            && guidebotAmbientEngineSoundClip.sourceEntryIndex == 1_262
+            && guidebotAmbientEngineSoundClip.sampleRate == 22_050
+            && guidebotAmbientEngineSoundClip.channelCount == 1
+            && guidebotAmbientEngineSoundClip.frameCount == 8_080
+            && guidebotAmbientEngineSoundClip.pcm16LittleEndian.count == 16_160
+            && guidebotAmbientEngineSoundClip.pcmSHA256
+                == "2a9c63eb02ea72e256cbaff7e87c575cce415ad11ef1d753123fe8a97b7da528"
+            && guidebotAmbientEngineSoundClip.sourceArchive == "d3.hog"
+            && guidebotAmbientEngineSoundClip.sourceSHA256
+                == "35eaf843ad66e61a1f5c46f68ced68d5fbec8580dc8e1c8d115e374349f5a96f"
+            && guidebotAmbientEngineSoundClip.importVolume == 0.1
+    )
     let openingLevel = playerLevel.addingTrainingOpeningLesson(
         .init(
             forwardGoalObjectHandle: forwardGoal.handle,
@@ -1365,11 +1397,16 @@ func runD3Import(
             deployedGuidebotMessage: messages["GetCameraMonitor"]!,
             deployedGuidebotVoiceSourceName: "guidebotb.osf",
             releaseSoundSourceName: guidebotReleaseSoundClip.sourceName,
+            ambientEngineSoundSourceName:
+                guidebotAmbientEngineSoundClip.sourceName,
             combat: .stockTraining,
             guidebot: .stockTraining
         ),
         voiceClips: [voiceClips[3], voiceClips[4]],
-        soundClips: [guidebotReleaseSoundClip]
+        soundClips: [
+            guidebotReleaseSoundClip,
+            guidebotAmbientEngineSoundClip,
+        ]
     )
     let cameraMonitor = robotGuidebotLevel.objects.first {
         $0.instanceName?.caseInsensitiveCompare("CameraMonitor")

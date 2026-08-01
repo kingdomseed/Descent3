@@ -288,7 +288,11 @@ private final class RevivalMacApplicationDelegate: NSObject,
                 try self.gameplayView?.presentTrainingOpening(
                     frame: frame,
                     voiceClips: simulation.level.voiceClips,
-                    soundClips: simulation.level.soundClips
+                    soundClips: simulation.level.soundClips,
+                    guidebotAmbientEngineSoundSourceName:
+                        simulation.level.trainingRobotGuidebotChain?
+                            .ambientEngineSoundSourceName,
+                    rooms: simulation.level.rooms
                 )
                 try renderer.update(level: simulation.level, frame: frame)
                 if frame.trainingFinalGoal != nil {

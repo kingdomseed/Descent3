@@ -8096,6 +8096,7 @@ final class WorldRenderingTests: XCTestCase {
             ),
         ])
         XCTAssertNil(script058.trainingGuidebot)
+        XCTAssertFalse(script058.trainingGuidebotAmbientEngineIsActive)
         XCTAssertEqual(
             script058.trainingGuidebotReturnMarkerLightDistance,
             50
@@ -8144,6 +8145,7 @@ final class WorldRenderingTests: XCTestCase {
         let afterReload = restored.update(at: 100.1, input: .zero)
         XCTAssertTrue(afterReload.trainingOpeningFeedback.isEmpty)
         XCTAssertNil(afterReload.trainingGuidebot)
+        XCTAssertFalse(afterReload.trainingGuidebotAmbientEngineIsActive)
         XCTAssertEqual(
             afterReload.trainingGuidebotReturnMarkerLightDistance,
             chain.returnToShip?.openMarkerLightDistance
@@ -8210,6 +8212,19 @@ final class WorldRenderingTests: XCTestCase {
             sourceSHA256: String(repeating: "9", count: 64),
             importVolume: 0.5
         )
+        let syntheticAmbientEngineSound = CanonicalSoundClip(
+            logicalName: "GBotEngineB1",
+            sourceName: "GBotEngineB.wav",
+            sourceEntryIndex: 1_262,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 1,
+            pcm16LittleEndian: Data(repeating: 0, count: 2),
+            pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+            sourceArchive: "d3.hog",
+            sourceSHA256: String(repeating: "8", count: 64),
+            importVolume: 0.1
+        )
         var levelObject = try XCTUnwrap(
             JSONSerialization.jsonObject(
                 with: JSONEncoder().encode(baseLevel)
@@ -8238,6 +8253,7 @@ final class WorldRenderingTests: XCTestCase {
             levelObject["trainingRobotGuidebotChain"] as? [String: Any]
         )
         releaseChain["releaseSoundSourceName"] = "GBExpulsionA.wav"
+        releaseChain["ambientEngineSoundSourceName"] = "GBotEngineB.wav"
         levelObject["trainingRobotGuidebotChain"] = releaseChain
         var soundClips = try XCTUnwrap(
             levelObject["soundClips"] as? [[String: Any]]
@@ -8245,6 +8261,11 @@ final class WorldRenderingTests: XCTestCase {
         soundClips.append(try XCTUnwrap(
             JSONSerialization.jsonObject(
                 with: JSONEncoder().encode(syntheticReleaseSound)
+            ) as? [String: Any]
+        ))
+        soundClips.append(try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(syntheticAmbientEngineSound)
             ) as? [String: Any]
         ))
         levelObject["soundClips"] = soundClips
@@ -8267,6 +8288,19 @@ final class WorldRenderingTests: XCTestCase {
                 ))
             ) as? [String: Any]
         ))
+        currentDependencies.append(try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(DependencyRecord(
+                    category: "sound",
+                    source: .init(
+                        storedIndex: 1_262,
+                        sourceName: "GBotEngineB.wav"
+                    ),
+                    state: "canonical-pcm-imported",
+                    provenance: "synthetic canonical fixture"
+                ))
+            ) as? [String: Any]
+        ))
         dependencyManifest["current"] = currentDependencies
         levelObject["dependencyManifest"] = dependencyManifest
         let level = try JSONDecoder().decode(
@@ -8277,6 +8311,12 @@ final class WorldRenderingTests: XCTestCase {
             $0.sourceName == "GBExpulsionA.wav"
         })
         XCTAssertEqual(decodedReleaseSound, syntheticReleaseSound)
+        XCTAssertEqual(
+            level.soundClips.first {
+                $0.sourceName == "GBotEngineB.wav"
+            },
+            syntheticAmbientEngineSound
+        )
         XCTAssertEqual(
             decodedReleaseSound.pcmSHA256,
             canonicalSHA256(decodedReleaseSound.pcm16LittleEndian)
@@ -8493,6 +8533,7 @@ final class WorldRenderingTests: XCTestCase {
             at: 100.1,
             input: .init(deploysTrainingGuidebot: true)
         )
+        XCTAssertFalse(released.trainingGuidebotAmbientEngineIsActive)
         let guidebot = try XCTUnwrap(released.trainingGuidebot)
         XCTAssertEqual(guidebot.spawnPosition, player.position)
         XCTAssertEqual(guidebot.orientation, player.orientation)
@@ -8571,18 +8612,312 @@ final class WorldRenderingTests: XCTestCase {
             feedbackCountBeforeRelease
         )
 
+        var ambientTransitionFrame: PlayerSimulationFrame?
+        var ambientTimestamp = 100.1
+        for _ in 1...20 {
+            ambientTimestamp += 0.1
+            let frame = releaseSimulation.update(
+                at: ambientTimestamp,
+                input: .zero
+            )
+            let continuationObject = try XCTUnwrap(
+                JSONSerialization.jsonObject(
+                    with: JSONEncoder().encode(
+                        releaseSimulation.continuation
+                    )
+                ) as? [String: Any]
+            )
+            let state = try XCTUnwrap(
+                continuationObject["trainingRobotGuidebotState"]
+                    as? [String: Any]
+            )
+            if state["guidebotMode"] as? String == "ambient" {
+                ambientTransitionFrame = frame
+                break
+            }
+            XCTAssertFalse(frame.trainingGuidebotAmbientEngineIsActive)
+        }
+        XCTAssertFalse(
+            try XCTUnwrap(ambientTransitionFrame)
+                .trainingGuidebotAmbientEngineIsActive,
+            "The released GBM_BIRTH branch returns on the transition frame."
+        )
+        ambientTimestamp += 0.1
+        let firstNormalAmbientFrame = releaseSimulation.update(
+            at: ambientTimestamp,
+            input: .zero
+        )
+        XCTAssertTrue(
+            firstNormalAmbientFrame.trainingGuidebotAmbientEngineIsActive
+        )
+        let ambientMix = try XCTUnwrap(
+            RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
+                frame: firstNormalAmbientFrame,
+                rooms: level.rooms
+            )
+        )
+        XCTAssertGreaterThanOrEqual(ambientMix.volumeScale, 0)
+        XCTAssertLessThanOrEqual(ambientMix.volumeScale, 1)
+        XCTAssertGreaterThanOrEqual(ambientMix.pan, -1)
+        XCTAssertLessThanOrEqual(ambientMix.pan, 1)
+        let listener = PlayerView(
+            playerID: 0,
+            objectHandle: 1,
+            roomSourceIndex: 1,
+            camera: .init(
+                position: .zero,
+                target: .init(x: 0, y: 0, z: 1),
+                up: .init(x: 0, y: 1, z: 0),
+                projection: .sourceDefault
+            ),
+            collisionRadius: 1
+        )
+        let sameRoom = LevelRoom(
+            sourceIndex: 1,
+            vertices: [],
+            faces: [],
+            portals: []
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
+                    sourcePosition: .init(x: 0, y: 0, z: 10),
+                    sourceRoomSourceIndex: 1,
+                    listener: listener,
+                    rooms: [sameRoom]
+                )
+            ).volumeScale,
+            1,
+            accuracy: 0.000_001
+        )
+        let rightMix = try XCTUnwrap(
+            RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
+                sourcePosition: .init(x: 55, y: 0, z: 0),
+                sourceRoomSourceIndex: 1,
+                listener: listener,
+                rooms: [sameRoom]
+            )
+        )
+        XCTAssertEqual(rightMix.volumeScale, 0.5, accuracy: 0.000_001)
+        XCTAssertEqual(rightMix.pan, 1, accuracy: 0.000_001)
+        XCTAssertEqual(
+            try XCTUnwrap(
+                RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
+                    sourcePosition: .init(x: -55, y: 0, z: 0),
+                    sourceRoomSourceIndex: 1,
+                    listener: listener,
+                    rooms: [sameRoom]
+                )
+            ).pan,
+            -1,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
+                    sourcePosition: .init(x: 0, y: 0, z: 100),
+                    sourceRoomSourceIndex: 1,
+                    listener: listener,
+                    rooms: [sameRoom]
+                )
+            ).volumeScale,
+            0,
+            accuracy: 0.000_001
+        )
+        let sourcePortal = LevelPortal(
+            faceIndex: 0,
+            connectedRoom: 2,
+            connectedPortal: 0,
+            pathPoint: .init(x: 20, y: 0, z: 0)
+        )
+        let firstReciprocal = LevelPortal(
+            faceIndex: 0,
+            connectedRoom: 1,
+            connectedPortal: 0,
+            pathPoint: .init(x: 20, y: 0, z: 0)
+        )
+        let secondPortal = LevelPortal(
+            faceIndex: 1,
+            connectedRoom: 3,
+            connectedPortal: 0,
+            pathPoint: .init(x: 80, y: 0, z: 0)
+        )
+        let secondReciprocal = LevelPortal(
+            faceIndex: 0,
+            connectedRoom: 2,
+            connectedPortal: 1,
+            pathPoint: .init(x: 80, y: 0, z: 0)
+        )
+        let portalRooms = [
+            LevelRoom(
+                sourceIndex: 1,
+                vertices: [],
+                faces: [],
+                portals: [sourcePortal]
+            ),
+            LevelRoom(
+                sourceIndex: 2,
+                vertices: [],
+                faces: [],
+                portals: [firstReciprocal, secondPortal]
+            ),
+            LevelRoom(
+                sourceIndex: 3,
+                vertices: [],
+                faces: [],
+                portals: [secondReciprocal]
+            ),
+        ]
+        let portalListener = PlayerView(
+            playerID: listener.playerID,
+            objectHandle: listener.objectHandle,
+            roomSourceIndex: 3,
+            camera: listener.camera,
+            collisionRadius: listener.collisionRadius
+        )
+        let routedMix = try XCTUnwrap(
+            RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
+                sourcePosition: .zero,
+                sourceRoomSourceIndex: 1,
+                listener: portalListener,
+                rooms: portalRooms
+            )
+        )
+        XCTAssertEqual(routedMix.volumeScale, 0, accuracy: 0.000_001)
+        XCTAssertEqual(routedMix.pan, 1, accuracy: 0.000_001)
+        let shortSourcePortal = LevelPortal(
+            faceIndex: 0,
+            connectedRoom: 2,
+            connectedPortal: 0,
+            pathPoint: .init(x: 10, y: 0, z: 0)
+        )
+        let shortFirstReciprocal = LevelPortal(
+            faceIndex: 0,
+            connectedRoom: 1,
+            connectedPortal: 0,
+            pathPoint: .init(x: 10, y: 0, z: 0)
+        )
+        let shortSecondPortal = LevelPortal(
+            faceIndex: 1,
+            connectedRoom: 3,
+            connectedPortal: 0,
+            pathPoint: .init(x: 20, y: 0, z: 0)
+        )
+        let shortSecondReciprocal = LevelPortal(
+            faceIndex: 0,
+            connectedRoom: 2,
+            connectedPortal: 1,
+            pathPoint: .init(x: 20, y: 0, z: 0)
+        )
+        let doorMix = try XCTUnwrap(
+            RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
+                sourcePosition: .zero,
+                sourceRoomSourceIndex: 1,
+                listener: portalListener,
+                rooms: [
+                    LevelRoom(
+                        sourceIndex: 1,
+                        vertices: [],
+                        faces: [],
+                        portals: [shortSourcePortal]
+                    ),
+                    LevelRoom(
+                        sourceIndex: 2,
+                        vertices: [],
+                        faces: [],
+                        portals: [
+                            shortFirstReciprocal,
+                            shortSecondPortal,
+                        ],
+                        door: .init(
+                            flags: 0,
+                            keysNeeded: 0,
+                            definition: .init(
+                                storedIndex: 0,
+                                sourceName: "TestDoor"
+                            ),
+                            position: 0
+                        )
+                    ),
+                    LevelRoom(
+                        sourceIndex: 3,
+                        vertices: [],
+                        faces: [],
+                        portals: [shortSecondReciprocal]
+                    ),
+                ]
+            )
+        )
+        XCTAssertEqual(
+            doorMix.volumeScale,
+            Float(2) / 15,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(doorMix.pan, 1, accuracy: 0.000_001)
+        let disconnectedListener = PlayerView(
+            playerID: listener.playerID,
+            objectHandle: listener.objectHandle,
+            roomSourceIndex: 4,
+            camera: listener.camera,
+            collisionRadius: listener.collisionRadius
+        )
+        XCTAssertNil(
+            RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
+                sourcePosition: .zero,
+                sourceRoomSourceIndex: 1,
+                listener: disconnectedListener,
+                rooms: [
+                    sameRoom,
+                    LevelRoom(
+                        sourceIndex: 4,
+                        vertices: [],
+                        faces: [],
+                        portals: []
+                    ),
+                ]
+            )
+        )
+        let ambientContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(releaseSimulation.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertNil(ambientContinuationObject["guidebotAmbientEngineActive"])
+
         let continuation = try JSONDecoder().decode(
             PlayerSimulationContinuation.self,
-            from: JSONEncoder().encode(releaseSimulation.continuation)
+            from: JSONSerialization.data(
+                withJSONObject: releasedContinuationObject
+            )
         )
         let restored = try PlayerSimulation(
             level: level,
             continuation: continuation,
-            resumedAtTimestamp: 100
+            resumedAtTimestamp: 200
         )
-        let silent = restored.update(at: 100.1, input: .zero)
+        let silent = restored.update(at: 200.1, input: .zero)
         XCTAssertNotNil(silent.trainingGuidebot)
         XCTAssertTrue(silent.trainingOpeningFeedback.isEmpty)
+
+        let ambientContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: ambientContinuationObject
+            )
+        )
+        let restoredAmbient = try PlayerSimulation(
+            level: level,
+            continuation: ambientContinuation,
+            resumedAtTimestamp: 250
+        )
+        let resumedAmbient = restoredAmbient.update(
+            at: 250.1,
+            input: .zero
+        )
+        XCTAssertTrue(
+            resumedAmbient.trainingGuidebotAmbientEngineIsActive
+        )
+        XCTAssertTrue(resumedAmbient.trainingOpeningFeedback.isEmpty)
 
         var compatibleLevelObject = try XCTUnwrap(
             JSONSerialization.jsonObject(
@@ -8594,11 +8929,16 @@ final class WorldRenderingTests: XCTestCase {
                 as? [String: Any]
         )
         compatibleChain.removeValue(forKey: "releaseSoundSourceName")
+        compatibleChain.removeValue(
+            forKey: "ambientEngineSoundSourceName"
+        )
         compatibleLevelObject["trainingRobotGuidebotChain"] = compatibleChain
         compatibleLevelObject["soundClips"] = try XCTUnwrap(
             compatibleLevelObject["soundClips"] as? [[String: Any]]
         ).filter {
-            $0["sourceName"] as? String != "GBExpulsionA.wav"
+            let sourceName = $0["sourceName"] as? String
+            return sourceName != "GBExpulsionA.wav"
+                && sourceName != "GBotEngineB.wav"
         }
         var compatibleManifest = try XCTUnwrap(
             compatibleLevelObject["dependencyManifest"] as? [String: Any]
@@ -8611,7 +8951,9 @@ final class WorldRenderingTests: XCTestCase {
             else {
                 return true
             }
-            return source["sourceName"] as? String != "GBExpulsionA.wav"
+            let sourceName = source["sourceName"] as? String
+            return sourceName != "GBExpulsionA.wav"
+                && sourceName != "GBotEngineB.wav"
         }
         compatibleLevelObject["dependencyManifest"] = compatibleManifest
         let compatibleLevel = try JSONDecoder().decode(
@@ -8636,12 +8978,30 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertNotNil(compatibleRelease.trainingGuidebot)
         XCTAssertTrue(compatibleRelease.trainingOpeningFeedback.isEmpty)
 
-        var hostileLevelObject = compatibleLevelObject
-        hostileLevelObject["trainingRobotGuidebotChain"] = try XCTUnwrap(
+        var hostileLevelObject = try XCTUnwrap(
             JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(level.trainingRobotGuidebotChain)
+                with: JSONEncoder().encode(level)
             ) as? [String: Any]
         )
+        hostileLevelObject["soundClips"] = try XCTUnwrap(
+            hostileLevelObject["soundClips"] as? [[String: Any]]
+        ).filter {
+            $0["sourceName"] as? String != "GBotEngineB.wav"
+        }
+        var hostileManifest = try XCTUnwrap(
+            hostileLevelObject["dependencyManifest"] as? [String: Any]
+        )
+        hostileManifest["current"] = try XCTUnwrap(
+            hostileManifest["current"] as? [[String: Any]]
+        ).filter { dependency in
+            guard dependency["category"] as? String == "sound",
+                  let source = dependency["source"] as? [String: Any]
+            else {
+                return true
+            }
+            return source["sourceName"] as? String != "GBotEngineB.wav"
+        }
+        hostileLevelObject["dependencyManifest"] = hostileManifest
         let hostileLevel = try JSONDecoder().decode(
             Level.self,
             from: JSONSerialization.data(withJSONObject: hostileLevelObject)
@@ -8685,9 +9045,7 @@ final class WorldRenderingTests: XCTestCase {
         }
 
         var hostileObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(continuation)
-            ) as? [String: Any]
+            ambientContinuationObject
         )
         var hostileState = try XCTUnwrap(
             hostileObject["trainingRobotGuidebotState"]
@@ -8725,14 +9083,23 @@ final class WorldRenderingTests: XCTestCase {
         hostileGuidebot["route"] = hostileRoute
         hostileState["guidebot"] = hostileGuidebot
         hostileObject["trainingRobotGuidebotState"] = hostileState
-        XCTAssertThrowsError(try PlayerSimulation(
-            level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: hostileObject)
-            ),
-            resumedAtTimestamp: 200
-        ))
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: hostileObject
+                    )
+                ),
+                resumedAtTimestamp: 200
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
     }
 
     func testKillbotEntryClosesPortalRoom5AndRunsTimedInstructionAcrossReload()
