@@ -1,0 +1,53 @@
+Revival/Sources/RevivalAppKit/RevivalGameplayView.swift
+  s_9760dba8b952fe::t_d4de3c354a51de 95,623-659,782-798,805,809
+  s_9760dba8b952fe::t_82ab81d20bf893 806-808
+  s_9760dba8b952fe::t_3c1be8847bdf61 810
+docs/revival/source-translation-ledger.md
+  s_9760dba8b952fe::t_8867445c961aa8 1612,1618
+  s_9760dba8b952fe::t_d5e867f7ec107a 616,1599-1611,1613-1617
+  s_9760dba8b952fe::t_855af2ecfac1d2 1621
+  s_9760dba8b952fe::t_999bb00cc924d2 1619-1620
+  s_9760dba8b952fe::t_783c2a0275d6ce 1622
+Revival/Sources/RevivalMac/RevivalMacApplication.swift
+  s_9760dba8b952fe::t_d4de3c354a51de 420,435-453
+  s_9760dba8b952fe::t_55b9f1edc5b502 454-455
+Revival/Sources/RevivalEditor/RevivalEditorWindowController.swift
+  s_9760dba8b952fe::t_d4de3c354a51de 462,488-516
+  s_9760dba8b952fe::t_419d6f3a67cc4a 517-518
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_9760dba8b952fe::t_1a7494ae4c7a5e 7612-7614,7700-7785,14370-14413
+  s_9760dba8b952fe::t_cb201b49bc561b 14414-14415
+docs/revival/functional-completeness-ledger.md
+  s_9760dba8b952fe::t_d5e867f7ec107a 61
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_9760dba8b952fe::t_d4de3c354a51de 3195-3213
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_a3ee701f124439 4,22-24,27,29,66-67,259
+  s_c503f7c0529e13::t_8cebbcf967d2a4 65
+  s_c503f7c0529e13::t_8c2bfd9a4d0db9 260
+  s_c503f7c0529e13::t_be6092ec8481e2 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "e02c9c5a551ca9f1bc2fe1bf315b778dbc415683",
+  "prompts": {},
+  "sessions": {
+    "s_9760dba8b952fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fb558-1ae1-7f92-b914-107bef37fc3b",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
