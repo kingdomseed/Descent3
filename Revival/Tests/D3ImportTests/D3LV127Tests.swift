@@ -223,6 +223,118 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertEqual(image.rgba8, Data([0, 255, 0, 255]))
     }
 
+    func testDecodesReachedOutrageOAFFramesForYellowFlareMaterials() throws {
+        func ogf(named name: String, pixel: UInt16) -> Data {
+            var data = Data([0, 0, 122])
+            data.appendCString(name)
+            data.append(1)
+            data.append(Data(repeating: 0, count: 9))
+            data.appendLittleEndian(UInt16(1))
+            data.appendLittleEndian(UInt16(1))
+            data.append(32)
+            data.append(40)
+            data.append(0)
+            data.appendLittleEndian(pixel)
+            return data
+        }
+        var oaf = Data([127, 1, 2])
+        oaf.appendLittleEndian(Float(0.07).bitPattern)
+        oaf.append(ogf(named: "flare000", pixel: 0xfc00))
+        oaf.append(ogf(named: "flare001", pixel: 0x83e0))
+
+        let animation = try decodeReachedOutrage16OAF(oaf)
+
+        XCTAssertEqual(animation.version, 1)
+        XCTAssertEqual(animation.sourceFrameTime, 0.07)
+        XCTAssertEqual(animation.frames.count, 2)
+        XCTAssertEqual(animation.frames[0].rgba8, Data([255, 0, 0, 255]))
+        XCTAssertEqual(animation.frames[1].rgba8, Data([0, 255, 0, 255]))
+    }
+
+    func testReadsReachedWeaponPhysicsAndLightingInSourceChunkOrder() throws {
+        var payload = Data()
+        payload.appendLittleEndian(UInt16(8))
+        for value in [
+            "Yellow flare", "Armeye.ogf", "FlareYellowBright.OOF",
+            "yellowspark",
+        ] {
+            payload.appendCString(value)
+        }
+        payload.append(25)
+        payload.appendFloat(0.3)
+        payload.appendFloat(0.2)
+        payload.appendLittleEndian(UInt32(0x8001_0000))
+        payload.appendCString("")
+        payload.append(0)
+        payload.appendCString("")
+        payload.appendCString("")
+        payload.append(0)
+        payload.appendFloat(0)
+        payload.appendFloat(0)
+        payload.appendFloat(0)
+        payload.appendFloat(0.1)
+        payload.appendFloat(Float(bitPattern: 0x405f_d5ea))
+        payload.appendFloat(0)
+        payload.appendFloat(0.1)
+        payload.appendFloat(0.0001)
+        payload.appendFloat(0)
+        payload.appendLittleEndian(UInt32(0x2000_0810))
+        payload.appendFloat(0)
+        payload.appendFloat(0)
+        payload.appendLittleEndian(Int32(0))
+        payload.appendFloat(100)
+        for _ in 0..<3 { payload.appendFloat(0) }
+        payload.appendFloat(0)
+        payload.appendFloat(0)
+        payload.appendFloat(1)
+        payload.appendFloat(1)
+        payload.appendFloat(0)
+        payload.appendFloat(0)
+        payload.appendFloat(0)
+        payload.append(0)
+        payload.appendFloat(1)
+        payload.appendCString("")
+        payload.appendFloat(0)
+        payload.appendFloat(0)
+        for _ in 0..<7 { payload.appendFloat(0) }
+        payload.appendFloat(15)
+        payload.appendFloat(35)
+        payload.appendVector(.init(x: 1, y: 0.8, z: 0.6))
+        payload.appendFloat(0.2)
+        payload.appendFloat(5)
+        payload.appendFloat(0.25)
+        payload.appendVector(.init(x: 0.1, y: 0.2, z: 0.3))
+        payload.appendLittleEndian(UInt32(16))
+        payload.appendLittleEndian(UInt32.max)
+        payload.append(0)
+        payload.append(0)
+        payload.appendFloat(0)
+        for _ in 0..<7 { payload.appendCString("") }
+        payload.appendCString("")
+        payload.appendCString("")
+        payload.appendFloat(0)
+        payload.appendCString("")
+
+        var table = Data([2])
+        table.appendLittleEndian(UInt32(payload.count + 4))
+        table.append(payload)
+
+        let weapon = try resolveRetailWeaponPresentation(
+            table: table,
+            overlay: Data(),
+            named: "Yellow flare"
+        )
+
+        XCTAssertEqual(weapon.speed, 100)
+        XCTAssertEqual(weapon.modelPageSize.bitPattern, 0x405f_d5ea)
+        XCTAssertEqual(weapon.coefficientOfRestitution, 1)
+        XCTAssertEqual(weapon.lightPresentation.directionalDot, 0.25)
+        XCTAssertEqual(
+            weapon.lightPresentation.secondaryColor,
+            .init(x: 0.1, y: 0.2, z: 0.3)
+        )
+    }
+
     func testTranslatesV7TextureFlagsIntoTypedWaterAndCoronaDefinitions() throws {
         let table = makeTextureTablePage(
             name: "Alien Force Field_1",

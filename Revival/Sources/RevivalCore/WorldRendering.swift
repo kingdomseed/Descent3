@@ -467,6 +467,10 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingDodgeTurretAngles: [Float]
     let trainingDodgeProjectiles: [TrainingDodgeProjectileFrame]
     let trainingPrimaryProjectiles: [TrainingBlueLaserProjectileFrame]
+    let trainingGuidebotYellowFlares:
+        [TrainingGuidebotYellowFlareFrame]
+    let trainingGuidebotYellowFlareParticles:
+        [TrainingGuidebotYellowFlareParticleFrame]
     let trainingFollowBot: TrainingFollowBotFrame?
     let trainingMovingTarget: TrainingMovingTargetFrame?
     let trainingGalleryMarkerLightDistance: Float?
@@ -517,6 +521,32 @@ struct TrainingBlueLaserProjectileFrame: Equatable, Sendable {
     let velocity: Vector3
     let roomSourceIndex: Int
     let model: SourceResource
+}
+
+struct TrainingGuidebotYellowFlareFrame: Equatable, Sendable {
+    let roomSourceIndex: Int
+    let position: Vector3
+    let orientation: Matrix3
+    let velocity: Vector3
+    let model: SourceResource
+    let collisionRadius: Float
+    let lifeRemaining: Float
+    let sourceLightDistance: Float
+    let lightDistance: Float
+    let lightPresentation: TrainingMarkerLightPresentation
+}
+
+struct TrainingGuidebotYellowFlareParticleFrame:
+    Equatable, Sendable
+{
+    let roomSourceIndex: Int
+    let position: Vector3
+    let size: Float
+    let lifeRemaining: Float
+    let lifetime: Float
+    let sourceSize: Float
+    let sourceLifetime: Float
+    let texture: SourceResource
 }
 
 struct TrainingMovingTargetFrame: Equatable, Sendable {
@@ -1080,6 +1110,12 @@ private struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
     var nextAmbientTime: Float? = nil
     var timeUntilNextPlayerVisibilityCheck: Float? = nil
     var timeUntilNextFlare: Float? = nil
+    var yellowFlareGoalSlots:
+        TrainingGuidebotYellowFlareGoalSlots? = nil
+    var yellowFlares:
+        [TrainingGuidebotYellowFlareState]? = nil
+    var yellowFlareParticles:
+        [TrainingGuidebotYellowFlareParticleState]? = nil
     var nextPowerupCheckTime: Float? = nil
     var lastMessageSoundTime: Float? = nil
     var returnTime: Float? = nil
@@ -1092,6 +1128,47 @@ private struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
     var destructionTimerRemaining: Float?
     var destructionFeedbackWasPresented = false
 }
+
+private struct TrainingGuidebotYellowFlareGoalSlots:
+    Codable, Equatable, Sendable
+{
+    var slot1IsUsed: Bool
+    var slot2IsUsed: Bool
+    var slot3IsUsed: Bool
+
+    var isEligible: Bool {
+        slot1IsUsed && !slot2IsUsed && !slot3IsUsed
+    }
+}
+
+private struct TrainingGuidebotYellowFlareState:
+    Codable, Equatable, Sendable
+{
+    var roomSourceIndex: Int
+    var position: Vector3
+    var orientation: Matrix3
+    var velocity: Vector3
+    var lifeRemaining: Float
+    var lastParticleDropTime: Float
+    var presentedLightDistance: Float
+    var stuckObjectHandle: UInt32? = nil
+    var stuckObjectOffset: Vector3? = nil
+    var stuckObjectOrientation: Matrix3? = nil
+}
+
+private struct TrainingGuidebotYellowFlareParticleState:
+    Codable, Equatable, Sendable
+{
+    let roomSourceIndex: Int
+    var position: Vector3
+    var velocity: Vector3
+    let size: Float
+    let lifetime: Float
+    var lifeRemaining: Float
+}
+
+let trainingGuidebotYellowFlarePresentationCapacity = 6
+let trainingGuidebotYellowFlareParticlePresentationCapacity = 64
 
 private struct TrainingCameraMonitorState:
     Codable, Equatable, Sendable
@@ -1619,6 +1696,9 @@ final class PlayerSimulation {
         trainingRobotGuidebotState = level.trainingRobotGuidebotChain.map {
             TrainingRobotGuidebotState(
                 robotShields: $0.combat.robotShields,
+                yellowFlares: $0.yellowFlare == nil ? nil : [],
+                yellowFlareParticles:
+                    $0.yellowFlare == nil ? nil : [],
                 lastMessageSoundTime: 0
             )
         }
@@ -2154,12 +2234,36 @@ final class PlayerSimulation {
         ) else {
             throw PlayerSimulationContinuationError.invalidState
         }
-        let restoredGuidebotRouteLevel =
+        var restoredGuidebotRouteLevel =
             continuation.trainingCameraMonitorState?
                 .script058WasPresented == true
                 && restoredRobotGuidebotState?.guidebot?.task == .outbound
             ? continuationLevel
             : routeAllocationLevel
+        if let binding = restoredGuidebotRouteLevel.defaultPlayerBinding,
+           let playerIndex = restoredGuidebotRouteLevel.objects.firstIndex(
+               where: { $0.handle == binding.objectHandle }
+           ) {
+            restoredGuidebotRouteLevel.objects[playerIndex].location =
+                continuation.playerLocation
+            restoredGuidebotRouteLevel.objects[playerIndex].position =
+                continuation.playerPosition
+            restoredGuidebotRouteLevel.objects[playerIndex].orientation =
+                continuation.playerOrientation
+        }
+        if let guidebot = restoredRobotGuidebotState?.guidebot,
+           let handle = restoredGuidebotRouteLevel
+            .trainingRobotGuidebotChain?.guidebotObjectHandle,
+           let guidebotIndex = restoredGuidebotRouteLevel.objects.firstIndex(
+               where: { $0.handle == handle }
+           ) {
+            restoredGuidebotRouteLevel.objects[guidebotIndex].location =
+                .room(guidebot.roomSourceIndex)
+            restoredGuidebotRouteLevel.objects[guidebotIndex].position =
+                guidebot.position
+            restoredGuidebotRouteLevel.objects[guidebotIndex].orientation =
+                guidebot.orientation
+        }
         guard
             validTrainingGalleryBarrierContinuation(
                 continuation.trainingGalleryBarrierState,
@@ -3275,16 +3379,14 @@ final class PlayerSimulation {
     private func advanceTrainingGuidebotTiming(
         duration: Float,
         gameTime: Float
-    ) {
+    ) -> TrainingOpeningFeedback? {
         guard duration > 0,
               var state = trainingRobotGuidebotState,
               let guidebot = state.guidebot,
-              guidebot.task != .escortPlayer,
-              guidebot.task != .returnToShip,
               let mode = state.guidebotMode,
               var modeTime = state.guidebotModeTime
         else {
-            return
+            return nil
         }
 
         if mode == .ambient,
@@ -3304,7 +3406,7 @@ final class PlayerSimulation {
                 )
             }
             trainingRobotGuidebotState = state
-            return
+            return nil
         }
 
         if gameTime > (state.nextAmbientTime ?? gameTime + 1) {
@@ -3324,11 +3426,43 @@ final class PlayerSimulation {
         state.timeUntilNextPlayerVisibilityCheck = visibility
 
         var flare = (state.timeUntilNextFlare ?? 3) - duration
+        var feedback: TrainingOpeningFeedback?
         if flare <= 0 {
             flare = 3 + nextAuthoritativeRandomFraction()
+            if state.yellowFlareGoalSlots?.isEligible == true,
+               let definition =
+                    level.trainingRobotGuidebotChain?.yellowFlare,
+               state.yellowFlares != nil {
+                feedback = .init(
+                    hudMessages: [],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: true,
+                    soundSourceName:
+                        definition.fireSoundSourceName
+                )
+                if state.yellowFlares!.count
+                    < trainingGuidebotYellowFlarePresentationCapacity {
+                    let orientation = sourceOrientation(
+                        forward: guidebot.orientation.forward,
+                        up: guidebot.orientation.up
+                    )
+                    state.yellowFlares!.append(.init(
+                        roomSourceIndex: guidebot.roomSourceIndex,
+                        position: guidebot.position,
+                        orientation: orientation,
+                        velocity:
+                            orientation.forward * definition.speed,
+                        lifeRemaining: definition.lifetime,
+                        lastParticleDropTime: 0,
+                        presentedLightDistance:
+                            definition.lightDistance
+                    ))
+                }
+            }
         }
         state.timeUntilNextFlare = flare
         trainingRobotGuidebotState = state
+        return feedback
     }
 
     private func trainingGuidebotFeedback(
@@ -3377,6 +3511,7 @@ final class PlayerSimulation {
         }
         state.timeUntilNextFlare =
             3 + nextAuthoritativeRandomFraction()
+        state.yellowFlareGoalSlots?.slot2IsUsed = false
         state.returnTime = gameTime
         state.returnGreetingWasPresented = true
         trainingRobotGuidebotState = state
@@ -3447,6 +3582,13 @@ final class PlayerSimulation {
         guidebot.routeDestinationRoomSourceIndex =
             targetRoomSourceIndex
         state.activeGoalWasReached = false
+        if state.yellowFlares != nil {
+            state.yellowFlareGoalSlots = .init(
+                slot1IsUsed: true,
+                slot2IsUsed: true,
+                slot3IsUsed: true
+            )
+        }
         state.guidebot = guidebot
         trainingRobotGuidebotState = state
         return trainingGuidebotFeedback(
@@ -3521,6 +3663,13 @@ final class PlayerSimulation {
         state.lastMessageSoundTime =
             state.lastMessageSoundTime ?? 0
         state.returnGreetingWasPresented = false
+        if state.yellowFlares != nil {
+            state.yellowFlareGoalSlots = .init(
+                slot1IsUsed: true,
+                slot2IsUsed: false,
+                slot3IsUsed: false
+            )
+        }
         setTrainingGuidebotMode(
             .birth,
             at: gameTime,
@@ -3788,6 +3937,13 @@ final class PlayerSimulation {
             guidebot.routeDestinationRoomSourceIndex =
                 playerRoomSourceIndex
             state.activeGoalWasReached = true
+            if state.yellowFlares != nil {
+                state.yellowFlareGoalSlots = .init(
+                    slot1IsUsed: true,
+                    slot2IsUsed: true,
+                    slot3IsUsed: false
+                )
+            }
             state.guidebot = guidebot
             trainingRobotGuidebotState = state
             restoreTrainingGuidebotPresentation()
@@ -3815,6 +3971,7 @@ final class PlayerSimulation {
             state.guidebot = nil
             state.guidebotIsDeployed = false
             state.guidebotEnteredShip = true
+            state.yellowFlareGoalSlots = nil
             trainingRobotGuidebotState = state
             let handle =
                 level.trainingRobotGuidebotChain!.guidebotObjectHandle
@@ -3825,10 +3982,222 @@ final class PlayerSimulation {
             )
             return .enteredShip
         }
+        if guidebot.task == .activeGoal {
+            if state.yellowFlareGoalSlots?.slot3IsUsed == true {
+                state.yellowFlareGoalSlots?.slot3IsUsed = false
+            } else if state.yellowFlareGoalSlots?.slot2IsUsed == true {
+                state.yellowFlareGoalSlots?.slot2IsUsed = false
+            }
+        } else if guidebot.task == .outbound, reachedGoal {
+            state.yellowFlareGoalSlots?.slot1IsUsed = false
+        }
         state.guidebot = guidebot
         trainingRobotGuidebotState = state
         restoreTrainingGuidebotPresentation()
         return nil
+    }
+
+    private func advanceTrainingGuidebotYellowFlares(
+        duration: Float,
+        gameTime: Float
+    ) {
+        guard duration > 0,
+              let definition =
+                level.trainingRobotGuidebotChain?.yellowFlare,
+              var state = trainingRobotGuidebotState,
+              let flares = state.yellowFlares,
+              var particles = state.yellowFlareParticles
+        else {
+            return
+        }
+
+        particles = particles.compactMap { particle in
+            var particle = particle
+            particle.lifeRemaining -= duration
+            guard particle.lifeRemaining > 0 else { return nil }
+            let motion = analyticLinearMotion(
+                position: particle.position,
+                velocity: particle.velocity,
+                force: .init(x: 0, y: -3_220, z: 0),
+                mass: 100,
+                drag: 0.1,
+                duration: duration
+            )
+            particle.position = motion.position
+            particle.velocity = motion.velocity
+            return particle
+        }
+
+        var survivors: [TrainingGuidebotYellowFlareState] = []
+        survivors.reserveCapacity(flares.count)
+        for var flare in flares {
+            flare.lifeRemaining -= duration
+            if gameTime - flare.lastParticleDropTime
+                > definition.particleInterval {
+                if particles.count
+                    < trainingGuidebotYellowFlareParticlePresentationCapacity
+                {
+                    let rawVelocity = Vector3(
+                        x: Float(
+                            Int(nextAuthoritativeRandomValue() % 100)
+                                - 50
+                        ),
+                        y: Float(
+                            nextAuthoritativeRandomValue() % 100
+                        ),
+                        z: Float(
+                            Int(nextAuthoritativeRandomValue() % 100)
+                                - 50
+                        )
+                    )
+                    let magnitude = sqrt(dot(rawVelocity, rawVelocity))
+                    let speed = Float(
+                        10 + nextAuthoritativeRandomValue() % 10
+                    )
+                    let velocity = magnitude > 0
+                        ? rawVelocity / magnitude * speed
+                        : .zero
+                    let sizeJitter = Float(
+                        Int(nextAuthoritativeRandomValue() % 11) - 5
+                    )
+                    let lifeJitter = Float(
+                        Int(nextAuthoritativeRandomValue() % 11) - 5
+                    )
+                    let particleSize = definition.particleSize
+                        + sizeJitter
+                            * (definition.particleSize / 10)
+                    let particleLifetime =
+                        definition.particleLifetime
+                        + lifeJitter
+                            * (definition.particleLifetime / 10)
+                    particles.append(.init(
+                        roomSourceIndex: flare.roomSourceIndex,
+                        position:
+                            flare.position
+                            - flare.orientation.forward
+                                * definition.collisionRadius,
+                        velocity: velocity,
+                        size: particleSize,
+                        lifetime: particleLifetime,
+                        lifeRemaining: particleLifetime
+                    ))
+                }
+                flare.lastParticleDropTime = gameTime
+            }
+
+            guard flare.lifeRemaining > 0 else {
+                // The released weapon control emits its due particle before
+                // timeout cleanup. Timeout children remain a later producer.
+                continue
+            }
+            if let handle = flare.stuckObjectHandle,
+               let localPosition = flare.stuckObjectOffset,
+               let localOrientation = flare.stuckObjectOrientation,
+               let object = level.objects.first(where: {
+                   $0.handle == handle
+               }),
+               case let .room(roomSourceIndex) = object.location {
+                flare.position =
+                    object.position
+                    + transform(localPosition, by: object.orientation)
+                flare.orientation = transform(
+                    localOrientation,
+                    by: object.orientation
+                )
+                flare.roomSourceIndex = roomSourceIndex
+            }
+
+            guard flare.stuckObjectHandle == nil,
+                  flare.velocity != .zero else {
+                flare.presentedLightDistance =
+                    definition.lightDistance
+                    + Float(
+                        Int(nextAuthoritativeRandomValue() % 5) - 2
+                    )
+                survivors.append(flare)
+                continue
+            }
+            let start = flare.position
+            let end = start + flare.velocity * duration
+            let trace = traceIndoorMovement(
+                in: level,
+                startRoom: flare.roomSourceIndex,
+                start: start,
+                end: end,
+                radius: definition.collisionRadius
+            )
+            let distance = vectorDistance(start, end)
+            let wallFraction = distance > 0
+                ? vectorDistance(start, trace.finalPosition) / distance
+                : 1
+            let age = definition.lifetime - flare.lifeRemaining
+            let parentHandle =
+                level.trainingRobotGuidebotChain!.guidebotObjectHandle
+            let nearestObjectHit = level.objects.compactMap {
+                object -> (object: PlacedObject, fraction: Float)? in
+                guard case let .room(objectRoomSourceIndex) = object.location,
+                      trace.visitedRoomSourceIndices.contains(
+                          objectRoomSourceIndex
+                      ),
+                      age >= 3 || object.handle != parentHandle,
+                      let presentation =
+                        level.objectPresentations.first(where: {
+                            $0.objectHandle == object.handle
+                                && $0.isVisible
+                        }),
+                      let model = level.models.first(where: {
+                          $0.source == presentation.primaryModel
+                      }),
+                      let fraction = segmentSphereHitFraction(
+                          start: start,
+                          end: end,
+                          center: object.position,
+                          radius:
+                            definition.collisionRadius
+                                + model.collisionRadius
+                      ) else {
+                    return nil
+                }
+                return (object, fraction)
+            }.min { $0.fraction < $1.fraction }
+            if let hit = nearestObjectHit,
+               hit.fraction <= wallFraction + 0.000_1 {
+                flare.position =
+                    start + (end - start) * hit.fraction
+                flare.velocity = .zero
+                flare.stuckObjectHandle = hit.object.handle
+                flare.stuckObjectOffset =
+                    inverseTransform(
+                        flare.position - hit.object.position,
+                        by: hit.object.orientation
+                    )
+                flare.stuckObjectOrientation = inverseTransform(
+                    flare.orientation,
+                    by: hit.object.orientation
+                )
+                if case let .room(roomSourceIndex) = hit.object.location {
+                    flare.roomSourceIndex = roomSourceIndex
+                }
+            } else if case .wallHit = trace.outcome {
+                flare.position = trace.finalPosition
+                flare.roomSourceIndex =
+                    trace.containingRoomSourceIndex
+                flare.velocity = .zero
+            } else {
+                flare.position = trace.finalPosition
+                flare.roomSourceIndex =
+                    trace.containingRoomSourceIndex
+            }
+            flare.presentedLightDistance =
+                definition.lightDistance
+                + Float(
+                    Int(nextAuthoritativeRandomValue() % 5) - 2
+                )
+            survivors.append(flare)
+        }
+        state.yellowFlares = survivors
+        state.yellowFlareParticles = particles
+        trainingRobotGuidebotState = state
     }
 
     private func requestTrainingGuidebotReturn(
@@ -3881,6 +4250,13 @@ final class PlayerSimulation {
             playerRoomSourceIndex
         state.guidebot = guidebot
         state.returnWasRequested = true
+        if state.yellowFlares != nil {
+            state.yellowFlareGoalSlots = .init(
+                slot1IsUsed: true,
+                slot2IsUsed: false,
+                slot3IsUsed: false
+            )
+        }
         trainingRobotGuidebotState = state
         return true
     }
@@ -5456,7 +5832,11 @@ final class PlayerSimulation {
         }!
         level.objects[movedPlayerIndex].position = position
         level.objects[movedPlayerIndex].location = .room(roomSourceIndex)
-        advanceTrainingGuidebotTiming(
+        advanceTrainingGuidebotYellowFlares(
+            duration: systemsFrameDuration,
+            gameTime: systemsGameTime
+        )
+        let guidebotFlareFeedback = advanceTrainingGuidebotTiming(
             duration: systemsFrameDuration,
             gameTime: systemsGameTime
         )
@@ -5478,6 +5858,9 @@ final class PlayerSimulation {
         }
         if let guidebotActiveGoalFeedback {
             trainingOpeningFeedback.append(guidebotActiveGoalFeedback)
+        }
+        if let guidebotFlareFeedback {
+            trainingOpeningFeedback.append(guidebotFlareFeedback)
         }
         if guidebotAdvanceEvent == .reachedActiveGoal,
            let soundSourceName =
@@ -7043,6 +7426,47 @@ final class PlayerSimulation {
                                 )
                             } ?? []
                     } ?? [],
+            trainingGuidebotYellowFlares:
+                level.trainingRobotGuidebotChain?.yellowFlare.map {
+                    definition in
+                    trainingRobotGuidebotState?.yellowFlares?.map {
+                        .init(
+                            roomSourceIndex: $0.roomSourceIndex,
+                            position: $0.position,
+                            orientation: $0.orientation,
+                            velocity: $0.velocity,
+                            model: definition.model,
+                            collisionRadius:
+                                definition.collisionRadius,
+                            lifeRemaining: $0.lifeRemaining,
+                            sourceLightDistance:
+                                definition.lightDistance,
+                            lightDistance:
+                                $0.presentedLightDistance,
+                            lightPresentation:
+                                definition.lightPresentation
+                        )
+                    } ?? []
+                } ?? [],
+            trainingGuidebotYellowFlareParticles:
+                level.trainingRobotGuidebotChain?.yellowFlare.map {
+                    definition in
+                    trainingRobotGuidebotState?
+                        .yellowFlareParticles?.map {
+                            .init(
+                                roomSourceIndex: $0.roomSourceIndex,
+                                position: $0.position,
+                                size: $0.size,
+                                lifeRemaining: $0.lifeRemaining,
+                                lifetime: $0.lifetime,
+                                sourceSize: definition.particleSize,
+                                sourceLifetime:
+                                    definition.particleLifetime,
+                                texture:
+                                    definition.particleTexture
+                            )
+                        } ?? []
+                } ?? [],
             trainingFollowBot:
                 trainingManeuverFollowState?.frame,
             trainingMovingTarget:
@@ -8183,6 +8607,149 @@ private func validTrainingRobotGuidebotContinuation(
           state.enabledControlHUDIsVisible
             != state.destructionFeedbackWasPresented
     else {
+        return false
+    }
+    if let definition = chain.yellowFlare {
+        let usesLegacySilentState =
+            state.yellowFlares == nil
+                && state.yellowFlareParticles == nil
+                && state.yellowFlareGoalSlots == nil
+        if !usesLegacySilentState {
+            guard let flares = state.yellowFlares,
+                  let particles = state.yellowFlareParticles,
+                  flares.count
+                    <= trainingGuidebotYellowFlarePresentationCapacity,
+                  particles.count
+                    <= trainingGuidebotYellowFlareParticlePresentationCapacity,
+                  flares.allSatisfy({ flare in
+                      roomSourceIndices.contains(flare.roomSourceIndex)
+                          && containingIndoorRoomSourceIndex(
+                              in: level,
+                              position: flare.position,
+                              candidates: [flare.roomSourceIndex]
+                          ) == flare.roomSourceIndex
+                          && isCanonicalRigidTransform(
+                              position: flare.position,
+                              orientation: flare.orientation
+                          )
+                          && flare.velocity.x.isFinite
+                          && flare.velocity.y.isFinite
+                          && flare.velocity.z.isFinite
+                          && (
+                              flare.velocity == .zero
+                                  || abs(
+                                      sqrt(dot(
+                                          flare.velocity,
+                                          flare.velocity
+                                      )) - definition.speed
+                                  ) <= 0.001
+                          )
+                          && flare.lifeRemaining.isFinite
+                          && flare.lifeRemaining > 0
+                          && flare.lifeRemaining <= definition.lifetime
+                          && flare.lastParticleDropTime.isFinite
+                          && flare.lastParticleDropTime >= 0
+                          && flare.lastParticleDropTime <= gameTime
+                          && flare.presentedLightDistance.isFinite
+                          && flare.presentedLightDistance
+                            >= definition.lightDistance - 2
+                          && flare.presentedLightDistance
+                            <= definition.lightDistance + 2
+                          && (
+                              flare.stuckObjectHandle == nil
+                                  && flare.stuckObjectOffset == nil
+                                  && flare.stuckObjectOrientation == nil
+                              || flare.stuckObjectHandle.map { handle in
+                                  guard flare.velocity == .zero,
+                                        let localPosition =
+                                            flare.stuckObjectOffset,
+                                        let localOrientation =
+                                            flare.stuckObjectOrientation,
+                                        localPosition.x.isFinite,
+                                        localPosition.y.isFinite,
+                                        localPosition.z.isFinite,
+                                        isCanonicalRigidTransform(
+                                            position: .zero,
+                                            orientation: localOrientation
+                                        ),
+                                        let object = level.objects.first(
+                                            where: { $0.handle == handle }
+                                        ),
+                                        case let .room(objectRoom) =
+                                            object.location,
+                                        objectRoom == flare.roomSourceIndex
+                                  else {
+                                      return false
+                                  }
+                                  let expectedPosition =
+                                      object.position
+                                      + transform(
+                                          localPosition,
+                                          by: object.orientation
+                                      )
+                                  let expectedOrientation = transform(
+                                      localOrientation,
+                                      by: object.orientation
+                                  )
+                                  return vectorDistance(
+                                      flare.position,
+                                      expectedPosition
+                                  ) <= 0.001
+                                      && vectorDistance(
+                                          flare.orientation.right,
+                                          expectedOrientation.right
+                                      ) <= 0.001
+                                      && vectorDistance(
+                                          flare.orientation.up,
+                                          expectedOrientation.up
+                                      ) <= 0.001
+                                      && vectorDistance(
+                                          flare.orientation.forward,
+                                          expectedOrientation.forward
+                                      ) <= 0.001
+                              } == true
+                          )
+                  }),
+                  particles.allSatisfy({ particle in
+                      roomSourceIndices.contains(
+                          particle.roomSourceIndex
+                      )
+                          && particle.position.x.isFinite
+                          && particle.position.y.isFinite
+                          && particle.position.z.isFinite
+                          && particle.velocity.x.isFinite
+                          && particle.velocity.y.isFinite
+                          && particle.velocity.z.isFinite
+                          && particle.size.isFinite
+                          && particle.size >= definition.particleSize * 0.5
+                          && particle.size <= definition.particleSize * 1.5
+                          && particle.lifetime.isFinite
+                          && particle.lifetime
+                            >= definition.particleLifetime * 0.5
+                          && particle.lifetime
+                            <= definition.particleLifetime * 1.5
+                          && particle.lifeRemaining.isFinite
+                          && particle.lifeRemaining > 0
+                          && particle.lifeRemaining <= particle.lifetime
+                  }) else {
+                return false
+            }
+            if let slots = state.yellowFlareGoalSlots {
+                guard state.guidebot != nil,
+                      !state.guidebotEnteredShip,
+                      !slots.slot2IsUsed || slots.slot1IsUsed,
+                      !slots.slot3IsUsed
+                        || slots.slot1IsUsed && slots.slot2IsUsed
+                else {
+                    return false
+                }
+            } else if state.guidebot != nil {
+                return false
+            }
+        }
+    } else if state.yellowFlares != nil
+                || state.yellowFlareParticles != nil
+                || state.yellowFlareGoalSlots != nil {
         return false
     }
     let hasAnyGuidebotTiming =
@@ -11002,6 +11569,98 @@ func extractTrainingBlueLaserDrawItems(
     }
 }
 
+func extractPreparedTrainingGuidebotYellowFlareDrawItems(
+    _ level: Level
+) -> [ModelDrawItem] {
+    guard let definition =
+            level.trainingRobotGuidebotChain?.yellowFlare,
+          let guidebot = level.objects.first(where: {
+              $0.handle
+                == level.trainingRobotGuidebotChain?
+                    .guidebotObjectHandle
+          }),
+          case let .room(roomSourceIndex) = guidebot.location
+    else {
+        return []
+    }
+    return extractTrainingGuidebotYellowFlareDrawItems(
+        level,
+        flares:
+            (0..<trainingGuidebotYellowFlarePresentationCapacity).map {
+                _ in .init(
+                    roomSourceIndex: roomSourceIndex,
+                    position: guidebot.position,
+                    orientation: guidebot.orientation,
+                    velocity:
+                        guidebot.orientation.forward
+                            * definition.speed,
+                    model: definition.model,
+                    collisionRadius: definition.collisionRadius,
+                    lifeRemaining: definition.lifetime,
+                    sourceLightDistance:
+                        definition.lightDistance,
+                    lightDistance: definition.lightDistance,
+                    lightPresentation:
+                        definition.lightPresentation
+                )
+            },
+        camera: .trainingRoom3
+    )
+}
+
+func extractTrainingGuidebotYellowFlareDrawItems(
+    _ level: Level,
+    flares: [TrainingGuidebotYellowFlareFrame],
+    camera: RoomCamera
+) -> [ModelDrawItem] {
+    guard let definition =
+            level.trainingRobotGuidebotChain?.yellowFlare,
+          let model = level.models.first(where: {
+              $0.source == definition.model
+          })
+    else {
+        return []
+    }
+    precondition(
+        flares.count
+            <= trainingGuidebotYellowFlarePresentationCapacity
+    )
+    let materialByTexture = Dictionary(
+        uniqueKeysWithValues: level.presentationMaterials.map {
+            ($0.texture, $0)
+        }
+    )
+    return flares.enumerated().flatMap { slot, flare in
+        let object = PlacedObject(
+            handle: UInt32.max - 1_000 - UInt32(slot),
+            type: 5,
+            storedID: definition.source.storedIndex,
+            definition: definition.source,
+            instanceName: nil,
+            flags: 0,
+            doorShields: nil,
+            location: .room(flare.roomSourceIndex),
+            position: flare.position,
+            orientation: flare.orientation,
+            containsType: 0,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: flare.lifeRemaining,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        )
+        return makeModelDrawItems(
+            object: object,
+            model: model,
+            materialByTexture: materialByTexture,
+            camera: camera,
+            cullBackfaces: false
+        )
+    }
+}
+
 private func accumulatedModelOffsets(_ model: CanonicalModel) -> [Vector3] {
     var offsets = [Vector3?](repeating: nil, count: model.submodels.count)
 
@@ -11628,6 +12287,30 @@ private func + (lhs: Vector3, rhs: Vector3) -> Vector3 {
 
 private func transform(_ value: Vector3, by matrix: Matrix3) -> Vector3 {
     matrix.right * value.x + matrix.up * value.y + matrix.forward * value.z
+}
+
+private func transform(_ value: Matrix3, by matrix: Matrix3) -> Matrix3 {
+    .init(
+        right: transform(value.right, by: matrix),
+        up: transform(value.up, by: matrix),
+        forward: transform(value.forward, by: matrix)
+    )
+}
+
+private func inverseTransform(_ value: Vector3, by matrix: Matrix3) -> Vector3 {
+    .init(
+        x: dot(value, matrix.right),
+        y: dot(value, matrix.up),
+        z: dot(value, matrix.forward)
+    )
+}
+
+private func inverseTransform(_ value: Matrix3, by matrix: Matrix3) -> Matrix3 {
+    .init(
+        right: inverseTransform(value.right, by: matrix),
+        up: inverseTransform(value.up, by: matrix),
+        forward: inverseTransform(value.forward, by: matrix)
+    )
 }
 
 private func * (lhs: Vector3, rhs: Float) -> Vector3 {

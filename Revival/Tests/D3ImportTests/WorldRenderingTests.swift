@@ -7901,6 +7901,600 @@ final class WorldRenderingTests: XCTestCase {
         }
     }
 
+    func testGuidebotYellowFlareResetsBeforeEligibilityThenRetainsCarrierAndFirstParticle()
+        throws
+    {
+        let level = makeTrainingGuidebotYellowFlareLevel()
+        let initialRandomState: UInt32 = 0x1357_9BDF
+        func nextState(_ state: UInt32) -> UInt32 {
+            state &* 214_013 &+ 2_531_011
+        }
+        func continuationObject(
+            _ continuation: PlayerSimulationContinuation
+        ) throws -> [String: Any] {
+            try XCTUnwrap(
+                JSONSerialization.jsonObject(
+                    with: JSONEncoder().encode(continuation)
+                ) as? [String: Any]
+            )
+        }
+        func preparedContinuation(
+            from continuation: PlayerSimulationContinuation,
+            helperSlotsAreUsed: Bool,
+            randomState: UInt32
+        ) throws -> PlayerSimulationContinuation {
+            var object = try continuationObject(continuation)
+            object["authoritativeRandomState"] = NSNumber(value: randomState)
+            var state = try XCTUnwrap(
+                object["trainingRobotGuidebotState"] as? [String: Any]
+            )
+            state["guidebotMode"] = "ambient"
+            state["guidebotModeTime"] = 0.1
+            state["nextAmbientTime"] = 100.0
+            state["timeUntilNextFlare"] = 0.05
+            state["nextPowerupCheckTime"] = 100.0
+            state["yellowFlareGoalSlots"] = [
+                "slot1IsUsed": true,
+                "slot2IsUsed": helperSlotsAreUsed,
+                "slot3IsUsed": helperSlotsAreUsed,
+            ]
+            state["yellowFlares"] = []
+            object["trainingRobotGuidebotState"] = state
+            return try JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: object)
+            )
+        }
+        func randomState(
+            in continuation: PlayerSimulationContinuation
+        ) throws -> UInt32 {
+            let object = try continuationObject(continuation)
+            return try XCTUnwrap(
+                (object["authoritativeRandomState"] as? NSNumber)?
+                    .uint32Value
+            )
+        }
+
+        let seedSimulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        _ = seedSimulation.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        _ = try PlayerSimulation(
+            level: level,
+            continuation: seedSimulation.continuation,
+            resumedAtTimestamp: 9
+        )
+        let blockedStart = try preparedContinuation(
+            from: seedSimulation.continuation,
+            helperSlotsAreUsed: true,
+            randomState: initialRandomState
+        )
+        let blocked = try PlayerSimulation(
+            level: level,
+            continuation: blockedStart,
+            resumedAtTimestamp: 10
+        )
+        let blockedFrame = blocked.update(at: 10.1, input: .zero)
+        let stateAfterBlockedReset = nextState(initialRandomState)
+        XCTAssertEqual(
+            try randomState(in: blocked.continuation),
+            stateAfterBlockedReset
+        )
+        XCTAssertTrue(blockedFrame.trainingGuidebotYellowFlares.isEmpty)
+        XCTAssertTrue(blockedFrame.trainingGuidebotYellowFlareParticles.isEmpty)
+        XCTAssertFalse(blockedFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+
+        let eligibleStart = try preparedContinuation(
+            from: blocked.continuation,
+            helperSlotsAreUsed: false,
+            randomState: stateAfterBlockedReset
+        )
+        let eligible = try PlayerSimulation(
+            level: level,
+            continuation: eligibleStart,
+            resumedAtTimestamp: 20
+        )
+        let fired = eligible.update(at: 20.1, input: .zero)
+        let stateAfterEligibleReset = nextState(stateAfterBlockedReset)
+        XCTAssertEqual(
+            try randomState(in: eligible.continuation),
+            stateAfterEligibleReset
+        )
+        XCTAssertEqual(
+            fired.trainingOpeningFeedback.filter {
+                $0.soundSourceName == "Flare.wav"
+            }.count,
+            1
+        )
+        let carrierAtCreation = try XCTUnwrap(
+            fired.trainingGuidebotYellowFlares.only
+        )
+        XCTAssertTrue(fired.trainingGuidebotYellowFlareParticles.isEmpty)
+        XCTAssertEqual(carrierAtCreation.lightDistance, 35)
+
+        let emitted = eligible.update(at: 20.2, input: .zero)
+        var expectedDrawState = stateAfterEligibleReset
+        let particleAndLightDraws = (0..<7).map { _ -> UInt32 in
+            expectedDrawState = nextState(expectedDrawState)
+            return (expectedDrawState >> 16) & 0x7fff
+        }
+        XCTAssertEqual(
+            try randomState(in: eligible.continuation),
+            expectedDrawState
+        )
+        XCTAssertFalse(emitted.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+        let carrier = try XCTUnwrap(
+            emitted.trainingGuidebotYellowFlares.only
+        )
+        XCTAssertEqual(carrier.model.sourceName, "FlareYellowBright.OOF")
+        XCTAssertEqual(carrier.collisionRadius, 0.1)
+        XCTAssertEqual(
+            carrier.velocity,
+            .init(
+                x: carrier.orientation.forward.x * 100,
+                y: carrier.orientation.forward.y * 100,
+                z: carrier.orientation.forward.z * 100
+            )
+        )
+        XCTAssertEqual(carrier.sourceLightDistance, 35)
+        XCTAssertTrue((33...37).contains(carrier.lightDistance))
+        let particle = try XCTUnwrap(
+            emitted.trainingGuidebotYellowFlareParticles.only
+        )
+        XCTAssertEqual(particle.texture.sourceName, "yellowspark")
+        let rawVelocity = Vector3(
+            x: Float(Int(particleAndLightDraws[0] % 100) - 50),
+            y: Float(particleAndLightDraws[1] % 100),
+            z: Float(Int(particleAndLightDraws[2] % 100) - 50)
+        )
+        let rawMagnitude = sqrt(
+            rawVelocity.x * rawVelocity.x
+                + rawVelocity.y * rawVelocity.y
+                + rawVelocity.z * rawVelocity.z
+        )
+        let expectedSpeed = Float(10 + particleAndLightDraws[3] % 10)
+        let emittedContinuationState = try XCTUnwrap(
+            try continuationObject(eligible.continuation)[
+                "trainingRobotGuidebotState"
+            ] as? [String: Any]
+        )
+        let persistedParticle = try XCTUnwrap(
+            (emittedContinuationState["yellowFlareParticles"]
+                as? [[String: Any]])?.only
+        )
+        let persistedVelocity = try XCTUnwrap(
+            persistedParticle["velocity"] as? [String: NSNumber]
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(persistedVelocity["x"]?.floatValue),
+            rawVelocity.x / rawMagnitude * expectedSpeed,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(persistedVelocity["y"]?.floatValue),
+            rawVelocity.y / rawMagnitude * expectedSpeed,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(persistedVelocity["z"]?.floatValue),
+            rawVelocity.z / rawMagnitude * expectedSpeed,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            particle.size,
+            0.2
+                + Float(Int(particleAndLightDraws[4] % 11) - 5)
+                    * 0.02,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            particle.lifetime,
+            0.3
+                + Float(Int(particleAndLightDraws[5] % 11) - 5)
+                    * 0.03,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(particle.sourceSize, 0.2)
+        XCTAssertEqual(particle.sourceLifetime, 0.3)
+        XCTAssertEqual(
+            particle.position.x,
+            carrierAtCreation.position.x
+                - carrierAtCreation.orientation.forward.x * 0.1,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            particle.position.y,
+            carrierAtCreation.position.y
+                - carrierAtCreation.orientation.forward.y * 0.1,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            particle.position.z,
+            carrierAtCreation.position.z
+                - carrierAtCreation.orientation.forward.z * 0.1,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            carrier.lightDistance,
+            35 + Float(Int(particleAndLightDraws[6] % 5) - 2)
+        )
+        XCTAssertNotEqual(carrier.position, carrierAtCreation.position)
+        let preparedPlan = try makeMetalWorldPlan(
+            level: eligible.level,
+            playerView: emitted.playerView
+        )
+        let retainedPlan = try updateMetalWorldPlan(
+            preparedPlan,
+            level: eligible.level,
+            playerView: emitted.playerView,
+            trainingGuidebotYellowFlares:
+                emitted.trainingGuidebotYellowFlares,
+            trainingGuidebotYellowFlareParticles:
+                emitted.trainingGuidebotYellowFlareParticles
+        )
+        XCTAssertTrue(retainedPlan.draws.contains {
+            $0.model == carrier.model
+                && $0.objectHandle == UInt32.max - 1_000
+        })
+        XCTAssertTrue(retainedPlan.draws.contains {
+            $0.texture == particle.texture
+                && $0.objectHandle == UInt32.max - 2_000
+        })
+        XCTAssertTrue(retainedPlan.draws.contains { draw in
+            draw.vertices.contains {
+                $0.dynamicLight.x > 0
+                    || $0.dynamicLight.y > 0
+                    || $0.dynamicLight.z > 0
+            }
+        })
+
+        let player = try XCTUnwrap(eligible.level.objects.first {
+            $0.handle == eligible.level.defaultPlayerBinding?.objectHandle
+        })
+        var attachedObject = try continuationObject(eligible.continuation)
+        attachedObject["frameDuration"] = 0.1
+        var attachedState = try XCTUnwrap(
+            attachedObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        attachedState["timeUntilNextFlare"] = 3.5
+        attachedState["yellowFlareParticles"] = []
+        var attachedFlares = try XCTUnwrap(
+            attachedState["yellowFlares"] as? [[String: Any]]
+        )
+        attachedFlares[0]["roomSourceIndex"] = {
+            if case let .room(room) = player.location { return room }
+            return -1
+        }()
+        attachedFlares[0]["position"] = [
+            "x": player.position.x,
+            "y": player.position.y,
+            "z": player.position.z,
+        ]
+        attachedFlares[0]["orientation"] = [
+            "right": [
+                "x": player.orientation.right.x,
+                "y": player.orientation.right.y,
+                "z": player.orientation.right.z,
+            ],
+            "up": [
+                "x": player.orientation.up.x,
+                "y": player.orientation.up.y,
+                "z": player.orientation.up.z,
+            ],
+            "forward": [
+                "x": player.orientation.forward.x,
+                "y": player.orientation.forward.y,
+                "z": player.orientation.forward.z,
+            ],
+        ]
+        attachedFlares[0]["velocity"] = ["x": 0, "y": 0, "z": 0]
+        attachedFlares[0]["stuckObjectHandle"] = player.handle
+        attachedFlares[0]["stuckObjectOffset"] = [
+            "x": 0, "y": 0, "z": 0,
+        ]
+        attachedFlares[0]["stuckObjectOrientation"] = [
+            "right": ["x": 1, "y": 0, "z": 0],
+            "up": ["x": 0, "y": 1, "z": 0],
+            "forward": ["x": 0, "y": 0, "z": 1],
+        ]
+        attachedState["yellowFlares"] = attachedFlares
+        attachedObject["trainingRobotGuidebotState"] = attachedState
+        let attached = try PlayerSimulation(
+            level: eligible.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: attachedObject)
+            ),
+            resumedAtTimestamp: 20.3
+        )
+        let attachedFrame = attached.update(
+            at: 20.4,
+            input: .init(forward: 1, yaw: 1)
+        )
+        let attachedCarrier = try XCTUnwrap(
+            attachedFrame.trainingGuidebotYellowFlares.only
+        )
+        XCTAssertEqual(
+            attachedCarrier.position,
+            attachedFrame.playerView.camera.position
+        )
+        XCTAssertNotEqual(attachedCarrier.position, player.position)
+        XCTAssertFalse(attachedFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+        let freshBaseRestore = try PlayerSimulation(
+            level: level,
+            continuation: attached.continuation,
+            resumedAtTimestamp: 20.5
+        )
+        let freshBaseFrame = freshBaseRestore.update(
+            at: 20.6,
+            input: .zero
+        )
+        XCTAssertEqual(
+            freshBaseFrame.trainingGuidebotYellowFlares.count,
+            1
+        )
+        XCTAssertFalse(freshBaseFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+
+        var incoherentAttachedObject = attachedObject
+        var incoherentAttachedState = try XCTUnwrap(
+            incoherentAttachedObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        var incoherentAttachedFlares = try XCTUnwrap(
+            incoherentAttachedState["yellowFlares"]
+                as? [[String: Any]]
+        )
+        incoherentAttachedFlares[0]["position"] = [
+            "x": player.position.x + 1,
+            "y": player.position.y,
+            "z": player.position.z,
+        ]
+        incoherentAttachedState["yellowFlares"] =
+            incoherentAttachedFlares
+        incoherentAttachedObject["trainingRobotGuidebotState"] =
+            incoherentAttachedState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: eligible.level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: incoherentAttachedObject
+                    )
+                ),
+                resumedAtTimestamp: 20.3
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var outsideObject = try continuationObject(eligible.continuation)
+        var outsideState = try XCTUnwrap(
+            outsideObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        var outsideFlares = try XCTUnwrap(
+            outsideState["yellowFlares"] as? [[String: Any]]
+        )
+        outsideFlares[0]["position"] = [
+            "x": 100_000, "y": 100_000, "z": 100_000,
+        ]
+        outsideState["yellowFlares"] = outsideFlares
+        outsideObject["trainingRobotGuidebotState"] = outsideState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: eligible.level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(withJSONObject: outsideObject)
+                ),
+                resumedAtTimestamp: 20.3
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var nearWallObject = try continuationObject(
+            eligible.continuation
+        )
+        nearWallObject["frameDuration"] = 0.01
+        var nearWallState = try XCTUnwrap(
+            nearWallObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        nearWallState["timeUntilNextFlare"] = 3.5
+        nearWallState["yellowFlareParticles"] = []
+        var nearWallFlares = try XCTUnwrap(
+            nearWallState["yellowFlares"] as? [[String: Any]]
+        )
+        var nearWallFlare = try XCTUnwrap(nearWallFlares.only)
+        let roomCenter = try XCTUnwrap(
+            eligible.level.rooms.first { $0.sourceIndex == 1 }
+        ).pathPoint
+        let forward = carrier.orientation.forward
+        let maximumComponent = max(
+            abs(forward.x),
+            abs(forward.y),
+            abs(forward.z)
+        )
+        let nearWallDistance =
+            (500 - carrier.collisionRadius) / maximumComponent - 0.2
+        nearWallFlare["position"] = [
+            "x": Double(roomCenter.x + forward.x * nearWallDistance),
+            "y": Double(roomCenter.y + forward.y * nearWallDistance),
+            "z": Double(roomCenter.z + forward.z * nearWallDistance),
+        ]
+        nearWallFlare["velocity"] = [
+            "x": Double(forward.x * 100),
+            "y": Double(forward.y * 100),
+            "z": Double(forward.z * 100),
+        ]
+        nearWallFlare["lastParticleDropTime"] =
+            nearWallObject["gameTime"]
+        nearWallFlares[0] = nearWallFlare
+        nearWallState["yellowFlares"] = nearWallFlares
+        nearWallObject["trainingRobotGuidebotState"] = nearWallState
+        let nearWall = try PlayerSimulation(
+            level: eligible.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: nearWallObject)
+            ),
+            resumedAtTimestamp: 21
+        )
+        let stuckFrame = nearWall.update(at: 21.01, input: .zero)
+        XCTAssertEqual(
+            try XCTUnwrap(stuckFrame.trainingGuidebotYellowFlares.only)
+                .velocity,
+            .zero
+        )
+        XCTAssertTrue(
+            stuckFrame.trainingGuidebotYellowFlareParticles.isEmpty
+        )
+        XCTAssertFalse(stuckFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+
+        var expiryObject = try continuationObject(nearWall.continuation)
+        expiryObject["frameDuration"] = 0.01
+        var expiryState = try XCTUnwrap(
+            expiryObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        expiryState["timeUntilNextFlare"] = 3.5
+        expiryState["yellowFlareParticles"] = []
+        var expiringFlares = try XCTUnwrap(
+            expiryState["yellowFlares"] as? [[String: Any]]
+        )
+        expiringFlares[0]["lifeRemaining"] = 0.005
+        expiringFlares[0]["lastParticleDropTime"] = 0
+        expiryState["yellowFlares"] = expiringFlares
+        expiryObject["trainingRobotGuidebotState"] = expiryState
+        let expiryInitialRandomState = try randomState(
+            in: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: expiryObject)
+            )
+        )
+        let expiry = try PlayerSimulation(
+            level: eligible.level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: expiryObject)
+            ),
+            resumedAtTimestamp: 22
+        )
+        let expiredFrame = expiry.update(at: 22.01, input: .zero)
+        XCTAssertTrue(expiredFrame.trainingGuidebotYellowFlares.isEmpty)
+        XCTAssertEqual(
+            expiredFrame.trainingGuidebotYellowFlareParticles.count,
+            1
+        )
+        XCTAssertEqual(
+            try randomState(in: expiry.continuation),
+            (0..<6).reduce(expiryInitialRandomState) {
+                state, _ in nextState(state)
+            }
+        )
+        XCTAssertFalse(expiredFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+        let expiredRestore = try PlayerSimulation(
+            level: eligible.level,
+            continuation: expiry.continuation,
+            resumedAtTimestamp: 23
+        )
+        let expiredRestoreFrame = expiredRestore.update(
+            at: 23.01,
+            input: .zero
+        )
+        XCTAssertTrue(
+            expiredRestoreFrame.trainingGuidebotYellowFlares.isEmpty
+        )
+        XCTAssertFalse(expiredRestoreFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+
+        var compatibleLevelObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(level)
+            ) as? [String: Any]
+        )
+        var compatibleChain = try XCTUnwrap(
+            compatibleLevelObject["trainingRobotGuidebotChain"]
+                as? [String: Any]
+        )
+        compatibleChain.removeValue(forKey: "yellowFlare")
+        compatibleLevelObject["trainingRobotGuidebotChain"] = compatibleChain
+        let compatibleLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: compatibleLevelObject)
+        )
+        let compatibleSeed = PlayerSimulation(
+            level: compatibleLevel,
+            presentationReadyTimestamp: 0
+        )
+        _ = compatibleSeed.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        var compatibleObject = try continuationObject(
+            compatibleSeed.continuation
+        )
+        compatibleObject["authoritativeRandomState"] = NSNumber(
+            value: initialRandomState
+        )
+        var compatibleState = try XCTUnwrap(
+            compatibleObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        compatibleState["guidebotMode"] = "ambient"
+        compatibleState["guidebotModeTime"] = 0.1
+        compatibleState["nextAmbientTime"] = 100.0
+        compatibleState["timeUntilNextFlare"] = 0.05
+        compatibleState["nextPowerupCheckTime"] = 100.0
+        compatibleObject["trainingRobotGuidebotState"] = compatibleState
+        let compatible = try PlayerSimulation(
+            level: compatibleLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: compatibleObject)
+            ),
+            resumedAtTimestamp: 30
+        )
+        let compatibleFrame = compatible.update(at: 30.1, input: .zero)
+        XCTAssertEqual(
+            try randomState(in: compatible.continuation),
+            nextState(initialRandomState)
+        )
+        XCTAssertTrue(compatibleFrame.trainingGuidebotYellowFlares.isEmpty)
+        XCTAssertTrue(
+            compatibleFrame.trainingGuidebotYellowFlareParticles.isEmpty
+        )
+        XCTAssertFalse(compatibleFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+    }
+
     func testCameraMonitorPickupUseAndTimedViewContinueOnceAcrossReload() throws {
         let level = makeTrainingCameraMonitorLevel()
         try level.validate()
@@ -9888,9 +10482,12 @@ final class WorldRenderingTests: XCTestCase {
             at target: PlacedObject,
             timestamp: Double
         ) throws -> PlayerSimulation {
+            let sourceContinuationData = try JSONEncoder().encode(
+                source.continuation
+            )
             var aimedContinuation = try XCTUnwrap(
                 JSONSerialization.jsonObject(
-                    with: JSONEncoder().encode(source.continuation)
+                    with: sourceContinuationData
                 ) as? [String: Any]
             )
             aimedContinuation["playerLocation"] = [
@@ -19430,6 +20027,171 @@ func makeTrainingRobotGuidebotLevel() -> Level {
                 sourceSHA256: String(repeating: "c", count: 64)
             ),
         ]
+    )
+}
+
+func makeTrainingGuidebotYellowFlareLevel() -> Level {
+    var level = makeTrainingRobotGuidebotLevel()
+    let roomIndex = level.rooms.firstIndex { $0.sourceIndex == 1 }!
+    let room = level.rooms[roomIndex]
+    level.rooms[roomIndex] = addingSourceContainmentShell(
+        to: .init(
+            sourceIndex: room.sourceIndex,
+            name: room.name,
+            pathPoint: room.pathPoint,
+            vertices: [],
+            faces: [],
+            portals: []
+        ),
+        center: room.pathPoint,
+        texture: level.surfacePhysics[0].texture,
+        halfExtent: 500
+    )
+    let playerIndex = level.objects.firstIndex { $0.handle == 2_048 }!
+    level.objects[playerIndex].location = .room(1)
+    level.objects[playerIndex].position = room.pathPoint
+    let chain = level.trainingRobotGuidebotChain!
+    let templateModel = level.models.first {
+        $0.source.sourceName.caseInsensitiveCompare("Buddybot.oof")
+            == .orderedSame
+    }!
+    let modelSource = SourceResource(
+        storedIndex: level.models.count,
+        sourceName: "FlareYellowBright.OOF"
+    )
+    let flareModel = CanonicalModel(
+        source: modelSource,
+        collisionRadius: Float(bitPattern: 0x405f_d5ea),
+        submodels: templateModel.submodels,
+        bounds: templateModel.bounds,
+        sourceArchive: templateModel.sourceArchive,
+        sourceSHA256:
+            "fa0f92ba8d3ea0d348766c2cf56897935a0a1afe211378729b5781d773fb9ed4"
+    )
+    let templateMaterial = level.presentationMaterials[0]
+    let particleTexture = SourceResource(
+        storedIndex: 878,
+        sourceName: "yellowspark"
+    )
+    let particleMaterial = PresentationMaterial(
+        texture: particleTexture,
+        bitmapSourceName: "yellowspark.oaf",
+        image: templateMaterial.image,
+        blend: .additiveSourceAlpha(opacity: 255),
+        lightmapBlend: .none,
+        waterProcedural: nil,
+        sourceArchive: templateMaterial.sourceArchive,
+        sourceSHA256:
+            "eabf95db1e5c17235b65a7b938081d40e44736456112acbc4a1ff99126051194"
+    )
+    let pcm = Data(repeating: 0, count: 2)
+    let sound = CanonicalSoundClip(
+        logicalName: "Flare",
+        sourceName: "Flare.wav",
+        sourceEntryIndex: 1_158,
+        sampleRate: 22_050,
+        channelCount: 1,
+        frameCount: 1,
+        pcm16LittleEndian: pcm,
+        pcmSHA256: canonicalSHA256(pcm),
+        sourceArchive: templateModel.sourceArchive,
+        sourceSHA256: String(repeating: "f", count: 64),
+        importVolume: 0.300_000_07
+    )
+    let yellowFlare = TrainingGuidebotYellowFlareDefinition(
+        source: .init(storedIndex: 3, sourceName: "Yellow flare"),
+        model: modelSource,
+        particleTexture: particleTexture,
+        fireSoundSourceName: sound.sourceName,
+        weaponFlags: 0x8001_0000,
+        physicsFlags: 0x2000_0810,
+        modelPageSize: Float(bitPattern: 0x405f_d5ea),
+        collisionRadius: 0.1,
+        speed: 100,
+        lifetime: 15,
+        mass: 0.1,
+        drag: 0.0001,
+        coefficientOfRestitution: 1,
+        lightDistance: 35,
+        lightPresentation: .init(
+            primaryColor: .init(x: 1, y: 1, z: 0.8),
+            secondaryColor: .zero,
+            timeInterval: 0.2,
+            flickerDistance: 5,
+            directionalDot: 0,
+            flags: 16,
+            timebits: UInt32.max,
+            angle: 0,
+            lightingRenderType: 0
+        ),
+        particleCount: 25,
+        particleInterval: 0.04,
+        particleSize: 0.2,
+        particleLifetime: 0.3
+    )
+    let boundChain = TrainingRobotGuidebotChain(
+        destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
+        guidebotObjectHandle: chain.guidebotObjectHandle,
+        destroyRobotRoomSourceIndex: chain.destroyRobotRoomSourceIndex,
+        destroyRobotFlags: chain.destroyRobotFlags,
+        destructionDelay: chain.destructionDelay,
+        destructionMessage: chain.destructionMessage,
+        exitInstruction: chain.exitInstruction,
+        destructionVoiceSourceName:
+            chain.destructionVoiceSourceName,
+        deployedGuidebotObjectType:
+            chain.deployedGuidebotObjectType,
+        deployedGuidebotMessage: chain.deployedGuidebotMessage,
+        deployedGuidebotVoiceSourceName:
+            chain.deployedGuidebotVoiceSourceName,
+        releaseSoundSourceName: chain.releaseSoundSourceName,
+        ambientEngineSoundSourceName:
+            chain.ambientEngineSoundSourceName,
+        yellowFlare: yellowFlare,
+        combat: chain.combat,
+        guidebot: chain.guidebot
+    )
+    let dependencies = level.dependencyManifest.current + [
+        DependencyRecord(
+            category: "weapon-definition",
+            source: yellowFlare.source,
+            state: "canonical-page-bound",
+            provenance: "synthetic Yellow flare fixture"
+        ),
+        .init(
+            category: "model",
+            source: modelSource,
+            state: "presentation-payload-imported",
+            provenance: "synthetic Yellow flare fixture"
+        ),
+        .init(
+            category: "texture",
+            source: particleTexture,
+            state: "presentation-payload-imported",
+            provenance: "synthetic Yellow flare fixture"
+        ),
+        .init(
+            category: "sound",
+            source: .init(
+                storedIndex: sound.sourceEntryIndex,
+                sourceName: sound.sourceName
+            ),
+            state: "canonical-pcm-imported",
+            provenance: "synthetic Yellow flare fixture"
+        ),
+    ]
+    return replacing(
+        level,
+        presentationMaterials:
+            level.presentationMaterials + [particleMaterial],
+        models: level.models + [flareModel],
+        trainingRobotGuidebotChain: boundChain,
+        soundClips: level.soundClips + [sound],
+        dependencyManifest: .init(
+            current: dependencies,
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
     )
 }
 

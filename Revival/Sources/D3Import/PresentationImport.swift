@@ -487,6 +487,12 @@ struct Outrage1555Image: Equatable, Sendable {
     let sourceWasARGB4444: Bool
 }
 
+struct Outrage1555Animation: Equatable, Sendable {
+    let version: Int
+    let sourceFrameTime: Float
+    let frames: [Outrage1555Image]
+}
+
 private enum LegacyOGFPixelFormat: Equatable {
     case argb1555
     case argb4444
@@ -997,6 +1003,21 @@ struct RetailWeaponPresentationSelection:
     let name: String
     let hudImageName: String
     let fireImageName: String
+    let particleName: String
+    let particleCount: Int
+    let particleLifetime: Float
+    let particleSize: Float
+    let weaponFlags: UInt32
+    let customSize: Float
+    let modelPageSize: Float
+    let mass: Float
+    let drag: Float
+    let physicsFlags: UInt32
+    let coefficientOfRestitution: Float
+    let speed: Float
+    let lifetime: Float
+    let lightDistance: Float
+    let lightPresentation: TrainingMarkerLightPresentation
 }
 
 func resolveRetailWeaponPresentation(
@@ -1052,11 +1073,106 @@ private func parseRetailWeaponPresentations(
                 throw RetailTextureTableError
                     .invalidPageLength
             }
+            let name = try cursor.readCString()
+            let hudImageName = try cursor.readCString(allowEmpty: true)
+            let fireImageName = try cursor.readCString(allowEmpty: true)
+            let particleName = try cursor.readCString(allowEmpty: true)
+            let particleCount = Int(try cursor.readUInt8())
+            let particleLifetime = try cursor.readFloat()
+            let particleSize = try cursor.readFloat()
+            let weaponFlags = try cursor.readUInt32()
+            _ = try cursor.readCString(allowEmpty: true)
+            _ = try cursor.readUInt8()
+            _ = try cursor.readCString(allowEmpty: true)
+            _ = try cursor.readCString(allowEmpty: true)
+            _ = try cursor.readUInt8()
+            _ = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            let customSize = try cursor.readFloat()
+            let modelPageSize = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            let mass = try cursor.readFloat()
+            let drag = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            let physicsFlags = try cursor.readUInt32()
+            _ = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            _ = try cursor.readInt32()
+            let speed = try cursor.readFloat()
+            for _ in 0..<3 { _ = try cursor.readFloat() }
+            _ = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            let coefficientOfRestitution = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            _ = try cursor.readUInt8()
+            _ = try cursor.readFloat()
+            _ = try cursor.readCString(allowEmpty: true)
+            _ = try cursor.readFloat()
+            _ = try cursor.readFloat()
+            for _ in 0..<7 { _ = try cursor.readFloat() }
+            let lifetime = try cursor.readFloat()
+            let lightDistance = try cursor.readFloat()
+            let primaryColor = Vector3(
+                x: try cursor.readFloat(),
+                y: try cursor.readFloat(),
+                z: try cursor.readFloat()
+            )
+            let timeInterval = try cursor.readFloat()
+            let flickerDistance = try cursor.readFloat()
+            let directionalDot = try cursor.readFloat()
+            let secondaryColor = Vector3(
+                x: try cursor.readFloat(),
+                y: try cursor.readFloat(),
+                z: try cursor.readFloat()
+            )
+            let lightFlags = try cursor.readUInt32()
+            let lightTimebits = try cursor.readUInt32()
+            let lightAngle = try cursor.readUInt8()
+            let lightRenderType = try cursor.readUInt8()
+            _ = try cursor.readFloat()
+            for _ in 0..<7 {
+                _ = try cursor.readCString(allowEmpty: true)
+            }
+            _ = try cursor.readCString(allowEmpty: true)
+            _ = try cursor.readCString(allowEmpty: true)
+            _ = try cursor.readFloat()
+            _ = try cursor.readCString(allowEmpty: true)
+            try cursor.requireEnd()
             pages.append(.init(
                 storedIndex: weaponIndex,
-                name: try cursor.readCString(),
-                hudImageName: try cursor.readCString(),
-                fireImageName: try cursor.readCString()
+                name: name,
+                hudImageName: hudImageName,
+                fireImageName: fireImageName,
+                particleName: particleName,
+                particleCount: particleCount,
+                particleLifetime: particleLifetime,
+                particleSize: particleSize,
+                weaponFlags: weaponFlags,
+                customSize: customSize,
+                modelPageSize: modelPageSize,
+                mass: mass,
+                drag: drag,
+                physicsFlags: physicsFlags,
+                coefficientOfRestitution:
+                    coefficientOfRestitution,
+                speed: speed,
+                lifetime: lifetime,
+                lightDistance: lightDistance,
+                lightPresentation: .init(
+                    primaryColor: primaryColor,
+                    secondaryColor: secondaryColor,
+                    timeInterval: timeInterval,
+                    flickerDistance: flickerDistance,
+                    directionalDot: directionalDot,
+                    flags: lightFlags,
+                    timebits: lightTimebits,
+                    angle: lightAngle,
+                    lightingRenderType: lightRenderType
+                )
             ))
             weaponIndex += 1
         }
@@ -2048,6 +2164,49 @@ private func expandModelBounds(_ bounds: ModelBounds?, _ point: Vector3) -> Mode
 
 func decodeReachedOutrage16OGF(_ data: Data) throws -> Outrage1555Image {
     var cursor = OGFByteCursor(data)
+    let image = try decodeReachedOutrage16OGF(cursor: &cursor)
+    guard cursor.isAtEnd else {
+        throw Outrage1555DecodeError.trailingBytes
+    }
+    return image
+}
+
+func decodeReachedOutrage16OAF(
+    _ data: Data
+) throws -> Outrage1555Animation {
+    var cursor = OGFByteCursor(data)
+    guard try cursor.readUInt8() == 127 else {
+        throw Outrage1555DecodeError.unsupportedHeader
+    }
+    let version = Int(try cursor.readUInt8())
+    let frameCount = Int(try cursor.readUInt8())
+    let sourceFrameTime = try cursor.readFloat()
+    guard version == 1,
+          frameCount > 0,
+          sourceFrameTime.isFinite,
+          sourceFrameTime > 0 else {
+        throw Outrage1555DecodeError.unsupportedHeader
+    }
+    var frames: [Outrage1555Image] = []
+    frames.reserveCapacity(frameCount)
+    for _ in 0..<frameCount {
+        frames.append(
+            try decodeReachedOutrage16OGF(cursor: &cursor)
+        )
+    }
+    guard cursor.isAtEnd else {
+        throw Outrage1555DecodeError.trailingBytes
+    }
+    return .init(
+        version: version,
+        sourceFrameTime: sourceFrameTime,
+        frames: frames
+    )
+}
+
+private func decodeReachedOutrage16OGF(
+    cursor: inout OGFByteCursor
+) throws -> Outrage1555Image {
     let imageIdentifierLength = Int(try cursor.readUInt8())
     guard try cursor.readUInt8() == 0 else {
         throw Outrage1555DecodeError.unsupportedHeader
@@ -2094,7 +2253,6 @@ func decodeReachedOutrage16OGF(_ data: Data) throws -> Outrage1555Image {
         }
         if mip == 0 { firstMip = pixels }
     }
-    guard cursor.isAtEnd else { throw Outrage1555DecodeError.trailingBytes }
     return Outrage1555Image(
         width: width,
         height: height,
@@ -2157,6 +2315,17 @@ private struct OGFByteCursor {
     mutating func readUInt16() throws -> UInt16 {
         let low = UInt16(try readUInt8())
         return low | UInt16(try readUInt8()) << 8
+    }
+
+    mutating func readUInt32() throws -> UInt32 {
+        UInt32(try readUInt8())
+            | UInt32(try readUInt8()) << 8
+            | UInt32(try readUInt8()) << 16
+            | UInt32(try readUInt8()) << 24
+    }
+
+    mutating func readFloat() throws -> Float {
+        Float(bitPattern: try readUInt32())
     }
 
     mutating func readCString(maximumByteCount: Int) throws -> String {

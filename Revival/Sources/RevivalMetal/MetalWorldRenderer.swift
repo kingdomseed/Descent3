@@ -254,6 +254,10 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
                         frame.trainingDodgeProjectiles,
                     trainingPrimaryProjectiles:
                         frame.trainingPrimaryProjectiles,
+                    trainingGuidebotYellowFlares:
+                        frame.trainingGuidebotYellowFlares,
+                    trainingGuidebotYellowFlareParticles:
+                        frame.trainingGuidebotYellowFlareParticles,
                     trainingDodgeMarkerLightDistance:
                         frame.trainingDodgeMarkerLightDistance,
                 trainingGuidebotReturnMarkerLightDistance:

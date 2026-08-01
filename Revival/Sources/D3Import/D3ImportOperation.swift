@@ -465,6 +465,45 @@ func runD3Import(
                 .caseInsensitiveCompare("bluelaser.OOF")
                 == .orderedSame
     )
+    let yellowFlareWeapon = try resolveRetailWeaponPresentation(
+        table: tableData,
+        overlay: overlayData,
+        named: "Yellow flare"
+    )
+    precondition(
+        yellowFlareWeapon.storedIndex == 3
+            && yellowFlareWeapon.hudImageName == "Armeye.ogf"
+            && yellowFlareWeapon.fireImageName
+                == "FlareYellowBright.OOF"
+            && yellowFlareWeapon.particleName == "yellowspark"
+            && yellowFlareWeapon.particleCount == 25
+            && yellowFlareWeapon.particleLifetime.bitPattern
+                == Float(0.3).bitPattern
+            && yellowFlareWeapon.particleSize.bitPattern
+                == Float(0.2).bitPattern
+            && yellowFlareWeapon.weaponFlags == 0x8001_0000
+            && yellowFlareWeapon.customSize == 0.1
+            && yellowFlareWeapon.modelPageSize.bitPattern
+                == 0x405f_d5ea
+            && yellowFlareWeapon.mass == 0.1
+            && yellowFlareWeapon.drag == 0.0001
+            && yellowFlareWeapon.physicsFlags == 0x2000_0810
+            && yellowFlareWeapon.coefficientOfRestitution == 1
+            && yellowFlareWeapon.speed == 100
+            && yellowFlareWeapon.lifetime == 15
+            && yellowFlareWeapon.lightDistance == 35
+            && yellowFlareWeapon.lightPresentation == .init(
+                primaryColor: .init(x: 1, y: 1, z: 0.8),
+                secondaryColor: .zero,
+                timeInterval: 0.2,
+                flickerDistance: 5,
+                directionalDot: 0,
+                flags: 16,
+                timebits: UInt32.max,
+                angle: 0,
+                lightingRenderType: 0
+            )
+    )
     let reachedModelNames = Set([
         reachedPages.ship.primaryModelName,
         reachedPages.ship.mediumModelName,
@@ -493,15 +532,22 @@ func runD3Import(
             dodgeTurretPage.lowModelName,
             "RedLaser.OOF",
             blueLaserWeapon.fireImageName,
+            yellowFlareWeapon.fireImageName,
     ].compactMap { $0 })
     let sortedModelNames = reachedModelNames.filter {
         $0.caseInsensitiveCompare(
             blueLaserWeapon.fireImageName
         ) != .orderedSame
+            && $0.caseInsensitiveCompare(
+                yellowFlareWeapon.fireImageName
+            ) != .orderedSame
     }.sorted {
         $0.localizedCaseInsensitiveCompare($1)
             == .orderedAscending
-    } + [blueLaserWeapon.fireImageName]
+    } + [
+        blueLaserWeapon.fireImageName,
+        yellowFlareWeapon.fireImageName,
+    ]
     var modelPayloadByName: [String: (data: Data, archive: String)] = [:]
     var textureNamesByModel: [String: [String]] = [:]
     var referencedTextureSlotsByModel: [String: Set<Int>] = [:]
@@ -523,6 +569,10 @@ func runD3Import(
     let reachedTextureNames = Set(textureNamesByModel.flatMap { key, names in
         referencedTextureSlotsByModel[key]!.sorted().map { names[$0] }
     }).filter { $0.caseInsensitiveCompare("SAMPLE TEXTURE") != .orderedSame }
+    let yellowFlareFrameAliases = [
+        "flarepuff01": "FlarePuff",
+        "flarepuffalt01": "FlarePuffAlt",
+    ]
     let reachedGyroFlasherFrame = "SecFlyLit-Flashers000"
     let reachedGyroFlareDefinitions = try resolveRetailTextureDefinitions(
         table: tableData,
@@ -534,10 +584,17 @@ func runD3Import(
     let resolvedReachedTextureDefinitions = try resolveRetailTextureDefinitions(
         table: tableData,
         overlay: overlayData,
-        names: Set(reachedTextureNames.filter {
-            $0.caseInsensitiveCompare(reachedGyroFlasherFrame)
-                != .orderedSame
-        })
+        names: Set(
+            reachedTextureNames.filter {
+                $0.caseInsensitiveCompare(reachedGyroFlasherFrame)
+                    != .orderedSame
+                    && yellowFlareFrameAliases[
+                        $0.lowercased()
+                    ] == nil
+            }
+        ).union(
+            yellowFlareFrameAliases.values
+        ).union([yellowFlareWeapon.particleName])
     )
     let reachedTextureDefinitions = Dictionary(
         (resolvedReachedTextureDefinitions + [reachedGyroFlareDefinition]).map {
@@ -558,6 +615,10 @@ func runD3Import(
     }
     modelTextureBySlotName[reachedGyroFlasherFrame.lowercased()]
         = modelTextureByName[reachedGyroFlareDefinition.name.lowercased()]
+    for (frameName, pageName) in yellowFlareFrameAliases {
+        modelTextureBySlotName[frameName] =
+            modelTextureByName[pageName.lowercased()]
+    }
     precondition(
         modelTextureBySlotName[reachedGyroFlasherFrame.lowercased()] != nil
     )
@@ -1112,6 +1173,9 @@ func runD3Import(
     let guidebotReleaseSoundClip = try reachedSoundClip(
         named: "GBExpulsionA"
     )
+    let guidebotFlareSoundClip = try reachedSoundClip(
+        named: "Flare"
+    )
     precondition(
         guidebotReleaseSoundClip.logicalName == "GBExpulsionA"
             && guidebotReleaseSoundClip.sourceName == "GBExpulsionA.wav"
@@ -1126,6 +1190,22 @@ func runD3Import(
             && guidebotReleaseSoundClip.sourceSHA256
                 == "ae030e17bd5fc5724b7b3aac6604299005d35adffc0b5d9620430d191e1ef288"
             && guidebotReleaseSoundClip.importVolume == 0.5
+    )
+    precondition(
+        guidebotFlareSoundClip.logicalName == "Flare"
+            && guidebotFlareSoundClip.sourceName == "Flare.wav"
+            && guidebotFlareSoundClip.sourceEntryIndex == 1_158
+            && guidebotFlareSoundClip.sampleRate == 22_050
+            && guidebotFlareSoundClip.channelCount == 1
+            && guidebotFlareSoundClip.frameCount == 25_086
+            && guidebotFlareSoundClip.pcm16LittleEndian.count == 50_172
+            && guidebotFlareSoundClip.pcmSHA256
+                == "98aa8dc4652268a3f512c995dcc8cc3f6ef3abe62947f839167bd809f9423452"
+            && guidebotFlareSoundClip.sourceArchive == "d3.hog"
+            && guidebotFlareSoundClip.sourceSHA256
+                == "79cb319f84c4cfdcdb6ca2ab853767df3f1e128f516ff007dc9febf8f5a988b7"
+            && guidebotFlareSoundClip.importVolume.bitPattern
+                == Float(0.300_000_07).bitPattern
     )
     let guidebotAmbientEngineSoundPage = try resolveRetailSoundPage(
         table: tableData,
@@ -1399,6 +1479,39 @@ func runD3Import(
             releaseSoundSourceName: guidebotReleaseSoundClip.sourceName,
             ambientEngineSoundSourceName:
                 guidebotAmbientEngineSoundClip.sourceName,
+            yellowFlare: .init(
+                source: .init(
+                    storedIndex: yellowFlareWeapon.storedIndex,
+                    sourceName: yellowFlareWeapon.name
+                ),
+                model: modelSources[
+                    yellowFlareWeapon.fireImageName.lowercased()
+                ]!,
+                particleTexture: modelTextureByName[
+                    yellowFlareWeapon.particleName.lowercased()
+                ]!,
+                fireSoundSourceName:
+                    guidebotFlareSoundClip.sourceName,
+                weaponFlags: yellowFlareWeapon.weaponFlags,
+                physicsFlags: yellowFlareWeapon.physicsFlags,
+                modelPageSize: yellowFlareWeapon.modelPageSize,
+                collisionRadius: yellowFlareWeapon.customSize,
+                speed: yellowFlareWeapon.speed,
+                lifetime: yellowFlareWeapon.lifetime,
+                mass: yellowFlareWeapon.mass,
+                drag: yellowFlareWeapon.drag,
+                coefficientOfRestitution:
+                    yellowFlareWeapon.coefficientOfRestitution,
+                lightDistance: yellowFlareWeapon.lightDistance,
+                lightPresentation:
+                    yellowFlareWeapon.lightPresentation,
+                particleCount: yellowFlareWeapon.particleCount,
+                particleInterval:
+                    1 / Float(yellowFlareWeapon.particleCount),
+                particleSize: yellowFlareWeapon.particleSize,
+                particleLifetime:
+                    yellowFlareWeapon.particleLifetime
+            ),
             combat: .stockTraining,
             guidebot: .stockTraining
         ),
@@ -1406,6 +1519,7 @@ func runD3Import(
         soundClips: [
             guidebotReleaseSoundClip,
             guidebotAmbientEngineSoundClip,
+            guidebotFlareSoundClip,
         ]
     )
     let cameraMonitor = robotGuidebotLevel.objects.first {
@@ -2794,7 +2908,12 @@ private func makePresentationMaterials(
             throw D3ImportOperationError.missingPresentationAsset(definition.bitmapSourceName)
         }
         let payload = indexed.validated.data.subdata(in: entry.payloadRange)
-        let image = try decodeReachedOutrage16OGF(payload)
+        let image: Outrage1555Image
+        if definition.bitmapSourceName.lowercased().hasSuffix(".oaf") {
+            image = try decodeReachedOutrage16OAF(payload).frames[0]
+        } else {
+            image = try decodeReachedOutrage16OGF(payload)
+        }
         return PresentationMaterial(
             texture: texture,
             bitmapSourceName: definition.bitmapSourceName,

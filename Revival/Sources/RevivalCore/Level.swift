@@ -766,6 +766,7 @@ struct TrainingRobotGuidebotChain: Codable, Equatable, Sendable {
     let deployedGuidebotVoiceSourceName: String
     var releaseSoundSourceName: String? = nil
     var ambientEngineSoundSourceName: String? = nil
+    var yellowFlare: TrainingGuidebotYellowFlareDefinition? = nil
     let combat: TrainingRobotCombatDefinition
     let guidebot: TrainingGuidebotDefinition
 }
@@ -1105,6 +1106,30 @@ struct TrainingGuidebotDefinition: Codable, Equatable, Sendable {
     let goalCircleDistance: Float
 }
 
+struct TrainingGuidebotYellowFlareDefinition:
+    Codable, Equatable, Sendable
+{
+    let source: SourceResource
+    let model: SourceResource
+    let particleTexture: SourceResource
+    let fireSoundSourceName: String
+    let weaponFlags: UInt32
+    let physicsFlags: UInt32
+    let modelPageSize: Float
+    let collisionRadius: Float
+    let speed: Float
+    let lifetime: Float
+    let mass: Float
+    let drag: Float
+    let coefficientOfRestitution: Float
+    let lightDistance: Float
+    let lightPresentation: TrainingMarkerLightPresentation
+    let particleCount: Int
+    let particleInterval: Float
+    let particleSize: Float
+    let particleLifetime: Float
+}
+
 extension TrainingRobotCombatDefinition {
     // d3.hog/table.gam generic page "RAS1 Light Security Flyer",
     // version 27 score field. All ten Training combat chains use this page.
@@ -1216,7 +1241,8 @@ func validateStockTrainingRobotGuidebotPackage(
     guidebotB: CanonicalVoiceClip?,
     proceed5: CanonicalVoiceClip?,
     releaseSound: CanonicalSoundClip? = nil,
-    ambientEngineSound: CanonicalSoundClip? = nil
+    ambientEngineSound: CanonicalSoundClip? = nil,
+    flareSound: CanonicalSoundClip? = nil
 ) throws {
     guard let chain,
           chain.destroyRobotObjectHandle == 4_112,
@@ -1265,6 +1291,64 @@ func validateStockTrainingRobotGuidebotPackage(
                     && ambientEngineSound?.sourceSHA256
                         == "35eaf843ad66e61a1f5c46f68ced68d5fbec8580dc8e1c8d115e374349f5a96f"
                     && ambientEngineSound?.importVolume == 0.1
+          ),
+          (
+              chain.yellowFlare == nil
+                  || chain.yellowFlare.map { flare in
+                      flare.source == .init(
+                          storedIndex: 3,
+                          sourceName: "Yellow flare"
+                      )
+                          && flare.model.sourceName
+                            == "FlareYellowBright.OOF"
+                          && flare.particleTexture == .init(
+                              storedIndex: 878,
+                              sourceName: "yellowspark"
+                          )
+                          && flare.fireSoundSourceName == "Flare.wav"
+                          && flare.weaponFlags == 0x8001_0000
+                          && flare.physicsFlags == 0x2000_0810
+                          && flare.modelPageSize.bitPattern
+                            == 0x405f_d5ea
+                          && flare.collisionRadius == 0.1
+                          && flare.speed == 100
+                          && flare.lifetime == 15
+                          && flare.mass == 0.1
+                          && flare.drag == 0.0001
+                          && flare.coefficientOfRestitution == 1
+                          && flare.lightDistance == 35
+                          && flare.lightPresentation == .init(
+                              primaryColor: .init(x: 1, y: 1, z: 0.8),
+                              secondaryColor: .zero,
+                              timeInterval: 0.2,
+                              flickerDistance: 5,
+                              directionalDot: 0,
+                              flags: 16,
+                              timebits: UInt32.max,
+                              angle: 0,
+                              lightingRenderType: 0
+                          )
+                          && flare.particleCount == 25
+                          && flare.particleInterval == 0.04
+                          && flare.particleSize.bitPattern
+                            == Float(0.2).bitPattern
+                          && flare.particleLifetime.bitPattern
+                            == Float(0.3).bitPattern
+                  } == true
+                  && flareSound?.logicalName == "Flare"
+                  && flareSound?.sourceName == "Flare.wav"
+                  && flareSound?.sourceEntryIndex == 1_158
+                  && flareSound?.sampleRate == 22_050
+                  && flareSound?.channelCount == 1
+                  && flareSound?.frameCount == 25_086
+                  && flareSound?.pcm16LittleEndian.count == 50_172
+                  && flareSound?.pcmSHA256
+                    == "98aa8dc4652268a3f512c995dcc8cc3f6ef3abe62947f839167bd809f9423452"
+                  && flareSound?.sourceArchive == "d3.hog"
+                  && flareSound?.sourceSHA256
+                    == "79cb319f84c4cfdcdb6ca2ab853767df3f1e128f516ff007dc9febf8f5a988b7"
+                  && flareSound?.importVolume.bitPattern
+                    == Float(0.300_000_07).bitPattern
           ),
           chain.combat == .stockTraining,
           chain.guidebot == .stockTraining,
@@ -2876,6 +2960,94 @@ func validateStockTrainingRobotGuidebotPresentation(
     }
 }
 
+func validateTrainingGuidebotYellowFlareBinding(
+    chain: TrainingRobotGuidebotChain,
+    models: [CanonicalModel],
+    materials: [PresentationMaterial],
+    sounds: [CanonicalSoundClip],
+    dependencies: [DependencyRecord]
+) throws {
+    guard let flare = chain.yellowFlare else { return }
+    let exactMaterialHashes = [
+        "energy":
+            "5c6e2eb6cde4b1592f4ff8bc9540ab858655da77607e07328db8cd12cfd7376f",
+        "YellowFlareCorona":
+            "4944668e9096eb632ae8716061946c2d558a86da4ffb5fdd493d5ea260c95cbe",
+        "FlarePuff":
+            "9416910ac344a0e3a9dd35ef596300147b7014972c73974a88546351ca92835c",
+        "FlarePuffAlt":
+            "8ad50ce9c0f198d49d1131ffd4c0a15df80c01c20105bf89094bc715f57a21f7",
+        "yellowspark":
+            "eabf95db1e5c17235b65a7b938081d40e44736456112acbc4a1ff99126051194",
+    ]
+    let materialsByName = Dictionary(
+        grouping: materials,
+        by: { $0.texture.sourceName }
+    )
+    let model = models.first { $0.source == flare.model }
+    let modelTextures = Set(model?.submodels.flatMap { submodel in
+        submodel.faces.compactMap { face -> String? in
+            guard case let .texture(texture) = face.material else {
+                return nil
+            }
+            return texture.sourceName
+        }
+    } ?? [])
+    let sound = sounds.first {
+        $0.sourceName == flare.fireSoundSourceName
+    }
+    let soundDependency = sound.map {
+        DependencyIdentity(
+            category: "sound",
+            source: .init(
+                storedIndex: $0.sourceEntryIndex,
+                sourceName: $0.sourceName
+            )
+        )
+    }
+    let dependencyIdentities = Set(dependencies.map {
+        DependencyIdentity(category: $0.category, source: $0.source)
+    })
+    guard model?.source.sourceName == "FlareYellowBright.OOF",
+          model?.collisionRadius.bitPattern == 0x405f_d5ea,
+          model?.submodels.count == 4,
+          model?.submodels.map(\.presentation)
+            == [.standard, .facing, .facing, .facing],
+          model?.sourceArchive == "d3.hog",
+          model?.sourceSHA256
+            == "fa0f92ba8d3ea0d348766c2cf56897935a0a1afe211378729b5781d773fb9ed4",
+          modelTextures
+            == Set(["energy", "YellowFlareCorona", "FlarePuff", "FlarePuffAlt"]),
+          exactMaterialHashes.allSatisfy({ name, hash in
+              materialsByName[name]?.count == 1
+                  && materialsByName[name]?.first?.sourceArchive == "d3.hog"
+                  && materialsByName[name]?.first?.sourceSHA256 == hash
+          }),
+          materialsByName["yellowspark"]?.count == 1,
+          materialsByName["yellowspark"]?.first?.texture
+            == flare.particleTexture,
+          sound?.sourceEntryIndex == 1_158,
+          sound?.pcmSHA256
+            == "98aa8dc4652268a3f512c995dcc8cc3f6ef3abe62947f839167bd809f9423452",
+          dependencyIdentities.contains(.init(
+              category: "weapon-definition",
+              source: flare.source
+          )),
+          dependencyIdentities.contains(.init(
+              category: "model",
+              source: flare.model
+          )),
+          dependencyIdentities.contains(.init(
+              category: "texture",
+              source: flare.particleTexture
+          )),
+          soundDependency.map(dependencyIdentities.contains) == true else {
+        throw LevelValidationError.invalidDependency(
+            "Training Guidebot Yellow flare binding"
+        )
+    }
+}
+
 private func validateStockTrainingRASBotDeathPackage(
     chain: TrainingRobotDeathChain?,
     expectedHandle: UInt32,
@@ -3795,6 +3967,9 @@ struct Level: Codable, Equatable, Sendable {
                     .destructionHandoff.map {
                         [$0.projectileModel.sourceName]
                     } ?? [])
+                + (trainingRobotGuidebotChain?.yellowFlare.map {
+                    [$0.model.sourceName]
+                } ?? [])
         )
         guard rooms.count <= 400,
               rooms.allSatisfy({ (0..<400).contains($0.sourceIndex) }) else {
@@ -5077,6 +5252,13 @@ struct Level: Codable, Equatable, Sendable {
                     "Training robot Guidebot chain"
                 )
             }
+            try validateTrainingGuidebotYellowFlareBinding(
+                chain: chain,
+                models: models,
+                materials: presentationMaterials,
+                sounds: soundClips,
+                dependencies: dependencyManifest.current
+            )
         }
         if let chain = trainingCameraMonitorChain {
             let clipNames = Set(voiceClips.map {
@@ -6393,6 +6575,9 @@ struct Level: Codable, Equatable, Sendable {
                 },
                 ambientEngineSound: soundClips.first {
                     $0.logicalName == "GBotEngineB1"
+                },
+                flareSound: soundClips.first {
+                    $0.logicalName == "Flare"
                 }
             )
             try validateStockTrainingRobotGuidebotPresentation(
@@ -7180,6 +7365,27 @@ struct Level: Codable, Equatable, Sendable {
                 provenance:
                     "\(clip.sourceArchive) \(clip.sourceSHA256)"
             )
+        }
+        if let flare = chain.yellowFlare {
+            dependencies.append(.init(
+                category: "weapon-definition",
+                source: flare.source,
+                state: "canonical-page-bound",
+                provenance:
+                    "manage/weaponpage.cpp:653-901; scripts/AIGame.cpp:6086-6115"
+            ))
+            if !dependencyManifest.current.contains(where: {
+                $0.category == "texture"
+                    && $0.source == flare.particleTexture
+            }) {
+                dependencies.append(.init(
+                    category: "texture",
+                    source: flare.particleTexture,
+                    state: "presentation-payload-imported",
+                    provenance:
+                        "manage/weaponpage.cpp:653-901; viseffect.cpp:899-933"
+                ))
+            }
         }
         let player = objects.first {
             $0.handle == defaultPlayerBinding?.objectHandle
@@ -8079,7 +8285,13 @@ struct Level: Codable, Equatable, Sendable {
             roomBySourceIndex[$0.roomSourceIndex]!.faces[$0.faceIndex].texture
         })
         let requiredModelTextures = referencedModelTextures(in: models)
-        let requiredTextures = requiredRoomTextures.union(requiredModelTextures)
+        let requiredTextures = requiredRoomTextures
+            .union(requiredModelTextures)
+            .union(
+                trainingRobotGuidebotChain?.yellowFlare.map {
+                    [$0.particleTexture]
+                } ?? []
+            )
         guard Set(presentationMaterials.map(\.texture)) == requiredTextures else {
             throw LevelValidationError.invalidDependency("player-component textures")
         }
