@@ -1109,6 +1109,24 @@ func runD3Import(
     let dodgeImpactSoundClip = try reachedSoundClip(
         named: "LazorHitshrt"
     )
+    let guidebotReleaseSoundClip = try reachedSoundClip(
+        named: "GBExpulsionA"
+    )
+    precondition(
+        guidebotReleaseSoundClip.logicalName == "GBExpulsionA"
+            && guidebotReleaseSoundClip.sourceName == "GBExpulsionA.wav"
+            && guidebotReleaseSoundClip.sourceEntryIndex == 1_246
+            && guidebotReleaseSoundClip.sampleRate == 22_050
+            && guidebotReleaseSoundClip.channelCount == 1
+            && guidebotReleaseSoundClip.frameCount == 22_475
+            && guidebotReleaseSoundClip.pcm16LittleEndian.count == 44_950
+            && guidebotReleaseSoundClip.pcmSHA256
+                == "24a95adeb0b468f3c677007e00f9d8fd73919d60128646bedaa29db5f3f56f6e"
+            && guidebotReleaseSoundClip.sourceArchive == "d3.hog"
+            && guidebotReleaseSoundClip.sourceSHA256
+                == "ae030e17bd5fc5724b7b3aac6604299005d35adffc0b5d9620430d191e1ef288"
+            && guidebotReleaseSoundClip.importVolume == 0.5
+    )
     let openingLevel = playerLevel.addingTrainingOpeningLesson(
         .init(
             forwardGoalObjectHandle: forwardGoal.handle,
@@ -1346,10 +1364,12 @@ func runD3Import(
             deployedGuidebotObjectType: 2,
             deployedGuidebotMessage: messages["GetCameraMonitor"]!,
             deployedGuidebotVoiceSourceName: "guidebotb.osf",
+            releaseSoundSourceName: guidebotReleaseSoundClip.sourceName,
             combat: .stockTraining,
             guidebot: .stockTraining
         ),
-        voiceClips: [voiceClips[3], voiceClips[4]]
+        voiceClips: [voiceClips[3], voiceClips[4]],
+        soundClips: [guidebotReleaseSoundClip]
     )
     let cameraMonitor = robotGuidebotLevel.objects.first {
         $0.instanceName?.caseInsensitiveCompare("CameraMonitor")

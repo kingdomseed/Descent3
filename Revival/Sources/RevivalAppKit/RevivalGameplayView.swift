@@ -498,6 +498,7 @@ final class RevivalGameplayView: MTKView {
                     )
                 },
                 presentHUDMessages: {
+                    guard !event.hudMessages.isEmpty else { return }
                     presentHUDMessages(event.hudMessages)
                 }
             )

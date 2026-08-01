@@ -3531,11 +3531,11 @@ final class PlayerSimulation {
         from player: PlacedObject,
         playerVelocity: Vector3,
         gameTime: Float
-    ) {
+    ) -> TrainingOpeningFeedback? {
         guard trainingGuidebotReleaseCommandIsAvailable,
               var state = trainingRobotGuidebotState
         else {
-            return
+            return nil
         }
         state.activeGoalWasReached = nil
         state.returnWasRequested = false
@@ -3546,6 +3546,20 @@ final class PlayerSimulation {
             from: player,
             playerVelocity: playerVelocity,
             gameTime: gameTime
+        )
+        guard trainingRobotGuidebotState?.guidebotIsDeployed == true,
+              trainingRobotGuidebotState?.guidebot?.task == .outbound,
+              trainingRobotGuidebotState?.guidebotMode == .birth,
+              let soundSourceName =
+                level.trainingRobotGuidebotChain?.releaseSoundSourceName
+        else {
+            return nil
+        }
+        return .init(
+            hudMessages: [],
+            voiceSourceName: "",
+            voicePrecedesHUDMessages: true,
+            soundSourceName: soundSourceName
         )
     }
 
@@ -4175,6 +4189,7 @@ final class PlayerSimulation {
             trainingCameraMonitorState?.wasUsed == true
         var guidebotReturnWasRequestedThisFrame = false
         var guidebotActiveGoalFeedback: TrainingOpeningFeedback?
+        var guidebotReleaseFeedback: TrainingOpeningFeedback?
         var cameraMonitorWasUsedThisFrame = false
         if input.usesInventory,
            var state = trainingCameraMonitorState,
@@ -4201,7 +4216,7 @@ final class PlayerSimulation {
         }
         if input.deploysTrainingGuidebot {
             if trainingGuidebotReleaseCommandIsAvailable {
-                releaseTrainingGuidebot(
+                guidebotReleaseFeedback = releaseTrainingGuidebot(
                     from: object,
                     playerVelocity: velocity,
                     gameTime: systemsGameTime
@@ -5455,6 +5470,9 @@ final class PlayerSimulation {
         }
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
+        if let guidebotReleaseFeedback {
+            trainingOpeningFeedback.append(guidebotReleaseFeedback)
+        }
         if let guidebotActiveGoalFeedback {
             trainingOpeningFeedback.append(guidebotActiveGoalFeedback)
         }

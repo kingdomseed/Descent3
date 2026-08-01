@@ -764,6 +764,7 @@ struct TrainingRobotGuidebotChain: Codable, Equatable, Sendable {
     let deployedGuidebotObjectType: UInt8
     let deployedGuidebotMessage: String
     let deployedGuidebotVoiceSourceName: String
+    var releaseSoundSourceName: String? = nil
     let combat: TrainingRobotCombatDefinition
     let guidebot: TrainingGuidebotDefinition
 }
@@ -1212,7 +1213,8 @@ extension KeyedDecodingContainer {
 func validateStockTrainingRobotGuidebotPackage(
     chain: TrainingRobotGuidebotChain?,
     guidebotB: CanonicalVoiceClip?,
-    proceed5: CanonicalVoiceClip?
+    proceed5: CanonicalVoiceClip?,
+    releaseSound: CanonicalSoundClip? = nil
 ) throws {
     guard let chain,
           chain.destroyRobotObjectHandle == 4_112,
@@ -1228,6 +1230,23 @@ func validateStockTrainingRobotGuidebotPackage(
           chain.deployedGuidebotMessage
             == "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
           chain.deployedGuidebotVoiceSourceName == "guidebotb.osf",
+          (
+              chain.releaseSoundSourceName == nil
+                  || chain.releaseSoundSourceName == "GBExpulsionA.wav"
+                    && releaseSound?.logicalName == "GBExpulsionA"
+                    && releaseSound?.sourceName == "GBExpulsionA.wav"
+                    && releaseSound?.sourceEntryIndex == 1_246
+                    && releaseSound?.sampleRate == 22_050
+                    && releaseSound?.channelCount == 1
+                    && releaseSound?.frameCount == 22_475
+                    && releaseSound?.pcm16LittleEndian.count == 44_950
+                    && releaseSound?.pcmSHA256
+                        == "24a95adeb0b468f3c677007e00f9d8fd73919d60128646bedaa29db5f3f56f6e"
+                    && releaseSound?.sourceArchive == "d3.hog"
+                    && releaseSound?.sourceSHA256
+                        == "ae030e17bd5fc5724b7b3aac6604299005d35adffc0b5d9620430d191e1ef288"
+                    && releaseSound?.importVolume == 0.5
+          ),
           chain.combat == .stockTraining,
           chain.guidebot == .stockTraining,
           guidebotB?.sourceName.caseInsensitiveCompare("guidebotb.osf")
@@ -4994,6 +5013,13 @@ struct Level: Codable, Equatable, Sendable {
             let clipNames = Set(voiceClips.map {
                 $0.sourceName.lowercased()
             })
+            let soundNames = Set(soundClips.flatMap {
+                [$0.logicalName.lowercased(), $0.sourceName.lowercased()]
+            })
+            let releaseSoundIsResolved =
+                chain.releaseSoundSourceName.map {
+                    soundNames.contains($0.lowercased())
+                } ?? true
             guard trainingGalleryBarrier != nil,
                   chain.destructionDelay.isFinite,
                   chain.destructionDelay > 0,
@@ -5021,7 +5047,8 @@ struct Level: Codable, Equatable, Sendable {
                   ),
                   clipNames.contains(
                     chain.deployedGuidebotVoiceSourceName.lowercased()
-                  ) else {
+                  ),
+                  releaseSoundIsResolved else {
                 throw LevelValidationError.invalidDependency(
                     "Training robot Guidebot chain"
                 )
@@ -6336,7 +6363,10 @@ struct Level: Codable, Equatable, Sendable {
             try validateStockTrainingRobotGuidebotPackage(
                 chain: trainingRobotGuidebotChain,
                 guidebotB: guidebotB,
-                proceed5: proceed5
+                proceed5: proceed5,
+                releaseSound: soundClips.first {
+                    $0.logicalName == "GBExpulsionA"
+                }
             )
             try validateStockTrainingRobotGuidebotPresentation(
                 chain: trainingRobotGuidebotChain!,
@@ -7084,7 +7114,8 @@ struct Level: Codable, Equatable, Sendable {
 
     func addingTrainingRobotGuidebotChain(
         _ chain: TrainingRobotGuidebotChain,
-        voiceClips addedVoiceClips: [CanonicalVoiceClip]
+        voiceClips addedVoiceClips: [CanonicalVoiceClip],
+        soundClips addedSoundClips: [CanonicalSoundClip] = []
     ) -> Level {
         var dependencies = addedVoiceClips.map { clip in
             DependencyRecord(
@@ -7110,6 +7141,18 @@ struct Level: Codable, Equatable, Sendable {
                 state: "canonical-reserved-object",
                 provenance: "scripts/AIGame.cpp:4668-4728"
             ))
+        }
+        dependencies += addedSoundClips.map { clip in
+            DependencyRecord(
+                category: "sound",
+                source: .init(
+                    storedIndex: clip.sourceEntryIndex,
+                    sourceName: clip.sourceName
+                ),
+                state: "canonical-pcm-imported",
+                provenance:
+                    "\(clip.sourceArchive) \(clip.sourceSHA256)"
+            )
         }
         let player = objects.first {
             $0.handle == defaultPlayerBinding?.objectHandle
@@ -7185,7 +7228,7 @@ struct Level: Codable, Equatable, Sendable {
             trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             voiceClips: voiceClips + addedVoiceClips,
-            soundClips: soundClips,
+            soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
                 current: dependencyManifest.current + dependencies,
                 historicalEagerBaseline:

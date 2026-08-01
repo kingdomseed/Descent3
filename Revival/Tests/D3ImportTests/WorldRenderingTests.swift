@@ -8196,7 +8196,105 @@ final class WorldRenderingTests: XCTestCase {
 
     @MainActor
     func testInShipReleaseGuidebotCommandReusesBirthAfterScript039() throws {
-        let level = makeTrainingKillbotEntryLevel()
+        let baseLevel = makeTrainingKillbotEntryLevel()
+        let syntheticReleaseSound = CanonicalSoundClip(
+            logicalName: "GBExpulsionA",
+            sourceName: "GBExpulsionA.wav",
+            sourceEntryIndex: 1_246,
+            sampleRate: 22_050,
+            channelCount: 1,
+            frameCount: 1,
+            pcm16LittleEndian: Data(repeating: 0, count: 2),
+            pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+            sourceArchive: "d3.hog",
+            sourceSHA256: String(repeating: "9", count: 64),
+            importVolume: 0.5
+        )
+        var levelObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(baseLevel)
+            ) as? [String: Any]
+        )
+        var source = try XCTUnwrap(
+            levelObject["source"] as? [String: Any]
+        )
+        source["archiveSHA256"] = String(repeating: "0", count: 64)
+        var profileFiles = try XCTUnwrap(
+            source["profileFiles"] as? [[String: Any]]
+        )
+        if !profileFiles.contains(where: {
+            $0["relativePath"] as? String == "d3.hog"
+        }) {
+            profileFiles.append([
+                "relativePath": "d3.hog",
+                "byteCount": 194_030_423,
+                "sha256":
+                    "a0f1cb2c1a73da828a5fd4e80d6544b63da04e177dc2b894d9e6418296bc24c6",
+            ])
+        }
+        source["profileFiles"] = profileFiles
+        levelObject["source"] = source
+        var releaseChain = try XCTUnwrap(
+            levelObject["trainingRobotGuidebotChain"] as? [String: Any]
+        )
+        releaseChain["releaseSoundSourceName"] = "GBExpulsionA.wav"
+        levelObject["trainingRobotGuidebotChain"] = releaseChain
+        var soundClips = try XCTUnwrap(
+            levelObject["soundClips"] as? [[String: Any]]
+        )
+        soundClips.append(try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(syntheticReleaseSound)
+            ) as? [String: Any]
+        ))
+        levelObject["soundClips"] = soundClips
+        var dependencyManifest = try XCTUnwrap(
+            levelObject["dependencyManifest"] as? [String: Any]
+        )
+        var currentDependencies = try XCTUnwrap(
+            dependencyManifest["current"] as? [[String: Any]]
+        )
+        currentDependencies.append(try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(DependencyRecord(
+                    category: "sound",
+                    source: .init(
+                        storedIndex: 1_246,
+                        sourceName: "GBExpulsionA.wav"
+                    ),
+                    state: "canonical-pcm-imported",
+                    provenance: "synthetic canonical fixture"
+                ))
+            ) as? [String: Any]
+        ))
+        dependencyManifest["current"] = currentDependencies
+        levelObject["dependencyManifest"] = dependencyManifest
+        let level = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: levelObject)
+        )
+        let decodedReleaseSound = try XCTUnwrap(level.soundClips.first {
+            $0.sourceName == "GBExpulsionA.wav"
+        })
+        XCTAssertEqual(decodedReleaseSound, syntheticReleaseSound)
+        XCTAssertEqual(
+            decodedReleaseSound.pcmSHA256,
+            canonicalSHA256(decodedReleaseSound.pcm16LittleEndian)
+        )
+        XCTAssertTrue(level.source.profileFiles.contains {
+            $0.relativePath == decodedReleaseSound.sourceArchive
+        })
+        XCTAssertTrue(level.dependencyManifest.current.contains {
+            $0.category == "sound"
+                && $0.source == .init(
+                    storedIndex: decodedReleaseSound.sourceEntryIndex,
+                    sourceName: decodedReleaseSound.sourceName
+                )
+        })
+        XCTAssertEqual(
+            Set(level.soundClips.map { $0.sourceName.lowercased() }).count,
+            level.soundClips.count
+        )
         try level.validate()
         let initialSimulation = PlayerSimulation(
             level: level,
@@ -8381,6 +8479,16 @@ final class WorldRenderingTests: XCTestCase {
         let inheritedVelocity = releaseSimulation.continuation.velocity
         let feedbackCountBeforeRelease =
             script039Frame.trainingOpeningFeedback.count
+        let releaseStateBefore = try XCTUnwrap(
+            releaseContinuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        let messageSoundTimeBeforeRelease =
+            releaseStateBefore["lastMessageSoundTime"] as? NSNumber
+        let randomStateBeforeRelease = try XCTUnwrap(
+            (releaseContinuationObject["authoritativeRandomState"]
+                as? NSNumber)?.uint32Value
+        )
         let released = releaseSimulation.update(
             at: 100.1,
             input: .init(deploysTrainingGuidebot: true)
@@ -8399,7 +8507,32 @@ final class WorldRenderingTests: XCTestCase {
                     + player.orientation.forward.z * 40
             )
         )
-        XCTAssertTrue(released.trainingOpeningFeedback.isEmpty)
+        XCTAssertEqual(released.trainingOpeningFeedback, [
+            .init(
+                hudMessages: [],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: true,
+                soundSourceName: "GBExpulsionA.wav"
+            ),
+        ])
+        var soundAttempts: [String] = []
+        var presentedHUDMessages: [String] = []
+        var hudPresentationCount = 0
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            released.trainingOpeningFeedback,
+            attemptVoice: { _ in },
+            attemptSound: { sourceName, eventVolume in
+                XCTAssertNil(eventVolume)
+                soundAttempts.append(sourceName)
+            },
+            presentHUDMessages: {
+                hudPresentationCount += 1
+                presentedHUDMessages.append(contentsOf: $0)
+            }
+        )
+        XCTAssertEqual(soundAttempts, ["GBExpulsionA.wav"])
+        XCTAssertEqual(hudPresentationCount, 0)
+        XCTAssertTrue(presentedHUDMessages.isEmpty)
         XCTAssertFalse(
             releaseSimulation.trainingGuidebotReleaseCommandIsAvailable
         )
@@ -8422,6 +8555,18 @@ final class WorldRenderingTests: XCTestCase {
         )
         XCTAssertEqual(releasedGuidebot["task"] as? String, "outbound")
         XCTAssertEqual(
+            releasedState["lastMessageSoundTime"] as? NSNumber,
+            messageSoundTimeBeforeRelease
+        )
+        let randomStateAfterRelease = try XCTUnwrap(
+            (releasedContinuationObject["authoritativeRandomState"]
+                as? NSNumber)?.uint32Value
+        )
+        let firstModeState =
+            randomStateBeforeRelease &* 214_013 &+ 2_531_011
+        let secondModeState = firstModeState &* 214_013 &+ 2_531_011
+        XCTAssertEqual(randomStateAfterRelease, secondModeState)
+        XCTAssertEqual(
             script039Frame.trainingOpeningFeedback.count,
             feedbackCountBeforeRelease
         )
@@ -8438,6 +8583,75 @@ final class WorldRenderingTests: XCTestCase {
         let silent = restored.update(at: 100.1, input: .zero)
         XCTAssertNotNil(silent.trainingGuidebot)
         XCTAssertTrue(silent.trainingOpeningFeedback.isEmpty)
+
+        var compatibleLevelObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(level)
+            ) as? [String: Any]
+        )
+        var compatibleChain = try XCTUnwrap(
+            compatibleLevelObject["trainingRobotGuidebotChain"]
+                as? [String: Any]
+        )
+        compatibleChain.removeValue(forKey: "releaseSoundSourceName")
+        compatibleLevelObject["trainingRobotGuidebotChain"] = compatibleChain
+        compatibleLevelObject["soundClips"] = try XCTUnwrap(
+            compatibleLevelObject["soundClips"] as? [[String: Any]]
+        ).filter {
+            $0["sourceName"] as? String != "GBExpulsionA.wav"
+        }
+        var compatibleManifest = try XCTUnwrap(
+            compatibleLevelObject["dependencyManifest"] as? [String: Any]
+        )
+        compatibleManifest["current"] = try XCTUnwrap(
+            compatibleManifest["current"] as? [[String: Any]]
+        ).filter { dependency in
+            guard dependency["category"] as? String == "sound",
+                  let source = dependency["source"] as? [String: Any]
+            else {
+                return true
+            }
+            return source["sourceName"] as? String != "GBExpulsionA.wav"
+        }
+        compatibleLevelObject["dependencyManifest"] = compatibleManifest
+        let compatibleLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: compatibleLevelObject)
+        )
+        try compatibleLevel.validate()
+        let compatibleSimulation = try PlayerSimulation(
+            level: compatibleLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: releaseContinuationObject
+                )
+            ),
+            resumedAtTimestamp: 300
+        )
+        let compatibleRelease = compatibleSimulation.update(
+            at: 300.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        XCTAssertNotNil(compatibleRelease.trainingGuidebot)
+        XCTAssertTrue(compatibleRelease.trainingOpeningFeedback.isEmpty)
+
+        var hostileLevelObject = compatibleLevelObject
+        hostileLevelObject["trainingRobotGuidebotChain"] = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(level.trainingRobotGuidebotChain)
+            ) as? [String: Any]
+        )
+        let hostileLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: hostileLevelObject)
+        )
+        XCTAssertThrowsError(try hostileLevel.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Training robot Guidebot chain")
+            )
+        }
 
         var mismatchedPlayerObject = try XCTUnwrap(
             JSONSerialization.jsonObject(
