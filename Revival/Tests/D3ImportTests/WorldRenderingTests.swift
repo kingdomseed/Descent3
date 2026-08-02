@@ -13746,6 +13746,7 @@ final class WorldRenderingTests: XCTestCase {
             "y": goal.position.y,
             "z": goal.position.z,
         ]
+        ready["playerHeadlightIsOn"] = true
         let simulation = try PlayerSimulation(
             level: level,
             continuation: JSONDecoder().decode(
@@ -13758,6 +13759,10 @@ final class WorldRenderingTests: XCTestCase {
         let frame = simulation.update(at: 0.2, input: .zero)
 
         let finalGoal = try XCTUnwrap(frame.trainingFinalGoal)
+        XCTAssertNil(
+            frame.playerFastHeadlight,
+            "the final result suppresses an otherwise-on headlight"
+        )
         XCTAssertEqual(finalGoal.endLevelState, .succeeded)
         XCTAssertEqual(finalGoal.scriptActionCounter, 1)
         XCTAssertTrue(finalGoal.controlsAreSuspended)
@@ -17321,6 +17326,298 @@ final class WorldRenderingTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testHRequestsOneFastPlayerHeadlightToggleAndRestoresSilently()
+        throws
+    {
+        XCTAssertTrue(
+            RevivalGameplayView.requestsHeadlightToggle(
+                keyCode: 4,
+                isRepeat: false,
+                gameplayIsActive: true
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsHeadlightToggle(
+                keyCode: 4,
+                isRepeat: true,
+                gameplayIsActive: true
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsHeadlightToggle(
+                keyCode: 4,
+                isRepeat: false,
+                gameplayIsActive: false
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsHeadlightToggle(
+                keyCode: 5,
+                isRepeat: false,
+                gameplayIsActive: true
+            )
+        )
+
+        var playerInput = PlayerInputState(rampDuration: 0)
+        playerInput.requestHeadlightToggle()
+        let firstInput = playerInput.snapshot(frameDuration: 0.1)
+        XCTAssertTrue(firstInput.togglesHeadlight)
+        XCTAssertFalse(
+            playerInput.snapshot(frameDuration: 0.1).togglesHeadlight
+        )
+
+        let level = makeFastPlayerHeadlightLevel()
+        let initialPlayerPosition = defaultPlayerView(in: level)
+            .camera.position
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let initialContinuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        let onFrame = simulation.update(
+            at: 0.1,
+            input: .init(sideways: 1, togglesHeadlight: true)
+        )
+        XCTAssertEqual(
+            onFrame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Headlight turned on."],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false,
+                    soundSourceName: "Headlight1",
+                    soundEventVolume: 1
+                ),
+            ]
+        )
+        var presentationOrder: [String] = []
+        RevivalGameplayView.presentTrainingFeedbackSequence(
+            onFrame.trainingOpeningFeedback,
+            attemptVoice: { _ in
+                XCTFail("Headlight feedback has no voice")
+            },
+            attemptSound: { name, volume in
+                presentationOrder.append("sound:\(name):\(volume ?? -1)")
+                throw TrainingOpeningPresentationError.soundPlaybackFailed(
+                    name
+                )
+            },
+            presentHUDMessages: {
+                presentationOrder.append(contentsOf: $0.map { "hud:\($0)" })
+            }
+        )
+        XCTAssertEqual(
+            presentationOrder,
+            [
+                "sound:Headlight1:1.0",
+                "hud:Headlight turned on.",
+            ],
+            "missing optional audio stays silent without suppressing HUD"
+        )
+        let onLight = try XCTUnwrap(onFrame.playerFastHeadlight)
+        XCTAssertEqual(onLight.roomSourceIndex, 1)
+        XCTAssertEqual(onLight.lightDistance, 20)
+        XCTAssertEqual(
+            onLight.position.x,
+            onFrame.playerView.camera.position.x,
+            accuracy: 0.000_1
+        )
+        XCTAssertNotEqual(
+            onFrame.playerView.camera.position.x,
+            initialPlayerPosition.x,
+            "the fast trace must originate after non-collinear movement"
+        )
+        XCTAssertEqual(
+            onLight.position.y,
+            onFrame.playerView.camera.position.y,
+            accuracy: 0.000_1
+        )
+        XCTAssertGreaterThan(
+            onLight.position.z,
+            onFrame.playerView.camera.position.z
+        )
+        XCTAssertLessThan(
+            onLight.position.z
+                - onFrame.playerView.camera.position.z,
+            150,
+            "the nearer visible ForwardGoal object wins over the wall"
+        )
+
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            continuationObject["playerHeadlightIsOn"] as? Bool,
+            true
+        )
+        XCTAssertEqual(
+            continuationObject["authoritativeRandomState"] as? NSNumber,
+            initialContinuationObject["authoritativeRandomState"] as? NSNumber,
+            "fast headlight consumes no authoritative RNG"
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: continuationObject
+                )
+            ),
+            resumedAtTimestamp: 0.1
+        ).update(at: 0.2, input: .zero)
+        XCTAssertNotNil(restored.playerFastHeadlight)
+        XCTAssertTrue(restored.trainingOpeningFeedback.isEmpty)
+
+        continuationObject.removeValue(forKey: "playerHeadlightIsOn")
+        let oldRestore = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: continuationObject
+                )
+            ),
+            resumedAtTimestamp: 0.1
+        ).update(at: 0.2, input: .zero)
+        XCTAssertNil(oldRestore.playerFastHeadlight)
+        XCTAssertTrue(oldRestore.trainingOpeningFeedback.isEmpty)
+
+        let schemaSevenLevel = makeTrainingRASBot1DeathLevel()
+        let schemaSevenInitial = PlayerSimulation(
+            level: schemaSevenLevel,
+            presentationReadyTimestamp: 0
+        )
+        var schemaSevenObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    schemaSevenInitial.continuation
+                )
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(schemaSevenObject["schemaVersion"] as? Int, 7)
+        let schemaSevenRandomState =
+            schemaSevenObject["authoritativeRandomState"] as? NSNumber
+        schemaSevenObject["playerHeadlightIsOn"] = true
+        let schemaSevenOn = try PlayerSimulation(
+            level: schemaSevenLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: schemaSevenObject
+                )
+            ),
+            resumedAtTimestamp: 0
+        )
+        let schemaSevenOnFrame = schemaSevenOn.update(
+            at: 0.1,
+            input: .zero
+        )
+        XCTAssertNotNil(schemaSevenOnFrame.playerFastHeadlight)
+        XCTAssertFalse(schemaSevenOnFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Headlight1"
+                || $0.hudMessages.contains {
+                    $0.hasPrefix("Headlight turned ")
+                }
+        })
+        let schemaSevenOnObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(schemaSevenOn.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            schemaSevenOnObject["authoritativeRandomState"] as? NSNumber,
+            schemaSevenRandomState
+        )
+        schemaSevenObject.removeValue(forKey: "playerHeadlightIsOn")
+        let schemaSevenOld = try PlayerSimulation(
+            level: schemaSevenLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: schemaSevenObject
+                )
+            ),
+            resumedAtTimestamp: 0
+        )
+        let schemaSevenOldFrame = schemaSevenOld.update(
+            at: 0.1,
+            input: .zero
+        )
+        XCTAssertNil(schemaSevenOldFrame.playerFastHeadlight)
+        XCTAssertFalse(schemaSevenOldFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Headlight1"
+                || $0.hudMessages.contains {
+                    $0.hasPrefix("Headlight turned ")
+                }
+        })
+        let schemaSevenOldObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(schemaSevenOld.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            schemaSevenOldObject["authoritativeRandomState"] as? NSNumber,
+            schemaSevenRandomState
+        )
+
+        let offFrame = simulation.update(
+            at: 0.2,
+            input: .init(togglesHeadlight: true)
+        )
+        XCTAssertNil(offFrame.playerFastHeadlight)
+        XCTAssertEqual(
+            offFrame.trainingOpeningFeedback,
+            [
+                .init(
+                    hudMessages: ["Headlight turned off."],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false,
+                    soundSourceName: "Headlight1",
+                    soundEventVolume: 1
+                ),
+            ]
+        )
+
+        let clearLevel = makeFastPlayerHeadlightLevel(
+            includesVisibleObject: false,
+            halfExtent: 400
+        )
+        let clearFrame = PlayerSimulation(
+            level: clearLevel,
+            presentationReadyTimestamp: 0
+        ).update(at: 0.1, input: .init(togglesHeadlight: true))
+        XCTAssertEqual(
+            try XCTUnwrap(clearFrame.playerFastHeadlight).position.z
+                - clearFrame.playerView.camera.position.z,
+            299.75,
+            accuracy: 0.001,
+            "a clear 300-unit trace lights its endpoint backed by forward/4"
+        )
+
+        let wallLevel = makeFastPlayerHeadlightLevel(
+            includesVisibleObject: false,
+            halfExtent: 100
+        )
+        let wallFrame = PlayerSimulation(
+            level: wallLevel,
+            presentationReadyTimestamp: 0
+        ).update(at: 0.1, input: .init(togglesHeadlight: true))
+        XCTAssertEqual(
+            try XCTUnwrap(wallFrame.playerFastHeadlight).position.z
+                - wallFrame.playerView.camera.position.z,
+            99.75,
+            accuracy: 0.001,
+            "the nearer wall wins and the result is backed by forward/4"
+        )
+    }
+
     func testCameraMonitorPopupBorderAndReachedSoundUseAppKitOwner() throws {
         let frame = RevivalGameplayView.cameraMonitorFrame(
             drawableWidth: 1_200,
@@ -19496,6 +19793,31 @@ func makeSliceSixObjectRenderLevel() -> Level {
         ),
         sourceChunks: base.sourceChunks
     )
+}
+
+func makeFastPlayerHeadlightLevel(
+    includesVisibleObject: Bool = true,
+    halfExtent: Float = 400
+) -> Level {
+    var level = makeSliceSixObjectRenderLevel()
+    let player = level.objects.first { $0.handle == 2_048 }!
+    level.rooms = [
+        makeSourceContainmentRoom(
+            center: player.position,
+            texture: level.surfacePhysics[0].texture,
+            sourceIndex: 1,
+            halfExtent: halfExtent
+        ),
+    ]
+    level.objects.removeAll {
+        $0.handle != 2_048
+            && (!includesVisibleObject || $0.handle != 12_301)
+    }
+    let retainedHandles = Set(level.objects.map(\.handle))
+    level.objectPresentations.removeAll {
+        !retainedHandles.contains($0.objectHandle)
+    }
+    return level
 }
 
 func makeTrainingGalleryBarrierLevel() -> Level {

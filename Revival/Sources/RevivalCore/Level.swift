@@ -6054,6 +6054,30 @@ struct Level: Codable, Equatable, Sendable {
                     "Canonical sound clip"
                 )
             }
+            if clip.logicalName.caseInsensitiveCompare("Headlight1")
+                == .orderedSame
+                || clip.sourceName.caseInsensitiveCompare("Headlight.wav")
+                    == .orderedSame
+            {
+                guard clip.logicalName == "Headlight1",
+                      clip.sourceName == "Headlight.wav",
+                      clip.sourceEntryIndex == 1_407,
+                      clip.sampleRate == 22_050,
+                      clip.channelCount == 1,
+                      clip.frameCount == 10_623,
+                      clip.pcm16LittleEndian.count == 21_246,
+                      clip.pcmSHA256
+                        == "7886b286bf1897c59c04bc5b80460d975ee5979ba21dae8e8f3596c5f0b23417",
+                      clip.sourceArchive == "d3.hog",
+                      clip.sourceSHA256
+                        == "cc05bbed03cf33ef705613d5a237d5c1879c83df49dc03bca01960cf5a20384a",
+                      clip.importVolume == 1
+                else {
+                    throw LevelValidationError.invalidDependency(
+                        "Headlight1 canonical sound binding"
+                    )
+                }
+            }
         }
         let hasStockTrainingSource =
             source.archiveSHA256

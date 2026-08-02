@@ -1232,6 +1232,14 @@ func runD3Import(
     let guidebotFlareSoundClip = try reachedSoundClip(
         named: "Flare"
     )
+    let headlightSoundPage = try resolveRetailSoundPage(
+        table: tableData,
+        overlay: overlayData,
+        named: "Headlight1"
+    )
+    let headlightSoundClip = try reachedSoundClip(
+        named: "Headlight1"
+    )
     precondition(
         guidebotReleaseSoundClip.logicalName == "GBExpulsionA"
             && guidebotReleaseSoundClip.sourceName == "GBExpulsionA.wav"
@@ -1262,6 +1270,30 @@ func runD3Import(
                 == "79cb319f84c4cfdcdb6ca2ab853767df3f1e128f516ff007dc9febf8f5a988b7"
             && guidebotFlareSoundClip.importVolume.bitPattern
                 == Float(0.300_000_07).bitPattern
+    )
+    precondition(
+        headlightSoundPage.storedIndex == 171
+            && headlightSoundPage.flags == 132
+            && headlightSoundPage.loopStart == 0
+            && headlightSoundPage.loopEnd == 10_622
+            && headlightSoundPage.outerConeVolume == 1
+            && headlightSoundPage.innerConeAngle == 360
+            && headlightSoundPage.outerConeAngle == 360
+            && headlightSoundPage.minimumDistance == 10
+            && headlightSoundPage.maximumDistance == 256
+            && headlightSoundClip.logicalName == "Headlight1"
+            && headlightSoundClip.sourceName == "Headlight.wav"
+            && headlightSoundClip.sourceEntryIndex == 1_407
+            && headlightSoundClip.sampleRate == 22_050
+            && headlightSoundClip.channelCount == 1
+            && headlightSoundClip.frameCount == 10_623
+            && headlightSoundClip.pcm16LittleEndian.count == 21_246
+            && headlightSoundClip.pcmSHA256
+                == "7886b286bf1897c59c04bc5b80460d975ee5979ba21dae8e8f3596c5f0b23417"
+            && headlightSoundClip.sourceArchive == "d3.hog"
+            && headlightSoundClip.sourceSHA256
+                == "cc05bbed03cf33ef705613d5a237d5c1879c83df49dc03bca01960cf5a20384a"
+            && headlightSoundClip.importVolume == 1
     )
     let guidebotAmbientEngineSoundPage = try resolveRetailSoundPage(
         table: tableData,
@@ -1463,7 +1495,8 @@ func runD3Import(
         ],
         soundClips: [menuBeepClip,
             dodgeFireSoundClip,
-            dodgeImpactSoundClip,]
+            dodgeImpactSoundClip,
+            headlightSoundClip,]
     )
     let galleryTrigger = openingLevel.triggers.first {
         $0.name.caseInsensitiveCompare("Portal2") == .orderedSame

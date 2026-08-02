@@ -65,6 +65,7 @@ struct InputSnapshot: Equatable, Sendable {
     let deploysTrainingGuidebot: Bool
     let requestsTrainingGuidebotActiveGoal: Bool
     let usesInventory: Bool
+    let togglesHeadlight: Bool
 
     static let zero = InputSnapshot()
 
@@ -81,7 +82,8 @@ struct InputSnapshot: Equatable, Sendable {
         firesPrimaryWeapon: Bool = false,
         deploysTrainingGuidebot: Bool = false,
         requestsTrainingGuidebotActiveGoal: Bool = false,
-        usesInventory: Bool = false
+        usesInventory: Bool = false,
+        togglesHeadlight: Bool = false
     ) {
         precondition(
             directLookPitchRadians.isFinite && directLookYawRadians.isFinite
@@ -100,6 +102,7 @@ struct InputSnapshot: Equatable, Sendable {
         self.requestsTrainingGuidebotActiveGoal =
             requestsTrainingGuidebotActiveGoal
         self.usesInventory = usesInventory
+        self.togglesHeadlight = togglesHeadlight
     }
 }
 
@@ -173,7 +176,8 @@ private extension InputSnapshot {
             deploysTrainingGuidebot: deploysTrainingGuidebot,
             requestsTrainingGuidebotActiveGoal:
                 requestsTrainingGuidebotActiveGoal,
-            usesInventory: usesInventory
+            usesInventory: usesInventory,
+            togglesHeadlight: togglesHeadlight
         )
     }
 }
@@ -261,6 +265,7 @@ struct PlayerInputState: Sendable {
     private var guidebotActiveGoalRequestIsPending = false
     private var primaryFireIsPending = false
     private var inventoryUseIsPending = false
+    private var headlightToggleIsPending = false
     private(set) var gameplayIsActive = true
     var mouseLookEnabled = false
 
@@ -303,6 +308,11 @@ struct PlayerInputState: Sendable {
         inventoryUseIsPending = true
     }
 
+    mutating func requestHeadlightToggle() {
+        guard gameplayIsActive else { return }
+        headlightToggleIsPending = true
+    }
+
     mutating func snapshot(frameDuration: Float) -> InputSnapshot {
         let keyboard = ramp.snapshot(
             held: held,
@@ -321,12 +331,14 @@ struct PlayerInputState: Sendable {
             guidebotActiveGoalRequestIsPending
         let firesPrimaryWeapon = primaryFireIsPending
         let usesInventory = inventoryUseIsPending
+        let togglesHeadlight = headlightToggleIsPending
         mouseDeltaX = 0
         mouseDeltaY = 0
         guidebotDeploymentIsPending = false
         guidebotActiveGoalRequestIsPending = false
         primaryFireIsPending = false
         inventoryUseIsPending = false
+        headlightToggleIsPending = false
         let mouseNormalizer = 10_000 * max(frameDuration, 0.005)
         let mouseYaw = mouseLookEnabled ? 0 : deltaX / mouseNormalizer
         let mousePitch = mouseLookEnabled ? 0 : -deltaY / mouseNormalizer
@@ -348,7 +360,8 @@ struct PlayerInputState: Sendable {
             deploysTrainingGuidebot: deploysTrainingGuidebot,
             requestsTrainingGuidebotActiveGoal:
                 requestsTrainingGuidebotActiveGoal,
-            usesInventory: usesInventory
+            usesInventory: usesInventory,
+            togglesHeadlight: togglesHeadlight
         )
     }
 
@@ -367,6 +380,7 @@ struct PlayerInputState: Sendable {
             guidebotActiveGoalRequestIsPending = false
             primaryFireIsPending = false
             inventoryUseIsPending = false
+            headlightToggleIsPending = false
             _ = ramp.snapshot(
                 held: .zero,
                 frameDuration: simulation?.frameDuration ?? 0,
@@ -462,6 +476,7 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let enabledPlayerControls: PlayerControlMask
     let showsEnabledPlayerControls: Bool
     let trainingOpeningFeedback: [TrainingOpeningFeedback]
+    let playerFastHeadlight: PlayerFastHeadlightFrame?
     let shields: Float
     let trainingDodgeMarkerLightDistance: Float?
     let trainingDodgeTurretAngles: [Float]
@@ -489,6 +504,12 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingLastRoomMarkerLightDistance: Float?
     let trainingFinalBotsMarkerLightDistance: Float?
     let trainingFinalGoal: TrainingFinalGoalFrame?
+}
+
+struct PlayerFastHeadlightFrame: Equatable, Sendable {
+    let roomSourceIndex: Int
+    let position: Vector3
+    let lightDistance: Float
 }
 
 enum TrainingFollowBotPathFailure: String, Codable, Equatable, Sendable {
@@ -1613,6 +1634,7 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     let lastThrustTime: Float
     fileprivate let authoritativeRandomState: UInt32?
     fileprivate let shields: Float?
+    fileprivate let playerHeadlightIsOn: Bool?
     fileprivate let trainingOpeningState: TrainingOpeningState?
     fileprivate let trainingDodgeAttemptState: TrainingDodgeAttemptState?
     fileprivate let trainingManeuverFollowState:
@@ -1690,6 +1712,7 @@ final class PlayerSimulation {
     private var lastTimestamp: Double
     private var lastThrustTime: Float = 0
     private var authoritativeRandomState: UInt32
+    private var playerHeadlightIsOn = false
     private var pauseDepth = 0
     private var pauseTimestamp: Double?
     private var trainingOpeningState: TrainingOpeningState?
@@ -2958,6 +2981,7 @@ final class PlayerSimulation {
         afterburnerIsActive = continuation.afterburnerIsActive
         energy = continuation.energy
         shields = continuation.shields ?? 100
+        playerHeadlightIsOn = continuation.playerHeadlightIsOn ?? false
         afterburnerMagnitude = continuation.afterburnerMagnitude
         wiggleFalloff = continuation.wiggleFalloff
         lastThrustTime = continuation.lastThrustTime
@@ -3036,6 +3060,7 @@ final class PlayerSimulation {
             lastThrustTime: lastThrustTime,
             authoritativeRandomState: authoritativeRandomState,
             shields: shields,
+            playerHeadlightIsOn: playerHeadlightIsOn,
             trainingOpeningState: trainingOpeningState,
             trainingDodgeAttemptState: trainingDodgeAttemptState,
             trainingManeuverFollowState:
@@ -4868,6 +4893,68 @@ final class PlayerSimulation {
         trainingManeuverFollowState = maneuverState
     }
 
+    private func fastPlayerHeadlight(
+        from player: PlacedObject
+    ) -> PlayerFastHeadlightFrame {
+        guard case let .room(startRoomSourceIndex) = player.location else {
+            preconditionFailure("The validated default player is indoor.")
+        }
+        let start = player.position
+        let forward = player.orientation.forward
+        let end = start + forward * 300
+        let wallTrace = traceIndoorMovement(
+            in: level,
+            startRoom: startRoomSourceIndex,
+            start: start,
+            end: end,
+            radius: 0
+        )
+        var selectedPosition = wallTrace.finalPosition
+        var selectedRoomSourceIndex =
+            wallTrace.containingRoomSourceIndex
+        var selectedFraction = vectorDistance(start, selectedPosition) / 300
+        let visitedRooms = Set(wallTrace.visitedRoomSourceIndices)
+        let presentationByHandle = Dictionary(
+            uniqueKeysWithValues: level.objectPresentations.map {
+                ($0.objectHandle, $0)
+            }
+        )
+        let modelBySource = Dictionary(
+            uniqueKeysWithValues: level.models.map { ($0.source, $0) }
+        )
+        for object in level.objects {
+            guard object.handle != player.handle,
+                  case let .room(roomSourceIndex) = object.location,
+                  visitedRooms.contains(roomSourceIndex),
+                  let presentation = presentationByHandle[object.handle],
+                  presentation.isVisible,
+                  let model = modelBySource[presentation.primaryModel]
+            else {
+                continue
+            }
+            let radius = sourceObjectPresentationSize(
+                model: model,
+                objectType: object.type
+            )
+            guard let fraction = segmentSphereHitFraction(
+                start: start,
+                end: end,
+                center: object.position,
+                radius: radius
+            ), fraction < selectedFraction else {
+                continue
+            }
+            selectedFraction = fraction
+            selectedPosition = start + (end - start) * fraction
+            selectedRoomSourceIndex = roomSourceIndex
+        }
+        return PlayerFastHeadlightFrame(
+            roomSourceIndex: selectedRoomSourceIndex,
+            position: selectedPosition - forward / 4,
+            lightDistance: 20
+        )
+    }
+
     func update(at timestamp: Double, input: InputSnapshot) -> PlayerSimulationFrame {
         precondition(timestamp.isFinite && timestamp >= lastTimestamp)
         precondition(pauseDepth == 0)
@@ -4894,6 +4981,21 @@ final class PlayerSimulation {
         let input = controlsAreSuspended
             ? InputSnapshot.zero
             : input.applying(currentEnabledControls)
+        var playerHeadlightFeedback: TrainingOpeningFeedback?
+        if input.togglesHeadlight {
+            playerHeadlightIsOn.toggle()
+            playerHeadlightFeedback = TrainingOpeningFeedback(
+                hudMessages: [
+                    playerHeadlightIsOn
+                        ? "Headlight turned on."
+                        : "Headlight turned off.",
+                ],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: false,
+                soundSourceName: "Headlight1",
+                soundEventVolume: 1
+            )
+        }
         let cameraMonitorWasUsedAtFrameStart =
             trainingCameraMonitorState?.wasUsed == true
         var guidebotReturnWasRequestedThisFrame = false
@@ -6162,6 +6264,9 @@ final class PlayerSimulation {
         }!
         level.objects[movedPlayerIndex].position = position
         level.objects[movedPlayerIndex].location = .room(roomSourceIndex)
+        let playerFastHeadlight = playerHeadlightIsOn
+            ? fastPlayerHeadlight(from: level.objects[movedPlayerIndex])
+            : nil
         advanceTrainingGuidebotYellowFlares(
             duration: systemsFrameDuration,
             gameTime: systemsGameTime
@@ -6183,6 +6288,9 @@ final class PlayerSimulation {
         }
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
+        if let playerHeadlightFeedback {
+            trainingOpeningFeedback.append(playerHeadlightFeedback)
+        }
         if let guidebotReleaseFeedback {
             trainingOpeningFeedback.append(guidebotReleaseFeedback)
         }
@@ -7726,6 +7834,8 @@ final class PlayerSimulation {
                             ?? (trainingOpeningState != nil)
                     ),
             trainingOpeningFeedback: trainingOpeningFeedback,
+            playerFastHeadlight:
+                finalGoalFrame == nil ? playerFastHeadlight : nil,
             shields: shields,
             trainingDodgeMarkerLightDistance:
                 trainingDodgeAttemptState?.markerLightDistance,

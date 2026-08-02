@@ -194,6 +194,8 @@ Likewise, the historical 32-by-32 terrain grouping is imported as historical ter
 
 ## Content identity and versioning
 
+Phase 5's first player-headlight consumer extends the optional schema-11 Training binding with only the exact stock `Headlight1` page and `Headlight.wav` clip. D3Import validates the prepared-retail identity, archive location, hashes, mono 22,050 Hz PCM shape and page playback values before canonical admission. Older schema-11 packages with no headlight clip remain valid: the fast light and HUD still work while the direct AppKit sound attempt is silent. A present but incomplete or relabeled binding rejects at the canonical boundary; there is no runtime HOG/WAV fallback and no schema bump.
+
 ContentKey is a durable namespaced identifier used where behavior, saves, editor references, or replacement content must survive package-local reordering. Dense package-local integers may be derived for runtime arrays.
 
 Do not assign durable identity to every value merely because it may be useful later. Use it when an actual reference crosses a save, project, package, or runtime ownership boundary.

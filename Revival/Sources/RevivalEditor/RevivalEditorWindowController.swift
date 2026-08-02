@@ -318,6 +318,9 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.inventoryUseRequested = {
             [weak self] in self?.playerInput.requestInventoryUse()
         }
+        metalView.headlightToggleRequested = {
+            [weak self] in self?.playerInput.requestHeadlightToggle()
+        }
         window.initialFirstResponder = roomNameField
         roomNameField.target = self
         roomNameField.action = #selector(commitRoomName(_:))

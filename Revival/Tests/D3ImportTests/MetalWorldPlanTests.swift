@@ -1,6 +1,98 @@
 import XCTest
 
 final class MetalWorldPlanTests: XCTestCase {
+    func testFastPlayerHeadlightLightsRetainedVisibleObjectDraw() throws {
+        let level = makeFastPlayerHeadlightLevel()
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(
+            at: 0.1,
+            input: .init(togglesHeadlight: true)
+        )
+        let initial = try makeMetalWorldPlan(
+            level: simulation.level,
+            playerView: frame.playerView
+        )
+        let baseline = initial.draws.first {
+            $0.objectHandle == 12_301
+        }!
+        let lit = try updateMetalWorldPlan(
+            initial,
+            level: simulation.level,
+            playerView: frame.playerView,
+            playerFastHeadlight: frame.playerFastHeadlight
+        )
+        let litObject = try XCTUnwrap(lit.draws.first {
+            $0.objectHandle == 12_301
+        })
+        XCTAssertTrue(
+            zip(litObject.vertices, baseline.vertices).contains {
+                $0.0.dynamicLight.x > $0.1.dynamicLight.x
+                    && $0.0.dynamicLight.y > $0.1.dynamicLight.y
+                    && $0.0.dynamicLight.z > $0.1.dynamicLight.z
+            }
+        )
+
+        let monitorLevel = makeTrainingCameraMonitorLevel()
+        let monitorSimulation = PlayerSimulation(
+            level: monitorLevel,
+            presentationReadyTimestamp: 0
+        )
+        _ = monitorSimulation.update(at: 0.1, input: .zero)
+        let used = monitorSimulation.update(
+            at: 0.2,
+            input: .init(usesInventory: true)
+        )
+        let monitor = try XCTUnwrap(used.trainingCameraMonitor)
+        let monitorInitial = try makeMetalWorldPlan(
+            level: monitorLevel,
+            playerView: used.playerView
+        )
+        let monitorBaseline = try updateMetalWorldPlan(
+            monitorInitial,
+            level: monitorLevel,
+            playerView: used.playerView,
+            trainingCameraMonitor: monitor
+        )
+        let auxiliaryOnlyIndex = try XCTUnwrap(
+            monitorBaseline.auxiliaryActiveDrawIndices.first {
+                !monitorBaseline.activeDrawIndices.contains($0)
+                    && !monitorBaseline.preparedDraws[$0].vertices.isEmpty
+            }
+        )
+        let auxiliaryTarget = try XCTUnwrap(
+            monitorBaseline.preparedDraws[auxiliaryOnlyIndex]
+                .vertices.first?.position
+        )
+        let auxiliaryLit = try updateMetalWorldPlan(
+            monitorBaseline,
+            level: monitorLevel,
+            playerView: used.playerView,
+            trainingCameraMonitor: monitor,
+            playerFastHeadlight: .init(
+                roomSourceIndex: monitor.roomSourceIndex,
+                position: .init(
+                    x: auxiliaryTarget.x,
+                    y: auxiliaryTarget.y,
+                    z: auxiliaryTarget.z
+                ),
+                lightDistance: 20
+            )
+        )
+        XCTAssertTrue(
+            zip(
+                auxiliaryLit.preparedDraws[auxiliaryOnlyIndex].vertices,
+                monitorBaseline.preparedDraws[auxiliaryOnlyIndex].vertices
+            ).contains {
+                $0.0.dynamicLight.x > $0.1.dynamicLight.x
+                    && $0.0.dynamicLight.y > $0.1.dynamicLight.y
+                    && $0.0.dynamicLight.z > $0.1.dynamicLight.z
+            }
+        )
+    }
+
     func testFollowBotBlueLaserUsesRetainedObjectDrawPath() throws {
         let level = makeTrainingMovingTargetHandoffLevel()
         let handoff = try XCTUnwrap(

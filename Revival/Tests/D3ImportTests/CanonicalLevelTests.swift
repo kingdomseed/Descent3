@@ -1,6 +1,82 @@
 import XCTest
 
 final class CanonicalLevelTests: XCTestCase {
+    func testPresentHeadlightSoundBindingRejectsNonretailClip() throws {
+        let level = makeTrainingFinalGoalLevel()
+        XCTAssertFalse(level.soundClips.contains {
+            $0.logicalName == "Headlight1"
+        })
+        XCTAssertNoThrow(
+            try level.validate(),
+            "older schema-11 packages remain valid without Headlight1"
+        )
+        let existing = try XCTUnwrap(level.soundClips.first)
+        let impostor = CanonicalSoundClip(
+            logicalName: "Headlight1",
+            sourceName: existing.sourceName,
+            sourceEntryIndex: existing.sourceEntryIndex,
+            sampleRate: existing.sampleRate,
+            channelCount: existing.channelCount,
+            frameCount: existing.frameCount,
+            pcm16LittleEndian: existing.pcm16LittleEndian,
+            pcmSHA256: existing.pcmSHA256,
+            sourceArchive: existing.sourceArchive,
+            sourceSHA256: existing.sourceSHA256,
+            importVolume: existing.importVolume
+        )
+        let hostile = replacing(
+            level,
+            soundClips: [impostor] + level.soundClips.dropFirst()
+        )
+        XCTAssertThrowsError(try hostile.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Headlight1 canonical sound binding")
+            )
+        }
+
+        let relabeledSource = SourceResource(
+            storedIndex: 1_407,
+            sourceName: "Headlight.wav"
+        )
+        let relabeled = CanonicalSoundClip(
+            logicalName: "RenamedHeadlight",
+            sourceName: relabeledSource.sourceName,
+            sourceEntryIndex: relabeledSource.storedIndex,
+            sampleRate: existing.sampleRate,
+            channelCount: existing.channelCount,
+            frameCount: existing.frameCount,
+            pcm16LittleEndian: existing.pcm16LittleEndian,
+            pcmSHA256: existing.pcmSHA256,
+            sourceArchive: existing.sourceArchive,
+            sourceSHA256: existing.sourceSHA256,
+            importVolume: existing.importVolume
+        )
+        let relabeledManifest = DependencyManifest(
+            current: level.dependencyManifest.current + [
+                DependencyRecord(
+                    category: "sound",
+                    source: relabeledSource,
+                    state: "production",
+                    provenance: "hostile renamed Headlight fixture"
+                ),
+            ],
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+        let renamedIdentity = replacing(
+            level,
+            soundClips: level.soundClips + [relabeled],
+            dependencyManifest: relabeledManifest
+        )
+        XCTAssertThrowsError(try renamedIdentity.validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("Headlight1 canonical sound binding")
+            )
+        }
+    }
+
     func testSchemaElevenRequiresExactFollowBotDestructionHandoff()
         throws
     {

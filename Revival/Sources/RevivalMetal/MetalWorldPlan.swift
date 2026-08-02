@@ -215,7 +215,8 @@ func updateMetalWorldPlan(
     trainingDodgeMarkerLightDistance: Float? = nil,
     trainingGuidebotReturnMarkerLightDistance: Float? = nil,
     trainingLastRoomMarkerLightDistance: Float? = nil,
-    trainingFinalBotsMarkerLightDistance: Float? = nil
+    trainingFinalBotsMarkerLightDistance: Float? = nil,
+    playerFastHeadlight: PlayerFastHeadlightFrame? = nil
 ) throws -> MetalWorldPlan {
     try updateMetalWorldPlan(
         prepared,
@@ -247,7 +248,8 @@ func updateMetalWorldPlan(
         trainingLastRoomMarkerLightDistance:
             trainingLastRoomMarkerLightDistance,
         trainingFinalBotsMarkerLightDistance:
-            trainingFinalBotsMarkerLightDistance
+            trainingFinalBotsMarkerLightDistance,
+        playerFastHeadlight: playerFastHeadlight
     )
 }
 
@@ -276,7 +278,8 @@ func updateMetalWorldPlan(
         trainingDodgeMarkerLightDistance: nil,
         trainingGuidebotReturnMarkerLightDistance: nil,
         trainingLastRoomMarkerLightDistance: nil,
-        trainingFinalBotsMarkerLightDistance: nil
+        trainingFinalBotsMarkerLightDistance: nil,
+        playerFastHeadlight: nil
     )
 }
 
@@ -306,7 +309,8 @@ private func updateMetalWorldPlan(
     trainingDodgeMarkerLightDistance: Float?,
     trainingGuidebotReturnMarkerLightDistance: Float?,
     trainingLastRoomMarkerLightDistance: Float?,
-    trainingFinalBotsMarkerLightDistance: Float?
+    trainingFinalBotsMarkerLightDistance: Float?,
+    playerFastHeadlight: PlayerFastHeadlightFrame?
 ) throws -> MetalWorldPlan {
     let extraction = try extractWorldForRendering(
         level,
@@ -670,6 +674,19 @@ private func updateMetalWorldPlan(
                         color: light.color
                     )
             }
+        }
+    }
+    if let headlight = playerFastHeadlight,
+       headlight.lightDistance > 0 {
+        for index in Set(
+            activeDrawIndices + auxiliaryActiveDrawIndices
+        ) {
+            updatedPreparedDraws[index] = applyingTrainingMarkerLight(
+                to: updatedPreparedDraws[index],
+                position: headlight.position,
+                distance: headlight.lightDistance,
+                color: SIMD3<Float>(repeating: 1)
+            )
         }
     }
     for flare in trainingGuidebotYellowFlares

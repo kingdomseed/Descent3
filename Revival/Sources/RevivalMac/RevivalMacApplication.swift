@@ -382,6 +382,9 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.inventoryUseRequested = {
                 [weak self] in self?.playerInput.requestInventoryUse()
             }
+            gameplayView.headlightToggleRequested = {
+                [weak self] in self?.playerInput.requestHeadlightToggle()
+            }
             gameplayView.trainingResultAcknowledgementRequested = {
                 [weak self] in self?.acknowledgeTrainingResult()
             }

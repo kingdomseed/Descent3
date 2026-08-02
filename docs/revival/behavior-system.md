@@ -101,6 +101,8 @@ The reached creator path uses the existing stable object handle and portal ident
 
 ## Engine queries and commands
 
+The first source-default player headlight subset remains direct typed game state rather than a behavior command. During ordinary Mac and disposable-editor play, one nonrepeating `H` downcount toggles the concrete player flag, attempts `Headlight1`, reports the exact on/off HUD result, and then lets post-movement object lighting derive the current fast indoor trace. Schema-7 continuation retains only the optional on/off value; missing older state restores off without replay. Stolen/recovery behavior, controller admission, AI visibility and broader authored light behavior remain outside this subset.
+
 Queries read typed RevivalCore state. Commands request named validated state changes. Start with the operations required by the current chain: objects, players, rooms, doors, triggers, AI, paths, goals, inventory, weapons, sound, messages, cameras, cinematics, score state, campaign flow, and difficulty as they appear.
 
 Prefer composition from existing operations. Add a direct domain operation when composition would obscure source behavior, duplicate substantial logic, or prevent useful validation. Never add arbitrary Swift, file, socket, process, pointer, reflection, framework, or native-module access to project content.

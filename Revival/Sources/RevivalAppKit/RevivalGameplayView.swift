@@ -34,6 +34,7 @@ final class RevivalGameplayView: MTKView {
     var guidebotDeployRequested: (() -> Void)?
     var primaryFireRequested: (() -> Void)?
     var inventoryUseRequested: (() -> Void)?
+    var headlightToggleRequested: (() -> Void)?
     var trainingResultAcknowledgementRequested: (() -> Void)?
     var trainingRestartRequested: (() -> Void)?
     var pilotProfileCreationRequested: ((String) -> Void)?
@@ -257,6 +258,14 @@ final class RevivalGameplayView: MTKView {
             gameplayIsActive: gameplayIsActive
         ) {
             inventoryUseRequested?()
+            return
+        }
+        if Self.requestsHeadlightToggle(
+            keyCode: event.keyCode,
+            isRepeat: event.isARepeat,
+            gameplayIsActive: gameplayIsActive
+        ) {
+            headlightToggleRequested?()
             return
         }
         guard Self.gameplayKeyCodes.contains(event.keyCode) else {
@@ -1177,6 +1186,14 @@ final class RevivalGameplayView: MTKView {
         gameplayIsActive: Bool
     ) -> Bool {
         gameplayIsActive && !isRepeat && keyCode == 42
+    }
+
+    nonisolated static func requestsHeadlightToggle(
+        keyCode: UInt16,
+        isRepeat: Bool,
+        gameplayIsActive: Bool
+    ) -> Bool {
+        gameplayIsActive && !isRepeat && keyCode == 4
     }
 
     nonisolated static func cameraMonitorFrame(
