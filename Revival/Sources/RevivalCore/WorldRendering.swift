@@ -67,6 +67,8 @@ struct InputSnapshot: Equatable, Sendable {
     let requestsTrainingGuidebotActiveGoal: Bool
     let usesInventory: Bool
     let togglesHeadlight: Bool
+    let rearViewPressed: Bool
+    let rearViewHeld: Bool
 
     static let zero = InputSnapshot()
 
@@ -85,7 +87,9 @@ struct InputSnapshot: Equatable, Sendable {
         deploysTrainingGuidebot: Bool = false,
         requestsTrainingGuidebotActiveGoal: Bool = false,
         usesInventory: Bool = false,
-        togglesHeadlight: Bool = false
+        togglesHeadlight: Bool = false,
+        rearViewPressed: Bool = false,
+        rearViewHeld: Bool = false
     ) {
         precondition(
             directLookPitchRadians.isFinite && directLookYawRadians.isFinite
@@ -106,6 +110,8 @@ struct InputSnapshot: Equatable, Sendable {
             requestsTrainingGuidebotActiveGoal
         self.usesInventory = usesInventory
         self.togglesHeadlight = togglesHeadlight
+        self.rearViewPressed = rearViewPressed
+        self.rearViewHeld = rearViewHeld
     }
 }
 
@@ -181,7 +187,9 @@ private extension InputSnapshot {
             requestsTrainingGuidebotActiveGoal:
                 requestsTrainingGuidebotActiveGoal,
             usesInventory: usesInventory,
-            togglesHeadlight: togglesHeadlight
+            togglesHeadlight: togglesHeadlight,
+            rearViewPressed: rearViewPressed,
+            rearViewHeld: rearViewHeld
         )
     }
 }
@@ -271,6 +279,8 @@ struct PlayerInputState: Sendable {
     private var playerFlareIsPending = false
     private var inventoryUseIsPending = false
     private var headlightToggleIsPending = false
+    private var rearViewPressIsPending = false
+    private var rearViewIsHeld = false
     private(set) var gameplayIsActive = true
     var mouseLookEnabled = false
 
@@ -326,6 +336,21 @@ struct PlayerInputState: Sendable {
         headlightToggleIsPending = true
     }
 
+    mutating func setRearView(pressed: Bool, held: Bool) {
+        guard gameplayIsActive else {
+            rearViewPressIsPending = false
+            rearViewIsHeld = false
+            return
+        }
+        rearViewPressIsPending = rearViewPressIsPending || pressed
+        rearViewIsHeld = held
+    }
+
+    mutating func cancelRearViewInput() {
+        rearViewPressIsPending = false
+        rearViewIsHeld = false
+    }
+
     mutating func snapshot(frameDuration: Float) -> InputSnapshot {
         let keyboard = ramp.snapshot(
             held: held,
@@ -346,6 +371,8 @@ struct PlayerInputState: Sendable {
         let firesPlayerFlare = playerFlareIsPending
         let usesInventory = inventoryUseIsPending
         let togglesHeadlight = headlightToggleIsPending
+        let rearViewPressed = rearViewPressIsPending
+        let rearViewHeld = rearViewIsHeld
         mouseDeltaX = 0
         mouseDeltaY = 0
         guidebotDeploymentIsPending = false
@@ -353,6 +380,7 @@ struct PlayerInputState: Sendable {
         inventoryUseIsPending = false
         headlightToggleIsPending = false
         playerFlareIsPending = false
+        rearViewPressIsPending = false
         let mouseNormalizer = 10_000 * max(frameDuration, 0.005)
         let mouseYaw = mouseLookEnabled ? 0 : deltaX / mouseNormalizer
         let mousePitch = mouseLookEnabled ? 0 : -deltaY / mouseNormalizer
@@ -376,7 +404,9 @@ struct PlayerInputState: Sendable {
             requestsTrainingGuidebotActiveGoal:
                 requestsTrainingGuidebotActiveGoal,
             usesInventory: usesInventory,
-            togglesHeadlight: togglesHeadlight
+            togglesHeadlight: togglesHeadlight,
+            rearViewPressed: rearViewPressed,
+            rearViewHeld: rearViewHeld
         )
     }
 
@@ -397,6 +427,8 @@ struct PlayerInputState: Sendable {
             playerFlareIsPending = false
             inventoryUseIsPending = false
             headlightToggleIsPending = false
+            rearViewPressIsPending = false
+            rearViewIsHeld = false
             _ = ramp.snapshot(
                 held: .zero,
                 frameDuration: simulation?.frameDuration ?? 0,
@@ -479,12 +511,29 @@ func defaultPlayerView(
     )
 }
 
+func rearPlayerView(_ playerView: PlayerView) -> PlayerView {
+    let camera = playerView.camera
+    return PlayerView(
+        playerID: playerView.playerID,
+        objectHandle: playerView.objectHandle,
+        roomSourceIndex: playerView.roomSourceIndex,
+        camera: RoomCamera(
+            position: camera.position,
+            target: camera.position - (camera.target - camera.position),
+            up: camera.up,
+            projection: camera.projection
+        ),
+        collisionRadius: playerView.collisionRadius
+    )
+}
+
 struct PlayerSimulationFrame: Equatable, Sendable {
     let systemsFrameDuration: Float
     let systemsGameTime: Float
     let storedFrameDuration: Float
     let gameTime: Float
     let playerView: PlayerView
+    let rearViewIsActive: Bool
     let velocity: Vector3
     let angularVelocity: Vector3
     let turnrollFixedAngle: Float
@@ -1674,6 +1723,11 @@ private func initialTrainingDestroyBot1DestructionState(
     )
 }
 
+fileprivate struct PlayerRearViewState: Codable, Equatable, Sendable {
+    var leaveMode: Bool
+    let entryGameTime: Float
+}
+
 struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     let schemaVersion: Int
     let levelKey: String
@@ -1696,6 +1750,7 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
     fileprivate let authoritativeRandomState: UInt32?
     fileprivate let shields: Float?
     fileprivate let playerHeadlightIsOn: Bool?
+    fileprivate let playerRearViewState: PlayerRearViewState?
     fileprivate let trainingOpeningState: TrainingOpeningState?
     fileprivate let trainingDodgeAttemptState: TrainingDodgeAttemptState?
     fileprivate let trainingManeuverFollowState:
@@ -1775,6 +1830,7 @@ final class PlayerSimulation {
     private var lastThrustTime: Float = 0
     private var authoritativeRandomState: UInt32
     private var playerHeadlightIsOn = false
+    private var playerRearViewState: PlayerRearViewState?
     private var pauseDepth = 0
     private var pauseTimestamp: Double?
     private var trainingOpeningState: TrainingOpeningState?
@@ -2524,6 +2580,12 @@ final class PlayerSimulation {
               continuation.frameDuration >= 0,
               continuation.gameTime.isFinite,
               continuation.gameTime >= 0,
+              continuation.playerRearViewState.map({ state in
+                  continuation.schemaVersion == 7
+                      && state.entryGameTime.isFinite
+                      && state.entryGameTime >= 0
+                      && state.entryGameTime <= continuation.gameTime
+              }) ?? true,
               isCanonicalRigidTransform(
                   position: continuation.playerPosition,
                   orientation: continuation.playerOrientation
@@ -3113,6 +3175,7 @@ final class PlayerSimulation {
         energy = continuation.energy
         shields = continuation.shields ?? 100
         playerHeadlightIsOn = continuation.playerHeadlightIsOn ?? false
+        playerRearViewState = continuation.playerRearViewState
         afterburnerMagnitude = continuation.afterburnerMagnitude
         wiggleFalloff = continuation.wiggleFalloff
         lastThrustTime = continuation.lastThrustTime
@@ -3171,8 +3234,9 @@ final class PlayerSimulation {
     var continuation: PlayerSimulationContinuation {
         let binding = level.defaultPlayerBinding!
         let player = level.objects.first { $0.handle == binding.objectHandle }!
+        let schemaVersion = playerSimulationContinuationSchema(for: level)
         return PlayerSimulationContinuation(
-            schemaVersion: playerSimulationContinuationSchema(for: level),
+            schemaVersion: schemaVersion,
             levelKey: level.levelKey,
             levelSHA256: level.source.levelSHA256,
             playerLocation: player.location,
@@ -3193,6 +3257,8 @@ final class PlayerSimulation {
             authoritativeRandomState: authoritativeRandomState,
             shields: shields,
             playerHeadlightIsOn: playerHeadlightIsOn,
+            playerRearViewState:
+                schemaVersion == 7 ? playerRearViewState : nil,
             trainingOpeningState: trainingOpeningState,
             trainingDodgeAttemptState: trainingDodgeAttemptState,
             trainingManeuverFollowState:
@@ -5462,6 +5528,31 @@ final class PlayerSimulation {
         )
     }
 
+    private func updatePlayerRearView(
+        input: InputSnapshot,
+        systemsGameTime: Float
+    ) {
+        if input.rearViewPressed {
+            if playerRearViewState != nil {
+                playerRearViewState = nil
+            } else {
+                playerRearViewState = PlayerRearViewState(
+                    leaveMode: false,
+                    entryGameTime: systemsGameTime
+                )
+            }
+            return
+        }
+        guard var state = playerRearViewState else { return }
+        if state.leaveMode && !input.rearViewHeld {
+            playerRearViewState = nil
+        } else if input.rearViewHeld,
+                  systemsGameTime - state.entryGameTime > 1.0 / 16.0 {
+            state.leaveMode = true
+            playerRearViewState = state
+        }
+    }
+
     func update(at timestamp: Double, input: InputSnapshot) -> PlayerSimulationFrame {
         precondition(timestamp.isFinite && timestamp >= lastTimestamp)
         precondition(pauseDepth == 0)
@@ -6229,6 +6320,10 @@ final class PlayerSimulation {
                 systemsGameTime: systemsGameTime
             )
             : nil
+        updatePlayerRearView(
+            input: input,
+            systemsGameTime: systemsGameTime
+        )
         var guidebotEnteredShipThisFrame = false
         var orientation = object.orientation
         if input.directLookPitchRadians != 0 || input.directLookYawRadians != 0 {
@@ -8428,13 +8523,23 @@ final class PlayerSimulation {
         frameDuration = Float(timestamp - lastTimestamp)
         lastTimestamp = timestamp
         gameTime += frameDuration
+        let presentsRearView =
+            finalGoalFrame == nil && playerRearViewState != nil
+        let forwardPlayerView = defaultPlayerView(
+            in: level,
+            projection: projection
+        )
 
         return PlayerSimulationFrame(
             systemsFrameDuration: systemsFrameDuration,
             systemsGameTime: systemsGameTime,
             storedFrameDuration: frameDuration,
             gameTime: gameTime,
-            playerView: defaultPlayerView(in: level, projection: projection),
+            playerView:
+                presentsRearView
+                    ? rearPlayerView(forwardPlayerView)
+                    : forwardPlayerView,
+            rearViewIsActive: presentsRearView,
             velocity: velocity,
             angularVelocity: angularVelocity,
             turnrollFixedAngle: turnrollFixedAngle,

@@ -17182,6 +17182,394 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(controller.roll, 1, accuracy: 0.000_001)
     }
 
+    @MainActor
+    func testFullScreenPlayerRearViewUsesReleasedInputTimingCameraAndContinuation()
+        throws
+    {
+        XCTAssertTrue(
+            RevivalGameplayView.requestsRearView(
+                keyCode: 9,
+                isRepeat: false,
+                gameplayIsActive: true
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsRearView(
+                keyCode: 9,
+                isRepeat: true,
+                gameplayIsActive: true
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsRearView(
+                keyCode: 9,
+                isRepeat: false,
+                gameplayIsActive: false
+            )
+        )
+        XCTAssertEqual(
+            RevivalGameplayView.heldInput(for: [15]).vertical,
+            1,
+            "R remains upward thrust; physical V owns rear view"
+        )
+
+        var physicalInput = PlayerInputState(rampDuration: 0)
+        physicalInput.setRearView(pressed: true, held: true)
+        let pressed = physicalInput.snapshot(frameDuration: 0.1)
+        XCTAssertTrue(pressed.rearViewPressed)
+        XCTAssertTrue(pressed.rearViewHeld)
+        let held = physicalInput.snapshot(frameDuration: 0.1)
+        XCTAssertFalse(held.rearViewPressed)
+        XCTAssertTrue(held.rearViewHeld)
+        var quickPhysicalInput = PlayerInputState(rampDuration: 0)
+        quickPhysicalInput.setRearView(pressed: true, held: true)
+        quickPhysicalInput.setRearView(pressed: false, held: false)
+        XCTAssertTrue(
+            quickPhysicalInput.snapshot(frameDuration: 0.1).rearViewPressed,
+            "a normal key-up preserves the already-observed down pulse"
+        )
+        quickPhysicalInput.setRearView(pressed: true, held: true)
+        quickPhysicalInput.cancelRearViewInput()
+        XCTAssertFalse(
+            quickPhysicalInput.snapshot(frameDuration: 0.1).rearViewPressed,
+            "capture teardown cancels an unsnapshotted physical pulse"
+        )
+        physicalInput.setGameplayActive(false, simulation: nil, at: 1)
+        XCTAssertFalse(
+            physicalInput.snapshot(frameDuration: 0.1).rearViewHeld,
+            "focus and gameplay teardown clear physical hold state"
+        )
+
+        let quick = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x1234_5678
+        )
+        let entered = quick.update(
+            at: 0.1,
+            input: .init(rearViewPressed: true, rearViewHeld: true)
+        )
+        let committedForward = defaultPlayerView(in: quick.level)
+        XCTAssertTrue(entered.rearViewIsActive)
+        XCTAssertEqual(
+            entered.playerView.camera.position,
+            committedForward.camera.position
+        )
+        XCTAssertEqual(entered.playerView.camera.up, committedForward.camera.up)
+        XCTAssertEqual(
+            entered.playerView.camera.target.x - entered.playerView.camera.position.x,
+            -(committedForward.camera.target.x
+                - committedForward.camera.position.x),
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            entered.playerView.camera.target.y - entered.playerView.camera.position.y,
+            -(committedForward.camera.target.y
+                - committedForward.camera.position.y),
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            entered.playerView.camera.target.z - entered.playerView.camera.position.z,
+            -(committedForward.camera.target.z
+                - committedForward.camera.position.z),
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            entered.playerView.camera.projection,
+            committedForward.camera.projection
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.showsOrdinaryGameplayOverlays(
+                rearViewIsActive: entered.rearViewIsActive
+            )
+        )
+        let toggled = quick.update(at: 0.2, input: .zero)
+        XCTAssertTrue(
+            toggled.rearViewIsActive,
+            "release before the hold branch runs leaves the view toggled"
+        )
+        let exited = quick.update(
+            at: 0.3,
+            input: .init(rearViewPressed: true, rearViewHeld: true)
+        )
+        XCTAssertFalse(exited.rearViewIsActive)
+        XCTAssertTrue(
+            RevivalGameplayView.showsOrdinaryGameplayOverlays(
+                rearViewIsActive: exited.rearViewIsActive
+            )
+        )
+
+        let masked = PlayerSimulation(
+            level: makeTrainingScript003Level(),
+            presentationReadyTimestamp: 0
+        )
+        let maskedRear = masked.update(
+            at: 0.1,
+            input: .init(
+                sideways: 1,
+                rearViewPressed: true,
+                rearViewHeld: true
+            )
+        )
+        XCTAssertEqual(maskedRear.enabledPlayerControls, [.forward])
+        XCTAssertTrue(
+            maskedRear.rearViewIsActive,
+            "the Training movement/weapon mask does not suppress rear view"
+        )
+
+        let moving = PlayerSimulation(
+            level: makeSliceSixObjectRenderLevel(),
+            presentationReadyTimestamp: 0
+        )
+        let movedRear = moving.update(
+            at: 0.1,
+            input: .init(
+                sideways: 1,
+                pitch: 0.75,
+                rearViewPressed: true,
+                rearViewHeld: true
+            )
+        )
+        let committedPlayer = try XCTUnwrap(
+            moving.level.objects.first {
+                $0.handle == movedRear.playerView.objectHandle
+            }
+        )
+        XCTAssertEqual(movedRear.playerView.camera.position, committedPlayer.position)
+        XCTAssertEqual(movedRear.playerView.camera.up, committedPlayer.orientation.up)
+        XCTAssertEqual(
+            movedRear.playerView.camera.target.x
+                - movedRear.playerView.camera.position.x,
+            -committedPlayer.orientation.forward.x,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            movedRear.playerView.camera.target.y
+                - movedRear.playerView.camera.position.y,
+            -committedPlayer.orientation.forward.y,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            movedRear.playerView.camera.target.z
+                - movedRear.playerView.camera.position.z,
+            -committedPlayer.orientation.forward.z,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            committedPlayer.location,
+            .room(movedRear.playerView.roomSourceIndex)
+        )
+
+        let cameraMonitorLevel = makeTrainingCameraMonitorLevel()
+        let cameraMonitor = PlayerSimulation(
+            level: cameraMonitorLevel,
+            presentationReadyTimestamp: 0
+        )
+        _ = cameraMonitor.update(at: 0.1, input: .init(usesInventory: true))
+        let rearWithMonitor = cameraMonitor.update(
+            at: 0.2,
+            input: .init(
+                usesInventory: true,
+                rearViewPressed: true,
+                rearViewHeld: true
+            )
+        )
+        XCTAssertTrue(rearWithMonitor.rearViewIsActive)
+        XCTAssertNotNil(
+            rearWithMonitor.trainingCameraMonitor,
+            "the independent auxiliary camera stays live and unflipped"
+        )
+
+        let yellowLevel = try makePlayerYellowFlareLevel()
+        let yellowRear = PlayerSimulation(
+            level: yellowLevel,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x2468_ace0
+        )
+        let yellowForward = PlayerSimulation(
+            level: yellowLevel,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x2468_ace0
+        )
+        let yellowRearFrame = yellowRear.update(
+            at: 0.1,
+            input: .init(
+                sideways: 1,
+                firesPlayerFlare: true,
+                rearViewPressed: true,
+                rearViewHeld: true
+            )
+        )
+        let yellowForwardFrame = yellowForward.update(
+            at: 0.1,
+            input: .init(sideways: 1, firesPlayerFlare: true)
+        )
+        XCTAssertTrue(yellowRearFrame.rearViewIsActive)
+        XCTAssertEqual(
+            yellowRearFrame.trainingGuidebotYellowFlares,
+            yellowForwardFrame.trainingGuidebotYellowFlares,
+            "rear processing follows flare creation and changes no carrier"
+        )
+        let yellowRearObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(yellowRear.continuation)
+            ) as? [String: Any]
+        )
+        let yellowForwardObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(yellowForward.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            yellowRearObject["authoritativeRandomState"] as? NSNumber,
+            yellowForwardObject["authoritativeRandomState"] as? NSNumber
+        )
+
+        let persistenceLevel = makeTrainingRASBot1DeathLevel()
+        let heldSimulation = PlayerSimulation(
+            level: persistenceLevel,
+            presentationReadyTimestamp: 0
+        )
+        _ = heldSimulation.update(
+            at: 0.1,
+            input: .init(rearViewPressed: true, rearViewHeld: true)
+        )
+        var exactObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(heldSimulation.continuation)
+            ) as? [String: Any]
+        )
+        var exactState = try XCTUnwrap(
+            exactObject["playerRearViewState"] as? [String: Any]
+        )
+        let savedGameTime = try XCTUnwrap(
+            (exactObject["gameTime"] as? NSNumber)?.floatValue
+        )
+        exactState["entryGameTime"] = savedGameTime - 1.0 / 16.0
+        exactObject["playerRearViewState"] = exactState
+        let exactContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: exactObject)
+        )
+        let exact = try PlayerSimulation(
+            level: persistenceLevel,
+            continuation: exactContinuation,
+            resumedAtTimestamp: 10
+        )
+        XCTAssertTrue(
+            exact.update(
+                at: 10.01,
+                input: .init(rearViewHeld: true)
+            ).rearViewIsActive,
+            "exactly 1/16 does not arm leave mode"
+        )
+        var exactAfterObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(exact.continuation)
+            ) as? [String: Any]
+        )
+        var exactAfterState = try XCTUnwrap(
+            exactAfterObject["playerRearViewState"] as? [String: Any]
+        )
+        XCTAssertEqual(exactAfterState["leaveMode"] as? Bool, false)
+        let restoredUnarmed = try PlayerSimulation(
+            level: persistenceLevel,
+            continuation: exactContinuation,
+            resumedAtTimestamp: 15
+        )
+        XCTAssertTrue(
+            restoredUnarmed.update(at: 15.1, input: .zero)
+                .rearViewIsActive,
+            "an unarmed restored toggle remains without a physical hold"
+        )
+        _ = exact.update(at: 10.02, input: .init(rearViewHeld: true))
+        exactAfterObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(exact.continuation)
+            ) as? [String: Any]
+        )
+        exactAfterState = try XCTUnwrap(
+            exactAfterObject["playerRearViewState"] as? [String: Any]
+        )
+        XCTAssertEqual(exactAfterState["leaveMode"] as? Bool, true)
+        XCTAssertFalse(
+            exact.update(at: 10.03, input: .zero).rearViewIsActive,
+            "release after strict-greater hold leaves rear view"
+        )
+
+        var restoredArmedObject = exactObject
+        var restoredArmedState = exactState
+        restoredArmedState["leaveMode"] = true
+        restoredArmedObject["playerRearViewState"] = restoredArmedState
+        let restoredArmed = try PlayerSimulation(
+            level: persistenceLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: restoredArmedObject)
+            ),
+            resumedAtTimestamp: 20
+        )
+        XCTAssertFalse(
+            restoredArmed.update(at: 20.1, input: .zero).rearViewIsActive
+        )
+
+        var oldObject = exactObject
+        oldObject.removeValue(forKey: "playerRearViewState")
+        let old = try PlayerSimulation(
+            level: persistenceLevel,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: oldObject)
+            ),
+            resumedAtTimestamp: 30
+        )
+        XCTAssertFalse(old.update(at: 30.1, input: .zero).rearViewIsActive)
+
+        var invalidObject = exactObject
+        var invalidState = exactState
+        invalidState["entryGameTime"] = savedGameTime + 0.001
+        invalidObject["playerRearViewState"] = invalidState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: persistenceLevel,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(withJSONObject: invalidObject)
+                ),
+                resumedAtTimestamp: 40
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var wrongSchemaObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(quick.continuation)
+            ) as? [String: Any]
+        )
+        wrongSchemaObject["playerRearViewState"] = exactState
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: quick.level,
+                continuation: JSONDecoder().decode(
+                    PlayerSimulationContinuation.self,
+                    from: JSONSerialization.data(
+                        withJSONObject: wrongSchemaObject
+                    )
+                ),
+                resumedAtTimestamp: 50
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
     func testF4RequestsGuidebotDeploymentOnlyDuringGameplay() {
         XCTAssertTrue(
             RevivalGameplayView.requestsGuidebotDeployment(

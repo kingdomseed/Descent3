@@ -327,6 +327,13 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.headlightToggleRequested = {
             [weak self] in self?.playerInput.requestHeadlightToggle()
         }
+        metalView.rearViewInputChanged = {
+            [weak self] in
+            self?.playerInput.setRearView(pressed: $0, held: $1)
+        }
+        metalView.rearViewInputCancelled = {
+            [weak self] in self?.playerInput.cancelRearViewInput()
+        }
         window.initialFirstResponder = roomNameField
         roomNameField.target = self
         roomNameField.action = #selector(commitRoomName(_:))

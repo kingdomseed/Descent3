@@ -391,6 +391,13 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.headlightToggleRequested = {
                 [weak self] in self?.playerInput.requestHeadlightToggle()
             }
+            gameplayView.rearViewInputChanged = {
+                [weak self] in
+                self?.playerInput.setRearView(pressed: $0, held: $1)
+            }
+            gameplayView.rearViewInputCancelled = {
+                [weak self] in self?.playerInput.cancelRearViewInput()
+            }
             gameplayView.trainingResultAcknowledgementRequested = {
                 [weak self] in self?.acknowledgeTrainingResult()
             }

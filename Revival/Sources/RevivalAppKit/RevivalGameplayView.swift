@@ -37,6 +37,8 @@ final class RevivalGameplayView: MTKView {
     var playerFlareRequestCancelled: (() -> Void)?
     var inventoryUseRequested: (() -> Void)?
     var headlightToggleRequested: (() -> Void)?
+    var rearViewInputChanged: ((Bool, Bool) -> Void)?
+    var rearViewInputCancelled: (() -> Void)?
     var trainingResultAcknowledgementRequested: (() -> Void)?
     var trainingRestartRequested: (() -> Void)?
     var pilotProfileCreationRequested: ((String) -> Void)?
@@ -279,6 +281,16 @@ final class RevivalGameplayView: MTKView {
             playerFlareRequested?()
             return
         }
+        if event.keyCode == 9, gameplayIsActive {
+            if Self.requestsRearView(
+                keyCode: event.keyCode,
+                isRepeat: event.isARepeat,
+                gameplayIsActive: gameplayIsActive
+            ) {
+                rearViewInputChanged?(true, true)
+            }
+            return
+        }
         guard Self.gameplayKeyCodes.contains(event.keyCode) else {
             super.keyDown(with: event)
             return
@@ -288,6 +300,10 @@ final class RevivalGameplayView: MTKView {
     }
 
     override func keyUp(with event: NSEvent) {
+        if event.keyCode == 9 {
+            rearViewInputChanged?(false, false)
+            return
+        }
         guard Self.gameplayKeyCodes.contains(event.keyCode) else {
             super.keyUp(with: event)
             return
@@ -408,6 +424,14 @@ final class RevivalGameplayView: MTKView {
         trainingEndLevelOverlay.isHidden = true
         trainingEndLevelLabel.isHidden = true
         trainingRestartButton.isHidden = true
+        let showsOrdinaryGameplayOverlays =
+            Self.showsOrdinaryGameplayOverlays(
+                rearViewIsActive: frame.rearViewIsActive
+            )
+        trainingMessageLabel.isHidden = !showsOrdinaryGameplayOverlays
+        enabledControlsLabel.isHidden = !showsOrdinaryGameplayOverlays
+        invulnerabilityStatusLabel.isHidden = !showsOrdinaryGameplayOverlays
+        cloakStatusLabel.isHidden = !showsOrdinaryGameplayOverlays
         cameraMonitorBorder.isHidden = frame.trainingCameraMonitor == nil
         invulnerabilityStatusLabel.stringValue =
             Self.invulnerabilityStatusText(
@@ -416,11 +440,12 @@ final class RevivalGameplayView: MTKView {
         let cloakStatus = Self.cloakStatusPresentation(
             frame.trainingCloak
         )
-        cloakShipMonitor.isHidden = false
+        cloakShipMonitor.isHidden = !showsOrdinaryGameplayOverlays
         cloakShipMonitor.alphaValue = cloakStatus.shipOpacity
         cloakStatusLabel.stringValue = cloakStatus.cloakText
         cloakStatusLabel.alphaValue = cloakStatus.cloakOpacity
-        if let pulse = Self.invulnerabilityMonitorPulse(
+        if showsOrdinaryGameplayOverlays,
+           let pulse = Self.invulnerabilityMonitorPulse(
             remaining: frame.trainingInvulnerabilityRemaining,
             gameTime: frame.gameTime,
             drawableWidth: bounds.width,
@@ -1220,6 +1245,20 @@ final class RevivalGameplayView: MTKView {
         gameplayIsActive && !isRepeat && keyCode == 5
     }
 
+    nonisolated static func requestsRearView(
+        keyCode: UInt16,
+        isRepeat: Bool,
+        gameplayIsActive: Bool
+    ) -> Bool {
+        gameplayIsActive && !isRepeat && keyCode == 9
+    }
+
+    nonisolated static func showsOrdinaryGameplayOverlays(
+        rearViewIsActive: Bool
+    ) -> Bool {
+        !rearViewIsActive
+    }
+
     nonisolated static func cameraMonitorFrame(
         drawableWidth: CGFloat,
         drawableHeight: CGFloat
@@ -1774,6 +1813,7 @@ final class RevivalGameplayView: MTKView {
     private func releaseMouse() {
         setPrimaryFireHeld(false)
         playerFlareRequestCancelled?()
+        rearViewInputCancelled?()
         guard mouseIsCaptured else { return }
         mouseIsCaptured = false
         pendingMouseX = 0
