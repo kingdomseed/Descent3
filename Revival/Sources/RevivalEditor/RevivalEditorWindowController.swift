@@ -315,6 +315,12 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.primaryFireHeldChanged = {
             [weak self] in self?.playerInput.setPrimaryFireHeld($0)
         }
+        metalView.playerFlareRequested = {
+            [weak self] in self?.playerInput.requestPlayerFlare()
+        }
+        metalView.playerFlareRequestCancelled = {
+            [weak self] in self?.playerInput.cancelPlayerFlareRequest()
+        }
         metalView.inventoryUseRequested = {
             [weak self] in self?.playerInput.requestInventoryUse()
         }

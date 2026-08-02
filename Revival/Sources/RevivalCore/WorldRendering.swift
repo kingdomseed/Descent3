@@ -62,6 +62,7 @@ struct InputSnapshot: Equatable, Sendable {
     let directLookPitchRadians: Float
     let directLookYawRadians: Float
     let firesPrimaryWeapon: Bool
+    let firesPlayerFlare: Bool
     let deploysTrainingGuidebot: Bool
     let requestsTrainingGuidebotActiveGoal: Bool
     let usesInventory: Bool
@@ -80,6 +81,7 @@ struct InputSnapshot: Equatable, Sendable {
         directLookPitchRadians: Float = 0,
         directLookYawRadians: Float = 0,
         firesPrimaryWeapon: Bool = false,
+        firesPlayerFlare: Bool = false,
         deploysTrainingGuidebot: Bool = false,
         requestsTrainingGuidebotActiveGoal: Bool = false,
         usesInventory: Bool = false,
@@ -98,6 +100,7 @@ struct InputSnapshot: Equatable, Sendable {
         self.directLookPitchRadians = directLookPitchRadians
         self.directLookYawRadians = directLookYawRadians
         self.firesPrimaryWeapon = firesPrimaryWeapon
+        self.firesPlayerFlare = firesPlayerFlare
         self.deploysTrainingGuidebot = deploysTrainingGuidebot
         self.requestsTrainingGuidebotActiveGoal =
             requestsTrainingGuidebotActiveGoal
@@ -173,6 +176,7 @@ private extension InputSnapshot {
                     : 0,
             firesPrimaryWeapon:
                 controls.contains(.primaryWeapon) && firesPrimaryWeapon,
+            firesPlayerFlare: firesPlayerFlare,
             deploysTrainingGuidebot: deploysTrainingGuidebot,
             requestsTrainingGuidebotActiveGoal:
                 requestsTrainingGuidebotActiveGoal,
@@ -264,6 +268,7 @@ struct PlayerInputState: Sendable {
     private var guidebotDeploymentIsPending = false
     private var guidebotActiveGoalRequestIsPending = false
     private var primaryFireIsHeld = false
+    private var playerFlareIsPending = false
     private var inventoryUseIsPending = false
     private var headlightToggleIsPending = false
     private(set) var gameplayIsActive = true
@@ -307,6 +312,15 @@ struct PlayerInputState: Sendable {
         inventoryUseIsPending = true
     }
 
+    mutating func requestPlayerFlare() {
+        guard gameplayIsActive else { return }
+        playerFlareIsPending = true
+    }
+
+    mutating func cancelPlayerFlareRequest() {
+        playerFlareIsPending = false
+    }
+
     mutating func requestHeadlightToggle() {
         guard gameplayIsActive else { return }
         headlightToggleIsPending = true
@@ -329,6 +343,7 @@ struct PlayerInputState: Sendable {
         let requestsTrainingGuidebotActiveGoal =
             guidebotActiveGoalRequestIsPending
         let firesPrimaryWeapon = primaryFireIsHeld
+        let firesPlayerFlare = playerFlareIsPending
         let usesInventory = inventoryUseIsPending
         let togglesHeadlight = headlightToggleIsPending
         mouseDeltaX = 0
@@ -337,6 +352,7 @@ struct PlayerInputState: Sendable {
         guidebotActiveGoalRequestIsPending = false
         inventoryUseIsPending = false
         headlightToggleIsPending = false
+        playerFlareIsPending = false
         let mouseNormalizer = 10_000 * max(frameDuration, 0.005)
         let mouseYaw = mouseLookEnabled ? 0 : deltaX / mouseNormalizer
         let mousePitch = mouseLookEnabled ? 0 : -deltaY / mouseNormalizer
@@ -355,6 +371,7 @@ struct PlayerInputState: Sendable {
             directLookPitchRadians: mouseLookEnabled ? -deltaY * directScale : 0,
             directLookYawRadians: mouseLookEnabled ? deltaX * directScale : 0,
             firesPrimaryWeapon: firesPrimaryWeapon,
+            firesPlayerFlare: firesPlayerFlare,
             deploysTrainingGuidebot: deploysTrainingGuidebot,
             requestsTrainingGuidebotActiveGoal:
                 requestsTrainingGuidebotActiveGoal,
@@ -377,6 +394,7 @@ struct PlayerInputState: Sendable {
             guidebotDeploymentIsPending = false
             guidebotActiveGoalRequestIsPending = false
             primaryFireIsHeld = false
+            playerFlareIsPending = false
             inventoryUseIsPending = false
             headlightToggleIsPending = false
             _ = ramp.snapshot(
@@ -1206,6 +1224,25 @@ private struct TrainingGuidebotYellowFlareState:
     var stuckObjectOffset: Vector3? = nil
     var stuckObjectOrientation: Matrix3? = nil
     var sourceObjectSlot: Int? = nil
+    var creationOrdinal: UInt64? = nil
+    var parentObjectHandle: UInt32? = nil
+}
+
+private enum YellowFlareAdvanceSelection {
+    case all
+    case none
+    case ordinal(UInt64)
+
+    func includes(_ ordinal: UInt64?) -> Bool {
+        switch self {
+        case .all:
+            true
+        case .none:
+            false
+        case .ordinal(let selected):
+            ordinal == selected
+        }
+    }
 }
 
 private struct TrainingGuidebotYellowFlareParticleState:
@@ -1218,6 +1255,8 @@ private struct TrainingGuidebotYellowFlareParticleState:
     let lifetime: Float
     var lifeRemaining: Float
     var creationTime: Float? = nil
+    var generationOrdinal: UInt64? = nil
+    var sourceAttemptIndex: Int? = nil
 }
 
 private struct TrainingGuidebotYellowFlareTimeoutExplosionState:
@@ -1229,6 +1268,7 @@ private struct TrainingGuidebotYellowFlareTimeoutExplosionState:
     let lifetime: Float
     var lifeRemaining: Float
     var creationTime: Float? = nil
+    var generationOrdinal: UInt64? = nil
 }
 
 private struct TrainingGuidebotYellowFlareTimeoutSparkState:
@@ -1244,6 +1284,19 @@ private struct TrainingGuidebotYellowFlareTimeoutSparkState:
     var lifeRemaining: Float
     var lastParticleDropTime: Float
     var presentedLightDistance: Float
+    var generationOrdinal: UInt64? = nil
+}
+
+private struct PlayerYellowFlareState: Codable, Equatable, Sendable {
+    var nextCreationOrdinal: UInt64 = 0
+    var nextFireTime: Float = 0
+    var parents: [TrainingGuidebotYellowFlareState] = []
+    var parentParticles: [TrainingGuidebotYellowFlareParticleState] = []
+    var timeoutExplosions:
+        [TrainingGuidebotYellowFlareTimeoutExplosionState] = []
+    var timeoutSparks: [TrainingGuidebotYellowFlareTimeoutSparkState] = []
+    var timeoutSparkParticles:
+        [TrainingGuidebotYellowFlareParticleState] = []
 }
 
 let trainingGuidebotYellowFlarePresentationCapacity = 6
@@ -1251,6 +1304,16 @@ let trainingGuidebotYellowFlareParticlePresentationCapacity = 64
 let trainingGuidebotYellowFlareTimeoutExplosionPresentationCapacity = 1
 let trainingGuidebotYellowFlareTimeoutSparkPresentationCapacity = 9
 let trainingGuidebotYellowFlareTimeoutSparkParticlePresentationCapacity = 54
+let playerYellowFlarePresentationCapacity = 16
+let playerYellowFlareParticlePresentationCapacity = 208
+let playerYellowFlareTimeoutExplosionPresentationCapacity = 16
+let playerYellowFlareTimeoutSparkPresentationCapacity = 144
+let playerYellowFlareTimeoutSparkParticlePresentationCapacity = 864
+let combinedYellowFlarePresentationCapacity = 22
+let combinedYellowFlareParticlePresentationCapacity = 272
+let combinedYellowFlareTimeoutExplosionPresentationCapacity = 17
+let combinedYellowFlareTimeoutSparkPresentationCapacity = 153
+let combinedYellowFlareTimeoutSparkParticlePresentationCapacity = 918
 
 private struct TrainingCameraMonitorState:
     Codable, Equatable, Sendable
@@ -1639,6 +1702,7 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
         TrainingManeuverFollowState?
     fileprivate let trainingGalleryBarrierState: TrainingGalleryBarrierState?
     fileprivate let trainingRobotGuidebotState: TrainingRobotGuidebotState?
+    fileprivate let playerYellowFlareState: PlayerYellowFlareState?
     fileprivate let trainingCameraMonitorState: TrainingCameraMonitorState?
     fileprivate let trainingKillbotEntryState: TrainingKillbotEntryState?
     fileprivate let trainingRASBot1DeathState: TrainingRASBot1DeathState?
@@ -1719,6 +1783,7 @@ final class PlayerSimulation {
         TrainingManeuverFollowState?
     private var trainingGalleryBarrierState: TrainingGalleryBarrierState?
     private var trainingRobotGuidebotState: TrainingRobotGuidebotState?
+    private var playerYellowFlareState: PlayerYellowFlareState?
     private var trainingCameraMonitorState: TrainingCameraMonitorState?
     private var trainingKillbotEntryState: TrainingKillbotEntryState?
     private var trainingRASBot1DeathState: TrainingRASBot1DeathState?
@@ -1794,6 +1859,8 @@ final class PlayerSimulation {
                 lastMessageSoundTime: 0
             )
         }
+        playerYellowFlareState = level.shipDefinitions.first?
+            .playerYellowFlare == nil ? nil : .init()
         trainingCameraMonitorState = level.trainingCameraMonitorChain.map {
             _ in TrainingCameraMonitorState()
         }
@@ -1870,6 +1937,62 @@ final class PlayerSimulation {
             continuation.authoritativeRandomState ?? 1
         var restoredRobotGuidebotState =
             continuation.trainingRobotGuidebotState
+        var restoredPlayerYellowFlareState =
+            continuation.playerYellowFlareState
+        if level.shipDefinitions.first?.playerYellowFlare != nil,
+           restoredPlayerYellowFlareState == nil {
+            restoredPlayerYellowFlareState = .init()
+            if var guidebotState = restoredRobotGuidebotState {
+                let hasLegacyYellowFamily =
+                    guidebotState.yellowFlares?.isEmpty == false
+                    || guidebotState.yellowFlareParticles?.isEmpty == false
+                    || guidebotState.yellowFlareTimeoutExplosions?.isEmpty
+                        == false
+                    || guidebotState.yellowFlareTimeoutSparks?.isEmpty
+                        == false
+                    || guidebotState.yellowFlareTimeoutSparkParticles?.isEmpty
+                        == false
+                if hasLegacyYellowFamily {
+                    guidebotState.yellowFlares =
+                        guidebotState.yellowFlares?.map { flare in
+                        var flare = flare
+                        flare.creationOrdinal = 0
+                        flare.parentObjectHandle = level
+                            .trainingRobotGuidebotChain?
+                            .guidebotObjectHandle
+                        return flare
+                    }
+                    guidebotState.yellowFlareParticles =
+                        guidebotState.yellowFlareParticles?.map { particle in
+                            var particle = particle
+                            particle.generationOrdinal = 0
+                            return particle
+                        }
+                    guidebotState.yellowFlareTimeoutExplosions =
+                        guidebotState.yellowFlareTimeoutExplosions?.map {
+                            explosion in
+                            var explosion = explosion
+                            explosion.generationOrdinal = 0
+                            return explosion
+                        }
+                    guidebotState.yellowFlareTimeoutSparks =
+                        guidebotState.yellowFlareTimeoutSparks?.map { spark in
+                            var spark = spark
+                            spark.generationOrdinal = 0
+                            return spark
+                        }
+                    guidebotState.yellowFlareTimeoutSparkParticles =
+                        guidebotState.yellowFlareTimeoutSparkParticles?.map {
+                            particle in
+                            var particle = particle
+                            particle.generationOrdinal = 0
+                            return particle
+                        }
+                    restoredPlayerYellowFlareState?.nextCreationOrdinal = 1
+                    restoredRobotGuidebotState = guidebotState
+                }
+            }
+        }
         if var state = restoredRobotGuidebotState {
             let hasReachedTimingState =
                 state.guidebotMode != nil
@@ -2356,6 +2479,23 @@ final class PlayerSimulation {
             restoredGuidebotRouteLevel.objects[guidebotIndex].orientation =
                 guidebot.orientation
         }
+        let guidebotContinuationIsValid =
+            validTrainingRobotGuidebotContinuation(
+                restoredRobotGuidebotState,
+                galleryState: continuation.trainingGalleryBarrierState,
+                cameraState: continuation.trainingCameraMonitorState,
+                playerLocation: continuation.playerLocation,
+                playerPosition: continuation.playerPosition,
+                gameTime: continuation.gameTime,
+                level: restoredGuidebotRouteLevel
+            )
+        let playerYellowContinuationIsValid =
+            validPlayerYellowFlareContinuation(
+                restoredPlayerYellowFlareState,
+                guidebotState: restoredRobotGuidebotState,
+                gameTime: continuation.gameTime,
+                level: restoredGuidebotRouteLevel
+            )
         guard
             validTrainingGalleryBarrierContinuation(
                 continuation.trainingGalleryBarrierState,
@@ -2363,15 +2503,8 @@ final class PlayerSimulation {
                 restoredRobotGuidebotState,
             level: continuationLevel
         ),
-        validTrainingRobotGuidebotContinuation(
-            restoredRobotGuidebotState,
-            galleryState: continuation.trainingGalleryBarrierState,
-            cameraState: continuation.trainingCameraMonitorState,
-            playerLocation: continuation.playerLocation,
-            playerPosition: continuation.playerPosition,
-            gameTime: continuation.gameTime,
-            level: restoredGuidebotRouteLevel
-        ) else {
+        guidebotContinuationIsValid,
+        playerYellowContinuationIsValid else {
             throw PlayerSimulationContinuationError.invalidState
         }
         guard case .room(let restoredRoomSourceIndex)
@@ -2991,6 +3124,7 @@ final class PlayerSimulation {
             continuation.trainingGalleryBarrierState
         trainingRobotGuidebotState =
             restoredRobotGuidebotState
+        playerYellowFlareState = restoredPlayerYellowFlareState
         trainingCameraMonitorState =
             continuation.trainingCameraMonitorState
         trainingKillbotEntryState =
@@ -3067,6 +3201,7 @@ final class PlayerSimulation {
                 trainingGalleryBarrierState,
             trainingRobotGuidebotState:
                 trainingRobotGuidebotState,
+            playerYellowFlareState: playerYellowFlareState,
             trainingCameraMonitorState:
                 trainingCameraMonitorState,
             trainingKillbotEntryState:
@@ -3439,6 +3574,17 @@ final class PlayerSimulation {
         Float(nextAuthoritativeRandomValue()) / 32_767
     }
 
+    private func nextYellowFlareCreationOrdinal() -> UInt64? {
+        guard var state = playerYellowFlareState,
+              state.nextCreationOrdinal < UInt64.max - 1 else {
+            return nil
+        }
+        let ordinal = state.nextCreationOrdinal
+        state.nextCreationOrdinal += 1
+        playerYellowFlareState = state
+        return ordinal
+    }
+
     private func reinitializeTrainingGuidebotAmbient(
         at gameTime: Float,
         state: inout TrainingRobotGuidebotState
@@ -3536,6 +3682,17 @@ final class PlayerSimulation {
                 )
                 if state.yellowFlares!.count
                     < trainingGuidebotYellowFlarePresentationCapacity {
+                    let usesSharedCreationOrdinals =
+                        playerYellowFlareState != nil
+                    let creationOrdinal = usesSharedCreationOrdinals
+                        ? nextYellowFlareCreationOrdinal()
+                        : nil
+                    guard !usesSharedCreationOrdinals
+                        || creationOrdinal != nil else {
+                        state.timeUntilNextFlare = flare
+                        trainingRobotGuidebotState = state
+                        return feedback
+                    }
                     let orientation = sourceOrientation(
                         forward: guidebot.orientation.forward,
                         up: guidebot.orientation.up
@@ -3559,7 +3716,11 @@ final class PlayerSimulation {
                         // DestroyBot2's released slot 16 is the top of the
                         // LIFO free stack when this first retained flare is
                         // created.
-                        sourceObjectSlot: receivesTimeout ? 16 : nil
+                        sourceObjectSlot: receivesTimeout ? 16 : nil,
+                        creationOrdinal: creationOrdinal,
+                        parentObjectHandle:
+                            level.trainingRobotGuidebotChain?
+                                .guidebotObjectHandle
                     ))
                 }
             }
@@ -4176,6 +4337,8 @@ final class PlayerSimulation {
         particleLifetime: Float,
         gameTime: Float,
         capacity: Int,
+        generationOrdinal: UInt64? = nil,
+        sourceAttemptIndex: Int? = nil,
         to particles: inout [TrainingGuidebotYellowFlareParticleState]
     ) {
         guard particles.count < capacity else { return }
@@ -4205,7 +4368,9 @@ final class PlayerSimulation {
             size: size,
             lifetime: lifetime,
             lifeRemaining: lifetime,
-            creationTime: gameTime
+            creationTime: gameTime,
+            generationOrdinal: generationOrdinal,
+            sourceAttemptIndex: sourceAttemptIndex
         ))
     }
 
@@ -4214,6 +4379,8 @@ final class PlayerSimulation {
         duration: Float,
         gameTime: Float,
         definition: TrainingGuidebotYellowFlareTimeoutDefinition,
+        particleCapacity: Int =
+            trainingGuidebotYellowFlareTimeoutSparkParticlePresentationCapacity,
         particles: inout [TrainingGuidebotYellowFlareParticleState]
     ) -> Bool {
         spark.lifeRemaining -= duration
@@ -4228,8 +4395,9 @@ final class PlayerSimulation {
                 particleSize: definition.childParticleSize,
                 particleLifetime: definition.childParticleLifetime,
                 gameTime: gameTime,
-                capacity:
-                    trainingGuidebotYellowFlareTimeoutSparkParticlePresentationCapacity,
+                capacity: particleCapacity,
+                generationOrdinal: spark.generationOrdinal,
+                sourceAttemptIndex: spark.sourceAttemptIndex,
                 to: &particles
             )
             spark.lastParticleDropTime = gameTime
@@ -4255,7 +4423,9 @@ final class PlayerSimulation {
 
     private func advanceTrainingGuidebotYellowFlares(
         duration: Float,
-        gameTime: Float
+        gameTime: Float,
+        selection: YellowFlareAdvanceSelection = .all,
+        advancesPassiveState: Bool = true
     ) {
         guard duration > 0,
               let definition =
@@ -4274,11 +4444,16 @@ final class PlayerSimulation {
            let sparks = timeoutSparks,
            var sparkParticles = timeoutSparkParticles,
            !sparks.isEmpty {
-            var advancedSparks: [TrainingGuidebotYellowFlareTimeoutSparkState] = []
+            var advancedSparks = sparks.filter {
+                !selection.includes($0.generationOrdinal)
+            }
             advancedSparks.reserveCapacity(sparks.count)
             for var spark in sparks.sorted(by: {
                 $0.sourceObjectSlot < $1.sourceObjectSlot
             }) {
+                guard selection.includes(spark.generationOrdinal) else {
+                    continue
+                }
                 if advanceTrainingGuidebotYellowFlareTimeoutSpark(
                     &spark,
                     duration: duration,
@@ -4289,15 +4464,20 @@ final class PlayerSimulation {
                     advancedSparks.append(spark)
                 }
             }
-            timeoutSparks = advancedSparks.sorted(by: {
-                $0.sourceAttemptIndex < $1.sourceAttemptIndex
-            })
+            timeoutSparks = advancedSparks.sorted {
+                ($0.generationOrdinal ?? 0, $0.sourceAttemptIndex)
+                    < ($1.generationOrdinal ?? 0, $1.sourceAttemptIndex)
+            }
             timeoutSparkParticles = sparkParticles
         }
 
         var survivors: [TrainingGuidebotYellowFlareState] = []
         survivors.reserveCapacity(flares.count)
         for var flare in flares {
+            guard selection.includes(flare.creationOrdinal) else {
+                survivors.append(flare)
+                continue
+            }
             flare.lifeRemaining -= duration
             if gameTime - flare.lastParticleDropTime
                 > definition.particleInterval {
@@ -4315,6 +4495,7 @@ final class PlayerSimulation {
                         gameTime: gameTime,
                         capacity:
                             trainingGuidebotYellowFlareParticlePresentationCapacity,
+                        generationOrdinal: flare.creationOrdinal,
                         to: &particles
                     )
                 }
@@ -4335,7 +4516,8 @@ final class PlayerSimulation {
                             size: timeout.explosionSize,
                             lifetime: timeout.explosionLifetime,
                             lifeRemaining: timeout.explosionLifetime,
-                            creationTime: gameTime
+                            creationTime: gameTime,
+                            generationOrdinal: flare.creationOrdinal
                         ))
                     }
                     let sourceSlots = [17, 8, 41, 42, 43, 44, 45, 46, 47]
@@ -4386,7 +4568,8 @@ final class PlayerSimulation {
                             lifeRemaining: timeout.childLifetime,
                             lastParticleDropTime: 0,
                             presentedLightDistance:
-                                timeout.childLightDistance
+                                timeout.childLightDistance,
+                            generationOrdinal: flare.creationOrdinal
                         )
                         let survivesCreationFrame: Bool
                         if spark.receivedControlOnCreationFrame {
@@ -4454,7 +4637,8 @@ final class PlayerSimulation {
                 : 1
             let age = definition.lifetime - flare.lifeRemaining
             let parentHandle =
-                level.trainingRobotGuidebotChain!.guidebotObjectHandle
+                flare.parentObjectHandle
+                    ?? level.trainingRobotGuidebotChain!.guidebotObjectHandle
             let nearestObjectHit = level.objects.compactMap {
                 object -> (object: PlacedObject, fraction: Float)? in
                 guard case let .room(objectRoomSourceIndex) = object.location,
@@ -4538,12 +4722,14 @@ final class PlayerSimulation {
                 return particle
             }
         }
-        particles = advanceParticles(particles)
-        timeoutSparkParticles = timeoutSparkParticles.map(advanceParticles)
-        timeoutExplosions = timeoutExplosions?.compactMap { explosion in
-            var explosion = explosion
-            explosion.lifeRemaining -= duration
-            return explosion.lifeRemaining >= 0 ? explosion : nil
+        if advancesPassiveState {
+            particles = advanceParticles(particles)
+            timeoutSparkParticles = timeoutSparkParticles.map(advanceParticles)
+            timeoutExplosions = timeoutExplosions?.compactMap { explosion in
+                var explosion = explosion
+                explosion.lifeRemaining -= duration
+                return explosion.lifeRemaining >= 0 ? explosion : nil
+            }
         }
         state.yellowFlares = survivors
         state.yellowFlareParticles = particles
@@ -4551,6 +4737,329 @@ final class PlayerSimulation {
         state.yellowFlareTimeoutSparks = timeoutSparks
         state.yellowFlareTimeoutSparkParticles = timeoutSparkParticles
         trainingRobotGuidebotState = state
+    }
+
+    private func firePlayerYellowFlare(
+        from player: PlacedObject,
+        roomSourceIndex: Int,
+        systemsFrameDuration: Float,
+        systemsGameTime: Float
+    ) -> TrainingOpeningFeedback? {
+        guard let binding = level.shipDefinitions.first?.playerYellowFlare,
+              let definition = level.trainingRobotGuidebotChain?.yellowFlare,
+              var state = playerYellowFlareState,
+              systemsGameTime >= state.nextFireTime else {
+            return nil
+        }
+        let previousDeadline = state.nextFireTime
+        let overdue = systemsGameTime - previousDeadline
+        let continuityWindow = max(
+            binding.fireWait,
+            systemsFrameDuration * 1.5
+        )
+        state.nextFireTime = overdue >= 0 && overdue <= continuityWindow
+            ? previousDeadline + binding.fireWait
+            : systemsGameTime + binding.fireWait
+        let muzzle = player.position
+            + transform(
+                binding.gunpointLocalPosition,
+                by: player.orientation
+            )
+        let muzzleTrace = traceIndoorMovement(
+            in: level,
+            startRoom: roomSourceIndex,
+            start: player.position,
+            end: muzzle,
+            radius: 0
+        )
+        guard case .noHit = muzzleTrace.outcome,
+              state.parents.count < playerYellowFlarePresentationCapacity,
+              state.nextCreationOrdinal < UInt64.max - 1
+        else {
+            playerYellowFlareState = state
+            return nil
+        }
+        let forward = normalized(transform(
+            binding.gunpointLocalForward,
+            by: player.orientation
+        ))
+        let orientation = sourceOrientation(
+            forward: forward,
+            up: player.orientation.up
+        )
+        let ordinal = state.nextCreationOrdinal
+        state.nextCreationOrdinal += 1
+        state.parents.append(.init(
+            roomSourceIndex: muzzleTrace.containingRoomSourceIndex,
+            position: muzzle,
+            orientation: orientation,
+            velocity: forward * definition.speed,
+            lifeRemaining: definition.lifetime,
+            lastParticleDropTime:
+                systemsGameTime - definition.particleInterval.nextUp,
+            presentedLightDistance: definition.lightDistance,
+            creationOrdinal: ordinal,
+            parentObjectHandle: player.handle
+        ))
+        playerYellowFlareState = state
+        return .init(
+            hudMessages: [],
+            voiceSourceName: "",
+            voicePrecedesHUDMessages: true,
+            soundSourceName: binding.fireSoundSourceName
+        )
+    }
+
+    private func advancePlayerYellowFlares(
+        duration: Float,
+        gameTime: Float,
+        selection: YellowFlareAdvanceSelection = .all,
+        advancesPassiveState: Bool = true
+    ) {
+        guard duration > 0,
+              let definition =
+                level.trainingRobotGuidebotChain?.yellowFlare,
+              let timeout = definition.timeout,
+              var state = playerYellowFlareState else {
+            return
+        }
+
+        var advancedSparks = state.timeoutSparks.filter {
+            !selection.includes($0.generationOrdinal)
+        }
+        for var spark in state.timeoutSparks.sorted(by: {
+            ($0.generationOrdinal ?? 0, $0.sourceAttemptIndex)
+                < ($1.generationOrdinal ?? 0, $1.sourceAttemptIndex)
+        }) {
+            guard selection.includes(spark.generationOrdinal) else {
+                continue
+            }
+            if advanceTrainingGuidebotYellowFlareTimeoutSpark(
+                &spark,
+                duration: duration,
+                gameTime: gameTime,
+                definition: timeout,
+                particleCapacity:
+                    playerYellowFlareTimeoutSparkParticlePresentationCapacity,
+                particles: &state.timeoutSparkParticles
+            ) {
+                advancedSparks.append(spark)
+            }
+        }
+        state.timeoutSparks = advancedSparks
+
+        var survivors: [TrainingGuidebotYellowFlareState] = []
+        for var flare in state.parents.sorted(by: {
+            ($0.creationOrdinal ?? 0) < ($1.creationOrdinal ?? 0)
+        }) {
+            guard selection.includes(flare.creationOrdinal) else {
+                survivors.append(flare)
+                continue
+            }
+            flare.lifeRemaining -= duration
+            if gameTime - flare.lastParticleDropTime
+                > definition.particleInterval {
+                appendTrainingGuidebotYellowFlareParticle(
+                    roomSourceIndex: flare.roomSourceIndex,
+                    position: flare.position
+                        - flare.orientation.forward
+                            * definition.collisionRadius,
+                    particleSize: definition.particleSize,
+                    particleLifetime: definition.particleLifetime,
+                    gameTime: gameTime,
+                    capacity: playerYellowFlareParticlePresentationCapacity,
+                    generationOrdinal: flare.creationOrdinal,
+                    to: &state.parentParticles
+                )
+                flare.lastParticleDropTime = gameTime
+            }
+            guard flare.lifeRemaining >= 0 else {
+                let ordinal = flare.creationOrdinal!
+                if state.timeoutExplosions.count
+                    < playerYellowFlareTimeoutExplosionPresentationCapacity {
+                    state.timeoutExplosions.append(.init(
+                        roomSourceIndex: flare.roomSourceIndex,
+                        position: flare.position,
+                        size: timeout.explosionSize,
+                        lifetime: timeout.explosionLifetime,
+                        lifeRemaining: timeout.explosionLifetime,
+                        creationTime: gameTime,
+                        generationOrdinal: ordinal
+                    ))
+                }
+                let origin = flare.position
+                    + flare.orientation.forward
+                        * (definition.collisionRadius / 2)
+                for attempt in 0..<timeout.childCount {
+                    guard state.timeoutSparks.count
+                        < playerYellowFlareTimeoutSparkPresentationCapacity
+                    else { continue }
+                    let orientation: Matrix3
+                    if attempt == 0 {
+                        orientation = flare.orientation
+                    } else {
+                        let norm = Float(attempt - 1)
+                            / Float(timeout.childCount - 1)
+                        let ringAngle = norm * 2 * Float.pi
+                        orientation = sourceOrthogonalized(
+                            sourceMatrixMultiply(
+                                flare.orientation,
+                                sourceTransposed(sourceRotationMatrix(
+                                    pitch: sourceFixedAngleRadians(
+                                        cos(ringAngle) * Float.pi / 8
+                                    ),
+                                    yaw: sourceFixedAngleRadians(
+                                        sin(ringAngle) * Float.pi / 8
+                                    ),
+                                    roll: 0
+                                ))
+                            )
+                        )
+                    }
+                    var spark = TrainingGuidebotYellowFlareTimeoutSparkState(
+                        sourceAttemptIndex: attempt,
+                        sourceObjectSlot: attempt,
+                        receivedControlOnCreationFrame: true,
+                        roomSourceIndex: flare.roomSourceIndex,
+                        position: origin,
+                        orientation: orientation,
+                        velocity: orientation.forward * timeout.childSpeed,
+                        lifeRemaining: timeout.childLifetime,
+                        lastParticleDropTime: 0,
+                        presentedLightDistance: timeout.childLightDistance,
+                        generationOrdinal: ordinal
+                    )
+                    if advanceTrainingGuidebotYellowFlareTimeoutSpark(
+                        &spark,
+                        duration: duration,
+                        gameTime: gameTime,
+                        definition: timeout,
+                        particleCapacity:
+                            playerYellowFlareTimeoutSparkParticlePresentationCapacity,
+                        particles: &state.timeoutSparkParticles
+                    ) {
+                        state.timeoutSparks.append(spark)
+                    }
+                }
+                continue
+            }
+
+            if let handle = flare.stuckObjectHandle,
+               let localPosition = flare.stuckObjectOffset,
+               let localOrientation = flare.stuckObjectOrientation,
+               let object = level.objects.first(where: {
+                   $0.handle == handle
+               }),
+               case let .room(roomSourceIndex) = object.location {
+                flare.position = object.position
+                    + transform(localPosition, by: object.orientation)
+                flare.orientation = transform(
+                    localOrientation,
+                    by: object.orientation
+                )
+                flare.roomSourceIndex = roomSourceIndex
+            }
+            if flare.stuckObjectHandle == nil, flare.velocity != .zero {
+                let start = flare.position
+                let end = start + flare.velocity * duration
+                let trace = traceIndoorMovement(
+                    in: level,
+                    startRoom: flare.roomSourceIndex,
+                    start: start,
+                    end: end,
+                    radius: definition.collisionRadius
+                )
+                let distance = vectorDistance(start, end)
+                let wallFraction = distance > 0
+                    ? vectorDistance(start, trace.finalPosition) / distance
+                    : 1
+                let age = definition.lifetime - flare.lifeRemaining
+                let nearestObjectHit = level.objects.compactMap {
+                    object -> (PlacedObject, Float)? in
+                    guard case let .room(objectRoom) = object.location,
+                          trace.visitedRoomSourceIndices.contains(objectRoom),
+                          age >= 3
+                            || object.handle != flare.parentObjectHandle,
+                          let presentation =
+                            level.objectPresentations.first(where: {
+                                $0.objectHandle == object.handle
+                                    && $0.isVisible
+                            }),
+                          let model = level.models.first(where: {
+                              $0.source == presentation.primaryModel
+                          }),
+                          let fraction = segmentSphereHitFraction(
+                              start: start,
+                              end: end,
+                              center: object.position,
+                              radius: definition.collisionRadius
+                                + model.collisionRadius
+                          ) else { return nil }
+                    return (object, fraction)
+                }.min { $0.1 < $1.1 }
+                if let hit = nearestObjectHit,
+                   hit.1 <= wallFraction + 0.000_1 {
+                    flare.position = start + (end - start) * hit.1
+                    flare.velocity = .zero
+                    flare.stuckObjectHandle = hit.0.handle
+                    flare.stuckObjectOffset = inverseTransform(
+                        flare.position - hit.0.position,
+                        by: hit.0.orientation
+                    )
+                    flare.stuckObjectOrientation = inverseTransform(
+                        flare.orientation,
+                        by: hit.0.orientation
+                    )
+                    if case let .room(room) = hit.0.location {
+                        flare.roomSourceIndex = room
+                    }
+                } else if case .wallHit = trace.outcome {
+                    flare.position = trace.finalPosition
+                    flare.roomSourceIndex = trace.containingRoomSourceIndex
+                    flare.velocity = .zero
+                } else {
+                    flare.position = trace.finalPosition
+                    flare.roomSourceIndex = trace.containingRoomSourceIndex
+                }
+            }
+            flare.presentedLightDistance = definition.lightDistance
+                + Float(Int(nextAuthoritativeRandomValue() % 5) - 2)
+            survivors.append(flare)
+        }
+        state.parents = survivors
+
+        func advanceParticles(
+            _ particles: [TrainingGuidebotYellowFlareParticleState]
+        ) -> [TrainingGuidebotYellowFlareParticleState] {
+            particles.compactMap { value in
+                var particle = value
+                particle.lifeRemaining -= duration
+                guard particle.lifeRemaining >= 0 else { return nil }
+                let motion = analyticLinearMotion(
+                    position: particle.position,
+                    velocity: particle.velocity,
+                    force: .init(x: 0, y: -3_220, z: 0),
+                    mass: 100,
+                    drag: 0.1,
+                    duration: duration
+                )
+                particle.position = motion.position
+                particle.velocity = motion.velocity
+                return particle
+            }
+        }
+        if advancesPassiveState {
+            state.parentParticles = advanceParticles(state.parentParticles)
+            state.timeoutSparkParticles =
+                advanceParticles(state.timeoutSparkParticles)
+            state.timeoutExplosions = state.timeoutExplosions.compactMap {
+                value in
+                var explosion = value
+                explosion.lifeRemaining -= duration
+                return explosion.lifeRemaining >= 0 ? explosion : nil
+            }
+        }
+        playerYellowFlareState = state
     }
 
     private func requestTrainingGuidebotReturn(
@@ -5712,6 +6221,14 @@ final class PlayerSimulation {
                 )
             }
         }
+        let playerFlareFeedback = input.firesPlayerFlare
+            ? firePlayerYellowFlare(
+                from: object,
+                roomSourceIndex: startRoom,
+                systemsFrameDuration: systemsFrameDuration,
+                systemsGameTime: systemsGameTime
+            )
+            : nil
         var guidebotEnteredShipThisFrame = false
         var orientation = object.orientation
         if input.directLookPitchRadians != 0 || input.directLookYawRadians != 0 {
@@ -6276,10 +6793,49 @@ final class PlayerSimulation {
         let playerFastHeadlight = playerHeadlightIsOn
             ? fastPlayerHeadlight(from: level.objects[movedPlayerIndex])
             : nil
-        advanceTrainingGuidebotYellowFlares(
-            duration: systemsFrameDuration,
-            gameTime: systemsGameTime
-        )
+        if playerYellowFlareState == nil {
+            advanceTrainingGuidebotYellowFlares(
+                duration: systemsFrameDuration,
+                gameTime: systemsGameTime
+            )
+        } else {
+            let creationOrdinals = Set(
+                (playerYellowFlareState?.parents.compactMap(\.creationOrdinal)
+                    ?? [])
+                + (playerYellowFlareState?.timeoutSparks.compactMap(
+                    \.generationOrdinal
+                ) ?? [])
+                + (trainingRobotGuidebotState?.yellowFlares?.compactMap(
+                    \.creationOrdinal
+                ) ?? [])
+                + (trainingRobotGuidebotState?.yellowFlareTimeoutSparks?
+                    .compactMap(\.generationOrdinal) ?? [])
+            ).sorted()
+            for ordinal in creationOrdinals {
+                advancePlayerYellowFlares(
+                    duration: systemsFrameDuration,
+                    gameTime: systemsGameTime,
+                    selection: .ordinal(ordinal),
+                    advancesPassiveState: false
+                )
+                advanceTrainingGuidebotYellowFlares(
+                    duration: systemsFrameDuration,
+                    gameTime: systemsGameTime,
+                    selection: .ordinal(ordinal),
+                    advancesPassiveState: false
+                )
+            }
+            advancePlayerYellowFlares(
+                duration: systemsFrameDuration,
+                gameTime: systemsGameTime,
+                selection: .none
+            )
+            advanceTrainingGuidebotYellowFlares(
+                duration: systemsFrameDuration,
+                gameTime: systemsGameTime,
+                selection: .none
+            )
+        }
         let guidebotFlareFeedback = advanceTrainingGuidebotTiming(
             duration: systemsFrameDuration,
             gameTime: systemsGameTime
@@ -6305,6 +6861,9 @@ final class PlayerSimulation {
         }
         if let guidebotActiveGoalFeedback {
             trainingOpeningFeedback.append(guidebotActiveGoalFeedback)
+        }
+        if let playerFlareFeedback {
+            trainingOpeningFeedback.append(playerFlareFeedback)
         }
         if let guidebotFlareFeedback {
             trainingOpeningFeedback.append(guidebotFlareFeedback)
@@ -7808,6 +8367,64 @@ final class PlayerSimulation {
             trainingCameraMonitorState = state
         }
 
+        let yellowFlareParents: [TrainingGuidebotYellowFlareState]
+        let yellowFlareParticles:
+            [TrainingGuidebotYellowFlareParticleState]
+        let yellowFlareTimeoutExplosions:
+            [TrainingGuidebotYellowFlareTimeoutExplosionState]
+        let yellowFlareTimeoutSparks:
+            [TrainingGuidebotYellowFlareTimeoutSparkState]
+        let yellowFlareTimeoutSparkParticles:
+            [TrainingGuidebotYellowFlareParticleState]
+        if let playerState = playerYellowFlareState {
+            yellowFlareParents = (
+                (trainingRobotGuidebotState?.yellowFlares ?? [])
+                    + playerState.parents
+            ).sorted {
+                ($0.creationOrdinal ?? 0) < ($1.creationOrdinal ?? 0)
+            }
+            yellowFlareParticles = (
+                (trainingRobotGuidebotState?.yellowFlareParticles ?? [])
+                    + playerState.parentParticles
+            ).sorted {
+                ($0.generationOrdinal ?? 0, $0.sourceAttemptIndex ?? 0)
+                    < ($1.generationOrdinal ?? 0, $1.sourceAttemptIndex ?? 0)
+            }
+            yellowFlareTimeoutExplosions = (
+                (trainingRobotGuidebotState?
+                    .yellowFlareTimeoutExplosions ?? [])
+                    + playerState.timeoutExplosions
+            ).sorted {
+                ($0.generationOrdinal ?? 0) < ($1.generationOrdinal ?? 0)
+            }
+            yellowFlareTimeoutSparks = (
+                (trainingRobotGuidebotState?.yellowFlareTimeoutSparks ?? [])
+                    + playerState.timeoutSparks
+            ).sorted {
+                ($0.generationOrdinal ?? 0, $0.sourceAttemptIndex)
+                    < ($1.generationOrdinal ?? 0, $1.sourceAttemptIndex)
+            }
+            yellowFlareTimeoutSparkParticles = (
+                (trainingRobotGuidebotState?
+                    .yellowFlareTimeoutSparkParticles ?? [])
+                    + playerState.timeoutSparkParticles
+            ).sorted {
+                ($0.generationOrdinal ?? 0, $0.sourceAttemptIndex ?? 0)
+                    < ($1.generationOrdinal ?? 0, $1.sourceAttemptIndex ?? 0)
+            }
+        } else {
+            yellowFlareParents =
+                trainingRobotGuidebotState?.yellowFlares ?? []
+            yellowFlareParticles =
+                trainingRobotGuidebotState?.yellowFlareParticles ?? []
+            yellowFlareTimeoutExplosions = trainingRobotGuidebotState?
+                .yellowFlareTimeoutExplosions ?? []
+            yellowFlareTimeoutSparks =
+                trainingRobotGuidebotState?.yellowFlareTimeoutSparks ?? []
+            yellowFlareTimeoutSparkParticles = trainingRobotGuidebotState?
+                .yellowFlareTimeoutSparkParticles ?? []
+        }
+
         frameDuration = Float(timestamp - lastTimestamp)
         lastTimestamp = timestamp
         gameTime += frameDuration
@@ -7878,7 +8495,7 @@ final class PlayerSimulation {
             trainingGuidebotYellowFlares:
                 level.trainingRobotGuidebotChain?.yellowFlare.map {
                     definition in
-                    trainingRobotGuidebotState?.yellowFlares?.map {
+                    yellowFlareParents.map {
                         .init(
                             roomSourceIndex: $0.roomSourceIndex,
                             position: $0.position,
@@ -7895,13 +8512,12 @@ final class PlayerSimulation {
                             lightPresentation:
                                 definition.lightPresentation
                         )
-                    } ?? []
+                    }
                 } ?? [],
             trainingGuidebotYellowFlareParticles:
                 level.trainingRobotGuidebotChain?.yellowFlare.map {
                     definition in
-                    trainingRobotGuidebotState?
-                        .yellowFlareParticles?.map {
+                    yellowFlareParticles.map {
                             .init(
                                 roomSourceIndex: $0.roomSourceIndex,
                                 position: $0.position,
@@ -7928,13 +8544,12 @@ final class PlayerSimulation {
                                         gameTime: systemsGameTime
                                     )
                             )
-                        } ?? []
+                        }
                 } ?? [],
             trainingGuidebotYellowFlareTimeoutExplosions:
                 level.trainingRobotGuidebotChain?.yellowFlare?.timeout.map {
                     timeout in
-                    trainingRobotGuidebotState?
-                        .yellowFlareTimeoutExplosions?.map {
+                    yellowFlareTimeoutExplosions.map {
                             .init(
                                 roomSourceIndex: $0.roomSourceIndex,
                                 position: $0.position,
@@ -7953,13 +8568,12 @@ final class PlayerSimulation {
                                         gameTime: systemsGameTime
                                     )
                             )
-                        } ?? []
+                        }
                 } ?? [],
             trainingGuidebotYellowFlareTimeoutSparks:
                 level.trainingRobotGuidebotChain?.yellowFlare?.timeout.map {
                     timeout in
-                    trainingRobotGuidebotState?
-                        .yellowFlareTimeoutSparks?.map {
+                    yellowFlareTimeoutSparks.map {
                             .init(
                                 sourceAttemptIndex: $0.sourceAttemptIndex,
                                 sourceObjectSlot: $0.sourceObjectSlot,
@@ -7984,13 +8598,12 @@ final class PlayerSimulation {
                                 lightPresentation:
                                     timeout.childLightPresentation
                             )
-                        } ?? []
+                        }
                 } ?? [],
             trainingGuidebotYellowFlareTimeoutSparkParticles:
                 level.trainingRobotGuidebotChain?.yellowFlare?.timeout.map {
                     timeout in
-                    trainingRobotGuidebotState?
-                        .yellowFlareTimeoutSparkParticles?.map {
+                    yellowFlareTimeoutSparkParticles.map {
                             .init(
                                 roomSourceIndex: $0.roomSourceIndex,
                                 position: $0.position,
@@ -8018,7 +8631,7 @@ final class PlayerSimulation {
                                         gameTime: systemsGameTime
                                     )
                             )
-                        } ?? []
+                        }
                 } ?? [],
             trainingFollowBot:
                 trainingManeuverFollowState?.frame,
@@ -9013,6 +9626,258 @@ private func trainingDodgeAimDot(
     )
 }
 
+private func validPlayerYellowFlareContinuation(
+    _ state: PlayerYellowFlareState?,
+    guidebotState: TrainingRobotGuidebotState?,
+    gameTime: Float,
+    level: Level
+) -> Bool {
+    guard level.shipDefinitions.first?.playerYellowFlare != nil else {
+        return state == nil
+    }
+    guard let state,
+          let playerHandle = level.defaultPlayerBinding?.objectHandle,
+          let definition = level.trainingRobotGuidebotChain?.yellowFlare,
+          let timeout = definition.timeout,
+          state.nextFireTime.isFinite,
+          state.nextFireTime >= 0,
+          state.parents.count <= playerYellowFlarePresentationCapacity,
+          state.parentParticles.count
+            <= playerYellowFlareParticlePresentationCapacity,
+          state.timeoutExplosions.count
+            <= playerYellowFlareTimeoutExplosionPresentationCapacity,
+          state.timeoutSparks.count
+            <= playerYellowFlareTimeoutSparkPresentationCapacity,
+          state.timeoutSparkParticles.count
+            <= playerYellowFlareTimeoutSparkParticlePresentationCapacity
+    else {
+        return false
+    }
+    let rooms = Set(level.rooms.map(\.sourceIndex))
+    let parentOrdinals = state.parents.compactMap(\.creationOrdinal)
+    guard parentOrdinals.count == state.parents.count,
+          Set(parentOrdinals).count == parentOrdinals.count,
+          state.parents.allSatisfy({ flare in
+              rooms.contains(flare.roomSourceIndex)
+                  && isCanonicalRigidTransform(
+                      position: flare.position,
+                      orientation: flare.orientation
+                  )
+                  && flare.velocity.x.isFinite
+                  && flare.velocity.y.isFinite
+                  && flare.velocity.z.isFinite
+                  && (
+                      flare.velocity == .zero
+                        || abs(
+                            sqrt(dot(flare.velocity, flare.velocity))
+                                - definition.speed
+                        ) <= 0.001
+                  )
+                  && flare.lifeRemaining.isFinite
+                  && flare.lifeRemaining >= 0
+                  && flare.lifeRemaining <= definition.lifetime
+                  && flare.lastParticleDropTime.isFinite
+                  && flare.lastParticleDropTime
+                    >= -definition.particleInterval.nextUp
+                  && flare.lastParticleDropTime <= gameTime
+                  && flare.presentedLightDistance.isFinite
+                  && flare.presentedLightDistance
+                    >= definition.lightDistance - 2
+                  && flare.presentedLightDistance
+                    <= definition.lightDistance + 2
+                  && flare.sourceObjectSlot == nil
+                  && flare.parentObjectHandle == playerHandle
+                  && (
+                      flare.stuckObjectHandle == nil
+                        && flare.stuckObjectOffset == nil
+                        && flare.stuckObjectOrientation == nil
+                      || flare.stuckObjectHandle.map { handle in
+                          guard flare.velocity == .zero,
+                                let localPosition = flare.stuckObjectOffset,
+                                let localOrientation =
+                                    flare.stuckObjectOrientation,
+                                localPosition.x.isFinite,
+                                localPosition.y.isFinite,
+                                localPosition.z.isFinite,
+                                isCanonicalRigidTransform(
+                                    position: .zero,
+                                    orientation: localOrientation
+                                ),
+                                let object = level.objects.first(where: {
+                                    $0.handle == handle
+                                }),
+                                case let .room(objectRoom) = object.location,
+                                objectRoom == flare.roomSourceIndex else {
+                              return false
+                          }
+                          return vectorDistance(
+                              flare.position,
+                              object.position + transform(
+                                  localPosition,
+                                  by: object.orientation
+                              )
+                          ) <= 0.001
+                              && vectorDistance(
+                                  flare.orientation.right,
+                                  transform(
+                                      localOrientation,
+                                      by: object.orientation
+                                  ).right
+                              ) <= 0.001
+                              && vectorDistance(
+                                  flare.orientation.up,
+                                  transform(
+                                      localOrientation,
+                                      by: object.orientation
+                                  ).up
+                              ) <= 0.001
+                              && vectorDistance(
+                                  flare.orientation.forward,
+                                  transform(
+                                      localOrientation,
+                                      by: object.orientation
+                                  ).forward
+                              ) <= 0.001
+                      } == true
+                  )
+          }) else {
+        return false
+    }
+
+    let playerGenerationOrdinals =
+        parentOrdinals
+        + state.parentParticles.compactMap(\.generationOrdinal)
+        + state.timeoutExplosions.compactMap(\.generationOrdinal)
+        + state.timeoutSparks.compactMap(\.generationOrdinal)
+        + state.timeoutSparkParticles.compactMap(\.generationOrdinal)
+    let guidebotGenerationOrdinals =
+        (guidebotState?.yellowFlares?.compactMap(\.creationOrdinal) ?? [])
+        + (guidebotState?.yellowFlareParticles?
+            .compactMap(\.generationOrdinal) ?? [])
+        + (guidebotState?.yellowFlareTimeoutExplosions?
+            .compactMap(\.generationOrdinal) ?? [])
+        + (guidebotState?.yellowFlareTimeoutSparks?
+            .compactMap(\.generationOrdinal) ?? [])
+        + (guidebotState?.yellowFlareTimeoutSparkParticles?
+            .compactMap(\.generationOrdinal) ?? [])
+    guard state.nextCreationOrdinal < UInt64.max,
+    (playerGenerationOrdinals + guidebotGenerationOrdinals).allSatisfy({
+        $0 < state.nextCreationOrdinal
+    }),
+    Set(playerGenerationOrdinals).isDisjoint(
+        with: Set(guidebotGenerationOrdinals)
+    ),
+    guidebotState?.yellowFlares?.allSatisfy({
+        $0.creationOrdinal != nil
+    }) ?? true,
+    guidebotState?.yellowFlareParticles?.allSatisfy({
+        $0.generationOrdinal != nil
+    }) ?? true,
+    guidebotState?.yellowFlareTimeoutExplosions?.allSatisfy({
+        $0.generationOrdinal != nil
+    }) ?? true,
+    guidebotState?.yellowFlareTimeoutSparks?.allSatisfy({
+        $0.generationOrdinal != nil
+    }) ?? true,
+    guidebotState?.yellowFlareTimeoutSparkParticles?.allSatisfy({
+        $0.generationOrdinal != nil
+    }) ?? true else {
+        return false
+    }
+
+    func validParticle(
+        _ particle: TrainingGuidebotYellowFlareParticleState,
+        sourceSize: Float,
+        sourceLifetime: Float
+    ) -> Bool {
+        rooms.contains(particle.roomSourceIndex)
+            && particle.position.x.isFinite
+            && particle.position.y.isFinite
+            && particle.position.z.isFinite
+            && particle.velocity.x.isFinite
+            && particle.velocity.y.isFinite
+            && particle.velocity.z.isFinite
+            && particle.size.isFinite
+            && particle.size >= sourceSize * 0.5
+            && particle.size <= sourceSize * 1.5
+            && particle.lifetime.isFinite
+            && particle.lifetime >= sourceLifetime * 0.5
+            && particle.lifetime <= sourceLifetime * 1.5
+            && particle.lifeRemaining.isFinite
+            && particle.lifeRemaining >= 0
+            && particle.lifeRemaining <= particle.lifetime
+            && particle.creationTime.map {
+                $0.isFinite && $0 >= 0 && $0 <= gameTime
+            } == true
+            && particle.generationOrdinal != nil
+    }
+    guard state.parentParticles.allSatisfy({
+        validParticle(
+            $0,
+            sourceSize: definition.particleSize,
+            sourceLifetime: definition.particleLifetime
+        ) && $0.sourceAttemptIndex == nil
+    }),
+    state.timeoutSparkParticles.allSatisfy({
+        validParticle(
+            $0,
+            sourceSize: timeout.childParticleSize,
+            sourceLifetime: timeout.childParticleLifetime
+        ) && $0.sourceAttemptIndex.map {
+            (0..<timeout.childCount).contains($0)
+        } == true
+    }),
+    state.timeoutExplosions.allSatisfy({ explosion in
+        rooms.contains(explosion.roomSourceIndex)
+            && explosion.position.x.isFinite
+            && explosion.position.y.isFinite
+            && explosion.position.z.isFinite
+            && explosion.size == timeout.explosionSize
+            && explosion.lifetime == timeout.explosionLifetime
+            && explosion.lifeRemaining.isFinite
+            && explosion.lifeRemaining >= 0
+            && explosion.lifeRemaining <= explosion.lifetime
+            && explosion.creationTime.map {
+                $0.isFinite && $0 >= 0 && $0 <= gameTime
+            } == true
+            && explosion.generationOrdinal != nil
+    }),
+    state.timeoutSparks.allSatisfy({ spark in
+        (0..<timeout.childCount).contains(spark.sourceAttemptIndex)
+            && spark.sourceObjectSlot == spark.sourceAttemptIndex
+            && spark.receivedControlOnCreationFrame
+            && rooms.contains(spark.roomSourceIndex)
+            && isCanonicalRigidTransform(
+                position: spark.position,
+                orientation: spark.orientation
+            )
+            && spark.velocity.x.isFinite
+            && spark.velocity.y.isFinite
+            && spark.velocity.z.isFinite
+            && spark.lifeRemaining.isFinite
+            && spark.lifeRemaining >= 0
+            && spark.lifeRemaining <= timeout.childLifetime
+            && spark.lastParticleDropTime.isFinite
+            && spark.lastParticleDropTime >= 0
+            && spark.lastParticleDropTime <= gameTime
+            && spark.presentedLightDistance
+                == timeout.childLightDistance
+            && spark.generationOrdinal != nil
+    }) else {
+        return false
+    }
+    let groupedSparkAttempts = Dictionary(
+        grouping: state.timeoutSparks,
+        by: { $0.generationOrdinal! }
+    ).values.map { $0.map(\.sourceAttemptIndex).sorted() }
+    guard groupedSparkAttempts.allSatisfy({
+        $0 == Array(0..<timeout.childCount)
+    }) else {
+        return false
+    }
+    return true
+}
+
 private func validTrainingRobotGuidebotContinuation(
     _ state: TrainingRobotGuidebotState?,
     galleryState: TrainingGalleryBarrierState?,
@@ -9211,6 +10076,11 @@ private func validTrainingRobotGuidebotContinuation(
                           && (
                               flare.sourceObjectSlot == nil
                                   || flare.sourceObjectSlot == 16
+                          )
+                          && (
+                              flare.creationOrdinal == nil
+                                || flare.parentObjectHandle
+                                    == chain.guidebotObjectHandle
                           )
                           && (
                               flare.stuckObjectHandle == nil
@@ -12317,7 +13187,7 @@ func extractPreparedTrainingGuidebotYellowFlareDrawItems(
     return extractTrainingGuidebotYellowFlareDrawItems(
         level,
         flares:
-            (0..<trainingGuidebotYellowFlarePresentationCapacity).map {
+            (0..<combinedYellowFlarePresentationCapacity).map {
                 _ in .init(
                     roomSourceIndex: roomSourceIndex,
                     position: guidebot.position,
@@ -12354,7 +13224,7 @@ func extractTrainingGuidebotYellowFlareDrawItems(
     }
     precondition(
         flares.count
-            <= trainingGuidebotYellowFlarePresentationCapacity
+            <= combinedYellowFlarePresentationCapacity
     )
     let materialByTexture = Dictionary(
         uniqueKeysWithValues: level.presentationMaterials.map {

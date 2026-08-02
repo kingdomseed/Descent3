@@ -33,6 +33,8 @@ final class RevivalGameplayView: MTKView {
     var controllerInputChanged: ((InputSnapshot) -> Void)?
     var guidebotDeployRequested: (() -> Void)?
     var primaryFireHeldChanged: ((Bool) -> Void)?
+    var playerFlareRequested: (() -> Void)?
+    var playerFlareRequestCancelled: (() -> Void)?
     var inventoryUseRequested: (() -> Void)?
     var headlightToggleRequested: (() -> Void)?
     var trainingResultAcknowledgementRequested: (() -> Void)?
@@ -267,6 +269,14 @@ final class RevivalGameplayView: MTKView {
             gameplayIsActive: gameplayIsActive
         ) {
             headlightToggleRequested?()
+            return
+        }
+        if Self.requestsPlayerFlare(
+            keyCode: event.keyCode,
+            isRepeat: event.isARepeat,
+            gameplayIsActive: gameplayIsActive
+        ) {
+            playerFlareRequested?()
             return
         }
         guard Self.gameplayKeyCodes.contains(event.keyCode) else {
@@ -1202,6 +1212,14 @@ final class RevivalGameplayView: MTKView {
         gameplayIsActive && !isRepeat && keyCode == 4
     }
 
+    nonisolated static func requestsPlayerFlare(
+        keyCode: UInt16,
+        isRepeat: Bool,
+        gameplayIsActive: Bool
+    ) -> Bool {
+        gameplayIsActive && !isRepeat && keyCode == 5
+    }
+
     nonisolated static func cameraMonitorFrame(
         drawableWidth: CGFloat,
         drawableHeight: CGFloat
@@ -1755,6 +1773,7 @@ final class RevivalGameplayView: MTKView {
 
     private func releaseMouse() {
         setPrimaryFireHeld(false)
+        playerFlareRequestCancelled?()
         guard mouseIsCaptured else { return }
         mouseIsCaptured = false
         pendingMouseX = 0

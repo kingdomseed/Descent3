@@ -830,6 +830,13 @@ func runD3Import(
         }
     })
     let retailShip = ship.shipDefinition!
+    let playerYellowFlareBattery = retailShip.playerYellowFlare
+    let playerYellowFlareGunpoint = try playerYellowFlareBattery.map { _ in
+        try reachedOutrageModelGunpoint(
+            modelPayloadByName[ship.primaryModelName.lowercased()]!.data,
+            index: 0
+        )
+    }
     precondition(
         retailShip.name == "Pyro-GL"
             && retailShip.presentationSize == 6.676084041595459
@@ -848,6 +855,28 @@ func runD3Import(
             && retailShip.physics.hitDieDot == -1
             && retailShip.physics.maximumTurnrollRate == 8_000
             && retailShip.physics.turnrollRatio == 0.13
+            && playerYellowFlareBattery?.batteryIndex == 20
+            && playerYellowFlareBattery?.firingMask == 1
+            && playerYellowFlareBattery?.weaponName == "Yellow flare"
+            && playerYellowFlareBattery?.fireSoundLogicalName == "Flare"
+            && playerYellowFlareBattery?.fireWait == 1
+            && playerYellowFlareBattery?.energyUsage == 0
+            && playerYellowFlareBattery?.ammoUsage == 0
+            && playerYellowFlareBattery?.fireFlags == 0
+            && playerYellowFlareBattery?.weaponFlags == 0
+            && playerYellowFlareGunpoint?.parentSubmodelIndex == 0
+            && playerYellowFlareGunpoint?.localPosition.x.bitPattern
+                == Float(0.000_000_444_4).bitPattern
+            && playerYellowFlareGunpoint?.localPosition.y.bitPattern
+                == Float(-1.046_244_4).bitPattern
+            && playerYellowFlareGunpoint?.localPosition.z.bitPattern
+                == Float(3.179_825_1).bitPattern
+            && playerYellowFlareGunpoint?.forward.x.bitPattern
+                == Float(0.000_007_629_6).bitPattern
+            && playerYellowFlareGunpoint?.forward.y.bitPattern
+                == Float(-0.000_015_258_7).bitPattern
+            && playerYellowFlareGunpoint?.forward.z.bitPattern
+                == Float(1).bitPattern
     )
     let shipSource = SourceResource(storedIndex: 0, sourceName: retailShip.name)
     let playerLevel = objectPresentationLevel.addingDefaultPlayerShip(
@@ -855,7 +884,30 @@ func runD3Import(
             source: shipSource,
             primaryModel: modelSources[ship.primaryModelName.lowercased()]!,
             presentationSize: retailShip.presentationSize,
-            physics: retailShip.physics
+            physics: retailShip.physics,
+            playerYellowFlare: .init(
+                batteryIndex: playerYellowFlareBattery!.batteryIndex,
+                firingMask: playerYellowFlareBattery!.firingMask,
+                weapon: .init(
+                    storedIndex: yellowFlareWeapon.storedIndex,
+                    sourceName: yellowFlareWeapon.name
+                ),
+                fireSoundLogicalName:
+                    playerYellowFlareBattery!.fireSoundLogicalName,
+                fireSoundSourceName: "Flare.wav",
+                fireWait: playerYellowFlareBattery!.fireWait,
+                energyUsage: playerYellowFlareBattery!.energyUsage,
+                ammoUsage: playerYellowFlareBattery!.ammoUsage,
+                fireFlags: playerYellowFlareBattery!.fireFlags,
+                weaponFlags: playerYellowFlareBattery!.weaponFlags,
+                gunpointIndex: 0,
+                gunpointParentSubmodelIndex:
+                    playerYellowFlareGunpoint!.parentSubmodelIndex,
+                gunpointLocalPosition:
+                    playerYellowFlareGunpoint!.localPosition,
+                gunpointLocalForward:
+                    playerYellowFlareGunpoint!.forward
+            )
         ),
         binding: .init(
             playerID: 0,

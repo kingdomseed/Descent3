@@ -1282,6 +1282,19 @@ struct RetailShipDefinition: Equatable, Sendable {
     let name: String
     let presentationSize: Float
     let physics: CanonicalShipPhysics
+    let playerYellowFlare: RetailPlayerYellowFlareBinding?
+}
+
+struct RetailPlayerYellowFlareBinding: Equatable, Sendable {
+    let batteryIndex: Int
+    let firingMask: UInt8
+    let weaponName: String
+    let fireSoundLogicalName: String
+    let fireWait: Float
+    let energyUsage: Float
+    let ammoUsage: Float
+    let fireFlags: UInt8
+    let weaponFlags: UInt16
 }
 
 struct RetailGenericLightDefinition: Equatable, Sendable {
@@ -1382,6 +1395,11 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                 let presentationSize = try cursor.readFloat()
                 _ = try cursor.readFloat()
                 _ = try cursor.readInt32()
+                let playerYellowFlare = try cursor.isAtEnd
+                    ? nil
+                    : cursor.readPlayerYellowFlareBinding(
+                        shipPageVersion: version
+                    )
                 guard version >= 1,
                       mediumDistance.isFinite,
                       lowDistance.isFinite,
@@ -1403,7 +1421,8 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                         shipDefinition: .init(
                             name: name,
                             presentationSize: presentationSize,
-                            physics: physics
+                            physics: physics,
+                            playerYellowFlare: playerYellowFlare
                         ),
                         genericLight: nil,
                         genericAI: nil
@@ -1527,6 +1546,68 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
 }
 
 private extension RetailPageCursor {
+    var isAtEnd: Bool { offset == data.count }
+
+    mutating func readPlayerYellowFlareBinding(
+        shipPageVersion: Int
+    ) throws -> RetailPlayerYellowFlareBinding {
+        guard shipPageVersion >= 6 else {
+            throw RetailTextureTableError.invalidPageLength
+        }
+        var selected: RetailPlayerYellowFlareBinding?
+        for batteryIndex in 0..<21 {
+            let fireFlags = try readUInt8()
+            _ = try readCString(allowEmpty: true)
+            _ = try readCString(allowEmpty: true)
+            _ = try readCString(allowEmpty: true)
+            _ = try readInt32()
+            let energyUsage = try readFloat()
+            let ammoUsage = try readFloat()
+            for _ in 0..<8 { _ = try readUInt16() }
+            var firingMasks: [UInt8] = []
+            var firingWaits: [Float] = []
+            for _ in 0..<8 {
+                firingMasks.append(try readUInt8())
+                firingWaits.append(try readFloat())
+                _ = try readFloat()
+                _ = try readFloat()
+                _ = try readFloat()
+                _ = try readFloat()
+            }
+            let maskCount = try readUInt8()
+            _ = try readUInt16()
+            _ = try readUInt8()
+            _ = try readFloat()
+            _ = try readFloat()
+            _ = try readFloat()
+            let weaponFlags = try readUInt16()
+            _ = try readUInt8()
+            let maskSoundNames = try (0..<8).map { _ in
+                try readCString(allowEmpty: true)
+            }
+            let weaponNames = try (0..<8).map { _ in
+                try readCString(allowEmpty: true)
+            }
+            guard batteryIndex == 20 else { continue }
+            selected = .init(
+                batteryIndex: batteryIndex,
+                firingMask: maskCount == 1 ? firingMasks[0] : 0,
+                weaponName: weaponNames[0],
+                fireSoundLogicalName: maskSoundNames[0],
+                fireWait: firingWaits[0],
+                energyUsage: energyUsage,
+                ammoUsage: ammoUsage,
+                fireFlags: fireFlags,
+                weaponFlags: weaponFlags
+            )
+        }
+        try requireEnd()
+        guard let selected else {
+            throw RetailTextureTableError.invalidPageLength
+        }
+        return selected
+    }
+
     mutating func readCanonicalShipPhysics() throws -> CanonicalShipPhysics {
         let mass = try readFloat()
         let drag = try readFloat()

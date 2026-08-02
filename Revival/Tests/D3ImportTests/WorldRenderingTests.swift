@@ -243,7 +243,6 @@ final class WorldRenderingTests: XCTestCase {
                 .invalidState
             )
         }
-
         var missingPredecessorObject = headingContinuationObject
         var missingPredecessorDodge = try XCTUnwrap(
             missingPredecessorObject["trainingDodgeAttemptState"]
@@ -17889,6 +17888,848 @@ final class WorldRenderingTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testPlayerYellowFlareRequestIsNonrepeatAndUsesThePreMovementGunpoint()
+        throws
+    {
+        XCTAssertTrue(
+            RevivalGameplayView.requestsPlayerFlare(
+                keyCode: 5,
+                isRepeat: false,
+                gameplayIsActive: true
+            )
+        )
+        XCTAssertFalse(
+            RevivalGameplayView.requestsPlayerFlare(
+                keyCode: 5,
+                isRepeat: true,
+                gameplayIsActive: true
+            )
+        )
+        XCTAssertEqual(
+            RevivalGameplayView.heldInput(for: [3]).vertical,
+            -1,
+            "F remains downward thrust"
+        )
+
+        var playerInput = PlayerInputState(rampDuration: 0)
+        playerInput.requestPlayerFlare()
+        XCTAssertTrue(
+            playerInput.snapshot(frameDuration: 0.1).firesPlayerFlare
+        )
+        XCTAssertFalse(
+            playerInput.snapshot(frameDuration: 0.1).firesPlayerFlare
+        )
+        playerInput.requestPlayerFlare()
+        playerInput.cancelPlayerFlareRequest()
+        XCTAssertFalse(
+            playerInput.snapshot(frameDuration: 0.1).firesPlayerFlare,
+            "capture teardown clears an unsnapshotted one-shot"
+        )
+        playerInput.requestPlayerFlare()
+        playerInput.setGameplayActive(false, simulation: nil, at: 1)
+        XCTAssertFalse(
+            playerInput.snapshot(frameDuration: 0.1).firesPlayerFlare
+        )
+
+        let level = try makePlayerYellowFlareLevel()
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        let binding = try XCTUnwrap(
+            level.shipDefinitions.only?.playerYellowFlare
+        )
+        func transformed(_ value: Vector3, by matrix: Matrix3) -> Vector3 {
+            .init(
+                x: matrix.right.x * value.x + matrix.up.x * value.y
+                    + matrix.forward.x * value.z,
+                y: matrix.right.y * value.x + matrix.up.y * value.y
+                    + matrix.forward.y * value.z,
+                z: matrix.right.z * value.x + matrix.up.z * value.y
+                    + matrix.forward.z * value.z
+            )
+        }
+        let transformedForward = transformed(
+            binding.gunpointLocalForward,
+            by: player.orientation
+        )
+        let forwardMagnitude = sqrt(
+            transformedForward.x * transformedForward.x
+                + transformedForward.y * transformedForward.y
+                + transformedForward.z * transformedForward.z
+        )
+        let transformedPosition = transformed(
+            binding.gunpointLocalPosition,
+            by: player.orientation
+        )
+        let expectedPosition = Vector3(
+            x: player.position.x + transformedPosition.x,
+            y: player.position.y + transformedPosition.y,
+            z: player.position.z + transformedPosition.z
+        )
+        let expectedForward = Vector3(
+            x: transformedForward.x / forwardMagnitude,
+            y: transformedForward.y / forwardMagnitude,
+            z: transformedForward.z / forwardMagnitude
+        )
+        let seed: UInt32 = 0x1234_5678
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: seed
+        )
+        let frame = simulation.update(
+            at: 0.1,
+            input: .init(yaw: 1, firesPlayerFlare: true)
+        )
+        let carrier = try XCTUnwrap(
+            frame.trainingGuidebotYellowFlares.only
+        )
+        XCTAssertEqual(
+            carrier.position,
+            .init(
+                x: expectedPosition.x + expectedForward.x * 10,
+                y: expectedPosition.y + expectedForward.y * 10,
+                z: expectedPosition.z + expectedForward.z * 10
+            )
+        )
+        XCTAssertEqual(carrier.orientation.forward, expectedForward)
+        XCTAssertEqual(
+            frame.trainingOpeningFeedback.filter {
+                $0.soundSourceName == "Flare.wav"
+            }.count,
+            1
+        )
+        XCTAssertEqual(
+            frame.trainingGuidebotYellowFlareParticles.count,
+            1
+        )
+        let retainedPlan = try updateMetalWorldPlan(
+            try makeMetalWorldPlan(
+                level: simulation.level,
+                playerView: frame.playerView
+            ),
+            level: simulation.level,
+            playerView: frame.playerView,
+            trainingGuidebotYellowFlares:
+                frame.trainingGuidebotYellowFlares,
+            trainingGuidebotYellowFlareParticles:
+                frame.trainingGuidebotYellowFlareParticles
+        )
+        XCTAssertTrue(retainedPlan.draws.contains {
+            $0.model == carrier.model
+                && $0.objectHandle == UInt32.max - 1_000
+        })
+        XCTAssertTrue(retainedPlan.draws.contains {
+            $0.objectHandle == UInt32.max - 2_000
+        })
+        var expectedState = seed
+        for _ in 0..<7 {
+            expectedState = expectedState &* 214_013 &+ 2_531_011
+        }
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            (continuationObject["authoritativeRandomState"] as? NSNumber)?
+                .uint32Value,
+            expectedState
+        )
+        let playerFlareState = try XCTUnwrap(
+            continuationObject["playerYellowFlareState"] as? [String: Any]
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                (playerFlareState["nextFireTime"] as? NSNumber)?.floatValue
+            ),
+            1,
+            accuracy: 0.000_001
+        )
+    }
+
+    func testPlayerYellowFlareFailureCadenceAndContinuationAreDeterministic()
+        throws
+    {
+        let level = try makePlayerYellowFlareLevel()
+        let seed: UInt32 = 0x2468_ace0
+        var blockedShip = level.shipDefinitions[0]
+        let stockBinding = try XCTUnwrap(blockedShip.playerYellowFlare)
+        blockedShip.playerYellowFlare = .init(
+            batteryIndex: stockBinding.batteryIndex,
+            firingMask: stockBinding.firingMask,
+            weapon: stockBinding.weapon,
+            fireSoundLogicalName: stockBinding.fireSoundLogicalName,
+            fireSoundSourceName: stockBinding.fireSoundSourceName,
+            fireWait: stockBinding.fireWait,
+            energyUsage: stockBinding.energyUsage,
+            ammoUsage: stockBinding.ammoUsage,
+            fireFlags: stockBinding.fireFlags,
+            weaponFlags: stockBinding.weaponFlags,
+            gunpointIndex: stockBinding.gunpointIndex,
+            gunpointParentSubmodelIndex:
+                stockBinding.gunpointParentSubmodelIndex,
+            gunpointLocalPosition: .init(x: 0, y: 0, z: 600),
+            gunpointLocalForward: stockBinding.gunpointLocalForward
+        )
+        let blocked = PlayerSimulation(
+            level: replacing(level, shipDefinitions: [blockedShip]),
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: seed
+        )
+        let blockedFrame = blocked.update(
+            at: 0.1,
+            input: .init(firesPlayerFlare: true)
+        )
+        XCTAssertTrue(blockedFrame.trainingGuidebotYellowFlares.isEmpty)
+        XCTAssertFalse(blockedFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+        var blockedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(blocked.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            (blockedObject["authoritativeRandomState"] as? NSNumber)?
+                .uint32Value,
+            seed
+        )
+        let blockedState = try XCTUnwrap(
+            blockedObject["playerYellowFlareState"] as? [String: Any]
+        )
+        XCTAssertEqual(
+            (blockedState["nextFireTime"] as? NSNumber)?.floatValue,
+            1
+        )
+
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: seed
+        )
+        _ = simulation.update(
+            at: 0.1,
+            input: .init(firesPlayerFlare: true)
+        )
+        _ = simulation.update(
+            at: 1,
+            input: .init(firesPlayerFlare: true)
+        )
+        let due = simulation.update(
+            at: 2,
+            input: .init(firesPlayerFlare: true)
+        )
+        XCTAssertEqual(due.trainingGuidebotYellowFlares.count, 2)
+        XCTAssertEqual(
+            due.trainingOpeningFeedback.filter {
+                $0.soundSourceName == "Flare.wav"
+            }.count,
+            1
+        )
+        let continuation = simulation.continuation
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: continuation,
+            resumedAtTimestamp: 2
+        )
+        let originalNext = simulation.update(at: 2.25, input: .zero)
+        let restoredNext = restored.update(at: 2.25, input: .zero)
+        XCTAssertEqual(originalNext, restoredNext)
+        XCTAssertEqual(simulation.continuation, restored.continuation)
+
+        var capacityObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(continuation)
+            ) as? [String: Any]
+        )
+        capacityObject["authoritativeRandomState"] = NSNumber(value: seed)
+        var capacityState = try XCTUnwrap(
+            capacityObject["playerYellowFlareState"] as? [String: Any]
+        )
+        let parentPrototype = try XCTUnwrap(
+            (capacityState["parents"] as? [[String: Any]])?.first
+        )
+        capacityState["parents"] = (0..<16).map { ordinal in
+            var parent = parentPrototype
+            parent["creationOrdinal"] = ordinal
+            parent["lifeRemaining"] = 15
+            parent["lastParticleDropTime"] = continuation.gameTime
+            parent["velocity"] = ["x": 0, "y": 0, "z": 0]
+            return parent
+        }
+        capacityState["parentParticles"] = []
+        capacityState["nextCreationOrdinal"] = 16
+        capacityState["nextFireTime"] = 0
+        capacityObject["playerYellowFlareState"] = capacityState
+        let capacity = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: capacityObject)
+            ),
+            resumedAtTimestamp: 3
+        )
+        let capacityFrame = capacity.update(
+            at: 3.1,
+            input: .init(firesPlayerFlare: true)
+        )
+        XCTAssertEqual(capacityFrame.trainingGuidebotYellowFlares.count, 16)
+        XCTAssertFalse(capacityFrame.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+        var expectedCapacityState = seed
+        for _ in 0..<16 {
+            expectedCapacityState =
+                expectedCapacityState &* 214_013 &+ 2_531_011
+        }
+        let capacityAfter = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(capacity.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            (capacityAfter["authoritativeRandomState"] as? NSNumber)?
+                .uint32Value,
+            expectedCapacityState,
+            "capacity failure adds no sound, carrier, or random draw"
+        )
+
+        blockedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(continuation)
+            ) as? [String: Any]
+        )
+        var hostileState = try XCTUnwrap(
+            blockedObject["playerYellowFlareState"] as? [String: Any]
+        )
+        hostileState["nextCreationOrdinal"] = 0
+        blockedObject["playerYellowFlareState"] = hostileState
+        let hostile = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: blockedObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostile,
+                resumedAtTimestamp: 2
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+        hostileState["nextCreationOrdinal"] = NSNumber(
+            value: UInt64.max
+        )
+        blockedObject["playerYellowFlareState"] = hostileState
+        let exhausted = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: blockedObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: exhausted,
+                resumedAtTimestamp: 2
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        let oldPackage = makeTrainingGuidebotYellowFlareLevel()
+        let silent = PlayerSimulation(
+            level: oldPackage,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: seed
+        ).update(at: 0.1, input: .init(firesPlayerFlare: true))
+        XCTAssertTrue(silent.trainingGuidebotYellowFlares.isEmpty)
+        XCTAssertFalse(silent.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Flare.wav"
+        })
+
+        let legacyGuidebot = PlayerSimulation(
+            level: oldPackage,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: seed
+        )
+        _ = legacyGuidebot.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        var legacyObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(legacyGuidebot.continuation)
+            ) as? [String: Any]
+        )
+        var legacyGuidebotState = try XCTUnwrap(
+            legacyObject["trainingRobotGuidebotState"] as? [String: Any]
+        )
+        legacyGuidebotState["guidebotMode"] = "ambient"
+        legacyGuidebotState["guidebotModeTime"] = 0.1
+        legacyGuidebotState["nextAmbientTime"] = 100.0
+        legacyGuidebotState["timeUntilNextFlare"] = 0.05
+        legacyGuidebotState["nextPowerupCheckTime"] = 100.0
+        legacyGuidebotState["yellowFlareGoalSlots"] = [
+            "slot1IsUsed": true,
+            "slot2IsUsed": false,
+            "slot3IsUsed": false,
+        ]
+        legacyGuidebotState["yellowFlares"] = []
+        legacyObject["trainingRobotGuidebotState"] = legacyGuidebotState
+        let restoredLegacyGuidebot = try PlayerSimulation(
+            level: oldPackage,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: legacyObject)
+            ),
+            resumedAtTimestamp: 1
+        )
+        let legacyGuidebotFrame = restoredLegacyGuidebot.update(
+            at: 1.1,
+            input: .zero
+        )
+        XCTAssertEqual(
+            legacyGuidebotFrame.trainingGuidebotYellowFlares.count,
+            1,
+            "an older schema-11 package keeps its landed Guidebot Yellow path"
+        )
+    }
+
+    func testPlayerAndGuidebotYellowFamiliesAdvanceBySharedCreationOrdinal()
+        throws
+    {
+        let level = try makePlayerYellowFlareLevel()
+        let seed: UInt32 = 0x3141_5926
+        let initial = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: seed
+        )
+        _ = initial.update(
+            at: 0.1,
+            input: .init(deploysTrainingGuidebot: true)
+        )
+        var dueObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(initial.continuation)
+            ) as? [String: Any]
+        )
+        var dueGuidebot = try XCTUnwrap(
+            dueObject["trainingRobotGuidebotState"] as? [String: Any]
+        )
+        dueGuidebot["guidebotMode"] = "ambient"
+        dueGuidebot["guidebotModeTime"] = 0.1
+        dueGuidebot["nextAmbientTime"] = 100.0
+        dueGuidebot["timeUntilNextFlare"] = 0.05
+        dueGuidebot["nextPowerupCheckTime"] = 100.0
+        dueGuidebot["yellowFlareGoalSlots"] = [
+            "slot1IsUsed": true,
+            "slot2IsUsed": false,
+            "slot3IsUsed": false,
+        ]
+        dueGuidebot["yellowFlares"] = []
+        dueObject["trainingRobotGuidebotState"] = dueGuidebot
+        let due = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: dueObject)
+            ),
+            resumedAtTimestamp: 1
+        )
+        _ = due.update(at: 1.1, input: .zero)
+        do {
+            _ = try PlayerSimulation(
+                level: level,
+                continuation: due.continuation,
+                resumedAtTimestamp: 1.15
+            )
+        } catch {
+            XCTFail("Guidebot-only ordinal continuation rejected: \(error)")
+            return
+        }
+
+        let playerPrototypeSimulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: seed
+        )
+        _ = playerPrototypeSimulation.update(
+            at: 0.1,
+            input: .init(firesPlayerFlare: true)
+        )
+        let playerPrototypeObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(
+                    playerPrototypeSimulation.continuation
+                )
+            ) as? [String: Any]
+        )
+        let playerPrototypeState = try XCTUnwrap(
+            playerPrototypeObject["playerYellowFlareState"]
+                as? [String: Any]
+        )
+        var playerPrototype = try XCTUnwrap(
+            (playerPrototypeState["parents"] as? [[String: Any]])?.only
+        )
+
+        var mixedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(due.continuation)
+            ) as? [String: Any]
+        )
+        mixedObject["authoritativeRandomState"] = NSNumber(value: seed)
+        mixedObject["frameDuration"] = 0.1
+        var mixedPlayer = try XCTUnwrap(
+            mixedObject["playerYellowFlareState"] as? [String: Any]
+        )
+        let playerParents = try XCTUnwrap(
+            mixedPlayer["parents"] as? [[String: Any]]
+        )
+        XCTAssertTrue(playerParents.isEmpty)
+        playerPrototype["creationOrdinal"] = 0
+        playerPrototype["lastParticleDropTime"] = 0
+        mixedPlayer["nextFireTime"] = 0
+        mixedPlayer["nextCreationOrdinal"] = 2
+        mixedPlayer["parents"] = [playerPrototype]
+        mixedPlayer["parentParticles"] = []
+        mixedObject["playerYellowFlareState"] = mixedPlayer
+        var mixedGuidebot = try XCTUnwrap(
+            mixedObject["trainingRobotGuidebotState"] as? [String: Any]
+        )
+        var guidebotParents = try XCTUnwrap(
+            mixedGuidebot["yellowFlares"] as? [[String: Any]]
+        )
+        guidebotParents[0]["creationOrdinal"] = 1
+        guidebotParents[0]["lastParticleDropTime"] = 0
+        mixedGuidebot["yellowFlares"] = guidebotParents
+        mixedGuidebot["yellowFlareParticles"] = []
+        mixedObject["trainingRobotGuidebotState"] = mixedGuidebot
+        let mixedContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: mixedObject)
+        )
+        let mixed: PlayerSimulation
+        do {
+            mixed = try PlayerSimulation(
+                level: level,
+                continuation: mixedContinuation,
+                resumedAtTimestamp: 3
+            )
+        } catch {
+            XCTFail("mixed ordinal setup rejected: \(error)")
+            return
+        }
+        _ = mixed.update(
+            at: 3.1,
+            input: .init(firesPlayerFlare: true)
+        )
+
+        var expectedState = seed
+        let draws = (0..<21).map { _ -> UInt32 in
+            expectedState = expectedState &* 214_013 &+ 2_531_011
+            return (expectedState >> 16) & 0x7fff
+        }
+        let resultObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(mixed.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            (resultObject["authoritativeRandomState"] as? NSNumber)?
+                .uint32Value,
+            expectedState
+        )
+        let resultPlayer = try XCTUnwrap(
+            resultObject["playerYellowFlareState"] as? [String: Any]
+        )
+        let resultGuidebot = try XCTUnwrap(
+            resultObject["trainingRobotGuidebotState"] as? [String: Any]
+        )
+        let playerParticles = try XCTUnwrap(
+            resultPlayer["parentParticles"] as? [[String: Any]]
+        )
+        let guidebotParticles = try XCTUnwrap(
+            resultGuidebot["yellowFlareParticles"] as? [[String: Any]]
+        )
+        func expectedSize(for ordinal: Int) -> Float {
+            0.2 + Float(Int(draws[ordinal * 7 + 4] % 11) - 5) * 0.02
+        }
+        func particleSize(
+            ordinal: Int,
+            in particles: [[String: Any]]
+        ) throws -> Float {
+            let particle = try XCTUnwrap(particles.first {
+                ($0["generationOrdinal"] as? NSNumber)?.intValue == ordinal
+            })
+            return try XCTUnwrap(
+                (particle["size"] as? NSNumber)?.floatValue
+            )
+        }
+        XCTAssertEqual(
+            try particleSize(ordinal: 0, in: playerParticles),
+            expectedSize(for: 0),
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            try particleSize(ordinal: 1, in: guidebotParticles),
+            expectedSize(for: 1),
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            try particleSize(ordinal: 2, in: playerParticles),
+            expectedSize(for: 2),
+            accuracy: 0.000_001
+        )
+
+        var collidingObject = mixedObject
+        var collidingPlayer = try XCTUnwrap(
+            collidingObject["playerYellowFlareState"] as? [String: Any]
+        )
+        var collidingGuidebot = try XCTUnwrap(
+            collidingObject["trainingRobotGuidebotState"] as? [String: Any]
+        )
+        var collidingPlayerParticle = try XCTUnwrap(playerParticles.first)
+        var collidingGuidebotParticle = try XCTUnwrap(
+            guidebotParticles.first
+        )
+        collidingPlayerParticle["generationOrdinal"] = 0
+        collidingGuidebotParticle["generationOrdinal"] = 0
+        collidingPlayer["parents"] = []
+        collidingPlayer["parentParticles"] = [collidingPlayerParticle]
+        collidingGuidebot["yellowFlares"] = []
+        collidingGuidebot["yellowFlareParticles"] = [
+            collidingGuidebotParticle
+        ]
+        collidingObject["playerYellowFlareState"] = collidingPlayer
+        collidingObject["trainingRobotGuidebotState"] = collidingGuidebot
+        let colliding = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: collidingObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: colliding,
+                resumedAtTimestamp: 3.2
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
+    func testPlayerYellowFlareStrictLifetimeTimeoutFamilyAndBindingShape()
+        throws
+    {
+        let level = try makePlayerYellowFlareLevel()
+        var levelObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(level)
+            ) as? [String: Any]
+        )
+        var ships = try XCTUnwrap(
+            levelObject["shipDefinitions"] as? [[String: Any]]
+        )
+        ships[0].removeValue(forKey: "playerYellowFlare")
+        levelObject["shipDefinitions"] = ships
+        XCTAssertNoThrow(
+            try JSONDecoder().decode(
+                Level.self,
+                from: JSONSerialization.data(withJSONObject: levelObject)
+            )
+        )
+        ships[0]["playerYellowFlare"] = ["batteryIndex": 20]
+        levelObject["shipDefinitions"] = ships
+        XCTAssertThrowsError(
+            try JSONDecoder().decode(
+                Level.self,
+                from: JSONSerialization.data(withJSONObject: levelObject)
+            )
+        )
+
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 7
+        )
+        _ = simulation.update(
+            at: 0.1,
+            input: .init(firesPlayerFlare: true)
+        )
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var state = try XCTUnwrap(
+            continuationObject["playerYellowFlareState"]
+                as? [String: Any]
+        )
+        var parents = try XCTUnwrap(
+            state["parents"] as? [[String: Any]]
+        )
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        var hostileAttachmentObject = continuationObject
+        var hostileAttachmentState = state
+        var hostileAttachmentParents = parents
+        hostileAttachmentParents[0]["roomSourceIndex"] = {
+            if case let .room(room) = player.location { return room }
+            return -1
+        }()
+        hostileAttachmentParents[0]["position"] = [
+            "x": player.position.x,
+            "y": player.position.y,
+            "z": player.position.z,
+        ]
+        hostileAttachmentParents[0]["velocity"] = [
+            "x": 0, "y": 0, "z": 0,
+        ]
+        hostileAttachmentParents[0]["stuckObjectHandle"] = NSNumber(
+            value: player.handle
+        )
+        hostileAttachmentParents[0]["stuckObjectOffset"] = [
+            "x": 0, "y": 0, "z": 0,
+        ]
+        hostileAttachmentParents[0]["stuckObjectOrientation"] = [
+            "right": ["x": 0, "y": 1, "z": 0],
+            "up": ["x": -1, "y": 0, "z": 0],
+            "forward": ["x": 0, "y": 0, "z": 1],
+        ]
+        hostileAttachmentState["parents"] = hostileAttachmentParents
+        hostileAttachmentObject["playerYellowFlareState"] =
+            hostileAttachmentState
+        let hostileAttachment = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(
+                withJSONObject: hostileAttachmentObject
+            )
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileAttachment,
+                resumedAtTimestamp: 0.1
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+        parents[0]["lifeRemaining"] = 0.1
+        state["parents"] = parents
+        continuationObject["playerYellowFlareState"] = state
+        let nearTimeout = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: continuationObject)
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: nearTimeout,
+            resumedAtTimestamp: 0.1
+        )
+        let exactZero = restored.update(at: 0.2, input: .zero)
+        XCTAssertEqual(exactZero.trainingGuidebotYellowFlares.count, 1)
+        XCTAssertTrue(
+            exactZero.trainingGuidebotYellowFlareTimeoutExplosions.isEmpty
+        )
+        let expired = restored.update(at: 0.3, input: .zero)
+        XCTAssertTrue(expired.trainingGuidebotYellowFlares.isEmpty)
+        XCTAssertEqual(
+            expired.trainingGuidebotYellowFlareTimeoutExplosions.count,
+            1
+        )
+        XCTAssertEqual(
+            expired.trainingGuidebotYellowFlareTimeoutSparks.count,
+            9
+        )
+        XCTAssertEqual(
+            Set(expired.trainingGuidebotYellowFlareTimeoutSparks.map {
+                $0.sourceAttemptIndex
+            }),
+            Set(0..<9)
+        )
+        XCTAssertTrue(
+            expired.trainingGuidebotYellowFlareTimeoutSparks.allSatisfy {
+                $0.receivedControlOnCreationFrame
+            }
+        )
+        XCTAssertEqual(
+            expired.trainingGuidebotYellowFlareTimeoutSparkParticles.count,
+            9
+        )
+
+        XCTAssertEqual(combinedYellowFlarePresentationCapacity, 22)
+        XCTAssertEqual(combinedYellowFlareParticlePresentationCapacity, 272)
+        XCTAssertEqual(
+            combinedYellowFlareTimeoutExplosionPresentationCapacity,
+            17
+        )
+        XCTAssertEqual(
+            combinedYellowFlareTimeoutSparkPresentationCapacity,
+            153
+        )
+        XCTAssertEqual(
+            combinedYellowFlareTimeoutSparkParticlePresentationCapacity,
+            918
+        )
+        let capacitySparks =
+            (0..<combinedYellowFlareTimeoutSparkPresentationCapacity).map {
+            expired.trainingGuidebotYellowFlareTimeoutSparks[
+                $0 % expired.trainingGuidebotYellowFlareTimeoutSparks.count
+            ]
+        }
+        let capacityPlan = try updateMetalWorldPlan(
+            try makeMetalWorldPlan(
+                level: restored.level,
+                playerView: exactZero.playerView
+            ),
+            level: restored.level,
+            playerView: exactZero.playerView,
+            trainingGuidebotYellowFlares: Array(
+                repeating: try XCTUnwrap(
+                    exactZero.trainingGuidebotYellowFlares.only
+                ),
+                count: combinedYellowFlarePresentationCapacity
+            ),
+            trainingGuidebotYellowFlareParticles: Array(
+                repeating: try XCTUnwrap(
+                    expired.trainingGuidebotYellowFlareParticles.first
+                ),
+                count: combinedYellowFlareParticlePresentationCapacity
+            ),
+            trainingGuidebotYellowFlareTimeoutExplosions: Array(
+                repeating: try XCTUnwrap(
+                    expired.trainingGuidebotYellowFlareTimeoutExplosions.only
+                ),
+                count:
+                    combinedYellowFlareTimeoutExplosionPresentationCapacity
+            ),
+            trainingGuidebotYellowFlareTimeoutSparks: capacitySparks,
+            trainingGuidebotYellowFlareTimeoutSparkParticles: Array(
+                repeating: try XCTUnwrap(
+                    expired.trainingGuidebotYellowFlareTimeoutSparkParticles
+                        .first
+                ),
+                count:
+                    combinedYellowFlareTimeoutSparkParticlePresentationCapacity
+            )
+        )
+        XCTAssertFalse(capacityPlan.draws.isEmpty)
+    }
+
     func testPlayerSimulationPreservesPriorFrameTimingAndNestedPauseRebasing() {
         let simulation = PlayerSimulation(
             level: makeSliceSixObjectRenderLevel(),
@@ -22178,6 +23019,36 @@ func makeTrainingGuidebotYellowFlareLevel() -> Level {
                 level.dependencyManifest.historicalEagerBaseline
         )
     )
+}
+
+func makePlayerYellowFlareLevel() throws -> Level {
+    let level = makeTrainingGuidebotYellowFlareLevel()
+    var ship = level.shipDefinitions[0]
+    ship.playerYellowFlare = .init(
+        batteryIndex: 20,
+        firingMask: 1,
+        weapon: .init(storedIndex: 3, sourceName: "Yellow flare"),
+        fireSoundLogicalName: "Flare",
+        fireSoundSourceName: "Flare.wav",
+        fireWait: 1,
+        energyUsage: 0,
+        ammoUsage: 0,
+        fireFlags: 0,
+        weaponFlags: 0,
+        gunpointIndex: 0,
+        gunpointParentSubmodelIndex: 0,
+        gunpointLocalPosition: .init(
+            x: 0.000_000_444_4,
+            y: -1.046_244_4,
+            z: 3.179_825_1
+        ),
+        gunpointLocalForward: .init(
+            x: 0.000_007_629_6,
+            y: -0.000_015_258_7,
+            z: 1
+        )
+    )
+    return replacing(level, shipDefinitions: [ship])
 }
 
 func makeTrainingCameraMonitorLevel() -> Level {

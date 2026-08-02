@@ -379,6 +379,12 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.primaryFireHeldChanged = {
                 [weak self] in self?.playerInput.setPrimaryFireHeld($0)
             }
+            gameplayView.playerFlareRequested = {
+                [weak self] in self?.playerInput.requestPlayerFlare()
+            }
+            gameplayView.playerFlareRequestCancelled = {
+                [weak self] in self?.playerInput.cancelPlayerFlareRequest()
+            }
             gameplayView.inventoryUseRequested = {
                 [weak self] in self?.playerInput.requestInventoryUse()
             }

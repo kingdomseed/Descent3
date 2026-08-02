@@ -4,7 +4,8 @@ import XCTest
 final class D3ImportOperationTests: XCTestCase {
     func testParsesReachedShipPhysicsInReleasedFieldOrderAndTypesFlags() throws {
         let pages = try resolveReachedObjectModelPages(
-            table: makeRetailShipTablePage() + makeRetailGenericModelTablePage(),
+            table: makeRetailShipTablePage(includeBatteries: true)
+                + makeRetailGenericModelTablePage(),
             overlay: Data(),
             shipName: "Pyro-GL",
             genericName: "Invisiblepowerup"
@@ -31,6 +32,20 @@ final class D3ImportOperationTests: XCTestCase {
         XCTAssertEqual(definition.physics.hitDieDot, -1)
         XCTAssertEqual(definition.physics.maximumTurnrollRate, 8_000)
         XCTAssertEqual(definition.physics.turnrollRatio, 0.13)
+        XCTAssertEqual(
+            definition.playerYellowFlare,
+            .init(
+                batteryIndex: 20,
+                firingMask: 1,
+                weaponName: "Yellow flare",
+                fireSoundLogicalName: "Flare",
+                fireWait: 1,
+                energyUsage: 0,
+                ammoUsage: 0,
+                fireFlags: 0,
+                weaponFlags: 0
+            )
+        )
     }
 
     func testReachedOOFPreservesCustomFacingAndRotationAndRejectsUnreachedPresentationProperties() throws {
@@ -1040,7 +1055,9 @@ private func makePCM16WAV(samples: [Int16]) -> Data {
     return data
 }
 
-private func makeRetailShipTablePage() -> Data {
+private func makeRetailShipTablePage(
+    includeBatteries: Bool = false
+) -> Data {
     var body = Data()
     body.appendUInt16(6)
     body.appendCString("Pyro-GL")
@@ -1070,6 +1087,45 @@ private func makeRetailShipTablePage() -> Data {
     body.appendFloat(6.676084041595459)
     body.appendFloat(1)
     body.appendInt32(1)
+    if includeBatteries {
+        for batteryIndex in 0..<21 {
+            body.append(0)
+            body.appendCString("")
+            body.appendCString("")
+            body.appendCString("")
+            body.appendInt32(0)
+            body.appendFloat(0)
+            body.appendFloat(0)
+            for _ in 0..<8 { body.appendUInt16(0) }
+            for maskIndex in 0..<8 {
+                body.append(maskIndex == 0 ? 1 : 0)
+                body.appendFloat(maskIndex == 0 ? 1 : 0)
+                for _ in 0..<4 { body.appendFloat(0) }
+            }
+            body.append(1)
+            body.appendUInt16(0)
+            body.append(0)
+            body.appendFloat(0)
+            body.appendFloat(0)
+            body.appendFloat(0)
+            body.appendUInt16(0)
+            body.append(0)
+            for maskIndex in 0..<8 {
+                body.appendCString(
+                    batteryIndex == 20 && maskIndex == 0
+                        ? "Flare"
+                        : ""
+                )
+            }
+            for maskIndex in 0..<8 {
+                body.appendCString(
+                    batteryIndex == 20 && maskIndex == 0
+                        ? "Yellow flare"
+                        : ""
+                )
+            }
+        }
+    }
 
     var table = Data([6])
     table.appendUInt32(UInt32(body.count + 4))
@@ -1091,6 +1147,32 @@ private func makeRetailGenericModelTablePage() -> Data {
     body.appendCString("")
     body.append(0)
     body.appendCString("")
+    body.appendFloat(0)
+    body.appendFloat(0)
+    body.append(Data(repeating: 0, count: 68))
+    body.appendFloat(1)
+    body.appendFloat(0)
+    body.appendVector(.init(x: 1, y: 1, z: 1))
+    body.appendFloat(0)
+    body.appendFloat(0)
+    body.appendFloat(0)
+    body.appendVector(.zero)
+    body.appendUInt32(0)
+    body.appendUInt32(0)
+    body.append(0)
+    body.append(0)
+    body.appendInt32(0)
+    body.appendUInt32(0)
+    body.appendUInt32(0)
+    body.append(0)
+    body.append(0)
+    body.append(0)
+    body.append(0)
+    body.appendFloat(0)
+    body.appendFloat(0)
+    body.appendFloat(0)
+    body.appendFloat(0)
+    body.appendUInt32(0)
     body.appendFloat(0)
     body.appendFloat(0)
 
