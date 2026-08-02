@@ -1,0 +1,25 @@
+Revival.xcodeproj/project.pbxproj
+  s_c503f7c0529e13::t_10872e51df36b8 61-65,128,269,523,548,571,596,629
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_15f4e1e5228990 23
+  s_c503f7c0529e13::t_7d7b0730d3775d 89-92
+  s_c503f7c0529e13::t_2f97748fbd4974 22,24-25,27,29
+Revival/Sources/RevivalCore/ReciprocalPortalComponent.swift
+  s_c503f7c0529e13::t_b9853d424f5586 1-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "13ff6b9c6c6d7e3aa0efd7affc0ef7d0d689b8a3",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
