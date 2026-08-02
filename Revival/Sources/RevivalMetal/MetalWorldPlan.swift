@@ -369,7 +369,8 @@ private func updateMetalWorldPlan(
                     sourceLifetime:
                         level.trainingRobotGuidebotChain!.yellowFlare!
                             .timeout!.childLifetime,
-                    texture: $0.texture
+                    texture: $0.texture,
+                    opacity: 1
                 )
             },
             camera: camera,
@@ -1235,22 +1236,27 @@ private func makePreparedTrainingGuidebotYellowFlareParticleDraws(
     else {
         return []
     }
-    return makeTrainingGuidebotYellowFlareParticleDraws(
-        level,
-        particles:
-            (0..<trainingGuidebotYellowFlareParticlePresentationCapacity)
-                .map { _ in .init(
-                    roomSourceIndex: roomSourceIndex,
-                    position: guidebot.position,
-                    size: definition.particleSize,
-                    lifeRemaining: definition.particleLifetime,
-                    lifetime: definition.particleLifetime,
-                    sourceSize: definition.particleSize,
-                    sourceLifetime: definition.particleLifetime,
-                    texture: definition.particleTexture
-                ) },
-        camera: .trainingRoom3
-    )
+    let textures = definition.timeout?.childAnimationFrames
+        ?? [definition.particleTexture]
+    return textures.flatMap { texture in
+        makeTrainingGuidebotYellowFlareParticleDraws(
+            level,
+            particles:
+                (0..<trainingGuidebotYellowFlareParticlePresentationCapacity)
+                    .map { _ in .init(
+                        roomSourceIndex: roomSourceIndex,
+                        position: guidebot.position,
+                        size: definition.particleSize,
+                        lifeRemaining: definition.particleLifetime,
+                        lifetime: definition.particleLifetime,
+                        sourceSize: definition.particleSize,
+                        sourceLifetime: definition.particleLifetime,
+                        texture: texture,
+                        opacity: 1
+                    ) },
+            camera: .trainingRoom3
+        )
+    }
 }
 
 private func makePreparedTrainingGuidebotYellowFlareTimeoutExplosionDraws(
@@ -1272,34 +1278,43 @@ private func makePreparedTrainingGuidebotYellowFlareTimeoutExplosionDraws(
 private func makePreparedTrainingGuidebotYellowFlareTimeoutSparkDraws(
     _ level: Level
 ) -> [MetalWorldDraw] {
-    makePreparedTrainingGuidebotYellowFlareTimeoutQuadDraws(
-        level,
-        count: trainingGuidebotYellowFlareTimeoutSparkPresentationCapacity,
-        texture: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
-            .childTexture,
-        size: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
-            .childCollisionRadius,
-        lifetime: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
-            .childLifetime,
-        handleBase: UInt32.max - 4_000
-    )
+    guard let timeout =
+            level.trainingRobotGuidebotChain?.yellowFlare?.timeout else {
+        return []
+    }
+    return (timeout.childAnimationFrames ?? [timeout.childTexture])
+        .flatMap { texture in
+            makePreparedTrainingGuidebotYellowFlareTimeoutQuadDraws(
+                level,
+                count:
+                    trainingGuidebotYellowFlareTimeoutSparkPresentationCapacity,
+                texture: texture,
+                size: timeout.childCollisionRadius,
+                lifetime: timeout.childLifetime,
+                handleBase: UInt32.max - 4_000
+            )
+        }
 }
 
 private func makePreparedTrainingGuidebotYellowFlareTimeoutSparkParticleDraws(
     _ level: Level
 ) -> [MetalWorldDraw] {
-    makePreparedTrainingGuidebotYellowFlareTimeoutQuadDraws(
-        level,
-        count:
-            trainingGuidebotYellowFlareTimeoutSparkParticlePresentationCapacity,
-        texture: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
-            .childTexture,
-        size: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
-            .childParticleSize,
-        lifetime: level.trainingRobotGuidebotChain?.yellowFlare?.timeout?
-            .childParticleLifetime,
-        handleBase: UInt32.max - 5_000
-    )
+    guard let timeout =
+            level.trainingRobotGuidebotChain?.yellowFlare?.timeout else {
+        return []
+    }
+    return (timeout.childAnimationFrames ?? [timeout.childTexture])
+        .flatMap { texture in
+            makePreparedTrainingGuidebotYellowFlareTimeoutQuadDraws(
+                level,
+                count:
+                    trainingGuidebotYellowFlareTimeoutSparkParticlePresentationCapacity,
+                texture: texture,
+                size: timeout.childParticleSize,
+                lifetime: timeout.childParticleLifetime,
+                handleBase: UInt32.max - 5_000
+            )
+        }
 }
 
 private func makePreparedTrainingGuidebotYellowFlareTimeoutQuadDraws(
@@ -1329,7 +1344,8 @@ private func makePreparedTrainingGuidebotYellowFlareTimeoutQuadDraws(
             lifetime: lifetime,
             sourceSize: size,
             sourceLifetime: lifetime,
-            texture: texture
+            texture: texture,
+            opacity: 1
         ) },
         camera: .trainingRoom3,
         capacity: count,
@@ -1392,8 +1408,7 @@ private func makeTrainingGuidebotYellowFlareQuadDraws(
             SIMD4<Float>(1, 1, 0, 0),
             SIMD4<Float>(0, 1, 0, 0),
         ]
-        let opacity = blendOpacity
-            * max(0, min(1, particle.lifeRemaining / particle.lifetime))
+        let opacity = blendOpacity * particle.opacity
         return MetalWorldDraw(
             roomSourceIndex: particle.roomSourceIndex,
             faceIndex: 0,

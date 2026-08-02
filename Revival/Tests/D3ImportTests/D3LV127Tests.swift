@@ -237,18 +237,67 @@ final class D3LV127Tests: XCTestCase {
             data.appendLittleEndian(pixel)
             return data
         }
-        var oaf = Data([127, 1, 2])
+        var oaf = Data([127, 1, 6])
         oaf.appendLittleEndian(Float(0.07).bitPattern)
-        oaf.append(ogf(named: "flare000", pixel: 0xfc00))
-        oaf.append(ogf(named: "flare001", pixel: 0x83e0))
+        for (index, pixel) in [
+            UInt16(0xfc00), 0x83e0, 0x801f, 0xffff, 0x8000, 0xc210,
+        ].enumerated() {
+            oaf.append(ogf(named: "flare00\(index)", pixel: pixel))
+        }
 
         let animation = try decodeReachedOutrage16OAF(oaf)
 
         XCTAssertEqual(animation.version, 1)
         XCTAssertEqual(animation.sourceFrameTime, 0.07)
-        XCTAssertEqual(animation.frames.count, 2)
+        XCTAssertEqual(animation.frames.count, 6)
         XCTAssertEqual(animation.frames[0].rgba8, Data([255, 0, 0, 255]))
         XCTAssertEqual(animation.frames[1].rgba8, Data([0, 255, 0, 255]))
+        XCTAssertEqual(animation.frames[5].width, 1)
+        XCTAssertEqual(animation.frames[5].height, 1)
+
+        let admission = try admitTrainingGuidebotYellowFlareAnimation(
+            texture: trainingGuidebotYellowFlareAnimationFrames[0],
+            animation: animation
+        )
+        XCTAssertEqual(
+            admission.resources,
+            trainingGuidebotYellowFlareAnimationFrames
+        )
+        XCTAssertEqual(admission.images, animation.frames)
+        XCTAssertEqual(
+            admission.sourceFrameTime.bitPattern,
+            Float(0.07).bitPattern
+        )
+        XCTAssertThrowsError(
+            try admitTrainingGuidebotYellowFlareAnimation(
+                texture: trainingGuidebotYellowFlareAnimationFrames[0],
+                animation: .init(
+                    version: animation.version,
+                    sourceFrameTime: animation.sourceFrameTime,
+                    frames: Array(animation.frames.dropLast())
+                )
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? D3ImportOperationError,
+                .missingPresentationAsset("yellowspark.oaf")
+            )
+        }
+        XCTAssertThrowsError(
+            try admitTrainingGuidebotYellowFlareAnimation(
+                texture: trainingGuidebotYellowFlareAnimationFrames[0],
+                animation: .init(
+                    version: animation.version,
+                    sourceFrameTime: 0.071,
+                    frames: animation.frames
+                )
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? D3ImportOperationError,
+                .missingPresentationAsset("yellowspark.oaf")
+            )
+        }
     }
 
     func testReadsReachedWeaponPhysicsAndLightingInSourceChunkOrder() throws {

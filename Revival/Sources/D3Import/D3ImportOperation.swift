@@ -674,6 +674,15 @@ func runD3Import(
         textureByName: modelTextureByName,
         archives: presentationArchives
     )
+    let yellowSparkAnimation = try admitTrainingGuidebotYellowFlareAnimation(
+        texture: modelTextureByName[
+            yellowFlareSparkWeapon.particleName.lowercased()
+        ]!,
+        animation: reachedOutrageAnimation(
+            named: yellowFlareSparkWeapon.fireImageName,
+            archives: presentationArchives
+        )
+    )
     let modelSources = Dictionary(
         uniqueKeysWithValues: sortedModelNames.enumerated().map {
             ($0.element.lowercased(), SourceResource(storedIndex: $0.offset, sourceName: $0.element))
@@ -1596,7 +1605,11 @@ func runD3Import(
                     childParticleSize:
                         yellowFlareSparkWeapon.particleSize,
                     childParticleLifetime:
-                        yellowFlareSparkWeapon.particleLifetime
+                        yellowFlareSparkWeapon.particleLifetime,
+                    childAnimationFrames:
+                        yellowSparkAnimation.resources,
+                    childSourceFrameTime:
+                        yellowSparkAnimation.sourceFrameTime
                 )
             ),
             combat: .stockTraining,
@@ -2978,6 +2991,50 @@ private struct IndexedPreparedArchive {
     let archive: HOG2Archive
 }
 
+private func reachedOutrageAnimation(
+    named name: String,
+    archives: [IndexedPreparedArchive]
+) throws -> Outrage1555Animation {
+    guard let indexed = archives.first(where: {
+        $0.archive.entry(named: name) != nil
+    }), let entry = indexed.archive.entry(named: name) else {
+        throw D3ImportOperationError.missingPresentationAsset(name)
+    }
+    return try decodeReachedOutrage16OAF(
+        indexed.validated.data.subdata(in: entry.payloadRange)
+    )
+}
+
+struct TrainingGuidebotYellowFlareAnimationAdmission:
+    Equatable, Sendable
+{
+    let resources: [SourceResource]
+    let images: [Outrage1555Image]
+    let sourceFrameTime: Float
+}
+
+func admitTrainingGuidebotYellowFlareAnimation(
+    texture: SourceResource,
+    animation: Outrage1555Animation
+) throws -> TrainingGuidebotYellowFlareAnimationAdmission {
+    let resources = [texture] + Array(
+        trainingGuidebotYellowFlareAnimationFrames.dropFirst()
+    )
+    guard texture == trainingGuidebotYellowFlareAnimationFrames[0],
+          animation.frames.count == resources.count,
+          animation.sourceFrameTime.bitPattern
+            == trainingGuidebotYellowFlareSourceFrameTime.bitPattern else {
+        throw D3ImportOperationError.missingPresentationAsset(
+            "yellowspark.oaf"
+        )
+    }
+    return .init(
+        resources: resources,
+        images: animation.frames,
+        sourceFrameTime: animation.sourceFrameTime
+    )
+}
+
 private func makePresentationMaterials(
     _ definitions: [RetailTextureDefinition],
     textureByName: [String: SourceResource],
@@ -2987,7 +3044,7 @@ private func makePresentationMaterials(
     let coronaIndexByName = Dictionary(
         uniqueKeysWithValues: coronaNames.enumerated().map { ($0.element, $0.offset) }
     )
-    return try definitions.map { definition throws -> PresentationMaterial in
+    return try definitions.flatMap { definition throws -> [PresentationMaterial] in
         guard let indexed = archives.first(where: { archive in
             archive.archive.entry(named: definition.bitmapSourceName) != nil
         }), let entry = indexed.archive.entry(named: definition.bitmapSourceName),
@@ -2995,29 +3052,51 @@ private func makePresentationMaterials(
             throw D3ImportOperationError.missingPresentationAsset(definition.bitmapSourceName)
         }
         let payload = indexed.validated.data.subdata(in: entry.payloadRange)
-        let image: Outrage1555Image
+        let images: [(texture: SourceResource, image: Outrage1555Image)]
         if definition.bitmapSourceName.lowercased().hasSuffix(".oaf") {
-            image = try decodeReachedOutrage16OAF(payload).frames[0]
-        } else {
-            image = try decodeReachedOutrage16OGF(payload)
-        }
-        return PresentationMaterial(
-            texture: texture,
-            bitmapSourceName: definition.bitmapSourceName,
-            image: .init(width: image.width, height: image.height, rgba8: image.rgba8),
-            blend: definition.blend,
-            lightmapBlend: definition.lightmapBlend,
-            waterProcedural: definition.waterProcedural,
-            lightCorona: definition.lightCorona.map {
-                PresentationLightCorona(
-                    assetIndex: coronaIndexByName[$0.bitmapSourceName]!,
-                    tint: $0.tint,
-                    blend: $0.blend
+            let animation = try decodeReachedOutrage16OAF(payload)
+            if definition.name.caseInsensitiveCompare("yellowspark")
+                    == .orderedSame
+                && definition.bitmapSourceName.caseInsensitiveCompare(
+                    "yellowspark.oaf"
+                ) == .orderedSame {
+                let admitted = try admitTrainingGuidebotYellowFlareAnimation(
+                    texture: texture,
+                    animation: animation
                 )
-            },
-            sourceArchive: indexed.validated.file.relativePath,
-            sourceSHA256: canonicalSHA256(payload)
-        )
+                images = Array(zip(
+                    admitted.resources,
+                    admitted.images
+                ))
+            } else {
+                images = [(texture, animation.frames[0])]
+            }
+        } else {
+            images = [(texture, try decodeReachedOutrage16OGF(payload))]
+        }
+        return images.map { frame in
+            PresentationMaterial(
+                texture: frame.texture,
+                bitmapSourceName: definition.bitmapSourceName,
+                image: .init(
+                    width: frame.image.width,
+                    height: frame.image.height,
+                    rgba8: frame.image.rgba8
+                ),
+                blend: definition.blend,
+                lightmapBlend: definition.lightmapBlend,
+                waterProcedural: definition.waterProcedural,
+                lightCorona: definition.lightCorona.map {
+                    PresentationLightCorona(
+                        assetIndex: coronaIndexByName[$0.bitmapSourceName]!,
+                        tint: $0.tint,
+                        blend: $0.blend
+                    )
+                },
+                sourceArchive: indexed.validated.file.relativePath,
+                sourceSHA256: canonicalSHA256(payload)
+            )
+        }
     }
 }
 

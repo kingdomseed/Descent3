@@ -1154,7 +1154,30 @@ struct TrainingGuidebotYellowFlareTimeoutDefinition:
     let childParticleInterval: Float
     let childParticleSize: Float
     let childParticleLifetime: Float
+    var childAnimationFrames: [SourceResource]? = nil
+    var childSourceFrameTime: Float? = nil
+
+    var hasCoherentChildAnimationBinding: Bool {
+        childAnimationFrames == nil && childSourceFrameTime == nil
+            || childAnimationFrames
+                == [childTexture]
+                    + Array(
+                        trainingGuidebotYellowFlareAnimationFrames.dropFirst()
+                    )
+                && childSourceFrameTime?.bitPattern
+                    == trainingGuidebotYellowFlareSourceFrameTime.bitPattern
+    }
 }
+
+let trainingGuidebotYellowFlareAnimationFrames: [SourceResource] = [
+    .init(storedIndex: 878, sourceName: "yellowspark"),
+    .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 1"),
+    .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 2"),
+    .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 3"),
+    .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 4"),
+    .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 5"),
+]
+let trainingGuidebotYellowFlareSourceFrameTime: Float = 0.07
 
 extension TrainingRobotCombatDefinition {
     // d3.hog/table.gam generic page "RAS1 Light Security Flyer",
@@ -1403,6 +1426,8 @@ func validateStockTrainingRobotGuidebotPackage(
                                           && timeout.childParticleInterval == 0.04
                                           && timeout.childParticleSize == 0.3
                                           && timeout.childParticleLifetime == 0.3
+                                          && timeout
+                                            .hasCoherentChildAnimationBinding
                                   } == true
                           )
                   } == true
@@ -3031,6 +3056,39 @@ func validateStockTrainingRobotGuidebotPresentation(
     }
 }
 
+func validateTrainingGuidebotYellowFlareAnimationBinding(
+    timeout: TrainingGuidebotYellowFlareTimeoutDefinition?,
+    materials: [PresentationMaterial],
+    dependencies: [DependencyRecord]
+) throws {
+    guard let timeout else { return }
+    let dependencyIdentities = Set(dependencies.map {
+        DependencyIdentity(category: $0.category, source: $0.source)
+    })
+    guard timeout.hasCoherentChildAnimationBinding else {
+        throw LevelValidationError.invalidDependency(
+            "Training Guidebot Yellow flare animation binding"
+        )
+    }
+    guard let frames = timeout.childAnimationFrames else { return }
+    guard frames.allSatisfy({ frame in
+        materials.first { $0.texture == frame }.map {
+            $0.bitmapSourceName == "yellowspark.oaf"
+                && $0.sourceArchive == "d3.hog"
+                && $0.sourceSHA256
+                    == "eabf95db1e5c17235b65a7b938081d40e44736456112acbc4a1ff99126051194"
+        } == true
+            && dependencyIdentities.contains(.init(
+                category: "texture",
+                source: frame
+            ))
+    }) else {
+        throw LevelValidationError.invalidDependency(
+            "Training Guidebot Yellow flare animation binding"
+        )
+    }
+}
+
 func validateTrainingGuidebotYellowFlareBinding(
     chain: TrainingRobotGuidebotChain,
     models: [CanonicalModel],
@@ -3039,6 +3097,11 @@ func validateTrainingGuidebotYellowFlareBinding(
     dependencies: [DependencyRecord]
 ) throws {
     guard let flare = chain.yellowFlare else { return }
+    try validateTrainingGuidebotYellowFlareAnimationBinding(
+        timeout: flare.timeout,
+        materials: materials,
+        dependencies: dependencies
+    )
     let exactMaterialHashes = [
         "energy":
             "5c6e2eb6cde4b1592f4ff8bc9540ab858655da77607e07328db8cd12cfd7376f",
@@ -7465,10 +7528,10 @@ struct Level: Codable, Equatable, Sendable {
                     provenance:
                         "manage/weaponpage.cpp:653-901; Descent3/WeaponFire.cpp:3162-3201"
                 ))
-                for texture in [
-                    timeout.explosionTexture,
-                    timeout.childTexture,
-                ] where !dependencyManifest.current.contains(where: {
+                for texture in [timeout.explosionTexture]
+                    + (timeout.childAnimationFrames
+                        ?? [timeout.childTexture])
+                where !dependencyManifest.current.contains(where: {
                     $0.category == "texture" && $0.source == texture
                 }) && !dependencies.contains(where: {
                     $0.category == "texture" && $0.source == texture
@@ -8387,7 +8450,9 @@ struct Level: Codable, Equatable, Sendable {
                 trainingRobotGuidebotChain?.yellowFlare.map {
                     [$0.particleTexture]
                         + ($0.timeout.map {
-                            [$0.explosionTexture, $0.childTexture]
+                            [$0.explosionTexture]
+                                + ($0.childAnimationFrames
+                                    ?? [$0.childTexture])
                         } ?? [])
                 } ?? []
             )
