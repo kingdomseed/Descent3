@@ -2646,7 +2646,8 @@ final class PlayerSimulation {
             duration: duration,
             definition: lesson.followBot,
             loopingPathIndex: lesson.followPathIndex,
-            orientsToPathNodes: true
+            orientsToPathNodes:
+                state.activePathIndex == lesson.followPathIndex
         )
         state.roomSourceIndex = motion.roomSourceIndex
         state.position = motion.position
@@ -5833,778 +5834,16 @@ final class PlayerSimulation {
            ) {
             trainingOpeningFeedback.append(greeting)
         }
-        if var dodgeState = trainingDodgeAttemptState,
-            let dodge = level.trainingDodgeAttempt
-        {
-            let triggerTimerConsumesFrame =
-                dodgeState.triggerTimerRemaining != nil
-            var almostDoneTimerConsumesFrame =
-                dodgeState.almostDoneTimerRemaining != nil
-            var successTimerConsumesFrame =
-                dodgeState.successTimerRemaining != nil
-            let maneuverLevelTimerConsumesFrame =
-                trainingManeuverFollowState?.levelTimerRemaining
-                    != nil
-            let followObjectTimerConsumesFrame =
-                trainingManeuverFollowState?.objectTimerRemaining
-                    != nil
-            let player = level.objects[movedPlayerIndex]
-            let turret = level.objects.first {
-                $0.handle == dodge.dodgeTurretObjectHandle
-            }!
-
-            if dodgeState.turretIsPowered,
-                dodgeState.script017Count == 0,
-                case .room(let turretRoom) = turret.location,
-                case .room(let playerRoom) = player.location
-            {
-                let connectedRooms = reciprocalPortalComponent(
-                    rooms: level.rooms,
-                    startRoomSourceIndex: turretRoom
-                )
-                let targetDistance = vectorDistance(
-                    turret.position,
-                    player.position
-                )
-                let crossRoomLimit: Float =
-                    dodgeState.awareness > 0 ? 720 : 450
-                let targetIsEligible =
-                    connectedRooms.contains(playerRoom)
-                    && (playerRoom == turretRoom
-                        || targetDistance <= crossRoomLimit)
-                if !targetIsEligible {
-                    dodgeState.seesTarget = false
-                } else if systemsGameTime
-                    - dodgeState.lastVisibleTargetTime > 0.35,
-                    systemsGameTime
-                        >= dodgeState.nextVisibilityCheckTime
-                {
-                    let visibility = traceIndoorMovement(
-                        in: level,
-                        startRoom: turretRoom,
-                        start: turret.position,
-                        end: player.position,
-                        radius: 0
-                    )
-                    // Visibility scheduling uses the deterministic midpoint
-                    // of the released 0.135...0.165 interval until replay/RNG
-                    // authority is selected.
-                    dodgeState.nextVisibilityCheckTime =
-                        systemsGameTime + 0.15
-                    if case .noHit = visibility.outcome {
-                        let targetDirection = normalized(
-                            player.position - turret.position
-                        )
-                        let closingSpeed =
-                            dodgeState.weaponSpeed
-                            - dot(targetDirection, velocity)
-                        if dodgeState.weaponSpeed > 0,
-                            closingSpeed > 0
-                        {
-                            dodgeState.retainedTargetPosition =
-                                player.position
-                                + velocity
-                                * (targetDistance
-                                    / closingSpeed
-                                    * dodge.turret
-                                    .fixedLeadAccuracy)
-                        } else {
-                            dodgeState.retainedTargetPosition =
-                                player.position
-                        }
-                        dodgeState.lastVisibleTargetTime =
-                            systemsGameTime
-                        dodgeState.seesTarget = true
-                        dodgeState.awareness = max(
-                            dodgeState.awareness,
-                            60
-                        )
-                    }
-                }
-                let visibleAge =
-                    systemsGameTime
-                    - dodgeState.lastVisibleTargetTime
-                if let retainedTarget =
-                    dodgeState.retainedTargetPosition,
-                    dodgeState.awareness > 15,
-                    visibleAge < 4
-                {
-                    for jointIndex in dodge.turret.joints.indices {
-                        let joint = dodge.turret.joints[jointIndex]
-                        let still =
-                            dodgeState.turretAngles[jointIndex]
-                        let right = constrainedTrainingTurretAngle(
-                            still
-                                - systemsFrameDuration
-                                * joint.rotationsPerSecond,
-                            fieldOfView: joint.fieldOfView,
-                            movesRight: true
-                        )
-                        let left = constrainedTrainingTurretAngle(
-                            still
-                                + systemsFrameDuration
-                                * joint.rotationsPerSecond,
-                            fieldOfView: joint.fieldOfView,
-                            movesRight: false
-                        )
-                        var candidates = dodgeState.turretAngles
-                        candidates[jointIndex] = still
-                        let stillDot = trainingDodgeAimDot(
-                            level: level,
-                            dodge: dodge,
-                            turret: turret,
-                            angles: candidates,
-                            target: retainedTarget
-                        )
-                        candidates[jointIndex] = right
-                        let rightDot = trainingDodgeAimDot(
-                            level: level,
-                            dodge: dodge,
-                            turret: turret,
-                            angles: candidates,
-                            target: retainedTarget
-                        )
-                        candidates[jointIndex] = left
-                        let leftDot = trainingDodgeAimDot(
-                            level: level,
-                            dodge: dodge,
-                            turret: turret,
-                            angles: candidates,
-                            target: retainedTarget
-                        )
-                        var bestAngle = still
-                        var bestDot = stillDot
-                        if rightDot > bestDot {
-                            bestAngle = right
-                            bestDot = rightDot
-                        }
-                        if leftDot > bestDot {
-                            bestAngle = left
-                        }
-                        dodgeState.turretAngles[jointIndex] =
-                            bestAngle
-                        dodgeState.turretDirections[jointIndex] =
-                            rightDot > leftDot ? 1 : 2
-                    }
-
-                    let aim = trainingDodgeGunTransform(
-                        level: level,
-                        dodge: dodge,
-                        turret: turret,
-                        angles: dodgeState.turretAngles,
-                        restPosition: dodge.turret.aimingGunpoint
-                    )
-                    let aimDirection = normalized(
-                        retainedTarget - aim.position
-                    )
-                    if visibleAge < 2,
-                        dot(aim.forward, aimDirection)
-                            >= dodge.turret.fireAlignmentDot,
-                        systemsGameTime >= dodgeState.nextFireTime
-                    {
-                        let fire = trainingDodgeGunTransform(
-                            level: level,
-                            dodge: dodge,
-                            turret: turret,
-                            angles: dodgeState.turretAngles,
-                            restPosition: dodge.turret.gunpoints[
-                                dodgeState.firingMaskIndex
-                            ]
-                        )
-                        let muzzleTrace = traceIndoorMovement(
-                            in: level,
-                            startRoom: turretRoom,
-                            start: turret.position,
-                            end: fire.position,
-                            radius: 0
-                        )
-                        if case .noHit = muzzleTrace.outcome {
-                            dodgeState.projectiles.append(
-                                .init(
-                                    roomSourceIndex: turretRoom,
-                                    position: fire.position,
-                                    velocity:
-                                        fire.forward
-                                        * dodge.turret.projectileSpeed,
-                                    lifeRemaining:
-                                        dodge.turret.projectileLifetime
-                                ))
-                            trainingOpeningFeedback.append(
-                                .init(
-                                    hudMessages: [],
-                                    voiceSourceName: "",
-                                    voicePrecedesHUDMessages: true,
-                                    soundSourceName:
-                                        dodge.turret.fireSoundSourceName
-                                ))
-                        }
-                        let scheduledFireTime =
-                            dodgeState.nextFireTime
-                        let continuousWindow = max(
-                            dodge.turret.fireWait,
-                            systemsFrameDuration * 1.5
-                        )
-                        dodgeState.nextFireTime =
-                            systemsGameTime - scheduledFireTime
-                                <= continuousWindow
-                            ? scheduledFireTime
-                                + dodge.turret.fireWait
-                            : systemsGameTime
-                                + dodge.turret.fireWait
-                        dodgeState.firingMaskIndex =
-                            (dodgeState.firingMaskIndex + 1)
-                            % dodge.turret.gunpoints.count
-                        dodgeState.weaponSpeed =
-                            dodge.turret.projectileSpeed
-                    }
-                }
-            }
-
-            var survivingProjectiles: [TrainingDodgeProjectileState] = []
-            for var projectile in dodgeState.projectiles {
-                let end =
-                    projectile.position
-                    + projectile.velocity * systemsFrameDuration
-                let trace = traceIndoorMovement(
-                    in: level,
-                    startRoom: projectile.roomSourceIndex,
-                    start: projectile.position,
-                    end: end,
-                    radius: dodge.turret.projectileRadius
-                )
-                let playerHit = segmentSphereHitFraction(
-                    start: projectile.position,
-                    end: end,
-                    center: player.position,
-                    radius:
-                        dodge.turret.projectileRadius
-                        + view.collisionRadius
-                )
-                let traceFraction =
-                    vectorDistance(
-                        projectile.position,
-                        end
-                    ) > 0
-                    ? vectorDistance(
-                        projectile.position,
-                        trace.finalPosition
-                    ) / vectorDistance(projectile.position, end)
-                    : 1
-                if let playerHit,
-                    playerHit <= traceFraction + 0.000_1
-                {
-                    shields -= dodge.turret.projectileDamage
-                    trainingOpeningFeedback.append(
-                        .init(
-                            hudMessages: [],
-                            voiceSourceName: "",
-                            voicePrecedesHUDMessages: true,
-                            soundSourceName:
-                                dodge.turret.impactSoundSourceName
-                        ))
-                    continue
-                }
-                guard case .noHit = trace.outcome else { continue }
-                projectile.position = trace.finalPosition
-                projectile.roomSourceIndex =
-                    trace.containingRoomSourceIndex
-                projectile.lifeRemaining -= systemsFrameDuration
-                if projectile.lifeRemaining > 0 {
-                    survivingProjectiles.append(projectile)
-                }
-            }
-            dodgeState.projectiles = survivingProjectiles
-
-            if dodgeState.script033Count < 1,
-                case .room(35) = player.location,
-                let startDodge = level.objects.first(where: {
-                    $0.handle == dodge.startDodgeObjectHandle
-                }),
-                segmentSphereHitFraction(
-                    start: object.position,
-                    end: player.position,
-                    center: startDodge.position,
-                    radius:
-                        dodge.startDodgeCollisionRadius
-                        + view.collisionRadius
-                ) != nil
-            {
-                if var openingState = trainingOpeningState {
-                    let raw = openingState.enabledControls.rawValue
-                    openingState.enabledControls = .init(
-                        rawValue: (raw & ~dodge.disabledControlMask)
-                            | dodge.enabledDodgeControlMask
-                    )
-                    trainingOpeningState = openingState
-                }
-                setTrainingDodgePortalRenderState(
-                    in: &level,
-                    roomSourceIndex: dodge.portalRoomTwoSourceIndex,
-                    portalIndices: dodge.orderedPortalIndices,
-                    rendersFaces: true
-                )
-                trainingOpeningFeedback.append(
-                    .init(
-                        hudMessages: [dodge.introduction],
-                        voiceSourceName:
-                            dodge.introductionVoiceSourceName,
-                        voicePrecedesHUDMessages: true
-                    ))
-                dodgeState.triggerTimerRemaining = dodge.triggerDelay
-                dodgeState.script033Count += 1
-            }
-
-            if let exit = dodge.dodgeExit,
-                (dodgeState.script019Count ?? 0) < 1,
-                case .room(35) = player.location,
-                let doneDodgeingGoal = level.objects.first(where: {
-                    $0.handle == exit.objectHandle
-                }),
-                segmentSphereHitFraction(
-                    start: object.position,
-                    end: player.position,
-                    center: doneDodgeingGoal.position,
-                    radius:
-                        exit.collisionRadius
-                        + view.collisionRadius
-                ) != nil
-            {
-                dodgeState.markerLightDistance =
-                    exit.markerLightDistance
-                setTrainingDodgePortalRenderState(
-                    in: &level,
-                    roomSourceIndex: exit.portalRoomSourceIndex,
-                    portalIndices: exit.orderedPortalIndices,
-                    rendersFaces: false
-                )
-                if var openingState = trainingOpeningState {
-                    openingState.enabledControls = .init(
-                        rawValue:
-                            openingState.enabledControls.rawValue
-                            & ~exit.disabledControlMask
-                    )
-                    trainingOpeningState = openingState
-                }
-                trainingOpeningFeedback.append(
-                    .init(
-                        hudMessages: [exit.instruction],
-                        voiceSourceName: exit.voiceSourceName,
-                        voicePrecedesHUDMessages: true
-                    ))
-                dodgeState.script019Count =
-                    min(
-                        (dodgeState.script019Count ?? 0) + 1,
-                        trainingScriptActionCounterMaximum
-                    )
-            }
-
-            if var maneuverState = trainingManeuverFollowState,
-               let lesson = dodge.maneuverFollow,
-               maneuverState.script021Count < 1,
-               dodgeState.script020Count > 0,
-               case .room(37) = player.location,
-               let maneuver = level.objects.first(where: {
-                   $0.handle == lesson.maneuverObjectHandle
-               }),
-               segmentSphereHitFraction(
-                   start: object.position,
-                   end: player.position,
-                   center: maneuver.position,
-                   radius:
-                       lesson.maneuverCollisionRadius
-                       + view.collisionRadius
-               ) != nil
-            {
-                dodgeState.markerLightDistance = 0
-                if var openingState = trainingOpeningState {
-                    openingState.enabledControls = .init(
-                        rawValue: lesson.headingControlMask
-                    )
-                    trainingOpeningState = openingState
-                }
-                setTrainingDodgePortalRenderState(
-                    in: &level,
-                    roomSourceIndex: lesson.portalRoomSourceIndex,
-                    portalIndices: lesson.orderedPortalIndices,
-                    rendersFaces: true
-                )
-                trainingOpeningFeedback.append(
-                    .init(
-                        hudMessages: [
-                            lesson.maneuverIntroduction,
-                        ],
-                        voiceSourceName:
-                            lesson.headingVoiceSourceName,
-                        voicePrecedesHUDMessages: false,
-                        trailingHUDMessages: [
-                            lesson.headingInstruction,
-                        ]
-                    ))
-                maneuverState.levelTimerRemaining =
-                    lesson.headingDuration
-                maneuverState.script021Count += 1
-                trainingManeuverFollowState = maneuverState
-            }
-
-            if shields < dodge.restoredPlayerShields,
-                dodgeState.script016Count > 0,
-                dodgeState.script017Count == 0
-            {
-                dodgeState.almostDoneTimerRemaining =
-                    dodge.almostDoneDelay
-                dodgeState.successTimerRemaining = dodge.successDelay
-                almostDoneTimerConsumesFrame = false
-                successTimerConsumesFrame = false
-                trainingOpeningFeedback.append(
-                    .init(
-                        hudMessages: [dodge.hitInstruction],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: true
-                    ))
-                shields = dodge.restoredPlayerShields
-                if dodgeState.script018Count
-                    < trainingScriptActionCounterMaximum
-                {
-                    dodgeState.script018Count += 1
-                }
-            }
-
-            if var timer = dodgeState.triggerTimerRemaining {
-                if triggerTimerConsumesFrame {
-                    timer -= systemsFrameDuration
-                }
-                if timer <= 0.000_001,
-                    dodgeState.script016Count < 1
-                {
-                    dodgeState.triggerTimerRemaining = nil
-                    shields = dodge.restoredPlayerShields
-                    trainingOpeningFeedback.append(
-                        .init(
-                            hudMessages: [dodge.instruction],
-                            voiceSourceName: "",
-                            voicePrecedesHUDMessages: true
-                        ))
-                    dodgeState.successTimerRemaining =
-                        dodge.successDelay
-                    dodgeState.almostDoneTimerRemaining =
-                        dodge.almostDoneDelay
-                    dodgeState.turretIsPowered = true
-                    dodgeState.nextFireTime = systemsGameTime
-                    dodgeState.script016Count += 1
-                } else {
-                    dodgeState.triggerTimerRemaining = timer
-                }
-            }
-            if var timer = dodgeState.almostDoneTimerRemaining {
-                if almostDoneTimerConsumesFrame {
-                    timer -= systemsFrameDuration
-                }
-                if timer <= 0.000_001 {
-                    dodgeState.almostDoneTimerRemaining = nil
-                    trainingOpeningFeedback.append(
-                        .init(
-                            hudMessages: [dodge.almostDoneInstruction],
-                            voiceSourceName:
-                                dodge.almostDoneVoiceSourceName,
-                            voicePrecedesHUDMessages: true
-                        ))
-                    if dodgeState.script020Count
-                        < trainingScriptActionCounterMaximum
-                    {
-                        dodgeState.script020Count += 1
-                    }
-                } else {
-                    dodgeState.almostDoneTimerRemaining = timer
-                }
-            }
-            if var timer = dodgeState.successTimerRemaining {
-                if successTimerConsumesFrame {
-                    timer -= systemsFrameDuration
-                }
-                if timer <= 0.000_001,
-                    dodgeState.script017Count < 1
-                {
-                    dodgeState.successTimerRemaining = nil
-                    dodgeState.markerLightDistance =
-                        dodge.successMarkerLightDistance
-                    setTrainingDodgePortalRenderState(
-                        in: &level,
-                        roomSourceIndex:
-                            dodge.portalRoomThreeSourceIndex,
-                        portalIndices: dodge.orderedPortalIndices,
-                        rendersFaces: false
-                    )
-                    dodgeState.turretIsPowered = false
-                    if var openingState = trainingOpeningState {
-                        openingState.enabledControls.formUnion(
-                            .init(
-                                rawValue: dodge.successControlMask
-                            ))
-                        trainingOpeningState = openingState
-                    }
-                    trainingOpeningFeedback.append(
-                        .init(
-                            hudMessages: [
-                                dodge.successMessage,
-                                dodge.leaveInstruction,
-                            ],
-                            voiceSourceName:
-                                dodge.successVoiceSourceName,
-                            voicePrecedesHUDMessages: true
-                        ))
-                    dodgeState.script017Count += 1
-                } else {
-                    dodgeState.successTimerRemaining = timer
-                }
-            }
-            if var maneuverState = trainingManeuverFollowState,
-               let lesson = dodge.maneuverFollow
-            {
-                var followObjectTimerWasRestarted = false
-                if maneuverState.script023Count > 0,
-                   maneuverState.script026Count == 0
-                {
-                    let followBotDirection =
-                        maneuverState.position - player.position
-                    let followBotIsVisible =
-                        dot(followBotDirection, followBotDirection)
-                            > 0.000_001
-                        && Double(
-                            dot(
-                                player.orientation.forward,
-                                normalized(followBotDirection)
-                            )
-                        ) > cos(Double.pi / 4)
-                    if !followBotIsVisible {
-                        maneuverState.objectTimerRemaining =
-                            lesson.followDuration
-                        followObjectTimerWasRestarted = true
-                    }
-                    if maneuverState.script025Count
-                        < trainingScriptActionCounterMaximum
-                    {
-                        maneuverState.script025Count += 1
-                    }
-                }
-                if maneuverState.script021Count > 0,
-                   energy < 50,
-                   var destruction = maneuverState.destruction {
-                    energy = 50
-                    destruction.script031Count = min(
-                        destruction.script031Count + 1,
-                        trainingScriptActionCounterMaximum
-                    )
-                    maneuverState.destruction = destruction
-                }
-
-                if var timer = maneuverState.levelTimerRemaining {
-                    if maneuverLevelTimerConsumesFrame {
-                        timer -= systemsFrameDuration
-                    }
-                    if timer <= 0.000_001 {
-                        maneuverState.levelTimerRemaining = nil
-                        // TrainingMission.cpp keeps the released level-timer
-                        // handler order 023, 024, 022.
-                        if maneuverState.script023Count < 1,
-                           maneuverState.script024Count > 0
-                        {
-                            if var openingState =
-                                    trainingOpeningState
-                            {
-                                openingState.enabledControls =
-                                    .init(
-                                        rawValue:
-                                            lesson
-                                            .rotationalControlMask
-                                    )
-                                trainingOpeningState = openingState
-                            }
-                            trainingOpeningFeedback.append(
-                                .init(
-                                    hudMessages: [
-                                        lesson.followIntroduction,
-                                        lesson.followInstruction,
-                                    ],
-                                    voiceSourceName:
-                                        lesson.followVoiceSourceName,
-                                    voicePrecedesHUDMessages: false
-                                ))
-                            maneuverState.followBotIsPowered = true
-                            maneuverState.followBotTeamFlags =
-                                lesson.friendlyTeamFlags
-                            maneuverState.objectTimerRemaining =
-                                lesson.followDuration
-                            assignTrainingFollowBotPath(
-                                lesson.followPathIndex,
-                                state: &maneuverState
-                            )
-                            maneuverState.script023Count += 1
-                        }
-                        if maneuverState.script024Count < 1,
-                           maneuverState.script022Count > 0
-                        {
-                            if var openingState =
-                                    trainingOpeningState
-                            {
-                                openingState.enabledControls =
-                                    .init(
-                                        rawValue:
-                                            lesson.bankControlMask
-                                    )
-                                trainingOpeningState = openingState
-                            }
-                            trainingOpeningFeedback.append(
-                                .init(
-                                    hudMessages: [
-                                        lesson.bankInstruction,
-                                    ],
-                                    voiceSourceName:
-                                        lesson.bankVoiceSourceName,
-                                    voicePrecedesHUDMessages: false
-                                ))
-                            maneuverState.levelTimerRemaining =
-                                lesson.bankDuration
-                            maneuverState.script024Count += 1
-                        }
-                        if maneuverState.script022Count < 1,
-                           maneuverState.script021Count > 0
-                        {
-                            if var openingState =
-                                    trainingOpeningState
-                            {
-                                openingState.enabledControls =
-                                    .init(
-                                        rawValue:
-                                            lesson.pitchControlMask
-                                    )
-                                trainingOpeningState = openingState
-                            }
-                            trainingOpeningFeedback.append(
-                                .init(
-                                    hudMessages: [
-                                        lesson.successMessage,
-                                        lesson.pitchInstruction,
-                                    ],
-                                    voiceSourceName:
-                                        lesson.pitchVoiceSourceName,
-                                    voicePrecedesHUDMessages: false
-                                ))
-                            maneuverState.levelTimerRemaining =
-                                lesson.pitchDuration
-                            maneuverState.script022Count += 1
-                        }
-                    } else {
-                        maneuverState.levelTimerRemaining = timer
-                    }
-                }
-
-                if let handoff = lesson.destructionHandoff,
-                   var destruction = maneuverState.destruction,
-                   var timer = destruction.levelTimer11Remaining {
-                    if !followBotTimer11StartedThisFrame {
-                        timer -= systemsFrameDuration
-                    }
-                    if timer <= 0.000_001,
-                       destruction.script027Count < 1 {
-                        destruction.levelTimer11Remaining = nil
-                        trainingOpeningFeedback.append(
-                            .init(
-                                hudMessages: [handoff.successMessage],
-                                voiceSourceName: "",
-                                voicePrecedesHUDMessages: false
-                            )
-                        )
-                        destruction.destroyBot2TeamFlags =
-                            handoff.movingTeamFlags
-                        destruction.destroyBot1TeamFlags =
-                            handoff.movingTeamFlags
-                        destruction.destroyBot1IsVisible = true
-                        setObjectPresentationVisibility(
-                            in: &level,
-                            handle:
-                                handoff.destroyBot1ObjectHandle,
-                            isVisible: true
-                        )
-                        trainingOpeningFeedback.append(
-                            .init(
-                                hudMessages: [
-                                    handoff.movingInstruction
-                                ],
-                                voiceSourceName:
-                                    handoff.voiceSourceName,
-                                voicePrecedesHUDMessages: false
-                            )
-                        )
-                        assignTrainingAuthoredPath(
-                            handoff.movingPathIndex,
-                            motion:
-                                &destruction
-                                .destroyBot1Motion
-                        )
-                        destruction.destroyBot1Destruction =
-                            initialTrainingDestroyBot1DestructionState(
-                                level: level,
-                                handoff: handoff
-                            )
-                        destruction.script027Count = min(
-                            destruction.script027Count + 1,
-                            trainingScriptActionCounterMaximum
-                        )
-                    } else {
-                        destruction.levelTimer11Remaining = timer
-                    }
-                    maneuverState.destruction = destruction
-                }
-
-                if var timer = maneuverState.objectTimerRemaining {
-                    if followObjectTimerConsumesFrame,
-                       !followObjectTimerWasRestarted {
-                        timer -= systemsFrameDuration
-                    }
-                    if timer <= 0.000_001 {
-                        maneuverState.objectTimerRemaining = nil
-                        if maneuverState.script025Count > 0 {
-                            if var openingState =
-                                    trainingOpeningState
-                            {
-                                openingState.enabledControls.formUnion(
-                                    .init(
-                                        rawValue:
-                                            lesson.weaponControlMask
-                                    ))
-                                trainingOpeningState = openingState
-                            }
-                            assignTrainingFollowBotPath(
-                                lesson.destroyPathIndex,
-                                state: &maneuverState
-                            )
-                            trainingOpeningFeedback.append(
-                                .init(
-                                    hudMessages: [
-                                        lesson.successMessage,
-                                        lesson.weaponsEnabledInstruction,
-                                    ],
-                                    voiceSourceName:
-                                        lesson.weaponVoiceSourceName,
-                                    voicePrecedesHUDMessages: false,
-                                    trailingHUDMessages: [
-                                        lesson.destroyInstruction,
-                                    ]
-                                ))
-                            maneuverState.script026Count = min(
-                                maneuverState.script026Count + 1,
-                                trainingScriptActionCounterMaximum
-                            )
-                        }
-                    } else {
-                        maneuverState.objectTimerRemaining = timer
-                    }
-                }
-                trainingManeuverFollowState = maneuverState
-                restoreTrainingFollowBotPresentation()
-            }
-            trainingDodgeAttemptState = dodgeState
-        }
+        advanceTrainingDodgeAndManeuverLesson(
+            object: object,
+            view: view,
+            movedPlayerIndex: movedPlayerIndex,
+            systemsFrameDuration: systemsFrameDuration,
+            systemsGameTime: systemsGameTime,
+            followBotTimer11StartedThisFrame:
+                followBotTimer11StartedThisFrame,
+            trainingOpeningFeedback: &trainingOpeningFeedback
+        )
         var trainingLastRoomWasTriggeredThisFrame = false
         var trainingFinalBotsWasTriggeredThisFrame = false
         if trainingFinalGoalWasHitThisFrame,
@@ -7770,6 +7009,789 @@ private extension PlayerSimulation {
                 }
             }
             trainingOpeningState = openingState
+        }
+    }
+
+    func advanceTrainingDodgeAndManeuverLesson(
+        object: PlacedObject,
+        view: PlayerView,
+        movedPlayerIndex: Int,
+        systemsFrameDuration: Float,
+        systemsGameTime: Float,
+        followBotTimer11StartedThisFrame: Bool,
+        trainingOpeningFeedback: inout [TrainingOpeningFeedback]
+    ) {
+        if var dodgeState = trainingDodgeAttemptState,
+            let dodge = level.trainingDodgeAttempt
+        {
+            let triggerTimerConsumesFrame =
+                dodgeState.triggerTimerRemaining != nil
+            var almostDoneTimerConsumesFrame =
+                dodgeState.almostDoneTimerRemaining != nil
+            var successTimerConsumesFrame =
+                dodgeState.successTimerRemaining != nil
+            let maneuverLevelTimerConsumesFrame =
+                trainingManeuverFollowState?.levelTimerRemaining
+                    != nil
+            let followObjectTimerConsumesFrame =
+                trainingManeuverFollowState?.objectTimerRemaining
+                    != nil
+            let player = level.objects[movedPlayerIndex]
+            let turret = level.objects.first {
+                $0.handle == dodge.dodgeTurretObjectHandle
+            }!
+
+            if dodgeState.turretIsPowered,
+                dodgeState.script017Count == 0,
+                case .room(let turretRoom) = turret.location,
+                case .room(let playerRoom) = player.location
+            {
+                let connectedRooms = reciprocalPortalComponent(
+                    rooms: level.rooms,
+                    startRoomSourceIndex: turretRoom
+                )
+                let targetDistance = vectorDistance(
+                    turret.position,
+                    player.position
+                )
+                let crossRoomLimit: Float =
+                    dodgeState.awareness > 0 ? 720 : 450
+                let targetIsEligible =
+                    connectedRooms.contains(playerRoom)
+                    && (playerRoom == turretRoom
+                        || targetDistance <= crossRoomLimit)
+                if !targetIsEligible {
+                    dodgeState.seesTarget = false
+                } else if systemsGameTime
+                    - dodgeState.lastVisibleTargetTime > 0.35,
+                    systemsGameTime
+                        >= dodgeState.nextVisibilityCheckTime
+                {
+                    let visibility = traceIndoorMovement(
+                        in: level,
+                        startRoom: turretRoom,
+                        start: turret.position,
+                        end: player.position,
+                        radius: 0
+                    )
+                    // Visibility scheduling uses the deterministic midpoint
+                    // of the released 0.135...0.165 interval until replay/RNG
+                    // authority is selected.
+                    dodgeState.nextVisibilityCheckTime =
+                        systemsGameTime + 0.15
+                    if case .noHit = visibility.outcome {
+                        let targetDirection = normalized(
+                            player.position - turret.position
+                        )
+                        let closingSpeed =
+                            dodgeState.weaponSpeed
+                            - dot(targetDirection, velocity)
+                        if dodgeState.weaponSpeed > 0,
+                            closingSpeed > 0
+                        {
+                            dodgeState.retainedTargetPosition =
+                                player.position
+                                + velocity
+                                * (targetDistance
+                                    / closingSpeed
+                                    * dodge.turret
+                                    .fixedLeadAccuracy)
+                        } else {
+                            dodgeState.retainedTargetPosition =
+                                player.position
+                        }
+                        dodgeState.lastVisibleTargetTime =
+                            systemsGameTime
+                        dodgeState.seesTarget = true
+                        dodgeState.awareness = max(
+                            dodgeState.awareness,
+                            60
+                        )
+                    }
+                }
+                let visibleAge =
+                    systemsGameTime
+                    - dodgeState.lastVisibleTargetTime
+                if let retainedTarget =
+                    dodgeState.retainedTargetPosition,
+                    dodgeState.awareness > 15,
+                    visibleAge < 4
+                {
+                    for jointIndex in dodge.turret.joints.indices {
+                        let joint = dodge.turret.joints[jointIndex]
+                        let still =
+                            dodgeState.turretAngles[jointIndex]
+                        let right = constrainedTrainingTurretAngle(
+                            still
+                                - systemsFrameDuration
+                                * joint.rotationsPerSecond,
+                            fieldOfView: joint.fieldOfView,
+                            movesRight: true
+                        )
+                        let left = constrainedTrainingTurretAngle(
+                            still
+                                + systemsFrameDuration
+                                * joint.rotationsPerSecond,
+                            fieldOfView: joint.fieldOfView,
+                            movesRight: false
+                        )
+                        var candidates = dodgeState.turretAngles
+                        candidates[jointIndex] = still
+                        let stillDot = trainingDodgeAimDot(
+                            level: level,
+                            dodge: dodge,
+                            turret: turret,
+                            angles: candidates,
+                            target: retainedTarget
+                        )
+                        candidates[jointIndex] = right
+                        let rightDot = trainingDodgeAimDot(
+                            level: level,
+                            dodge: dodge,
+                            turret: turret,
+                            angles: candidates,
+                            target: retainedTarget
+                        )
+                        candidates[jointIndex] = left
+                        let leftDot = trainingDodgeAimDot(
+                            level: level,
+                            dodge: dodge,
+                            turret: turret,
+                            angles: candidates,
+                            target: retainedTarget
+                        )
+                        var bestAngle = still
+                        var bestDot = stillDot
+                        if rightDot > bestDot {
+                            bestAngle = right
+                            bestDot = rightDot
+                        }
+                        if leftDot > bestDot {
+                            bestAngle = left
+                        }
+                        dodgeState.turretAngles[jointIndex] =
+                            bestAngle
+                        dodgeState.turretDirections[jointIndex] =
+                            rightDot > leftDot ? 1 : 2
+                    }
+
+                    let aim = trainingDodgeGunTransform(
+                        level: level,
+                        dodge: dodge,
+                        turret: turret,
+                        angles: dodgeState.turretAngles,
+                        restPosition: dodge.turret.aimingGunpoint
+                    )
+                    let aimDirection = normalized(
+                        retainedTarget - aim.position
+                    )
+                    if visibleAge < 2,
+                        dot(aim.forward, aimDirection)
+                            >= dodge.turret.fireAlignmentDot,
+                        systemsGameTime >= dodgeState.nextFireTime
+                    {
+                        let fire = trainingDodgeGunTransform(
+                            level: level,
+                            dodge: dodge,
+                            turret: turret,
+                            angles: dodgeState.turretAngles,
+                            restPosition: dodge.turret.gunpoints[
+                                dodgeState.firingMaskIndex
+                            ]
+                        )
+                        let muzzleTrace = traceIndoorMovement(
+                            in: level,
+                            startRoom: turretRoom,
+                            start: turret.position,
+                            end: fire.position,
+                            radius: 0
+                        )
+                        if case .noHit = muzzleTrace.outcome {
+                            dodgeState.projectiles.append(
+                                .init(
+                                    roomSourceIndex: turretRoom,
+                                    position: fire.position,
+                                    velocity:
+                                        fire.forward
+                                        * dodge.turret.projectileSpeed,
+                                    lifeRemaining:
+                                        dodge.turret.projectileLifetime
+                                ))
+                            trainingOpeningFeedback.append(
+                                .init(
+                                    hudMessages: [],
+                                    voiceSourceName: "",
+                                    voicePrecedesHUDMessages: true,
+                                    soundSourceName:
+                                        dodge.turret.fireSoundSourceName
+                                ))
+                        }
+                        let scheduledFireTime =
+                            dodgeState.nextFireTime
+                        let continuousWindow = max(
+                            dodge.turret.fireWait,
+                            systemsFrameDuration * 1.5
+                        )
+                        dodgeState.nextFireTime =
+                            systemsGameTime - scheduledFireTime
+                                <= continuousWindow
+                            ? scheduledFireTime
+                                + dodge.turret.fireWait
+                            : systemsGameTime
+                                + dodge.turret.fireWait
+                        dodgeState.firingMaskIndex =
+                            (dodgeState.firingMaskIndex + 1)
+                            % dodge.turret.gunpoints.count
+                        dodgeState.weaponSpeed =
+                            dodge.turret.projectileSpeed
+                    }
+                }
+            }
+
+            var survivingProjectiles: [TrainingDodgeProjectileState] = []
+            for var projectile in dodgeState.projectiles {
+                let end =
+                    projectile.position
+                    + projectile.velocity * systemsFrameDuration
+                let trace = traceIndoorMovement(
+                    in: level,
+                    startRoom: projectile.roomSourceIndex,
+                    start: projectile.position,
+                    end: end,
+                    radius: dodge.turret.projectileRadius
+                )
+                let playerHit = segmentSphereHitFraction(
+                    start: projectile.position,
+                    end: end,
+                    center: player.position,
+                    radius:
+                        dodge.turret.projectileRadius
+                        + view.collisionRadius
+                )
+                let traceFraction =
+                    vectorDistance(
+                        projectile.position,
+                        end
+                    ) > 0
+                    ? vectorDistance(
+                        projectile.position,
+                        trace.finalPosition
+                    ) / vectorDistance(projectile.position, end)
+                    : 1
+                if let playerHit,
+                    playerHit <= traceFraction + 0.000_1
+                {
+                    shields -= dodge.turret.projectileDamage
+                    trainingOpeningFeedback.append(
+                        .init(
+                            hudMessages: [],
+                            voiceSourceName: "",
+                            voicePrecedesHUDMessages: true,
+                            soundSourceName:
+                                dodge.turret.impactSoundSourceName
+                        ))
+                    continue
+                }
+                guard case .noHit = trace.outcome else { continue }
+                projectile.position = trace.finalPosition
+                projectile.roomSourceIndex =
+                    trace.containingRoomSourceIndex
+                projectile.lifeRemaining -= systemsFrameDuration
+                if projectile.lifeRemaining > 0 {
+                    survivingProjectiles.append(projectile)
+                }
+            }
+            dodgeState.projectiles = survivingProjectiles
+
+            if dodgeState.script033Count < 1,
+                case .room(35) = player.location,
+                let startDodge = level.objects.first(where: {
+                    $0.handle == dodge.startDodgeObjectHandle
+                }),
+                segmentSphereHitFraction(
+                    start: object.position,
+                    end: player.position,
+                    center: startDodge.position,
+                    radius:
+                        dodge.startDodgeCollisionRadius
+                        + view.collisionRadius
+                ) != nil
+            {
+                if var openingState = trainingOpeningState {
+                    let raw = openingState.enabledControls.rawValue
+                    openingState.enabledControls = .init(
+                        rawValue: (raw & ~dodge.disabledControlMask)
+                            | dodge.enabledDodgeControlMask
+                    )
+                    trainingOpeningState = openingState
+                }
+                setTrainingDodgePortalRenderState(
+                    in: &level,
+                    roomSourceIndex: dodge.portalRoomTwoSourceIndex,
+                    portalIndices: dodge.orderedPortalIndices,
+                    rendersFaces: true
+                )
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [dodge.introduction],
+                        voiceSourceName:
+                            dodge.introductionVoiceSourceName,
+                        voicePrecedesHUDMessages: true
+                    ))
+                dodgeState.triggerTimerRemaining = dodge.triggerDelay
+                dodgeState.script033Count += 1
+            }
+
+            if let exit = dodge.dodgeExit,
+                (dodgeState.script019Count ?? 0) < 1,
+                case .room(35) = player.location,
+                let doneDodgeingGoal = level.objects.first(where: {
+                    $0.handle == exit.objectHandle
+                }),
+                segmentSphereHitFraction(
+                    start: object.position,
+                    end: player.position,
+                    center: doneDodgeingGoal.position,
+                    radius:
+                        exit.collisionRadius
+                        + view.collisionRadius
+                ) != nil
+            {
+                dodgeState.markerLightDistance =
+                    exit.markerLightDistance
+                setTrainingDodgePortalRenderState(
+                    in: &level,
+                    roomSourceIndex: exit.portalRoomSourceIndex,
+                    portalIndices: exit.orderedPortalIndices,
+                    rendersFaces: false
+                )
+                if var openingState = trainingOpeningState {
+                    openingState.enabledControls = .init(
+                        rawValue:
+                            openingState.enabledControls.rawValue
+                            & ~exit.disabledControlMask
+                    )
+                    trainingOpeningState = openingState
+                }
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [exit.instruction],
+                        voiceSourceName: exit.voiceSourceName,
+                        voicePrecedesHUDMessages: true
+                    ))
+                dodgeState.script019Count =
+                    min(
+                        (dodgeState.script019Count ?? 0) + 1,
+                        trainingScriptActionCounterMaximum
+                    )
+            }
+
+            if var maneuverState = trainingManeuverFollowState,
+               let lesson = dodge.maneuverFollow,
+               maneuverState.script021Count < 1,
+               dodgeState.script020Count > 0,
+               case .room(37) = player.location,
+               let maneuver = level.objects.first(where: {
+                   $0.handle == lesson.maneuverObjectHandle
+               }),
+               segmentSphereHitFraction(
+                   start: object.position,
+                   end: player.position,
+                   center: maneuver.position,
+                   radius:
+                       lesson.maneuverCollisionRadius
+                       + view.collisionRadius
+               ) != nil
+            {
+                dodgeState.markerLightDistance = 0
+                if var openingState = trainingOpeningState {
+                    openingState.enabledControls = .init(
+                        rawValue: lesson.headingControlMask
+                    )
+                    trainingOpeningState = openingState
+                }
+                setTrainingDodgePortalRenderState(
+                    in: &level,
+                    roomSourceIndex: lesson.portalRoomSourceIndex,
+                    portalIndices: lesson.orderedPortalIndices,
+                    rendersFaces: true
+                )
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [
+                            lesson.maneuverIntroduction,
+                        ],
+                        voiceSourceName:
+                            lesson.headingVoiceSourceName,
+                        voicePrecedesHUDMessages: false,
+                        trailingHUDMessages: [
+                            lesson.headingInstruction,
+                        ]
+                    ))
+                maneuverState.levelTimerRemaining =
+                    lesson.headingDuration
+                maneuverState.script021Count += 1
+                trainingManeuverFollowState = maneuverState
+            }
+
+            if shields < dodge.restoredPlayerShields,
+                dodgeState.script016Count > 0,
+                dodgeState.script017Count == 0
+            {
+                dodgeState.almostDoneTimerRemaining =
+                    dodge.almostDoneDelay
+                dodgeState.successTimerRemaining = dodge.successDelay
+                almostDoneTimerConsumesFrame = false
+                successTimerConsumesFrame = false
+                trainingOpeningFeedback.append(
+                    .init(
+                        hudMessages: [dodge.hitInstruction],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: true
+                    ))
+                shields = dodge.restoredPlayerShields
+                if dodgeState.script018Count
+                    < trainingScriptActionCounterMaximum
+                {
+                    dodgeState.script018Count += 1
+                }
+            }
+
+            if var timer = dodgeState.triggerTimerRemaining {
+                if triggerTimerConsumesFrame {
+                    timer -= systemsFrameDuration
+                }
+                if timer <= 0.000_001,
+                    dodgeState.script016Count < 1
+                {
+                    dodgeState.triggerTimerRemaining = nil
+                    shields = dodge.restoredPlayerShields
+                    trainingOpeningFeedback.append(
+                        .init(
+                            hudMessages: [dodge.instruction],
+                            voiceSourceName: "",
+                            voicePrecedesHUDMessages: true
+                        ))
+                    dodgeState.successTimerRemaining =
+                        dodge.successDelay
+                    dodgeState.almostDoneTimerRemaining =
+                        dodge.almostDoneDelay
+                    dodgeState.turretIsPowered = true
+                    dodgeState.nextFireTime = systemsGameTime
+                    dodgeState.script016Count += 1
+                } else {
+                    dodgeState.triggerTimerRemaining = timer
+                }
+            }
+            if var timer = dodgeState.almostDoneTimerRemaining {
+                if almostDoneTimerConsumesFrame {
+                    timer -= systemsFrameDuration
+                }
+                if timer <= 0.000_001 {
+                    dodgeState.almostDoneTimerRemaining = nil
+                    trainingOpeningFeedback.append(
+                        .init(
+                            hudMessages: [dodge.almostDoneInstruction],
+                            voiceSourceName:
+                                dodge.almostDoneVoiceSourceName,
+                            voicePrecedesHUDMessages: true
+                        ))
+                    if dodgeState.script020Count
+                        < trainingScriptActionCounterMaximum
+                    {
+                        dodgeState.script020Count += 1
+                    }
+                } else {
+                    dodgeState.almostDoneTimerRemaining = timer
+                }
+            }
+            if var timer = dodgeState.successTimerRemaining {
+                if successTimerConsumesFrame {
+                    timer -= systemsFrameDuration
+                }
+                if timer <= 0.000_001,
+                    dodgeState.script017Count < 1
+                {
+                    dodgeState.successTimerRemaining = nil
+                    dodgeState.markerLightDistance =
+                        dodge.successMarkerLightDistance
+                    setTrainingDodgePortalRenderState(
+                        in: &level,
+                        roomSourceIndex:
+                            dodge.portalRoomThreeSourceIndex,
+                        portalIndices: dodge.orderedPortalIndices,
+                        rendersFaces: false
+                    )
+                    dodgeState.turretIsPowered = false
+                    if var openingState = trainingOpeningState {
+                        openingState.enabledControls.formUnion(
+                            .init(
+                                rawValue: dodge.successControlMask
+                            ))
+                        trainingOpeningState = openingState
+                    }
+                    trainingOpeningFeedback.append(
+                        .init(
+                            hudMessages: [
+                                dodge.successMessage,
+                                dodge.leaveInstruction,
+                            ],
+                            voiceSourceName:
+                                dodge.successVoiceSourceName,
+                            voicePrecedesHUDMessages: true
+                        ))
+                    dodgeState.script017Count += 1
+                } else {
+                    dodgeState.successTimerRemaining = timer
+                }
+            }
+            if var maneuverState = trainingManeuverFollowState,
+               let lesson = dodge.maneuverFollow
+            {
+                var followObjectTimerWasRestarted = false
+                if maneuverState.script023Count > 0,
+                   maneuverState.script026Count == 0
+                {
+                    let followBotDirection =
+                        maneuverState.position - player.position
+                    let followBotIsVisible =
+                        dot(followBotDirection, followBotDirection)
+                            > 0.000_001
+                        && Double(
+                            dot(
+                                player.orientation.forward,
+                                normalized(followBotDirection)
+                            )
+                        ) > cos(Double.pi / 4)
+                    if !followBotIsVisible {
+                        maneuverState.objectTimerRemaining =
+                            lesson.followDuration
+                        followObjectTimerWasRestarted = true
+                    }
+                    if maneuverState.script025Count
+                        < trainingScriptActionCounterMaximum
+                    {
+                        maneuverState.script025Count += 1
+                    }
+                }
+                if maneuverState.script021Count > 0,
+                   energy < 50,
+                   var destruction = maneuverState.destruction {
+                    energy = 50
+                    destruction.script031Count = min(
+                        destruction.script031Count + 1,
+                        trainingScriptActionCounterMaximum
+                    )
+                    maneuverState.destruction = destruction
+                }
+
+                if var timer = maneuverState.levelTimerRemaining {
+                    if maneuverLevelTimerConsumesFrame {
+                        timer -= systemsFrameDuration
+                    }
+                    if timer <= 0.000_001 {
+                        maneuverState.levelTimerRemaining = nil
+                        // TrainingMission.cpp keeps the released level-timer
+                        // handler order 023, 024, 022.
+                        if maneuverState.script023Count < 1,
+                           maneuverState.script024Count > 0
+                        {
+                            if var openingState =
+                                    trainingOpeningState
+                            {
+                                openingState.enabledControls =
+                                    .init(
+                                        rawValue:
+                                            lesson
+                                            .rotationalControlMask
+                                    )
+                                trainingOpeningState = openingState
+                            }
+                            trainingOpeningFeedback.append(
+                                .init(
+                                    hudMessages: [
+                                        lesson.followIntroduction,
+                                        lesson.followInstruction,
+                                    ],
+                                    voiceSourceName:
+                                        lesson.followVoiceSourceName,
+                                    voicePrecedesHUDMessages: false
+                                ))
+                            maneuverState.followBotIsPowered = true
+                            maneuverState.followBotTeamFlags =
+                                lesson.friendlyTeamFlags
+                            maneuverState.objectTimerRemaining =
+                                lesson.followDuration
+                            assignTrainingFollowBotPath(
+                                lesson.followPathIndex,
+                                state: &maneuverState
+                            )
+                            maneuverState.script023Count += 1
+                        }
+                        if maneuverState.script024Count < 1,
+                           maneuverState.script022Count > 0
+                        {
+                            if var openingState =
+                                    trainingOpeningState
+                            {
+                                openingState.enabledControls =
+                                    .init(
+                                        rawValue:
+                                            lesson.bankControlMask
+                                    )
+                                trainingOpeningState = openingState
+                            }
+                            trainingOpeningFeedback.append(
+                                .init(
+                                    hudMessages: [
+                                        lesson.bankInstruction,
+                                    ],
+                                    voiceSourceName:
+                                        lesson.bankVoiceSourceName,
+                                    voicePrecedesHUDMessages: false
+                                ))
+                            maneuverState.levelTimerRemaining =
+                                lesson.bankDuration
+                            maneuverState.script024Count += 1
+                        }
+                        if maneuverState.script022Count < 1,
+                           maneuverState.script021Count > 0
+                        {
+                            if var openingState =
+                                    trainingOpeningState
+                            {
+                                openingState.enabledControls =
+                                    .init(
+                                        rawValue:
+                                            lesson.pitchControlMask
+                                    )
+                                trainingOpeningState = openingState
+                            }
+                            trainingOpeningFeedback.append(
+                                .init(
+                                    hudMessages: [
+                                        lesson.successMessage,
+                                        lesson.pitchInstruction,
+                                    ],
+                                    voiceSourceName:
+                                        lesson.pitchVoiceSourceName,
+                                    voicePrecedesHUDMessages: false
+                                ))
+                            maneuverState.levelTimerRemaining =
+                                lesson.pitchDuration
+                            maneuverState.script022Count += 1
+                        }
+                    } else {
+                        maneuverState.levelTimerRemaining = timer
+                    }
+                }
+
+                if let handoff = lesson.destructionHandoff,
+                   var destruction = maneuverState.destruction,
+                   var timer = destruction.levelTimer11Remaining {
+                    if !followBotTimer11StartedThisFrame {
+                        timer -= systemsFrameDuration
+                    }
+                    if timer <= 0.000_001,
+                       destruction.script027Count < 1 {
+                        destruction.levelTimer11Remaining = nil
+                        trainingOpeningFeedback.append(
+                            .init(
+                                hudMessages: [handoff.successMessage],
+                                voiceSourceName: "",
+                                voicePrecedesHUDMessages: false
+                            )
+                        )
+                        destruction.destroyBot2TeamFlags =
+                            handoff.movingTeamFlags
+                        destruction.destroyBot1TeamFlags =
+                            handoff.movingTeamFlags
+                        destruction.destroyBot1IsVisible = true
+                        setObjectPresentationVisibility(
+                            in: &level,
+                            handle:
+                                handoff.destroyBot1ObjectHandle,
+                            isVisible: true
+                        )
+                        trainingOpeningFeedback.append(
+                            .init(
+                                hudMessages: [
+                                    handoff.movingInstruction
+                                ],
+                                voiceSourceName:
+                                    handoff.voiceSourceName,
+                                voicePrecedesHUDMessages: false
+                            )
+                        )
+                        assignTrainingAuthoredPath(
+                            handoff.movingPathIndex,
+                            motion:
+                                &destruction
+                                .destroyBot1Motion
+                        )
+                        destruction.destroyBot1Destruction =
+                            initialTrainingDestroyBot1DestructionState(
+                                level: level,
+                                handoff: handoff
+                            )
+                        destruction.script027Count = min(
+                            destruction.script027Count + 1,
+                            trainingScriptActionCounterMaximum
+                        )
+                    } else {
+                        destruction.levelTimer11Remaining = timer
+                    }
+                    maneuverState.destruction = destruction
+                }
+
+                if var timer = maneuverState.objectTimerRemaining {
+                    if followObjectTimerConsumesFrame,
+                       !followObjectTimerWasRestarted {
+                        timer -= systemsFrameDuration
+                    }
+                    if timer <= 0.000_001 {
+                        maneuverState.objectTimerRemaining = nil
+                        if maneuverState.script025Count > 0 {
+                            if var openingState =
+                                    trainingOpeningState
+                            {
+                                openingState.enabledControls.formUnion(
+                                    .init(
+                                        rawValue:
+                                            lesson.weaponControlMask
+                                    ))
+                                trainingOpeningState = openingState
+                            }
+                            assignTrainingFollowBotPath(
+                                lesson.destroyPathIndex,
+                                state: &maneuverState
+                            )
+                            trainingOpeningFeedback.append(
+                                .init(
+                                    hudMessages: [
+                                        lesson.successMessage,
+                                        lesson.weaponsEnabledInstruction,
+                                    ],
+                                    voiceSourceName:
+                                        lesson.weaponVoiceSourceName,
+                                    voicePrecedesHUDMessages: false,
+                                    trailingHUDMessages: [
+                                        lesson.destroyInstruction,
+                                    ]
+                                ))
+                            maneuverState.script026Count = min(
+                                maneuverState.script026Count + 1,
+                                trainingScriptActionCounterMaximum
+                            )
+                        }
+                    } else {
+                        maneuverState.objectTimerRemaining = timer
+                    }
+                }
+                trainingManeuverFollowState = maneuverState
+                restoreTrainingFollowBotPresentation()
+            }
+            trainingDodgeAttemptState = dodgeState
         }
     }
 
