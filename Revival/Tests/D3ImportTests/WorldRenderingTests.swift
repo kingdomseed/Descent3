@@ -13784,6 +13784,16 @@ final class WorldRenderingTests: XCTestCase {
         )
         XCTAssertEqual(frame.enabledPlayerControls, [])
         XCTAssertFalse(frame.showsEnabledPlayerControls)
+        _ = simulation.update(
+            at: 0.3,
+            input: .init(firesPrimaryWeapon: true)
+        )
+        XCTAssertEqual(
+            simulation.energy,
+            finalGoal.postLevelResult.energy,
+            accuracy: 0.000_001,
+            "successful final-result suspension cannot spend another volley"
+        )
         XCTAssertEqual(
             finalGoal.presentation,
             .init(
@@ -17647,27 +17657,235 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertFalse(input.snapshot(frameDuration: 0.1).usesInventory)
     }
 
-    func testPrimaryFireRequestIsOneShotAndClearsOutsideGameplay() {
+    @MainActor
+    func testHeldPrimaryFirePublishesUntilReleaseAndKeepsScheduledCadence()
+        throws
+    {
         var playerInput = PlayerInputState(rampDuration: 0)
-        playerInput.requestPrimaryFire()
+        playerInput.setPrimaryFireHeld(true)
         XCTAssertTrue(
             playerInput.snapshot(frameDuration: 0.1)
                 .firesPrimaryWeapon
+        )
+        XCTAssertTrue(
+            playerInput.snapshot(frameDuration: 0.1)
+                .firesPrimaryWeapon
+        )
+        playerInput.setPrimaryFireHeld(false)
+        XCTAssertFalse(
+            playerInput.snapshot(frameDuration: 0.1)
+                .firesPrimaryWeapon
+        )
+
+        playerInput.setPrimaryFireHeld(true)
+        playerInput.setGameplayActive(
+            false,
+            simulation: nil,
+            at: 1
         )
         XCTAssertFalse(
             playerInput.snapshot(frameDuration: 0.1)
                 .firesPrimaryWeapon
         )
 
-        playerInput.setGameplayActive(
-            false,
-            simulation: nil,
-            at: 1
+        let view = RevivalGameplayView(frame: .zero, device: nil)
+        var heldChanges: [Bool] = []
+        view.primaryFireHeldChanged = { heldChanges.append($0) }
+        view.setGameplayActive(true)
+        let mouseDown = try XCTUnwrap(
+            NSEvent.mouseEvent(
+                with: .leftMouseDown,
+                location: .zero,
+                modifierFlags: [],
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                eventNumber: 1,
+                clickCount: 1,
+                pressure: 1
+            )
         )
-        playerInput.requestPrimaryFire()
+        let mouseUp = try XCTUnwrap(
+            NSEvent.mouseEvent(
+                with: .leftMouseUp,
+                location: .zero,
+                modifierFlags: [],
+                timestamp: 0.01,
+                windowNumber: 0,
+                context: nil,
+                eventNumber: 2,
+                clickCount: 1,
+                pressure: 0
+            )
+        )
+        view.mouseDown(with: mouseDown)
+        view.mouseUp(with: mouseUp)
+        view.mouseDown(with: mouseDown)
+        view.clearInput()
+        view.mouseDown(with: mouseDown)
+        view.setGameplayActive(false)
+        XCTAssertEqual(
+            heldChanges,
+            [true, false, true, false, true, false]
+        )
+
+        var level = makeTrainingRobotGuidebotLevel()
+        let player = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            }
+        )
+        let robotIndex = try XCTUnwrap(
+            level.objects.firstIndex { $0.handle == 4_112 }
+        )
+        level.objects[robotIndex].position = .init(
+            x: player.position.x - player.orientation.forward.x * 100,
+            y: player.position.y - player.orientation.forward.y * 100,
+            z: player.position.z - player.orientation.forward.z * 100
+        )
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x1234_5678
+        )
+
+        var frame = simulation.update(
+            at: 0.01,
+            input: .init(yaw: 1, firesPrimaryWeapon: true)
+        )
+        let initialPosition = player.position
+        XCTAssertNotEqual(
+            frame.playerView.camera.target,
+            Vector3(
+                x: initialPosition.x + player.orientation.forward.x,
+                y: initialPosition.y + player.orientation.forward.y,
+                z: initialPosition.z + player.orientation.forward.z
+            )
+        )
+        XCTAssertEqual(simulation.energy, 99.85, accuracy: 0.000_01)
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var guidebotState = try XCTUnwrap(
+            continuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        let firstProjectiles = try XCTUnwrap(
+            guidebotState["projectiles"] as? [[String: Any]]
+        )
+        XCTAssertEqual(firstProjectiles.count, 2)
+        let firstVolleyPositions = try firstProjectiles.map { projectile in
+            let position = try XCTUnwrap(
+                projectile["position"] as? [String: Any]
+            )
+            return Vector3(
+                x: Float(try XCTUnwrap(position["x"] as? Double)),
+                y: Float(try XCTUnwrap(position["y"] as? Double)),
+                z: Float(try XCTUnwrap(position["z"] as? Double))
+            )
+        }
+        let gunpoints = try XCTUnwrap(
+            level.trainingRobotGuidebotChain?.combat.gunpoints
+        )
+        let projectileAdvance = try XCTUnwrap(
+            level.trainingRobotGuidebotChain?.combat.projectileSpeed
+        ) * 0.1
+        let expectedPositions = gunpoints.map { gunpoint in
+            Vector3(
+                x: initialPosition.x
+                    + player.orientation.right.x * gunpoint.x
+                    + player.orientation.up.x * gunpoint.y
+                    + player.orientation.forward.x
+                        * (
+                            gunpoint.z + projectileAdvance
+                        ),
+                y: initialPosition.y
+                    + player.orientation.right.y * gunpoint.x
+                    + player.orientation.up.y * gunpoint.y
+                    + player.orientation.forward.y
+                        * (
+                            gunpoint.z + projectileAdvance
+                        ),
+                z: initialPosition.z
+                    + player.orientation.right.z * gunpoint.x
+                    + player.orientation.up.z * gunpoint.y
+                    + player.orientation.forward.z
+                        * (
+                            gunpoint.z + projectileAdvance
+                        )
+            )
+        }
+        XCTAssertEqual(firstVolleyPositions, expectedPositions)
+
+        frame = simulation.update(
+            at: 0.257,
+            input: .init(firesPrimaryWeapon: true)
+        )
+        XCTAssertEqual(simulation.energy, 99.85, accuracy: 0.000_01)
+        frame = simulation.update(
+            at: 0.267,
+            input: .init(firesPrimaryWeapon: true)
+        )
+        XCTAssertEqual(simulation.energy, 99.7, accuracy: 0.000_01)
+
+        continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        guidebotState = try XCTUnwrap(
+            continuationObject["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                guidebotState["projectiles"] as? [[String: Any]]
+            ).count,
+            4
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                guidebotState["nextPrimaryFireTime"] as? Double
+            ),
+            0.5,
+            accuracy: 0.000_000_1
+        )
+        XCTAssertEqual(
+            continuationObject["authoritativeRandomState"] as? Int,
+            Int(0x1234_5678)
+        )
+
+        _ = simulation.update(at: 9, input: .zero)
+        _ = simulation.update(at: 9.016, input: .zero)
+        frame = simulation.update(
+            at: 9.032,
+            input: .init(firesPrimaryWeapon: true)
+        )
+        XCTAssertEqual(simulation.energy, 99.55, accuracy: 0.000_01)
+        let rebasedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        let rebasedGuidebot = try XCTUnwrap(
+            rebasedObject["trainingRobotGuidebotState"] as? [String: Any]
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                rebasedGuidebot["nextPrimaryFireTime"] as? Double
+            ),
+            9.266,
+            accuracy: 0.000_001
+        )
+
         XCTAssertFalse(
-            playerInput.snapshot(frameDuration: 0.1)
-                .firesPrimaryWeapon
+            trainingPlayerControlMask(
+                galleryWasTriggered: true,
+                controlsWereRestored: false,
+                openingControls: .all
+            ).contains(.primaryWeapon)
         )
     }
 

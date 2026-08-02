@@ -376,8 +376,8 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.guidebotDeployRequested = {
                 [weak self] in self?.requestGuidebotAction()
             }
-            gameplayView.primaryFireRequested = {
-                [weak self] in self?.playerInput.requestPrimaryFire()
+            gameplayView.primaryFireHeldChanged = {
+                [weak self] in self?.playerInput.setPrimaryFireHeld($0)
             }
             gameplayView.inventoryUseRequested = {
                 [weak self] in self?.playerInput.requestInventoryUse()

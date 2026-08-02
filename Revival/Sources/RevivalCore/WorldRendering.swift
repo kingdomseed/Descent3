@@ -263,7 +263,7 @@ struct PlayerInputState: Sendable {
     private var mouseDeltaY: Float = 0
     private var guidebotDeploymentIsPending = false
     private var guidebotActiveGoalRequestIsPending = false
-    private var primaryFireIsPending = false
+    private var primaryFireIsHeld = false
     private var inventoryUseIsPending = false
     private var headlightToggleIsPending = false
     private(set) var gameplayIsActive = true
@@ -298,9 +298,8 @@ struct PlayerInputState: Sendable {
         guidebotActiveGoalRequestIsPending = true
     }
 
-    mutating func requestPrimaryFire() {
-        guard gameplayIsActive else { return }
-        primaryFireIsPending = true
+    mutating func setPrimaryFireHeld(_ isHeld: Bool) {
+        primaryFireIsHeld = gameplayIsActive && isHeld
     }
 
     mutating func requestInventoryUse() {
@@ -329,14 +328,13 @@ struct PlayerInputState: Sendable {
         let deploysTrainingGuidebot = guidebotDeploymentIsPending
         let requestsTrainingGuidebotActiveGoal =
             guidebotActiveGoalRequestIsPending
-        let firesPrimaryWeapon = primaryFireIsPending
+        let firesPrimaryWeapon = primaryFireIsHeld
         let usesInventory = inventoryUseIsPending
         let togglesHeadlight = headlightToggleIsPending
         mouseDeltaX = 0
         mouseDeltaY = 0
         guidebotDeploymentIsPending = false
         guidebotActiveGoalRequestIsPending = false
-        primaryFireIsPending = false
         inventoryUseIsPending = false
         headlightToggleIsPending = false
         let mouseNormalizer = 10_000 * max(frameDuration, 0.005)
@@ -378,7 +376,7 @@ struct PlayerInputState: Sendable {
             mouseDeltaY = 0
             guidebotDeploymentIsPending = false
             guidebotActiveGoalRequestIsPending = false
-            primaryFireIsPending = false
+            primaryFireIsHeld = false
             inventoryUseIsPending = false
             headlightToggleIsPending = false
             _ = ramp.snapshot(
@@ -5078,8 +5076,19 @@ final class PlayerSimulation {
                     ))
                 }
                 energy -= combat.batteryEnergyCost
-                state.nextPrimaryFireTime =
-                    systemsGameTime + combat.batteryFireWait
+                let previousDeadline = state.nextPrimaryFireTime
+                let overdue = systemsGameTime - previousDeadline
+                let continuityWindow = max(
+                    combat.batteryFireWait,
+                    systemsFrameDuration * 1.5
+                )
+                if overdue >= 0, overdue <= continuityWindow {
+                    state.nextPrimaryFireTime =
+                        previousDeadline + combat.batteryFireWait
+                } else {
+                    state.nextPrimaryFireTime =
+                        systemsGameTime + combat.batteryFireWait
+                }
             }
 
             var maneuverState = trainingManeuverFollowState

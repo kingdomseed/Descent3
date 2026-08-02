@@ -32,7 +32,7 @@ final class RevivalGameplayView: MTKView {
     var heldInputChanged: ((InputSnapshot) -> Void)?
     var controllerInputChanged: ((InputSnapshot) -> Void)?
     var guidebotDeployRequested: (() -> Void)?
-    var primaryFireRequested: (() -> Void)?
+    var primaryFireHeldChanged: ((Bool) -> Void)?
     var inventoryUseRequested: (() -> Void)?
     var headlightToggleRequested: (() -> Void)?
     var trainingResultAcknowledgementRequested: (() -> Void)?
@@ -47,6 +47,7 @@ final class RevivalGameplayView: MTKView {
     private var activeController: GCController?
     private var gameplayIsActive = false
     private var mouseIsCaptured = false
+    private var primaryFireIsHeld = false
     private var afterburnerIsHeld = false
     private let trainingMessageLabel = NSTextField(labelWithString: "")
     private let enabledControlsLabel = NSTextField(labelWithString: "")
@@ -304,7 +305,11 @@ final class RevivalGameplayView: MTKView {
             return
         }
         captureMouse()
-        primaryFireRequested?()
+        setPrimaryFireHeld(true)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        setPrimaryFireHeld(false)
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -348,6 +353,7 @@ final class RevivalGameplayView: MTKView {
         rooms: [LevelRoom] = []
     ) throws {
         if let finalGoal = frame.trainingFinalGoal {
+            clearInput()
             trainingMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
             invulnerabilityStatusLabel.stringValue = ""
@@ -1748,12 +1754,19 @@ final class RevivalGameplayView: MTKView {
     }
 
     private func releaseMouse() {
+        setPrimaryFireHeld(false)
         guard mouseIsCaptured else { return }
         mouseIsCaptured = false
         pendingMouseX = 0
         pendingMouseY = 0
         CGAssociateMouseAndMouseCursorPosition(1)
         NSCursor.unhide()
+    }
+
+    private func setPrimaryFireHeld(_ isHeld: Bool) {
+        guard primaryFireIsHeld != isHeld else { return }
+        primaryFireIsHeld = isHeld
+        primaryFireHeldChanged?(isHeld)
     }
 
     nonisolated private static func direction(

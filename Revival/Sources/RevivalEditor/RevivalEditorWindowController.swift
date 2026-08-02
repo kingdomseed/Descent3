@@ -312,8 +312,8 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.guidebotDeployRequested = {
             [weak self] in self?.requestGuidebotAction()
         }
-        metalView.primaryFireRequested = {
-            [weak self] in self?.playerInput.requestPrimaryFire()
+        metalView.primaryFireHeldChanged = {
+            [weak self] in self?.playerInput.setPrimaryFireHeld($0)
         }
         metalView.inventoryUseRequested = {
             [weak self] in self?.playerInput.requestInventoryUse()
