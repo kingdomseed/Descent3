@@ -1,0 +1,23 @@
+Revival.xcodeproj/project.pbxproj
+  s_c503f7c0529e13::t_59c6f7f9757a81 66-70,134,276,531,557,581,607,641
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_4c0ffdd5be3bdc 22-25,27,29,91-94
+Revival/Sources/RevivalCore/WorldRenderExtractionValues.swift
+  s_c503f7c0529e13::t_20b5a35044b7dd 1-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "5e6b870425294161ccd935117b82ebf6cfe6cb44",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
