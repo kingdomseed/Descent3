@@ -151,6 +151,114 @@ final class MetalWorldPlanTests: XCTestCase {
         )
     }
 
+    func testRookieConcussionUsesRetainedMissileExplosionSparkAndLightDraws()
+        throws
+    {
+        let level = try makePlayerConcussionLevel()
+        let playerView = defaultPlayerView(in: level)
+        let binding = try XCTUnwrap(
+            level.shipDefinitions.first?.playerConcussion
+        )
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            playerView: playerView
+        )
+        XCTAssertTrue(initial.preparedDraws.contains {
+            $0.objectHandle == UInt32.max - 6_000
+                && $0.model == binding.model
+        })
+        XCTAssertTrue(initial.preparedDraws.contains {
+            $0.objectHandle == UInt32.max - 7_000
+                && $0.texture == binding.explosionFrames[0]
+        })
+        XCTAssertTrue(initial.preparedDraws.contains {
+            $0.objectHandle == UInt32.max - 8_000
+        })
+
+        let position = playerView.camera.position
+        let missile = PlayerConcussionMissileFrame(
+            roomSourceIndex: playerView.roomSourceIndex,
+            position: position,
+            orientation: .init(
+                right: .init(x: 1, y: 0, z: 0),
+                up: .init(x: 0, y: 1, z: 0),
+                forward: .init(x: 0, y: 0, z: 1)
+            ),
+            velocity: .init(x: 0, y: 0, z: binding.speed),
+            model: binding.model,
+            lightDistance: binding.lightDistance,
+            lightPresentation: binding.lightPresentation
+        )
+        let explosion = PlayerConcussionExplosionFrame(
+            roomSourceIndex: playerView.roomSourceIndex,
+            position: position,
+            size: binding.explosionSize,
+            texture: binding.explosionFrames[0]
+        )
+        let spark = PlayerConcussionSparkFrame(
+            roomSourceIndex: playerView.roomSourceIndex,
+            start: position,
+            end: .init(x: position.x + 1, y: position.y, z: position.z)
+        )
+        let updated = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            playerView: playerView,
+            playerConcussionMissiles: [missile],
+            playerConcussionExplosions: [explosion],
+            playerConcussionSparks: [spark]
+        )
+        let missileDraw = try XCTUnwrap(updated.draws.first {
+            $0.objectHandle == UInt32.max - 6_000
+                && $0.model == binding.model
+        })
+        XCTAssertTrue(missileDraw.vertices.contains {
+            $0.dynamicLight.x > 0
+                && $0.dynamicLight.y > 0
+                && $0.dynamicLight.z == 0
+        })
+        XCTAssertTrue(updated.draws.contains {
+            $0.objectHandle == UInt32.max - 7_000
+                && $0.texture == binding.explosionFrames[0]
+        })
+        XCTAssertTrue(updated.draws.contains {
+            $0.objectHandle == UInt32.max - 8_000
+                && $0.sourceColor == .init(1, 0.5, 0)
+        })
+        XCTAssertEqual(
+            updated.activeDrawIndices.map { updated.preparedDraws[$0] },
+            updated.draws
+        )
+    }
+
+    func testRookieConcussionSimulationFrameReachesRendererComposition()
+        throws
+    {
+        let level = try makePlayerConcussionLevel()
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(
+            at: 0.01,
+            input: .init(firesSecondaryWeapon: true)
+        )
+        XCTAssertEqual(frame.playerConcussionMissiles.count, 1)
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            playerView: frame.playerView
+        )
+        let updated = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            frame: frame,
+            drawableAspect: 1
+        )
+        XCTAssertTrue(updated.draws.contains {
+            $0.objectHandle == UInt32.max - 6_000
+        })
+    }
+
     func testTimedDodgeAnglesProjectilesAndMarkerReachRetainedMetalPlan()
         throws
     {

@@ -46,6 +46,22 @@ final class D3ImportOperationTests: XCTestCase {
                 weaponFlags: 0
             )
         )
+        XCTAssertEqual(
+            definition.playerConcussion,
+            .init(
+                batteryIndex: 10,
+                firingMasks: [1, 2],
+                weaponName: "Concussion",
+                fireSoundLogicalNames: [
+                    "concmissilefire71", "concmissilefire71",
+                ],
+                fireWaits: [0.5, 0.5],
+                energyUsage: 0,
+                ammoUsage: 1,
+                fireFlags: 0,
+                weaponFlags: 0
+            )
+        )
     }
 
     func testReachedOOFPreservesCustomFacingAndRotationAndRejectsUnreachedPresentationProperties() throws {
@@ -1095,14 +1111,22 @@ private func makeRetailShipTablePage(
             body.appendCString("")
             body.appendInt32(0)
             body.appendFloat(0)
-            body.appendFloat(0)
+            body.appendFloat(batteryIndex == 10 ? 1 : 0)
             for _ in 0..<8 { body.appendUInt16(0) }
             for maskIndex in 0..<8 {
-                body.append(maskIndex == 0 ? 1 : 0)
-                body.appendFloat(maskIndex == 0 ? 1 : 0)
+                body.append(
+                    batteryIndex == 10 && maskIndex == 1
+                        ? 2
+                        : maskIndex == 0 ? 1 : 0
+                )
+                body.appendFloat(
+                    batteryIndex == 10 && maskIndex < 2
+                        ? 0.5
+                        : maskIndex == 0 ? 1 : 0
+                )
                 for _ in 0..<4 { body.appendFloat(0) }
             }
-            body.append(1)
+            body.append(batteryIndex == 10 ? 2 : 1)
             body.appendUInt16(0)
             body.append(0)
             body.appendFloat(0)
@@ -1112,14 +1136,18 @@ private func makeRetailShipTablePage(
             body.append(0)
             for maskIndex in 0..<8 {
                 body.appendCString(
-                    batteryIndex == 20 && maskIndex == 0
+                    batteryIndex == 10 && maskIndex < 2
+                        ? "concmissilefire71"
+                        : batteryIndex == 20 && maskIndex == 0
                         ? "Flare"
                         : ""
                 )
             }
             for maskIndex in 0..<8 {
                 body.appendCString(
-                    batteryIndex == 20 && maskIndex == 0
+                    batteryIndex == 10 && maskIndex < 2
+                        ? "Concussion"
+                        : batteryIndex == 20 && maskIndex == 0
                         ? "Yellow flare"
                         : ""
                 )

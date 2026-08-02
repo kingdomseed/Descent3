@@ -237,42 +237,18 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             try replace(level: level, playerView: frame.playerView)
             return
         }
+        let width = Float(view.drawableSize.width)
+        let height = Float(view.drawableSize.height)
+        let drawableAspect = width.isFinite && height.isFinite
+            && width > 0 && height > 0
+            ? width / height
+            : frame.playerView.camera.projection.aspectRatio
         presentation.update(
             try updateMetalWorldPlan(
                 presentation.plan,
                 level: level,
-                playerView: playerViewWithDrawableAspect(frame.playerView),
-                presentationFrame: .init(
-                    systemsFrameDuration: frame.systemsFrameDuration,
-                    systemsGameTime: frame.systemsGameTime
-                ),
-                trainingCameraMonitor: frame.trainingCameraMonitor,
-                trainingCloak: frame.trainingCloak,
-                    trainingDodgeTurretAngles:
-                        frame.trainingDodgeTurretAngles,
-                    trainingDodgeProjectiles:
-                        frame.trainingDodgeProjectiles,
-                    trainingPrimaryProjectiles:
-                        frame.trainingPrimaryProjectiles,
-                    trainingGuidebotYellowFlares:
-                        frame.trainingGuidebotYellowFlares,
-                    trainingGuidebotYellowFlareParticles:
-                        frame.trainingGuidebotYellowFlareParticles,
-                    trainingGuidebotYellowFlareTimeoutExplosions:
-                        frame.trainingGuidebotYellowFlareTimeoutExplosions,
-                    trainingGuidebotYellowFlareTimeoutSparks:
-                        frame.trainingGuidebotYellowFlareTimeoutSparks,
-                    trainingGuidebotYellowFlareTimeoutSparkParticles:
-                        frame.trainingGuidebotYellowFlareTimeoutSparkParticles,
-                    trainingDodgeMarkerLightDistance:
-                        frame.trainingDodgeMarkerLightDistance,
-                trainingGuidebotReturnMarkerLightDistance:
-                    frame.trainingGuidebotReturnMarkerLightDistance,
-                trainingLastRoomMarkerLightDistance:
-                    frame.trainingLastRoomMarkerLightDistance,
-                trainingFinalBotsMarkerLightDistance:
-                    frame.trainingFinalBotsMarkerLightDistance,
-                playerFastHeadlight: frame.playerFastHeadlight
+                frame: frame,
+                drawableAspect: drawableAspect
             )
         )
     }

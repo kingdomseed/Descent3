@@ -18045,6 +18045,735 @@ final class WorldRenderingTests: XCTestCase {
     }
 
     @MainActor
+    func testHeldSecondaryFirePublishesUntilReleaseAndClearsWhenGameplayStops()
+        throws
+    {
+        var input = PlayerInputState(rampDuration: 0)
+        input.setSecondaryFireHeld(true)
+        XCTAssertTrue(input.snapshot(frameDuration: 0.1).firesSecondaryWeapon)
+        XCTAssertTrue(input.snapshot(frameDuration: 0.1).firesSecondaryWeapon)
+        input.setSecondaryFireHeld(false)
+        XCTAssertFalse(input.snapshot(frameDuration: 0.1).firesSecondaryWeapon)
+
+        input.setSecondaryFireHeld(true)
+        input.setGameplayActive(false, simulation: nil, at: 1)
+        XCTAssertFalse(input.snapshot(frameDuration: 0.1).firesSecondaryWeapon)
+
+        let view = RevivalGameplayView(frame: .zero, device: nil)
+        var heldChanges: [Bool] = []
+        view.secondaryFireHeldChanged = { heldChanges.append($0) }
+        view.setGameplayActive(true)
+        let spaceDown = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: " ",
+            charactersIgnoringModifiers: " ",
+            isARepeat: false,
+            keyCode: 49
+        ))
+        let spaceUp = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyUp,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0.01,
+            windowNumber: 0,
+            context: nil,
+            characters: " ",
+            charactersIgnoringModifiers: " ",
+            isARepeat: false,
+            keyCode: 49
+        ))
+        let rightDown = try XCTUnwrap(NSEvent.mouseEvent(
+            with: .rightMouseDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0.02,
+            windowNumber: 0,
+            context: nil,
+            eventNumber: 1,
+            clickCount: 1,
+            pressure: 1
+        ))
+        let rightUp = try XCTUnwrap(NSEvent.mouseEvent(
+            with: .rightMouseUp,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0.03,
+            windowNumber: 0,
+            context: nil,
+            eventNumber: 2,
+            clickCount: 1,
+            pressure: 0
+        ))
+        view.keyDown(with: spaceDown)
+        view.keyUp(with: spaceUp)
+        view.rightMouseDown(with: rightDown)
+        view.rightMouseUp(with: rightUp)
+        view.keyDown(with: spaceDown)
+        view.clearInput()
+        view.rightMouseDown(with: rightDown)
+        view.setGameplayActive(false)
+        XCTAssertEqual(
+            heldChanges,
+            [true, false, true, false, true, false, true, false]
+        )
+    }
+
+    func testRookieConcussionUsesExactCanonicalGunpointsAndOldOmission()
+        throws
+    {
+        let level = try makePlayerConcussionLevel()
+        let binding = try XCTUnwrap(
+            level.shipDefinitions[0].playerConcussion
+        )
+        XCTAssertEqual(binding.gunpoints[0].localPosition, .init(
+            x: 2.792_412_5,
+            y: -1.186_958_9,
+            z: 2.687_090_9
+        ))
+        XCTAssertEqual(binding.gunpoints[0].localForward, .init(
+            x: 0.000_007_629_434_5,
+            y: 0.000_003_337_758_7,
+            z: 1
+        ))
+        XCTAssertEqual(binding.gunpoints[1].localPosition, .init(
+            x: -2.804_046_4,
+            y: -1.186_885_0,
+            z: 2.687_135_2
+        ))
+        XCTAssertEqual(binding.gunpoints[1].localForward, .init(
+            x: 0.000_008_106_278,
+            y: 0.000_003_814_590_4,
+            z: 1
+        ))
+
+        var oldObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(level))
+                as? [String: Any]
+        )
+        var oldShips = try XCTUnwrap(
+            oldObject["shipDefinitions"] as? [[String: Any]]
+        )
+        oldShips[0].removeValue(forKey: "playerConcussion")
+        oldObject["shipDefinitions"] = oldShips
+        let oldLevel = try JSONDecoder().decode(
+            Level.self,
+            from: JSONSerialization.data(withJSONObject: oldObject)
+        )
+        XCTAssertNil(oldLevel.shipDefinitions[0].playerConcussion)
+
+        var hostileShip = level.shipDefinitions[0]
+        var hostile = try XCTUnwrap(hostileShip.playerConcussion)
+        var gunpoints = hostile.gunpoints
+        gunpoints[0] = .init(
+            index: gunpoints[0].index,
+            parentSubmodelIndex: gunpoints[0].parentSubmodelIndex,
+            localPosition: gunpoints[0].localPosition,
+            localForward: .init(x: 0, y: 0, z: 1)
+        )
+        hostile = replacing(hostile, gunpoints: gunpoints)
+        hostileShip.playerConcussion = hostile
+        XCTAssertThrowsError(try replacing(
+            level,
+            shipDefinitions: [hostileShip]
+        ).validate()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidDependency("default player Concussion binding")
+            )
+        }
+    }
+
+    func testRookieConcussionInclusiveAlternatingAndScheduledCadence()
+        throws
+    {
+        var level = try makePlayerConcussionLevel()
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == 4_112
+        })
+        level.objects[robotIndex].position = .init(
+            x: player.position.x,
+            y: player.position.y,
+            z: player.position.z - 100
+        )
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let first = simulation.update(
+            at: 0.1,
+            input: .init(firesSecondaryWeapon: true)
+        )
+        XCTAssertEqual(first.playerConcussionMissiles.count, 1)
+        let firstForward = try XCTUnwrap(
+            level.shipDefinitions[0].playerConcussion?.gunpoints[0]
+        ).localForward
+        XCTAssertEqual(
+            first.playerConcussionMissiles[0].position.x,
+            player.position.x + 2.792_412_5
+                + firstForward.x * 175 * first.systemsFrameDuration,
+            accuracy: 0.000_01
+        )
+        _ = simulation.update(at: 0.5, input: .zero)
+        let exactDue = simulation.update(
+            at: 0.5,
+            input: .init(firesSecondaryWeapon: true)
+        )
+        XCTAssertEqual(exactDue.systemsGameTime, 0.5, accuracy: 0.000_1)
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        var state = try XCTUnwrap(
+            object["playerConcussionState"] as? [String: Any]
+        )
+        XCTAssertEqual(state["ammo"] as? Int, 4)
+        XCTAssertEqual(
+            try XCTUnwrap(state["nextFireTime"] as? Double),
+            1,
+            accuracy: 0.000_1
+        )
+
+        _ = simulation.update(at: 1.6, input: .zero)
+        let carried = simulation.update(
+            at: 1.6,
+            input: .init(firesSecondaryWeapon: true)
+        )
+        object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        state = try XCTUnwrap(
+            object["playerConcussionState"] as? [String: Any]
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(state["nextFireTime"] as? Double),
+            1.5,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(state["ammo"] as? Int, 3)
+        XCTAssertEqual(state["nextFiringMaskIndex"] as? Int, 1)
+
+        _ = simulation.update(at: 10, input: .zero)
+        _ = simulation.update(at: 10.01, input: .zero)
+        let rebased = simulation.update(
+            at: 10.01,
+            input: .init(firesSecondaryWeapon: true)
+        )
+        object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        state = try XCTUnwrap(
+            object["playerConcussionState"] as? [String: Any]
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(state["nextFireTime"] as? Double),
+            Double(rebased.systemsGameTime + 0.5),
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(state["ammo"] as? Int, 2)
+        XCTAssertEqual(state["nextFiringMaskIndex"] as? Int, 0)
+        XCTAssertEqual(carried.systemsGameTime, 1.6, accuracy: 0.000_1)
+    }
+
+    func testRookieConcussionLaunchImpactShockwaveAndContinuationAreDeterministic()
+        throws
+    {
+        var level = try makePlayerConcussionLevel()
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == 4_112
+        })
+        level.objects[robotIndex].position = .init(
+            x: player.position.x + player.orientation.forward.x * 15,
+            y: player.position.y + player.orientation.forward.y * 15,
+            z: player.position.z + player.orientation.forward.z * 15
+        )
+        level.objects[robotIndex].location = player.location
+
+        let seed = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x1234_5678
+        )
+        let continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(seed.continuation)
+            ) as? [String: Any]
+        )
+        let reached = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: continuationObject)
+        )
+        let simulation = try PlayerSimulation(
+            level: level,
+            continuation: reached,
+            resumedAtTimestamp: 100
+        )
+        let randomStateBefore = try XCTUnwrap(
+            continuationObject["authoritativeRandomState"] as? NSNumber
+        ).uint32Value
+
+        let impact = simulation.update(
+            at: 100.1,
+            input: .init(firesSecondaryWeapon: true)
+        )
+        XCTAssertEqual(impact.playerConcussionMissiles.count, 0)
+        XCTAssertEqual(impact.playerConcussionExplosions.count, 1)
+        XCTAssertEqual(
+            impact.playerConcussionExplosions[0].texture.sourceName,
+            "ExplosionE"
+        )
+        XCTAssertEqual(
+            impact.trainingOpeningFeedback.compactMap(\.soundSourceName),
+            ["concmissilefire7.wav", "Explode1.wav"]
+        )
+        XCTAssertTrue((3...8).contains(impact.playerConcussionSparks.count))
+
+        var impactContinuation = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        let concussionState = try XCTUnwrap(
+            impactContinuation["playerConcussionState"] as? [String: Any]
+        )
+        XCTAssertEqual(concussionState["ammo"] as? Int, 5)
+        XCTAssertEqual(concussionState["nextFiringMaskIndex"] as? Int, 1)
+        let robotAfterDirect = try XCTUnwrap(
+            impactContinuation["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        XCTAssertEqual(robotAfterDirect["robotShields"] as? Double, 46)
+        let sparkStates = try XCTUnwrap(
+            concussionState["sparks"] as? [[String: Any]]
+        )
+        let firstSpark = try XCTUnwrap(sparkStates.first)
+        XCTAssertNotNil(firstSpark["position"] as? [String: Any])
+        XCTAssertNotNil(firstSpark["velocity"] as? [String: Any])
+        XCTAssertTrue((0.7...1.06).contains(
+            try XCTUnwrap(firstSpark["size"] as? Double)
+        ))
+        XCTAssertTrue((1...2.35).contains(
+            try XCTUnwrap(firstSpark["lifetime"] as? Double)
+        ))
+
+        var expectedRandomState = randomStateBefore
+        for _ in 0..<(1 + impact.playerConcussionSparks.count * 6) {
+            expectedRandomState = expectedRandomState &* 214_013 &+ 2_531_011
+        }
+        XCTAssertEqual(
+            (impactContinuation["authoritativeRandomState"] as? NSNumber)?
+                .uint32Value,
+            expectedRandomState
+        )
+
+        let premature = simulation.update(
+            at: 100.2,
+            input: .init(firesSecondaryWeapon: true)
+        )
+        XCTAssertEqual(premature.playerConcussionMissiles.count, 0)
+        impactContinuation = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        let prematureState = try XCTUnwrap(
+            impactContinuation["playerConcussionState"] as? [String: Any]
+        )
+        XCTAssertEqual(prematureState["ammo"] as? Int, 5)
+        let robotAfterShockwave = try XCTUnwrap(
+            impactContinuation["trainingRobotGuidebotState"]
+                as? [String: Any]
+        )
+        let explosion = impact.playerConcussionExplosions[0]
+        let robotPosition = level.objects[robotIndex].position
+        let robotRadius = try XCTUnwrap(
+            level.trainingRobotGuidebotChain?.combat.robotCollisionRadius
+        )
+        let surfaceDistance = max(
+            0,
+            sqrt(
+                pow(robotPosition.x - explosion.position.x, 2)
+                    + pow(robotPosition.y - explosion.position.y, 2)
+                    + pow(robotPosition.z - explosion.position.z, 2)
+            ) - robotRadius
+        )
+        let expectedShockwaveDamage = 19 * (1 - surfaceDistance / 32) * 1.5
+        XCTAssertEqual(
+            try XCTUnwrap(robotAfterShockwave["robotShields"] as? Double),
+            Double(46 - expectedShockwaveDamage),
+            accuracy: 0.000_1
+        )
+        let movedState = try XCTUnwrap(
+            prematureState["sparks"] as? [[String: Any]]
+        )
+        XCTAssertNotEqual(
+            movedState.first?["position"] as? [String: Double],
+            firstSpark["position"] as? [String: Double]
+        )
+
+        let savedContinuation = simulation.continuation
+        let expectedRestoredFrame = simulation.update(
+            at: 100.3,
+            input: .zero
+        )
+        let restored = try PlayerSimulation(
+            level: level,
+            continuation: savedContinuation,
+            resumedAtTimestamp: 200
+        )
+        let restoredFrame = restored.update(at: 200, input: .zero)
+        XCTAssertEqual(
+            restoredFrame.playerConcussionExplosions,
+            expectedRestoredFrame.playerConcussionExplosions
+        )
+        XCTAssertFalse(
+            restored.update(at: 200.1, input: .zero)
+                .trainingOpeningFeedback.contains {
+                    $0.soundSourceName == "concmissilefire7.wav"
+                }
+        )
+    }
+
+    func testRookieConcussionBlockedAndExhaustedAttemptsAreSideEffectFree()
+        throws
+    {
+        var level = try makePlayerConcussionLevel()
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        let gunpoint = try XCTUnwrap(
+            level.shipDefinitions.first?.playerConcussion?.gunpoints.first
+        )
+        let blockerIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == 4_112
+        })
+        let local = gunpoint.localPosition
+        let offset = Vector3(
+            x: player.orientation.right.x * local.x
+                + player.orientation.up.x * local.y
+                + player.orientation.forward.x * local.z,
+            y: player.orientation.right.y * local.x
+                + player.orientation.up.y * local.y
+                + player.orientation.forward.y * local.z,
+            z: player.orientation.right.z * local.x
+                + player.orientation.up.z * local.y
+                + player.orientation.forward.z * local.z
+        )
+        level.objects[blockerIndex].position = .init(
+            x: player.position.x + offset.x * 0.5,
+            y: player.position.y + offset.y * 0.5,
+            z: player.position.z + offset.z * 0.5
+        )
+        level.objects[blockerIndex].location = player.location
+
+        let blockedSimulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x8765_4321
+        )
+        let before = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(blockedSimulation.continuation)
+            ) as? [String: Any]
+        )
+        let blocked = blockedSimulation.update(
+            at: 0.1,
+            input: .init(firesSecondaryWeapon: true)
+        )
+        XCTAssertTrue(blocked.playerConcussionMissiles.isEmpty)
+        XCTAssertTrue(blocked.playerConcussionExplosions.isEmpty)
+        XCTAssertFalse(blocked.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "concmissilefire7.wav"
+        })
+        var after = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(blockedSimulation.continuation)
+            ) as? [String: Any]
+        )
+        let blockedState = try XCTUnwrap(
+            after["playerConcussionState"] as? [String: Any]
+        )
+        XCTAssertEqual(blockedState["ammo"] as? Int, 6)
+        XCTAssertEqual(blockedState["nextFiringMaskIndex"] as? Int, 0)
+        XCTAssertEqual(
+            (after["authoritativeRandomState"] as? NSNumber)?.uint32Value,
+            (before["authoritativeRandomState"] as? NSNumber)?.uint32Value
+        )
+
+        var exhaustedState = blockedState
+        exhaustedState["ammo"] = 0
+        exhaustedState["nextFireTime"] = 0
+        after["playerConcussionState"] = exhaustedState
+        let exhaustedSimulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(withJSONObject: after)
+            ),
+            resumedAtTimestamp: 10
+        )
+        let exhausted = exhaustedSimulation.update(
+            at: 10.1,
+            input: .init(firesSecondaryWeapon: true)
+        )
+        XCTAssertEqual(
+            exhausted.trainingOpeningFeedback.flatMap(\.hudMessages),
+            ["Not enough projectiles available!"]
+        )
+        XCTAssertTrue(exhausted.playerConcussionMissiles.isEmpty)
+        let exhaustedAfter = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(exhaustedSimulation.continuation)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(
+            (exhaustedAfter["authoritativeRandomState"] as? NSNumber)?
+                .uint32Value,
+            (after["authoritativeRandomState"] as? NSNumber)?.uint32Value
+        )
+    }
+
+    func testRookieConcussionTimeoutAndHostileContinuationAreBounded()
+        throws
+    {
+        let level = try makePlayerConcussionLevel()
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        let playerRoom = try XCTUnwrap({ () -> Int? in
+            guard case let .room(sourceIndex) = player.location else {
+                return nil
+            }
+            return sourceIndex
+        }())
+        let seed = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x1111_2222
+        )
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(seed.continuation)
+            ) as? [String: Any]
+        )
+        var concussionState = try XCTUnwrap(
+            continuationObject["playerConcussionState"] as? [String: Any]
+        )
+        let missile: [String: Any] = [
+            "creationOrdinal": 0,
+            "roomSourceIndex": playerRoom,
+            "position": try XCTUnwrap(
+                continuationObject["playerPosition"] as? [String: Any]
+            ),
+            "orientation": try XCTUnwrap(
+                continuationObject["playerOrientation"] as? [String: Any]
+            ),
+            "velocity": ["x": 0, "y": 0, "z": 0],
+            "lifeRemaining": 0.05,
+        ]
+        concussionState["missiles"] = [missile]
+        concussionState["ammo"] = 5
+        concussionState["nextCreationOrdinal"] = 1
+        continuationObject["playerConcussionState"] = concussionState
+        let timeoutContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: continuationObject)
+        )
+        let timeoutSimulation = try PlayerSimulation(
+            level: level,
+            continuation: timeoutContinuation,
+            resumedAtTimestamp: 10
+        )
+        let timeout = timeoutSimulation.update(at: 10.1, input: .zero)
+        XCTAssertTrue(timeout.playerConcussionMissiles.isEmpty)
+        XCTAssertEqual(timeout.playerConcussionExplosions.count, 1)
+        XCTAssertTrue(timeout.trainingOpeningFeedback.contains {
+            $0.soundSourceName == "Explode1.wav"
+        })
+
+        concussionState["missiles"] = [missile, missile]
+        concussionState["ammo"] = 4
+        continuationObject["playerConcussionState"] = concussionState
+        let hostile = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: continuationObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostile,
+                resumedAtTimestamp: 20
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var impossibleConservation = concussionState
+        impossibleConservation["missiles"] = (0..<6).map { ordinal in
+            var distinct = missile
+            distinct["creationOrdinal"] = ordinal
+            return distinct
+        }
+        impossibleConservation["ammo"] = 6
+        impossibleConservation["nextCreationOrdinal"] = 6
+        continuationObject["playerConcussionState"] = impossibleConservation
+        let impossible = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: continuationObject)
+        )
+        XCTAssertThrowsError(try PlayerSimulation(
+            level: level,
+            continuation: impossible,
+            resumedAtTimestamp: 20
+        )) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var ordinalOverflow = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(seed.continuation)
+            ) as? [String: Any]
+        )
+        var ordinalOverflowState = try XCTUnwrap(
+            ordinalOverflow["playerConcussionState"] as? [String: Any]
+        )
+        ordinalOverflowState["nextCreationOrdinal"] = NSNumber(
+            value: UInt64.max - 59
+        )
+        ordinalOverflow["playerConcussionState"] = ordinalOverflowState
+        let overflowing = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: ordinalOverflow)
+        )
+        XCTAssertThrowsError(try PlayerSimulation(
+            level: level,
+            continuation: overflowing,
+            resumedAtTimestamp: 20
+        )) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+    }
+
+    func testScript030RestoresBeforeSameFrameConcussionImpact() throws {
+        var level = try makePlayerConcussionLevel()
+        let openingLevel = makeTrainingScript003Level()
+        let existingVoiceNames = Set(level.voiceClips.map(\.sourceName))
+        let addedVoices = openingLevel.voiceClips.filter {
+            !existingVoiceNames.contains($0.sourceName)
+        }
+        let existingDependencies = Set(
+            level.dependencyManifest.current.map {
+                "\($0.category):\($0.source.storedIndex):\($0.source.sourceName)"
+            }
+        )
+        let addedDependencies = openingLevel.dependencyManifest.current.filter {
+            $0.category == "voice"
+                && !existingDependencies.contains(
+                "\($0.category):\($0.source.storedIndex):\($0.source.sourceName)"
+            )
+        }
+        level = replacing(
+            level,
+            trainingOpeningLesson: openingLevel.trainingOpeningLesson,
+            voiceClips: level.voiceClips + addedVoices,
+            dependencyManifest: .init(
+                current: level.dependencyManifest.current + addedDependencies,
+                historicalEagerBaseline:
+                    level.dependencyManifest.historicalEagerBaseline
+            )
+        )
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        let playerRoom = try XCTUnwrap({ () -> Int? in
+            guard case let .room(sourceIndex) = player.location else {
+                return nil
+            }
+            return sourceIndex
+        }())
+        let seed = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        var continuationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(seed.continuation)
+            ) as? [String: Any]
+        )
+        continuationObject["shields"] = 1
+        var openingState = try XCTUnwrap(
+            continuationObject["trainingOpeningState"] as? [String: Any]
+        )
+        openingState["startCourseWasPresented"] = true
+        openingState["enabledControls"] = try XCTUnwrap(
+            level.trainingOpeningLesson?.startCourse?.enabledControlMask
+        )
+        continuationObject["trainingOpeningState"] = openingState
+        var concussionState = try XCTUnwrap(
+            continuationObject["playerConcussionState"] as? [String: Any]
+        )
+        concussionState["explosions"] = [[
+            "creationOrdinal": 0,
+            "roomSourceIndex": playerRoom,
+            "position": try XCTUnwrap(
+                continuationObject["playerPosition"] as? [String: Any]
+            ),
+            "lifeRemaining": 0.5,
+            "shockwaveLifeRemaining": 0.1,
+            "damagedObjectHandles": [],
+            "damagedPlayer": false,
+        ]]
+        concussionState["ammo"] = 5
+        concussionState["nextCreationOrdinal"] = 1
+        continuationObject["playerConcussionState"] = concussionState
+        let simulation = try PlayerSimulation(
+            level: level,
+            continuation: JSONDecoder().decode(
+                PlayerSimulationContinuation.self,
+                from: JSONSerialization.data(
+                    withJSONObject: continuationObject
+                )
+            ),
+            resumedAtTimestamp: 10
+        )
+        let frame = simulation.update(at: 10.1, input: .zero)
+        XCTAssertEqual(frame.shields, 31)
+        let after = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(simulation.continuation)
+            ) as? [String: Any]
+        )
+        let afterOpening = try XCTUnwrap(
+            after["trainingOpeningState"] as? [String: Any]
+        )
+        XCTAssertEqual(afterOpening["script030Count"] as? Int, 1)
+    }
+
+    @MainActor
     func testHeldPrimaryFirePublishesUntilReleaseAndKeepsScheduledCadence()
         throws
     {
@@ -23437,6 +24166,215 @@ func makePlayerYellowFlareLevel() throws -> Level {
         )
     )
     return replacing(level, shipDefinitions: [ship])
+}
+
+func makePlayerConcussionLevel() throws -> Level {
+    var level = try makePlayerYellowFlareLevel()
+    let modelSource = SourceResource(
+        storedIndex: level.models.count,
+        sourceName: "ConcussionMissile.OOF"
+    )
+    let modelTemplate = level.models[0]
+    let concussionModel = CanonicalModel(
+        source: modelSource,
+        collisionRadius: 1,
+        submodels: modelTemplate.submodels,
+        bounds: modelTemplate.bounds,
+        sourceArchive: modelTemplate.sourceArchive,
+        sourceSHA256: String(repeating: "c", count: 64)
+    )
+    let firstExplosionIndex = level.presentationMaterials.count
+    let explosionFrames = [
+        SourceResource(
+            storedIndex: firstExplosionIndex,
+            sourceName: "ExplosionE"
+        ),
+    ] + (1..<15).map {
+        SourceResource(
+            storedIndex: firstExplosionIndex,
+            sourceName: "ExplosionE.oaf frame \($0)"
+        )
+    }
+    let materialTemplate = level.presentationMaterials[0]
+    let explosionMaterials = explosionFrames.map { frame in
+        PresentationMaterial(
+            texture: frame,
+            bitmapSourceName: "ExplosionE.oaf",
+            image: materialTemplate.image,
+            blend: .additiveSourceAlpha(opacity: 255),
+            lightmapBlend: .none,
+            waterProcedural: nil,
+            sourceArchive: materialTemplate.sourceArchive,
+            sourceSHA256: String(repeating: "e", count: 64)
+        )
+    }
+    let soundTemplate = level.soundClips[0]
+    func sound(
+        logicalName: String,
+        sourceName: String,
+        entryIndex: Int
+    ) -> CanonicalSoundClip {
+        .init(
+            logicalName: logicalName,
+            sourceName: sourceName,
+            sourceEntryIndex: entryIndex,
+            sampleRate: soundTemplate.sampleRate,
+            channelCount: soundTemplate.channelCount,
+            frameCount: soundTemplate.frameCount,
+            pcm16LittleEndian: soundTemplate.pcm16LittleEndian,
+            pcmSHA256: soundTemplate.pcmSHA256,
+            sourceArchive: soundTemplate.sourceArchive,
+            sourceSHA256: soundTemplate.sourceSHA256,
+            importVolume: 1
+        )
+    }
+    var ship = level.shipDefinitions[0]
+    ship.playerConcussion = .init(
+        batteryIndex: 10,
+        firingMasks: [1, 2],
+        weapon: .init(storedIndex: 10, sourceName: "Concussion"),
+        model: modelSource,
+        fireSoundLogicalNames: ["concmissilefire71", "concmissilefire71"],
+        fireSoundSourceName: "concmissilefire7.wav",
+        impactSoundLogicalName: "Explode1",
+        impactSoundSourceName: "Explode1.wav",
+        fireWaits: [0.5, 0.5],
+        energyUsage: 0,
+        ammoUsage: 1,
+        fireFlags: 0,
+        weaponFlags: 0,
+        gunpoints: [
+            .init(
+                index: 1,
+                parentSubmodelIndex: 0,
+                localPosition: .init(
+                    x: 2.792_412_5,
+                    y: -1.186_958_9,
+                    z: 2.687_090_9
+                ),
+                localForward: .init(
+                    x: 0.000_007_629_434_5,
+                    y: 0.000_003_337_758_7,
+                    z: 1
+                )
+            ),
+            .init(
+                index: 2,
+                parentSubmodelIndex: 0,
+                localPosition: .init(
+                    x: -2.804_046_4,
+                    y: -1.186_885_0,
+                    z: 2.687_135_2
+                ),
+                localForward: .init(
+                    x: 0.000_008_106_278,
+                    y: 0.000_003_814_590_4,
+                    z: 1
+                )
+            ),
+        ],
+        collisionRadius: 1,
+        speed: 175,
+        lifetime: 15,
+        rotationalVelocity: 35_000,
+        lightDistance: 12.5,
+        lightPresentation: .init(
+            primaryColor: .init(x: 1, y: 0.5, z: 0),
+            secondaryColor: .zero,
+            timeInterval: 0,
+            flickerDistance: 0,
+            directionalDot: 0,
+            flags: 0,
+            timebits: 0,
+            angle: 0,
+            lightingRenderType: 0
+        ),
+        explosionFrames: explosionFrames,
+        explosionSourceFrameTime: Float(0.5) / 15,
+        explosionSize: 10,
+        explosionLifetime: 0.5,
+        directRobotDamage: 9,
+        shockwaveDuration: 0.1,
+        shockwaveRadius: 32,
+        shockwaveDamage: 19,
+        shockwaveForce: 3_000
+    )
+    let dependencies = [
+        DependencyRecord(
+            category: "model",
+            source: modelSource,
+            state: "presentation-payload-imported",
+            provenance: "synthetic canonical fixture"
+        ),
+    ] + explosionFrames.map {
+        DependencyRecord(
+            category: "texture",
+            source: $0,
+            state: "presentation-payload-imported",
+            provenance: "synthetic canonical fixture"
+        )
+    }
+    level = replacing(
+        level,
+        presentationMaterials: level.presentationMaterials + explosionMaterials,
+        models: level.models + [concussionModel],
+        shipDefinitions: [ship],
+        soundClips: level.soundClips + [
+            sound(
+                logicalName: "concmissilefire71",
+                sourceName: "concmissilefire7.wav",
+                entryIndex: 20_000
+            ),
+            sound(
+                logicalName: "Explode1",
+                sourceName: "Explode1.wav",
+                entryIndex: 20_001
+            ),
+        ],
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current + dependencies,
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
+    return level
+}
+
+func replacing(
+    _ binding: PlayerConcussionBinding,
+    gunpoints: [PlayerConcussionGunpoint]
+) -> PlayerConcussionBinding {
+    PlayerConcussionBinding(
+        batteryIndex: binding.batteryIndex,
+        firingMasks: binding.firingMasks,
+        weapon: binding.weapon,
+        model: binding.model,
+        fireSoundLogicalNames: binding.fireSoundLogicalNames,
+        fireSoundSourceName: binding.fireSoundSourceName,
+        impactSoundLogicalName: binding.impactSoundLogicalName,
+        impactSoundSourceName: binding.impactSoundSourceName,
+        fireWaits: binding.fireWaits,
+        energyUsage: binding.energyUsage,
+        ammoUsage: binding.ammoUsage,
+        fireFlags: binding.fireFlags,
+        weaponFlags: binding.weaponFlags,
+        gunpoints: gunpoints,
+        collisionRadius: binding.collisionRadius,
+        speed: binding.speed,
+        lifetime: binding.lifetime,
+        rotationalVelocity: binding.rotationalVelocity,
+        lightDistance: binding.lightDistance,
+        lightPresentation: binding.lightPresentation,
+        explosionFrames: binding.explosionFrames,
+        explosionSourceFrameTime: binding.explosionSourceFrameTime,
+        explosionSize: binding.explosionSize,
+        explosionLifetime: binding.explosionLifetime,
+        directRobotDamage: binding.directRobotDamage,
+        shockwaveDuration: binding.shockwaveDuration,
+        shockwaveRadius: binding.shockwaveRadius,
+        shockwaveDamage: binding.shockwaveDamage,
+        shockwaveForce: binding.shockwaveForce
+    )
 }
 
 func makeTrainingCameraMonitorLevel() -> Level {

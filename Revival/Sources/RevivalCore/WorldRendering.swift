@@ -62,6 +62,7 @@ struct InputSnapshot: Equatable, Sendable {
     let directLookPitchRadians: Float
     let directLookYawRadians: Float
     let firesPrimaryWeapon: Bool
+    let firesSecondaryWeapon: Bool
     let firesPlayerFlare: Bool
     let deploysTrainingGuidebot: Bool
     let requestsTrainingGuidebotActiveGoal: Bool
@@ -83,6 +84,7 @@ struct InputSnapshot: Equatable, Sendable {
         directLookPitchRadians: Float = 0,
         directLookYawRadians: Float = 0,
         firesPrimaryWeapon: Bool = false,
+        firesSecondaryWeapon: Bool = false,
         firesPlayerFlare: Bool = false,
         deploysTrainingGuidebot: Bool = false,
         requestsTrainingGuidebotActiveGoal: Bool = false,
@@ -104,6 +106,7 @@ struct InputSnapshot: Equatable, Sendable {
         self.directLookPitchRadians = directLookPitchRadians
         self.directLookYawRadians = directLookYawRadians
         self.firesPrimaryWeapon = firesPrimaryWeapon
+        self.firesSecondaryWeapon = firesSecondaryWeapon
         self.firesPlayerFlare = firesPlayerFlare
         self.deploysTrainingGuidebot = deploysTrainingGuidebot
         self.requestsTrainingGuidebotActiveGoal =
@@ -182,6 +185,8 @@ private extension InputSnapshot {
                     : 0,
             firesPrimaryWeapon:
                 controls.contains(.primaryWeapon) && firesPrimaryWeapon,
+            firesSecondaryWeapon:
+                controls.contains(.secondaryWeapon) && firesSecondaryWeapon,
             firesPlayerFlare: firesPlayerFlare,
             deploysTrainingGuidebot: deploysTrainingGuidebot,
             requestsTrainingGuidebotActiveGoal:
@@ -276,6 +281,7 @@ struct PlayerInputState: Sendable {
     private var guidebotDeploymentIsPending = false
     private var guidebotActiveGoalRequestIsPending = false
     private var primaryFireIsHeld = false
+    private var secondaryFireIsHeld = false
     private var playerFlareIsPending = false
     private var inventoryUseIsPending = false
     private var headlightToggleIsPending = false
@@ -315,6 +321,10 @@ struct PlayerInputState: Sendable {
 
     mutating func setPrimaryFireHeld(_ isHeld: Bool) {
         primaryFireIsHeld = gameplayIsActive && isHeld
+    }
+
+    mutating func setSecondaryFireHeld(_ isHeld: Bool) {
+        secondaryFireIsHeld = gameplayIsActive && isHeld
     }
 
     mutating func requestInventoryUse() {
@@ -368,6 +378,7 @@ struct PlayerInputState: Sendable {
         let requestsTrainingGuidebotActiveGoal =
             guidebotActiveGoalRequestIsPending
         let firesPrimaryWeapon = primaryFireIsHeld
+        let firesSecondaryWeapon = secondaryFireIsHeld
         let firesPlayerFlare = playerFlareIsPending
         let usesInventory = inventoryUseIsPending
         let togglesHeadlight = headlightToggleIsPending
@@ -399,6 +410,7 @@ struct PlayerInputState: Sendable {
             directLookPitchRadians: mouseLookEnabled ? -deltaY * directScale : 0,
             directLookYawRadians: mouseLookEnabled ? deltaX * directScale : 0,
             firesPrimaryWeapon: firesPrimaryWeapon,
+            firesSecondaryWeapon: firesSecondaryWeapon,
             firesPlayerFlare: firesPlayerFlare,
             deploysTrainingGuidebot: deploysTrainingGuidebot,
             requestsTrainingGuidebotActiveGoal:
@@ -424,6 +436,7 @@ struct PlayerInputState: Sendable {
             guidebotDeploymentIsPending = false
             guidebotActiveGoalRequestIsPending = false
             primaryFireIsHeld = false
+            secondaryFireIsHeld = false
             playerFlareIsPending = false
             inventoryUseIsPending = false
             headlightToggleIsPending = false
@@ -547,6 +560,9 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingDodgeTurretAngles: [Float]
     let trainingDodgeProjectiles: [TrainingDodgeProjectileFrame]
     let trainingPrimaryProjectiles: [TrainingBlueLaserProjectileFrame]
+    let playerConcussionMissiles: [PlayerConcussionMissileFrame]
+    let playerConcussionExplosions: [PlayerConcussionExplosionFrame]
+    let playerConcussionSparks: [PlayerConcussionSparkFrame]
     let trainingGuidebotYellowFlares:
         [TrainingGuidebotYellowFlareFrame]
     let trainingGuidebotYellowFlareParticles:
@@ -613,6 +629,29 @@ struct TrainingBlueLaserProjectileFrame: Equatable, Sendable {
     let velocity: Vector3
     let roomSourceIndex: Int
     let model: SourceResource
+}
+
+struct PlayerConcussionMissileFrame: Equatable, Sendable {
+    let roomSourceIndex: Int
+    let position: Vector3
+    let orientation: Matrix3
+    let velocity: Vector3
+    let model: SourceResource
+    let lightDistance: Float
+    let lightPresentation: TrainingMarkerLightPresentation
+}
+
+struct PlayerConcussionExplosionFrame: Equatable, Sendable {
+    let roomSourceIndex: Int
+    let position: Vector3
+    let size: Float
+    let texture: SourceResource
+}
+
+struct PlayerConcussionSparkFrame: Equatable, Sendable {
+    let roomSourceIndex: Int
+    let start: Vector3
+    let end: Vector3
 }
 
 struct TrainingGuidebotYellowFlareFrame: Equatable, Sendable {
@@ -1199,6 +1238,7 @@ private struct TrainingOpeningState: Codable, Equatable, Sendable {
     var continueToCourseWasPresented: Bool? = nil
     var startCourseWasPresented: Bool? = nil
     var finishCourseWasPresented: Bool? = nil
+    var script030Count: Int? = nil
     var enabledControls: PlayerControlMask = [.forward]
 }
 
@@ -1346,6 +1386,51 @@ private struct PlayerYellowFlareState: Codable, Equatable, Sendable {
     var timeoutSparks: [TrainingGuidebotYellowFlareTimeoutSparkState] = []
     var timeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleState] = []
+}
+
+private struct PlayerConcussionMissileState:
+    Codable, Equatable, Sendable
+{
+    let creationOrdinal: UInt64
+    var roomSourceIndex: Int
+    var position: Vector3
+    var orientation: Matrix3
+    let velocity: Vector3
+    var lifeRemaining: Float
+}
+
+private struct PlayerConcussionExplosionState:
+    Codable, Equatable, Sendable
+{
+    let creationOrdinal: UInt64
+    let roomSourceIndex: Int
+    let position: Vector3
+    var lifeRemaining: Float
+    var shockwaveLifeRemaining: Float
+    var damagedObjectHandles: Set<UInt32> = []
+    var damagedPlayer = false
+}
+
+private struct PlayerConcussionSparkState:
+    Codable, Equatable, Sendable
+{
+    let creationOrdinal: UInt64
+    let roomSourceIndex: Int
+    var position: Vector3
+    var velocity: Vector3
+    let size: Float
+    let lifetime: Float
+    var lifeRemaining: Float
+}
+
+private struct PlayerConcussionState: Codable, Equatable, Sendable {
+    var ammo = 6
+    var nextFireTime: Float = 0
+    var nextFiringMaskIndex = 0
+    var nextCreationOrdinal: UInt64 = 0
+    var missiles: [PlayerConcussionMissileState] = []
+    var explosions: [PlayerConcussionExplosionState] = []
+    var sparks: [PlayerConcussionSparkState] = []
 }
 
 let trainingGuidebotYellowFlarePresentationCapacity = 6
@@ -1757,6 +1842,7 @@ struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
         TrainingManeuverFollowState?
     fileprivate let trainingGalleryBarrierState: TrainingGalleryBarrierState?
     fileprivate let trainingRobotGuidebotState: TrainingRobotGuidebotState?
+    fileprivate let playerConcussionState: PlayerConcussionState?
     fileprivate let playerYellowFlareState: PlayerYellowFlareState?
     fileprivate let trainingCameraMonitorState: TrainingCameraMonitorState?
     fileprivate let trainingKillbotEntryState: TrainingKillbotEntryState?
@@ -1839,6 +1925,7 @@ final class PlayerSimulation {
         TrainingManeuverFollowState?
     private var trainingGalleryBarrierState: TrainingGalleryBarrierState?
     private var trainingRobotGuidebotState: TrainingRobotGuidebotState?
+    private var playerConcussionState: PlayerConcussionState?
     private var playerYellowFlareState: PlayerYellowFlareState?
     private var trainingCameraMonitorState: TrainingCameraMonitorState?
     private var trainingKillbotEntryState: TrainingKillbotEntryState?
@@ -1915,6 +2002,7 @@ final class PlayerSimulation {
                 lastMessageSoundTime: 0
             )
         }
+        playerConcussionState = ship.playerConcussion == nil ? nil : .init()
         playerYellowFlareState = level.shipDefinitions.first?
             .playerYellowFlare == nil ? nil : .init()
         trainingCameraMonitorState = level.trainingCameraMonitorChain.map {
@@ -1993,6 +2081,11 @@ final class PlayerSimulation {
             continuation.authoritativeRandomState ?? 1
         var restoredRobotGuidebotState =
             continuation.trainingRobotGuidebotState
+        var restoredPlayerConcussionState = continuation.playerConcussionState
+        if level.shipDefinitions.first?.playerConcussion != nil,
+           restoredPlayerConcussionState == nil {
+            restoredPlayerConcussionState = .init()
+        }
         var restoredPlayerYellowFlareState =
             continuation.playerYellowFlareState
         if level.shipDefinitions.first?.playerYellowFlare != nil,
@@ -2552,6 +2645,12 @@ final class PlayerSimulation {
                 gameTime: continuation.gameTime,
                 level: restoredGuidebotRouteLevel
             )
+        let playerConcussionContinuationIsValid =
+            validPlayerConcussionContinuation(
+                restoredPlayerConcussionState,
+                gameTime: continuation.gameTime,
+                level: restoredGuidebotRouteLevel
+            )
         guard
             validTrainingGalleryBarrierContinuation(
                 continuation.trainingGalleryBarrierState,
@@ -2560,6 +2659,7 @@ final class PlayerSimulation {
             level: continuationLevel
         ),
         guidebotContinuationIsValid,
+        playerConcussionContinuationIsValid,
         playerYellowContinuationIsValid else {
             throw PlayerSimulationContinuationError.invalidState
         }
@@ -3187,6 +3287,7 @@ final class PlayerSimulation {
             continuation.trainingGalleryBarrierState
         trainingRobotGuidebotState =
             restoredRobotGuidebotState
+        playerConcussionState = restoredPlayerConcussionState
         playerYellowFlareState = restoredPlayerYellowFlareState
         trainingCameraMonitorState =
             continuation.trainingCameraMonitorState
@@ -3267,6 +3368,7 @@ final class PlayerSimulation {
                 trainingGalleryBarrierState,
             trainingRobotGuidebotState:
                 trainingRobotGuidebotState,
+            playerConcussionState: playerConcussionState,
             playerYellowFlareState: playerYellowFlareState,
             trainingCameraMonitorState:
                 trainingCameraMonitorState,
@@ -4876,6 +4978,208 @@ final class PlayerSimulation {
         )
     }
 
+    private struct PlayerConcussionImpact {
+        let roomSourceIndex: Int
+        let position: Vector3
+        let directObjectHandle: UInt32?
+        let explosionCreationOrdinal: UInt64
+    }
+
+    private func firePlayerConcussion(
+        from player: PlacedObject,
+        roomSourceIndex: Int,
+        binding: PlayerConcussionBinding,
+        state: inout PlayerConcussionState,
+        frameDuration: Float,
+        gameTime: Float
+    ) -> TrainingOpeningFeedback? {
+        guard state.ammo >= Int(binding.ammoUsage) else {
+            return .init(
+                hudMessages: ["Not enough projectiles available!"],
+                voiceSourceName: "",
+                voicePrecedesHUDMessages: false
+            )
+        }
+        guard gameTime >= state.nextFireTime,
+              state.nextCreationOrdinal < UInt64.max,
+              state.missiles.count < 6 else {
+            return nil
+        }
+        let maskIndex = state.nextFiringMaskIndex
+        let gunpoint = binding.gunpoints[maskIndex]
+        let muzzlePosition = player.position
+            + transform(gunpoint.localPosition, by: player.orientation)
+        let wallTrace = traceIndoorMovement(
+            in: level,
+            startRoom: roomSourceIndex,
+            start: player.position,
+            end: muzzlePosition,
+            radius: 0
+        )
+        let muzzleDistance = vectorDistance(player.position, muzzlePosition)
+        let wallFraction = muzzleDistance > 0
+            ? vectorDistance(player.position, wallTrace.finalPosition)
+                / muzzleDistance
+            : 1
+        let objectObstructsMuzzle = level.objects.contains { object in
+            guard object.handle != player.handle,
+                  case let .room(objectRoom) = object.location,
+                  wallTrace.visitedRoomSourceIndices.contains(objectRoom),
+                  let presentation = level.objectPresentations.first(where: {
+                      $0.objectHandle == object.handle && $0.isVisible
+                  }),
+                  let model = level.models.first(where: {
+                      $0.source == presentation.primaryModel
+                  }),
+                  let fraction = segmentSphereHitFraction(
+                      start: player.position,
+                      end: muzzlePosition,
+                      center: object.position,
+                      radius: model.collisionRadius
+                  ) else {
+                return false
+            }
+            return fraction < min(1, wallFraction) - 0.000_1
+        }
+        guard case .noHit = wallTrace.outcome,
+              !objectObstructsMuzzle else {
+            return nil
+        }
+
+        let forward = normalized(
+            transform(gunpoint.localForward, by: player.orientation)
+        )
+        state.missiles.append(.init(
+            creationOrdinal: state.nextCreationOrdinal,
+            roomSourceIndex: wallTrace.containingRoomSourceIndex,
+            position: muzzlePosition,
+            orientation: player.orientation,
+            velocity: forward * binding.speed + velocity,
+            lifeRemaining: binding.lifetime
+        ))
+        state.nextCreationOrdinal += 1
+        state.ammo -= Int(binding.ammoUsage)
+        state.nextFiringMaskIndex = (maskIndex + 1) % binding.firingMasks.count
+        let wait = binding.fireWaits[maskIndex]
+        let previousDeadline = state.nextFireTime
+        let overdue = gameTime - previousDeadline
+        let continuityWindow = max(wait, frameDuration * 1.5)
+        if previousDeadline >= 0,
+           overdue >= 0,
+           overdue <= continuityWindow {
+            state.nextFireTime = previousDeadline + wait
+        } else {
+            state.nextFireTime = gameTime + wait
+        }
+        return .init(
+            hudMessages: [],
+            voiceSourceName: "",
+            voicePrecedesHUDMessages: false,
+            soundSourceName: binding.fireSoundSourceName
+        )
+    }
+
+    private func advancePlayerConcussionMissiles(
+        duration: Float,
+        playerHandle: UInt32,
+        binding: PlayerConcussionBinding,
+        state: inout PlayerConcussionState
+    ) -> [PlayerConcussionImpact] {
+        var impacts: [PlayerConcussionImpact] = []
+        var survivors: [PlayerConcussionMissileState] = []
+        for var missile in state.missiles {
+            let spin = binding.rotationalVelocity
+                / 65_536 * (2 * Float.pi) * duration
+            missile.orientation = .init(
+                right: rotate(
+                    missile.orientation.right,
+                    around: missile.orientation.forward,
+                    angle: spin
+                ),
+                up: rotate(
+                    missile.orientation.up,
+                    around: missile.orientation.forward,
+                    angle: spin
+                ),
+                forward: missile.orientation.forward
+            )
+            let start = missile.position
+            let end = start + missile.velocity * duration
+            let trace = traceIndoorMovement(
+                in: level,
+                startRoom: missile.roomSourceIndex,
+                start: start,
+                end: end,
+                radius: binding.collisionRadius
+            )
+            let distance = vectorDistance(start, end)
+            let wallFraction = distance > 0
+                ? vectorDistance(start, trace.finalPosition) / distance
+                : 1
+            let objectHit = level.objects.compactMap {
+                object -> (PlacedObject, Float)? in
+                guard object.handle != playerHandle,
+                      case let .room(objectRoom) = object.location,
+                      trace.visitedRoomSourceIndices.contains(objectRoom),
+                      let presentation = level.objectPresentations.first(where: {
+                          $0.objectHandle == object.handle && $0.isVisible
+                      }),
+                      let model = level.models.first(where: {
+                          $0.source == presentation.primaryModel
+                      }),
+                      let fraction = segmentSphereHitFraction(
+                          start: start,
+                          end: end,
+                          center: object.position,
+                          radius: binding.collisionRadius
+                            + model.collisionRadius
+                      ) else {
+                    return nil
+                }
+                return (object, fraction)
+            }.min { $0.1 < $1.1 }
+
+            let impactPosition: Vector3?
+            let directObjectHandle: UInt32?
+            if let objectHit, objectHit.1 <= wallFraction + 0.000_1 {
+                impactPosition = start + (end - start) * objectHit.1
+                directObjectHandle = objectHit.0.type == 2
+                    ? objectHit.0.handle
+                    : nil
+            } else if case .noHit = trace.outcome {
+                missile.position = trace.finalPosition
+                missile.roomSourceIndex = trace.containingRoomSourceIndex
+                missile.lifeRemaining -= duration
+                if missile.lifeRemaining > 0 {
+                    survivors.append(missile)
+                    continue
+                }
+                impactPosition = missile.position
+                directObjectHandle = nil
+            } else {
+                impactPosition = trace.finalPosition
+                directObjectHandle = nil
+            }
+            let ordinal = state.nextCreationOrdinal
+            state.nextCreationOrdinal += 1
+            state.explosions.append(.init(
+                creationOrdinal: ordinal,
+                roomSourceIndex: trace.containingRoomSourceIndex,
+                position: impactPosition!,
+                lifeRemaining: binding.explosionLifetime,
+                shockwaveLifeRemaining: binding.shockwaveDuration
+            ))
+            impacts.append(.init(
+                roomSourceIndex: trace.containingRoomSourceIndex,
+                position: impactPosition!,
+                directObjectHandle: directObjectHandle,
+                explosionCreationOrdinal: ordinal
+            ))
+        }
+        state.missiles = survivors
+        return impacts
+    }
+
     private func advancePlayerYellowFlares(
         duration: Float,
         gameTime: Float,
@@ -5580,6 +5884,17 @@ final class PlayerSimulation {
             ? InputSnapshot.zero
             : input.applying(currentEnabledControls)
         var playerHeadlightFeedback: TrainingOpeningFeedback?
+        var playerConcussionFeedback: [TrainingOpeningFeedback] = []
+        if var state = trainingOpeningState,
+           state.startCourseWasPresented == true,
+           shields < 50 {
+            shields = 50
+            state.script030Count = min(
+                (state.script030Count ?? 0) + 1,
+                trainingScriptActionCounterMaximum
+            )
+            trainingOpeningState = state
+        }
         if input.togglesHeadlight {
             playerHeadlightIsOn.toggle()
             playerHeadlightFeedback = TrainingOpeningFeedback(
@@ -5689,6 +6004,21 @@ final class PlayerSimulation {
                     state.nextPrimaryFireTime =
                         systemsGameTime + combat.batteryFireWait
                 }
+            }
+            if input.firesSecondaryWeapon,
+               let concussion = ship.playerConcussion,
+               var concussionState = playerConcussionState {
+                if let feedback = firePlayerConcussion(
+                    from: object,
+                    roomSourceIndex: startRoom,
+                    binding: concussion,
+                    state: &concussionState,
+                    frameDuration: systemsFrameDuration,
+                    gameTime: systemsGameTime
+                ) {
+                    playerConcussionFeedback.append(feedback)
+                }
+                playerConcussionState = concussionState
             }
 
             var maneuverState = trainingManeuverFollowState
@@ -5811,6 +6141,243 @@ final class PlayerSimulation {
             var lastBot3State = trainingLastBot3DeathState
             var lastBot4State = trainingLastBot4DeathState
             var lastBot5State = trainingLastBot5DeathState
+            if let concussion = ship.playerConcussion,
+               var concussionState = playerConcussionState {
+                typealias ConcussionTarget = (
+                    handle: UInt32,
+                    roomSourceIndex: Int,
+                    position: Vector3,
+                    radius: Float
+                )
+                var targets: [ConcussionTarget] = []
+                func addTarget(_ object: PlacedObject?, radius: Float?) {
+                    guard let object, let radius,
+                          case let .room(roomSourceIndex) = object.location
+                    else { return }
+                    targets.append((
+                        object.handle,
+                        roomSourceIndex,
+                        object.position,
+                        radius
+                    ))
+                }
+                addTarget(robot, radius: combat.robotCollisionRadius)
+                addTarget(followBot, radius: handoff?.combat.robotCollisionRadius)
+                addTarget(destroyBot1, radius: handoff?.combat.robotCollisionRadius)
+                addTarget(rasBot1, radius: rasBot1Chain?.combat.robotCollisionRadius)
+                addTarget(rasBot2, radius: rasBot2Chain?.combat.robotCollisionRadius)
+                addTarget(rasBot3, radius: rasBot3Chain?.combat.robotCollisionRadius)
+                addTarget(rasBot4, radius: rasBot4Chain?.combat.robotCollisionRadius)
+                addTarget(lastBot1, radius: lastBot1Chain?.combat.robotCollisionRadius)
+                addTarget(lastBot2, radius: lastBot2Chain?.combat.robotCollisionRadius)
+                addTarget(lastBot3, radius: lastBot3Chain?.combat.robotCollisionRadius)
+                addTarget(lastBot4, radius: lastBot4Chain?.combat.robotCollisionRadius)
+                addTarget(lastBot5, radius: lastBot5Chain?.combat.robotCollisionRadius)
+
+                func applyDamage(to handle: UInt32, amount: Float) -> Bool {
+                    if handle == robot?.handle {
+                        state.robotShields -= amount
+                    } else if handle == followBot?.handle {
+                        followBotDestructionState?.followBotShields -= amount
+                    } else if handle == destroyBot1?.handle {
+                        destroyBot1DestructionState?.destroyBot1Shields -= amount
+                    } else if handle == rasBot1?.handle {
+                        rasBot1State?.shields -= amount
+                    } else if handle == rasBot2?.handle {
+                        rasBot2State?.shields -= amount
+                    } else if handle == rasBot3?.handle {
+                        rasBot3State?.shields -= amount
+                    } else if handle == rasBot4?.handle {
+                        rasBot4State?.shields -= amount
+                    } else if handle == lastBot1?.handle {
+                        lastBot1State?.shields -= amount
+                    } else if handle == lastBot2?.handle {
+                        lastBot2State?.shields -= amount
+                    } else if handle == lastBot3?.handle {
+                        lastBot3State?.shields -= amount
+                    } else if handle == lastBot4?.handle {
+                        lastBot4State?.shields -= amount
+                    } else if handle == lastBot5?.handle {
+                        lastBot5State?.shields -= amount
+                    } else {
+                        return false
+                    }
+                    return true
+                }
+
+                concussionState.sparks = concussionState.sparks.compactMap {
+                    spark in
+                    var spark = spark
+                    spark.lifeRemaining -= systemsFrameDuration
+                    guard spark.lifeRemaining >= 0 else { return nil }
+                    let motion = analyticLinearMotion(
+                        position: spark.position,
+                        velocity: spark.velocity,
+                        force: .init(
+                            x: 0,
+                            y: level.metadata.gravity * 500,
+                            z: 0
+                        ),
+                        mass: 500,
+                        drag: 0.001,
+                        duration: systemsFrameDuration
+                    )
+                    spark.position = motion.position
+                    spark.velocity = motion.velocity
+                    return spark
+                }
+                let impacts = advancePlayerConcussionMissiles(
+                    duration: systemsFrameDuration,
+                    playerHandle: object.handle,
+                    binding: concussion,
+                    state: &concussionState
+                )
+                let newExplosionOrdinals = Set(
+                    impacts.map(\.explosionCreationOrdinal)
+                )
+
+                // The released impact path creates the explosion object first,
+                // then applies the direct hit. Its shockwave acts afterward.
+                for impact in impacts {
+                    playerConcussionFeedback.append(.init(
+                        hudMessages: [],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: false,
+                        soundSourceName: concussion.impactSoundSourceName
+                    ))
+                    guard let handle = impact.directObjectHandle,
+                          applyDamage(
+                            to: handle,
+                            amount: concussion.directRobotDamage
+                          ) else {
+                        continue
+                    }
+                    let sparkCount = 3
+                        + Int(nextAuthoritativeRandomValue() % 6)
+                    for _ in 0..<sparkCount {
+                        let rawDirection = Vector3(
+                            x: Float(Int(nextAuthoritativeRandomValue() % 100) - 50),
+                            y: Float(nextAuthoritativeRandomValue() % 100),
+                            z: Float(Int(nextAuthoritativeRandomValue() % 100) - 50)
+                        )
+                        let direction = rawDirection == .zero
+                            ? Vector3(x: 1, y: 0, z: 0)
+                            : normalized(rawDirection)
+                        let speed = Float(
+                            20 + nextAuthoritativeRandomValue() % 10
+                        )
+                        let size = 0.7
+                            + Float(nextAuthoritativeRandomValue() % 10) * 0.04
+                        let lifetime = 1
+                            + Float(nextAuthoritativeRandomValue() % 10) * 0.15
+                        concussionState.sparks.append(.init(
+                            creationOrdinal:
+                                concussionState.nextCreationOrdinal,
+                            roomSourceIndex: impact.roomSourceIndex,
+                            position: impact.position,
+                            velocity: direction * speed,
+                            size: size,
+                            lifetime: lifetime,
+                            lifeRemaining: lifetime
+                        ))
+                        concussionState.nextCreationOrdinal += 1
+                    }
+                }
+                for index in concussionState.explosions.indices {
+                    if !newExplosionOrdinals.contains(
+                        concussionState.explosions[index].creationOrdinal
+                    ) {
+                        concussionState.explosions[index].lifeRemaining -=
+                            systemsFrameDuration
+                        concussionState.explosions[index]
+                            .shockwaveLifeRemaining = max(
+                                0,
+                                concussionState.explosions[index]
+                                    .shockwaveLifeRemaining
+                                    - systemsFrameDuration
+                            )
+                    }
+                    let explosion = concussionState.explosions[index]
+                    let shockwaveProgress = max(
+                        0,
+                        min(
+                            1,
+                            1 - explosion.shockwaveLifeRemaining
+                                / concussion.shockwaveDuration
+                        )
+                    )
+                    let shockwaveRadius =
+                        concussion.shockwaveRadius * shockwaveProgress
+                    for target in targets where
+                        !concussionState.explosions[index]
+                            .damagedObjectHandles.contains(target.handle)
+                            && max(
+                                0,
+                                vectorDistance(target.position, explosion.position)
+                                    - target.radius
+                            ) <= shockwaveRadius
+                    {
+                        concussionState.explosions[index]
+                            .damagedObjectHandles.insert(target.handle)
+                        let visibility = traceIndoorMovement(
+                            in: level,
+                            startRoom: explosion.roomSourceIndex,
+                            start: explosion.position,
+                            end: target.position,
+                            radius: 0
+                        )
+                        guard case .noHit = visibility.outcome else { continue }
+                        let surfaceDistance = max(
+                            0,
+                            vectorDistance(target.position, explosion.position)
+                                - target.radius
+                        )
+                        let scale = max(
+                            0,
+                            1 - surfaceDistance / concussion.shockwaveRadius
+                        )
+                        _ = applyDamage(
+                            to: target.handle,
+                            amount: concussion.shockwaveDamage * scale * 1.5
+                        )
+                    }
+                    let playerSurfaceDistance = max(
+                        0,
+                        vectorDistance(object.position, explosion.position)
+                            - ship.presentationSize * 0.8
+                    )
+                    if !concussionState.explosions[index].damagedPlayer,
+                       playerSurfaceDistance <= shockwaveRadius {
+                        concussionState.explosions[index].damagedPlayer = true
+                        let visibility = traceIndoorMovement(
+                            in: level,
+                            startRoom: explosion.roomSourceIndex,
+                            start: explosion.position,
+                            end: object.position,
+                            radius: 0
+                        )
+                        if case .noHit = visibility.outcome {
+                            let scale = max(
+                                0,
+                                1 - playerSurfaceDistance
+                                    / concussion.shockwaveRadius
+                            )
+                            shields -= concussion.shockwaveDamage * scale
+                            let away = object.position - explosion.position
+                            if away != .zero {
+                                velocity = velocity
+                                    + normalized(away)
+                                        * (concussion.shockwaveForce * scale
+                                            / ship.physics.mass)
+                            }
+                        }
+                    }
+                }
+                concussionState.explosions.removeAll {
+                    $0.lifeRemaining <= 0
+                }
+                playerConcussionState = concussionState
+            }
             var survivingProjectiles: [TrainingLaserProjectileState] = []
             for var projectile in state.projectiles {
                 let end = projectile.position
@@ -6957,6 +7524,7 @@ final class PlayerSimulation {
         if let guidebotActiveGoalFeedback {
             trainingOpeningFeedback.append(guidebotActiveGoalFeedback)
         }
+        trainingOpeningFeedback.append(contentsOf: playerConcussionFeedback)
         if let playerFlareFeedback {
             trainingOpeningFeedback.append(playerFlareFeedback)
         }
@@ -8597,6 +9165,48 @@ final class PlayerSimulation {
                                 )
                             } ?? []
                     } ?? [],
+            playerConcussionMissiles:
+                ship.playerConcussion.map { concussion in
+                    playerConcussionState?.missiles.map {
+                        .init(
+                            roomSourceIndex: $0.roomSourceIndex,
+                            position: $0.position,
+                            orientation: $0.orientation,
+                            velocity: $0.velocity,
+                            model: concussion.model,
+                            lightDistance: concussion.lightDistance,
+                            lightPresentation: concussion.lightPresentation
+                        )
+                    } ?? []
+                } ?? [],
+            playerConcussionExplosions:
+                ship.playerConcussion.map { concussion in
+                    playerConcussionState?.explosions.map { explosion in
+                        let age = concussion.explosionLifetime
+                            - explosion.lifeRemaining
+                        let frameIndex = min(
+                            concussion.explosionFrames.count - 1,
+                            max(
+                                0,
+                                Int(age / concussion.explosionSourceFrameTime)
+                            )
+                        )
+                        return .init(
+                            roomSourceIndex: explosion.roomSourceIndex,
+                            position: explosion.position,
+                            size: concussion.explosionSize,
+                            texture: concussion.explosionFrames[frameIndex]
+                        )
+                    } ?? []
+                } ?? [],
+            playerConcussionSparks:
+                playerConcussionState?.sparks.map {
+                    .init(
+                        roomSourceIndex: $0.roomSourceIndex,
+                        start: $0.position,
+                        end: $0.position - normalized($0.velocity) * $0.size
+                    )
+                } ?? [],
             trainingGuidebotYellowFlares:
                 level.trainingRobotGuidebotChain?.yellowFlare.map {
                     definition in
@@ -9729,6 +10339,97 @@ private func trainingDodgeAimDot(
         aim.forward,
         normalized(target - aim.position)
     )
+}
+
+private func validPlayerConcussionContinuation(
+    _ state: PlayerConcussionState?,
+    gameTime: Float,
+    level: Level
+) -> Bool {
+    guard level.shipDefinitions.first?.playerConcussion != nil else {
+        return state == nil
+    }
+    guard let state,
+          (0...6).contains(state.ammo),
+          state.nextFireTime.isFinite,
+          state.nextFireTime >= 0,
+          (0..<2).contains(state.nextFiringMaskIndex),
+          state.missiles.count <= 6,
+          state.explosions.count <= 6,
+          state.ammo + state.missiles.count + state.explosions.count <= 6,
+          state.sparks.count <= 48 else {
+        return false
+    }
+    let maximumFutureCreationCount =
+        state.ammo * 10 + state.missiles.count * 9
+    guard state.nextCreationOrdinal
+            <= UInt64.max - UInt64(maximumFutureCreationCount) else {
+        return false
+    }
+    let ordinals = state.missiles.map(\.creationOrdinal)
+        + state.explosions.map(\.creationOrdinal)
+        + state.sparks.map(\.creationOrdinal)
+    guard Set(ordinals).count == ordinals.count,
+          ordinals.allSatisfy({ $0 < state.nextCreationOrdinal }) else {
+        return false
+    }
+    let roomIndices = Set(level.rooms.map(\.sourceIndex))
+    guard state.missiles.allSatisfy({ missile in
+        roomIndices.contains(missile.roomSourceIndex)
+            && isCanonicalRigidTransform(
+                position: missile.position,
+                orientation: missile.orientation
+            )
+            && missile.velocity.x.isFinite
+            && missile.velocity.y.isFinite
+            && missile.velocity.z.isFinite
+            && missile.lifeRemaining.isFinite
+            && missile.lifeRemaining > 0
+            && missile.lifeRemaining <= 15
+    }), state.explosions.allSatisfy({ explosion in
+        roomIndices.contains(explosion.roomSourceIndex)
+            && explosion.position.x.isFinite
+            && explosion.position.y.isFinite
+            && explosion.position.z.isFinite
+            && explosion.lifeRemaining.isFinite
+            && explosion.lifeRemaining > 0
+            && explosion.lifeRemaining <= 0.5
+            && explosion.shockwaveLifeRemaining.isFinite
+            && explosion.shockwaveLifeRemaining >= 0
+            && explosion.shockwaveLifeRemaining <= 0.1
+    }), state.sparks.allSatisfy({ spark in
+        roomIndices.contains(spark.roomSourceIndex)
+            && spark.position.x.isFinite && spark.position.y.isFinite
+            && spark.position.z.isFinite && spark.velocity.x.isFinite
+            && spark.velocity.y.isFinite && spark.velocity.z.isFinite
+            && spark.size.isFinite && spark.size >= 0.7 && spark.size <= 1.06
+            && spark.lifetime.isFinite
+            && spark.lifetime >= 1 && spark.lifetime <= 2.35
+            && spark.lifeRemaining.isFinite
+            && spark.lifeRemaining >= 0
+            && spark.lifeRemaining <= spark.lifetime
+    }) else {
+        return false
+    }
+    let allowedDamageHandles = Set([
+        level.trainingRobotGuidebotChain?.destroyRobotObjectHandle,
+        level.trainingDodgeAttempt?.maneuverFollow?.destructionHandoff?
+            .followBotObjectHandle,
+        level.trainingDodgeAttempt?.maneuverFollow?.destructionHandoff?
+            .destroyBot1ObjectHandle,
+        level.trainingRASBot1DeathChain?.robotObjectHandle,
+        level.trainingRASBot2DeathChain?.robotObjectHandle,
+        level.trainingRASBot3DeathChain?.robotObjectHandle,
+        level.trainingRASBot4DeathChain?.robotObjectHandle,
+        level.trainingLastBot1DeathChain?.robotObjectHandle,
+        level.trainingLastBot2DeathChain?.robotObjectHandle,
+        level.trainingLastBot3DeathChain?.robotObjectHandle,
+        level.trainingLastBot4DeathChain?.robotObjectHandle,
+        level.trainingLastBot5DeathChain?.robotObjectHandle,
+    ].compactMap { $0 })
+    return state.explosions.allSatisfy {
+        $0.damagedObjectHandles.isSubset(of: allowedDamageHandles)
+    } && gameTime.isFinite
 }
 
 private func validPlayerYellowFlareContinuation(
@@ -13172,6 +13873,7 @@ func extractTrainingDodgeProjectileDrawItems(
 }
 
 private let trainingBlueLaserPresentationCapacity = 40
+let playerConcussionMissilePresentationCapacity = 6
 
 func extractPreparedTrainingBlueLaserDrawItems(
     _ level: Level
@@ -13256,6 +13958,81 @@ func extractTrainingBlueLaserDrawItems(
                 up: up,
                 forward: forward
             ),
+            containsType: 0,
+            containsID: 0,
+            containsCount: 0,
+            lifeLeft: 0,
+            soundSource: nil,
+            inertScriptName: nil,
+            inertModuleName: nil,
+            lightmapSubmodels: []
+        )
+        return makeModelDrawItems(
+            object: object,
+            model: model,
+            materialByTexture: materialByTexture,
+            camera: camera,
+            cullBackfaces: false
+        )
+    }
+}
+
+func extractPreparedPlayerConcussionMissileDrawItems(
+    _ level: Level
+) -> [ModelDrawItem] {
+    guard let binding = level.shipDefinitions.first?.playerConcussion,
+          let player = level.objects.first(where: {
+              $0.handle == level.defaultPlayerBinding?.objectHandle
+          }),
+          case let .room(roomSourceIndex) = player.location else {
+        return []
+    }
+    return extractPlayerConcussionMissileDrawItems(
+        level,
+        missiles: (0..<playerConcussionMissilePresentationCapacity).map {
+            _ in .init(
+                roomSourceIndex: roomSourceIndex,
+                position: player.position,
+                orientation: player.orientation,
+                velocity: player.orientation.forward * binding.speed,
+                model: binding.model,
+                lightDistance: binding.lightDistance,
+                lightPresentation: binding.lightPresentation
+            )
+        },
+        camera: .trainingRoom3
+    )
+}
+
+func extractPlayerConcussionMissileDrawItems(
+    _ level: Level,
+    missiles: [PlayerConcussionMissileFrame],
+    camera: RoomCamera
+) -> [ModelDrawItem] {
+    guard let binding = level.shipDefinitions.first?.playerConcussion,
+          let model = level.models.first(where: {
+              $0.source == binding.model
+          }) else {
+        return []
+    }
+    precondition(missiles.count <= playerConcussionMissilePresentationCapacity)
+    let materialByTexture = Dictionary(
+        uniqueKeysWithValues: level.presentationMaterials.map {
+            ($0.texture, $0)
+        }
+    )
+    return missiles.enumerated().flatMap { slot, missile in
+        let object = PlacedObject(
+            handle: UInt32.max - 6_000 - UInt32(slot),
+            type: 5,
+            storedID: binding.weapon.storedIndex,
+            definition: binding.weapon,
+            instanceName: nil,
+            flags: 0,
+            doorShields: nil,
+            location: .room(missile.roomSourceIndex),
+            position: missile.position,
+            orientation: missile.orientation,
             containsType: 0,
             containsID: 0,
             containsCount: 0,

@@ -315,6 +315,9 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.primaryFireHeldChanged = {
             [weak self] in self?.playerInput.setPrimaryFireHeld($0)
         }
+        metalView.secondaryFireHeldChanged = {
+            [weak self] in self?.playerInput.setSecondaryFireHeld($0)
+        }
         metalView.playerFlareRequested = {
             [weak self] in self?.playerInput.requestPlayerFlare()
         }

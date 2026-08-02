@@ -1019,12 +1019,21 @@ struct RetailWeaponPresentationSelection:
     let physicsFlags: UInt32
     let coefficientOfRestitution: Float
     let speed: Float
+    let rotationalVelocity: Vector3
     let lifetime: Float
     let explosionTextureName: String
     let explosionLifetime: Float
     let explosionSize: Float
+    let playerDamage: Float
+    let genericDamage: Float
+    let impactSize: Float
+    let impactTime: Float
+    let impactPlayerDamage: Float
+    let impactGenericDamage: Float
+    let impactForce: Float
     let lightDistance: Float
     let lightPresentation: TrainingMarkerLightPresentation
+    let soundLogicalNames: [String]
 }
 
 func resolveRetailWeaponPresentation(
@@ -1107,7 +1116,11 @@ private func parseRetailWeaponPresentations(
             _ = try cursor.readFloat()
             _ = try cursor.readInt32()
             let speed = try cursor.readFloat()
-            for _ in 0..<3 { _ = try cursor.readFloat() }
+            let rotationalVelocity = Vector3(
+                x: try cursor.readFloat(),
+                y: try cursor.readFloat(),
+                z: try cursor.readFloat()
+            )
             _ = try cursor.readFloat()
             _ = try cursor.readFloat()
             let coefficientOfRestitution = try cursor.readFloat()
@@ -1120,7 +1133,13 @@ private func parseRetailWeaponPresentations(
             let explosionTextureName = try cursor.readCString(allowEmpty: true)
             let explosionLifetime = try cursor.readFloat()
             let explosionSize = try cursor.readFloat()
-            for _ in 0..<7 { _ = try cursor.readFloat() }
+            let playerDamage = try cursor.readFloat()
+            let genericDamage = try cursor.readFloat()
+            let impactSize = try cursor.readFloat()
+            let impactTime = try cursor.readFloat()
+            let impactPlayerDamage = try cursor.readFloat()
+            let impactGenericDamage = try cursor.readFloat()
+            let impactForce = try cursor.readFloat()
             let lifetime = try cursor.readFloat()
             let lightDistance = try cursor.readFloat()
             let primaryColor = Vector3(
@@ -1141,8 +1160,8 @@ private func parseRetailWeaponPresentations(
             let lightAngle = try cursor.readUInt8()
             let lightRenderType = try cursor.readUInt8()
             _ = try cursor.readFloat()
-            for _ in 0..<7 {
-                _ = try cursor.readCString(allowEmpty: true)
+            let soundLogicalNames = try (0..<7).map { _ in
+                try cursor.readCString(allowEmpty: true)
             }
             _ = try cursor.readCString(allowEmpty: true)
             _ = try cursor.readCString(allowEmpty: true)
@@ -1171,10 +1190,18 @@ private func parseRetailWeaponPresentations(
                 coefficientOfRestitution:
                     coefficientOfRestitution,
                 speed: speed,
+                rotationalVelocity: rotationalVelocity,
                 lifetime: lifetime,
                 explosionTextureName: explosionTextureName,
                 explosionLifetime: explosionLifetime,
                 explosionSize: explosionSize,
+                playerDamage: playerDamage,
+                genericDamage: genericDamage,
+                impactSize: impactSize,
+                impactTime: impactTime,
+                impactPlayerDamage: impactPlayerDamage,
+                impactGenericDamage: impactGenericDamage,
+                impactForce: impactForce,
                 lightDistance: lightDistance,
                 lightPresentation: .init(
                     primaryColor: primaryColor,
@@ -1186,7 +1213,8 @@ private func parseRetailWeaponPresentations(
                     timebits: lightTimebits,
                     angle: lightAngle,
                     lightingRenderType: lightRenderType
-                )
+                ),
+                soundLogicalNames: soundLogicalNames
             ))
             weaponIndex += 1
         }
@@ -1282,7 +1310,20 @@ struct RetailShipDefinition: Equatable, Sendable {
     let name: String
     let presentationSize: Float
     let physics: CanonicalShipPhysics
+    let playerConcussion: RetailPlayerConcussionBinding?
     let playerYellowFlare: RetailPlayerYellowFlareBinding?
+}
+
+struct RetailPlayerConcussionBinding: Equatable, Sendable {
+    let batteryIndex: Int
+    let firingMasks: [UInt8]
+    let weaponName: String
+    let fireSoundLogicalNames: [String]
+    let fireWaits: [Float]
+    let energyUsage: Float
+    let ammoUsage: Float
+    let fireFlags: UInt8
+    let weaponFlags: UInt16
 }
 
 struct RetailPlayerYellowFlareBinding: Equatable, Sendable {
@@ -1395,11 +1436,9 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                 let presentationSize = try cursor.readFloat()
                 _ = try cursor.readFloat()
                 _ = try cursor.readInt32()
-                let playerYellowFlare = try cursor.isAtEnd
+                let playerWeaponBindings = try cursor.isAtEnd
                     ? nil
-                    : cursor.readPlayerYellowFlareBinding(
-                        shipPageVersion: version
-                    )
+                    : cursor.readPlayerWeaponBindings(shipPageVersion: version)
                 guard version >= 1,
                       mediumDistance.isFinite,
                       lowDistance.isFinite,
@@ -1422,7 +1461,8 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                             name: name,
                             presentationSize: presentationSize,
                             physics: physics,
-                            playerYellowFlare: playerYellowFlare
+                            playerConcussion: playerWeaponBindings?.concussion,
+                            playerYellowFlare: playerWeaponBindings?.yellowFlare
                         ),
                         genericLight: nil,
                         genericAI: nil
@@ -1548,13 +1588,17 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
 private extension RetailPageCursor {
     var isAtEnd: Bool { offset == data.count }
 
-    mutating func readPlayerYellowFlareBinding(
+    mutating func readPlayerWeaponBindings(
         shipPageVersion: Int
-    ) throws -> RetailPlayerYellowFlareBinding {
+    ) throws -> (
+        concussion: RetailPlayerConcussionBinding,
+        yellowFlare: RetailPlayerYellowFlareBinding
+    ) {
         guard shipPageVersion >= 6 else {
             throw RetailTextureTableError.invalidPageLength
         }
-        var selected: RetailPlayerYellowFlareBinding?
+        var concussion: RetailPlayerConcussionBinding?
+        var yellowFlare: RetailPlayerYellowFlareBinding?
         for batteryIndex in 0..<21 {
             let fireFlags = try readUInt8()
             _ = try readCString(allowEmpty: true)
@@ -1588,24 +1632,38 @@ private extension RetailPageCursor {
             let weaponNames = try (0..<8).map { _ in
                 try readCString(allowEmpty: true)
             }
-            guard batteryIndex == 20 else { continue }
-            selected = .init(
-                batteryIndex: batteryIndex,
-                firingMask: maskCount == 1 ? firingMasks[0] : 0,
-                weaponName: weaponNames[0],
-                fireSoundLogicalName: maskSoundNames[0],
-                fireWait: firingWaits[0],
-                energyUsage: energyUsage,
-                ammoUsage: ammoUsage,
-                fireFlags: fireFlags,
-                weaponFlags: weaponFlags
-            )
+            if batteryIndex == 10 {
+                let count = Int(maskCount)
+                concussion = .init(
+                    batteryIndex: batteryIndex,
+                    firingMasks: Array(firingMasks.prefix(count)),
+                    weaponName: weaponNames[0],
+                    fireSoundLogicalNames: Array(maskSoundNames.prefix(count)),
+                    fireWaits: Array(firingWaits.prefix(count)),
+                    energyUsage: energyUsage,
+                    ammoUsage: ammoUsage,
+                    fireFlags: fireFlags,
+                    weaponFlags: weaponFlags
+                )
+            } else if batteryIndex == 20 {
+                yellowFlare = .init(
+                    batteryIndex: batteryIndex,
+                    firingMask: maskCount == 1 ? firingMasks[0] : 0,
+                    weaponName: weaponNames[0],
+                    fireSoundLogicalName: maskSoundNames[0],
+                    fireWait: firingWaits[0],
+                    energyUsage: energyUsage,
+                    ammoUsage: ammoUsage,
+                    fireFlags: fireFlags,
+                    weaponFlags: weaponFlags
+                )
+            }
         }
         try requireEnd()
-        guard let selected else {
+        guard let concussion, let yellowFlare else {
             throw RetailTextureTableError.invalidPageLength
         }
-        return selected
+        return (concussion, yellowFlare)
     }
 
     mutating func readCanonicalShipPhysics() throws -> CanonicalShipPhysics {

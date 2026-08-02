@@ -33,6 +33,7 @@ final class RevivalGameplayView: MTKView {
     var controllerInputChanged: ((InputSnapshot) -> Void)?
     var guidebotDeployRequested: (() -> Void)?
     var primaryFireHeldChanged: ((Bool) -> Void)?
+    var secondaryFireHeldChanged: ((Bool) -> Void)?
     var playerFlareRequested: (() -> Void)?
     var playerFlareRequestCancelled: (() -> Void)?
     var inventoryUseRequested: (() -> Void)?
@@ -52,6 +53,7 @@ final class RevivalGameplayView: MTKView {
     private var gameplayIsActive = false
     private var mouseIsCaptured = false
     private var primaryFireIsHeld = false
+    private var secondaryFireIsHeld = false
     private var afterburnerIsHeld = false
     private let trainingMessageLabel = NSTextField(labelWithString: "")
     private let enabledControlsLabel = NSTextField(labelWithString: "")
@@ -250,6 +252,10 @@ final class RevivalGameplayView: MTKView {
             releaseMouse()
             return
         }
+        if event.keyCode == 49, gameplayIsActive {
+            setSecondaryFireHeld(true)
+            return
+        }
         if Self.requestsGuidebotDeployment(
             keyCode: event.keyCode,
             gameplayIsActive: gameplayIsActive
@@ -300,6 +306,10 @@ final class RevivalGameplayView: MTKView {
     }
 
     override func keyUp(with event: NSEvent) {
+        if event.keyCode == 49 {
+            setSecondaryFireHeld(false)
+            return
+        }
         if event.keyCode == 9 {
             rearViewInputChanged?(false, false)
             return
@@ -336,6 +346,19 @@ final class RevivalGameplayView: MTKView {
 
     override func mouseUp(with event: NSEvent) {
         setPrimaryFireHeld(false)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard gameplayIsActive else {
+            super.rightMouseDown(with: event)
+            return
+        }
+        captureMouse()
+        setSecondaryFireHeld(true)
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        setSecondaryFireHeld(false)
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -1812,6 +1835,7 @@ final class RevivalGameplayView: MTKView {
 
     private func releaseMouse() {
         setPrimaryFireHeld(false)
+        setSecondaryFireHeld(false)
         playerFlareRequestCancelled?()
         rearViewInputCancelled?()
         guard mouseIsCaptured else { return }
@@ -1826,6 +1850,12 @@ final class RevivalGameplayView: MTKView {
         guard primaryFireIsHeld != isHeld else { return }
         primaryFireIsHeld = isHeld
         primaryFireHeldChanged?(isHeld)
+    }
+
+    private func setSecondaryFireHeld(_ isHeld: Bool) {
+        guard secondaryFireIsHeld != isHeld else { return }
+        secondaryFireIsHeld = isHeld
+        secondaryFireHeldChanged?(isHeld)
     }
 
     nonisolated private static func direction(

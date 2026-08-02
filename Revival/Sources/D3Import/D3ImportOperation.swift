@@ -465,6 +465,35 @@ func runD3Import(
                 .caseInsensitiveCompare("bluelaser.OOF")
                 == .orderedSame
     )
+    let concussionWeapon = try resolveRetailWeaponPresentation(
+        table: tableData,
+        overlay: overlayData,
+        named: "Concussion"
+    )
+    precondition(
+        concussionWeapon.name == "Concussion"
+            && concussionWeapon.fireImageName
+                .caseInsensitiveCompare("ConcussionMissile.OOF")
+                == .orderedSame
+            && concussionWeapon.customSize == 1
+            && concussionWeapon.speed == 175
+            && concussionWeapon.rotationalVelocity
+                == .init(x: 0, y: 0, z: 35_000)
+            && concussionWeapon.lifetime == 15
+            && concussionWeapon.explosionTextureName == "ExplosionE"
+            && concussionWeapon.explosionLifetime == 0.5
+            && concussionWeapon.explosionSize == 10
+            && concussionWeapon.genericDamage == 6
+            && concussionWeapon.impactSize == 32
+            && concussionWeapon.impactTime == 0.1
+            && concussionWeapon.impactPlayerDamage == 19
+            && concussionWeapon.impactGenericDamage == 19
+            && concussionWeapon.impactForce == 3_000
+            && concussionWeapon.lightDistance == 12.5
+            && concussionWeapon.lightPresentation.primaryColor
+                == .init(x: 1, y: 0.5, z: 0)
+            && concussionWeapon.soundLogicalNames.contains("Explode1")
+    )
     let yellowFlareWeapon = try resolveRetailWeaponPresentation(
         table: tableData,
         overlay: overlayData,
@@ -579,12 +608,16 @@ func runD3Import(
             dodgeTurretPage.lowModelName,
             "RedLaser.OOF",
             blueLaserWeapon.fireImageName,
+            concussionWeapon.fireImageName,
             yellowFlareWeapon.fireImageName,
     ].compactMap { $0 })
     let sortedModelNames = reachedModelNames.filter {
         $0.caseInsensitiveCompare(
             blueLaserWeapon.fireImageName
         ) != .orderedSame
+            && $0.caseInsensitiveCompare(
+                concussionWeapon.fireImageName
+            ) != .orderedSame
             && $0.caseInsensitiveCompare(
                 yellowFlareWeapon.fireImageName
             ) != .orderedSame
@@ -593,6 +626,7 @@ func runD3Import(
             == .orderedAscending
     } + [
         blueLaserWeapon.fireImageName,
+        concussionWeapon.fireImageName,
         yellowFlareWeapon.fireImageName,
     ]
     var modelPayloadByName: [String: (data: Data, archive: String)] = [:]
@@ -641,7 +675,10 @@ func runD3Import(
             }
         ).union(
             yellowFlareFrameAliases.values
-        ).union([yellowFlareWeapon.particleName])
+        ).union([
+            yellowFlareWeapon.particleName,
+            concussionWeapon.explosionTextureName,
+        ])
     )
     let reachedTextureDefinitions = Dictionary(
         (resolvedReachedTextureDefinitions + [reachedGyroFlareDefinition]).map {
@@ -680,6 +717,15 @@ func runD3Import(
         ]!,
         animation: reachedOutrageAnimation(
             named: yellowFlareSparkWeapon.fireImageName,
+            archives: presentationArchives
+        )
+    )
+    let concussionExplosionAnimation = try admitPlayerConcussionExplosionAnimation(
+        texture: modelTextureByName[
+            concussionWeapon.explosionTextureName.lowercased()
+        ]!,
+        animation: reachedOutrageAnimation(
+            named: "ExplosionE.oaf",
             archives: presentationArchives
         )
     )
@@ -830,6 +876,13 @@ func runD3Import(
         }
     })
     let retailShip = ship.shipDefinition!
+    let playerConcussionBattery = retailShip.playerConcussion
+    let playerConcussionGunpoints = try [1, 2].map { index in
+        try reachedOutrageModelGunpoint(
+            modelPayloadByName[ship.primaryModelName.lowercased()]!.data,
+            index: index
+        )
+    }
     let playerYellowFlareBattery = retailShip.playerYellowFlare
     let playerYellowFlareGunpoint = try playerYellowFlareBattery.map { _ in
         try reachedOutrageModelGunpoint(
@@ -855,6 +908,42 @@ func runD3Import(
             && retailShip.physics.hitDieDot == -1
             && retailShip.physics.maximumTurnrollRate == 8_000
             && retailShip.physics.turnrollRatio == 0.13
+            && playerConcussionBattery?.batteryIndex == 10
+            && playerConcussionBattery?.firingMasks == [1, 2]
+            && playerConcussionBattery?.weaponName == "Concussion"
+            && playerConcussionBattery?.fireSoundLogicalNames
+                == ["concmissilefire71", "concmissilefire71"]
+            && playerConcussionBattery?.fireWaits == [0.5, 0.5]
+            && playerConcussionBattery?.energyUsage == 0
+            && playerConcussionBattery?.ammoUsage == 1
+            && playerConcussionBattery?.fireFlags == 0
+            && playerConcussionBattery?.weaponFlags == 0
+            && playerConcussionGunpoints[0].parentSubmodelIndex == 0
+            && playerConcussionGunpoints[0].localPosition.x.bitPattern
+                == Float(2.792_412_5).bitPattern
+            && playerConcussionGunpoints[0].localPosition.y.bitPattern
+                == Float(-1.186_958_9).bitPattern
+            && playerConcussionGunpoints[0].localPosition.z.bitPattern
+                == Float(2.687_090_9).bitPattern
+            && playerConcussionGunpoints[0].forward.x.bitPattern
+                == Float(0.000_007_629_434_5).bitPattern
+            && playerConcussionGunpoints[0].forward.y.bitPattern
+                == Float(0.000_003_337_758_7).bitPattern
+            && playerConcussionGunpoints[0].forward.z.bitPattern
+                == Float(1).bitPattern
+            && playerConcussionGunpoints[1].parentSubmodelIndex == 0
+            && playerConcussionGunpoints[1].localPosition.x.bitPattern
+                == Float(-2.804_046_4).bitPattern
+            && playerConcussionGunpoints[1].localPosition.y.bitPattern
+                == Float(-1.186_885_0).bitPattern
+            && playerConcussionGunpoints[1].localPosition.z.bitPattern
+                == Float(2.687_135_2).bitPattern
+            && playerConcussionGunpoints[1].forward.x.bitPattern
+                == Float(0.000_008_106_278).bitPattern
+            && playerConcussionGunpoints[1].forward.y.bitPattern
+                == Float(0.000_003_814_590_4).bitPattern
+            && playerConcussionGunpoints[1].forward.z.bitPattern
+                == Float(1).bitPattern
             && playerYellowFlareBattery?.batteryIndex == 20
             && playerYellowFlareBattery?.firingMask == 1
             && playerYellowFlareBattery?.weaponName == "Yellow flare"
@@ -885,6 +974,53 @@ func runD3Import(
             primaryModel: modelSources[ship.primaryModelName.lowercased()]!,
             presentationSize: retailShip.presentationSize,
             physics: retailShip.physics,
+            playerConcussion: .init(
+                batteryIndex: playerConcussionBattery!.batteryIndex,
+                firingMasks: playerConcussionBattery!.firingMasks,
+                weapon: .init(
+                    storedIndex: concussionWeapon.storedIndex,
+                    sourceName: concussionWeapon.name
+                ),
+                model: modelSources[
+                    concussionWeapon.fireImageName.lowercased()
+                ]!,
+                fireSoundLogicalNames:
+                    playerConcussionBattery!.fireSoundLogicalNames,
+                fireSoundSourceName: "concmissilefire7.wav",
+                impactSoundLogicalName: "Explode1",
+                impactSoundSourceName: "Explode1.wav",
+                fireWaits: playerConcussionBattery!.fireWaits,
+                energyUsage: playerConcussionBattery!.energyUsage,
+                ammoUsage: playerConcussionBattery!.ammoUsage,
+                fireFlags: playerConcussionBattery!.fireFlags,
+                weaponFlags: playerConcussionBattery!.weaponFlags,
+                gunpoints: zip([1, 2], playerConcussionGunpoints).map {
+                    index, gunpoint in
+                    .init(
+                        index: index,
+                        parentSubmodelIndex: gunpoint.parentSubmodelIndex,
+                        localPosition: gunpoint.localPosition,
+                        localForward: gunpoint.forward
+                    )
+                },
+                collisionRadius: concussionWeapon.customSize,
+                speed: concussionWeapon.speed,
+                lifetime: concussionWeapon.lifetime,
+                rotationalVelocity:
+                    concussionWeapon.rotationalVelocity.z,
+                lightDistance: concussionWeapon.lightDistance,
+                lightPresentation: concussionWeapon.lightPresentation,
+                explosionFrames: concussionExplosionAnimation.resources,
+                explosionSourceFrameTime:
+                    concussionExplosionAnimation.sourceFrameTime,
+                explosionSize: concussionWeapon.explosionSize,
+                explosionLifetime: concussionWeapon.explosionLifetime,
+                directRobotDamage: concussionWeapon.genericDamage * 1.5,
+                shockwaveDuration: concussionWeapon.impactTime,
+                shockwaveRadius: concussionWeapon.impactSize,
+                shockwaveDamage: concussionWeapon.impactGenericDamage,
+                shockwaveForce: concussionWeapon.impactForce
+            ),
             playerYellowFlare: .init(
                 batteryIndex: playerYellowFlareBattery!.batteryIndex,
                 firingMask: playerYellowFlareBattery!.firingMask,
@@ -1278,6 +1414,12 @@ func runD3Import(
     let dodgeImpactSoundClip = try reachedSoundClip(
         named: "LazorHitshrt"
     )
+    let concussionFireSoundClip = try reachedSoundClip(
+        named: "concmissilefire71"
+    )
+    let concussionImpactSoundClip = try reachedSoundClip(
+        named: "Explode1"
+    )
     let guidebotReleaseSoundClip = try reachedSoundClip(
         named: "GBExpulsionA"
     )
@@ -1548,6 +1690,8 @@ func runD3Import(
         soundClips: [menuBeepClip,
             dodgeFireSoundClip,
             dodgeImpactSoundClip,
+            concussionFireSoundClip,
+            concussionImpactSoundClip,
             headlightSoundClip,]
     )
     let galleryTrigger = openingLevel.triggers.first {
@@ -3098,6 +3242,39 @@ struct TrainingGuidebotYellowFlareAnimationAdmission:
     let sourceFrameTime: Float
 }
 
+struct PlayerConcussionExplosionAnimationAdmission:
+    Equatable, Sendable
+{
+    let resources: [SourceResource]
+    let images: [Outrage1555Image]
+    let sourceFrameTime: Float
+}
+
+func admitPlayerConcussionExplosionAnimation(
+    texture: SourceResource,
+    animation: Outrage1555Animation
+) throws -> PlayerConcussionExplosionAnimationAdmission {
+    let resources = [texture] + (1..<15).map {
+        SourceResource(
+            storedIndex: texture.storedIndex,
+            sourceName: "ExplosionE.oaf frame \($0)"
+        )
+    }
+    guard texture.sourceName == "ExplosionE",
+          animation.frames.count == resources.count,
+          animation.sourceFrameTime.bitPattern
+            == (Float(0.5) / 15).bitPattern else {
+        throw D3ImportOperationError.missingPresentationAsset(
+            "ExplosionE.oaf"
+        )
+    }
+    return .init(
+        resources: resources,
+        images: animation.frames,
+        sourceFrameTime: animation.sourceFrameTime
+    )
+}
+
 func admitTrainingGuidebotYellowFlareAnimation(
     texture: SourceResource,
     animation: Outrage1555Animation
@@ -3153,6 +3330,13 @@ private func makePresentationMaterials(
                     admitted.resources,
                     admitted.images
                 ))
+            } else if definition.name == "ExplosionE",
+                      definition.bitmapSourceName == "ExplosionE.oaf" {
+                let admitted = try admitPlayerConcussionExplosionAnimation(
+                    texture: texture,
+                    animation: animation
+                )
+                images = Array(zip(admitted.resources, admitted.images))
             } else {
                 images = [(texture, animation.frames[0])]
             }
