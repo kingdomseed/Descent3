@@ -63,6 +63,11 @@
 		C60000000000000000000004 /* ReciprocalPortalComponent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60000000000000000000001 /* ReciprocalPortalComponent.swift */; };
 		C60000000000000000000005 /* ReciprocalPortalComponent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60000000000000000000001 /* ReciprocalPortalComponent.swift */; };
 		C60000000000000000000006 /* ReciprocalPortalComponent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60000000000000000000001 /* ReciprocalPortalComponent.swift */; };
+		C70000000000000000000002 /* WorldRenderExtractionValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000001 /* WorldRenderExtractionValues.swift */; };
+		C70000000000000000000003 /* WorldRenderExtractionValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000001 /* WorldRenderExtractionValues.swift */; };
+		C70000000000000000000004 /* WorldRenderExtractionValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000001 /* WorldRenderExtractionValues.swift */; };
+		C70000000000000000000005 /* WorldRenderExtractionValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000001 /* WorldRenderExtractionValues.swift */; };
+		C70000000000000000000006 /* WorldRenderExtractionValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000001 /* WorldRenderExtractionValues.swift */; };
 		C10000000000000000000008 /* EditorProjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000004 /* EditorProjectTests.swift */; };
 		C10000000000000000000009 /* RevivalProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000005 /* RevivalProject.swift */; };
 		C1000000000000000000000A /* RevivalProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000005 /* RevivalProject.swift */; };
@@ -126,6 +131,7 @@
 		C40000000000000000000001 /* PlayerSimulationPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationPresentation.swift; sourceTree = "<group>"; };
 		C50000000000000000000001 /* WaterProceduralEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaterProceduralEvaluator.swift; sourceTree = "<group>"; };
 		C60000000000000000000001 /* ReciprocalPortalComponent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReciprocalPortalComponent.swift; sourceTree = "<group>"; };
+		C70000000000000000000001 /* WorldRenderExtractionValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtractionValues.swift; sourceTree = "<group>"; };
 		C20000000000000000000004 /* EditorProjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorProjectTests.swift; sourceTree = "<group>"; };
 		C20000000000000000000005 /* RevivalProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalProject.swift; sourceTree = "<group>"; };
 		D20000000000000000000001 /* MetalWorldPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalWorldPlanTests.swift; sourceTree = "<group>"; };
@@ -267,6 +273,7 @@
 				C40000000000000000000001 /* PlayerSimulationPresentation.swift */,
 				C50000000000000000000001 /* WaterProceduralEvaluator.swift */,
 				C60000000000000000000001 /* ReciprocalPortalComponent.swift */,
+				C70000000000000000000001 /* WorldRenderExtractionValues.swift */,
 				C20000000000000000000003 /* WorldRendering.swift */,
 				B20000000000000000000009 /* CanonicalPackage.swift */,
 				B20000000000000000000007 /* Level.swift */,
@@ -521,6 +528,7 @@
 				C40000000000000000000002 /* PlayerSimulationPresentation.swift in Sources */,
 				C50000000000000000000002 /* WaterProceduralEvaluator.swift in Sources */,
 				C60000000000000000000002 /* ReciprocalPortalComponent.swift in Sources */,
+				C70000000000000000000002 /* WorldRenderExtractionValues.swift in Sources */,
 				C10000000000000000000004 /* WorldRendering.swift in Sources */,
 				C10000000000000000000001 /* PresentationImport.swift in Sources */,
 				B10000000000000000000015 /* D3ImportOperation.swift in Sources */,
@@ -546,6 +554,7 @@
 				C40000000000000000000003 /* PlayerSimulationPresentation.swift in Sources */,
 				C50000000000000000000003 /* WaterProceduralEvaluator.swift in Sources */,
 				C60000000000000000000003 /* ReciprocalPortalComponent.swift in Sources */,
+				C70000000000000000000003 /* WorldRenderExtractionValues.swift in Sources */,
 				C10000000000000000000005 /* WorldRendering.swift in Sources */,
 				B10000000000000000000011 /* CanonicalPackage.swift in Sources */,
 				B1000000000000000000000B /* Level.swift in Sources */,
@@ -569,6 +578,7 @@
 				C40000000000000000000004 /* PlayerSimulationPresentation.swift in Sources */,
 				C50000000000000000000004 /* WaterProceduralEvaluator.swift in Sources */,
 				C60000000000000000000004 /* ReciprocalPortalComponent.swift in Sources */,
+				C70000000000000000000004 /* WorldRenderExtractionValues.swift in Sources */,
 				C10000000000000000000006 /* WorldRendering.swift in Sources */,
 				B10000000000000000000012 /* CanonicalPackage.swift in Sources */,
 				B1000000000000000000000C /* Level.swift in Sources */,
@@ -594,6 +604,7 @@
 				C40000000000000000000005 /* PlayerSimulationPresentation.swift in Sources */,
 				C50000000000000000000005 /* WaterProceduralEvaluator.swift in Sources */,
 				C60000000000000000000005 /* ReciprocalPortalComponent.swift in Sources */,
+				C70000000000000000000005 /* WorldRenderExtractionValues.swift in Sources */,
 				C10000000000000000000007 /* WorldRendering.swift in Sources */,
 				C10000000000000000000003 /* WorldRenderingTests.swift in Sources */,
 				C10000000000000000000002 /* PresentationImport.swift in Sources */,
@@ -627,6 +638,7 @@
 				C40000000000000000000006 /* PlayerSimulationPresentation.swift in Sources */,
 				C50000000000000000000006 /* WaterProceduralEvaluator.swift in Sources */,
 				C60000000000000000000006 /* ReciprocalPortalComponent.swift in Sources */,
+				C70000000000000000000006 /* WorldRenderExtractionValues.swift in Sources */,
 				F10000000000000000000004 /* WorldRendering.swift in Sources */,
 				F10000000000000000000003 /* CanonicalPackage.swift in Sources */,
 				F10000000000000000000002 /* Level.swift in Sources */,
