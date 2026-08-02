@@ -5353,33 +5353,60 @@ final class WorldRenderingTests: XCTestCase {
         )
         level = level.addingTrainingOpeningLesson(lesson, voiceClips: [])
 
-        var unconditionalLevel = level
         let unconditionalPlayer = try XCTUnwrap(
-            unconditionalLevel.objects.first {
+            level.objects.first {
                 $0.handle == 2_048
             }
         )
-        let unconditionalPlayerRoomIndex = try XCTUnwrap(
-            unconditionalLevel.rooms.firstIndex {
-                $0.sourceIndex == 1
+        let openingGoalHandles: [UInt32] = [
+            goalHandle,
+            startGoalHandle,
+            leftGoalHandle,
+            18_441,
+        ]
+        let isolatedOpeningLevel = level
+        func contacting(
+            _ handle: UInt32,
+            at position: Vector3
+        ) throws -> Level {
+            var objects = isolatedOpeningLevel.objects
+            for openingGoalHandle in openingGoalHandles {
+                let index = try XCTUnwrap(
+                    objects.firstIndex {
+                        $0.handle == openingGoalHandle
+                    }
+                )
+                objects[index].position = openingGoalHandle == handle
+                    ? position
+                    : .init(
+                        x: position.x + 100,
+                        y: position.y,
+                        z: position.z
+                    )
+                objects[index].location = .room(1)
             }
-        )
-        unconditionalLevel.rooms[unconditionalPlayerRoomIndex] =
-            makeSourceContainmentRoom(
-                center: unconditionalPlayer.position,
-                texture: unconditionalLevel.surfacePhysics[0].texture,
+            let roomIndex = try XCTUnwrap(
+                isolatedOpeningLevel.rooms.firstIndex {
+                    $0.sourceIndex == 1
+                }
+            )
+            var rooms = isolatedOpeningLevel.rooms
+            rooms[roomIndex] = makeSourceContainmentRoom(
+                center: position,
+                texture: isolatedOpeningLevel.surfacePhysics[0].texture,
                 sourceIndex: 1,
                 halfExtent: 200
             )
-        let unconditionalLeftGoalIndex = try XCTUnwrap(
-            unconditionalLevel.objects.firstIndex {
-                $0.handle == leftGoalHandle
-            }
+            return replacing(
+                isolatedOpeningLevel,
+                rooms: rooms,
+                objects: objects
+            )
+        }
+        let unconditionalLevel = try contacting(
+            leftGoalHandle,
+            at: unconditionalPlayer.position
         )
-        unconditionalLevel.objects[unconditionalLeftGoalIndex].location =
-            unconditionalPlayer.location
-        unconditionalLevel.objects[unconditionalLeftGoalIndex].position =
-            unconditionalPlayer.position
         let unconditionalSimulation = PlayerSimulation(
             level: unconditionalLevel,
             presentationReadyTimestamp: 0
@@ -5412,8 +5439,12 @@ final class WorldRenderingTests: XCTestCase {
             PlayerSimulationContinuation.self,
             from: unconditionalContinuationData
         )
+        let unconditionalStartLevel = try contacting(
+            startGoalHandle,
+            at: unconditionalContinuation.playerPosition
+        )
         let restoredUnconditionalScript004 = try PlayerSimulation(
-            level: unconditionalLevel,
+            level: unconditionalStartLevel,
             continuation: unconditionalContinuation,
             resumedAtTimestamp: 1
         )
@@ -5444,19 +5475,38 @@ final class WorldRenderingTests: XCTestCase {
                 restoredUnconditionalScript004.continuation
             )
         )
-        let restoredEarlyUp = try PlayerSimulation(
-            level: unconditionalLevel,
+        let restoredEarlyUpSimulation = try PlayerSimulation(
+            level: unconditionalStartLevel,
             continuation: earlyUpContinuation,
             resumedAtTimestamp: 2
-        ).update(at: 2.1, input: .zero)
+        )
+        let restoredEarlyUp = restoredEarlyUpSimulation.update(
+            at: 2.1,
+            input: .zero
+        )
         XCTAssertTrue(restoredEarlyUp.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(restoredEarlyUp.enabledPlayerControls, [.forward, .up])
 
+        let earlyForwardStart = restoredEarlyUpSimulation.continuation
+            .playerPosition
+        let earlyForwardLevel = try contacting(
+            goalHandle,
+            at: .init(
+                x: earlyForwardStart.x,
+                y: earlyForwardStart.y,
+                z: earlyForwardStart.z + 50
+            )
+        )
+        let earlyForwardSimulation = try PlayerSimulation(
+            level: earlyForwardLevel,
+            continuation: restoredEarlyUpSimulation.continuation,
+            resumedAtTimestamp: 3
+        )
         var earlyForwardGoalFrame: PlayerSimulationFrame?
-        var earlyTimestamp = 1.1
+        var earlyTimestamp = 3.0
         for _ in 0..<80 {
             earlyTimestamp += 0.1
-            let frame = restoredUnconditionalScript004.update(
+            let frame = earlyForwardSimulation.update(
                 at: earlyTimestamp,
                 input: .init(forward: 1)
             )
@@ -5474,11 +5524,20 @@ final class WorldRenderingTests: XCTestCase {
         let earlyForwardContinuation = try JSONDecoder().decode(
             PlayerSimulationContinuation.self,
             from: JSONEncoder().encode(
-                restoredUnconditionalScript004.continuation
+                earlyForwardSimulation.continuation
+            )
+        )
+        let earlyReturnStart = earlyForwardContinuation.playerPosition
+        let earlyReturnLevel = try contacting(
+            startGoalHandle,
+            at: .init(
+                x: earlyReturnStart.x,
+                y: earlyReturnStart.y,
+                z: earlyReturnStart.z - 50
             )
         )
         let restoredAfterEarlyForward = try PlayerSimulation(
-            level: unconditionalLevel,
+            level: earlyReturnLevel,
             continuation: earlyForwardContinuation,
             resumedAtTimestamp: 100
         )
@@ -5516,7 +5575,7 @@ final class WorldRenderingTests: XCTestCase {
             )
         )
         let restoredAfterEarlyReturn = try PlayerSimulation(
-            level: unconditionalLevel,
+            level: earlyReturnLevel,
             continuation: earlyReturnContinuation,
             resumedAtTimestamp: 200
         )
@@ -5715,14 +5774,20 @@ final class WorldRenderingTests: XCTestCase {
         let firstGoal = try XCTUnwrap(collisionFrame)
         XCTAssertEqual(
             firstGoal.trainingOpeningFeedback,
-            [.init(
-                hudMessages: [
-                    "Excellent!",
-                    "Now use the reverse Key to return to where you started!",
-                ],
-                voiceSourceName: "return1.osf",
-                voicePrecedesHUDMessages: false
-            )]
+            [
+                .init(
+                    hudMessages: ["Excellent!"],
+                    voiceSourceName: "return1.osf",
+                    voicePrecedesHUDMessages: false
+                ),
+                .init(
+                    hudMessages: [
+                        "Now use the reverse Key to return to where you started!",
+                    ],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false
+                ),
+            ]
         )
         XCTAssertEqual(firstGoal.enabledPlayerControls, [.reverse])
 
@@ -5781,33 +5846,17 @@ final class WorldRenderingTests: XCTestCase {
             from: returnedContinuationData
         )
         let restoredAfterReturn = try PlayerSimulation(
-            level: level,
+            level: try contacting(
+                leftGoalHandle,
+                at: returnedContinuation.playerPosition
+            ),
             continuation: returnedContinuation,
             resumedAtTimestamp: 200
         )
-        let resumedAfterReturn = restoredAfterReturn.update(
+        let reachedLeftGoal = restoredAfterReturn.update(
             at: 200.1,
-            input: .init(sideways: -1)
+            input: .zero
         )
-        var leftGoalFrame = resumedAfterReturn.trainingOpeningFeedback
-            .contains(where: {
-                $0.voiceSourceName == "return2.osf"
-            }) ? resumedAfterReturn : nil
-        if leftGoalFrame == nil {
-            for frameIndex in 2...80 {
-                let frame = restoredAfterReturn.update(
-                    at: 200 + Double(frameIndex) * 0.1,
-                    input: .init(sideways: -1)
-                )
-                if frame.trainingOpeningFeedback.contains(where: {
-                    $0.voiceSourceName == "return2.osf"
-                }) {
-                    leftGoalFrame = frame
-                    break
-                }
-            }
-        }
-        let reachedLeftGoal = try XCTUnwrap(leftGoalFrame)
         XCTAssertEqual(
             reachedLeftGoal.trainingOpeningFeedback,
             [
@@ -5847,7 +5896,7 @@ final class WorldRenderingTests: XCTestCase {
         )
         let afterLeftGoal = restoredAfterReturn.update(
             at: 208.1,
-            input: .init(sideways: -1)
+            input: .zero
         )
         XCTAssertTrue(afterLeftGoal.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(afterLeftGoal.enabledPlayerControls, [.right])
@@ -5863,7 +5912,7 @@ final class WorldRenderingTests: XCTestCase {
         compatibleScript004Lesson.returnUp = nil
         let compatibleScript004 = try PlayerSimulation(
             level: replacing(
-                level,
+                restoredAfterReturn.level,
                 trainingOpeningLesson: compatibleScript004Lesson
             ),
             continuation: script004Continuation,
@@ -5873,33 +5922,17 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(compatibleScript004.enabledPlayerControls, [.right])
 
         let restoredAfterScript004 = try PlayerSimulation(
-            level: level,
+            level: try contacting(
+                startGoalHandle,
+                at: script004Continuation.playerPosition
+            ),
             continuation: script004Continuation,
             resumedAtTimestamp: 300
         )
-        let resumedAfterScript004 = restoredAfterScript004.update(
+        let returnedFromLeft = restoredAfterScript004.update(
             at: 300.1,
-            input: .init(sideways: 1)
+            input: .zero
         )
-        var script005Frame = resumedAfterScript004.trainingOpeningFeedback
-            .contains(where: {
-                $0.voiceSourceName == "up1.osf"
-            }) ? resumedAfterScript004 : nil
-        if script005Frame == nil {
-            for frameIndex in 2...80 {
-                let frame = restoredAfterScript004.update(
-                    at: 300 + Double(frameIndex) * 0.1,
-                    input: .init(sideways: 1)
-                )
-                if frame.trainingOpeningFeedback.contains(where: {
-                    $0.voiceSourceName == "up1.osf"
-                }) {
-                    script005Frame = frame
-                    break
-                }
-            }
-        }
-        let returnedFromLeft = try XCTUnwrap(script005Frame)
         XCTAssertEqual(
             returnedFromLeft.trainingOpeningFeedback,
             [
@@ -5918,14 +5951,14 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(returnedFromLeft.enabledPlayerControls, [.up])
         let afterScript005 = restoredAfterScript004.update(
             at: 308.1,
-            input: .init(sideways: 1)
+            input: .zero
         )
         XCTAssertTrue(afterScript005.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(afterScript005.enabledPlayerControls, [.up])
 
         let script005Continuation = restoredAfterScript004.continuation
         let restoredAfterScript005 = try PlayerSimulation(
-            level: level,
+            level: restoredAfterScript004.level,
             continuation: script005Continuation,
             resumedAtTimestamp: 400
         ).update(at: 400.1, input: .zero)
@@ -5939,7 +5972,7 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertThrowsError(
             try PlayerSimulation(
                 level: replacing(
-                    level,
+                    restoredAfterScript004.level,
                     trainingOpeningLesson: missingUpLesson
                 ),
                 continuation: script005Continuation,
@@ -5957,7 +5990,7 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertThrowsError(
             try PlayerSimulation(
                 level: replacing(
-                    level,
+                    restoredAfterReturn.level,
                     trainingOpeningLesson: missingRightLesson
                 ),
                 continuation: script004Continuation,

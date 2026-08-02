@@ -6984,258 +6984,22 @@ final class PlayerSimulation {
             }
             trainingRobotGuidebotState = state
         }
-        if var openingState = trainingOpeningState,
-           let lesson = level.trainingOpeningLesson {
-            if !openingState.forwardGoalWasReached,
-               trainingForwardGoalWasReachedThisFrame {
-                openingState.forwardGoalWasReached = true
-                openingState.enabledControls.remove(.forward)
-                openingState.enabledControls.insert(.reverse)
-                trainingOpeningFeedback.append(contentsOf: [
-                    TrainingOpeningFeedback(
-                        hudMessages: [lesson.successMessage],
-                        voiceSourceName: lesson.successVoiceSourceName,
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [lesson.reverseInstruction],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                ])
-            }
-            if openingState.repeatForwardWasPresented == true,
-               openingState.repeatForwardGoalWasPresented != true,
-               trainingForwardGoalWasReachedThisFrame,
-               let repeatForwardGoal = lesson.repeatForwardGoal {
-                openingState.enabledControls.remove(.forward)
-                openingState.enabledControls.insert(.reverse)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [repeatForwardGoal.reverseInstruction],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false,
-                    soundSourceName: repeatForwardGoal.soundLogicalName
-                ))
-                openingState.repeatForwardGoalWasPresented = true
-            }
-            if openingState.forwardGoalWasReached,
-               openingState.returnGoalWasReached != true,
-               trainingStartGoalWasReachedThisFrame,
-               let returnLeft = lesson.returnLeft {
-                openingState.enabledControls.remove(.reverse)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [returnLeft.instruction],
-                    voiceSourceName: returnLeft.voiceSourceName,
-                    voicePrecedesHUDMessages: false
-                ))
-                openingState.enabledControls.insert(.left)
-                openingState.returnGoalWasReached = true
-            }
-            if openingState.rightGoalWasReached != true,
-               trainingLeftGoalWasReachedThisFrame,
-               let returnRight = lesson.returnRight {
-                openingState.enabledControls.remove(.left)
-                openingState.enabledControls.insert(.right)
-                trainingOpeningFeedback.append(contentsOf: [
-                    TrainingOpeningFeedback(
-                        hudMessages: [returnRight.successMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [returnRight.instruction],
-                        voiceSourceName: returnRight.voiceSourceName,
-                        voicePrecedesHUDMessages: true
-                    ),
-                ])
-                openingState.rightGoalWasReached = true
-            }
-            if openingState.rightGoalWasReached == true,
-               openingState.upGoalWasReached != true,
-               trainingStartGoalWasReachedThisFrame,
-               let returnUp = lesson.returnUp {
-                openingState.enabledControls.remove(.right)
-                openingState.enabledControls.insert(.up)
-                trainingOpeningFeedback.append(contentsOf: [
-                    TrainingOpeningFeedback(
-                        hudMessages: [returnUp.successMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [returnUp.instruction],
-                        voiceSourceName: returnUp.voiceSourceName,
-                        voicePrecedesHUDMessages: true
-                    ),
-                ])
-                openingState.upGoalWasReached = true
-            }
-            if openingState.downGoalWasReached != true,
-               trainingDownGoalWasReachedThisFrame,
-               let returnDown = lesson.returnDown {
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [returnDown.successMessage],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false
-                ))
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [returnDown.instruction],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false
-                ))
-                openingState.enabledControls.remove(.up)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [],
-                    voiceSourceName: returnDown.voiceSourceName,
-                    voicePrecedesHUDMessages: false
-                ))
-                openingState.enabledControls.insert(.down)
-                openingState.downGoalWasReached = true
-            }
-            if openingState.downGoalWasReached == true,
-               openingState.repeatForwardWasPresented != true,
-               trainingStartGoalWasReachedThisFrame,
-               let repeatForward = lesson.repeatForward {
-                trainingOpeningFeedback.append(contentsOf: [
-                    TrainingOpeningFeedback(
-                        hudMessages: [repeatForward.successMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [repeatForward.repeatMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [repeatForward.forwardInstruction],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [],
-                        voiceSourceName: repeatForward.voiceSourceName,
-                        voicePrecedesHUDMessages: false
-                    ),
-                ])
-                openingState.enabledControls.remove(.down)
-                openingState.enabledControls.insert(.forward)
-                openingState.repeatForwardWasPresented = true
-            }
-            if openingState.repeatReturnLeftWasPresented != true,
-               openingState.repeatForwardGoalWasPresented == true,
-               trainingStartGoalWasReachedThisFrame,
-               let repeatReturnLeft = lesson.repeatReturnLeft {
-                openingState.enabledControls.remove(.reverse)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [repeatReturnLeft.instruction],
-                    voiceSourceName: repeatReturnLeft.voiceSourceName,
-                    voicePrecedesHUDMessages: true
-                ))
-                openingState.enabledControls.insert(.left)
-                openingState.repeatReturnLeftWasPresented = true
-            }
-            if openingState.repeatReturnRightWasPresented != true,
-               openingState.repeatReturnLeftWasPresented == true,
-               trainingLeftGoalWasReachedThisFrame,
-               let repeatReturnRight = lesson.repeatReturnRight {
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [repeatReturnRight.instruction],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false,
-                    soundSourceName: repeatReturnRight.soundLogicalName
-                ))
-                openingState.enabledControls.remove(.left)
-                openingState.enabledControls.insert(.right)
-                openingState.repeatReturnRightWasPresented = true
-            }
-            if openingState.repeatReturnUpWasPresented != true,
-               openingState.repeatReturnRightWasPresented == true,
-               trainingStartGoalWasReachedThisFrame,
-               let repeatReturnUp = lesson.repeatReturnUp {
-                openingState.enabledControls.remove(.right)
-                openingState.enabledControls.insert(.up)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [repeatReturnUp.instruction],
-                    voiceSourceName: repeatReturnUp.voiceSourceName,
-                    voicePrecedesHUDMessages: true
-                ))
-                openingState.repeatReturnUpWasPresented = true
-            }
-            if openingState.repeatReturnDownWasPresented != true,
-               openingState.repeatReturnUpWasPresented == true,
-               trainingDownGoalWasReachedThisFrame,
-               let repeatReturnDown = lesson.repeatReturnDown {
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [repeatReturnDown.instruction],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false,
-                    soundSourceName: repeatReturnDown.soundLogicalName,
-                    soundEventVolume: 1
-                ))
-                openingState.enabledControls.remove(.up)
-                openingState.enabledControls.insert(.down)
-                openingState.repeatReturnDownWasPresented = true
-            }
-            if openingState.continueToCourseWasPresented != true,
-               openingState.repeatReturnDownWasPresented == true,
-               trainingStartGoalWasReachedThisFrame,
-               let continueToCourse = lesson.continueToCourse {
-                openTrainingContinueToCoursePortals(in: &level)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [continueToCourse.instruction],
-                    voiceSourceName: continueToCourse.voiceSourceName,
-                    voicePrecedesHUDMessages: true
-                ))
-                openingState.continueToCourseWasPresented = true
-            }
-            if openingState.startCourseWasPresented != true,
-               trainingStartCourseWasReachedThisFrame,
-               let startCourse = lesson.startCourse {
-                closeTrainingStartCoursePortal(in: &level)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [startCourse.instruction],
-                    voiceSourceName: startCourse.voiceSourceName,
-                    voicePrecedesHUDMessages: false
-                ))
-                openingState.enabledControls.formUnion(
-                    PlayerControlMask(
-                        rawValue: startCourse.enabledControlMask
-                    )
-                )
-                openingState.startCourseWasPresented = true
-            }
-            if openingState.finishCourseWasPresented != true,
-               trainingFinishCourseWasReachedThisFrame,
-               let finishCourse = lesson.finishCourse {
-                openingState.enabledControls = PlayerControlMask(
-                    rawValue: finishCourse.enabledControlMask
-                )
-                openTrainingFinishCoursePortals(in: &level)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [finishCourse.successMessage],
-                    voiceSourceName: finishCourse.voiceSourceName,
-                    voicePrecedesHUDMessages: false,
-                    trailingHUDMessages: [finishCourse.instruction]
-                ))
-                openingState.finishCourseWasPresented = true
-            }
-            if !openingState.welcomeWasPresented {
-                openingState.timerRemaining -= systemsFrameDuration
-                if openingState.timerRemaining <= 0.000_001 {
-                    openingState.welcomeWasPresented = true
-                    trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                        hudMessages: [
-                            lesson.welcomeMessage,
-                            lesson.forwardInstruction,
-                        ],
-                        voiceSourceName: lesson.welcomeVoiceSourceName,
-                        voicePrecedesHUDMessages: false
-                    ))
-                }
-            }
-            trainingOpeningState = openingState
-        }
+        advanceTrainingOpeningLesson(
+            systemsFrameDuration: systemsFrameDuration,
+            trainingForwardGoalWasReachedThisFrame:
+                trainingForwardGoalWasReachedThisFrame,
+            trainingStartGoalWasReachedThisFrame:
+                trainingStartGoalWasReachedThisFrame,
+            trainingLeftGoalWasReachedThisFrame:
+                trainingLeftGoalWasReachedThisFrame,
+            trainingDownGoalWasReachedThisFrame:
+                trainingDownGoalWasReachedThisFrame,
+            trainingStartCourseWasReachedThisFrame:
+                trainingStartCourseWasReachedThisFrame,
+            trainingFinishCourseWasReachedThisFrame:
+                trainingFinishCourseWasReachedThisFrame,
+            trainingOpeningFeedback: &trainingOpeningFeedback
+        )
         if var state = trainingKillbotEntryState,
            state.wasTriggered,
            !state.followupWasPresented,
@@ -7745,6 +7509,270 @@ final class PlayerSimulation {
 }
 
 private extension PlayerSimulation {
+    func advanceTrainingOpeningLesson(
+        systemsFrameDuration: Float,
+        trainingForwardGoalWasReachedThisFrame: Bool,
+        trainingStartGoalWasReachedThisFrame: Bool,
+        trainingLeftGoalWasReachedThisFrame: Bool,
+        trainingDownGoalWasReachedThisFrame: Bool,
+        trainingStartCourseWasReachedThisFrame: Bool,
+        trainingFinishCourseWasReachedThisFrame: Bool,
+        trainingOpeningFeedback: inout [TrainingOpeningFeedback]
+    ) {
+        if var openingState = trainingOpeningState,
+           let lesson = level.trainingOpeningLesson {
+            if !openingState.forwardGoalWasReached,
+               trainingForwardGoalWasReachedThisFrame {
+                openingState.forwardGoalWasReached = true
+                openingState.enabledControls.remove(.forward)
+                openingState.enabledControls.insert(.reverse)
+                trainingOpeningFeedback.append(contentsOf: [
+                    TrainingOpeningFeedback(
+                        hudMessages: [lesson.successMessage],
+                        voiceSourceName: lesson.successVoiceSourceName,
+                        voicePrecedesHUDMessages: false
+                    ),
+                    TrainingOpeningFeedback(
+                        hudMessages: [lesson.reverseInstruction],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: false
+                    ),
+                ])
+            }
+            if openingState.repeatForwardWasPresented == true,
+               openingState.repeatForwardGoalWasPresented != true,
+               trainingForwardGoalWasReachedThisFrame,
+               let repeatForwardGoal = lesson.repeatForwardGoal {
+                openingState.enabledControls.remove(.forward)
+                openingState.enabledControls.insert(.reverse)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [repeatForwardGoal.reverseInstruction],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false,
+                    soundSourceName: repeatForwardGoal.soundLogicalName
+                ))
+                openingState.repeatForwardGoalWasPresented = true
+            }
+            if openingState.forwardGoalWasReached,
+               openingState.returnGoalWasReached != true,
+               trainingStartGoalWasReachedThisFrame,
+               let returnLeft = lesson.returnLeft {
+                openingState.enabledControls.remove(.reverse)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [returnLeft.instruction],
+                    voiceSourceName: returnLeft.voiceSourceName,
+                    voicePrecedesHUDMessages: false
+                ))
+                openingState.enabledControls.insert(.left)
+                openingState.returnGoalWasReached = true
+            }
+            if openingState.rightGoalWasReached != true,
+               trainingLeftGoalWasReachedThisFrame,
+               let returnRight = lesson.returnRight {
+                openingState.enabledControls.remove(.left)
+                openingState.enabledControls.insert(.right)
+                trainingOpeningFeedback.append(contentsOf: [
+                    TrainingOpeningFeedback(
+                        hudMessages: [returnRight.successMessage],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: false
+                    ),
+                    TrainingOpeningFeedback(
+                        hudMessages: [returnRight.instruction],
+                        voiceSourceName: returnRight.voiceSourceName,
+                        voicePrecedesHUDMessages: true
+                    ),
+                ])
+                openingState.rightGoalWasReached = true
+            }
+            if openingState.rightGoalWasReached == true,
+               openingState.upGoalWasReached != true,
+               trainingStartGoalWasReachedThisFrame,
+               let returnUp = lesson.returnUp {
+                openingState.enabledControls.remove(.right)
+                openingState.enabledControls.insert(.up)
+                trainingOpeningFeedback.append(contentsOf: [
+                    TrainingOpeningFeedback(
+                        hudMessages: [returnUp.successMessage],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: false
+                    ),
+                    TrainingOpeningFeedback(
+                        hudMessages: [returnUp.instruction],
+                        voiceSourceName: returnUp.voiceSourceName,
+                        voicePrecedesHUDMessages: true
+                    ),
+                ])
+                openingState.upGoalWasReached = true
+            }
+            if openingState.downGoalWasReached != true,
+               trainingDownGoalWasReachedThisFrame,
+               let returnDown = lesson.returnDown {
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [returnDown.successMessage],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false
+                ))
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [returnDown.instruction],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false
+                ))
+                openingState.enabledControls.remove(.up)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [],
+                    voiceSourceName: returnDown.voiceSourceName,
+                    voicePrecedesHUDMessages: false
+                ))
+                openingState.enabledControls.insert(.down)
+                openingState.downGoalWasReached = true
+            }
+            if openingState.downGoalWasReached == true,
+               openingState.repeatForwardWasPresented != true,
+               trainingStartGoalWasReachedThisFrame,
+               let repeatForward = lesson.repeatForward {
+                trainingOpeningFeedback.append(contentsOf: [
+                    TrainingOpeningFeedback(
+                        hudMessages: [repeatForward.successMessage],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: false
+                    ),
+                    TrainingOpeningFeedback(
+                        hudMessages: [repeatForward.repeatMessage],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: false
+                    ),
+                    TrainingOpeningFeedback(
+                        hudMessages: [repeatForward.forwardInstruction],
+                        voiceSourceName: "",
+                        voicePrecedesHUDMessages: false
+                    ),
+                    TrainingOpeningFeedback(
+                        hudMessages: [],
+                        voiceSourceName: repeatForward.voiceSourceName,
+                        voicePrecedesHUDMessages: false
+                    ),
+                ])
+                openingState.enabledControls.remove(.down)
+                openingState.enabledControls.insert(.forward)
+                openingState.repeatForwardWasPresented = true
+            }
+            if openingState.repeatReturnLeftWasPresented != true,
+               openingState.repeatForwardGoalWasPresented == true,
+               trainingStartGoalWasReachedThisFrame,
+               let repeatReturnLeft = lesson.repeatReturnLeft {
+                openingState.enabledControls.remove(.reverse)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [repeatReturnLeft.instruction],
+                    voiceSourceName: repeatReturnLeft.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                ))
+                openingState.enabledControls.insert(.left)
+                openingState.repeatReturnLeftWasPresented = true
+            }
+            if openingState.repeatReturnRightWasPresented != true,
+               openingState.repeatReturnLeftWasPresented == true,
+               trainingLeftGoalWasReachedThisFrame,
+               let repeatReturnRight = lesson.repeatReturnRight {
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [repeatReturnRight.instruction],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false,
+                    soundSourceName: repeatReturnRight.soundLogicalName
+                ))
+                openingState.enabledControls.remove(.left)
+                openingState.enabledControls.insert(.right)
+                openingState.repeatReturnRightWasPresented = true
+            }
+            if openingState.repeatReturnUpWasPresented != true,
+               openingState.repeatReturnRightWasPresented == true,
+               trainingStartGoalWasReachedThisFrame,
+               let repeatReturnUp = lesson.repeatReturnUp {
+                openingState.enabledControls.remove(.right)
+                openingState.enabledControls.insert(.up)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [repeatReturnUp.instruction],
+                    voiceSourceName: repeatReturnUp.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                ))
+                openingState.repeatReturnUpWasPresented = true
+            }
+            if openingState.repeatReturnDownWasPresented != true,
+               openingState.repeatReturnUpWasPresented == true,
+               trainingDownGoalWasReachedThisFrame,
+               let repeatReturnDown = lesson.repeatReturnDown {
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [repeatReturnDown.instruction],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false,
+                    soundSourceName: repeatReturnDown.soundLogicalName,
+                    soundEventVolume: 1
+                ))
+                openingState.enabledControls.remove(.up)
+                openingState.enabledControls.insert(.down)
+                openingState.repeatReturnDownWasPresented = true
+            }
+            if openingState.continueToCourseWasPresented != true,
+               openingState.repeatReturnDownWasPresented == true,
+               trainingStartGoalWasReachedThisFrame,
+               let continueToCourse = lesson.continueToCourse {
+                openTrainingContinueToCoursePortals(in: &level)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [continueToCourse.instruction],
+                    voiceSourceName: continueToCourse.voiceSourceName,
+                    voicePrecedesHUDMessages: true
+                ))
+                openingState.continueToCourseWasPresented = true
+            }
+            if openingState.startCourseWasPresented != true,
+               trainingStartCourseWasReachedThisFrame,
+               let startCourse = lesson.startCourse {
+                closeTrainingStartCoursePortal(in: &level)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [startCourse.instruction],
+                    voiceSourceName: startCourse.voiceSourceName,
+                    voicePrecedesHUDMessages: false
+                ))
+                openingState.enabledControls.formUnion(
+                    PlayerControlMask(
+                        rawValue: startCourse.enabledControlMask
+                    )
+                )
+                openingState.startCourseWasPresented = true
+            }
+            if openingState.finishCourseWasPresented != true,
+               trainingFinishCourseWasReachedThisFrame,
+               let finishCourse = lesson.finishCourse {
+                openingState.enabledControls = PlayerControlMask(
+                    rawValue: finishCourse.enabledControlMask
+                )
+                openTrainingFinishCoursePortals(in: &level)
+                trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                    hudMessages: [finishCourse.successMessage],
+                    voiceSourceName: finishCourse.voiceSourceName,
+                    voicePrecedesHUDMessages: false,
+                    trailingHUDMessages: [finishCourse.instruction]
+                ))
+                openingState.finishCourseWasPresented = true
+            }
+            if !openingState.welcomeWasPresented {
+                openingState.timerRemaining -= systemsFrameDuration
+                if openingState.timerRemaining <= 0.000_001 {
+                    openingState.welcomeWasPresented = true
+                    trainingOpeningFeedback.append(TrainingOpeningFeedback(
+                        hudMessages: [
+                            lesson.welcomeMessage,
+                            lesson.forwardInstruction,
+                        ],
+                        voiceSourceName: lesson.welcomeVoiceSourceName,
+                        voicePrecedesHUDMessages: false
+                    ))
+                }
+            }
+            trainingOpeningState = openingState
+        }
+    }
+
     func advanceTrainingCombat(
         input: InputSnapshot,
         object: PlacedObject,
