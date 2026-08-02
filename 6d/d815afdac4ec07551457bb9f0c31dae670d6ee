@@ -1,0 +1,24 @@
+Revival/Tests/D3ImportTests/WorldRenderingTests.swift
+  s_c503f7c0529e13::t_1243ccc1a219a4 5357,5361-5386,5388-5396,5400-5408,5442-5445,5447,5478-5479,5482-5486,5490-5504,5506,5509,5527-5536,5540,5578,5777-5790,5849-5852,5856,5858,5899,5915,5925-5928,5932,5934-5935,5954,5961,5975,5993
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_3d3f79473f8b17 22-25,27,29
+  s_c503f7c0529e13::t_27fed4ba123e7d 93-96
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_c503f7c0529e13::t_49ce8e88d032af 6987-7002,7512-7775
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "6dd815afdac4ec07551457bb9f0c31dae670d6ee",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
