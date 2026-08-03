@@ -5421,93 +5421,15 @@ final class PlayerSimulation {
                 roomSourceIndex = trace.containingRoomSourceIndex
             }
         }
-        if turnrollFixedAngle != 0 {
-            orientation = sourceMatrixMultiply(
-                orientation,
-                sourceRotationMatrix(
-                    pitch: 0,
-                    yaw: 0,
-                    roll: sourceFixedAngleUnits(-turnrollFixedAngle)
-                )
-            )
-        }
-
-        var rotationalThrust = Vector3(
-            x: ship.physics.fullRotationalThrust
-                * max(-0.75, min(0.75, input.pitch)),
-            y: ship.physics.fullRotationalThrust * input.yaw,
-            z: ship.physics.fullRotationalThrust * input.roll
+        advanceIndoorPlayerRotation(
+            object: &object,
+            binding: binding,
+            orientation: &orientation,
+            input: input,
+            ship: ship,
+            forwardControl: forwardControl,
+            systemsFrameDuration: systemsFrameDuration
         )
-        if forwardControl != 0 || input.sideways != 0 || input.vertical != 0
-            || rotationalThrust != .zero {
-            lastThrustTime = gameTime
-        }
-        rotationalThrust = sourceIndoorAutoLevelThrust(
-            rotationalThrust,
-            orientation: orientation,
-            storedOrientation: object.orientation,
-            fullRotationalThrust: ship.physics.fullRotationalThrust,
-            turnrollFixedAngle: turnrollFixedAngle,
-            mode: indoorAutoLevelMode,
-            gameTime: gameTime,
-            lastThrustTime: lastThrustTime
-        )
-        angularVelocity = analyticAngularVelocity(
-            velocity: angularVelocity,
-            force: rotationalThrust,
-            mass: ship.physics.mass,
-            drag: ship.physics.rotationalDrag,
-            duration: systemsFrameDuration
-        )
-        orientation = sourceMatrixMultiply(
-            orientation,
-            sourceRotationMatrix(
-                pitch: sourceFixedAngleUnits(
-                    angularVelocity.x * systemsFrameDuration
-                ),
-                yaw: sourceFixedAngleUnits(
-                    angularVelocity.y * systemsFrameDuration
-                ),
-                roll: sourceFixedAngleUnits(
-                    angularVelocity.z * systemsFrameDuration
-                )
-            )
-        )
-        if ship.physics.behaviors.contains(.turnroll) {
-            let desired = max(
-                -32_000,
-                min(
-                    32_000,
-                    -angularVelocity.y * ship.physics.turnrollRatio
-                )
-            )
-            let maximumChange = Float(
-                Int(ship.physics.maximumTurnrollRate * systemsFrameDuration)
-            )
-            if abs(desired - turnrollFixedAngle) > maximumChange {
-                turnrollFixedAngle += desired > turnrollFixedAngle
-                    ? maximumChange
-                    : -maximumChange
-            } else {
-                turnrollFixedAngle = Float(Int(desired))
-            }
-        }
-        if turnrollFixedAngle != 0 {
-            orientation = sourceMatrixMultiply(
-                orientation,
-                sourceRotationMatrix(
-                    pitch: 0,
-                    yaw: 0,
-                    roll: sourceFixedAngleUnits(turnrollFixedAngle)
-                )
-            )
-        }
-        orientation = sourceOrthogonalized(orientation)
-        object.orientation = orientation
-        let orientedPlayerIndex = level.objects.firstIndex {
-            $0.handle == binding.objectHandle
-        }!
-        level.objects[orientedPlayerIndex].orientation = orientation
 
         var remainingDuration = systemsFrameDuration
         var responseForce = force
@@ -6341,6 +6263,104 @@ final class PlayerSimulation {
 }
 
 private extension PlayerSimulation {
+    private func advanceIndoorPlayerRotation(
+        object: inout PlacedObject,
+        binding: DefaultPlayerBinding,
+        orientation: inout Matrix3,
+        input: InputSnapshot,
+        ship: CanonicalShipDefinition,
+        forwardControl: Float,
+        systemsFrameDuration: Float
+    ) {
+        if turnrollFixedAngle != 0 {
+            orientation = sourceMatrixMultiply(
+                orientation,
+                sourceRotationMatrix(
+                    pitch: 0,
+                    yaw: 0,
+                    roll: sourceFixedAngleUnits(-turnrollFixedAngle)
+                )
+            )
+        }
+
+        var rotationalThrust = Vector3(
+            x: ship.physics.fullRotationalThrust
+                * max(-0.75, min(0.75, input.pitch)),
+            y: ship.physics.fullRotationalThrust * input.yaw,
+            z: ship.physics.fullRotationalThrust * input.roll
+        )
+        if forwardControl != 0 || input.sideways != 0 || input.vertical != 0
+            || rotationalThrust != .zero {
+            lastThrustTime = gameTime
+        }
+        rotationalThrust = sourceIndoorAutoLevelThrust(
+            rotationalThrust,
+            orientation: orientation,
+            storedOrientation: object.orientation,
+            fullRotationalThrust: ship.physics.fullRotationalThrust,
+            turnrollFixedAngle: turnrollFixedAngle,
+            mode: indoorAutoLevelMode,
+            gameTime: gameTime,
+            lastThrustTime: lastThrustTime
+        )
+        angularVelocity = analyticAngularVelocity(
+            velocity: angularVelocity,
+            force: rotationalThrust,
+            mass: ship.physics.mass,
+            drag: ship.physics.rotationalDrag,
+            duration: systemsFrameDuration
+        )
+        orientation = sourceMatrixMultiply(
+            orientation,
+            sourceRotationMatrix(
+                pitch: sourceFixedAngleUnits(
+                    angularVelocity.x * systemsFrameDuration
+                ),
+                yaw: sourceFixedAngleUnits(
+                    angularVelocity.y * systemsFrameDuration
+                ),
+                roll: sourceFixedAngleUnits(
+                    angularVelocity.z * systemsFrameDuration
+                )
+            )
+        )
+        if ship.physics.behaviors.contains(.turnroll) {
+            let desired = max(
+                -32_000,
+                min(
+                    32_000,
+                    -angularVelocity.y * ship.physics.turnrollRatio
+                )
+            )
+            let maximumChange = Float(
+                Int(ship.physics.maximumTurnrollRate * systemsFrameDuration)
+            )
+            if abs(desired - turnrollFixedAngle) > maximumChange {
+                turnrollFixedAngle += desired > turnrollFixedAngle
+                    ? maximumChange
+                    : -maximumChange
+            } else {
+                turnrollFixedAngle = Float(Int(desired))
+            }
+        }
+        if turnrollFixedAngle != 0 {
+            orientation = sourceMatrixMultiply(
+                orientation,
+                sourceRotationMatrix(
+                    pitch: 0,
+                    yaw: 0,
+                    roll: sourceFixedAngleUnits(turnrollFixedAngle)
+                )
+            )
+        }
+        orientation = sourceOrthogonalized(orientation)
+        object.orientation = orientation
+        let orientedPlayerIndex = level.objects.firstIndex {
+            $0.handle == binding.objectHandle
+        }!
+        level.objects[orientedPlayerIndex].orientation = orientation
+    }
+
     private func finalizePlayerSimulationFrame(
         at timestamp: Double,
         systemsFrameDuration: Float,
