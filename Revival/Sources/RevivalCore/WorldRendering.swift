@@ -6261,6 +6261,95 @@ final class PlayerSimulation {
             trainingKillbotEntryState = state
         }
 
+        return finalizePlayerSimulationFrame(
+            at: timestamp,
+            systemsFrameDuration: systemsFrameDuration,
+            systemsGameTime: systemsGameTime,
+            ship: ship,
+            wallContact: wallContact,
+            trainingOpeningFeedback: trainingOpeningFeedback,
+            playerFastHeadlight: playerFastHeadlight
+        )
+    }
+
+    func acknowledgeTrainingResult() -> TrainingSessionOutcome? {
+        guard trainingPostLevelResult != nil else { return nil }
+        trainingSessionOutcome = .completed
+        return trainingSessionOutcome
+    }
+
+    private func makeTrainingPostLevelResult(
+        elapsedTime: Float
+    ) -> TrainingPostLevelResult {
+        let enemyKills = [
+            trainingRobotGuidebotState?.robotWasDestroyed == true,
+            trainingRASBot1DeathState?.wasDestroyed == true,
+            trainingRASBot2DeathState?.wasDestroyed == true,
+            trainingRASBot3DeathState?.wasDestroyed == true,
+            trainingRASBot4DeathState?.wasDestroyed == true,
+            trainingLastBot1DeathState?.wasDestroyed == true,
+            trainingLastBot2DeathState?.wasDestroyed == true,
+            trainingLastBot3DeathState?.wasDestroyed == true,
+            trainingLastBot4DeathState?.wasDestroyed == true,
+            trainingLastBot5DeathState?.wasDestroyed == true,
+        ].count(where: { $0 })
+        return TrainingPostLevelResult(
+            title: "Mission Successful",
+            levelName: level.metadata.name,
+            difficulty: .rookie,
+            score:
+                enemyKills
+                * TrainingRobotCombatDefinition.stockTrainingScore,
+            elapsedTime: elapsedTime,
+            enemyKills: enemyKills,
+            // Player damage, death, and restore ownership are later Phase 5
+            // islands. The current normal Training path retains its source
+            // initial ratings and has no admitted death or restore transition.
+            shields: shields,
+            energy: energy,
+            deaths: 0,
+            restores: 0,
+            // Training's two camera goals do not carry LGF_TELCOM_LISTS, so
+            // SinglePlayerPostLevelResults presents no objective rows.
+            objectives: []
+        )
+    }
+
+    func stopTime(at timestamp: Double) {
+        precondition(timestamp.isFinite && timestamp >= lastTimestamp)
+        if pauseDepth == 0 {
+            pauseTimestamp = timestamp
+        }
+        pauseDepth += 1
+    }
+
+    func setIndoorAutoLevelMode(_ mode: IndoorAutoLevelMode) {
+        indoorAutoLevelMode = mode
+    }
+
+    func startTime(at timestamp: Double) {
+        precondition(timestamp.isFinite)
+        guard pauseDepth > 0 else { return }
+        pauseDepth -= 1
+        if pauseDepth == 0 {
+            let pausedAt = pauseTimestamp!
+            precondition(timestamp >= pausedAt)
+            lastTimestamp += timestamp - pausedAt
+            pauseTimestamp = nil
+        }
+    }
+}
+
+private extension PlayerSimulation {
+    private func finalizePlayerSimulationFrame(
+        at timestamp: Double,
+        systemsFrameDuration: Float,
+        systemsGameTime: Float,
+        ship: CanonicalShipDefinition,
+        wallContact: IndoorWallContact?,
+        trainingOpeningFeedback: [TrainingOpeningFeedback],
+        playerFastHeadlight: PlayerFastHeadlightFrame?
+    ) -> PlayerSimulationFrame {
         if afterburnerIsActive {
             afterburnerMagnitude += 2 * systemsFrameDuration
         } else {
@@ -6679,75 +6768,6 @@ final class PlayerSimulation {
         )
     }
 
-    func acknowledgeTrainingResult() -> TrainingSessionOutcome? {
-        guard trainingPostLevelResult != nil else { return nil }
-        trainingSessionOutcome = .completed
-        return trainingSessionOutcome
-    }
-
-    private func makeTrainingPostLevelResult(
-        elapsedTime: Float
-    ) -> TrainingPostLevelResult {
-        let enemyKills = [
-            trainingRobotGuidebotState?.robotWasDestroyed == true,
-            trainingRASBot1DeathState?.wasDestroyed == true,
-            trainingRASBot2DeathState?.wasDestroyed == true,
-            trainingRASBot3DeathState?.wasDestroyed == true,
-            trainingRASBot4DeathState?.wasDestroyed == true,
-            trainingLastBot1DeathState?.wasDestroyed == true,
-            trainingLastBot2DeathState?.wasDestroyed == true,
-            trainingLastBot3DeathState?.wasDestroyed == true,
-            trainingLastBot4DeathState?.wasDestroyed == true,
-            trainingLastBot5DeathState?.wasDestroyed == true,
-        ].count(where: { $0 })
-        return TrainingPostLevelResult(
-            title: "Mission Successful",
-            levelName: level.metadata.name,
-            difficulty: .rookie,
-            score:
-                enemyKills
-                * TrainingRobotCombatDefinition.stockTrainingScore,
-            elapsedTime: elapsedTime,
-            enemyKills: enemyKills,
-            // Player damage, death, and restore ownership are later Phase 5
-            // islands. The current normal Training path retains its source
-            // initial ratings and has no admitted death or restore transition.
-            shields: shields,
-            energy: energy,
-            deaths: 0,
-            restores: 0,
-            // Training's two camera goals do not carry LGF_TELCOM_LISTS, so
-            // SinglePlayerPostLevelResults presents no objective rows.
-            objectives: []
-        )
-    }
-
-    func stopTime(at timestamp: Double) {
-        precondition(timestamp.isFinite && timestamp >= lastTimestamp)
-        if pauseDepth == 0 {
-            pauseTimestamp = timestamp
-        }
-        pauseDepth += 1
-    }
-
-    func setIndoorAutoLevelMode(_ mode: IndoorAutoLevelMode) {
-        indoorAutoLevelMode = mode
-    }
-
-    func startTime(at timestamp: Double) {
-        precondition(timestamp.isFinite)
-        guard pauseDepth > 0 else { return }
-        pauseDepth -= 1
-        if pauseDepth == 0 {
-            let pausedAt = pauseTimestamp!
-            precondition(timestamp >= pausedAt)
-            lastTimestamp += timestamp - pausedAt
-            pauseTimestamp = nil
-        }
-    }
-}
-
-private extension PlayerSimulation {
     func advanceTrainingOpeningLesson(
         systemsFrameDuration: Float,
         trainingForwardGoalWasReachedThisFrame: Bool,
