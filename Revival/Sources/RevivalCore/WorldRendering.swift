@@ -4614,6 +4614,55 @@ final class PlayerSimulation {
         playerYellowFlareState = state
     }
 
+    private func advancePlayerAndGuidebotYellowFlares(
+        duration systemsFrameDuration: Float,
+        gameTime systemsGameTime: Float
+    ) -> Void {
+        if playerYellowFlareState == nil {
+            advanceTrainingGuidebotYellowFlares(
+                duration: systemsFrameDuration,
+                gameTime: systemsGameTime
+            )
+        } else {
+            let creationOrdinals = Set(
+                (playerYellowFlareState?.parents.compactMap(\.creationOrdinal)
+                    ?? [])
+                + (playerYellowFlareState?.timeoutSparks.compactMap(
+                    \.generationOrdinal
+                ) ?? [])
+                + (trainingRobotGuidebotState?.yellowFlares?.compactMap(
+                    \.creationOrdinal
+                ) ?? [])
+                + (trainingRobotGuidebotState?.yellowFlareTimeoutSparks?
+                    .compactMap(\.generationOrdinal) ?? [])
+            ).sorted()
+            for ordinal in creationOrdinals {
+                advancePlayerYellowFlares(
+                    duration: systemsFrameDuration,
+                    gameTime: systemsGameTime,
+                    selection: .ordinal(ordinal),
+                    advancesPassiveState: false
+                )
+                advanceTrainingGuidebotYellowFlares(
+                    duration: systemsFrameDuration,
+                    gameTime: systemsGameTime,
+                    selection: .ordinal(ordinal),
+                    advancesPassiveState: false
+                )
+            }
+            advancePlayerYellowFlares(
+                duration: systemsFrameDuration,
+                gameTime: systemsGameTime,
+                selection: .none
+            )
+            advanceTrainingGuidebotYellowFlares(
+                duration: systemsFrameDuration,
+                gameTime: systemsGameTime,
+                selection: .none
+            )
+        }
+    }
+
     private func requestTrainingGuidebotReturn(
         to player: PlacedObject
     ) -> Bool {
@@ -5662,49 +5711,10 @@ final class PlayerSimulation {
         let playerFastHeadlight = playerHeadlightIsOn
             ? fastPlayerHeadlight(from: level.objects[movedPlayerIndex])
             : nil
-        if playerYellowFlareState == nil {
-            advanceTrainingGuidebotYellowFlares(
-                duration: systemsFrameDuration,
-                gameTime: systemsGameTime
-            )
-        } else {
-            let creationOrdinals = Set(
-                (playerYellowFlareState?.parents.compactMap(\.creationOrdinal)
-                    ?? [])
-                + (playerYellowFlareState?.timeoutSparks.compactMap(
-                    \.generationOrdinal
-                ) ?? [])
-                + (trainingRobotGuidebotState?.yellowFlares?.compactMap(
-                    \.creationOrdinal
-                ) ?? [])
-                + (trainingRobotGuidebotState?.yellowFlareTimeoutSparks?
-                    .compactMap(\.generationOrdinal) ?? [])
-            ).sorted()
-            for ordinal in creationOrdinals {
-                advancePlayerYellowFlares(
-                    duration: systemsFrameDuration,
-                    gameTime: systemsGameTime,
-                    selection: .ordinal(ordinal),
-                    advancesPassiveState: false
-                )
-                advanceTrainingGuidebotYellowFlares(
-                    duration: systemsFrameDuration,
-                    gameTime: systemsGameTime,
-                    selection: .ordinal(ordinal),
-                    advancesPassiveState: false
-                )
-            }
-            advancePlayerYellowFlares(
-                duration: systemsFrameDuration,
-                gameTime: systemsGameTime,
-                selection: .none
-            )
-            advanceTrainingGuidebotYellowFlares(
-                duration: systemsFrameDuration,
-                gameTime: systemsGameTime,
-                selection: .none
-            )
-        }
+        advancePlayerAndGuidebotYellowFlares(
+            duration: systemsFrameDuration,
+            gameTime: systemsGameTime
+        )
         let guidebotFlareFeedback = advanceTrainingGuidebotTiming(
             duration: systemsFrameDuration,
             gameTime: systemsGameTime
