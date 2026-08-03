@@ -1369,6 +1369,389 @@ final class WorldRenderingTests: XCTestCase {
     }
 
     @MainActor
+    func testTimedDodgeUsesReleasedRookieDifficultyAndRandomOrder()
+        throws
+    {
+        func continuationObject(
+            _ simulation: PlayerSimulation
+        ) throws -> [String: Any] {
+            try XCTUnwrap(
+                JSONSerialization.jsonObject(
+                    with: JSONEncoder().encode(simulation.continuation)
+                ) as? [String: Any]
+            )
+        }
+        func dodgeState(
+            _ simulation: PlayerSimulation
+        ) throws -> [String: Any] {
+            try XCTUnwrap(
+                try continuationObject(simulation)[
+                    "trainingDodgeAttemptState"
+                ] as? [String: Any]
+            )
+        }
+        func randomState(
+            _ simulation: PlayerSimulation
+        ) throws -> UInt32 {
+            try XCTUnwrap(
+                try continuationObject(simulation)[
+                    "authoritativeRandomState"
+                ] as? NSNumber
+            ).uint32Value
+        }
+        func vector(
+            _ value: Any?,
+            file: StaticString = #filePath,
+            line: UInt = #line
+        ) throws -> Vector3 {
+            let object = try XCTUnwrap(
+                value as? [String: Any],
+                file: file,
+                line: line
+            )
+            return .init(
+                x: Float(try XCTUnwrap(object["x"] as? Double)),
+                y: Float(try XCTUnwrap(object["y"] as? Double)),
+                z: Float(try XCTUnwrap(object["z"] as? Double))
+            )
+        }
+        func magnitude(_ value: Vector3) -> Float {
+            sqrt(
+                value.x * value.x
+                    + value.y * value.y
+                    + value.z * value.z
+            )
+        }
+        func scaled(
+            _ value: Vector3,
+            to targetMagnitude: Float
+        ) -> Vector3 {
+            let sourceMagnitude = magnitude(value)
+            return .init(
+                x: value.x * targetMagnitude / sourceMagnitude,
+                y: value.y * targetMagnitude / sourceMagnitude,
+                z: value.z * targetMagnitude / sourceMagnitude
+            )
+        }
+        func assertVector(
+            _ actual: Vector3,
+            _ expected: Vector3,
+            accuracy: Float = 0.000_01,
+            file: StaticString = #filePath,
+            line: UInt = #line
+        ) {
+            XCTAssertEqual(actual.x, expected.x, accuracy: accuracy, file: file, line: line)
+            XCTAssertEqual(actual.y, expected.y, accuracy: accuracy, file: file, line: line)
+            XCTAssertEqual(actual.z, expected.z, accuracy: accuracy, file: file, line: line)
+        }
+
+        var level = makeTrainingDodgeAttemptLevel()
+        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            }
+        )
+        let startDodge = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == dodge.startDodgeObjectHandle
+            }
+        )
+        let turret = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == dodge.dodgeTurretObjectHandle
+            }
+        )
+        level.objects[playerIndex].location = startDodge.location
+        level.objects[playerIndex].position = startDodge.position
+
+        let simulation = PlayerSimulation(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 1
+        )
+        var timestamp = 0.1
+        let contact = simulation.update(at: timestamp, input: .zero)
+        XCTAssertEqual(contact.enabledPlayerControls.rawValue, 60)
+        XCTAssertEqual(try randomState(simulation), 1)
+        XCTAssertEqual(
+            try XCTUnwrap(
+                try dodgeState(simulation)["triggerTimerRemaining"]
+                    as? Double
+            ),
+            10,
+            accuracy: 0.000_001
+        )
+
+        var capturedInstructionFrame: PlayerSimulationFrame?
+        for _ in 0..<110 {
+            timestamp += 0.1
+            let frame = simulation.update(at: timestamp, input: .zero)
+            XCTAssertEqual(
+                try randomState(simulation),
+                1,
+                "StartDodge and the real Script-016 timer consume no random draw"
+            )
+            if frame.trainingOpeningFeedback.contains(where: {
+                $0.hudMessages == [dodge.instruction]
+            }) {
+                capturedInstructionFrame = frame
+                break
+            }
+        }
+        let instructionFrame = try XCTUnwrap(capturedInstructionFrame)
+
+        timestamp += 0.1
+        let firstAttempt = simulation.update(
+            at: timestamp,
+            input: .init(sideways: 1)
+        )
+        let firstState = try dodgeState(simulation)
+        XCTAssertEqual(try randomState(simulation), 0x0029_e2c0)
+        let visibilityFraction = Float(41) / Float(32_767)
+        let expectedVisibilityTime = Float(
+            (Double(firstAttempt.systemsGameTime) + 0.9 * Double(0.15))
+                + (0.2 * Double(0.15)) * Double(visibilityFraction)
+        )
+        XCTAssertEqual(
+            Float(try XCTUnwrap(firstState["nextVisibilityCheckTime"] as? Double)),
+            expectedVisibilityTime
+        )
+        XCTAssertEqual(
+            expectedVisibilityTime - firstAttempt.systemsGameTime,
+            0.135_037_541_389_465_33,
+            accuracy: 0.000_001
+        )
+        let jointStep = Float(0.1) * (Float(0.125) * Float(0.7))
+        XCTAssertEqual(jointStep, 0.008_75)
+        XCTAssertEqual(firstAttempt.trainingDodgeTurretAngles[0], 0)
+        XCTAssertEqual(
+            min(
+                abs(firstAttempt.trainingDodgeTurretAngles[1]),
+                abs(1 - firstAttempt.trainingDodgeTurretAngles[1])
+            ),
+            jointStep,
+            accuracy: 0.000_001
+        )
+        assertVector(
+            try vector(firstState["retainedTargetPosition"]),
+            firstAttempt.playerView.camera.position
+        )
+        XCTAssertEqual(firstState["weaponSpeed"] as? Double, 0)
+        XCTAssertEqual(firstState["firingMaskIndex"] as? Int, 0)
+        XCTAssertTrue(firstAttempt.trainingDodgeProjectiles.isEmpty)
+
+        var capturedFireFrame: PlayerSimulationFrame?
+        for _ in 0..<20 {
+            timestamp += 0.01
+            let candidate = simulation.update(at: timestamp, input: .zero)
+            let candidateState = try dodgeState(simulation)
+            if try randomState(simulation) == 0x0029_e2c0 {
+                XCTAssertEqual(candidateState["weaponSpeed"] as? Double, 0)
+                XCTAssertEqual(candidateState["firingMaskIndex"] as? Int, 0)
+                XCTAssertEqual(
+                    Float(try XCTUnwrap(
+                        candidateState["nextFireTime"] as? Double
+                    )),
+                    instructionFrame.systemsGameTime
+                )
+                XCTAssertEqual(
+                    Float(try XCTUnwrap(
+                        candidateState["nextVisibilityCheckTime"] as? Double
+                    )),
+                    expectedVisibilityTime
+                )
+                XCTAssertTrue(candidate.trainingDodgeProjectiles.isEmpty)
+                continue
+            }
+            capturedFireFrame = candidate
+            break
+        }
+        let fireFrame = try XCTUnwrap(capturedFireFrame)
+        let fireState = try dodgeState(simulation)
+        let firstRandomState = try randomState(simulation)
+        XCTAssertEqual(firstRandomState, 0xe784_7115)
+        XCTAssertEqual(fireState["weaponSpeed"] as? Double, 200)
+        XCTAssertEqual(fireState["firingMaskIndex"] as? Int, 1)
+        XCTAssertEqual(
+            Float(try XCTUnwrap(fireState["nextFireTime"] as? Double)),
+            instructionFrame.systemsGameTime + dodge.turret.fireWait
+        )
+
+        let spread = 2_515
+        let halfSpread = 1_257
+        let pitch = Int(18_467 % UInt32(spread)) - halfSpread
+        let heading = Int(6_334 % UInt32(spread)) - halfSpread
+        let bank = Int(26_500 % UInt32(spread)) - halfSpread
+        XCTAssertEqual((pitch, heading, bank).0, -395)
+        XCTAssertEqual((pitch, heading, bank).1, 47)
+        XCTAssertEqual((pitch, heading, bank).2, 93)
+
+        let projectile = try XCTUnwrap(
+            fireFrame.trainingDodgeProjectiles.first
+        )
+        XCTAssertEqual(magnitude(projectile.velocity), 150, accuracy: 0.001)
+        let expectedFirstDirection = Vector3(
+            x: 0.002_732_447,
+            y: -0.586_422_86,
+            z: -0.810_000_5
+        )
+        assertVector(
+            scaled(projectile.velocity, to: 1),
+            expectedFirstDirection,
+            accuracy: 0.000_01
+        )
+        let encodedProjectile = try XCTUnwrap(
+            try XCTUnwrap(fireState["projectiles"] as? [[String: Any]]).first
+        )
+        XCTAssertEqual(
+            Set(encodedProjectile.keys),
+            Set(["roomSourceIndex", "position", "velocity", "lifeRemaining"])
+        )
+        assertVector(
+            projectile.position,
+            .init(
+                x: 2_061.215_3,
+                y: -707.162_9,
+                z: 2_352.224
+            ),
+            accuracy: 0.001
+        )
+
+        let newContinuationData = try JSONEncoder().encode(
+            simulation.continuation
+        )
+        let newContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: newContinuationData
+        )
+        let restoredNew = try PlayerSimulation(
+            level: level,
+            continuation: newContinuation,
+            resumedAtTimestamp: timestamp + 1
+        )
+        let restoredNewState = try dodgeState(restoredNew)
+        let restoredNewProjectile = try XCTUnwrap(
+            try XCTUnwrap(
+                restoredNewState["projectiles"] as? [[String: Any]]
+            ).first
+        )
+        XCTAssertEqual(
+            magnitude(try vector(restoredNewProjectile["velocity"])),
+            150,
+            accuracy: 0.001
+        )
+
+        var legacyObject = try continuationObject(simulation)
+        var legacyState = try XCTUnwrap(
+            legacyObject["trainingDodgeAttemptState"] as? [String: Any]
+        )
+        var legacyProjectiles = try XCTUnwrap(
+            legacyState["projectiles"] as? [[String: Any]]
+        )
+        let liveVelocity = try vector(legacyProjectiles[0]["velocity"])
+        let legacyVelocity = scaled(liveVelocity, to: 200)
+        legacyProjectiles[0]["velocity"] = [
+            "x": legacyVelocity.x,
+            "y": legacyVelocity.y,
+            "z": legacyVelocity.z,
+        ]
+        legacyState["projectiles"] = legacyProjectiles
+        legacyObject["trainingDodgeAttemptState"] = legacyState
+        let legacyContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: legacyObject)
+        )
+        let restoredLegacy = try PlayerSimulation(
+            level: level,
+            continuation: legacyContinuation,
+            resumedAtTimestamp: timestamp + 2
+        )
+        let restoredLegacyProjectile = try XCTUnwrap(
+            try XCTUnwrap(
+                try dodgeState(restoredLegacy)["projectiles"]
+                    as? [[String: Any]]
+            ).first
+        )
+        XCTAssertEqual(
+            magnitude(try vector(restoredLegacyProjectile["velocity"])),
+            200,
+            accuracy: 0.001
+        )
+
+        var hostileObject = legacyObject
+        var hostileState = legacyState
+        var hostileProjectiles = legacyProjectiles
+        let hostileVelocity = scaled(liveVelocity, to: 175)
+        hostileProjectiles[0]["velocity"] = [
+            "x": hostileVelocity.x,
+            "y": hostileVelocity.y,
+            "z": hostileVelocity.z,
+        ]
+        hostileState["projectiles"] = hostileProjectiles
+        hostileObject["trainingDodgeAttemptState"] = hostileState
+        let hostileContinuation = try JSONDecoder().decode(
+            PlayerSimulationContinuation.self,
+            from: JSONSerialization.data(withJSONObject: hostileObject)
+        )
+        XCTAssertThrowsError(
+            try PlayerSimulation(
+                level: level,
+                continuation: hostileContinuation,
+                resumedAtTimestamp: timestamp + 3
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? PlayerSimulationContinuationError,
+                .invalidState
+            )
+        }
+
+        var leadFrame: PlayerSimulationFrame?
+        var leadState: [String: Any]?
+        for _ in 0..<4 {
+            timestamp += 0.1
+            let frame = simulation.update(
+                at: timestamp,
+                input: .init(sideways: 1)
+            )
+            if try randomState(simulation) != firstRandomState {
+                leadFrame = frame
+                leadState = try dodgeState(simulation)
+                break
+            }
+        }
+        let laterFrame = try XCTUnwrap(leadFrame)
+        let laterState = try XCTUnwrap(leadState)
+        XCTAssertEqual(try randomState(simulation), 0xcae1_df84)
+        let playerPosition = laterFrame.playerView.camera.position
+        let toTarget = Vector3(
+            x: playerPosition.x - turret.position.x,
+            y: playerPosition.y - turret.position.y,
+            z: playerPosition.z - turret.position.z
+        )
+        let targetDistance = magnitude(toTarget)
+        let targetDirection = scaled(toTarget, to: 1)
+        let closingSpeed = 200
+            - (targetDirection.x * laterFrame.velocity.x
+                + targetDirection.y * laterFrame.velocity.y
+                + targetDirection.z * laterFrame.velocity.z)
+        let leadDuration = targetDistance / closingSpeed
+            * dodge.turret.fixedLeadAccuracy
+        let expectedLead = Vector3(
+            x: playerPosition.x + laterFrame.velocity.x * leadDuration,
+            y: playerPosition.y + laterFrame.velocity.y * leadDuration,
+            z: playerPosition.z + laterFrame.velocity.z * leadDuration
+        )
+        assertVector(
+            try vector(laterState["retainedTargetPosition"]),
+            expectedLead,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(laterState["weaponSpeed"] as? Double, 200)
+    }
+
+    @MainActor
     func testTimedDodgeUsesRealTurretHitAndReleasedTimerOrder() throws {
         var level = makeTrainingDodgeAttemptLevel()
         let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
@@ -1413,8 +1796,9 @@ final class WorldRenderingTests: XCTestCase {
 
         var timestamp = 0.1
         var sawInstruction = false
-        var realHitCount = 0
-        for _ in 0..<160 {
+        var capturedFirstHitFrame: PlayerSimulationFrame?
+        var hitCount = 0
+        for _ in 0..<280 {
             timestamp += 0.1
             frame = simulation.update(at: timestamp, input: .zero)
             sawInstruction =
@@ -1422,13 +1806,32 @@ final class WorldRenderingTests: XCTestCase {
                 || frame.trainingOpeningFeedback.contains {
                     $0.hudMessages == [dodge.instruction]
                 }
-            realHitCount += frame.trainingOpeningFeedback.count {
+            let frameHitCount = frame.trainingOpeningFeedback.count {
                 $0.hudMessages == [dodge.hitInstruction]
             }
-            if sawInstruction && realHitCount >= 2 { break }
+            if frameHitCount > 0 {
+                if capturedFirstHitFrame == nil {
+                    capturedFirstHitFrame = frame
+                }
+                hitCount += frameHitCount
+                if hitCount >= 2 { break }
+            }
         }
         XCTAssertTrue(sawInstruction)
-        XCTAssertGreaterThanOrEqual(realHitCount, 2)
+        XCTAssertEqual(hitCount, 2)
+        let firstHitFrame = try XCTUnwrap(capturedFirstHitFrame)
+        XCTAssertEqual(firstHitFrame.shields, 100)
+        let impactIndex = try XCTUnwrap(
+            firstHitFrame.trainingOpeningFeedback.firstIndex {
+                $0.soundSourceName == dodge.turret.impactSoundSourceName
+            }
+        )
+        let resetIndex = try XCTUnwrap(
+            firstHitFrame.trainingOpeningFeedback.firstIndex {
+                $0.hudMessages == [dodge.hitInstruction]
+            }
+        )
+        XCTAssertLessThan(impactIndex, resetIndex)
         XCTAssertEqual(frame.shields, 100)
 
         let continuationObject = try XCTUnwrap(
@@ -1443,9 +1846,20 @@ final class WorldRenderingTests: XCTestCase {
         XCTAssertEqual(dodgeState["script033Count"] as? Int, 1)
         XCTAssertEqual(dodgeState["script016Count"] as? Int, 1)
         XCTAssertEqual(dodgeState["script017Count"] as? Int, 0)
-        XCTAssertGreaterThanOrEqual(
-            dodgeState["script018Count"] as? Int ?? 0,
-            2
+        XCTAssertEqual(dodgeState["script018Count"] as? Int, 2)
+        XCTAssertEqual(
+            try XCTUnwrap(
+                dodgeState["almostDoneTimerRemaining"] as? Double
+            ),
+            Double(dodge.almostDoneDelay),
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                dodgeState["successTimerRemaining"] as? Double
+            ),
+            Double(dodge.successDelay),
+            accuracy: 0.000_001
         )
 
         let restored = try PlayerSimulation(

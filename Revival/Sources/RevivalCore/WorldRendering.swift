@@ -2924,6 +2924,31 @@ final class PlayerSimulation {
         Float(nextAuthoritativeRandomValue()) / 32_767
     }
 
+    private func trainingDodgeSpreadDirection(
+        _ forward: Vector3
+    ) -> Vector3 {
+        let difficultyScale = 1 / (5 - 1)
+        let spreadScale =
+            Float(16_768) * (1 - Float(difficultyScale))
+            + Float(5_000) * Float(difficultyScale)
+        let fireSpread = Int16(Float(0.15) * spreadScale)
+        let halfFireSpread = fireSpread >> 1
+        func angle() -> Int16 {
+            Int16(truncatingIfNeeded:
+                Int(nextAuthoritativeRandomValue() % UInt32(fireSpread))
+                    - Int(halfFireSpread)
+            )
+        }
+        return inverseTransform(
+            forward,
+            by: sourceRotationMatrix(
+                pitch: angle(),
+                yaw: angle(),
+                roll: angle()
+            )
+        )
+    }
+
     private func nextYellowFlareCreationOrdinal() -> UInt64? {
         guard var state = playerYellowFlareState,
               state.nextCreationOrdinal < UInt64.max - 1 else {
@@ -7124,11 +7149,7 @@ private extension PlayerSimulation {
                         end: player.position,
                         radius: 0
                     )
-                    // Visibility scheduling uses the deterministic midpoint
-                    // of the released 0.135...0.165 interval until replay/RNG
-                    // authority is selected.
-                    dodgeState.nextVisibilityCheckTime =
-                        systemsGameTime + 0.15
+                    dodgeState.seesTarget = false
                     if case .noHit = visibility.outcome {
                         let targetDirection = normalized(
                             player.position - turret.position
@@ -7158,6 +7179,19 @@ private extension PlayerSimulation {
                             60
                         )
                     }
+                    let interval: Float =
+                        dodgeState.seesTarget
+                            || systemsGameTime
+                                - dodgeState.lastVisibleTargetTime < 7
+                        ? 0.15
+                        : 2
+                    let draw = nextAuthoritativeRandomValue()
+                    let fraction = Float(draw) / Float(32_767)
+                    let scheduled =
+                        (Double(systemsGameTime)
+                            + 0.9 * Double(interval))
+                        + (0.2 * Double(interval)) * Double(fraction)
+                    dodgeState.nextVisibilityCheckTime = Float(scheduled)
                 }
                 let visibleAge =
                     systemsGameTime
@@ -7171,17 +7205,19 @@ private extension PlayerSimulation {
                         let joint = dodge.turret.joints[jointIndex]
                         let still =
                             dodgeState.turretAngles[jointIndex]
+                        let scaledRate =
+                            Float(joint.rotationsPerSecond) * Float(0.7)
                         let right = constrainedTrainingTurretAngle(
                             still
                                 - systemsFrameDuration
-                                * joint.rotationsPerSecond,
+                                * scaledRate,
                             fieldOfView: joint.fieldOfView,
                             movesRight: true
                         )
                         let left = constrainedTrainingTurretAngle(
                             still
                                 + systemsFrameDuration
-                                * joint.rotationsPerSecond,
+                                * scaledRate,
                             fieldOfView: joint.fieldOfView,
                             movesRight: false
                         )
@@ -7249,6 +7285,8 @@ private extension PlayerSimulation {
                                 dodgeState.firingMaskIndex
                             ]
                         )
+                        let fireDirection =
+                            trainingDodgeSpreadDirection(fire.forward)
                         let muzzleTrace = traceIndoorMovement(
                             in: level,
                             startRoom: turretRoom,
@@ -7262,8 +7300,9 @@ private extension PlayerSimulation {
                                     roomSourceIndex: turretRoom,
                                     position: fire.position,
                                     velocity:
-                                        fire.forward
-                                        * dodge.turret.projectileSpeed,
+                                        fireDirection
+                                        * (dodge.turret.projectileSpeed
+                                            * Float(0.75)),
                                     lifeRemaining:
                                         dodge.turret.projectileLifetime
                                 ))
@@ -9449,13 +9488,17 @@ private func validTrainingDodgeAttemptContinuation(
                 && projectile.velocity.x.isFinite
                 && projectile.velocity.y.isFinite
                 && projectile.velocity.z.isFinite
-                && abs(
-                    dot(
+                && {
+                    let speed = dot(
                         projectile.velocity,
                         projectile.velocity
                     ).squareRoot()
-                        - dodge.turret.projectileSpeed
-                ) <= 0.001
+                    let rookieSpeed =
+                        dodge.turret.projectileSpeed * Float(0.75)
+                    return abs(speed - rookieSpeed) <= 0.001
+                        || abs(speed - dodge.turret.projectileSpeed)
+                            <= 0.001
+                }()
                 && projectile.lifeRemaining.isFinite
                 && projectile.lifeRemaining > 0
                 && projectile.lifeRemaining
