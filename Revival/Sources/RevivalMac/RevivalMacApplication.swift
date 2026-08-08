@@ -42,6 +42,10 @@ private final class RevivalMacApplicationDelegate: NSObject,
     private var statusLabel: NSTextField?
     private var contentRequests = CanonicalPackageRequestQueue<ContentRequest>()
     private var libraryPreparationError: String?
+    private var soloPauseIsOpen = false
+    private var soloPauseWasAcknowledged = false
+    private var soloPauseHasInactiveFocus = false
+    private var applicationIsTerminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installMenu()
@@ -113,6 +117,12 @@ private final class RevivalMacApplicationDelegate: NSObject,
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        applicationIsTerminating = true
+        if soloPauseIsOpen {
+            NSApplication.shared.abortModal()
+        }
+        gameplayView?.setGameplayActive(false)
+        simulation = nil
         renderer?.shutdown()
         renderer = nil
     }
@@ -401,6 +411,9 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.rearViewInputCancelled = {
                 [weak self] in self?.playerInput.cancelRearViewInput()
             }
+            gameplayView.soloPauseChanged = {
+                [weak self] in self?.setSoloPause($0)
+            }
             gameplayView.trainingResultAcknowledgementRequested = {
                 [weak self] in self?.acknowledgeTrainingResult()
             }
@@ -423,6 +436,10 @@ private final class RevivalMacApplicationDelegate: NSObject,
     }
 
     private func updateGameplayActivity() {
+        if soloPauseIsOpen || soloPauseWasAcknowledged {
+            updateSoloPauseActivity()
+            return
+        }
         let active =
             NSApplication.shared.isActive
             && window?.isKeyWindow == true
@@ -433,6 +450,52 @@ private final class RevivalMacApplicationDelegate: NSObject,
             at: ProcessInfo.processInfo.systemUptime
         )
         gameplayView?.setGameplayActive(active && simulation != nil)
+    }
+
+    private func setSoloPause(_ isOpen: Bool) {
+        guard let simulation, !applicationIsTerminating else { return }
+        if isOpen {
+            guard !soloPauseIsOpen,
+                  !soloPauseWasAcknowledged,
+                  playerInput.gameplayIsActive else {
+                return
+            }
+            soloPauseIsOpen = true
+            playerInput.setGameplayActive(
+                false,
+                simulation: simulation,
+                at: ProcessInfo.processInfo.systemUptime
+            )
+            return
+        }
+        guard soloPauseIsOpen else { return }
+        soloPauseIsOpen = false
+        soloPauseWasAcknowledged = true
+        updateSoloPauseActivity()
+    }
+
+    private func updateSoloPauseActivity() {
+        guard let simulation, !applicationIsTerminating else { return }
+        let applicationIsActive = NSApplication.shared.isActive
+        if !applicationIsActive && !soloPauseHasInactiveFocus {
+            simulation.stopTime(at: ProcessInfo.processInfo.systemUptime)
+            soloPauseHasInactiveFocus = true
+        } else if applicationIsActive && soloPauseHasInactiveFocus {
+            simulation.startTime(at: ProcessInfo.processInfo.systemUptime)
+            soloPauseHasInactiveFocus = false
+        }
+        gameplayView?.clearInput()
+        guard soloPauseWasAcknowledged, applicationIsActive else { return }
+        soloPauseWasAcknowledged = false
+        playerInput.setGameplayActive(
+            true,
+            simulation: simulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+        gameplayView?.resumePausedTrainingAudio()
+        if let gameplayView {
+            window?.makeFirstResponder(gameplayView)
+        }
     }
 
     private func requestGuidebotAction() {

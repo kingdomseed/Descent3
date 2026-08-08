@@ -40,6 +40,7 @@ final class RevivalGameplayView: MTKView {
     var headlightToggleRequested: (() -> Void)?
     var rearViewInputChanged: ((Bool, Bool) -> Void)?
     var rearViewInputCancelled: (() -> Void)?
+    var soloPauseChanged: ((Bool) -> Void)?
     var trainingResultAcknowledgementRequested: (() -> Void)?
     var trainingRestartRequested: (() -> Void)?
     var pilotProfileCreationRequested: ((String) -> Void)?
@@ -96,6 +97,10 @@ final class RevivalGameplayView: MTKView {
     private var trainingVoicePlayer: AVAudioPlayer?
     private var trainingSoundPlayers: [AVAudioPlayer] = []
     private var trainingGuidebotAmbientEnginePlayer: AVAudioPlayer?
+    private var pausedTrainingVoicePlayer: AVAudioPlayer?
+    private var pausedTrainingSoundPlayers: [AVAudioPlayer] = []
+    private var pausedTrainingGuidebotAmbientEnginePlayer: AVAudioPlayer?
+    private var soloPauseAlertIsPresented = false
     private var trainingMessageExpiresAt: Float?
     private var trainingResultIsPresented = false
     private var trainingResultPresentedAt: TimeInterval?
@@ -248,6 +253,19 @@ final class RevivalGameplayView: MTKView {
             requestTrainingResultAcknowledgement()
             return
         }
+        if Self.requestsSoloPause(
+            keyCode: event.keyCode,
+            isRepeat: event.isARepeat,
+            gameplayIsActive: gameplayIsActive
+        ) {
+            clearInput()
+            pauseCurrentTrainingAudio()
+            soloPauseChanged?(true)
+            if presentSoloPauseAlert() {
+                soloPauseChanged?(false)
+            }
+            return
+        }
         if event.keyCode == 53 {
             releaseMouse()
             return
@@ -390,6 +408,7 @@ final class RevivalGameplayView: MTKView {
             trainingSoundPlayers.forEach { $0.stop() }
             trainingSoundPlayers.removeAll()
             stopTrainingGuidebotAmbientEngine()
+            clearPausedTrainingAudio()
             cameraMonitorBorder.isHidden = true
         }
     }
@@ -961,6 +980,69 @@ final class RevivalGameplayView: MTKView {
         releaseMouse()
     }
 
+    func pauseCurrentTrainingAudio() {
+        clearPausedTrainingAudio()
+        if let player = trainingVoicePlayer, player.isPlaying {
+            player.pause()
+            pausedTrainingVoicePlayer = player
+        }
+        trainingSoundPlayers.removeAll { !$0.isPlaying }
+        pausedTrainingSoundPlayers = trainingSoundPlayers
+        pausedTrainingSoundPlayers.forEach { $0.pause() }
+        if let player = trainingGuidebotAmbientEnginePlayer,
+           player.isPlaying {
+            player.pause()
+            pausedTrainingGuidebotAmbientEnginePlayer = player
+        }
+    }
+
+    func resumePausedTrainingAudio() {
+        if pausedTrainingVoicePlayer === trainingVoicePlayer {
+            pausedTrainingVoicePlayer?.play()
+        }
+        for player in pausedTrainingSoundPlayers where
+            trainingSoundPlayers.contains(where: { $0 === player }) {
+            player.play()
+        }
+        if pausedTrainingGuidebotAmbientEnginePlayer
+            === trainingGuidebotAmbientEnginePlayer {
+            pausedTrainingGuidebotAmbientEnginePlayer?.play()
+        }
+        clearPausedTrainingAudio()
+    }
+
+    @discardableResult
+    private func presentSoloPauseAlert() -> Bool {
+        guard !soloPauseAlertIsPresented else { return false }
+        soloPauseAlertIsPresented = true
+        defer { soloPauseAlertIsPresented = false }
+
+        let alert = NSAlert()
+        alert.messageText = "Pause"
+        alert.informativeText =
+            "The game is paused.\nPress P or click OK to resume."
+        alert.addButton(withTitle: "OK")
+        let monitor = NSEvent.addLocalMonitorForEvents(
+            matching: .keyDown
+        ) { event in
+            guard event.keyCode == 35, !event.isARepeat else { return event }
+            alert.buttons.first?.performClick(nil)
+            return nil
+        }
+        defer {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+        }
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func clearPausedTrainingAudio() {
+        pausedTrainingVoicePlayer = nil
+        pausedTrainingSoundPlayers.removeAll()
+        pausedTrainingGuidebotAmbientEnginePlayer = nil
+    }
+
     func presentTrainingGuidebotGoalMenu() -> Bool {
         trainingGuidebotGoalWasSelected = false
         let menu = Self.trainingGuidebotGoalMenu(
@@ -1274,6 +1356,14 @@ final class RevivalGameplayView: MTKView {
         gameplayIsActive: Bool
     ) -> Bool {
         gameplayIsActive && !isRepeat && keyCode == 9
+    }
+
+    nonisolated static func requestsSoloPause(
+        keyCode: UInt16,
+        isRepeat: Bool,
+        gameplayIsActive: Bool
+    ) -> Bool {
+        gameplayIsActive && !isRepeat && keyCode == 35
     }
 
     nonisolated static func showsOrdinaryGameplayOverlays(

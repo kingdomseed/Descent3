@@ -184,6 +184,7 @@
 		DC000000000000000000000B /* WorldRenderFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000B /* WorldRenderFixtures.swift */; };
 		DC000000000000000000000C /* TrainingBehaviorFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000C /* TrainingBehaviorFixtures.swift */; };
 		DC000000000000000000000D /* PlayerSimulationFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000D /* PlayerSimulationFixtures.swift */; };
+		DC000000000000000000000E /* SoloPauseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000E /* SoloPauseTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -258,6 +259,7 @@
 		DA000000000000000000000B /* WorldRenderFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderFixtures.swift; sourceTree = "<group>"; };
 		DA000000000000000000000C /* TrainingBehaviorFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingBehaviorFixtures.swift; sourceTree = "<group>"; };
 		DA000000000000000000000D /* PlayerSimulationFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationFixtures.swift; sourceTree = "<group>"; };
+		DA000000000000000000000E /* SoloPauseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoloPauseTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -461,6 +463,7 @@
 				DA000000000000000000000B /* WorldRenderFixtures.swift */,
 				DA000000000000000000000C /* TrainingBehaviorFixtures.swift */,
 				DA000000000000000000000D /* PlayerSimulationFixtures.swift */,
+				DA000000000000000000000E /* SoloPauseTests.swift */,
 				BA0000000000000000000006 /* TrainingLevelValidationTests.swift */,
 				BA0000000000000000000007 /* IndoorMovementTraceTests.swift */,
 				B20000000000000000000006 /* CanonicalLevelTests.swift */,
@@ -797,6 +800,7 @@
 				DC000000000000000000000B /* WorldRenderFixtures.swift in Sources */,
 				DC000000000000000000000C /* TrainingBehaviorFixtures.swift in Sources */,
 				DC000000000000000000000D /* PlayerSimulationFixtures.swift in Sources */,
+				DC000000000000000000000E /* SoloPauseTests.swift in Sources */,
 				DB000000000000000000001F /* PlayerSimulationValues.swift in Sources */,
 				DB0000000000000000000020 /* PlayerSimulation.swift in Sources */,
 				DB0000000000000000000021 /* TrainingGuidebotSimulation.swift in Sources */,

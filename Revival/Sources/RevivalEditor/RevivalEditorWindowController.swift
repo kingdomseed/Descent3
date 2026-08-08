@@ -45,6 +45,10 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     private var placementOwner = RevivalEditorPlacementOwner.object
     private var playSimulation: PlayerSimulation?
     private var playerInput = PlayerInputState()
+    private var soloPauseIsOpen = false
+    private var soloPauseWasAcknowledged = false
+    private var soloPauseHasInactiveFocus = false
+    private var windowIsClosing = false
 
     init(document: RevivalProjectDocument) {
         projectDocument = document
@@ -337,6 +341,21 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.rearViewInputCancelled = {
             [weak self] in self?.playerInput.cancelRearViewInput()
         }
+        metalView.soloPauseChanged = {
+            [weak self] in self?.setSoloPause($0)
+        }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationActivityChanged(_:)),
+            name: NSApplication.didResignActiveNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationActivityChanged(_:)),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
         window.initialFirstResponder = roomNameField
         roomNameField.target = self
         roomNameField.action = #selector(commitRoomName(_:))
@@ -451,10 +470,20 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     }
 
     func windowWillClose(_ notification: Notification) {
+        windowIsClosing = true
+        if soloPauseIsOpen {
+            NSApplication.shared.abortModal()
+        }
+        gameplayView.setGameplayActive(false)
+        playSimulation = nil
         renderer?.shutdown()
     }
 
     func windowDidResignKey(_ notification: Notification) {
+        if soloPauseIsOpen || soloPauseWasAcknowledged {
+            gameplayView.clearInput()
+            return
+        }
         playerInput.setGameplayActive(
             false,
             simulation: playSimulation,
@@ -464,6 +493,10 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
+        if soloPauseIsOpen || soloPauseWasAcknowledged {
+            updateSoloPauseActivity()
+            return
+        }
         guard playSimulation != nil else { return }
         playerInput.setGameplayActive(
             true,
@@ -471,6 +504,55 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             at: ProcessInfo.processInfo.systemUptime
         )
         gameplayView.setGameplayActive(true)
+        window?.makeFirstResponder(gameplayView)
+    }
+
+    private func setSoloPause(_ isOpen: Bool) {
+        guard let simulation = playSimulation, !windowIsClosing else { return }
+        if isOpen {
+            guard !soloPauseIsOpen,
+                  !soloPauseWasAcknowledged,
+                  playerInput.gameplayIsActive else {
+                return
+            }
+            soloPauseIsOpen = true
+            playerInput.setGameplayActive(
+                false,
+                simulation: simulation,
+                at: ProcessInfo.processInfo.systemUptime
+            )
+            return
+        }
+        guard soloPauseIsOpen else { return }
+        soloPauseIsOpen = false
+        soloPauseWasAcknowledged = true
+        updateSoloPauseActivity()
+    }
+
+    @objc private func applicationActivityChanged(_ notification: Notification) {
+        guard soloPauseIsOpen || soloPauseWasAcknowledged else { return }
+        updateSoloPauseActivity()
+    }
+
+    private func updateSoloPauseActivity() {
+        guard let simulation = playSimulation, !windowIsClosing else { return }
+        let applicationIsActive = NSApplication.shared.isActive
+        if !applicationIsActive && !soloPauseHasInactiveFocus {
+            simulation.stopTime(at: ProcessInfo.processInfo.systemUptime)
+            soloPauseHasInactiveFocus = true
+        } else if applicationIsActive && soloPauseHasInactiveFocus {
+            simulation.startTime(at: ProcessInfo.processInfo.systemUptime)
+            soloPauseHasInactiveFocus = false
+        }
+        gameplayView.clearInput()
+        guard soloPauseWasAcknowledged, applicationIsActive else { return }
+        soloPauseWasAcknowledged = false
+        playerInput.setGameplayActive(
+            true,
+            simulation: simulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+        gameplayView.resumePausedTrainingAudio()
         window?.makeFirstResponder(gameplayView)
     }
 
