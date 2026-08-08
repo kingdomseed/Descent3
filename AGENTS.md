@@ -1,5 +1,7 @@
 @/Users/jasonholt/.codex/RTK.md
 
+Always talk in ASD-STE100 Simplified Technical English. Always read `CONTEXT.md` files and use their ubiquitous language.
+
 # Descent 3 revival
 
 Documents under `docs/revival/` declare their status and authority at the top. Accepted contracts and execution records govern current work; historical discovery, archived build procedures, and inherited upstream documents are evidence only and cannot override them.
@@ -27,6 +29,7 @@ Read REVIVAL.md, docs/revival/functional-completeness.md, docs/revival/functiona
 ## Source translation
 
 - Follow docs/revival/source-translation.md. Work in coherent dependency islands that end in a visible player or editor result.
+- Use the released source file and responsibility layout as the default native file map. Project-owned production and test source files have a hard maximum of 5,000 physical lines. At 4,000 lines, add no new responsibility until a source-aligned extraction makes room. A different file split or name needs a recorded technical reason.
 - At every new roadmap phase, milestone checkpoint, dependency island, subsystem, or material code group, run the bounded fog-of-war preflight in docs/revival/source-translation.md before finalizing the work packet or starting production implementation. Deliberately test whether the current plan missed a caller, dependency, state transition, ownership edge, creator path, or verification need. This is procedural skepticism, not a presumption that something is wrong; `no new gap found` is a valid result. Record real findings in the existing accepted document, ledger, or current plan, and invoke `revival-wayfinding` only when several linked unknowns actually prevent a concrete contract.
 - When a pinned PiccuEngine or DESCENT 3MASTERED change maps to the current island, inspect that exact before/after diff before translating the corresponding older path. Treat it as investigation already performed: extract the defect or improvement, corrected observable result, invariant, ordering, formula, dependency or lifetime lesson, and useful regression case, then implement that result directly in native Swift or MSL. Do not recreate a known old defect merely to fix it later, and do not dismiss a useful semantic correction because its carrier uses Win32, OpenGL, OpenAL, SDL, legacy Osiris, or another non-native mechanism. The released source and retail evidence remain the shipped-behavior baseline; the maintained change supplies a source-cited correction or improvement whose adoption, deferral, or inapplicability must be recorded with exact provenance.
 - Before closing an island, account for every legacy file and important symbol involved, including editor callers and handwritten behavior outside generated blocks.

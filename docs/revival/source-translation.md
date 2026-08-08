@@ -1,7 +1,7 @@
 # Source translation discipline
 
 - Status: accepted, amended
-- Date: July 22, 2026
+- Date: August 5, 2026
 - Authority: binding source-accounting and modernization protocol
 
 ## Decision
@@ -38,6 +38,32 @@ The checked-in [source-translation ledger](source-translation-ledger.md) records
 - current status.
 
 The ledger follows the source tree, but implementation follows coherent dependency islands. Porting arbitrary files in alphabetical order would create stubs and adapters without producing a runnable system.
+
+## Native file layout and maintainability
+
+Use the released source file and responsibility layout as the default native file map. Keep the source game-domain name when it still describes the native responsibility. This default makes source review, defect tracing, and long-term maintenance direct.
+
+Before production edits, record the relevant legacy files and the proposed native files. Start with one native file for each relevant legacy implementation file. Use a different split only for a named technical reason:
+
+- a legacy file mixes responsibilities that have different native owners;
+- several legacy files implement one small, inseparable native responsibility;
+- an Apple framework owns a platform responsibility that the legacy file mixed with game semantics;
+- a canonical boundary moves format knowledge into D3Import; or
+- Swift type or access rules require a different placement and the change keeps ownership clearer.
+
+Record each difference in the island census. Do not use convenience, an existing large file, or fewer project-file entries as a technical reason.
+
+One mutable simulation owner does not require one physical Swift file. Use cohesive files and same-module extensions to keep one owner, one state, and one update path. Do not add public access, duplicate state, a manager, a service, a protocol, or a second path only to split a file.
+
+The file limit comes from the pinned released source, not from the current Swift files. On August 5, 2026, the human-maintained `.c`, `.cc`, and `.cpp` implementation corpus at released revision `156cba8aafd997d27deb0902ba6026bcdcc1cfaf` contained 455 files after generated campaign scripts, legacy utility copies, build outputs, vendored code, and Revival were removed. Its median was 483 physical lines. Exactly 450 of the 455 files, or 98.9 percent, were 4,864 lines or less. The project rounds this normal-source upper bound to a hard maximum of 5,000 physical lines for each project-owned production or test source file. A physical line is one newline-delimited line as reported by `wc -l` on the final file.
+
+At 4,000 lines, a file is at the review threshold. Add no new responsibility until a behavior-neutral, source-aligned extraction makes room. A file above 5,000 lines is active maintenance debt and cannot receive feature work. If the corresponding legacy file is itself above the limit, split it at its internal source responsibilities; the legacy outlier is evidence to inspect, not an exception to copy. Move the related tests with the production responsibility. Prove that the extraction keeps behavior, target membership, access, ordering, and the direct player and editor paths unchanged.
+
+Before a production packet starts, record the physical line count of each project-owned production or test file that it will touch. For an extraction, record the old and new counts, moved declarations or ranges, released-source roots, target membership, access changes, state ownership, and smallest behavior evidence. A line-only move is not a complete packet. The packet closes a named source responsibility and leaves every affected file below the hard maximum.
+
+Generated retail data and external source are not project-owned source files. Project-owned generated code gets no exception; split it or replace it with canonical data.
+
+Test files follow the production responsibility map by default. A different test split needs the same type of technical reason as production code.
 
 ## Fog-of-war preflight
 

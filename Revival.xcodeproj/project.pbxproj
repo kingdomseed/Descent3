@@ -27,6 +27,33 @@
 		B1000000000000000000000B /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
 		B1000000000000000000000C /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
 		B1000000000000000000000D /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
+		BB0000000000000000000001 /* LevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* LevelValues.swift */; };
+		BB0000000000000000000002 /* TrainingLevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* TrainingLevelValues.swift */; };
+		BB0000000000000000000003 /* TrainingLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* TrainingLevelValidation.swift */; };
+		BB0000000000000000000004 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
+		BB0000000000000000000005 /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
+		BB0000000000000000000006 /* LevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* LevelValues.swift */; };
+		BB0000000000000000000007 /* TrainingLevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* TrainingLevelValues.swift */; };
+		BB0000000000000000000008 /* TrainingLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* TrainingLevelValidation.swift */; };
+		BB0000000000000000000009 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
+		BB000000000000000000000A /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
+		BB000000000000000000000B /* LevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* LevelValues.swift */; };
+		BB000000000000000000000C /* TrainingLevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* TrainingLevelValues.swift */; };
+		BB000000000000000000000D /* TrainingLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* TrainingLevelValidation.swift */; };
+		BB000000000000000000000E /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
+		BB000000000000000000000F /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
+		BB0000000000000000000010 /* LevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* LevelValues.swift */; };
+		BB0000000000000000000011 /* TrainingLevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* TrainingLevelValues.swift */; };
+		BB0000000000000000000012 /* TrainingLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* TrainingLevelValidation.swift */; };
+		BB0000000000000000000013 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
+		BB0000000000000000000014 /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
+		BB0000000000000000000015 /* LevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* LevelValues.swift */; };
+		BB0000000000000000000016 /* TrainingLevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* TrainingLevelValues.swift */; };
+		BB0000000000000000000017 /* TrainingLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* TrainingLevelValidation.swift */; };
+		BB0000000000000000000018 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
+		BB0000000000000000000019 /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
+		BB000000000000000000001A /* TrainingLevelValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000006 /* TrainingLevelValidationTests.swift */; };
+		BB000000000000000000001B /* IndoorMovementTraceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000007 /* IndoorMovementTraceTests.swift */; };
 		B1000000000000000000000E /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
 		B1000000000000000000000F /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
 		B10000000000000000000010 /* CanonicalPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* CanonicalPackage.swift */; };
@@ -120,6 +147,13 @@
 		B20000000000000000000005 /* D3LV127.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127.swift; sourceTree = "<group>"; };
 		B20000000000000000000006 /* CanonicalLevelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalLevelTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000007 /* Level.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Level.swift; sourceTree = "<group>"; };
+		BA0000000000000000000001 /* LevelValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelValues.swift; sourceTree = "<group>"; };
+		BA0000000000000000000002 /* TrainingLevelValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLevelValues.swift; sourceTree = "<group>"; };
+		BA0000000000000000000003 /* TrainingLevelValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLevelValidation.swift; sourceTree = "<group>"; };
+		BA0000000000000000000004 /* LevelAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelAssembly.swift; sourceTree = "<group>"; };
+		BA0000000000000000000005 /* IndoorMovementTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorMovementTrace.swift; sourceTree = "<group>"; };
+		BA0000000000000000000006 /* TrainingLevelValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLevelValidationTests.swift; sourceTree = "<group>"; };
+		BA0000000000000000000007 /* IndoorMovementTraceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorMovementTraceTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000008 /* D3LV127Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127Decoder.swift; sourceTree = "<group>"; };
 		B20000000000000000000009 /* CanonicalPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalPackage.swift; sourceTree = "<group>"; };
 		B2000000000000000000000A /* D3ImportOperationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3ImportOperationTests.swift; sourceTree = "<group>"; };
@@ -276,7 +310,12 @@
 				C70000000000000000000001 /* WorldRenderExtractionValues.swift */,
 				C20000000000000000000003 /* WorldRendering.swift */,
 				B20000000000000000000009 /* CanonicalPackage.swift */,
+				BA0000000000000000000001 /* LevelValues.swift */,
+				BA0000000000000000000002 /* TrainingLevelValues.swift */,
+				BA0000000000000000000003 /* TrainingLevelValidation.swift */,
 				B20000000000000000000007 /* Level.swift */,
+				BA0000000000000000000004 /* LevelAssembly.swift */,
+				BA0000000000000000000005 /* IndoorMovementTrace.swift */,
 			);
 			path = RevivalCore;
 			sourceTree = "<group>";
@@ -323,6 +362,8 @@
 				D20000000000000000000001 /* MetalWorldPlanTests.swift */,
 				C20000000000000000000004 /* EditorProjectTests.swift */,
 				C20000000000000000000002 /* WorldRenderingTests.swift */,
+				BA0000000000000000000006 /* TrainingLevelValidationTests.swift */,
+				BA0000000000000000000007 /* IndoorMovementTraceTests.swift */,
 				B20000000000000000000006 /* CanonicalLevelTests.swift */,
 				B2000000000000000000000A /* D3ImportOperationTests.swift */,
 				A20000000000000000000004 /* HOG2ArchiveTests.swift */,
@@ -533,7 +574,12 @@
 				C10000000000000000000001 /* PresentationImport.swift in Sources */,
 				B10000000000000000000015 /* D3ImportOperation.swift in Sources */,
 				B10000000000000000000010 /* CanonicalPackage.swift in Sources */,
+				BB0000000000000000000001 /* LevelValues.swift in Sources */,
+				BB0000000000000000000002 /* TrainingLevelValues.swift in Sources */,
+				BB0000000000000000000003 /* TrainingLevelValidation.swift in Sources */,
 				B1000000000000000000000A /* Level.swift in Sources */,
+				BB0000000000000000000004 /* LevelAssembly.swift in Sources */,
+				BB0000000000000000000005 /* IndoorMovementTrace.swift in Sources */,
 				B10000000000000000000007 /* D3LV127.swift in Sources */,
 				B1000000000000000000000E /* D3LV127Decoder.swift in Sources */,
 				A10000000000000000000006 /* HOG2Archive.swift in Sources */,
@@ -557,7 +603,12 @@
 				C70000000000000000000003 /* WorldRenderExtractionValues.swift in Sources */,
 				C10000000000000000000005 /* WorldRendering.swift in Sources */,
 				B10000000000000000000011 /* CanonicalPackage.swift in Sources */,
+				BB0000000000000000000006 /* LevelValues.swift in Sources */,
+				BB0000000000000000000007 /* TrainingLevelValues.swift in Sources */,
+				BB0000000000000000000008 /* TrainingLevelValidation.swift in Sources */,
 				B1000000000000000000000B /* Level.swift in Sources */,
+				BB0000000000000000000009 /* LevelAssembly.swift in Sources */,
+				BB000000000000000000000A /* IndoorMovementTrace.swift in Sources */,
 				H10000000000000000000001 /* PilotProfile.swift in Sources */,
 				G10000000000000000000001 /* RevivalGameplayView.swift in Sources */,
 				A10000000000000000000002 /* RevivalMacApplication.swift in Sources */,
@@ -581,7 +632,12 @@
 				C70000000000000000000004 /* WorldRenderExtractionValues.swift in Sources */,
 				C10000000000000000000006 /* WorldRendering.swift in Sources */,
 				B10000000000000000000012 /* CanonicalPackage.swift in Sources */,
+				BB000000000000000000000B /* LevelValues.swift in Sources */,
+				BB000000000000000000000C /* TrainingLevelValues.swift in Sources */,
+				BB000000000000000000000D /* TrainingLevelValidation.swift in Sources */,
 				B1000000000000000000000C /* Level.swift in Sources */,
+				BB000000000000000000000E /* LevelAssembly.swift in Sources */,
+				BB000000000000000000000F /* IndoorMovementTrace.swift in Sources */,
 				G10000000000000000000002 /* RevivalGameplayView.swift in Sources */,
 				A10000000000000000000003 /* RevivalEditorApplication.swift in Sources */,
 			);
@@ -610,13 +666,20 @@
 				C10000000000000000000002 /* PresentationImport.swift in Sources */,
 				B10000000000000000000016 /* D3ImportOperation.swift in Sources */,
 				B10000000000000000000013 /* CanonicalPackage.swift in Sources */,
+				BB0000000000000000000010 /* LevelValues.swift in Sources */,
+				BB0000000000000000000011 /* TrainingLevelValues.swift in Sources */,
+				BB0000000000000000000012 /* TrainingLevelValidation.swift in Sources */,
 				B1000000000000000000000D /* Level.swift in Sources */,
+				BB0000000000000000000013 /* LevelAssembly.swift in Sources */,
+				BB0000000000000000000014 /* IndoorMovementTrace.swift in Sources */,
 				H10000000000000000000002 /* PilotProfile.swift in Sources */,
 				B10000000000000000000008 /* D3LV127.swift in Sources */,
 				B1000000000000000000000F /* D3LV127Decoder.swift in Sources */,
 				A10000000000000000000007 /* HOG2Archive.swift in Sources */,
 				B10000000000000000000003 /* PreparedRetailProfile.swift in Sources */,
 				B10000000000000000000005 /* TrainingMission.swift in Sources */,
+				BB000000000000000000001A /* TrainingLevelValidationTests.swift in Sources */,
+				BB000000000000000000001B /* IndoorMovementTraceTests.swift in Sources */,
 				B10000000000000000000009 /* CanonicalLevelTests.swift in Sources */,
 				B10000000000000000000014 /* D3ImportOperationTests.swift in Sources */,
 				A10000000000000000000004 /* HOG2ArchiveTests.swift in Sources */,
@@ -641,7 +704,12 @@
 				C70000000000000000000006 /* WorldRenderExtractionValues.swift in Sources */,
 				F10000000000000000000004 /* WorldRendering.swift in Sources */,
 				F10000000000000000000003 /* CanonicalPackage.swift in Sources */,
+				BB0000000000000000000015 /* LevelValues.swift in Sources */,
+				BB0000000000000000000016 /* TrainingLevelValues.swift in Sources */,
+				BB0000000000000000000017 /* TrainingLevelValidation.swift in Sources */,
 				F10000000000000000000002 /* Level.swift in Sources */,
+				BB0000000000000000000018 /* LevelAssembly.swift in Sources */,
+				BB0000000000000000000019 /* IndoorMovementTrace.swift in Sources */,
 				H10000000000000000000003 /* PilotProfile.swift in Sources */,
 				F10000000000000000000001 /* RevivalMobileApplication.swift in Sources */,
 			);

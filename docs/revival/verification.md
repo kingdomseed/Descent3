@@ -73,9 +73,24 @@ Import tests use the production D3Import parsers and cover the version 1.0 user-
 - provenance, hashes, imported scope, and explicit ignored or deferred entries;
 - proof that RevivalMac, RevivalMobile and RevivalEditor never open retail formats.
 
-Synthetic fixtures enter Git. Owned retail packages, converted media, and captures remain local and ignored.
+Synthetic fixtures enter Git. Owned retail packages, converted media, and captures remain local and ignored. An owned artifact that a later accepted test or closure action still needs must live under the stable ignored `runtime-data/revival-evidence/` tree, with its relative path, content identity, provenance, and hashes recorded by the owning packet. `/tmp` and `/private/tmp` are scratch space only. A path there cannot be the sole retained copy of required evidence. Remove a stable local artifact only after no accepted current or later gate depends on it, or after an exact recorded replacement supersedes it.
 
 When an authorized exact-final owned import reaches the production importer and exposes a concrete current-scope defect before promotion, the smallest source-supported correction may receive one necessary affected-importer build and one fresh owned import without another user authorization. Each fresh run requires a distinct confirmed defect and an intervening correction; unchanged, exploratory, or precautionary reruns are prohibited. Only successful promotion unlocks one directly associated package-admission selector. This bounded recovery does not authorize another build matrix, unrelated selector, review, completion-gate invocation, launch, broad suite, profile, soak, or later dependency island, and it stops when correction would require a new product decision or wider packet.
+
+The current Phase 5 owned Training evidence is retained under ignored
+`runtime-data/revival-evidence/current-training-schema11/`. Its schema-11,
+48-room `level.json`, sibling `content.json`, and `report.json` SHA-256 values
+are `ff61f9b2f36c4d4a0631927c51dda4f4f159d2bec0cf0277b50f166b554deee1`,
+`a8d117f48b5633464ef4aad7469bf41d5cf58da296614da026d9a0892b608855`,
+and `b2af537b72d4334b6a1e41151d95de2c642256d70be820ffa8e907951ed6c596`.
+The Xcode managed test process cannot read that retained path directly from
+the Documents tree. A terminal action may therefore use one fresh
+byte-identical `/private/tmp` copy after it proves the copied `level.json`
+hash matches the retained file. The copy is scratch evidence only. Temporary
+scheme variables must be removed after that action and the scheme must have no
+diff. The accepted current action passed 102/102 selected Release tests with
+no failure or skip; Release builds also passed for D3Import, RevivalMac,
+RevivalEditor and unsigned RevivalMobile.
 
 Do not test stream cells, stream blobs, spatial envelopes, package-layer locators, semantic revision hierarchies, or external marketplace threats before those production boundaries exist.
 

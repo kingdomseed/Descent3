@@ -57,6 +57,8 @@ Look for concrete simplifications in five areas.
 - Replace one-implementation protocols, managers, services, providers, registries, and factories with concrete ownership.
 - Remove mode flags, broad optionals, fallback paths, and hidden mutable state when construction can express one valid state.
 - Keep one mutable simulation owner and resident-level owner per application or play-session instance, one shared renderer implementation, and distinct editor-document and play-session values.
+- Keep the native file map source-aligned by default. One mutable owner can use same-module extensions in several cohesive files. Each different split or name needs the technical reason required by the source-translation contract.
+- At 4,000 physical lines, stop adding responsibilities to a project-owned production or test source file. Select one source responsibility and move it through a behavior-neutral extraction. The accepted hard maximum is 5,000 lines.
 - Use direct AppKit or UIKit, Metal, MetalKit, GameController, AVFoundation, AVAudioSession, Network, and CryptoKit calls in the concrete target that owns each service. UIKit remains RevivalMobile's default lifecycle and UI toolkit. Retain a SwiftUI component only when it has a documented current advantage and stays inside the same UIKit lifecycle, navigation, state, and game-view path. Do not consolidate the shells into a generic platform, input, or filesystem abstraction.
 - Keep canonical data free of renderer objects, framework workarounds, and legacy container knowledge.
 
@@ -76,7 +78,7 @@ Look for concrete simplifications in five areas.
 - Remove work that is provably repeated, unused, or immediately overwritten.
 - Keep observable iteration order, Float32 operation order, update order, eager preparation, reachable lazy dependency discovery, and final GPU-use lifetime intact.
 - Do not add concurrency, caching, unsafe access, specialization, custom allocation, streaming, or a scheduler change as cleanup.
-- Performance refactoring requires the accepted optimized M4 measurement gate for an applicable Mac/shared claim and, beginning with Phase 8, applicable physical iPhone and iPad measurement for a mobile claim. Unavailable mobile hardware, signing, or development-team setup cannot make a Phase 1–7 simplification `HOLD`. Exact support-floor certification is public-beta or release evidence. Line count and theoretical speed are not evidence.
+- Performance refactoring requires the accepted optimized M4 measurement gate for an applicable Mac/shared claim and, beginning with Phase 8, applicable physical iPhone and iPad measurement for a mobile claim. Unavailable mobile hardware, signing, or development-team setup cannot make a Phase 1–7 simplification `HOLD`. Exact support-floor certification is public-beta or release evidence. Line count does not prove a safe cut; the source responsibility map and behavior evidence do.
 
 ### Blast radius
 
@@ -136,7 +138,7 @@ Reject a simplification that:
 - replaces readable direct Swift with a framework, macro system, protocol graph, or type maze;
 - preserves a legacy API, ABI, generic platform, input, or filesystem layer, or defensive branch merely because it existed in C++ or appears to unify the concrete AppKit and UIKit shells;
 - creates a second loader, renderer, scheduler, content reader, simulation mode, or resource-lifetime path;
-- optimizes for file size, line count, abstraction purity, or reviewer taste;
+- splits only to lower line count, without a source responsibility seam and behavior-preservation evidence;
 - reports build success as proof of behavior preservation.
 
 ## Method provenance

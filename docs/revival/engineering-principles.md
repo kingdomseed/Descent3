@@ -1,7 +1,7 @@
 # Engineering principles
 
 - Status: accepted, amended
-- Date: July 18, 2026
+- Date: August 5, 2026
 - Authority: binding implementation rules
 
 ## Objective
@@ -19,6 +19,7 @@ The source is allowed to influence semantics without dictating native structure.
 - Preserve reachable data flow, ordering, formulas, dependency discovery and lifetime, and observable results before changing them.
 - Account for every involved source file and record deliberate differences.
 - Combine or split source responsibilities when that produces clearer Swift ownership.
+- Start from the native file map in [Source translation discipline](source-translation.md#native-file-layout-and-maintainability). One state owner can use many cohesive Swift files. Do not use single ownership as a reason for one very large file.
 - Replace platform APIs and ABI machinery directly; do not wrap them to resemble C++.
 - Do not carry dead branches, duplicated paths, defensive checks after a trusted boundary, or fixed-capacity accidents merely for fidelity.
 - Do not call a redesign a port. Baseline, change, and verification are separate records.

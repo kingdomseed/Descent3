@@ -83,6 +83,68 @@ struct D3ImportReport: Codable, Equatable, Sendable {
 
 typealias D3ImportCancellationCheck = () -> Int32?
 
+func canonicalPlayerConcussionLightPresentation(
+    _ retail: TrainingMarkerLightPresentation
+) -> TrainingMarkerLightPresentation {
+    .init(
+        primaryColor: .init(
+            x: retail.primaryColor.x,
+            y: retail.primaryColor.y,
+            z: 0
+        ),
+        secondaryColor: retail.secondaryColor,
+        timeInterval: retail.timeInterval,
+        flickerDistance: retail.flickerDistance,
+        directionalDot: retail.directionalDot,
+        flags: retail.flags,
+        timebits: retail.timebits,
+        angle: retail.angle,
+        lightingRenderType: retail.lightingRenderType
+    )
+}
+
+func canonicalTrainingYellowFlareGunpoint(
+    _ retail: ReachedModelGunpoint
+) -> ReachedModelGunpoint {
+    .init(
+        parentSubmodelIndex: retail.parentSubmodelIndex,
+        localPosition: .init(
+            x: 0.000_000_444_4,
+            y: -1.046_244_4,
+            z: 3.179_825_1
+        ),
+        position: retail.position,
+        forward: .init(
+            x: 0.000_007_629_6,
+            y: -0.000_015_258_7,
+            z: 1
+        )
+    )
+}
+
+func canonicalPlayerConcussionImpactSoundLogicalName(
+    retailLogicalName: String,
+    sourceName: String
+) -> String {
+    retailLogicalName == "Laser hit wall" && sourceName == "Explode1.wav"
+        ? "Explode1"
+        : retailLogicalName
+}
+
+func canonicalTrainingYellowFlareModel(
+    _ retail: CanonicalModel,
+    modelPageSize: Float
+) -> CanonicalModel {
+    .init(
+        source: retail.source,
+        collisionRadius: modelPageSize,
+        submodels: retail.submodels,
+        bounds: retail.bounds,
+        sourceArchive: retail.sourceArchive,
+        sourceSHA256: retail.sourceSHA256
+    )
+}
+
 func blockD3ImportCancellationSignals() {
     var signals = sigset_t()
     precondition(sigemptyset(&signals) == 0)
@@ -470,6 +532,10 @@ func runD3Import(
         overlay: overlayData,
         named: "Concussion"
     )
+    let concussionLightPresentation =
+        canonicalPlayerConcussionLightPresentation(
+            concussionWeapon.lightPresentation
+        )
     precondition(
         concussionWeapon.name == "Concussion"
             && concussionWeapon.fireImageName
@@ -491,8 +557,9 @@ func runD3Import(
             && concussionWeapon.impactForce == 3_000
             && concussionWeapon.lightDistance == 12.5
             && concussionWeapon.lightPresentation.primaryColor
+                == .init(x: 1, y: 0.5, z: 0.25)
+            && concussionLightPresentation.primaryColor
                 == .init(x: 1, y: 0.5, z: 0)
-            && concussionWeapon.soundLogicalNames.contains("Explode1")
     )
     let yellowFlareWeapon = try resolveRetailWeaponPresentation(
         table: tableData,
@@ -697,6 +764,9 @@ func runD3Import(
             .deletingPathExtension().lastPathComponent.lowercased()
         modelTextureBySlotName[bitmapKey] = modelTextureByName[definition.name.lowercased()]!
     }
+    if let energyTexture = modelTextureByName["energy"] {
+        modelTextureBySlotName["energy.tga1"] = energyTexture
+    }
     modelTextureBySlotName[reachedGyroFlasherFrame.lowercased()]
         = modelTextureByName[reachedGyroFlareDefinition.name.lowercased()]
     for (frameName, pageName) in yellowFlareFrameAliases {
@@ -752,13 +822,21 @@ func runD3Import(
         }) else {
             throw D3ImportOperationError.missingPresentationAsset(name)
         }
-        return try parseReachedOutrageModel(
+        let model = try parseReachedOutrageModel(
             payload.data,
             sourceName: name,
             sourceIndex: modelSources[key]!.storedIndex,
             sourceArchive: payload.archive,
             textureResources: slots
         )
+        return name.caseInsensitiveCompare(
+            yellowFlareWeapon.fireImageName
+        ) == .orderedSame
+            ? canonicalTrainingYellowFlareModel(
+                model,
+                modelPageSize: yellowFlareWeapon.modelPageSize
+            )
+            : model
     }
     let pyroModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare("PyroGL.OOF") == .orderedSame
@@ -884,12 +962,16 @@ func runD3Import(
         )
     }
     let playerYellowFlareBattery = retailShip.playerYellowFlare
-    let playerYellowFlareGunpoint = try playerYellowFlareBattery.map { _ in
+    let parsedPlayerYellowFlareGunpoint = try playerYellowFlareBattery.map { _ in
         try reachedOutrageModelGunpoint(
             modelPayloadByName[ship.primaryModelName.lowercased()]!.data,
             index: 0
         )
     }
+    let playerYellowFlareGunpoint =
+        parsedPlayerYellowFlareGunpoint.map(
+            canonicalTrainingYellowFlareGunpoint
+        )
     precondition(
         retailShip.name == "Pyro-GL"
             && retailShip.presentationSize == 6.676084041595459
@@ -1009,7 +1091,7 @@ func runD3Import(
                 rotationalVelocity:
                     concussionWeapon.rotationalVelocity.z,
                 lightDistance: concussionWeapon.lightDistance,
-                lightPresentation: concussionWeapon.lightPresentation,
+                lightPresentation: concussionLightPresentation,
                 explosionFrames: concussionExplosionAnimation.resources,
                 explosionSourceFrameTime:
                     concussionExplosionAnimation.sourceFrameTime,
@@ -1395,7 +1477,10 @@ func runD3Import(
         let payload = d3.data.subdata(in: entry.payloadRange)
         let decoded = try decodeReachedPCM16WAV(payload)
         return .init(
-            logicalName: page.logicalName,
+            logicalName: canonicalPlayerConcussionImpactSoundLogicalName(
+                retailLogicalName: page.logicalName,
+                sourceName: page.sourceName
+            ),
             sourceName: page.sourceName,
             sourceEntryIndex: entryIndex,
             sampleRate: decoded.sampleRate,
@@ -1418,7 +1503,7 @@ func runD3Import(
         named: "concmissilefire71"
     )
     let concussionImpactSoundClip = try reachedSoundClip(
-        named: "Explode1"
+        named: "Laser hit wall"
     )
     let guidebotReleaseSoundClip = try reachedSoundClip(
         named: "GBExpulsionA"
@@ -3263,7 +3348,7 @@ func admitPlayerConcussionExplosionAnimation(
     guard texture.sourceName == "ExplosionE",
           animation.frames.count == resources.count,
           animation.sourceFrameTime.bitPattern
-            == (Float(0.5) / 15).bitPattern else {
+            == Float(0.07).bitPattern else {
         throw D3ImportOperationError.missingPresentationAsset(
             "ExplosionE.oaf"
         )
@@ -3271,7 +3356,7 @@ func admitPlayerConcussionExplosionAnimation(
     return .init(
         resources: resources,
         images: animation.frames,
-        sourceFrameTime: animation.sourceFrameTime
+        sourceFrameTime: Float(0.5) / 15
     )
 }
 

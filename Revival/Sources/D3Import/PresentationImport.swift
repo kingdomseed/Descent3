@@ -847,13 +847,17 @@ private func canonicalTextureDefinition(
     }
     return RetailTextureDefinition(
         storedIndex: page.storedIndex,
-        name: page.name,
+        name: canonicalPresentationTextureLogicalName(page.name),
         bitmapSourceName: page.bitmapSourceName,
         blend: blend,
         lightmapBlend: blend == .opaque ? .multiply : .none,
         waterProcedural: nil,
         lightCorona: lightCorona,
     )
+}
+
+func canonicalPresentationTextureLogicalName(_ retailName: String) -> String {
+    retailName == "energy.TGA1" ? "energy" : retailName
 }
 
 private func canonicalLightCorona(
@@ -1326,6 +1330,28 @@ struct RetailPlayerConcussionBinding: Equatable, Sendable {
     let weaponFlags: UInt16
 }
 
+func canonicalPlayerConcussionBinding(
+    _ retail: RetailPlayerConcussionBinding
+) -> RetailPlayerConcussionBinding {
+    .init(
+        batteryIndex: retail.batteryIndex,
+        firingMasks:
+            retail.batteryIndex == 10 && retail.firingMasks == [2, 4]
+                ? [1, 2]
+                : retail.firingMasks,
+        weaponName:
+            retail.batteryIndex == 10
+                ? "Concussion"
+                : retail.weaponName,
+        fireSoundLogicalNames: retail.fireSoundLogicalNames,
+        fireWaits: retail.fireWaits,
+        energyUsage: retail.energyUsage,
+        ammoUsage: retail.ammoUsage,
+        fireFlags: retail.fireFlags,
+        weaponFlags: retail.weaponFlags
+    )
+}
+
 struct RetailPlayerYellowFlareBinding: Equatable, Sendable {
     let batteryIndex: Int
     let firingMask: UInt8
@@ -1634,7 +1660,7 @@ private extension RetailPageCursor {
             }
             if batteryIndex == 10 {
                 let count = Int(maskCount)
-                concussion = .init(
+                concussion = canonicalPlayerConcussionBinding(.init(
                     batteryIndex: batteryIndex,
                     firingMasks: Array(firingMasks.prefix(count)),
                     weaponName: weaponNames[0],
@@ -1644,7 +1670,7 @@ private extension RetailPageCursor {
                     ammoUsage: ammoUsage,
                     fireFlags: fireFlags,
                     weaponFlags: weaponFlags
-                )
+                ))
             } else if batteryIndex == 20 {
                 yellowFlare = .init(
                     batteryIndex: batteryIndex,

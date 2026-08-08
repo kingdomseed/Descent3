@@ -9148,10 +9148,6 @@ private func validTrainingManeuverFollowContinuation(
               position: state.position,
               orientation: state.orientation
           ),
-          sourceConvexRoomContains(
-              state.position,
-              in: followBotRoom
-          ),
           state.velocity.x.isFinite,
           state.velocity.y.isFinite,
           state.velocity.z.isFinite,
@@ -9180,9 +9176,14 @@ private func validTrainingManeuverFollowContinuation(
             && !state.followBotIsPowered
             && state.followBotTeamFlags == 0
             && state.activePathIndex == nil
+            && state.position == followBot.position
+            && state.orientation == followBot.orientation
+            && state.velocity == .zero
+            && state.pathFailure == nil
     }
     return state.followBotIsPowered
         && state.followBotTeamFlags == lesson.friendlyTeamFlags
+        && sourceConvexRoomContains(state.position, in: followBotRoom)
         && (
             state.script026Count == 0
                 ? state.activePathIndex == lesson.followPathIndex

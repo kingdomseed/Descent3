@@ -40,9 +40,10 @@ These are evidence categories, not new ledger states or a mandatory sequence. A 
 5. Exercise composition only where ownership, serialization, concrete AppKit or UIKit adaptation, process, GPU, application, physical-device lifecycle, or milestone behavior can fail independently. Do not add a generic platform, input, or filesystem abstraction to make a matrix easier to run.
 6. Compare source-supported behavior and native behavior. Record tolerances and every deliberate difference instead of blending modernization into a fidelity claim.
 7. Audit skipped, disabled, quarantined, deleted, weakened, and replaced cases. A test protecting the claimed current contract must execute and pass.
-8. Check source and functional ledger transitions against the exact scope being claimed; do not advance a row on prose or build success alone.
-9. For a material slice, require the completed [`revival-review`](../revival-review/SKILL.md) report and confirm every concrete finding changed the diff or received evidence-backed resolution.
-10. Issue a bounded evidence verdict: supported at a named evidence rung, or unsupported with the concrete missing or contradictory evidence. For material closure, pass that result to [`revival-completion-gate`](../revival-completion-gate/SKILL.md) rather than deciding that every unexecuted broader evidence category blocks the packet.
+8. For each ignored owned artifact that a later accepted test or closure action still needs, require a stable path under `runtime-data/revival-evidence/`, plus recorded content identity, provenance, and hashes. Treat `/tmp` and `/private/tmp` as disposable scratch, never as the sole retained evidence store. If a required artifact is absent, report that fact; do not substitute another import by name or similarity.
+9. Check source and functional ledger transitions against the exact scope being claimed; do not advance a row on prose or build success alone.
+10. For a material slice, require the completed [`revival-review`](../revival-review/SKILL.md) report and confirm every concrete finding changed the diff or received evidence-backed resolution.
+11. Issue a bounded evidence verdict: supported at a named evidence rung, or unsupported with the concrete missing or contradictory evidence. For material closure, pass that result to [`revival-completion-gate`](../revival-completion-gate/SKILL.md) rather than deciding that every unexecuted broader evidence category blocks the packet.
 
 Documentation-only work uses link, consistency, and evidence checks. It does not manufacture a red product test. Performance changes start from a reproducible optimized measurement that misses an accepted budget or demonstrates a regression. Through Phase 7, RevivalMobile target builds and focused simulator or unsigned generic-device checks are compatibility evidence only; unavailable hardware, signing, or development-team setup cannot return `HOLD` or block the next Mac/shared packet. Beginning with Phase 8, claims that cover mobile presentation, input, package intake, lifecycle, memory, thermal, or audio behavior require applicable physical iPhone and iPad evidence; simulator evidence alone cannot close them. Representative support-floor evidence is required for a public-beta or release-floor claim, and missing floor hardware leaves only that claim open.
 
@@ -69,6 +70,7 @@ Keep the result compact and auditable:
 - **Claim and authority:** observable scope, owning document, rows, and milestone.
 - **Evidence rung:** the exact category being established.
 - **Execution:** command or procedure, input or content identity, configuration, environment, concrete target shell, and physical device when applicable.
+- **Retained local inputs:** stable ignored path, content identity, provenance, hashes, later gate that still needs the artifact, and approved replacement or removal when applicable.
 - **Observed result:** values, images, counts, diagnostics, timings, or failure state that bear on the claim.
 - **Nonexecuted cases:** every relevant skip, disablement, deletion, weakening, replacement, and approved disposition.
 - **Differences and provenance:** source comparison, tolerances, intentional changes, hashes, and rights boundary.

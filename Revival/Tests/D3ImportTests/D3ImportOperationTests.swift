@@ -2,6 +2,306 @@ import Darwin
 import XCTest
 
 final class D3ImportOperationTests: XCTestCase {
+    func testCanonicalTextureAnimationFramesMayShareSourcePageIndex() {
+        XCTAssertTrue(
+            allowsDuplicateDependencyStoredIndex(
+                category: "texture",
+                sourceName: "yellowspark.oaf frame 1"
+            )
+        )
+        XCTAssertFalse(
+            allowsDuplicateDependencyStoredIndex(
+                category: "texture",
+                sourceName: "FlarePuff"
+            )
+        )
+        XCTAssertFalse(
+            allowsDuplicateDependencyStoredIndex(
+                category: "sound",
+                sourceName: "yellowspark.oaf frame 1"
+            )
+        )
+    }
+
+    func testCanonicalDefaultPlayerShipMarksConcussionExplosionFramesImported() {
+        let explosionFrames = [
+            .init(storedIndex: 398, sourceName: "ExplosionE"),
+        ] + (1..<15).map {
+            SourceResource(
+                storedIndex: 398,
+                sourceName: "ExplosionE.oaf frame \($0)"
+            )
+        }
+        let concussion = PlayerConcussionBinding(
+            batteryIndex: 10,
+            firingMasks: [1, 2],
+            weapon: .init(storedIndex: 3, sourceName: "Concussion"),
+            model: .init(storedIndex: 0, sourceName: "ConcussionMissile.OOF"),
+            fireSoundLogicalNames: [],
+            fireSoundSourceName: "concmissilefire7.wav",
+            impactSoundLogicalName: "Explode1",
+            impactSoundSourceName: "Explode1.wav",
+            fireWaits: [],
+            energyUsage: 0,
+            ammoUsage: 0,
+            fireFlags: 0,
+            weaponFlags: 0,
+            gunpoints: [],
+            collisionRadius: 1,
+            speed: 175,
+            lifetime: 15,
+            rotationalVelocity: 35_000,
+            lightDistance: 12.5,
+            lightPresentation: .init(
+                primaryColor: .init(x: 1, y: 0.5, z: 0),
+                secondaryColor: .zero,
+                timeInterval: 0,
+                flickerDistance: 0,
+                directionalDot: 0,
+                flags: 0,
+                timebits: 0,
+                angle: 0,
+                lightingRenderType: 0
+            ),
+            explosionFrames: explosionFrames,
+            explosionSourceFrameTime: Float(0.5) / 15,
+            explosionSize: 10,
+            explosionLifetime: 0.5,
+            directRobotDamage: 9,
+            shockwaveDuration: 0.1,
+            shockwaveRadius: 32,
+            shockwaveDamage: 19,
+            shockwaveForce: 3_000
+        )
+        let ship = CanonicalShipDefinition(
+            source: .init(storedIndex: 0, sourceName: "Pyro-GL"),
+            primaryModel: .init(storedIndex: 0, sourceName: "PyroGL.OOF"),
+            presentationSize: 1,
+            physics: .init(
+                mass: 1,
+                drag: 1,
+                fullThrust: 1,
+                behaviors: [],
+                rotationalDrag: 1,
+                fullRotationalThrust: 1,
+                numberOfBounces: 0,
+                initialForwardVelocity: 0,
+                initialAngularVelocity: .zero,
+                wiggleAmplitude: 0,
+                wigglesPerSecond: 0,
+                coefficientOfRestitution: 1,
+                hitDieDot: -1,
+                maximumTurnrollRate: 0,
+                turnrollRatio: 0
+            ),
+            playerConcussion: concussion
+        )
+
+        let updated = makeMinimalCanonicalLevel().addingDefaultPlayerShip(
+            ship,
+            binding: .init(
+                playerID: 0,
+                objectHandle: 2_048,
+                ship: ship.source
+            )
+        )
+
+        let importedExplosionFrames = updated.dependencyManifest.current
+            .filter {
+                $0.category == "texture"
+                    && $0.source.sourceName.hasPrefix("ExplosionE")
+            }
+        XCTAssertEqual(
+            importedExplosionFrames.map(\.source),
+            explosionFrames
+        )
+        XCTAssertTrue(
+            importedExplosionFrames.allSatisfy {
+                $0.state == "presentation-payload-imported"
+            }
+        )
+    }
+
+    func testCanonicalWeaponDefinitionSourceIdentityAcceptsStockIndex() {
+        XCTAssertTrue(
+            D3SourceIdentity.isValidSourceResource(
+                .init(storedIndex: 3, sourceName: "Yellow flare"),
+                category: "weapon-definition"
+            )
+        )
+    }
+
+    func testCanonicalizesStockYellowFlareModelPageSize() {
+        let retail = CanonicalModel(
+            source: .init(storedIndex: 0, sourceName: "FlareYellowBright.OOF"),
+            collisionRadius: Float(bitPattern: 0x405f_3213),
+            submodels: [],
+            bounds: .init(minimum: .zero, maximum: .zero),
+            sourceArchive: "d3.hog",
+            sourceSHA256: "model-sha"
+        )
+
+        let canonical = canonicalTrainingYellowFlareModel(
+            retail,
+            modelPageSize: Float(bitPattern: 0x405f_d5ea)
+        )
+
+        XCTAssertEqual(
+            canonical.collisionRadius.bitPattern,
+            0x405f_d5ea
+        )
+        XCTAssertEqual(canonical.submodels, retail.submodels)
+        XCTAssertEqual(canonical.bounds, retail.bounds)
+        XCTAssertEqual(canonical.sourceSHA256, retail.sourceSHA256)
+    }
+
+    func testCanonicalizesStockEnergyTextureName() {
+        XCTAssertEqual(
+            canonicalPresentationTextureLogicalName("energy.TGA1"),
+            "energy"
+        )
+        XCTAssertEqual(
+            canonicalPresentationTextureLogicalName("FlarePuff"),
+            "FlarePuff"
+        )
+    }
+
+    func testCanonicalizesStockConcussionImpactSoundName() {
+        XCTAssertEqual(
+            canonicalPlayerConcussionImpactSoundLogicalName(
+                retailLogicalName: "Laser hit wall",
+                sourceName: "Explode1.wav"
+            ),
+            "Explode1"
+        )
+        XCTAssertEqual(
+            canonicalPlayerConcussionImpactSoundLogicalName(
+                retailLogicalName: "GBExpulsionA",
+                sourceName: "GBExpulsionA.wav"
+            ),
+            "GBExpulsionA"
+        )
+    }
+
+    func testCanonicalizesStockConcussionBatteryDefaults() {
+        let retail = RetailPlayerConcussionBinding(
+            batteryIndex: 10,
+            firingMasks: [2, 4],
+            weaponName: "Laser",
+            fireSoundLogicalNames: [
+                "concmissilefire71", "concmissilefire71",
+            ],
+            fireWaits: [0.5, 0.5],
+            energyUsage: 0,
+            ammoUsage: 1,
+            fireFlags: 0,
+            weaponFlags: 0
+        )
+
+        let canonical = canonicalPlayerConcussionBinding(retail)
+
+        XCTAssertEqual(canonical.firingMasks, [1, 2])
+        XCTAssertEqual(canonical.weaponName, "Concussion")
+    }
+
+    func testCanonicalizesStockYellowFlareGunpointPrecision() {
+        let retail = ReachedModelGunpoint(
+            parentSubmodelIndex: 0,
+            localPosition: .init(
+                x: 4.4440458e-7,
+                y: -1.0462444,
+                z: 3.179825
+            ),
+            position: .zero,
+            forward: .init(
+                x: 7.629598e-6,
+                y: -1.5258687e-5,
+                z: 1
+            )
+        )
+
+        let canonical = canonicalTrainingYellowFlareGunpoint(retail)
+
+        XCTAssertEqual(
+            canonical.localPosition.x.bitPattern,
+            Float(0.000_000_444_4).bitPattern
+        )
+        XCTAssertEqual(
+            canonical.localPosition.y.bitPattern,
+            Float(-1.046_244_4).bitPattern
+        )
+        XCTAssertEqual(
+            canonical.localPosition.z.bitPattern,
+            Float(3.179_825_1).bitPattern
+        )
+        XCTAssertEqual(
+            canonical.forward.x.bitPattern,
+            Float(0.000_007_629_6).bitPattern
+        )
+        XCTAssertEqual(
+            canonical.forward.y.bitPattern,
+            Float(-0.000_015_258_7).bitPattern
+        )
+        XCTAssertEqual(canonical.forward.z.bitPattern, Float(1).bitPattern)
+    }
+
+    func testCanonicalizesRetailConcussionLightToStockTrainingColor() {
+        let retail = TrainingMarkerLightPresentation(
+            primaryColor: .init(x: 1, y: 0.5, z: 0.25),
+            secondaryColor: .init(x: 0.1, y: 0.2, z: 0.3),
+            timeInterval: 0.2,
+            flickerDistance: 5,
+            directionalDot: 0.25,
+            flags: 16,
+            timebits: .max,
+            angle: 0,
+            lightingRenderType: 0
+        )
+
+        let canonical = canonicalPlayerConcussionLightPresentation(retail)
+
+        XCTAssertEqual(
+            canonical.primaryColor,
+            .init(x: 1, y: 0.5, z: 0)
+        )
+        XCTAssertEqual(canonical.secondaryColor, retail.secondaryColor)
+        XCTAssertEqual(canonical.timeInterval, retail.timeInterval)
+        XCTAssertEqual(canonical.flickerDistance, retail.flickerDistance)
+        XCTAssertEqual(canonical.directionalDot, retail.directionalDot)
+        XCTAssertEqual(canonical.flags, retail.flags)
+        XCTAssertEqual(canonical.timebits, retail.timebits)
+        XCTAssertEqual(canonical.angle, retail.angle)
+        XCTAssertEqual(
+            canonical.lightingRenderType,
+            retail.lightingRenderType
+        )
+    }
+
+    func testAdmitsRetailConcussionAnimationUsingWeaponLifetimeCadence() throws {
+        let image = Outrage1555Image(
+            width: 1,
+            height: 1,
+            rgba8: Data(repeating: 0, count: 4),
+            sourceWasARGB4444: false
+        )
+        let animation = Outrage1555Animation(
+            version: 1,
+            sourceFrameTime: 0.07,
+            frames: Array(repeating: image, count: 15)
+        )
+
+        let admitted = try admitPlayerConcussionExplosionAnimation(
+            texture: .init(storedIndex: 0, sourceName: "ExplosionE"),
+            animation: animation
+        )
+
+        XCTAssertEqual(admitted.images, animation.frames)
+        XCTAssertEqual(
+            admitted.sourceFrameTime.bitPattern,
+            (Float(0.5) / 15).bitPattern
+        )
+    }
+
     func testParsesReachedShipPhysicsInReleasedFieldOrderAndTypesFlags() throws {
         let pages = try resolveReachedObjectModelPages(
             table: makeRetailShipTablePage(includeBatteries: true)

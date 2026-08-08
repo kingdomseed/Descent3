@@ -61,8 +61,9 @@ At packet start or resumption:
 1. Read `current-plan.md` before selecting work. Identify the active packet, checkpoint, packet owner, integration owner, next accepted slice, and lane-specific blockers.
 2. Inspect the actual repository state and target identity. Do not treat a chat summary, stale handoff, or intended branch as proof of the current tree.
 3. Read the owning contract and applicable source and functional rows. Compare their states with the last landed evidence rather than inferring completion from code presence or a green build.
-4. Resolve any discrepancy before implementation. A stale current plan is corrected only by the integration owner; another agent supplies the exact proposed change and evidence.
-5. State the restored execution context in the work packet or handoff. Do not create a recovery file.
+4. Record `wc -l` for each project-owned production or test source file the packet will touch. Apply the accepted 4,000-line review threshold and 5,000-line hard maximum before a new responsibility enters that file.
+5. Resolve any discrepancy before implementation. A stale current plan is corrected only by the integration owner; another agent supplies the exact proposed change and evidence.
+6. State the restored execution context in the work packet or handoff. Do not create a recovery file.
 
 A resumable packet can answer from canonical files and the actual tree:
 
@@ -78,7 +79,7 @@ If one answer is missing, label it unproven or assign the existing owner that mu
 
 1. **Name the maintenance boundary.** Record the base and target, active packet and checkpoint, integration owner, affected contracts and rows, and whether the task is entry, resumption, evidence change, amendment, handoff, or closure.
 2. **Compare claims with evidence.** Inspect the full changed-file contents and reachable consequences. Separate verified fact, accepted decision, inference, proposed update, and unresolved question.
-3. **Run a bounded drift scan.** Check active documents for conflicting platform floors, toolchains, target counts, phase state, ownership, blockers, next-step prose, superseded mechanisms, duplicate queues, broken links, and claims that exceed the recorded checkpoint. Reject any Phase 1–7 state or handoff that turns unavailable mobile hardware, signing, development-team setup, or physical-device evidence into `HOLD`; route those facts to the Phase 8 mobile gate. Confirm UIKit remains the default mobile lifecycle and UI toolkit and that any SwiftUI use has a bounded current justification.
+3. **Run a bounded drift scan.** Check active documents for conflicting platform floors, toolchains, target counts, phase state, ownership, blockers, next-step prose, superseded mechanisms, duplicate queues, broken links, source-file limit violations, and claims that exceed the recorded checkpoint. Reject any Phase 1–7 state or handoff that turns unavailable mobile hardware, signing, development-team setup, or physical-device evidence into `HOLD`; route those facts to the Phase 8 mobile gate. Confirm UIKit remains the default mobile lifecycle and UI toolkit and that any SwiftUI use has a bounded current justification.
 4. **Route the smallest durable update.** Change only the canonical owners whose facts changed. Preserve each document's status and authority header. Remove superseded active prose in the same change rather than leaving both directions.
 5. **Reconcile the handoff.** Give the integration owner the one completion-gate verdict and dispositions, an exact `current-plan.md` proposal, affected ledger transitions, accepted-document changes, verification, open uncertainty, and next two or three slices. The integration owner accepts, adjusts, or rejects the proposal against the evidence.
 

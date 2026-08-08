@@ -29,12 +29,17 @@ If this skill conflicts with an accepted document, follow the document and repor
 ## Units of work and proof
 
 - A legacy file is a source-accounting unit. Every relevant implementation file receives a disposition.
+- A native file map is a maintenance unit. It starts from the released source file and responsibility layout. Each different split or name needs one recorded technical reason.
 - A dependency island is the implementation and cutover unit. It contains the smallest complete source path that can produce a real result through the applicable Mac player, mobile player, or editor entry point.
 - An observable contract is the verification unit. It states what the native product must do, not how the C++ happened to be arranged.
 - A roadmap phase is a product milestone. File count, translated line count, compiler-error count, and target count are not product progress.
 - A `current-plan.md` work packet is the near-term ownership and integration unit. Through Phase 7, it closes on its applicable Mac/shared contract; early mobile build and simulator composition is compatibility evidence rather than a second closure checkpoint. Phase 8 owns required physical mobile integration.
 
-Do not translate files alphabetically or require one Swift file per C++ file. Do not translate the whole repository before running the product. Complete one observable island at a time and leave one production path.
+Do not translate files alphabetically or treat the default file map as a mechanical rewrite order. Do not translate the whole repository before running the product. Complete one observable island at a time and leave one production path.
+
+Do not put a new responsibility into an existing large owner file only because that file already has the main type. One mutable owner can have same-module extensions in several cohesive files. At 4,000 physical lines, stop adding responsibilities and select a behavior-neutral, source-aligned extraction. A project-owned production or test source file must not exceed the accepted 5,000-line maximum.
+
+Before production work, record `wc -l` for every project-owned production or test source file the packet will touch. If one is at or above 4,000 lines, the packet starts with the smallest source-aligned extraction that makes room. If one is above 5,000 lines, no new responsibility enters it until a bounded extraction sequence returns it below the hard maximum. Record old and new counts, moved declarations or ranges, source roots, target membership, access changes, state ownership, and the smallest behavior evidence.
 
 ## Uncover the fog before fixing the island
 
@@ -68,13 +73,14 @@ Use the trial's failures to correct this skill, the island trace, or the shared 
 
 Before production implementation:
 
-1. Name the next observable player or editor result, its `current-plan.md` packet and checkpoint, pinned released-source revision, mapped maintained-source revisions, runtime and editor entry symbols, applicable build variants, refined preflight boundary, native owners, and every concrete shipping shell applicable to that checkpoint.
+1. Name the next observable player or editor result, its `current-plan.md` packet and checkpoint, pinned released-source revision, mapped maintained-source revisions, runtime and editor entry symbols, applicable build variants, refined preflight boundary, native owners, native file map, and every concrete shipping shell applicable to that checkpoint.
 2. Build a sorted bounded source census: trace forward through definitions, calls, data flow, important globals, ordering, dependency discovery, initialization, teardown, and editor consumers; search backward across the pinned tree for callers and registrations of the island entry symbols and state or types the island defines, mutates, or owns; and inspect callbacks, virtual dispatch, function pointers, macros, generated blocks, and handwritten behavior when actually present. Classify and stop at an outside caller that cannot reach the named contract instead of recursively reverse-tracing every shared helper.
 3. Continue until every discovered semantic dependency and outward edge is included, evidenced as irrelevant, excluded, or deferred to a named roadmap phase and missing dependency. Add or split ledger rows for every census file and relevant symbol or range; do not treat the original row list as proof that discovery is complete. Persist one compact census block in the source ledger with the revision, claim, roots, variants, native owners, sorted row anchors, deferred outward edges, and later independent-review result.
 4. Capture the historical baseline with source evidence, a synthetic fixture, the reference executable, or owned local retail content.
 5. Record the difficult native ownership boundary. Do not design a project-wide lifetime framework.
-6. Identify only the semantic hazards present in this island.
-7. Write the focused failing production test once the contract is known, then record the red command and intended failure.
+6. For each native file that differs from the released file or responsibility map, record the concrete technical reason. Check target membership, Swift access, test placement, and the one-owner invariant.
+7. Identify only the semantic hazards present in this island.
+8. Write the focused failing production test once the contract is known, then record the red command and intended failure.
 
 Deepen the trace as real code exposes additional dependencies. Iterative discovery is expected. An incomplete trace is never completion.
 
@@ -162,6 +168,8 @@ Reject:
 - permanent C++ bridges, legacy runtime readers, alternate loaders, alternate renderers, or compatibility feature flags;
 - a generic cross-platform, platform-service, input, or filesystem abstraction between the concrete AppKit and UIKit shells and their shared native paths;
 - speculative protocols, managers, services, ECSs, job systems, render graphs, resource managers, custom allocators, or broad package graphs;
+- a line-only move that does not close one named source responsibility or leaves an affected file above the hard maximum;
+- a giant owner or test file used as a default destination for unrelated source responsibilities;
 - defensive checks inside trusted runtime code for states canonical construction already excludes;
 - preservation of MFC, Win32, OpenGL, SDL, native Osiris, ABI, packet, binary-layout, or editor/game handoff machinery;
 - dismissal of a mapped maintained-source change solely because its carrier uses one of those obsolete mechanisms, without first extracting any corrected behavior, invariant, dependency, lifetime lesson, or regression case;
@@ -178,6 +186,7 @@ Source accounting for the island closes only when:
 
 - the bounded source census has reached a classified fixed point from its declared runtime and editor roots, and an independent source-fidelity reviewer has reconstructed it rather than merely reading the implementer's row list;
 - every census implementation file, important symbol, editor caller, generated block, handwritten range, and outward edge has a final disposition or a named justified deferral;
+- the native file map follows the released source responsibility layout by default, and every different split or name has a recorded technical reason;
 - the source or reference comparison and every deliberate difference are recorded;
 - temporary research and scaffolding are deleted or archived outside product targets;
 - license and provenance are complete;

@@ -108,11 +108,16 @@ Check:
 - the implementation honors its accepted commit point: supported precommit failure preserves the prior state, while postcommit cleanup is best effort and does not recursively attempt rollback;
 - impossible states behind a trusted boundary terminate through ordinary Swift invariants, preconditions, or traps instead of speculative guards and recovery;
 - test convenience did not add production seams;
+- the native file map starts from the released source file and responsibility layout, and each different split or name has a recorded technical reason;
+- one state owner is not used as a reason for one giant physical file; same-module cohesive files and extensions keep one owner without duplicate state or public access;
+- no project-owned production or test source file exceeds 5,000 physical lines, and a file at or above the 4,000-line review threshold receives no new responsibility before a source-aligned extraction;
+- an extraction records old and new line counts, moved declarations or ranges, released-source roots, target membership, access changes, state ownership, and the smallest behavior evidence;
+- tests follow the production responsibility map unless a named technical reason supports a different test split;
 - concurrency, caching, unsafe access, specialization, allocation machinery, or optimization has measured justification;
 - a discovery aid did not become a hand-maintained knowledge graph, graph database, duplicate ledger, whole-program gate, or production dependency without accepted evidence;
 - simplification preserves ledgered capability and source-supported observable behavior.
 
-There is no line-count limit. A large file is a problem only when it causes a concrete ownership, comprehension, testing, or change-isolation failure.
+Line count does not select the cut by itself. The accepted source-translation contract derives a 5,000-line hard maximum and a 4,000-line review threshold from the released source corpus. The reviewer must identify the source responsibility seam, safe native owner, and behavior evidence for the split.
 
 ## Finding contract
 
@@ -129,7 +134,7 @@ Every actionable finding states:
 - the accepted user-visible, preservation, or termination outcome that is violated;
 - the smallest credible correction or proof needed.
 
-Do not report style preference, hypothetical future need, unsupported performance concern, literal source-shape mismatch, generic best practice, arbitrary failure, coverage in the abstract, or absence of a mathematical rollback guarantee as a defect. A recovery syscall failure is actionable only through its truthful propagated outcome unless an accepted supported event requires another layer of recovery.
+Do not report style preference, hypothetical future need, unsupported performance concern, literal source-shape mismatch without the required file-map analysis, generic best practice, arbitrary failure, coverage in the abstract, or absence of a mathematical rollback guarantee as a defect. A missing technical reason for a changed file map, or a file that violates the accepted maintainability stop, is a structural process finding.
 
 ### Classify the claim before testing it
 
