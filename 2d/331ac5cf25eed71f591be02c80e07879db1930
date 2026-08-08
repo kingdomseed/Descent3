@@ -1,0 +1,54 @@
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_cb7c7f4d923ba9 22,24-25,105-107,241
+  s_c503f7c0529e13::t_78e5b731f86d66 29
+  s_c503f7c0529e13::t_8c2c71e2cef191 23
+  s_c503f7c0529e13::t_9ee02db9bb1099 31
+Revival/Sources/RevivalAppKit/RevivalGameplayView.swift
+  s_58b3dc96cbbfc9::t_285dd215a437c1 1029
+  s_58b3dc96cbbfc9::t_70b22b3b5d274a 1028
+  s_58b3dc96cbbfc9::t_df605f3acc4fcc 43,100-103,256-268,411,983-1027,1030-1045,1361-1367
+  s_58b3dc96cbbfc9::t_62104be2727fc6 1368
+Revival/Sources/RevivalMac/RevivalMacApplication.swift
+  s_58b3dc96cbbfc9::t_df605f3acc4fcc 45-48,120-125,414-416,439-442,455-499
+  s_58b3dc96cbbfc9::t_5b0aa6d117c6f7 500
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_cb7c7f4d923ba9 2037-2058,2062
+  s_c503f7c0529e13::t_78e5b731f86d66 2035,2059-2061
+  s_c503f7c0529e13::t_9ec21d0bd2259d 2036
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_cb7c7f4d923ba9 43,65
+Revival/Sources/RevivalEditor/RevivalEditorWindowController.swift
+  s_58b3dc96cbbfc9::t_285dd215a437c1 349,355,532
+  s_58b3dc96cbbfc9::t_df605f3acc4fcc 48-51,344-348,350-354,356-358,473-478,483-486,496-499,510-531,533-555,557
+  s_58b3dc96cbbfc9::t_a79992638f9281 556
+  s_58b3dc96cbbfc9::t_65b365c1a869bd 558
+Revival.xcodeproj/project.pbxproj
+  s_58b3dc96cbbfc9::t_b0f16ae7f05ad3 187,262,466,803
+Revival/Tests/D3ImportTests/SoloPauseTests.swift
+  s_58b3dc96cbbfc9::t_70b22b3b5d274a 75-76
+  s_58b3dc96cbbfc9::t_b0f16ae7f05ad3 1-74,77-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "2d331ac5cf25eed71f591be02c80e07879db1930",
+  "prompts": {},
+  "sessions": {
+    "s_58b3dc96cbbfc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fdf42-a1c6-7010-bd50-6a7128f20a76",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
