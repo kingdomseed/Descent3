@@ -1,0 +1,25 @@
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_324c8385b6af62 1946,1957-1958,2118-2141
+  s_c503f7c0529e13::t_03b5d876795a94 2142
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_324c8385b6af62 86
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_0802fd444631f7 31,109
+  s_c503f7c0529e13::t_324c8385b6af62 22-25,28,108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "b274015bf96164b5e0bbd60df246b333f1d834eb",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
