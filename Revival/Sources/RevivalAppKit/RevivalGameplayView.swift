@@ -58,6 +58,7 @@ final class RevivalGameplayView: MTKView {
     private var afterburnerIsHeld = false
     private let trainingMessageLabel = NSTextField(labelWithString: "")
     private let enabledControlsLabel = NSTextField(labelWithString: "")
+    private let energyLabel = NSTextField(labelWithString: "")
     private let invulnerabilityStatusLabel =
         NSTextField(labelWithString: "")
     private let cloakShipMonitor = NoninteractiveTrainingOverlay()
@@ -161,19 +162,31 @@ final class RevivalGameplayView: MTKView {
             width: width,
             height: CGFloat(trainingMessageLabel.maximumNumberOfLines) * 28
         )
-        invulnerabilityStatusLabel.frame = NSRect(
+        let statusY = max(
+            trainingMessageLabel.frame.maxY + 8,
+            bounds.height - 52
+        )
+        energyLabel.frame = NSRect(
             x: left,
-            y: max(
-                trainingMessageLabel.frame.maxY + 8,
-                bounds.height - 52
-            ),
-            width: max(0, width - 104),
+            y: statusY,
+            width: min(160, width),
             height: 28
         )
+        let cloakWidth = min(96, width)
         cloakStatusLabel.frame = NSRect(
-            x: left + max(0, width - 96),
-            y: invulnerabilityStatusLabel.frame.minY,
-            width: 96,
+            x: left + max(0, width - cloakWidth),
+            y: statusY,
+            width: cloakWidth,
+            height: 28
+        )
+        let invulnerabilityLeft = energyLabel.frame.maxX + 8
+        invulnerabilityStatusLabel.frame = NSRect(
+            x: invulnerabilityLeft,
+            y: statusY,
+            width: max(
+                0,
+                cloakStatusLabel.frame.minX - 8 - invulnerabilityLeft
+            ),
             height: 28
         )
         cloakShipMonitor.frame = cloakStatusLabel.frame
@@ -398,6 +411,8 @@ final class RevivalGameplayView: MTKView {
             clearInput()
             trainingMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
+            energyLabel.stringValue = ""
+            energyLabel.isHidden = true
             invulnerabilityStatusLabel.stringValue = ""
             cloakShipMonitor.isHidden = true
             cloakStatusLabel.stringValue = ""
@@ -424,6 +439,7 @@ final class RevivalGameplayView: MTKView {
             clearInput()
             trainingMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
+            energyLabel.isHidden = true
             invulnerabilityStatusLabel.stringValue = ""
             cloakShipMonitor.isHidden = true
             cloakStatusLabel.stringValue = ""
@@ -472,9 +488,23 @@ final class RevivalGameplayView: MTKView {
             )
         trainingMessageLabel.isHidden = !showsOrdinaryGameplayOverlays
         enabledControlsLabel.isHidden = !showsOrdinaryGameplayOverlays
+        energyLabel.isHidden = !showsOrdinaryGameplayOverlays
         invulnerabilityStatusLabel.isHidden = !showsOrdinaryGameplayOverlays
         cloakStatusLabel.isHidden = !showsOrdinaryGameplayOverlays
         cameraMonitorBorder.isHidden = frame.trainingCameraMonitor == nil
+        let energyIsLow = frame.energy <= 20
+        energyLabel.stringValue = String(
+            format: "Energy: %03d",
+            Int(frame.energy)
+        )
+        energyLabel.textColor = energyIsLow ? .systemRed : .systemGreen
+        energyLabel.font = .monospacedDigitSystemFont(
+            ofSize: 18,
+            weight: energyIsLow ? .bold : .semibold
+        )
+        energyLabel.setAccessibilityLabel(
+            energyIsLow ? "Energy, low energy warning" : "Energy"
+        )
         invulnerabilityStatusLabel.stringValue =
             Self.invulnerabilityStatusText(
                 remaining: frame.trainingInvulnerabilityRemaining
@@ -1546,6 +1576,7 @@ final class RevivalGameplayView: MTKView {
         for label in [
             enabledControlsLabel,
             trainingMessageLabel,
+            energyLabel,
             invulnerabilityStatusLabel,
             cloakStatusLabel,
         ] {
@@ -1564,6 +1595,13 @@ final class RevivalGameplayView: MTKView {
         )
         trainingMessageLabel.maximumNumberOfLines = 2
         trainingMessageLabel.setAccessibilityLabel("Training instruction")
+        energyLabel.alignment = .left
+        energyLabel.font = .monospacedDigitSystemFont(
+            ofSize: 18,
+            weight: .semibold
+        )
+        energyLabel.setAccessibilityIdentifier("Live Energy HUD")
+        energyLabel.setAccessibilityLabel("Energy")
         invulnerabilityStatusLabel.textColor = .systemRed
         invulnerabilityStatusLabel.setAccessibilityLabel(
             "Invulnerability status"
