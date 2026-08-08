@@ -1,0 +1,45 @@
+Revival/Sources/RevivalCore/PlayerSimulationUpdate.swift
+  s_981b97c102d028::t_6a8b4d2afbcdb7 1438
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_22c1a1857b3654 2064-2088
+Revival/Sources/RevivalAppKit/RevivalGameplayView.swift
+  s_981b97c102d028::t_6a8b4d2afbcdb7 61,165-169,171-172,175,177-189,414-415,442,491,495-507,1579,1598-1604
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_22c1a1857b3654 34,86
+Revival/Tests/D3ImportTests/LiveEnergyHUDTests.swift
+  s_981b97c102d028::t_b19fd521cf7a5f 1-48,52-54,56-62,65-70,74-126,128-142
+  s_981b97c102d028::t_a393f0df75c6b7 49-51,55,63-64
+  s_981b97c102d028::t_850f19d6c45b4a 71-73
+  s_981b97c102d028::t_07d18492068bad 127
+Revival/Sources/RevivalCore/PlayerSimulationPresentation.swift
+  s_981b97c102d028::t_6a8b4d2afbcdb7 78
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_dd94d577eb0d7e 242
+  s_c503f7c0529e13::t_22c1a1857b3654 22-25,31,106,108
+Revival.xcodeproj/project.pbxproj
+  s_981b97c102d028::t_b19fd521cf7a5f 188,264,469,807
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "29c9bb927aa0eabc455410c44fdc79cc37841e6d",
+  "prompts": {},
+  "sessions": {
+    "s_981b97c102d028": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe07d-a8ec-7f60-9155-0b5221f17e1f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
