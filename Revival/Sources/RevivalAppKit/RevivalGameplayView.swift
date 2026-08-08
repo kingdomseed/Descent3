@@ -59,6 +59,7 @@ final class RevivalGameplayView: MTKView {
     private let trainingMessageLabel = NSTextField(labelWithString: "")
     private let enabledControlsLabel = NSTextField(labelWithString: "")
     private let energyLabel = NSTextField(labelWithString: "")
+    private let afterburnerLabel = NSTextField(labelWithString: "")
     private let invulnerabilityStatusLabel =
         NSTextField(labelWithString: "")
     private let cloakShipMonitor = NoninteractiveTrainingOverlay()
@@ -163,13 +164,19 @@ final class RevivalGameplayView: MTKView {
             height: CGFloat(trainingMessageLabel.maximumNumberOfLines) * 28
         )
         let statusY = max(
-            trainingMessageLabel.frame.maxY + 8,
+            trainingMessageLabel.frame.maxY + 40,
             bounds.height - 52
         )
         energyLabel.frame = NSRect(
             x: left,
             y: statusY,
             width: min(160, width),
+            height: 28
+        )
+        afterburnerLabel.frame = NSRect(
+            x: left,
+            y: statusY - 32,
+            width: min(200, width),
             height: 28
         )
         let cloakWidth = min(96, width)
@@ -413,6 +420,8 @@ final class RevivalGameplayView: MTKView {
             enabledControlsLabel.stringValue = ""
             energyLabel.stringValue = ""
             energyLabel.isHidden = true
+            afterburnerLabel.stringValue = ""
+            afterburnerLabel.isHidden = true
             invulnerabilityStatusLabel.stringValue = ""
             cloakShipMonitor.isHidden = true
             cloakStatusLabel.stringValue = ""
@@ -440,6 +449,7 @@ final class RevivalGameplayView: MTKView {
             trainingMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
             energyLabel.isHidden = true
+            afterburnerLabel.isHidden = true
             invulnerabilityStatusLabel.stringValue = ""
             cloakShipMonitor.isHidden = true
             cloakStatusLabel.stringValue = ""
@@ -489,6 +499,7 @@ final class RevivalGameplayView: MTKView {
         trainingMessageLabel.isHidden = !showsOrdinaryGameplayOverlays
         enabledControlsLabel.isHidden = !showsOrdinaryGameplayOverlays
         energyLabel.isHidden = !showsOrdinaryGameplayOverlays
+        afterburnerLabel.isHidden = !showsOrdinaryGameplayOverlays
         invulnerabilityStatusLabel.isHidden = !showsOrdinaryGameplayOverlays
         cloakStatusLabel.isHidden = !showsOrdinaryGameplayOverlays
         cameraMonitorBorder.isHidden = frame.trainingCameraMonitor == nil
@@ -504,6 +515,23 @@ final class RevivalGameplayView: MTKView {
         )
         energyLabel.setAccessibilityLabel(
             energyIsLow ? "Energy, low energy warning" : "Energy"
+        )
+        let afterburnerFraction = frame.afterburnerFuel / 5
+        let afterburnerIsLow = afterburnerFraction <= 0.3
+        afterburnerLabel.stringValue = String(
+            format: "Afterburner: %d%%",
+            Int(afterburnerFraction * 100)
+        )
+        afterburnerLabel.textColor =
+            afterburnerIsLow ? .systemRed : .systemGreen
+        afterburnerLabel.font = .monospacedDigitSystemFont(
+            ofSize: 18,
+            weight: afterburnerIsLow ? .bold : .semibold
+        )
+        afterburnerLabel.setAccessibilityLabel(
+            afterburnerIsLow
+                ? "Afterburner, low fuel warning"
+                : "Afterburner"
         )
         invulnerabilityStatusLabel.stringValue =
             Self.invulnerabilityStatusText(
@@ -1577,6 +1605,7 @@ final class RevivalGameplayView: MTKView {
             enabledControlsLabel,
             trainingMessageLabel,
             energyLabel,
+            afterburnerLabel,
             invulnerabilityStatusLabel,
             cloakStatusLabel,
         ] {
@@ -1602,6 +1631,13 @@ final class RevivalGameplayView: MTKView {
         )
         energyLabel.setAccessibilityIdentifier("Live Energy HUD")
         energyLabel.setAccessibilityLabel("Energy")
+        afterburnerLabel.alignment = .left
+        afterburnerLabel.font = .monospacedDigitSystemFont(
+            ofSize: 18,
+            weight: .semibold
+        )
+        afterburnerLabel.setAccessibilityIdentifier("Live Afterburner HUD")
+        afterburnerLabel.setAccessibilityLabel("Afterburner")
         invulnerabilityStatusLabel.textColor = .systemRed
         invulnerabilityStatusLabel.setAccessibilityLabel(
             "Invulnerability status"

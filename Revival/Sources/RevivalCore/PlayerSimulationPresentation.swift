@@ -76,6 +76,7 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let playerFastHeadlight: PlayerFastHeadlightFrame?
     let shields: Float
     let energy: Float
+    let afterburnerFuel: Float
     let trainingDodgeMarkerLightDistance: Float?
     let trainingDodgeTurretAngles: [Float]
     let trainingDodgeProjectiles: [TrainingDodgeProjectileFrame]

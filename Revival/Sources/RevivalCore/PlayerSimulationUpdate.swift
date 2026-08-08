@@ -1436,6 +1436,7 @@ extension PlayerSimulation {
                 finalGoalFrame == nil ? playerFastHeadlight : nil,
             shields: shields,
             energy: energy,
+            afterburnerFuel: afterburnerFuel,
             trainingDodgeMarkerLightDistance:
                 trainingDodgeAttemptState?.markerLightDistance,
             trainingDodgeTurretAngles:
