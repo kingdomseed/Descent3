@@ -111,6 +111,83 @@ extension CanonicalLevelTests {
         XCTAssertEqual(trace.visitedRoomSourceIndices, [10, 20])
         XCTAssertEqual(trace.containingRoomSourceIndex, 10)
     }
+    func testIndoorTracePreservesPortalIndexTraversalOrder() {
+        let base = makeSelectedRoomRenderLevel()
+        let texture = base.surfacePhysics[0].texture
+        let vertices = [
+            Vector3(x: -10, y: 1, z: -10),
+            Vector3(x: 10, y: 1, z: -10),
+            Vector3(x: 10, y: 1, z: 10),
+            Vector3(x: -10, y: 1, z: 10),
+            Vector3(x: 1, y: -10, z: -10),
+            Vector3(x: 1, y: -10, z: 10),
+            Vector3(x: 1, y: 10, z: 10),
+            Vector3(x: 1, y: 10, z: -10),
+        ]
+        func portalFace(
+            vertexIndices: [Int],
+            portalIndex: Int
+        ) -> LevelFace {
+            .init(
+                corners: vertexIndices.map {
+                    .init(vertexIndex: $0, u: 0, v: 0, alpha: 255)
+                },
+                flags: 0,
+                portalIndex: portalIndex,
+                texture: texture
+            )
+        }
+        let sourceRoom = LevelRoom(
+            sourceIndex: 100,
+            vertices: vertices,
+            faces: [
+                portalFace(vertexIndices: [0, 1, 2, 3], portalIndex: 0),
+                portalFace(vertexIndices: [4, 5, 6, 7], portalIndex: 1),
+            ],
+            portals: [
+                .init(
+                    faceIndex: 0,
+                    connectedRoom: 101,
+                    connectedPortal: 0
+                ),
+                .init(
+                    faceIndex: 1,
+                    connectedRoom: 102,
+                    connectedPortal: 0
+                ),
+            ]
+        )
+        let tracedLevel = replacing(
+            base,
+            rooms: [
+                sourceRoom,
+                LevelRoom(
+                    sourceIndex: 101,
+                    vertices: [],
+                    faces: [],
+                    portals: []
+                ),
+                LevelRoom(
+                    sourceIndex: 102,
+                    vertices: [],
+                    faces: [],
+                    portals: []
+                ),
+            ]
+        )
+        let trace = traceIndoorMovement(
+            in: tracedLevel,
+            startRoom: sourceRoom.sourceIndex,
+            start: .zero,
+            end: .init(x: 4, y: 2, z: 0),
+            radius: 0
+        )
+
+        XCTAssertEqual(
+            Array(trace.visitedRoomSourceIndices.prefix(3)),
+            [100, 101, 102]
+        )
+    }
 }
 
 private func makeIndoorTraceLevel(portalFlags: UInt32) -> Level {

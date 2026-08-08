@@ -65,11 +65,6 @@
 		B10000000000000000000016 /* D3ImportOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000B /* D3ImportOperation.swift */; };
 		C10000000000000000000001 /* PresentationImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* PresentationImport.swift */; };
 		C10000000000000000000002 /* PresentationImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* PresentationImport.swift */; };
-		C10000000000000000000003 /* WorldRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000002 /* WorldRenderingTests.swift */; };
-		C10000000000000000000004 /* WorldRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WorldRendering.swift */; };
-		C10000000000000000000005 /* WorldRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WorldRendering.swift */; };
-		C10000000000000000000006 /* WorldRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WorldRendering.swift */; };
-		C10000000000000000000007 /* WorldRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WorldRendering.swift */; };
 		C30000000000000000000002 /* PlayerInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000001 /* PlayerInput.swift */; };
 		C30000000000000000000003 /* PlayerInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000001 /* PlayerInput.swift */; };
 		C30000000000000000000004 /* PlayerInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000001 /* PlayerInput.swift */; };
@@ -114,7 +109,6 @@
 		F10000000000000000000001 /* RevivalMobileApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* RevivalMobileApplication.swift */; };
 		F10000000000000000000002 /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
 		F10000000000000000000003 /* CanonicalPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* CanonicalPackage.swift */; };
-		F10000000000000000000004 /* WorldRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WorldRendering.swift */; };
 		F10000000000000000000005 /* MetalWorldPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* MetalWorldPlan.swift */; };
 		F10000000000000000000006 /* MetalWorldRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* MetalWorldRenderer.swift */; };
 		F10000000000000000000007 /* WorldShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000004 /* WorldShaders.metal */; };
@@ -127,6 +121,69 @@
 		H10000000000000000000001 /* PilotProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = H20000000000000000000001 /* PilotProfile.swift */; };
 		H10000000000000000000002 /* PilotProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = H20000000000000000000001 /* PilotProfile.swift */; };
 		H10000000000000000000003 /* PilotProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = H20000000000000000000001 /* PilotProfile.swift */; };
+		DB0000000000000000000001 /* PlayerSimulationValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000001 /* PlayerSimulationValues.swift */; };
+		DB0000000000000000000002 /* PlayerSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000002 /* PlayerSimulation.swift */; };
+		DB0000000000000000000003 /* TrainingGuidebotSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000003 /* TrainingGuidebotSimulation.swift */; };
+		DB0000000000000000000004 /* PlayerWeaponSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000004 /* PlayerWeaponSimulation.swift */; };
+		DB0000000000000000000005 /* PlayerSimulationUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000005 /* PlayerSimulationUpdate.swift */; };
+		DB0000000000000000000006 /* TrainingCombatSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000006 /* TrainingCombatSimulation.swift */; };
+		DB0000000000000000000007 /* PlayerSimulationValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000007 /* PlayerSimulationValidation.swift */; };
+		DB0000000000000000000008 /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
+		DB0000000000000000000009 /* SourceVectorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000009 /* SourceVectorMath.swift */; };
+		DB000000000000000000000A /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
+		DB000000000000000000000B /* PlayerSimulationValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000001 /* PlayerSimulationValues.swift */; };
+		DB000000000000000000000C /* PlayerSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000002 /* PlayerSimulation.swift */; };
+		DB000000000000000000000D /* TrainingGuidebotSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000003 /* TrainingGuidebotSimulation.swift */; };
+		DB000000000000000000000E /* PlayerWeaponSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000004 /* PlayerWeaponSimulation.swift */; };
+		DB000000000000000000000F /* PlayerSimulationUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000005 /* PlayerSimulationUpdate.swift */; };
+		DB0000000000000000000010 /* TrainingCombatSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000006 /* TrainingCombatSimulation.swift */; };
+		DB0000000000000000000011 /* PlayerSimulationValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000007 /* PlayerSimulationValidation.swift */; };
+		DB0000000000000000000012 /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
+		DB0000000000000000000013 /* SourceVectorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000009 /* SourceVectorMath.swift */; };
+		DB0000000000000000000014 /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
+		DB0000000000000000000015 /* PlayerSimulationValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000001 /* PlayerSimulationValues.swift */; };
+		DB0000000000000000000016 /* PlayerSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000002 /* PlayerSimulation.swift */; };
+		DB0000000000000000000017 /* TrainingGuidebotSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000003 /* TrainingGuidebotSimulation.swift */; };
+		DB0000000000000000000018 /* PlayerWeaponSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000004 /* PlayerWeaponSimulation.swift */; };
+		DB0000000000000000000019 /* PlayerSimulationUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000005 /* PlayerSimulationUpdate.swift */; };
+		DB000000000000000000001A /* TrainingCombatSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000006 /* TrainingCombatSimulation.swift */; };
+		DB000000000000000000001B /* PlayerSimulationValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000007 /* PlayerSimulationValidation.swift */; };
+		DB000000000000000000001C /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
+		DB000000000000000000001D /* SourceVectorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000009 /* SourceVectorMath.swift */; };
+		DB000000000000000000001E /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
+		DB000000000000000000001F /* PlayerSimulationValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000001 /* PlayerSimulationValues.swift */; };
+		DB0000000000000000000020 /* PlayerSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000002 /* PlayerSimulation.swift */; };
+		DB0000000000000000000021 /* TrainingGuidebotSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000003 /* TrainingGuidebotSimulation.swift */; };
+		DB0000000000000000000022 /* PlayerWeaponSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000004 /* PlayerWeaponSimulation.swift */; };
+		DB0000000000000000000023 /* PlayerSimulationUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000005 /* PlayerSimulationUpdate.swift */; };
+		DB0000000000000000000024 /* TrainingCombatSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000006 /* TrainingCombatSimulation.swift */; };
+		DB0000000000000000000025 /* PlayerSimulationValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000007 /* PlayerSimulationValidation.swift */; };
+		DB0000000000000000000026 /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
+		DB0000000000000000000027 /* SourceVectorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000009 /* SourceVectorMath.swift */; };
+		DB0000000000000000000028 /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
+		DB0000000000000000000029 /* PlayerSimulationValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000001 /* PlayerSimulationValues.swift */; };
+		DB000000000000000000002A /* PlayerSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000002 /* PlayerSimulation.swift */; };
+		DB000000000000000000002B /* TrainingGuidebotSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000003 /* TrainingGuidebotSimulation.swift */; };
+		DB000000000000000000002C /* PlayerWeaponSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000004 /* PlayerWeaponSimulation.swift */; };
+		DB000000000000000000002D /* PlayerSimulationUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000005 /* PlayerSimulationUpdate.swift */; };
+		DB000000000000000000002E /* TrainingCombatSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000006 /* TrainingCombatSimulation.swift */; };
+		DB000000000000000000002F /* PlayerSimulationValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000007 /* PlayerSimulationValidation.swift */; };
+		DB0000000000000000000030 /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
+		DB0000000000000000000031 /* SourceVectorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000009 /* SourceVectorMath.swift */; };
+		DB0000000000000000000032 /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
+		DC0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift */; };
+		DC0000000000000000000002 /* TrainingOpeningLessonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000002 /* TrainingOpeningLessonTests.swift */; };
+		DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000003 /* TrainingGuidebotTests.swift */; };
+		DC0000000000000000000004 /* TrainingCameraAndReturnTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */; };
+		DC0000000000000000000005 /* TrainingCombatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000005 /* TrainingCombatTests.swift */; };
+		DC0000000000000000000006 /* TrainingMissionCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */; };
+		DC0000000000000000000007 /* PlayerInputAndAppKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */; };
+		DC0000000000000000000008 /* PlayerWeaponTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000008 /* PlayerWeaponTests.swift */; };
+		DC0000000000000000000009 /* PlayerFlightAndCollisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000009 /* PlayerFlightAndCollisionTests.swift */; };
+		DC000000000000000000000A /* WorldRenderExtractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000A /* WorldRenderExtractionTests.swift */; };
+		DC000000000000000000000B /* WorldRenderFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000B /* WorldRenderFixtures.swift */; };
+		DC000000000000000000000C /* TrainingBehaviorFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000C /* TrainingBehaviorFixtures.swift */; };
+		DC000000000000000000000D /* PlayerSimulationFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000D /* PlayerSimulationFixtures.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -159,8 +216,6 @@
 		B2000000000000000000000A /* D3ImportOperationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3ImportOperationTests.swift; sourceTree = "<group>"; };
 		B2000000000000000000000B /* D3ImportOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3ImportOperation.swift; sourceTree = "<group>"; };
 		C20000000000000000000001 /* PresentationImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationImport.swift; sourceTree = "<group>"; };
-		C20000000000000000000002 /* WorldRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderingTests.swift; sourceTree = "<group>"; };
-		C20000000000000000000003 /* WorldRendering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRendering.swift; sourceTree = "<group>"; };
 		C30000000000000000000001 /* PlayerInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerInput.swift; sourceTree = "<group>"; };
 		C40000000000000000000001 /* PlayerSimulationPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationPresentation.swift; sourceTree = "<group>"; };
 		C50000000000000000000001 /* WaterProceduralEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaterProceduralEvaluator.swift; sourceTree = "<group>"; };
@@ -180,6 +235,29 @@
 		F20000000000000000000004 /* RevivalMobilePresentationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalMobilePresentationState.swift; sourceTree = "<group>"; };
 		G20000000000000000000001 /* RevivalGameplayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalGameplayView.swift; sourceTree = "<group>"; };
 		H20000000000000000000001 /* PilotProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PilotProfile.swift; sourceTree = "<group>"; };
+		D90000000000000000000001 /* PlayerSimulationValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationValues.swift; sourceTree = "<group>"; };
+		D90000000000000000000002 /* PlayerSimulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulation.swift; sourceTree = "<group>"; };
+		D90000000000000000000003 /* TrainingGuidebotSimulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingGuidebotSimulation.swift; sourceTree = "<group>"; };
+		D90000000000000000000004 /* PlayerWeaponSimulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerWeaponSimulation.swift; sourceTree = "<group>"; };
+		D90000000000000000000005 /* PlayerSimulationUpdate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationUpdate.swift; sourceTree = "<group>"; };
+		D90000000000000000000006 /* TrainingCombatSimulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingCombatSimulation.swift; sourceTree = "<group>"; };
+		D90000000000000000000007 /* PlayerSimulationValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationValidation.swift; sourceTree = "<group>"; };
+		D90000000000000000000008 /* PlayerSimulationPhysics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationPhysics.swift; sourceTree = "<group>"; };
+		D90000000000000000000009 /* SourceVectorMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceVectorMath.swift; sourceTree = "<group>"; };
+		D9000000000000000000000A /* WorldRenderExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtraction.swift; sourceTree = "<group>"; };
+		DA0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDodgeAndManeuverTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000002 /* TrainingOpeningLessonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingOpeningLessonTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000003 /* TrainingGuidebotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingGuidebotTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingCameraAndReturnTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000005 /* TrainingCombatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingCombatTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingMissionCompletionTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerInputAndAppKitTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000008 /* PlayerWeaponTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerWeaponTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000009 /* PlayerFlightAndCollisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerFlightAndCollisionTests.swift; sourceTree = "<group>"; };
+		DA000000000000000000000A /* WorldRenderExtractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtractionTests.swift; sourceTree = "<group>"; };
+		DA000000000000000000000B /* WorldRenderFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderFixtures.swift; sourceTree = "<group>"; };
+		DA000000000000000000000C /* TrainingBehaviorFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingBehaviorFixtures.swift; sourceTree = "<group>"; };
+		DA000000000000000000000D /* PlayerSimulationFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationFixtures.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -305,10 +383,19 @@
 				H20000000000000000000001 /* PilotProfile.swift */,
 				C30000000000000000000001 /* PlayerInput.swift */,
 				C40000000000000000000001 /* PlayerSimulationPresentation.swift */,
+				D90000000000000000000001 /* PlayerSimulationValues.swift */,
+				D90000000000000000000002 /* PlayerSimulation.swift */,
+				D90000000000000000000003 /* TrainingGuidebotSimulation.swift */,
+				D90000000000000000000004 /* PlayerWeaponSimulation.swift */,
+				D90000000000000000000005 /* PlayerSimulationUpdate.swift */,
+				D90000000000000000000006 /* TrainingCombatSimulation.swift */,
+				D90000000000000000000007 /* PlayerSimulationValidation.swift */,
+				D90000000000000000000008 /* PlayerSimulationPhysics.swift */,
+				D90000000000000000000009 /* SourceVectorMath.swift */,
+				D9000000000000000000000A /* WorldRenderExtraction.swift */,
 				C50000000000000000000001 /* WaterProceduralEvaluator.swift */,
 				C60000000000000000000001 /* ReciprocalPortalComponent.swift */,
 				C70000000000000000000001 /* WorldRenderExtractionValues.swift */,
-				C20000000000000000000003 /* WorldRendering.swift */,
 				B20000000000000000000009 /* CanonicalPackage.swift */,
 				BA0000000000000000000001 /* LevelValues.swift */,
 				BA0000000000000000000002 /* TrainingLevelValues.swift */,
@@ -361,7 +448,19 @@
 				F20000000000000000000003 /* RevivalMobilePresentationStateTests.swift */,
 				D20000000000000000000001 /* MetalWorldPlanTests.swift */,
 				C20000000000000000000004 /* EditorProjectTests.swift */,
-				C20000000000000000000002 /* WorldRenderingTests.swift */,
+				DA0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift */,
+				DA0000000000000000000002 /* TrainingOpeningLessonTests.swift */,
+				DA0000000000000000000003 /* TrainingGuidebotTests.swift */,
+				DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */,
+				DA0000000000000000000005 /* TrainingCombatTests.swift */,
+				DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */,
+				DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */,
+				DA0000000000000000000008 /* PlayerWeaponTests.swift */,
+				DA0000000000000000000009 /* PlayerFlightAndCollisionTests.swift */,
+				DA000000000000000000000A /* WorldRenderExtractionTests.swift */,
+				DA000000000000000000000B /* WorldRenderFixtures.swift */,
+				DA000000000000000000000C /* TrainingBehaviorFixtures.swift */,
+				DA000000000000000000000D /* PlayerSimulationFixtures.swift */,
 				BA0000000000000000000006 /* TrainingLevelValidationTests.swift */,
 				BA0000000000000000000007 /* IndoorMovementTraceTests.swift */,
 				B20000000000000000000006 /* CanonicalLevelTests.swift */,
@@ -567,10 +666,19 @@
 			files = (
 				C30000000000000000000002 /* PlayerInput.swift in Sources */,
 				C40000000000000000000002 /* PlayerSimulationPresentation.swift in Sources */,
+				DB0000000000000000000001 /* PlayerSimulationValues.swift in Sources */,
+				DB0000000000000000000002 /* PlayerSimulation.swift in Sources */,
+				DB0000000000000000000003 /* TrainingGuidebotSimulation.swift in Sources */,
+				DB0000000000000000000004 /* PlayerWeaponSimulation.swift in Sources */,
+				DB0000000000000000000005 /* PlayerSimulationUpdate.swift in Sources */,
+				DB0000000000000000000006 /* TrainingCombatSimulation.swift in Sources */,
+				DB0000000000000000000007 /* PlayerSimulationValidation.swift in Sources */,
+				DB0000000000000000000008 /* PlayerSimulationPhysics.swift in Sources */,
+				DB0000000000000000000009 /* SourceVectorMath.swift in Sources */,
+				DB000000000000000000000A /* WorldRenderExtraction.swift in Sources */,
 				C50000000000000000000002 /* WaterProceduralEvaluator.swift in Sources */,
 				C60000000000000000000002 /* ReciprocalPortalComponent.swift in Sources */,
 				C70000000000000000000002 /* WorldRenderExtractionValues.swift in Sources */,
-				C10000000000000000000004 /* WorldRendering.swift in Sources */,
 				C10000000000000000000001 /* PresentationImport.swift in Sources */,
 				B10000000000000000000015 /* D3ImportOperation.swift in Sources */,
 				B10000000000000000000010 /* CanonicalPackage.swift in Sources */,
@@ -598,10 +706,19 @@
 				D10000000000000000000002 /* MetalWorldPlan.swift in Sources */,
 				C30000000000000000000003 /* PlayerInput.swift in Sources */,
 				C40000000000000000000003 /* PlayerSimulationPresentation.swift in Sources */,
+				DB000000000000000000000B /* PlayerSimulationValues.swift in Sources */,
+				DB000000000000000000000C /* PlayerSimulation.swift in Sources */,
+				DB000000000000000000000D /* TrainingGuidebotSimulation.swift in Sources */,
+				DB000000000000000000000E /* PlayerWeaponSimulation.swift in Sources */,
+				DB000000000000000000000F /* PlayerSimulationUpdate.swift in Sources */,
+				DB0000000000000000000010 /* TrainingCombatSimulation.swift in Sources */,
+				DB0000000000000000000011 /* PlayerSimulationValidation.swift in Sources */,
+				DB0000000000000000000012 /* PlayerSimulationPhysics.swift in Sources */,
+				DB0000000000000000000013 /* SourceVectorMath.swift in Sources */,
+				DB0000000000000000000014 /* WorldRenderExtraction.swift in Sources */,
 				C50000000000000000000003 /* WaterProceduralEvaluator.swift in Sources */,
 				C60000000000000000000003 /* ReciprocalPortalComponent.swift in Sources */,
 				C70000000000000000000003 /* WorldRenderExtractionValues.swift in Sources */,
-				C10000000000000000000005 /* WorldRendering.swift in Sources */,
 				B10000000000000000000011 /* CanonicalPackage.swift in Sources */,
 				BB0000000000000000000006 /* LevelValues.swift in Sources */,
 				BB0000000000000000000007 /* TrainingLevelValues.swift in Sources */,
@@ -627,10 +744,19 @@
 				C10000000000000000000009 /* RevivalProject.swift in Sources */,
 				C30000000000000000000004 /* PlayerInput.swift in Sources */,
 				C40000000000000000000004 /* PlayerSimulationPresentation.swift in Sources */,
+				DB0000000000000000000015 /* PlayerSimulationValues.swift in Sources */,
+				DB0000000000000000000016 /* PlayerSimulation.swift in Sources */,
+				DB0000000000000000000017 /* TrainingGuidebotSimulation.swift in Sources */,
+				DB0000000000000000000018 /* PlayerWeaponSimulation.swift in Sources */,
+				DB0000000000000000000019 /* PlayerSimulationUpdate.swift in Sources */,
+				DB000000000000000000001A /* TrainingCombatSimulation.swift in Sources */,
+				DB000000000000000000001B /* PlayerSimulationValidation.swift in Sources */,
+				DB000000000000000000001C /* PlayerSimulationPhysics.swift in Sources */,
+				DB000000000000000000001D /* SourceVectorMath.swift in Sources */,
+				DB000000000000000000001E /* WorldRenderExtraction.swift in Sources */,
 				C50000000000000000000004 /* WaterProceduralEvaluator.swift in Sources */,
 				C60000000000000000000004 /* ReciprocalPortalComponent.swift in Sources */,
 				C70000000000000000000004 /* WorldRenderExtractionValues.swift in Sources */,
-				C10000000000000000000006 /* WorldRendering.swift in Sources */,
 				B10000000000000000000012 /* CanonicalPackage.swift in Sources */,
 				BB000000000000000000000B /* LevelValues.swift in Sources */,
 				BB000000000000000000000C /* TrainingLevelValues.swift in Sources */,
@@ -658,11 +784,32 @@
 				C10000000000000000000008 /* EditorProjectTests.swift in Sources */,
 				C30000000000000000000005 /* PlayerInput.swift in Sources */,
 				C40000000000000000000005 /* PlayerSimulationPresentation.swift in Sources */,
+				DC0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift in Sources */,
+				DC0000000000000000000002 /* TrainingOpeningLessonTests.swift in Sources */,
+				DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */,
+				DC0000000000000000000004 /* TrainingCameraAndReturnTests.swift in Sources */,
+				DC0000000000000000000005 /* TrainingCombatTests.swift in Sources */,
+				DC0000000000000000000006 /* TrainingMissionCompletionTests.swift in Sources */,
+				DC0000000000000000000007 /* PlayerInputAndAppKitTests.swift in Sources */,
+				DC0000000000000000000008 /* PlayerWeaponTests.swift in Sources */,
+				DC0000000000000000000009 /* PlayerFlightAndCollisionTests.swift in Sources */,
+				DC000000000000000000000A /* WorldRenderExtractionTests.swift in Sources */,
+				DC000000000000000000000B /* WorldRenderFixtures.swift in Sources */,
+				DC000000000000000000000C /* TrainingBehaviorFixtures.swift in Sources */,
+				DC000000000000000000000D /* PlayerSimulationFixtures.swift in Sources */,
+				DB000000000000000000001F /* PlayerSimulationValues.swift in Sources */,
+				DB0000000000000000000020 /* PlayerSimulation.swift in Sources */,
+				DB0000000000000000000021 /* TrainingGuidebotSimulation.swift in Sources */,
+				DB0000000000000000000022 /* PlayerWeaponSimulation.swift in Sources */,
+				DB0000000000000000000023 /* PlayerSimulationUpdate.swift in Sources */,
+				DB0000000000000000000024 /* TrainingCombatSimulation.swift in Sources */,
+				DB0000000000000000000025 /* PlayerSimulationValidation.swift in Sources */,
+				DB0000000000000000000026 /* PlayerSimulationPhysics.swift in Sources */,
+				DB0000000000000000000027 /* SourceVectorMath.swift in Sources */,
+				DB0000000000000000000028 /* WorldRenderExtraction.swift in Sources */,
 				C50000000000000000000005 /* WaterProceduralEvaluator.swift in Sources */,
 				C60000000000000000000005 /* ReciprocalPortalComponent.swift in Sources */,
 				C70000000000000000000005 /* WorldRenderExtractionValues.swift in Sources */,
-				C10000000000000000000007 /* WorldRendering.swift in Sources */,
-				C10000000000000000000003 /* WorldRenderingTests.swift in Sources */,
 				C10000000000000000000002 /* PresentationImport.swift in Sources */,
 				B10000000000000000000016 /* D3ImportOperation.swift in Sources */,
 				B10000000000000000000013 /* CanonicalPackage.swift in Sources */,
@@ -699,10 +846,19 @@
 				F10000000000000000000005 /* MetalWorldPlan.swift in Sources */,
 				C30000000000000000000006 /* PlayerInput.swift in Sources */,
 				C40000000000000000000006 /* PlayerSimulationPresentation.swift in Sources */,
+				DB0000000000000000000029 /* PlayerSimulationValues.swift in Sources */,
+				DB000000000000000000002A /* PlayerSimulation.swift in Sources */,
+				DB000000000000000000002B /* TrainingGuidebotSimulation.swift in Sources */,
+				DB000000000000000000002C /* PlayerWeaponSimulation.swift in Sources */,
+				DB000000000000000000002D /* PlayerSimulationUpdate.swift in Sources */,
+				DB000000000000000000002E /* TrainingCombatSimulation.swift in Sources */,
+				DB000000000000000000002F /* PlayerSimulationValidation.swift in Sources */,
+				DB0000000000000000000030 /* PlayerSimulationPhysics.swift in Sources */,
+				DB0000000000000000000031 /* SourceVectorMath.swift in Sources */,
+				DB0000000000000000000032 /* WorldRenderExtraction.swift in Sources */,
 				C50000000000000000000006 /* WaterProceduralEvaluator.swift in Sources */,
 				C60000000000000000000006 /* ReciprocalPortalComponent.swift in Sources */,
 				C70000000000000000000006 /* WorldRenderExtractionValues.swift in Sources */,
-				F10000000000000000000004 /* WorldRendering.swift in Sources */,
 				F10000000000000000000003 /* CanonicalPackage.swift in Sources */,
 				BB0000000000000000000015 /* LevelValues.swift in Sources */,
 				BB0000000000000000000016 /* TrainingLevelValues.swift in Sources */,

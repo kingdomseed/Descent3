@@ -379,3 +379,43 @@ enum TrainingGuidebotRouteError:
     case noBoundaryNodePath
     case noRoomPortalPath
 }
+
+func defaultPlayerView(
+    in level: Level,
+    projection: PerspectiveProjection = .sourceDefault
+) -> PlayerView {
+    let binding = level.defaultPlayerBinding!
+    let object = level.objects.first { $0.handle == binding.objectHandle }!
+    let ship = level.shipDefinitions.first { $0.source == binding.ship }!
+    guard case let .room(roomSourceIndex) = object.location else {
+        preconditionFailure("The validated default player start is indoor.")
+    }
+    return PlayerView(
+        playerID: binding.playerID,
+        objectHandle: object.handle,
+        roomSourceIndex: roomSourceIndex,
+        camera: RoomCamera(
+            position: object.position,
+            target: object.position + object.orientation.forward,
+            up: object.orientation.up,
+            projection: projection
+        ),
+        collisionRadius: ship.presentationSize * 0.8
+    )
+}
+
+func rearPlayerView(_ playerView: PlayerView) -> PlayerView {
+    let camera = playerView.camera
+    return PlayerView(
+        playerID: playerView.playerID,
+        objectHandle: playerView.objectHandle,
+        roomSourceIndex: playerView.roomSourceIndex,
+        camera: RoomCamera(
+            position: camera.position,
+            target: camera.position - (camera.target - camera.position),
+            up: camera.up,
+            projection: camera.projection
+        ),
+        collisionRadius: playerView.collisionRadius
+    )
+}
