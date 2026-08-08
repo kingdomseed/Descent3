@@ -1,0 +1,172 @@
+Revival/Sources/RevivalCore/TrainingLevelValidation.swift
+  s_6bccdb2e137a23::t_93708502173fd8 1-2346
+docs/revival/skills-and-agents.md
+  s_c503f7c0529e13::t_1aa0330d0fe98e 4,99,157,214-216
+docs/revival/source-translation.md
+  s_c503f7c0529e13::t_1aa0330d0fe98e 4,42-57,65-66
+  s_c503f7c0529e13::t_291d18e5081c2e 58
+  s_c503f7c0529e13::t_e72e82b2b9ba2b 62-63
+  s_c503f7c0529e13::t_f68fdf2fce594b 59-61
+  s_c503f7c0529e13::t_8a9fb7adfee5ae 64
+  s_c503f7c0529e13::t_085f56a9b91841 67
+Revival/Sources/RevivalCore/LevelValues.swift
+  s_6b3a3b0de82545::t_8506b44dda551c 35
+  s_6bccdb2e137a23::t_93708502173fd8 1-34,36-804
+Revival/Tests/D3ImportTests/TrainingLevelValidationTests.swift
+  s_223f9d8f7fc2c5::t_a5d134672d0ae3 2413-2418
+  s_a63eaf30b242e9::t_b041d6fa75a034 966-973,1038-1039,1042
+  s_6bccdb2e137a23::t_93708502173fd8 1-965,974-1037,1040,1043-2412,2419-4766
+  s_a63eaf30b242e9::t_1b06319ee01aca 1041
+Revival/Sources/RevivalCore/TrainingLevelValues.swift
+  s_6bccdb2e137a23::t_93708502173fd8 1-825
+docs/revival/verification.md
+  s_c503f7c0529e13::t_9dd5e9cded6d57 80-94
+  s_c503f7c0529e13::t_6430b1fbb71f2c 76
+.agents/skills/revival-verification/SKILL.md
+  s_c503f7c0529e13::t_6430b1fbb71f2c 43-46,73
+Revival/Tests/D3ImportTests/D3ImportOperationTests.swift
+  s_6b3a3b0de82545::t_4ffcb2d073dcf3 26-114,116-124
+  s_6b3a3b0de82545::t_63a16b2aaca2b5 158-168
+  s_6b3a3b0de82545::t_055f43ed2d01a2 186-206
+  s_6b3a3b0de82545::t_3fc883da05ef33 248-279
+  s_6b3a3b0de82545::t_8c0f8e3c2e25ea 280-304
+  s_6b3a3b0de82545::t_e3e2497c3e30ca 207-247
+  s_6b3a3b0de82545::t_cf4840938bc530 5-25
+  s_6b3a3b0de82545::t_5d1d9d909cd9ce 125-133
+  s_6b3a3b0de82545::t_e8b5dc83fd4e3a 115
+  s_6b3a3b0de82545::t_d930b22ffed6d0 169-185
+  s_6b3a3b0de82545::t_1db37410d18205 134-157
+Revival/Tests/D3ImportTests/IndoorMovementTraceTests.swift
+  s_6bccdb2e137a23::t_93708502173fd8 1-254
+.agents/skills/revival-review/SKILL.md
+  s_c503f7c0529e13::t_d693a64adfed6e 111-112,115,137
+  s_c503f7c0529e13::t_231991c5fba47b 113,120
+  s_c503f7c0529e13::t_e72e82b2b9ba2b 114
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_35ec3c5132e68b 4
+  s_c503f7c0529e13::t_fdcf504a0f757b 204
+  s_c503f7c0529e13::t_441dfc55033377 26
+  s_c503f7c0529e13::t_d4a87a0b0eade0 202,263
+  s_c503f7c0529e13::t_9499a1b36f210d 215
+Revival/Sources/RevivalCore/WorldRendering.swift
+  s_a63eaf30b242e9::t_876b8ffec75bf2 9179-9182,9186
+.agents/skills/revival-documentation-steward/SKILL.md
+  s_c503f7c0529e13::t_3a4b22c1dc4bf8 64-66,82
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_5f1f76a4f5aa72 239
+  s_c503f7c0529e13::t_7802a93d6fddb1 103
+  s_c503f7c0529e13::t_8f50972a3dc129 27
+  s_c503f7c0529e13::t_1e1c20aa689144 22,24-25,28-29,31
+  s_c503f7c0529e13::t_6d34ee8060f37d 104-105
+  s_c503f7c0529e13::t_5cb601aa5e154c 23
+  s_c503f7c0529e13::t_6cfa186e5cb31e 4
+Revival/Sources/RevivalCore/LevelAssembly.swift
+  s_6bccdb2e137a23::t_93708502173fd8 1-259,274-1345
+  s_6b3a3b0de82545::t_c33c5fc19539dc 260-273
+.agents/skills/revival-source-translation/SKILL.md
+  s_c503f7c0529e13::t_1aa0330d0fe98e 32,38,41,76,81-83,172,189
+  s_c503f7c0529e13::t_e72e82b2b9ba2b 42,171
+  s_c503f7c0529e13::t_9457cdb60c83d9 39-40
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_91464bad2119a9 1950
+  s_c503f7c0529e13::t_35ec3c5132e68b 4
+  s_c503f7c0529e13::t_816ed324bd2adc 2002-2020
+docs/revival/engineering-principles.md
+  s_c503f7c0529e13::t_1aa0330d0fe98e 4,22
+Revival/Sources/RevivalCore/IndoorMovementTrace.swift
+  s_6bccdb2e137a23::t_93708502173fd8 1-444
+Revival/Sources/RevivalCore/Level.swift
+  s_6b3a3b0de82545::t_b1c611ea3fd96f 3131-3137
+  s_6b3a3b0de82545::t_26c44dd6e9727b 3728-3731,3734-3735
+  s_6b3a3b0de82545::t_784ef9d4dd64dc 3732-3733
+  s_fe6b946e466ede::t_ea2bc77cfb4b9d 2936-2937,2939-2941,2973,2980,3047,3104-3105
+  s_6bccdb2e137a23::t_93708502173fd8 3-12,14-63,66-110,112-156,159-163,166-170,173-177,1628,2942-2944,2946-2951,2953-2958,2960-2965,2967-2972,2974-2979,2981-3004,3006-3010,3012-3046,3048-3072,3075-3082,3085-3091,3093-3103,3106-3113,3117-3130,3138-3152,3155-3168,3247,3331,3617,3662,3675,3679,3715,3757,3807,3962,3979,4050,4081,4199-4204,4207,4220,4224
+AGENTS.md
+  s_c503f7c0529e13::t_1aa0330d0fe98e 3-4
+  s_41a3213c8c3966::t_12f5975aae370f 32
+Revival/Sources/D3Import/PresentationImport.swift
+  s_6b3a3b0de82545::t_25cd30fe4be3a2 850,859-860
+  s_6b3a3b0de82545::t_6f47599a5f8318 861,1333-1335,1353-1354,1663,1673
+  s_6b3a3b0de82545::t_0d22076073aed8 1336-1352
+  s_6b3a3b0de82545::t_3a2bd9bc17008b 862
+Revival.xcodeproj/project.pbxproj
+  s_6bccdb2e137a23::t_ec50f9ad67f0a1 30-56,150-156,313-315,317-318,365-366,577-579,581-582,606-608,610-611,635-637,639-640,669-671,673-674,681-682,707-709,711-712
+Revival/Sources/D3Import/D3ImportOperation.swift
+  s_6b3a3b0de82545::t_b346a552159087 86-105,535-538,560-561,1094
+  s_6b3a3b0de82545::t_ffca76e7440dc7 109-122
+  s_6b3a3b0de82545::t_25cd30fe4be3a2 767-769
+  s_6b3a3b0de82545::t_0df50a049355c0 140
+  s_6b3a3b0de82545::t_57610c65f96bee 3351,3359
+  s_6b3a3b0de82545::t_1db37410d18205 134-139,141-147,825,832-839
+  s_6b3a3b0de82545::t_08bb085be1ea81 106-108,123-124,965,971-974
+  s_6b3a3b0de82545::t_aede37ff063dcc 125-133,1480-1483,1506
+.agents/skills/revival-simplify/SKILL.md
+  s_c503f7c0529e13::t_d693a64adfed6e 60,81,141
+  s_c503f7c0529e13::t_088f0f2976e3d9 61
+Revival/Tests/D3ImportTests/CanonicalLevelTests.swift
+  s_6bccdb2e137a23::t_93708502173fd8 4-6,8-12,14-15,18-49,51-55,57-64,66-70,72-92,95-98,100-104,106-115,120-121,124-132,134-138,140-154,158-161,2199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "0ebf71325dd8eb85b80544a5135fd0bebf14dd51",
+  "prompts": {},
+  "sessions": {
+    "s_223f9d8f7fc2c5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fd21b-a9f2-7a00-845f-216c8f51be45",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_41a3213c8c3966": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fd196-514f-7e02-b9ac-a0a0531e4a25",
+        "model": "unknown"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_6b3a3b0de82545": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fde48-ecb1-7212-9262-f49dce08176f",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_6bccdb2e137a23": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fd1cd-0eef-7241-adf8-2264b72abca1",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_a63eaf30b242e9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fded1-ed49-72e0-a4f9-1ff97393b5ea",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_fe6b946e466ede": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fd1aa-77e5-7561-8636-41d71eb9b53e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
