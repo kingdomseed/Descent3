@@ -188,6 +188,12 @@
 		DC000000000000000000000F /* LiveEnergyHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000F /* LiveEnergyHUDTests.swift */; };
 		DC0000000000000000000010 /* LiveAfterburnerHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */; };
 		DC0000000000000000000011 /* LiveShieldsHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000011 /* LiveShieldsHUDTests.swift */; };
+		EA0000000000000000000001 /* PlayerSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000001 /* PlayerSave.swift */; };
+		EA0000000000000000000002 /* PlayerSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000001 /* PlayerSave.swift */; };
+		EA0000000000000000000003 /* PlayerSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000001 /* PlayerSave.swift */; };
+		EA0000000000000000000004 /* PlayerSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000001 /* PlayerSave.swift */; };
+		EA0000000000000000000005 /* PlayerSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000001 /* PlayerSave.swift */; };
+		EA0000000000000000000006 /* TrainingQuicksaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000002 /* TrainingQuicksaveTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -266,6 +272,8 @@
 		DA000000000000000000000F /* LiveEnergyHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEnergyHUDTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAfterburnerHUDTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000011 /* LiveShieldsHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveShieldsHUDTests.swift; sourceTree = "<group>"; };
+		E90000000000000000000001 /* PlayerSave.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSave.swift; sourceTree = "<group>"; };
+		E90000000000000000000002 /* TrainingQuicksaveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingQuicksaveTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -389,6 +397,7 @@
 			isa = PBXGroup;
 			children = (
 				H20000000000000000000001 /* PilotProfile.swift */,
+				E90000000000000000000001 /* PlayerSave.swift */,
 				C30000000000000000000001 /* PlayerInput.swift */,
 				C40000000000000000000001 /* PlayerSimulationPresentation.swift */,
 				D90000000000000000000001 /* PlayerSimulationValues.swift */,
@@ -453,6 +462,7 @@
 		A3000000000000000000000B /* D3ImportTests */ = {
 			isa = PBXGroup;
 			children = (
+				E90000000000000000000002 /* TrainingQuicksaveTests.swift */,
 				F20000000000000000000003 /* RevivalMobilePresentationStateTests.swift */,
 				D20000000000000000000001 /* MetalWorldPlanTests.swift */,
 				C20000000000000000000004 /* EditorProjectTests.swift */,
@@ -676,6 +686,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA0000000000000000000001 /* PlayerSave.swift in Sources */,
 				C30000000000000000000002 /* PlayerInput.swift in Sources */,
 				C40000000000000000000002 /* PlayerSimulationPresentation.swift in Sources */,
 				DB0000000000000000000001 /* PlayerSimulationValues.swift in Sources */,
@@ -713,6 +724,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA0000000000000000000002 /* PlayerSave.swift in Sources */,
 				D10000000000000000000007 /* WorldShaders.metal in Sources */,
 				D10000000000000000000005 /* MetalWorldRenderer.swift in Sources */,
 				D10000000000000000000002 /* MetalWorldPlan.swift in Sources */,
@@ -748,6 +760,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA0000000000000000000003 /* PlayerSave.swift in Sources */,
 				E10000000000000000000003 /* RevivalEditorWindowController.swift in Sources */,
 				E10000000000000000000001 /* RevivalProjectDocument.swift in Sources */,
 				D10000000000000000000008 /* WorldShaders.metal in Sources */,
@@ -785,6 +798,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA0000000000000000000006 /* TrainingQuicksaveTests.swift in Sources */,
+				EA0000000000000000000004 /* PlayerSave.swift in Sources */,
 				F1000000000000000000000A /* RevivalMobilePresentationState.swift in Sources */,
 				F10000000000000000000008 /* RevivalMobilePresentationStateTests.swift in Sources */,
 				E10000000000000000000005 /* MetalWorldRenderer.swift in Sources */,
@@ -856,6 +871,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA0000000000000000000005 /* PlayerSave.swift in Sources */,
 				F10000000000000000000009 /* RevivalMobilePresentationState.swift in Sources */,
 				F10000000000000000000007 /* WorldShaders.metal in Sources */,
 				F10000000000000000000006 /* MetalWorldRenderer.swift in Sources */,

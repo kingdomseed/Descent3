@@ -31,10 +31,12 @@ private final class RevivalMacApplicationDelegate: NSObject,
 
     private let library = CanonicalPackageLibrary.revivalMac
     private let profileLibrary = PilotProfileLibrary.revivalMac
+    private let playerSaveFile = PlayerSaveFile.revivalMac
     private var window: NSWindow?
     private var renderer: MetalWorldRenderer?
     private var gameplayView: RevivalGameplayView?
     private var simulation: PlayerSimulation?
+    private var activePackage: ActivatedCanonicalPackage?
     private var profileRecord: PilotProfileLibraryRecord?
     private var activeProfileID: UUID?
     private var pendingTrainingProgressPackage: CanonicalPackageReference?
@@ -258,6 +260,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             presentationReadyTimestamp: presentationReadyTimestamp
         )
         gameplayView?.prepareForTrainingSession()
+        activePackage = activation
         self.simulation = simulation
         playerInput = PlayerInputState()
         playerInput.setGameplayActive(
@@ -267,7 +270,10 @@ private final class RevivalMacApplicationDelegate: NSObject,
         )
         gameplayView?.setGameplayActive(playerInput.gameplayIsActive)
         renderer.setFrameUpdate { [weak self, weak renderer] timestamp in
-            guard let self, let renderer, self.simulation === simulation else { return }
+            guard let self,
+                  let renderer,
+                  let simulation = self.simulation,
+                  let activePackage = self.activePackage else { return }
             guard self.playerInput.gameplayIsActive else { return }
             let mouse = self.gameplayView?.drainMouseDelta() ?? (0, 0)
             self.playerInput.accumulateMouseDelta(x: mouse.0, y: mouse.1)
@@ -279,7 +285,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             if frame.trainingFinalGoal != nil {
                 do {
                     try self.persistTrainingProgress(
-                        package: activation.reference
+                        package: activePackage.reference
                     )
                     completionStatus = (
                         "Training progress saved. Acknowledge the result to complete the session.",
@@ -287,7 +293,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                     )
                 } catch {
                     self.pendingTrainingProgressPackage =
-                        activation.reference
+                        activePackage.reference
                     completionStatus = (
                         "Training completed, but progress was not saved: \(error.localizedDescription) Fix storage access, then acknowledge again to retry.",
                         true
@@ -414,6 +420,9 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.soloPauseChanged = {
                 [weak self] in self?.setSoloPause($0)
             }
+            gameplayView.playerSaveActionRequested = {
+                [weak self] in self?.requestPlayerSaveAction($0)
+            }
             gameplayView.trainingResultAcknowledgementRequested = {
                 [weak self] in self?.acknowledgeTrainingResult()
             }
@@ -516,6 +525,89 @@ private final class RevivalMacApplicationDelegate: NSObject,
         updateGameplayActivity()
         guard selected, playerInput.gameplayIsActive else { return }
         playerInput.requestTrainingGuidebotActiveGoal()
+    }
+
+    private func requestPlayerSaveAction(_ action: TrainingPlayerSaveAction) {
+        guard let simulation,
+              simulation.trainingSessionOutcome == nil,
+              let activePackage,
+              let activeProfileID,
+              let gameplayView,
+              let renderer,
+              playerInput.gameplayIsActive else {
+            setStatus(
+                "Training quicksave and quickload are unavailable now.",
+                isError: true
+            )
+            return
+        }
+        let timestamp = ProcessInfo.processInfo.systemUptime
+        gameplayView.clearInput()
+        gameplayView.pauseCurrentTrainingAudio()
+        playerInput.setGameplayActive(
+            false,
+            simulation: simulation,
+            at: timestamp
+        )
+
+        do {
+            switch action {
+            case .quicksave:
+                try playerSaveFile.save(
+                    profileID: activeProfileID,
+                    package: activePackage.reference,
+                    continuation: simulation.continuation
+                )
+                resumeAfterPlayerSave(simulation, gameplayView: gameplayView)
+                setStatus(
+                    "Training quicksave saved for the selected pilot.",
+                    isError: false
+                )
+            case .quickload:
+                let candidate = try playerSaveFile.load(
+                    profileID: activeProfileID,
+                    package: activePackage.reference,
+                    baseLevel: activePackage.level,
+                    resumedAtTimestamp: timestamp
+                )
+                candidate.stopTime(at: timestamp)
+                try renderer.update(
+                    level: candidate.level,
+                    playerView: defaultPlayerView(in: candidate.level)
+                )
+                gameplayView.setGameplayActive(false)
+                candidate.startTime(at: ProcessInfo.processInfo.systemUptime)
+                self.simulation = candidate
+                playerInput = PlayerInputState()
+                gameplayView.setGameplayActive(true)
+                window?.makeFirstResponder(gameplayView)
+                renderer.drawNow()
+                setStatus(
+                    "Training quicksave loaded for the selected pilot.",
+                    isError: false
+                )
+            }
+        } catch {
+            resumeAfterPlayerSave(simulation, gameplayView: gameplayView)
+            let operation = action == .quicksave ? "save" : "load"
+            setStatus(
+                "Could not \(operation) the Training quicksave: \(error.localizedDescription)",
+                isError: true
+            )
+        }
+    }
+
+    private func resumeAfterPlayerSave(
+        _ simulation: PlayerSimulation,
+        gameplayView: RevivalGameplayView
+    ) {
+        playerInput.setGameplayActive(
+            true,
+            simulation: simulation,
+            at: ProcessInfo.processInfo.systemUptime
+        )
+        gameplayView.resumePausedTrainingAudio()
+        window?.makeFirstResponder(gameplayView)
     }
 
     private func requestTrainingGuidebotReturnToShipOrDeployment() {

@@ -20,6 +20,11 @@ enum TrainingOpeningPresentationError: LocalizedError {
     }
 }
 
+enum TrainingPlayerSaveAction: Equatable {
+    case quicksave
+    case quickload
+}
+
 @MainActor
 private final class NoninteractiveTrainingOverlay: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
@@ -41,6 +46,7 @@ final class RevivalGameplayView: MTKView {
     var rearViewInputChanged: ((Bool, Bool) -> Void)?
     var rearViewInputCancelled: (() -> Void)?
     var soloPauseChanged: ((Bool) -> Void)?
+    var playerSaveActionRequested: ((TrainingPlayerSaveAction) -> Void)?
     var trainingResultAcknowledgementRequested: (() -> Void)?
     var trainingRestartRequested: (() -> Void)?
     var pilotProfileCreationRequested: ((String) -> Void)?
@@ -278,6 +284,24 @@ final class RevivalGameplayView: MTKView {
            Self.isTrainingResultAcknowledgementKey(event.keyCode) {
             pendingTrainingResultKeyAcknowledgement = true
             requestTrainingResultAcknowledgement()
+            return
+        }
+        if let action = Self.requestedTrainingPlayerSaveAction(
+            keyCode: event.keyCode,
+            modifierFlags: event.modifierFlags,
+            isRepeat: event.isARepeat,
+            gameplayIsActive: gameplayIsActive && !trainingResultIsPresented
+        ) {
+            if let playerSaveActionRequested {
+                playerSaveActionRequested(action)
+            } else {
+                clearInput()
+                pauseCurrentTrainingAudio()
+                soloPauseChanged?(true)
+                if presentPlayerSaveUnavailableAlert() {
+                    soloPauseChanged?(false)
+                }
+            }
             return
         }
         if Self.requestsSoloPause(
@@ -1119,6 +1143,20 @@ final class RevivalGameplayView: MTKView {
         return alert.runModal() == .alertFirstButtonReturn
     }
 
+    @discardableResult
+    private func presentPlayerSaveUnavailableAlert() -> Bool {
+        guard !soloPauseAlertIsPresented else { return false }
+        soloPauseAlertIsPresented = true
+        defer { soloPauseAlertIsPresented = false }
+
+        let alert = NSAlert()
+        alert.messageText = "Save Unavailable"
+        alert.informativeText =
+            "Save and load are unavailable in disposable editor play."
+        alert.addButton(withTitle: "OK")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
     private func clearPausedTrainingAudio() {
         pausedTrainingVoicePlayer = nil
         pausedTrainingSoundPlayers.removeAll()
@@ -1446,6 +1484,25 @@ final class RevivalGameplayView: MTKView {
         gameplayIsActive: Bool
     ) -> Bool {
         gameplayIsActive && !isRepeat && keyCode == 35
+    }
+
+    nonisolated static func requestedTrainingPlayerSaveAction(
+        keyCode: UInt16,
+        modifierFlags: NSEvent.ModifierFlags,
+        isRepeat: Bool,
+        gameplayIsActive: Bool
+    ) -> TrainingPlayerSaveAction? {
+        guard gameplayIsActive, !isRepeat else { return nil }
+        let primaryModifiers = modifierFlags.intersection([
+            .shift, .control, .option, .command,
+        ])
+        if keyCode == 101, primaryModifiers.isEmpty {
+            return .quicksave
+        }
+        if keyCode == 99, primaryModifiers == .option {
+            return .quickload
+        }
+        return nil
     }
 
     nonisolated static func showsOrdinaryGameplayOverlays(
