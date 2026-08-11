@@ -304,6 +304,17 @@ final class RevivalGameplayView: MTKView {
             }
             return
         }
+        if event.keyCode == 122,
+           !event.isARepeat,
+           gameplayIsActive {
+            clearInput()
+            pauseCurrentTrainingAudio()
+            soloPauseChanged?(true)
+            if presentSoloHelpAlert() {
+                soloPauseChanged?(false)
+            }
+            return
+        }
         if Self.requestsSoloPause(
             keyCode: event.keyCode,
             isRepeat: event.isARepeat,
@@ -1132,6 +1143,50 @@ final class RevivalGameplayView: MTKView {
             matching: .keyDown
         ) { event in
             guard event.keyCode == 35, !event.isARepeat else { return event }
+            alert.buttons.first?.performClick(nil)
+            return nil
+        }
+        defer {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+        }
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    @discardableResult
+    private func presentSoloHelpAlert() -> Bool {
+        guard !soloPauseAlertIsPresented else { return false }
+        soloPauseAlertIsPresented = true
+        defer { soloPauseAlertIsPresented = false }
+
+        let alert = NSAlert()
+        alert.messageText = "Keys"
+        alert.informativeText = [
+            "W/S — Forward/reverse thrust",
+            "A/D — Slide left/right",
+            "R/F — Slide up/down",
+            "Arrow keys — Pitch/yaw",
+            "Q/E — Bank",
+            "Mouse — Look",
+            "Left-click — Primary fire",
+            "Space or right-click — Secondary fire",
+            "Shift — Afterburner",
+            "G — Flare",
+            "H — Headlight",
+            "V — Rear view",
+            "Backslash — Inventory use",
+            "F4 — GuideBot",
+            "P — Pause",
+            "F9 — Quicksave",
+            "Option-F3 — Quickload",
+            "F1 — Close",
+        ].joined(separator: "\n")
+        alert.addButton(withTitle: "OK")
+        let monitor = NSEvent.addLocalMonitorForEvents(
+            matching: .keyDown
+        ) { event in
+            guard event.keyCode == 122, !event.isARepeat else { return event }
             alert.buttons.first?.performClick(nil)
             return nil
         }

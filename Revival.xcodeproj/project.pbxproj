@@ -188,6 +188,7 @@
 		DC000000000000000000000F /* LiveEnergyHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000F /* LiveEnergyHUDTests.swift */; };
 		DC0000000000000000000010 /* LiveAfterburnerHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */; };
 		DC0000000000000000000011 /* LiveShieldsHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000011 /* LiveShieldsHUDTests.swift */; };
+		DC0000000000000000000012 /* SoloHelpTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000012 /* SoloHelpTests.swift */; };
 		EA0000000000000000000001 /* PlayerSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000001 /* PlayerSave.swift */; };
 		EA0000000000000000000002 /* PlayerSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000001 /* PlayerSave.swift */; };
 		EA0000000000000000000003 /* PlayerSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000001 /* PlayerSave.swift */; };
@@ -272,6 +273,7 @@
 		DA000000000000000000000F /* LiveEnergyHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEnergyHUDTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAfterburnerHUDTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000011 /* LiveShieldsHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveShieldsHUDTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000012 /* SoloHelpTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoloHelpTests.swift; sourceTree = "<group>"; };
 		E90000000000000000000001 /* PlayerSave.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSave.swift; sourceTree = "<group>"; };
 		E90000000000000000000002 /* TrainingQuicksaveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingQuicksaveTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -480,6 +482,7 @@
 				DA000000000000000000000C /* TrainingBehaviorFixtures.swift */,
 				DA000000000000000000000D /* PlayerSimulationFixtures.swift */,
 				DA000000000000000000000E /* SoloPauseTests.swift */,
+				DA0000000000000000000012 /* SoloHelpTests.swift */,
 				DA000000000000000000000F /* LiveEnergyHUDTests.swift */,
 				DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */,
 				DA0000000000000000000011 /* LiveShieldsHUDTests.swift */,
@@ -825,6 +828,7 @@
 				DC000000000000000000000C /* TrainingBehaviorFixtures.swift in Sources */,
 				DC000000000000000000000D /* PlayerSimulationFixtures.swift in Sources */,
 				DC000000000000000000000E /* SoloPauseTests.swift in Sources */,
+				DC0000000000000000000012 /* SoloHelpTests.swift in Sources */,
 				DC000000000000000000000F /* LiveEnergyHUDTests.swift in Sources */,
 				DC0000000000000000000010 /* LiveAfterburnerHUDTests.swift in Sources */,
 				DC0000000000000000000011 /* LiveShieldsHUDTests.swift in Sources */,
