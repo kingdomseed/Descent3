@@ -1,0 +1,41 @@
+Revival/Tests/D3ImportTests/SoloHelpTests.swift
+  s_473664bbdbb66b::t_443f1ae4ce960f 1-138
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_62d631f12e0701 2173-2198
+Revival/Sources/RevivalAppKit/RevivalGameplayView.swift
+  s_473664bbdbb66b::t_b95a0242a8524b 307-317,1157-1189,1192,1196-1197
+  s_473664bbdbb66b::t_f4e8035215aaa9 1190-1191
+  s_473664bbdbb66b::t_01d7b356c071fd 1193-1195
+  s_473664bbdbb66b::t_d3a500ed6276a3 1198-1200
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_15bafd53cdbc45 22-25,28,110-112
+Revival.xcodeproj/project.pbxproj
+  s_473664bbdbb66b::t_443f1ae4ce960f 191,276,485,831
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_7b981b6767bf88 68,472-478
+  s_c503f7c0529e13::t_58ca35f10a0d47 479
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c05cbdf7ffd92c1e178550f93a70d7a988ba3a2f",
+  "prompts": {},
+  "sessions": {
+    "s_473664bbdbb66b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff2a2-d41d-72b0-8b51-3cbc9a770c26",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
