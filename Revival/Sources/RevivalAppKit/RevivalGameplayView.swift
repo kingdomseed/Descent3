@@ -60,6 +60,7 @@ final class RevivalGameplayView: MTKView {
     private let enabledControlsLabel = NSTextField(labelWithString: "")
     private let energyLabel = NSTextField(labelWithString: "")
     private let afterburnerLabel = NSTextField(labelWithString: "")
+    private let shieldsLabel = NSTextField(labelWithString: "")
     private let invulnerabilityStatusLabel =
         NSTextField(labelWithString: "")
     private let cloakShipMonitor = NoninteractiveTrainingOverlay()
@@ -177,6 +178,12 @@ final class RevivalGameplayView: MTKView {
             x: left,
             y: statusY - 32,
             width: min(200, width),
+            height: 28
+        )
+        shieldsLabel.frame = NSRect(
+            x: left,
+            y: statusY - 64,
+            width: min(160, width),
             height: 28
         )
         let cloakWidth = min(96, width)
@@ -422,6 +429,8 @@ final class RevivalGameplayView: MTKView {
             energyLabel.isHidden = true
             afterburnerLabel.stringValue = ""
             afterburnerLabel.isHidden = true
+            shieldsLabel.stringValue = ""
+            shieldsLabel.isHidden = true
             invulnerabilityStatusLabel.stringValue = ""
             cloakShipMonitor.isHidden = true
             cloakStatusLabel.stringValue = ""
@@ -450,6 +459,7 @@ final class RevivalGameplayView: MTKView {
             enabledControlsLabel.stringValue = ""
             energyLabel.isHidden = true
             afterburnerLabel.isHidden = true
+            shieldsLabel.isHidden = true
             invulnerabilityStatusLabel.stringValue = ""
             cloakShipMonitor.isHidden = true
             cloakStatusLabel.stringValue = ""
@@ -500,6 +510,7 @@ final class RevivalGameplayView: MTKView {
         enabledControlsLabel.isHidden = !showsOrdinaryGameplayOverlays
         energyLabel.isHidden = !showsOrdinaryGameplayOverlays
         afterburnerLabel.isHidden = !showsOrdinaryGameplayOverlays
+        shieldsLabel.isHidden = !showsOrdinaryGameplayOverlays
         invulnerabilityStatusLabel.isHidden = !showsOrdinaryGameplayOverlays
         cloakStatusLabel.isHidden = !showsOrdinaryGameplayOverlays
         cameraMonitorBorder.isHidden = frame.trainingCameraMonitor == nil
@@ -532,6 +543,19 @@ final class RevivalGameplayView: MTKView {
             afterburnerIsLow
                 ? "Afterburner, low fuel warning"
                 : "Afterburner"
+        )
+        let shieldsAreLow = frame.shields <= 20
+        shieldsLabel.stringValue = String(
+            format: "Shields: %03d",
+            Int(frame.shields)
+        )
+        shieldsLabel.textColor = shieldsAreLow ? .systemRed : .systemGreen
+        shieldsLabel.font = .monospacedDigitSystemFont(
+            ofSize: 18,
+            weight: shieldsAreLow ? .bold : .semibold
+        )
+        shieldsLabel.setAccessibilityLabel(
+            shieldsAreLow ? "Shields, low shields warning" : "Shields"
         )
         invulnerabilityStatusLabel.stringValue =
             Self.invulnerabilityStatusText(
@@ -1606,6 +1630,7 @@ final class RevivalGameplayView: MTKView {
             trainingMessageLabel,
             energyLabel,
             afterburnerLabel,
+            shieldsLabel,
             invulnerabilityStatusLabel,
             cloakStatusLabel,
         ] {
@@ -1638,6 +1663,13 @@ final class RevivalGameplayView: MTKView {
         )
         afterburnerLabel.setAccessibilityIdentifier("Live Afterburner HUD")
         afterburnerLabel.setAccessibilityLabel("Afterburner")
+        shieldsLabel.alignment = .left
+        shieldsLabel.font = .monospacedDigitSystemFont(
+            ofSize: 18,
+            weight: .semibold
+        )
+        shieldsLabel.setAccessibilityIdentifier("Live Shields HUD")
+        shieldsLabel.setAccessibilityLabel("Shields")
         invulnerabilityStatusLabel.textColor = .systemRed
         invulnerabilityStatusLabel.setAccessibilityLabel(
             "Invulnerability status"

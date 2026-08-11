@@ -187,6 +187,7 @@
 		DC000000000000000000000E /* SoloPauseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000E /* SoloPauseTests.swift */; };
 		DC000000000000000000000F /* LiveEnergyHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000F /* LiveEnergyHUDTests.swift */; };
 		DC0000000000000000000010 /* LiveAfterburnerHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */; };
+		DC0000000000000000000011 /* LiveShieldsHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000011 /* LiveShieldsHUDTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -264,6 +265,7 @@
 		DA000000000000000000000E /* SoloPauseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoloPauseTests.swift; sourceTree = "<group>"; };
 		DA000000000000000000000F /* LiveEnergyHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEnergyHUDTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAfterburnerHUDTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000011 /* LiveShieldsHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveShieldsHUDTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -470,6 +472,7 @@
 				DA000000000000000000000E /* SoloPauseTests.swift */,
 				DA000000000000000000000F /* LiveEnergyHUDTests.swift */,
 				DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */,
+				DA0000000000000000000011 /* LiveShieldsHUDTests.swift */,
 				BA0000000000000000000006 /* TrainingLevelValidationTests.swift */,
 				BA0000000000000000000007 /* IndoorMovementTraceTests.swift */,
 				B20000000000000000000006 /* CanonicalLevelTests.swift */,
@@ -809,6 +812,7 @@
 				DC000000000000000000000E /* SoloPauseTests.swift in Sources */,
 				DC000000000000000000000F /* LiveEnergyHUDTests.swift in Sources */,
 				DC0000000000000000000010 /* LiveAfterburnerHUDTests.swift in Sources */,
+				DC0000000000000000000011 /* LiveShieldsHUDTests.swift in Sources */,
 				DB000000000000000000001F /* PlayerSimulationValues.swift in Sources */,
 				DB0000000000000000000020 /* PlayerSimulation.swift in Sources */,
 				DB0000000000000000000021 /* TrainingGuidebotSimulation.swift in Sources */,
