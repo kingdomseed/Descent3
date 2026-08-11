@@ -1,0 +1,69 @@
+Revival/Tests/D3ImportTests/TrainingBehaviorEditorTests.swift
+  s_f5fa1d370da1c4::t_ad0012df5a92c7 6-14,16-26,28-59
+  s_f5fa1d370da1c4::t_9da691e8030b98 2457-2476,2479,2483-2486,2490-2495,2502,2919-2920
+  s_f5fa1d370da1c4::t_d03b8b94e56530 2612-2616,2670,2675,2738,2872-2875
+  s_f5fa1d370da1c4::t_fac1406a72a5dd 1,3-5,3027-3028
+  s_f5fa1d370da1c4::t_d87397257d51ef 2954-2957
+  s_f5fa1d370da1c4::t_a18578b89c5f9a 2927
+  s_f5fa1d370da1c4::t_ba5b6e65fc377a 60-2456,3029-3087
+  s_f5fa1d370da1c4::t_368ed6808a5a00 15,27
+  s_f5fa1d370da1c4::t_1f071d967e1ecc 2477,2926,2928-2952
+  s_f5fa1d370da1c4::t_2d5d37517b6f5c 2518-2538,2810-2815
+  s_f5fa1d370da1c4::t_1608c7481a746f 2,2478,2480-2482,2487-2489,2496-2501,2503-2517,2539-2611,2617-2669,2671-2674,2676-2737,2739-2809,2816-2871,2876-2918,2921-2925,2953,2958-3026
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_61c72330b6de7e 480-487
+Revival/Sources/RevivalCore/Level.swift
+  s_f5fa1d370da1c4::t_feeb6326a1ee90 24
+Revival/Sources/RevivalEditor/RevivalProjectDocument.swift
+  s_f5fa1d370da1c4::t_c28c5d93800e08 377,381-384,387-389,737-786
+  s_f5fa1d370da1c4::t_2d5d37517b6f5c 376,378-380,385-386
+  s_f5fa1d370da1c4::t_fb20ce4c8682da 787
+Revival/Sources/RevivalEditor/RevivalEditorWindowController.swift
+  s_f5fa1d370da1c4::t_85f0e372dae6f4 28-32,48-49,141-145,148-149,152-164,252-258,322-323,412-417,468,493-495,750-762,765-766,771-772,781,785-795,1229-1275,1348-1349
+  s_f5fa1d370da1c4::t_2d5d37517b6f5c 146-147,150-151,324-331,496-497,775-780,782-784
+  s_f5fa1d370da1c4::t_368ed6808a5a00 763-764,767-770,773-774
+  s_f5fa1d370da1c4::t_711ad85eddd0f2 1350-1351
+Revival/Sources/RevivalCore/PlayerLevelValidation.swift
+  s_f5fa1d370da1c4::t_f3f1a23228f901 5-195,197-324
+  s_f5fa1d370da1c4::t_63e4bbfa3f4d65 1-4,196,325
+Revival/Sources/RevivalEditor/RevivalProject.swift
+  s_f5fa1d370da1c4::t_feeb6326a1ee90 17,69-70,372-378,405-412,439-440,463,468,474,915-925,969,1065-1068,1072-1100,1490-1496,1500-1524,1706,1810-1837,1846-1856,1862,1865-1866,1958-1979,2175-2213
+  s_f5fa1d370da1c4::t_2d5d37517b6f5c 1069-1071,1497-1499,1838-1845
+  s_f5fa1d370da1c4::t_a18578b89c5f9a 1857-1861,1863-1864
+  s_f5fa1d370da1c4::t_368ed6808a5a00 640,643
+  s_f5fa1d370da1c4::t_7845ce8318601c 2214
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_03b69dc12fcb90 2199-2227
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_0d65e2a750a39c 28
+  s_c503f7c0529e13::t_a18d201772d00e 22-25,111-113
+Revival/Tests/D3ImportTests/EditorProjectTests.swift
+  s_f5fa1d370da1c4::t_368ed6808a5a00 111,1019,1038
+  s_f5fa1d370da1c4::t_0d73c941f3c5d2 147-149,151-153,160-163,165,167-168,175,177-180,182-187,189,192-193,195,199-205,208-209,211-212,215-216,218-256,258-259,262-263,266-267,269-282,284-306,308-324,326,328-332,334-338,340,342-346,348-349,351-353,356
+Revival.xcodeproj/project.pbxproj
+  s_f5fa1d370da1c4::t_cdee3597b02585 30-34,99,224,243,431,480,725,765,805,828,869,918
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "24701a09d4f21dc11cc13e3513a07a735245db72",
+  "prompts": {},
+  "sessions": {
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_f5fa1d370da1c4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff2e2-f305-7052-8b87-9b0c1088a7dc",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
