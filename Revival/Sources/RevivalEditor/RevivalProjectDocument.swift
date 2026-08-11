@@ -373,6 +373,20 @@ final class RevivalProjectDocument: NSDocument {
         )
     }
 
+    func orientPathNode(
+        pathIndex: Int,
+        nodeIndex: Int,
+        forward: Vector3,
+        up: Vector3
+    ) throws {
+        try applyPathNodeOrientation(
+            pathIndex: pathIndex,
+            nodeIndex: nodeIndex,
+            forward: forward,
+            up: up
+        )
+    }
+
     func setObjectTransform(
         handle: UInt32,
         to transform: RevivalRigidTransform
@@ -715,6 +729,57 @@ final class RevivalProjectDocument: NSDocument {
             } catch {
                 preconditionFailure(
                     "Training Guidebot return-barrier undo invariant failed: \(error)"
+                )
+            }
+        }
+    }
+
+    private func applyPathNodeOrientation(
+        pathIndex: Int,
+        nodeIndex: Int,
+        forward: Vector3,
+        up: Vector3
+    ) throws {
+        var previous: (forward: Vector3, up: Vector3)?
+        try projectStorage.withLock { storedProject in
+            guard var project = storedProject else {
+                throw RevivalProjectDocumentError.projectNotLoaded
+            }
+            previous = try project.setPathNodeOrientation(
+                pathIndex: pathIndex,
+                nodeIndex: nodeIndex,
+                forward: forward,
+                up: up
+            )
+            storedProject = project
+        }
+        registerPathNodeOrientationUndo(
+            pathIndex: pathIndex,
+            nodeIndex: nodeIndex,
+            forward: previous!.forward,
+            up: previous!.up
+        )
+        undoManager?.setActionName("Orient Path Node")
+        refreshWindowControllers()
+    }
+
+    private func registerPathNodeOrientationUndo(
+        pathIndex: Int,
+        nodeIndex: Int,
+        forward: Vector3,
+        up: Vector3
+    ) {
+        undoManager?.registerUndo(withTarget: self) { document in
+            do {
+                try document.applyPathNodeOrientation(
+                    pathIndex: pathIndex,
+                    nodeIndex: nodeIndex,
+                    forward: forward,
+                    up: up
+                )
+            } catch {
+                preconditionFailure(
+                    "Path-node orientation undo invariant failed: \(error)"
                 )
             }
         }

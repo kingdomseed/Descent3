@@ -14,6 +14,7 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
     case playerStartMissing(playerID: Int, handle: UInt32)
     case vertexMissing(roomSourceIndex: Int, vertexIndex: Int)
     case invalidRoomVertexEdit(roomSourceIndex: Int, vertexIndex: Int)
+    case invalidPathNodeOrientationEdit(pathIndex: Int, nodeIndex: Int)
     case roomVertexEditRejected(roomSourceIndex: Int, vertexIndex: Int, reason: String)
     case placementHasNoContainingRoom(owner: String)
     case placementBlocked(owner: String, roomSourceIndex: Int, faceIndex: Int)
@@ -65,6 +66,8 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
             "Source room \(roomSourceIndex) has no vertex \(vertexIndex) to edit."
         case let .invalidRoomVertexEdit(roomSourceIndex, vertexIndex):
             "The project contains an invalid or redundant vertex edit for source room \(roomSourceIndex) vertex \(vertexIndex)."
+        case let .invalidPathNodeOrientationEdit(pathIndex, nodeIndex):
+            "The project contains an invalid or redundant orientation edit for path \(pathIndex) node \(nodeIndex)."
         case let .roomVertexEditRejected(roomSourceIndex, vertexIndex, reason):
             "Source room \(roomSourceIndex) vertex \(vertexIndex) was not changed: \(reason)"
         case let .placementHasNoContainingRoom(owner):
@@ -366,6 +369,13 @@ struct RevivalPlayerStartTransformEdit: Codable, Equatable, Sendable {
     let transform: RevivalRigidTransform
 }
 
+struct RevivalPathNodeOrientationEdit: Codable, Equatable, Sendable {
+    let pathIndex: Int
+    let nodeIndex: Int
+    let forward: Vector3
+    let up: Vector3
+}
+
 struct RevivalPlacementResult: Equatable, Sendable {
     let committedLocation: SpatialLocation
     let committedPosition: Vector3
@@ -391,6 +401,14 @@ enum RevivalProjectDifference: Equatable, Sendable {
         vertexIndex: Int,
         before: Vector3,
         after: Vector3
+    )
+    case pathNodeOrientation(
+        pathIndex: Int,
+        nodeIndex: Int,
+        beforeForward: Vector3,
+        beforeUp: Vector3,
+        afterForward: Vector3,
+        afterUp: Vector3
     )
     case objectTransform(
         handle: UInt32,
@@ -418,6 +436,8 @@ enum RevivalProjectDifference: Equatable, Sendable {
             "Room \(roomSourceIndex) portal \(portalIndex) renders face: \(before) → \(after)"
         case let .roomVertex(roomSourceIndex, vertexIndex, _, _):
             "Room \(roomSourceIndex) vertex \(vertexIndex) position changed"
+        case let .pathNodeOrientation(pathIndex, nodeIndex, _, _, _, _):
+            "Path \(pathIndex) node \(nodeIndex) orientation changed"
         case let .objectTransform(handle, beforeLocation, afterLocation, _, _):
             "Object \(handle) transform changed; \(locationSummary(beforeLocation)) → \(locationSummary(afterLocation))"
         case let .playerStartTransform(
@@ -440,16 +460,18 @@ struct RevivalProjectSource: Codable, Equatable, Sendable {
     var faceMaterialEdits: [RevivalFaceMaterialEdit]
     var portalRenderingEdits: [RevivalPortalRenderingEdit]
     var roomVertexEdits: [RevivalRoomVertexEdit]
+    var pathNodeOrientationEdits: [RevivalPathNodeOrientationEdit]
     var objectTransformEdits: [RevivalObjectTransformEdit]
     var playerStartTransformEdits: [RevivalPlayerStartTransformEdit]
 
     init(base: CanonicalPackageReference) {
-        schemaVersion = 3
+        schemaVersion = 4
         self.base = base
         roomNameEdits = []
         faceMaterialEdits = []
         portalRenderingEdits = []
         roomVertexEdits = []
+        pathNodeOrientationEdits = []
         objectTransformEdits = []
         playerStartTransformEdits = []
     }
@@ -615,10 +637,10 @@ struct RevivalProject: Equatable, Sendable {
         let destroyPath = level.paths[lesson.destroyPathIndex]
         if let handoff = lesson.destructionHandoff {
             return
-                "TrainingMission.cpp Scripts 021,022,024,023,025,026,031,037,027,028 / ManuverRoomCenter \(lesson.maneuverObjectHandle) / FollowBot1 \(handoff.followBotObjectHandle) / DestroyBot1 \(handoff.destroyBot1ObjectHandle) then DestroyBot2 \(handoff.destroyBot2ObjectHandle) / timer \(handoff.levelTimerID) = \(handoff.destructionDelay)s / stock read-only \(followPath.name) path \(handoff.movingPathIndex) nodes \(followPath.nodes.count) flags 0x\(String(handoff.movingPathGoalFlags, radix: 16)) + \(destroyPath.name) path \(lesson.destroyPathIndex) nodes \(destroyPath.nodes.count) flags 0x\(String(lesson.destroyPathGoalFlags, radix: 16)) / goal \(handoff.goalID) priority \(handoff.goalPriority) / \(handoff.combat.projectileSourceName) via \(handoff.projectileModel.sourceName) / runtime path failure: invalidPath|movementBlocked"
+                "TrainingMission.cpp Scripts 021,022,024,023,025,026,031,037,027,028 / ManuverRoomCenter \(lesson.maneuverObjectHandle) / FollowBot1 \(handoff.followBotObjectHandle) / DestroyBot1 \(handoff.destroyBot1ObjectHandle) then DestroyBot2 \(handoff.destroyBot2ObjectHandle) / timer \(handoff.levelTimerID) = \(handoff.destructionDelay)s / stock orientation-editable \(followPath.name) path \(handoff.movingPathIndex) nodes \(followPath.nodes.count) flags 0x\(String(handoff.movingPathGoalFlags, radix: 16)) + \(destroyPath.name) path \(lesson.destroyPathIndex) nodes \(destroyPath.nodes.count) flags 0x\(String(lesson.destroyPathGoalFlags, radix: 16)) / goal \(handoff.goalID) priority \(handoff.goalPriority) / \(handoff.combat.projectileSourceName) via \(handoff.projectileModel.sourceName) / runtime path failure: invalidPath|movementBlocked"
         }
         return
-            "TrainingMission.cpp Scripts 021,022,024,023,025,026 / ManuverRoomCenter \(lesson.maneuverObjectHandle) / FollowBot1 \(lesson.followBotObjectHandle) / stock read-only \(followPath.name) path \(lesson.followPathIndex) nodes \(followPath.nodes.count) flags 0x\(String(lesson.followPathGoalFlags, radix: 16)) + \(destroyPath.name) path \(lesson.destroyPathIndex) nodes \(destroyPath.nodes.count) flags 0x\(String(lesson.destroyPathGoalFlags, radix: 16)) / slot \(lesson.goalSlot) priority \(lesson.goalPriority) / runtime path failure: invalidPath|movementBlocked"
+            "TrainingMission.cpp Scripts 021,022,024,023,025,026 / ManuverRoomCenter \(lesson.maneuverObjectHandle) / FollowBot1 \(lesson.followBotObjectHandle) / stock orientation-editable \(followPath.name) path \(lesson.followPathIndex) nodes \(followPath.nodes.count) flags 0x\(String(lesson.followPathGoalFlags, radix: 16)) + \(destroyPath.name) path \(lesson.destroyPathIndex) nodes \(destroyPath.nodes.count) flags 0x\(String(lesson.destroyPathGoalFlags, radix: 16)) / slot \(lesson.goalSlot) priority \(lesson.goalPriority) / runtime path failure: invalidPath|movementBlocked"
     }
     func trainingManeuverFollowRuntimeDiagnostic(
         frame: PlayerSimulationFrame
@@ -890,6 +912,17 @@ struct RevivalProject: Equatable, Sendable {
                 after: edit.position
             )
         })
+        differences.append(contentsOf: source.pathNodeOrientationEdits.map { edit in
+            let baseNode = importedBase.paths[edit.pathIndex].nodes[edit.nodeIndex]
+            return .pathNodeOrientation(
+                pathIndex: edit.pathIndex,
+                nodeIndex: edit.nodeIndex,
+                beforeForward: baseNode.forward,
+                beforeUp: baseNode.up,
+                afterForward: edit.forward,
+                afterUp: edit.up
+            )
+        })
         differences.append(contentsOf: source.objectTransformEdits.map { edit in
             .objectTransform(
                 handle: edit.handle,
@@ -933,7 +966,7 @@ struct RevivalProject: Equatable, Sendable {
         source: RevivalProjectSource,
         library: CanonicalPackageLibrary
     ) throws {
-        guard source.schemaVersion == 3 else {
+        guard source.schemaVersion == 4 else {
             throw RevivalProjectError.unsupportedSchema(source.schemaVersion)
         }
         let importedBase = try library.load(source.base)
@@ -1028,6 +1061,42 @@ struct RevivalProject: Equatable, Sendable {
             }
             materializedLevel.rooms[roomIndex].vertices[edit.vertexIndex] = edit.position
             previousVertexIdentity = identity
+        }
+        var previousPathNodeIdentity: (Int, Int)?
+        for edit in source.pathNodeOrientationEdits {
+            let identity = (edit.pathIndex, edit.nodeIndex)
+            guard previousPathNodeIdentity.map({ $0 < identity }) ?? true,
+                  edit.pathIndex
+                    == importedBase.trainingDodgeAttempt?.maneuverFollow?
+                        .followPathIndex,
+                  importedBase.paths.indices.contains(edit.pathIndex),
+                  importedBase.paths[edit.pathIndex].nodes.indices.contains(
+                    edit.nodeIndex
+                  ),
+                  isValidPathNodeOrientation(
+                    forward: edit.forward,
+                    up: edit.up
+                  ) else {
+                throw RevivalProjectError.invalidPathNodeOrientationEdit(
+                    pathIndex: edit.pathIndex,
+                    nodeIndex: edit.nodeIndex
+                )
+            }
+            let baseNode = importedBase.paths[edit.pathIndex].nodes[edit.nodeIndex]
+            guard baseNode.forward != edit.forward || baseNode.up != edit.up else {
+                throw RevivalProjectError.invalidPathNodeOrientationEdit(
+                    pathIndex: edit.pathIndex,
+                    nodeIndex: edit.nodeIndex
+                )
+            }
+            replacePathNodeOrientation(
+                in: &materializedLevel,
+                pathIndex: edit.pathIndex,
+                nodeIndex: edit.nodeIndex,
+                forward: edit.forward,
+                up: edit.up
+            )
+            previousPathNodeIdentity = identity
         }
         var previousObjectHandle: UInt32?
         for edit in source.objectTransformEdits {
@@ -1419,6 +1488,41 @@ struct RevivalProject: Equatable, Sendable {
     }
 
     @discardableResult
+    mutating func setPathNodeOrientation(
+        pathIndex: Int,
+        nodeIndex: Int,
+        forward: Vector3,
+        up: Vector3
+    ) throws -> (forward: Vector3, up: Vector3) {
+        guard pathIndex
+                == level.trainingDodgeAttempt?.maneuverFollow?.followPathIndex,
+              level.paths.indices.contains(pathIndex),
+              level.paths[pathIndex].nodes.indices.contains(nodeIndex),
+              isValidPathNodeOrientation(forward: forward, up: up) else {
+            throw RevivalProjectError.invalidPathNodeOrientationEdit(
+                pathIndex: pathIndex,
+                nodeIndex: nodeIndex
+            )
+        }
+        let node = level.paths[pathIndex].nodes[nodeIndex]
+        guard node.forward != forward || node.up != up else {
+            throw RevivalProjectError.unchangedProperty
+        }
+        replacePathNodeOrientation(
+            in: &level,
+            pathIndex: pathIndex,
+            nodeIndex: nodeIndex,
+            forward: forward,
+            up: up
+        )
+        updatePathNodeOrientationEdit(
+            pathIndex: pathIndex,
+            nodeIndex: nodeIndex
+        )
+        return (node.forward, node.up)
+    }
+
+    @discardableResult
     mutating func snapRoomVertex(
         roomSourceIndex: Int,
         vertexIndex: Int,
@@ -1599,7 +1703,7 @@ struct RevivalProject: Equatable, Sendable {
     }
 
     func validate() throws {
-        guard source.schemaVersion == 3 else {
+        guard source.schemaVersion == 4 else {
             throw RevivalProjectError.unsupportedSchema(source.schemaVersion)
         }
         guard importedBase.missionKey == source.base.missionKey,
@@ -1703,6 +1807,63 @@ struct RevivalProject: Equatable, Sendable {
                 vertexIndex: identity.vertexIndex
             )
         }
+        var expectedPathNodeEdits: [RevivalPathNodeOrientationEdit] = []
+        for pathIndex in level.paths.indices {
+            guard importedBase.paths.indices.contains(pathIndex),
+                  importedBase.paths[pathIndex].name == level.paths[pathIndex].name,
+                  importedBase.paths[pathIndex].flags == level.paths[pathIndex].flags,
+                  importedBase.paths[pathIndex].nodes.count
+                    == level.paths[pathIndex].nodes.count else {
+                throw RevivalProjectError.invalidPathNodeOrientationEdit(
+                    pathIndex: pathIndex,
+                    nodeIndex: -1
+                )
+            }
+            for nodeIndex in level.paths[pathIndex].nodes.indices {
+                let baseNode = importedBase.paths[pathIndex].nodes[nodeIndex]
+                let node = level.paths[pathIndex].nodes[nodeIndex]
+                guard baseNode.position == node.position,
+                      baseNode.location == node.location,
+                      baseNode.flags == node.flags,
+                      isValidPathNodeOrientation(
+                        forward: node.forward,
+                        up: node.up
+                      ) else {
+                    throw RevivalProjectError.invalidPathNodeOrientationEdit(
+                        pathIndex: pathIndex,
+                        nodeIndex: nodeIndex
+                    )
+                }
+                if baseNode.forward != node.forward || baseNode.up != node.up {
+                    guard pathIndex
+                            == level.trainingDodgeAttempt?.maneuverFollow?
+                                .followPathIndex else {
+                        throw RevivalProjectError.invalidPathNodeOrientationEdit(
+                            pathIndex: pathIndex,
+                            nodeIndex: nodeIndex
+                        )
+                    }
+                    expectedPathNodeEdits.append(.init(
+                        pathIndex: pathIndex,
+                        nodeIndex: nodeIndex,
+                        forward: node.forward,
+                        up: node.up
+                    ))
+                }
+            }
+        }
+        guard level.paths.count == importedBase.paths.count,
+              source.pathNodeOrientationEdits == expectedPathNodeEdits else {
+            let identity = source.pathNodeOrientationEdits.first.map {
+                ($0.pathIndex, $0.nodeIndex)
+            } ?? expectedPathNodeEdits.first.map {
+                ($0.pathIndex, $0.nodeIndex)
+            } ?? (-1, -1)
+            throw RevivalProjectError.invalidPathNodeOrientationEdit(
+                pathIndex: identity.0,
+                nodeIndex: identity.1
+            )
+        }
         var expectedObjectEdits: [RevivalObjectTransformEdit] = []
         var expectedPlayerEdits: [RevivalPlayerStartTransformEdit] = []
         for object in level.objects {
@@ -1791,6 +1952,28 @@ struct RevivalProject: Equatable, Sendable {
         if baseName != currentName {
             source.roomNameEdits.append(.init(sourceIndex: sourceIndex, name: currentName))
             source.roomNameEdits.sort { $0.sourceIndex < $1.sourceIndex }
+        }
+    }
+
+    private mutating func updatePathNodeOrientationEdit(
+        pathIndex: Int,
+        nodeIndex: Int
+    ) {
+        let base = importedBase.paths[pathIndex].nodes[nodeIndex]
+        let current = level.paths[pathIndex].nodes[nodeIndex]
+        source.pathNodeOrientationEdits.removeAll {
+            $0.pathIndex == pathIndex && $0.nodeIndex == nodeIndex
+        }
+        if base.forward != current.forward || base.up != current.up {
+            source.pathNodeOrientationEdits.append(.init(
+                pathIndex: pathIndex,
+                nodeIndex: nodeIndex,
+                forward: current.forward,
+                up: current.up
+            ))
+            source.pathNodeOrientationEdits.sort {
+                ($0.pathIndex, $0.nodeIndex) < ($1.pathIndex, $1.nodeIndex)
+            }
         }
     }
 
@@ -1987,6 +2170,46 @@ private func isValidRigidTransform(_ transform: RevivalRigidTransform) -> Bool {
 
 private func isFiniteProjectPosition(_ position: Vector3) -> Bool {
     position.x.isFinite && position.y.isFinite && position.z.isFinite
+}
+
+private func isValidPathNodeOrientation(
+    forward: Vector3,
+    up: Vector3
+) -> Bool {
+    guard isFiniteProjectPosition(forward), isFiniteProjectPosition(up) else {
+        return false
+    }
+    let forwardLengthSquared = dot(forward, forward)
+    let upLengthSquared = dot(up, up)
+    let cross = sourceVectorCross(up, forward)
+    let crossLengthSquared = dot(cross, cross)
+    return forwardLengthSquared.isFinite && forwardLengthSquared > 0
+        && upLengthSquared.isFinite && upLengthSquared > 0
+        && crossLengthSquared.isFinite && crossLengthSquared > 0
+}
+
+private func replacePathNodeOrientation(
+    in level: inout Level,
+    pathIndex: Int,
+    nodeIndex: Int,
+    forward: Vector3,
+    up: Vector3
+) {
+    let path = level.paths[pathIndex]
+    let node = path.nodes[nodeIndex]
+    var nodes = path.nodes
+    nodes[nodeIndex] = .init(
+        position: node.position,
+        location: node.location,
+        flags: node.flags,
+        forward: forward,
+        up: up
+    )
+    level.paths[pathIndex] = .init(
+        name: path.name,
+        flags: path.flags,
+        nodes: nodes
+    )
 }
 
 private func locationSummary(_ location: SpatialLocation) -> String {

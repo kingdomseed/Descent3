@@ -25,6 +25,11 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     private let followPortalButton: NSButton
     private let roomNameField: NSTextField
     private let renameButton: NSButton
+    private let pathPopup: NSPopUpButton
+    private let pathNodePopup: NSPopUpButton
+    private let pathNodeForwardLabel: NSTextField
+    private let pathNodeUpLabel: NSTextField
+    private let orientPathNodeButton: NSButton
     private let objectPopup: NSPopUpButton
     private let rotateObjectButton: NSButton
     private let playerStartPopup: NSPopUpButton
@@ -40,6 +45,8 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     private let statusLabel: NSTextField
     private var rendererError: String?
     private var selectedVertexIndex: Int?
+    private var selectedPathIndex: Int?
+    private var selectedPathNodeIndex: Int?
     private var selectedObjectHandle: UInt32?
     private var selectedPlayerStartHandle: UInt32?
     private var placementOwner = RevivalEditorPlacementOwner.object
@@ -131,6 +138,30 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         renameButton = NSButton(title: "Rename Room", target: nil, action: nil)
         renameButton.setAccessibilityLabel("Rename selected room")
 
+        pathPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        pathPopup.setAccessibilityLabel("Selected game path")
+        pathNodePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        pathNodePopup.setAccessibilityLabel("Selected path node")
+        pathNodeForwardLabel = NSTextField(labelWithString: "Forward: —")
+        pathNodeForwardLabel.maximumNumberOfLines = 0
+        pathNodeForwardLabel.lineBreakMode = .byWordWrapping
+        pathNodeForwardLabel.setAccessibilityLabel("Selected path node forward")
+        pathNodeUpLabel = NSTextField(labelWithString: "Up: —")
+        pathNodeUpLabel.maximumNumberOfLines = 0
+        pathNodeUpLabel.lineBreakMode = .byWordWrapping
+        pathNodeUpLabel.setAccessibilityLabel("Selected path node up")
+        orientPathNodeButton = NSButton(
+            title: "Orient Node to Editor View",
+            target: nil,
+            action: nil
+        )
+        orientPathNodeButton.setAccessibilityLabel(
+            "Orient Node to Editor View"
+        )
+        orientPathNodeButton.setAccessibilityHelp(
+            "Sets only the selected path node's forward and up axes from the current editor view."
+        )
+
         objectPopup = NSPopUpButton(frame: .zero, pullsDown: false)
         objectPopup.setAccessibilityLabel("Reached object")
         objectPopup.setAccessibilityHelp("Selects a reached non-player object by stable handle.")
@@ -218,6 +249,13 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         sidebar.addArrangedSubview(followPortalButton)
         sidebar.addArrangedSubview(roomNameField)
         sidebar.addArrangedSubview(renameButton)
+        sidebar.addArrangedSubview(NSTextField(labelWithString: "Game Path"))
+        sidebar.addArrangedSubview(pathPopup)
+        sidebar.addArrangedSubview(NSTextField(labelWithString: "Path Node"))
+        sidebar.addArrangedSubview(pathNodePopup)
+        sidebar.addArrangedSubview(pathNodeForwardLabel)
+        sidebar.addArrangedSubview(pathNodeUpLabel)
+        sidebar.addArrangedSubview(orientPathNodeButton)
         let editSeparator = NSBox()
         editSeparator.boxType = .separator
         sidebar.addArrangedSubview(editSeparator)
@@ -281,6 +319,16 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             faceMaterialPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
             portalPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
             roomNameField.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
+            pathPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
+            pathNodePopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
+            pathNodeForwardLabel.widthAnchor.constraint(
+                equalTo: sidebar.widthAnchor,
+                constant: -36
+            ),
+            pathNodeUpLabel.widthAnchor.constraint(
+                equalTo: sidebar.widthAnchor,
+                constant: -36
+            ),
             objectPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
             playerStartPopup.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
             placementCoordinates.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -36),
@@ -361,6 +409,12 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         roomNameField.action = #selector(commitRoomName(_:))
         renameButton.target = self
         renameButton.action = #selector(commitRoomName(_:))
+        pathPopup.target = self
+        pathPopup.action = #selector(selectPath(_:))
+        pathNodePopup.target = self
+        pathNodePopup.action = #selector(selectPathNode(_:))
+        orientPathNodeButton.target = self
+        orientPathNodeButton.action = #selector(orientPathNode(_:))
         roomPopup.target = self
         roomPopup.action = #selector(selectRoom(_:))
         facePopup.target = self
@@ -411,6 +465,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         }
         selectedRoomHeading.stringValue = "Selected Source Room \(selection.room.sourceIndex)"
         populateSelectionControls(level: level, selection: selection)
+        populatePathControls(level: level)
         populateObjectControls(level: level)
         let differences = projectDocument.project.semanticDiff
         changesLabel.stringValue = boundedSemanticChangesText(
@@ -435,6 +490,11 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         followPortalButton.isEnabled = !isPlaying && selection.portal != nil
         roomNameField.isEnabled = !isPlaying
         renameButton.isEnabled = !isPlaying
+        pathPopup.isEnabled = !isPlaying && pathPopup.numberOfItems > 0
+        pathNodePopup.isEnabled = !isPlaying && pathNodePopup.numberOfItems > 0
+        orientPathNodeButton.isEnabled = pathNodePopup.isEnabled
+            && selectedPathIndex
+                == level.trainingDodgeAttempt?.maneuverFollow?.followPathIndex
         objectPopup.isEnabled = !isPlaying && objectPopup.numberOfItems > 0
         rotateObjectButton.isEnabled = objectPopup.isEnabled
         playerStartPopup.isEnabled = !isPlaying && playerStartPopup.numberOfItems > 0
@@ -685,6 +745,52 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     @objc private func selectVertex(_ sender: NSPopUpButton) {
         selectedVertexIndex = sender.selectedItem?.representedObject as? Int
         refreshVertexCoordinates()
+    }
+
+    @objc private func selectPath(_ sender: NSPopUpButton) {
+        selectedPathIndex = sender.selectedItem?.representedObject as? Int
+        selectedPathNodeIndex = nil
+        refreshFromDocument(renderWorld: false)
+    }
+
+    @objc private func selectPathNode(_ sender: NSPopUpButton) {
+        selectedPathNodeIndex = sender.selectedItem?.representedObject as? Int
+        refreshFromDocument(renderWorld: false)
+    }
+
+    @objc private func orientPathNode(_ sender: Any?) {
+        do {
+            guard let pathIndex = selectedPathIndex else {
+                throw RevivalProjectError.invalidPathNodeOrientationEdit(
+                    pathIndex: -1,
+                    nodeIndex: -1
+                )
+            }
+            guard let nodeIndex = selectedPathNodeIndex else {
+                throw RevivalProjectError.invalidPathNodeOrientationEdit(
+                    pathIndex: pathIndex,
+                    nodeIndex: -1
+                )
+            }
+            let camera = projectDocument.camera
+            let orientation = sourceOrientation(
+                forward: camera.target - camera.position,
+                up: camera.up
+            )
+            try projectDocument.orientPathNode(
+                pathIndex: pathIndex,
+                nodeIndex: nodeIndex,
+                forward: orientation.forward,
+                up: orientation.up
+            )
+            setSuccessStatus(
+                "Oriented path \(pathIndex) node \(nodeIndex) to the editor view. Undo action: Orient Path Node."
+            )
+        } catch {
+            refreshFromDocument()
+            setStatus(error.localizedDescription, isError: true)
+            NSSound.beep()
+        }
     }
 
     @objc private func setVertexPosition(_ sender: Any?) {
@@ -1120,6 +1226,53 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         )
     }
 
+    private func populatePathControls(level: Level) {
+        if !level.paths.indices.contains(selectedPathIndex ?? -1) {
+            selectedPathIndex = level.paths.indices.first
+            selectedPathNodeIndex = nil
+        }
+        pathPopup.removeAllItems()
+        for pathIndex in level.paths.indices {
+            pathPopup.addItem(
+                withTitle: "\(level.paths[pathIndex].name) — Path \(pathIndex)"
+            )
+            pathPopup.lastItem?.representedObject = pathIndex
+        }
+        if let selectedPathIndex {
+            pathPopup.selectItem(at: selectedPathIndex)
+        }
+
+        pathNodePopup.removeAllItems()
+        guard let selectedPathIndex,
+              level.paths.indices.contains(selectedPathIndex) else {
+            pathNodeForwardLabel.stringValue = "Forward: —"
+            pathNodeUpLabel.stringValue = "Up: —"
+            return
+        }
+        let nodes = level.paths[selectedPathIndex].nodes
+        if !nodes.indices.contains(selectedPathNodeIndex ?? -1) {
+            selectedPathNodeIndex = nodes.indices.contains(1)
+                ? 1
+                : nodes.indices.first
+        }
+        for nodeIndex in nodes.indices {
+            pathNodePopup.addItem(withTitle: "Node \(nodeIndex)")
+            pathNodePopup.lastItem?.representedObject = nodeIndex
+        }
+        guard let selectedPathNodeIndex else {
+            pathNodeForwardLabel.stringValue = "Forward: —"
+            pathNodeUpLabel.stringValue = "Up: —"
+            return
+        }
+        pathNodePopup.selectItem(at: selectedPathNodeIndex)
+        let node = nodes[selectedPathNodeIndex]
+        pathNodeForwardLabel.stringValue = vectorLabel(
+            "Forward",
+            value: node.forward
+        )
+        pathNodeUpLabel.stringValue = vectorLabel("Up", value: node.up)
+    }
+
     private func selectedVertexIdentity() throws -> (room: Int, vertex: Int) {
         guard let vertex = selectedVertexIndex else {
             throw RevivalEditorInputError.invalidCoordinates
@@ -1190,6 +1343,10 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         setStatus(message, isError: false)
     }
 
+}
+
+private func vectorLabel(_ name: String, value: Vector3) -> String {
+    "\(name): (\(value.x), \(value.y), \(value.z))"
 }
 
 private enum RevivalEditorInputError: Error, LocalizedError {
