@@ -1,0 +1,48 @@
+Revival.xcodeproj/project.pbxproj
+  s_f30f74a80a6e1d::t_8ca0a426cb408f 190,268,475,815
+docs/revival/source-translation-ledger.md
+  s_c503f7c0529e13::t_6366dfea35c4bb 2120-2126,2134,2142-2143
+  s_c503f7c0529e13::t_99896a80f2ffaa 2133
+Revival/Sources/RevivalAppKit/RevivalGameplayView.swift
+  s_f30f74a80a6e1d::t_20b2753668a272 63,183-188,432-433,462,513,547-559,1633,1666-1672
+docs/revival/functional-completeness-ledger.md
+  s_c503f7c0529e13::t_6366dfea35c4bb 86
+Revival/Tests/D3ImportTests/LiveShieldsHUDTests.swift
+  s_f30f74a80a6e1d::t_8ca0a426cb408f 1-59,61-65,67,73-193
+  s_ac96a058935bf1::t_248dd07e3b79d4 60,66,68-72
+docs/revival/current-plan.md
+  s_c503f7c0529e13::t_2f772861b13935 4,30
+  s_c503f7c0529e13::t_6366dfea35c4bb 22,24-25,28,31,108-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0c25aa8304e7ee4a53aff11b6703ec5ee75dd2a8",
+  "prompts": {},
+  "sessions": {
+    "s_ac96a058935bf1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fef9e-447a-70b0-8933-cb86efa329d0",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_c503f7c0529e13": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f66e3-9777-7a82-83c4-ca01c025a4e8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    },
+    "s_f30f74a80a6e1d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe298-a5ed-7ef2-8d6b-b8f683afe3fc",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jason Holt <st199007@stud.uni-stuttgart.de>"
+    }
+  }
+}
