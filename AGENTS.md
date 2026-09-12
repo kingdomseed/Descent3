@@ -1,12 +1,40 @@
 @/Users/jasonholt/.codex/RTK.md
 
-Always talk in ASD-STE100 Simplified Technical English. Always read `CONTEXT.md` files and use their ubiquitous language.
+Use ASD-STE100 Simplified Technical English. Read applicable `CONTEXT.md` files when the task depends on domain vocabulary or behavior, and use their ubiquitous language.
 
 # Descent 3 revival
 
 Documents under `docs/revival/` declare their status and authority at the top. Accepted contracts and execution records govern current work; historical discovery, archived build procedures, and inherited upstream documents are evidence only and cannot override them.
 
-Read REVIVAL.md, docs/revival/functional-completeness.md, docs/revival/functional-completeness-ledger.md, docs/revival/future-opportunities.md, docs/revival/architecture.md, docs/revival/source-translation.md, docs/revival/source-translation-ledger.md, docs/revival/engineering-principles.md, docs/revival/test-driven-development.md, docs/revival/roadmap.md, docs/revival/current-plan.md, and docs/revival/verification.md before making product changes. The roadmap and accepted contracts govern scope and phase order; docs/revival/current-plan.md is the single living execution-state record beneath them. Read it before selecting work, and let the integration owner update it when work lands or the active sequence changes. Do not create a competing current-work plan. Use `.agents/skills/revival-documentation-steward/SKILL.md` at the start or resumption of a material work packet and at its handoff or closure so durable facts reach their existing accepted document, ledger, current-plan, or change-record owner. After ordinary review is consolidated and before a material packet is declared `READY` or `HOLD`, handed off, or sent into more terminal evidence or expensive profiling, use `.agents/skills/revival-completion-gate/SKILL.md` exactly once to decide whether continued work is required, bounded, deferred, or ceremonial. The steward may propose an exact plan update, but only the integration owner edits live `current-plan.md` state; do not create `task_plan.md`, `findings.md`, `progress.md`, `.planning/`, or another status diary. Read docs/revival/world-loading.md before changing level loading, asset lifetime, residency, visibility, terrain detail, or future streaming. Read docs/revival/content-pipeline.md before changing import or asset behavior, docs/revival/behavior-system.md before changing gameplay behavior, docs/revival/adaptive-music.md before changing score behavior, docs/revival/creator-suite.md before changing editor or publishing behavior, docs/revival/internet-multiplayer-study.md before changing Internet multiplayer or service topology, and docs/revival/skills-and-agents.md plus docs/revival/skill-supply-chain.md before adding, updating, or assigning a project skill.
+## Context by task
+
+- Before selecting or resuming product work, read `docs/revival/current-plan.md`
+  and the applicable roadmap checkpoint. The roadmap and accepted contracts
+  govern scope; current-plan is the single living execution-state record.
+- For product scope or completeness, use `REVIVAL.md`,
+  `docs/revival/functional-completeness.md`, and its ledger. Use
+  `docs/revival/future-opportunities.md` when evaluating later scope.
+- For ownership or implementation strategy, use `docs/revival/architecture.md`
+  and `docs/revival/engineering-principles.md`.
+- For a source-translation island, use `docs/revival/source-translation.md`
+  and `docs/revival/source-translation-ledger.md`.
+- For shipping behavior or verification, use
+  `docs/revival/test-driven-development.md` and `docs/revival/verification.md`.
+  Their production protocol and checkpoint obligations remain binding.
+- For level loading, lifetime, residency, visibility, terrain, or streaming,
+  use `docs/revival/world-loading.md`.
+- For import/assets, gameplay, score, editor/publishing, or Internet topology,
+  use the corresponding `content-pipeline.md`, `behavior-system.md`,
+  `adaptive-music.md`, `creator-suite.md`, or `internet-multiplayer-study.md`
+  under `docs/revival/`.
+- For project-skill changes or assignment, use `docs/revival/skills-and-agents.md`
+  and `docs/revival/skill-supply-chain.md`.
+
+Use the documentation steward and completion gate at the material boundaries
+specified under Workstream gates. Only the integration owner edits live
+`current-plan.md` state. The steward may propose an exact update. Do not create
+a competing plan or status diary such as `task_plan.md`, `findings.md`,
+`progress.md`, or `.planning/`.
 
 ## Binding direction
 
