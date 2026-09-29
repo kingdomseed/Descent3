@@ -1427,6 +1427,16 @@ final class PlayerSimulation {
             } else {
                 openTrainingGalleryBarrier(in: &restoredLevel)
             }
+            // Script 058 (TrainingMission.cpp:1447) and Script 042, the
+            // Portal3 entry (TrainingMission.cpp:2356), set portal render
+            // state after the gallery events. Restore them in that order.
+            if continuation.trainingCameraMonitorState?
+                .script058WasPresented == true {
+                openTrainingGuidebotReturnBarrier(in: &restoredLevel)
+            }
+            if continuation.trainingKillbotEntryState?.wasTriggered == true {
+                closeTrainingKillbotEntryBarrier(in: &restoredLevel)
+            }
         }
         let binding = restoredLevel.defaultPlayerBinding!
         let objectIndex = restoredLevel.objects.firstIndex {

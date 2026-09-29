@@ -756,6 +756,14 @@ extension WorldRenderingTests {
             at: 0.1,
             input: .init(deploysTrainingGuidebot: true)
         )
+        // AIGame.cpp:5893 keeps GBM_BIRTH until mode_time > 1.2 s, and
+        // AIGame.cpp:4892 offers the goal commands only in GBM_AMBIENT.
+        // DoInit sets last_sound_time to the level start (AIGame.cpp:5683),
+        // so DoMessage plays its sound only after 2.5 s (AIGame.cpp:4542).
+        XCTAssertFalse(seed.trainingGuidebotGoalCommandIsAvailable)
+        for frameIndex in 2...26 {
+            _ = seed.update(at: Double(frameIndex) * 0.1, input: .zero)
+        }
         var continuationObject = try XCTUnwrap(
             JSONSerialization.jsonObject(
                 with: JSONEncoder().encode(seed.continuation)
@@ -942,14 +950,16 @@ extension WorldRenderingTests {
             beforeArrival = frame
         }
         let returned = try XCTUnwrap(arrival)
+        // The arrival DoMessage comes less than 2.5 s after the accepted
+        // command's sound, so AIGame.cpp:4542 suppresses its sound.
+        XCTAssertLessThan(returned.gameTime - accepted.gameTime, 2.5)
         XCTAssertEqual(returned.trainingOpeningFeedback, [
             .init(
                 hudMessages: [
                     "GB: I am at the goal, coming back to get you.",
                 ],
                 voiceSourceName: "",
-                voicePrecedesHUDMessages: true,
-                soundSourceName: "GBotAcceptOrder.wav"
+                voicePrecedesHUDMessages: true
             ),
         ])
         let guidebotAtGoal = try XCTUnwrap(

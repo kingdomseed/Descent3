@@ -506,6 +506,13 @@ extension WorldRenderingTests {
         )
         compatibleLesson.repeatForwardGoal = nil
         compatibleLesson.repeatReturnLeft = nil
+        // Scripts 010-013 each require the previous script counter
+        // (TrainingMission.cpp:1759, 1715, 1791, 1727), so a package
+        // without Scripts 008 and 009 cannot carry them.
+        compatibleLesson.repeatReturnRight = nil
+        compatibleLesson.repeatReturnUp = nil
+        compatibleLesson.repeatReturnDown = nil
+        compatibleLesson.continueToCourse = nil
         let compatibleLevel = replacing(
             level,
             trainingOpeningLesson: compatibleLesson,
@@ -2109,9 +2116,16 @@ extension WorldRenderingTests {
             at: 0.1,
             input: .init(forward: 1)
         )
+        // Script 001 (TrainingMission.cpp:1633-1635) shows "Excellent",
+        // streams return1.osf, then shows the reverse instruction as a
+        // separate HUD message before the level timer's welcome feedback.
         XCTAssertEqual(
             simultaneous.trainingOpeningFeedback.map(\.voiceSourceName),
-            ["return1.osf", "welcome.osf"]
+            ["return1.osf", "", "welcome.osf"]
+        )
+        XCTAssertEqual(
+            simultaneous.trainingOpeningFeedback.map(\.hudMessages),
+            [["Excellent"], ["Reverse"], ["Welcome", "Forward"]]
         )
         XCTAssertEqual(
             RevivalGameplayView.trainingMessageLineCount(
