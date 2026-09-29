@@ -20,7 +20,8 @@ Read first: `docs/revival/engineering.md`, sections 2, 3, and 6.
 3. **Review and verification run on Codex, not a Claude subagent:**
    ```bash
    # work item
-   codex exec review --uncommitted -m gpt-6.1-sol -c model_reasoning_effort="xhigh"
+   codex exec -C "$PWD" -m gpt-6.1-sol -c model_reasoning_effort="xhigh" -s read-only --ephemeral \
+     -o /private/tmp/revival-review.md "Review git diff HEAD. Do not build, test, or launch. Report defects with severity and file:line."
    # focused claim (use -m gpt-6-astra -c model_reasoning_effort="high" for milestones and large diffs)
    codex exec -C "$PWD" -m gpt-6.1-sol -c model_reasoning_effort="xhigh" -s read-only --ephemeral \
      -o /private/tmp/revival-verify.md "Verify each claim: VERIFIED / REFUTED / UNVERIFIABLE with file:line or command evidence. Claims: ..."
@@ -30,6 +31,7 @@ Read first: `docs/revival/engineering.md`, sections 2, 3, and 6.
 5. **Clean up** before you say "done":
    ```bash
    pgrep -fl 'RevivalMac|RevivalEditor|RevivalMobile|D3Import|xctest|lldb|codex exec' || echo clean
+   ps -eo pid,command | grep -E 'swift-frontend|xcodebuild' | grep open-source-90s-games | grep -v grep || echo clean
    rm -rf /private/tmp/revival-dd-*
    ```
    Quit only the processes you started. Keep retained evidence in `runtime-data/revival-evidence/`.
