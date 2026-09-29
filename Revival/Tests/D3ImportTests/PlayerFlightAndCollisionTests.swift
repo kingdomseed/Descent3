@@ -2,7 +2,7 @@ import XCTest
 
 extension WorldRenderingTests {
     func testPlayerSimulationPreservesPriorFrameTimingAndNestedPauseRebasing() {
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 10
         )
@@ -30,7 +30,7 @@ extension WorldRenderingTests {
 
     func testVariableDeltaDecisionMatchesBoundedFixedCadenceReferenceTrace() {
         func run(measuredDeltas: [Double]) -> PlayerSimulationFrame {
-            let simulation = PlayerSimulation(
+            let simulation = GameSession(
                 level: makeSliceSixObjectRenderLevel(),
                 presentationReadyTimestamp: 0
             )
@@ -77,7 +77,7 @@ extension WorldRenderingTests {
         ) {
             let base = makeSliceSixObjectRenderLevel()
             let clearance = defaultPlayerView(in: base).collisionRadius + 0.5
-            let simulation = PlayerSimulation(
+            let simulation = GameSession(
                 level: makeSliceTenContactLevel(clearance: clearance),
                 presentationReadyTimestamp: 0
             )
@@ -140,7 +140,7 @@ extension WorldRenderingTests {
             measuredDeltas: [Double],
             input: InputSnapshot
         ) -> (frame: PlayerSimulationFrame, fuel: Float, falloff: Float) {
-            let simulation = PlayerSimulation(
+            let simulation = GameSession(
                 level: level,
                 presentationReadyTimestamp: 0
             )
@@ -201,7 +201,7 @@ extension WorldRenderingTests {
     func testPlayerSimulationUsesPyroAnalyticThrustWithoutDiagonalNormalization() {
         let level = makeSliceSixObjectRenderLevel()
         let start = defaultPlayerView(in: level).camera.position
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -232,7 +232,7 @@ extension WorldRenderingTests {
     func testPlayerSimulationUsesSampledBasisThenCommitsRotationalFlight() {
         let level = makeSliceSixObjectRenderLevel()
         let start = defaultPlayerView(in: level).camera.position
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -285,11 +285,11 @@ extension WorldRenderingTests {
     }
 
     func testPlayerSimulationAppliesIsolatedRollToAngularVelocityAndCameraUp() {
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 0
         )
-        let start = defaultPlayerView(in: simulation.level)
+        let start = defaultPlayerView(in: simulation.runtimeLevel)
 
         let frame = simulation.update(
             at: 0.016,
@@ -316,11 +316,11 @@ extension WorldRenderingTests {
     }
 
     func testIndoorNewPlayerAutolevelCanBeTurnedOffAfterSourceDelay() {
-        let active = PlayerSimulation(
+        let active = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 0
         )
-        let disabled = PlayerSimulation(
+        let disabled = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 0
         )
@@ -351,7 +351,7 @@ extension WorldRenderingTests {
     }
 
     func testPlayerSimulationCommitsContactResponseToSamePlayerAndRoom() throws {
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceTenContactLevel(),
             presentationReadyTimestamp: 0
         )
@@ -372,7 +372,7 @@ extension WorldRenderingTests {
         let frame = try XCTUnwrap(contactFrame)
         let contact = try XCTUnwrap(frame.wallContact)
         let player = try XCTUnwrap(
-            simulation.level.objects.first {
+            simulation.runtimeLevel.objects.first {
                 $0.handle == frame.playerView.objectHandle
             }
         )
@@ -392,11 +392,11 @@ extension WorldRenderingTests {
     }
 
     func testBaseAfterburnerUsesReleasedBoostFuelAndProjectionState() {
-        let boosted = PlayerSimulation(
+        let boosted = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 0
         )
-        let ordinary = PlayerSimulation(
+        let ordinary = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 0
         )
@@ -443,7 +443,7 @@ extension WorldRenderingTests {
             afterburnerFrames: Int
         ) -> Float {
             let simulations = (0..<3).map { _ in
-                PlayerSimulation(
+                GameSession(
                     level: makeSliceSixObjectRenderLevel(),
                     presentationReadyTimestamp: 0
                 )
@@ -503,7 +503,7 @@ extension WorldRenderingTests {
             0x4019_99a9
         )
 
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 0
         )
@@ -542,7 +542,7 @@ extension WorldRenderingTests {
     }
 
     func testReleasedNoCoolerRechargeConsumesEnergyAboveThreshold() {
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 0
         )
@@ -576,7 +576,7 @@ extension WorldRenderingTests {
     }
 
     func testReleasedRechargeConsumesUntrimmedFrameWhenFuelCaps() {
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 0
         )
@@ -591,11 +591,11 @@ extension WorldRenderingTests {
     }
 
     func testPyroWiggleIsSourceQuantizedAuthoritativeMovementWithFalloff() {
-        let stationary = PlayerSimulation(
+        let stationary = GameSession(
             level: makeSliceThirteenWiggleLevel(),
             presentationReadyTimestamp: 0
         )
-        let thrusting = PlayerSimulation(
+        let thrusting = GameSession(
             level: makeSliceThirteenWiggleLevel(),
             presentationReadyTimestamp: 0
         )
@@ -627,7 +627,7 @@ extension WorldRenderingTests {
         let playerIndex = objects.firstIndex { $0.handle == 2_048 }!
         objects[playerIndex].position = .zero
         level = replacing(level, objects: objects)
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -642,11 +642,11 @@ extension WorldRenderingTests {
     }
 
     func testPyroWiggleUsesPostMouselookPreRotationUpAxis() {
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceThirteenWiggleLevel(),
             presentationReadyTimestamp: 0
         )
-        let start = defaultPlayerView(in: simulation.level).camera.position
+        let start = defaultPlayerView(in: simulation.runtimeLevel).camera.position
 
         let frame = simulation.update(
             at: 0.1,
@@ -662,7 +662,7 @@ extension WorldRenderingTests {
     }
 
     func testPyroWiggleRetainsTenPercentMovementAtFullFalloff() {
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceThirteenWiggleLevel(),
             presentationReadyTimestamp: 0
         )
@@ -676,7 +676,7 @@ extension WorldRenderingTests {
             )
             timestamp += 0.1
         }
-        let priorPosition = defaultPlayerView(in: simulation.level).camera.position
+        let priorPosition = defaultPlayerView(in: simulation.runtimeLevel).camera.position
         let frame = simulation.update(
             at: timestamp,
             input: .init(afterburner: 0.000_02)
@@ -690,7 +690,7 @@ extension WorldRenderingTests {
     }
 
     func testPyroWiggleCommitsReturnedRoomAfterPortalCrossing() {
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceThirteenPortalWiggleLevel(),
             presentationReadyTimestamp: 0
         )
@@ -699,17 +699,17 @@ extension WorldRenderingTests {
 
         XCTAssertEqual(frame.playerView.roomSourceIndex, 99)
         XCTAssertEqual(
-            simulation.level.objects.first { $0.handle == 2_048 }!.location,
+            simulation.runtimeLevel.objects.first { $0.handle == 2_048 }!.location,
             .room(99)
         )
     }
 
     func testPyroWiggleRefusesMovementOnIndoorContact() {
-        let open = PlayerSimulation(
+        let open = GameSession(
             level: makeSliceThirteenWiggleLevel(),
             presentationReadyTimestamp: 0
         )
-        let blocked = PlayerSimulation(
+        let blocked = GameSession(
             level: makeSliceThirteenWiggleLevel(blocked: true),
             presentationReadyTimestamp: 0
         )
@@ -726,7 +726,7 @@ extension WorldRenderingTests {
     func testPlayerSimulationSlidesAndRetracesRemainingFrameAfterContact() throws {
         let base = makeSliceSixObjectRenderLevel()
         let clearance = defaultPlayerView(in: base).collisionRadius + 0.5
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceTenContactLevel(clearance: clearance),
             presentationReadyTimestamp: 0
         )
@@ -779,7 +779,7 @@ extension WorldRenderingTests {
     }
 
     func testPlayerSimulationUsesSourceDefaultForceFieldBounce() throws {
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceElevenForceFieldLevel(clearance: 20),
             presentationReadyTimestamp: 0
         )
@@ -808,7 +808,7 @@ extension WorldRenderingTests {
     func testNearImmediateContactUsesReleasedNormalNudge() throws {
         let base = makeSliceSixObjectRenderLevel()
         let clearance = defaultPlayerView(in: base).collisionRadius - 0.0005
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceTenContactLevel(clearance: clearance),
             presentationReadyTimestamp: 0
         )
@@ -835,7 +835,7 @@ extension WorldRenderingTests {
     func testPlayerSimulationStopsAtReleasedNineContactLimit() throws {
         let base = makeSliceSixObjectRenderLevel()
         let clearance = defaultPlayerView(in: base).collisionRadius - 0.0005
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceElevenTrappedLevel(clearance: clearance),
             presentationReadyTimestamp: 0
         )

@@ -218,7 +218,11 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
         )
     }
 
-    func update(level: Level, playerView: PlayerView) throws {
+    func update(
+        level: Level,
+        world: GameWorld,
+        playerView: PlayerView
+    ) throws {
         guard let presentation else {
             try replace(level: level, playerView: playerView)
             return
@@ -227,12 +231,18 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             try updateMetalWorldPlan(
                 presentation.plan,
                 level: level,
+                objects: world.objects,
+                roomStates: world.rooms,
                 playerView: playerViewWithDrawableAspect(playerView)
             )
         )
     }
 
-    func update(level: Level, frame: PlayerSimulationFrame) throws {
+    func update(
+        level: Level,
+        world: GameWorld,
+        frame: PlayerSimulationFrame
+    ) throws {
         guard let presentation else {
             try replace(level: level, playerView: frame.playerView)
             return
@@ -247,6 +257,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             try updateMetalWorldPlan(
                 presentation.plan,
                 level: level,
+                world: world,
                 frame: frame,
                 drawableAspect: drawableAspect
             )

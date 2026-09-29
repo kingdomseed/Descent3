@@ -308,8 +308,8 @@ struct RevivalPlaySession: Equatable, Sendable {
 
     func makePlayerSimulation(
         presentationReadyTimestamp: Double
-    ) -> PlayerSimulation {
-        PlayerSimulation(
+    ) -> GameSession {
+        GameSession(
             level: level,
             presentationReadyTimestamp: presentationReadyTimestamp
         )

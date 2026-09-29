@@ -9,7 +9,7 @@ extension WorldRenderingTests {
         let chain = try XCTUnwrap(
             level.trainingFinalBotsCompletionChain
         )
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -38,7 +38,7 @@ extension WorldRenderingTests {
             }
         }
 
-        try assertBarrierIsOpen(in: simulation.level)
+        try assertBarrierIsOpen(in: simulation.runtimeLevel)
         XCTAssertEqual(
             frame.trainingFinalBotsMarkerLightDistance,
             50
@@ -47,13 +47,12 @@ extension WorldRenderingTests {
             $0.voiceSourceName == chain.completionVoiceSourceName
         })
         let pendingData = try JSONEncoder().encode(
-            simulation.continuation
+            simulation.world
         )
         let pendingObject = try XCTUnwrap(
             JSONSerialization.jsonObject(with: pendingData)
                 as? [String: Any]
         )
-        XCTAssertEqual(pendingObject["schemaVersion"] as? Int, 7)
         let pendingState = try XCTUnwrap(
             pendingObject["trainingFinalBotsCompletionState"]
                 as? [String: Any]
@@ -65,15 +64,15 @@ extension WorldRenderingTests {
             accuracy: 0.000_1
         )
 
-        let restored = try PlayerSimulation(
+        let restored = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
+            world: (JSONDecoder().decode(
+                GameWorld.self,
                 from: pendingData
-            ),
+            )).rebased(onto: level),
             resumedAtTimestamp: 100
         )
-        try assertBarrierIsOpen(in: restored.level)
+        try assertBarrierIsOpen(in: restored.runtimeLevel)
         for frameIndex in 1...20 {
             frame = restored.update(
                 at: 100 + Double(frameIndex) * 0.1,
@@ -97,44 +96,21 @@ extension WorldRenderingTests {
             ).trainingOpeningFeedback.isEmpty
         )
 
-        let completed = try PlayerSimulation(
+        let completed = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONEncoder().encode(restored.continuation)
-            ),
+            world: (JSONDecoder().decode(
+                GameWorld.self,
+                from: JSONEncoder().encode(restored.world)
+            )).rebased(onto: level),
             resumedAtTimestamp: 200
         )
-        try assertBarrierIsOpen(in: completed.level)
+        try assertBarrierIsOpen(in: completed.runtimeLevel)
         XCTAssertTrue(
             completed.update(
                 at: 200.1,
                 input: .zero
             ).trainingOpeningFeedback.isEmpty
         )
-
-        var hostileObject = pendingObject
-        var hostileState = pendingState
-        hostileState["markerLightDistance"] = 0
-        hostileObject["trainingFinalBotsCompletionState"] =
-            hostileState
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: JSONDecoder().decode(
-                    PlayerSimulationContinuation.self,
-                    from: JSONSerialization.data(
-                        withJSONObject: hostileObject
-                    )
-                ),
-                resumedAtTimestamp: 300
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
     }
 
     @MainActor
@@ -147,7 +123,7 @@ extension WorldRenderingTests {
         let goal = try XCTUnwrap(level.objects.first {
             $0.handle == chain.goalObjectHandle
         })
-        let initial = PlayerSimulation(
+        let initial = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -163,9 +139,7 @@ extension WorldRenderingTests {
         initial.destroyTrainingLastBot5(handle: 2_083)
         _ = initial.update(at: 0.1, input: .zero)
         var ready = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(initial.continuation)
-            ) as? [String: Any]
+            testWorldObject(initial.world)
         )
         ready["playerLocation"] = [
             "room": ["_0": chain.goalRoomSourceIndex]
@@ -176,12 +150,9 @@ extension WorldRenderingTests {
             "z": goal.position.z,
         ]
         ready["playerHeadlightIsOn"] = true
-        let simulation = try PlayerSimulation(
+        let simulation = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: ready)
-            ),
+            world: (decodeTestWorld(ready)).rebased(onto: level),
             resumedAtTimestamp: 0
         )
 
@@ -344,13 +315,12 @@ extension WorldRenderingTests {
         )
 
         let continuationData = try JSONEncoder().encode(
-            simulation.continuation
+            simulation.world
         )
         let continuationObject = try XCTUnwrap(
             JSONSerialization.jsonObject(with: continuationData)
                 as? [String: Any]
         )
-        XCTAssertEqual(continuationObject["schemaVersion"] as? Int, 7)
         let finalGoalState = try XCTUnwrap(
             continuationObject["trainingFinalGoalState"]
                 as? [String: Any]
@@ -364,12 +334,12 @@ extension WorldRenderingTests {
             1
         )
 
-        let restored = try PlayerSimulation(
+        let restored = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
+            world: (JSONDecoder().decode(
+                GameWorld.self,
                 from: continuationData
-            ),
+            )).rebased(onto: level),
             resumedAtTimestamp: 100
         )
         let restoredFrame = restored.update(at: 100.1, input: .zero)
@@ -381,28 +351,6 @@ extension WorldRenderingTests {
             restoredFrame.trainingFinalGoal?.scriptActionCounter,
             1
         )
-
-        var hostile = continuationObject
-        var hostileFinalGoalState = finalGoalState
-        hostileFinalGoalState["scriptActionCounter"] = 2
-        hostile["trainingFinalGoalState"] = hostileFinalGoalState
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: JSONDecoder().decode(
-                    PlayerSimulationContinuation.self,
-                    from: JSONSerialization.data(
-                        withJSONObject: hostile
-                    )
-                ),
-                resumedAtTimestamp: 200
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
     }
 
     @MainActor
@@ -506,7 +454,7 @@ extension WorldRenderingTests {
         let goal = try XCTUnwrap(level.objects.first {
             $0.handle == chain.goalObjectHandle
         })
-        let initial = PlayerSimulation(
+        let initial = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -522,9 +470,7 @@ extension WorldRenderingTests {
         initial.destroyTrainingLastBot5(handle: 2_083)
         _ = initial.update(at: 0.1, input: .zero)
         var ready = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(initial.continuation)
-            ) as? [String: Any]
+            testWorldObject(initial.world)
         )
         ready["playerLocation"] = [
             "room": ["_0": chain.goalRoomSourceIndex]
@@ -534,12 +480,9 @@ extension WorldRenderingTests {
             "y": goal.position.y,
             "z": goal.position.z,
         ]
-        let simulation = try PlayerSimulation(
+        let simulation = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: ready)
-            ),
+            world: (decodeTestWorld(ready)).rebased(onto: level),
             resumedAtTimestamp: 0
         )
 

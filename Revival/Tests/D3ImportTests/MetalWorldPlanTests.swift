@@ -3,7 +3,7 @@ import XCTest
 final class MetalWorldPlanTests: XCTestCase {
     func testFastPlayerHeadlightLightsRetainedVisibleObjectDraw() throws {
         let level = makeFastPlayerHeadlightLevel()
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -12,7 +12,7 @@ final class MetalWorldPlanTests: XCTestCase {
             input: .init(togglesHeadlight: true)
         )
         let initial = try makeMetalWorldPlan(
-            level: simulation.level,
+            level: simulation.runtimeLevel,
             playerView: frame.playerView
         )
         let baseline = initial.draws.first {
@@ -21,6 +21,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let lit = try updateMetalWorldPlan(
             initial,
             level: simulation.level,
+            objects: simulation.world.objects,
+            roomStates: simulation.world.rooms,
             playerView: frame.playerView,
             playerFastHeadlight: frame.playerFastHeadlight
         )
@@ -36,7 +38,7 @@ final class MetalWorldPlanTests: XCTestCase {
         )
 
         let monitorLevel = makeTrainingCameraMonitorLevel()
-        let monitorSimulation = PlayerSimulation(
+        let monitorSimulation = GameSession(
             level: monitorLevel,
             presentationReadyTimestamp: 0
         )
@@ -53,6 +55,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let monitorBaseline = try updateMetalWorldPlan(
             monitorInitial,
             level: monitorLevel,
+            objects: ObjectTable(level: monitorLevel),
+            roomStates: RoomState.canonical(monitorLevel),
             playerView: used.playerView,
             trainingCameraMonitor: monitor
         )
@@ -69,6 +73,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let auxiliaryLit = try updateMetalWorldPlan(
             monitorBaseline,
             level: monitorLevel,
+            objects: ObjectTable(level: monitorLevel),
+            roomStates: RoomState.canonical(monitorLevel),
             playerView: used.playerView,
             trainingCameraMonitor: monitor,
             playerFastHeadlight: .init(
@@ -117,6 +123,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             trainingPrimaryProjectiles: [projectile]
         )
@@ -203,6 +211,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             playerConcussionMissiles: [missile],
             playerConcussionExplosions: [explosion],
@@ -235,7 +245,7 @@ final class MetalWorldPlanTests: XCTestCase {
         throws
     {
         let level = try makePlayerConcussionLevel()
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -251,6 +261,7 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: level,
+            world: GameWorld(level: level),
             frame: frame,
             drawableAspect: 1
         )
@@ -274,7 +285,7 @@ final class MetalWorldPlanTests: XCTestCase {
             })
         level.objects[playerIndex].location = start.location
         level.objects[playerIndex].position = start.position
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -291,7 +302,7 @@ final class MetalWorldPlanTests: XCTestCase {
             })
 
         let initial = try makeMetalWorldPlan(
-            level: simulation.level,
+            level: simulation.runtimeLevel,
             playerView: frame.playerView
         )
         let initialTurretVertices = initial.draws.filter {
@@ -300,6 +311,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: simulation.level,
+            objects: simulation.world.objects,
+            roomStates: simulation.world.rooms,
             playerView: frame.playerView,
             presentationFrame: .init(
                 systemsFrameDuration: frame.systemsFrameDuration,
@@ -352,6 +365,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let lit = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             presentationFrame: .init(
                 systemsFrameDuration: 0.1,
@@ -394,6 +409,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let lit = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             presentationFrame: .init(
                 systemsFrameDuration: 0.1,
@@ -410,7 +427,7 @@ final class MetalWorldPlanTests: XCTestCase {
 
     func testCloakAlphaReachesAuxiliaryCameraPlayerDraws() throws {
         let level = makeTrainingCloakPickupLevel()
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -428,6 +445,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let faded = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: used.playerView,
             trainingCameraMonitor: monitor,
             trainingCloak: .init(
@@ -464,12 +483,16 @@ final class MetalWorldPlanTests: XCTestCase {
         let baseline = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: used.playerView,
             trainingCameraMonitor: monitor
         )
         let cloaked = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: used.playerView,
             presentationFrame: .init(
                 systemsFrameDuration: 0.1,
@@ -558,6 +581,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let fullyLit = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             presentationFrame: .init(
                 systemsFrameDuration: 0.1,
@@ -568,6 +593,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let pulseFloor = try updateMetalWorldPlan(
             fullyLit,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             presentationFrame: .init(
                 systemsFrameDuration: 0.1,
@@ -590,7 +617,7 @@ final class MetalWorldPlanTests: XCTestCase {
         throws
     {
         var level = makeTrainingCameraMonitorLevel()
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -608,6 +635,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let auxiliaryBaseline = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             trainingCameraMonitor: monitor
         )
@@ -637,6 +666,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let fullyLit = try updateMetalWorldPlan(
             auxiliaryBaseline,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             presentationFrame: .init(
                 systemsFrameDuration: 0.1,
@@ -648,6 +679,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let pulseFloor = try updateMetalWorldPlan(
             fullyLit,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             presentationFrame: .init(
                 systemsFrameDuration: 0.1,
@@ -683,7 +716,7 @@ final class MetalWorldPlanTests: XCTestCase {
 
     func testCameraMonitorUsesRetainedWorldPlanForItsSecurityCamera() throws {
         let level = makeTrainingCameraMonitorLevel()
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -700,6 +733,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: simulation.level,
+            objects: simulation.world.objects,
+            roomStates: simulation.world.rooms,
             playerView: used.playerView,
             trainingCameraMonitor: used.trainingCameraMonitor
         )
@@ -754,6 +789,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             trainingCameraMonitor: monitor
         )
@@ -812,6 +849,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: movedPlayerView,
             trainingCameraMonitor: monitor
         )
@@ -860,6 +899,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: playerView,
             trainingCameraMonitor: monitor
         )
@@ -1124,7 +1165,7 @@ final class MetalWorldPlanTests: XCTestCase {
         let level = makeSliceSixObjectRenderLevel()
         let initialView = defaultPlayerView(in: level)
         let initial = try makeMetalWorldPlan(level: level, playerView: initialView)
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -1136,6 +1177,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: simulation.level,
+            objects: simulation.world.objects,
+            roomStates: simulation.world.rooms,
             playerView: frame.playerView
         )
 
@@ -1208,7 +1251,7 @@ final class MetalWorldPlanTests: XCTestCase {
             $0.objectHandle == guidebotHandle
         })
 
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -1219,6 +1262,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: simulation.level,
+            objects: simulation.world.objects,
+            roomStates: simulation.world.rooms,
             playerView: frame.playerView
         )
 
@@ -1250,6 +1295,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
             playerView: movedView
         )
         let fresh = try makeMetalWorldPlan(level: level, playerView: movedView)

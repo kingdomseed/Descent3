@@ -246,7 +246,7 @@ struct TrainingEndLevelPresentation: Equatable, Sendable {
     let showsHeadlightIndicator: Bool
 }
 
-struct TrainingPostLevelResult: Equatable, Sendable {
+struct TrainingPostLevelResult: Codable, Equatable, Sendable {
     let title: String
     let levelName: String
     let difficulty: TrainingDifficulty
@@ -260,7 +260,7 @@ struct TrainingPostLevelResult: Equatable, Sendable {
     let objectives: [String]
 }
 
-enum TrainingSessionOutcome: Equatable, Sendable {
+enum TrainingSessionOutcome: Codable, Equatable, Sendable {
     case awaitingResultAcknowledgement
     case completed
 }
@@ -382,19 +382,33 @@ enum TrainingGuidebotRouteError:
     case noRoomPortalPath
 }
 
+/// The player view at the level's initial placement.
 func defaultPlayerView(
     in level: Level,
     projection: PerspectiveProjection = .sourceDefault
 ) -> PlayerView {
+    defaultPlayerView(
+        in: level,
+        objects: ObjectTable(level: level),
+        projection: projection
+    )
+}
+
+/// The player view at the player's current object in `objects`.
+func defaultPlayerView(
+    in level: Level,
+    objects: ObjectTable,
+    projection: PerspectiveProjection = .sourceDefault
+) -> PlayerView {
     let binding = level.defaultPlayerBinding!
-    let object = level.objects.first { $0.handle == binding.objectHandle }!
+    let object = objects[ObjectHandle(binding.objectHandle)]!
     let ship = level.shipDefinitions.first { $0.source == binding.ship }!
     guard case let .room(roomSourceIndex) = object.location else {
         preconditionFailure("The validated default player start is indoor.")
     }
     return PlayerView(
         playerID: binding.playerID,
-        objectHandle: object.handle,
+        objectHandle: object.handle.rawValue,
         roomSourceIndex: roomSourceIndex,
         camera: RoomCamera(
             position: object.position,

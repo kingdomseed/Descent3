@@ -4,6 +4,7 @@ import Foundation
 
 func trainingGuidebotRoute(
     in level: Level,
+    roomStates: [RoomState],
     startRoomSourceIndex: Int,
     start: Vector3,
     startForward: Vector3,
@@ -25,6 +26,7 @@ func trainingGuidebotRoute(
     guard let boaRooms else { return .failure(.noBOAPath) }
     if trainingGuidebotProbeIsClear(
         in: level,
+        roomStates: roomStates,
         startRoomSourceIndex: startRoomSourceIndex,
         start: start,
         destination: destination,
@@ -83,6 +85,7 @@ func trainingGuidebotRoute(
         trainingGuidebotDistance(start, startNodes[$0].position) < 800
             && trainingGuidebotProbeIsClear(
                 in: level,
+                roomStates: roomStates,
                 startRoomSourceIndex: startRoomSourceIndex,
                 start: start,
                 destination: startNodes[$0].position,
@@ -110,6 +113,7 @@ func trainingGuidebotRoute(
                 &&
             trainingGuidebotProbeIsClear(
                 in: level,
+                roomStates: roomStates,
                 startRoomSourceIndex: destinationRoomSourceIndex,
                 start: destinationNodes[$0].position,
                 destination: destination,
@@ -265,6 +269,7 @@ private func trainingGuidebotBoundaryNodePath(
 
 private func trainingGuidebotProbeIsClear(
     in level: Level,
+    roomStates: [RoomState],
     startRoomSourceIndex: Int,
     start: Vector3,
     destination: Vector3,
@@ -272,6 +277,7 @@ private func trainingGuidebotProbeIsClear(
 ) -> Bool {
     if case .noHit = traceIndoorMovement(
         in: level,
+        roomStates: roomStates,
         startRoom: startRoomSourceIndex,
         start: start,
         end: destination,
@@ -300,13 +306,14 @@ private func trainingGuidebotQuickDistance(
 }
 
 func trainingCameraMonitorGoalTarget(
-    in level: Level
-) -> PlacedObject? {
+    in level: Level,
+    world: GameWorld
+) -> GameObject? {
     guard let cameraChain = level.trainingCameraMonitorChain else {
         return nil
     }
-    let activePrimaryIndices = level.goals.indices.filter { index in
-        let status = level.goals[index].status
+    let activePrimaryIndices = world.goals.indices.filter { index in
+        let status = world.goals[index].status
         return status & 0x0000_0004 != 0
             && status
                 & (0x0000_0002 | 0x0000_0008 | 0x0000_0080)
@@ -314,7 +321,7 @@ func trainingCameraMonitorGoalTarget(
     }
     let minimumPriorityByList = Dictionary(
         activePrimaryIndices.map {
-            (level.goals[$0].list, level.goals[$0].priority)
+            (world.goals[$0].list, world.goals[$0].priority)
         },
         uniquingKeysWith: min
     )
@@ -322,14 +329,14 @@ func trainingCameraMonitorGoalTarget(
         .lazy
         .compactMap { list in
             activePrimaryIndices.first { index in
-                let goal = level.goals[index]
+                let goal = world.goals[index]
                 return goal.list == list
                     && goal.priority == minimumPriorityByList[list]
             }
         }
         .first
     guard let firstActivePrimaryIndex else { return nil }
-    let goal = level.goals[firstActivePrimaryIndex]
+    let goal = world.goals[firstActivePrimaryIndex]
     guard goal.status & (0x0000_0020 | 0x0000_0040) == 0,
           goal.name == "Locate the Camera Monitor",
           goal.itemName == "Camera Monitor",
@@ -339,7 +346,10 @@ func trainingCameraMonitorGoalTarget(
           item.sourceHandle == cameraChain.pickupObjectHandle,
           item.objectHandle == cameraChain.pickupObjectHandle,
           !item.done,
-          let target = trainingCameraMonitorObjectTarget(in: level)
+          let target = trainingCameraMonitorObjectTarget(
+              in: level,
+              objects: world.objects
+          )
     else {
         return nil
     }
@@ -347,14 +357,14 @@ func trainingCameraMonitorGoalTarget(
 }
 
 func trainingCameraMonitorObjectTarget(
-    in level: Level
-) -> PlacedObject? {
+    in level: Level,
+    objects: ObjectTable
+) -> GameObject? {
     guard let cameraChain = level.trainingCameraMonitorChain,
           cameraChain.returnToShip != nil,
-          let target = level.objects.first(where: {
-              $0.handle == cameraChain.pickupObjectHandle
-          }),
-          target.type == 7,
+          let target =
+            objects[ObjectHandle(cameraChain.pickupObjectHandle)],
+          target.type == .powerup,
           target.location == .room(39)
     else {
         return nil
@@ -362,7 +372,7 @@ func trainingCameraMonitorObjectTarget(
     return target
 }
 
-extension PlayerSimulation {
+extension GameSession {
     func assignTrainingFollowBotPath(
         _ pathIndex: Int,
         state: inout TrainingManeuverFollowState
@@ -435,7 +445,7 @@ extension PlayerSimulation {
         state.pathNodeIndex = motion.pathNodeIndex
         state.pathFailure = motion.pathFailure
         trainingManeuverFollowState = state
-        restoreTrainingFollowBotPresentation()
+        syncTrainingFollowBotObject()
     }
 
     func advanceTrainingMovingTarget(duration: Float) {
@@ -478,17 +488,15 @@ extension PlayerSimulation {
         }
         state.destruction = destruction
         trainingManeuverFollowState = state
-        if let objectIndex = level.objects.firstIndex(where: {
-            $0.handle == activeHandle
-        }) {
+        if var object = world.objects[ObjectHandle(activeHandle)] {
             let motion = activeHandle == handoff.destroyBot1ObjectHandle
                 ? destruction.destroyBot1Motion
                 : destruction.destroyBot1Destruction!
                     .destroyBot2Motion
-            level.objects[objectIndex].location =
-                .room(motion.roomSourceIndex)
-            level.objects[objectIndex].position = motion.position
-            level.objects[objectIndex].orientation = motion.orientation
+            object.location = .room(motion.roomSourceIndex)
+            object.position = motion.position
+            object.orientation = motion.orientation
+            world.objects[object.handle] = object
         }
     }
 
@@ -563,6 +571,7 @@ extension PlayerSimulation {
         }
         let trace = traceIndoorMovement(
             in: level,
+            roomStates: world.rooms,
             startRoom: motion.roomSourceIndex,
             start: motion.position,
             end: motion.position + motion.velocity * duration,
@@ -642,20 +651,19 @@ extension PlayerSimulation {
         }
     }
 
-    func restoreTrainingFollowBotPresentation() {
+    func syncTrainingFollowBotObject() {
         guard let state = trainingManeuverFollowState,
               let lesson =
                 level.trainingDodgeAttempt?.maneuverFollow,
-              let objectIndex = level.objects.firstIndex(where: {
-                  $0.handle == lesson.followBotObjectHandle
-              })
+              var object =
+                world.objects[ObjectHandle(lesson.followBotObjectHandle)]
         else {
             return
         }
-        level.objects[objectIndex].location =
-            .room(state.roomSourceIndex)
-        level.objects[objectIndex].position = state.position
-        level.objects[objectIndex].orientation = state.orientation
+        object.location = .room(state.roomSourceIndex)
+        object.position = state.position
+        object.orientation = state.orientation
+        world.objects[object.handle] = object
     }
 
     var trainingGuidebotGoalCommandIsAvailable: Bool {
@@ -937,7 +945,7 @@ extension PlayerSimulation {
     }
 
     private func trainingCameraMonitorActiveGoalTarget()
-        -> PlacedObject?
+        -> GameObject?
     {
         guard let state = trainingRobotGuidebotState,
               state.guidebotContinuationWasPresented,
@@ -949,7 +957,7 @@ extension PlayerSimulation {
               !cameraState.isHeld,
               !cameraState.wasUsed,
               !cameraState.script058WasPresented,
-              let target = trainingCameraMonitorGoalTarget(in: level)
+              let target = trainingCameraMonitorGoalTarget(in: level, world: world)
         else {
             return nil
         }
@@ -979,6 +987,7 @@ extension PlayerSimulation {
         )
         guard case let .success(route) = trainingGuidebotRoute(
             in: level,
+            roomStates: world.rooms,
             startRoomSourceIndex: guidebot.roomSourceIndex,
             start: guidebot.position,
             startForward: startForward,
@@ -1017,7 +1026,7 @@ extension PlayerSimulation {
     }
 
     func deployTrainingGuidebot(
-        from player: PlacedObject,
+        from player: GameObject,
         playerVelocity: Vector3,
         gameTime: Float
     ) {
@@ -1035,6 +1044,7 @@ extension PlayerSimulation {
             + player.orientation.forward * definition.goalForwardDistance
         let allocated = trainingGuidebotRoute(
             in: level,
+            roomStates: world.rooms,
             startRoomSourceIndex: roomSourceIndex,
             start: player.position,
             startForward: player.orientation.forward,
@@ -1094,11 +1104,11 @@ extension PlayerSimulation {
             state: &state
         )
         trainingRobotGuidebotState = state
-        restoreTrainingGuidebotPresentation()
+        syncTrainingGuidebotObject()
     }
 
     func releaseTrainingGuidebot(
-        from player: PlacedObject,
+        from player: GameObject,
         playerVelocity: Vector3,
         gameTime: Float
     ) -> TrainingOpeningFeedback? {
@@ -1133,40 +1143,28 @@ extension PlayerSimulation {
         )
     }
 
-    func restoreTrainingGuidebotPresentation() {
+    func syncTrainingGuidebotObject() {
         guard let guidebot =
                 trainingRobotGuidebotState?.guidebot,
               let chain = level.trainingRobotGuidebotChain,
-              let objectIndex = level.objects.firstIndex(where: {
-                  $0.handle == chain.guidebotObjectHandle
-              }),
-              let presentationIndex =
-                level.objectPresentations.firstIndex(where: {
-                    $0.objectHandle == chain.guidebotObjectHandle
-                })
+              var object =
+                world.objects[ObjectHandle(chain.guidebotObjectHandle)],
+              level.objectPresentations.contains(where: {
+                  $0.objectHandle == chain.guidebotObjectHandle
+              })
         else {
             return
         }
-        level.objects[objectIndex].location =
-            .room(guidebot.roomSourceIndex)
-        level.objects[objectIndex].position = guidebot.position
-        level.objects[objectIndex].orientation = guidebot.orientation
-        let presentation = level.objectPresentations[presentationIndex]
-        level.objectPresentations[presentationIndex] = .init(
-            objectHandle: presentation.objectHandle,
-            primaryModel: presentation.primaryModel,
-            mediumModel: presentation.mediumModel,
-            lowModel: presentation.lowModel,
-            dyingModel: presentation.dyingModel,
-            mediumDistance: presentation.mediumDistance,
-            lowDistance: presentation.lowDistance,
-            isVisible: true
-        )
+        object.location = .room(guidebot.roomSourceIndex)
+        object.position = guidebot.position
+        object.orientation = guidebot.orientation
+        object.renderType = .polyobj
+        world.objects[object.handle] = object
     }
 
     func advanceTrainingGuidebot(
         duration: Float,
-        player: PlacedObject,
+        player: GameObject,
         playerRadius: Float
     ) -> TrainingGuidebotAdvanceEvent? {
         guard duration > 0,
@@ -1182,7 +1180,7 @@ extension PlayerSimulation {
             guidebot.activeSteeringMode = .stopped
             state.guidebot = guidebot
             trainingRobotGuidebotState = state
-            restoreTrainingGuidebotPresentation()
+            syncTrainingGuidebotObject()
             return nil
         }
         if guidebot.task == .returnToPlayer
@@ -1198,6 +1196,7 @@ extension PlayerSimulation {
                 )
                 let allocated = trainingGuidebotRoute(
                     in: level,
+                    roomStates: world.rooms,
                     startRoomSourceIndex: guidebot.roomSourceIndex,
                     start: guidebot.position,
                     startForward: startForward,
@@ -1295,6 +1294,7 @@ extension PlayerSimulation {
         let movementStart = guidebot.position
         let trace = traceIndoorMovement(
             in: level,
+            roomStates: world.rooms,
             startRoom: guidebot.roomSourceIndex,
             start: guidebot.position,
             end: guidebot.position + guidebot.velocity * duration,
@@ -1320,6 +1320,7 @@ extension PlayerSimulation {
             )
             let allocated = trainingGuidebotRoute(
                 in: level,
+                roomStates: world.rooms,
                 startRoomSourceIndex: guidebot.roomSourceIndex,
                 start: guidebot.position,
                 startForward: startForward,
@@ -1364,7 +1365,7 @@ extension PlayerSimulation {
             }
             state.guidebot = guidebot
             trainingRobotGuidebotState = state
-            restoreTrainingGuidebotPresentation()
+            syncTrainingGuidebotObject()
             return .reachedActiveGoal
         }
         if guidebot.task == .returnToPlayer, reachedGoal {
@@ -1374,7 +1375,7 @@ extension PlayerSimulation {
             guidebot.task = .escortPlayer
             state.guidebot = guidebot
             trainingRobotGuidebotState = state
-            restoreTrainingGuidebotPresentation()
+            syncTrainingGuidebotObject()
             return .returnedToPlayer
         }
         if guidebot.task == .returnToShip,
@@ -1393,11 +1394,7 @@ extension PlayerSimulation {
             trainingRobotGuidebotState = state
             let handle =
                 level.trainingRobotGuidebotChain!.guidebotObjectHandle
-            setObjectPresentationVisibility(
-                in: &level,
-                handle: handle,
-                isVisible: false
-            )
+            world.setObjectRendered(handle, false)
             return .enteredShip
         }
         if guidebot.task == .activeGoal {
@@ -1411,7 +1408,7 @@ extension PlayerSimulation {
         }
         state.guidebot = guidebot
         trainingRobotGuidebotState = state
-        restoreTrainingGuidebotPresentation()
+        syncTrainingGuidebotObject()
         return nil
     }
 
@@ -1751,9 +1748,7 @@ extension PlayerSimulation {
             if let handle = flare.stuckObjectHandle,
                let localPosition = flare.stuckObjectOffset,
                let localOrientation = flare.stuckObjectOrientation,
-               let object = level.objects.first(where: {
-                   $0.handle == handle
-               }),
+               let object = world.objects[ObjectHandle(handle)],
                case let .room(roomSourceIndex) = object.location {
                 flare.position =
                     object.position
@@ -1779,6 +1774,7 @@ extension PlayerSimulation {
             let end = start + flare.velocity * duration
             let trace = traceIndoorMovement(
                 in: level,
+                roomStates: world.rooms,
                 startRoom: flare.roomSourceIndex,
                 start: start,
                 end: end,
@@ -1792,18 +1788,18 @@ extension PlayerSimulation {
             let parentHandle =
                 flare.parentObjectHandle
                     ?? level.trainingRobotGuidebotChain!.guidebotObjectHandle
-            let nearestObjectHit = level.objects.compactMap {
-                object -> (object: PlacedObject, fraction: Float)? in
+            let nearestObjectHit = world.objects.compactMap {
+                object -> (object: GameObject, fraction: Float)? in
                 guard case let .room(objectRoomSourceIndex) = object.location,
                       trace.visitedRoomSourceIndices.contains(
                           objectRoomSourceIndex
                       ),
-                      age >= 3 || object.handle != parentHandle,
+                      age >= 3 || object.handle.rawValue != parentHandle,
                       let presentation =
                         level.objectPresentations.first(where: {
-                            $0.objectHandle == object.handle
-                                && $0.isVisible
+                            $0.objectHandle == object.handle.rawValue
                         }),
+                      object.renderType == .polyobj,
                       let model = level.models.first(where: {
                           $0.source == presentation.primaryModel
                       }),
@@ -1824,7 +1820,7 @@ extension PlayerSimulation {
                 flare.position =
                     start + (end - start) * hit.fraction
                 flare.velocity = .zero
-                flare.stuckObjectHandle = hit.object.handle
+                flare.stuckObjectHandle = hit.object.handle.rawValue
                 flare.stuckObjectOffset =
                     inverseTransform(
                         flare.position - hit.object.position,
@@ -1892,7 +1888,7 @@ extension PlayerSimulation {
         trainingRobotGuidebotState = state
     }
     func requestTrainingGuidebotReturn(
-        to player: PlacedObject
+        to player: GameObject
     ) -> Bool {
         guard var state = trainingRobotGuidebotState,
               !state.returnWasRequested,
@@ -1910,6 +1906,7 @@ extension PlayerSimulation {
         )
         let allocated = trainingGuidebotRoute(
             in: level,
+            roomStates: world.rooms,
             startRoomSourceIndex: guidebot.roomSourceIndex,
             start: guidebot.position,
             startForward: startForward,
@@ -1954,10 +1951,10 @@ extension PlayerSimulation {
 }
 
 func completeTrainingCameraMonitorLocateGoal(
-    in level: inout Level,
+    in world: inout GameWorld,
     pickupObjectHandle: UInt32
 ) {
-    guard let goalIndex = level.goals.firstIndex(where: { goal in
+    guard let goalIndex = world.goals.firstIndex(where: { goal in
         goal.status & 0x0000_0400 != 0
             && goal.items.contains {
                 $0.type == 2
@@ -1966,8 +1963,8 @@ func completeTrainingCameraMonitorLocateGoal(
     }) else {
         return
     }
-    let goal = level.goals[goalIndex]
-    level.goals[goalIndex] = .init(
+    let goal = world.goals[goalIndex]
+    world.goals[goalIndex] = .init(
         status: goal.status | 0x0000_0008,
         priority: goal.priority,
         list: goal.list,
@@ -1992,13 +1989,13 @@ func completeTrainingCameraMonitorLocateGoal(
 
 func trainingCameraMonitorFrame(
     level: Level,
+    world: GameWorld,
     state: TrainingCameraMonitorState?
 ) -> TrainingCameraMonitorFrame? {
     guard let chain = level.trainingCameraMonitorChain,
           let remainingDuration = state?.popupRemaining,
-          let cameraObject = level.objects.first(where: {
-              $0.handle == chain.securityCameraObjectHandle
-          }),
+          let cameraObject =
+              world.objects[ObjectHandle(chain.securityCameraObjectHandle)],
           case let .room(roomSourceIndex) = cameraObject.location else {
         return nil
     }
@@ -2009,6 +2006,7 @@ func trainingCameraMonitorFrame(
         + cameraObject.orientation.forward * localPosition.z
     let gunpointRoomSourceIndex = traceIndoorMovement(
         in: level,
+        roomStates: world.rooms,
         startRoom: roomSourceIndex,
         start: cameraObject.position,
         end: position,

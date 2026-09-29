@@ -111,7 +111,7 @@ A disposable, non-shipping **DALLAS translator** may convert the generated actio
 
 - Format and rules: see the `d3-content-import` skill. It is deterministic JSON plus Apple-readable media. Each level is complete.
 - Current package schema: **11**. The Training-specific fields added in schemas 7–11 are removed in M1, and the package moves to **schema 12** with generic data: game tables, script names, object script bindings, message tables, and canonical sound, model, and texture keys.
-- Other schemas today: player save 1, continuation 7 (replaced by `GameSave` over `GameWorld` in M1), pilot profile 1, package record 1, creator project 4.
+- Other schemas today: `GameSave` 2 (a Codable `GameWorld` plus the package reference and the pilot; it replaced player save 1 and continuation 7 in M1 step 2), pilot profile 1, package record 1, creator project 4.
 - During development the only migration is reimport. Pre-M1 quicksaves stop loading after M1, which is acceptable because nothing has shipped.
 
 ### Saves
@@ -147,4 +147,6 @@ A disposable, non-shipping **DALLAS translator** may convert the generated actio
 | F1 help (pre-M4) | Help screen | Native alert listing the implemented controls | Temporary until the menus port in M4 |
 | Guide-Bot route | Cached CBOA/NODE tables | Route derived from reciprocal portals; a blocked same-room allocation takes the route, not the `AISR_SEES_GOAL` shortcut | Accepted correction |
 | Fixes | Known bugs | Corrections listed in `sources.md` | Adopted fork fixes |
+| Save range | Binary save of float `Gametime` with no range check | A save is rejected when any saved value exceeds ±1e6 (about 11.6 days of game time) | Float32 time loses sub-frame precision near 1e6 s in both versions; the bound keeps untrusted saves from crashing the game |
+| Handle wrap | `ObjCreate` hits a debug break (`Int3`) when a slot's handle count is about to wrap (`object.cpp:1707`), then wraps | The count skips 0 on wrap, so a wrapped handle is never mistaken for an old one | Unreachable in practice (about 2 million reuses of one slot); avoids a stale-handle alias |
 | Platform | Win32, SDL, DLL scripts, OpenGL | AppKit, UIKit, compiled Swift scripts, Metal | Apple-native |

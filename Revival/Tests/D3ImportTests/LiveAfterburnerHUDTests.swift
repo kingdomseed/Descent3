@@ -41,7 +41,7 @@ extension WorldRenderingTests {
         }
 
         func restoreControlsThroughNormalTraining(
-            in simulation: PlayerSimulation,
+            in simulation: GameSession,
             startingAt timestamp: inout Double
         ) -> PlayerSimulationFrame {
             var frame = simulation.update(at: timestamp, input: .zero)
@@ -65,7 +65,7 @@ extension WorldRenderingTests {
             y: player.position.y + player.orientation.forward.y * 20,
             z: player.position.z + player.orientation.forward.z * 20
         )
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1234_5678
@@ -76,7 +76,7 @@ extension WorldRenderingTests {
             startingAt: &timestamp
         )
         XCTAssertEqual(controlsRestored.enabledPlayerControls, .all)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == 4_112
         })
 
@@ -114,7 +114,7 @@ extension WorldRenderingTests {
         XCTAssertEqual(simulation.afterburnerFuel, 5, accuracy: 0.000_001)
         XCTAssertEqual(simulation.energy, 99.3, accuracy: 0.000_01)
 
-        let truncationSimulation = PlayerSimulation(
+        let truncationSimulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1234_5678
@@ -172,7 +172,7 @@ extension WorldRenderingTests {
         let goal = try XCTUnwrap(finalLevel.objects.first {
             $0.handle == finalChain.goalObjectHandle
         })
-        let initialFinalSimulation = PlayerSimulation(
+        let initialFinalSimulation = GameSession(
             level: finalLevel,
             presentationReadyTimestamp: 0
         )
@@ -188,11 +188,7 @@ extension WorldRenderingTests {
         initialFinalSimulation.destroyTrainingLastBot5(handle: 2_083)
         _ = initialFinalSimulation.update(at: 0.1, input: .zero)
         var ready = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(
-                    initialFinalSimulation.continuation
-                )
-            ) as? [String: Any]
+            testWorldObject(initialFinalSimulation.world)
         )
         ready["playerLocation"] = [
             "room": ["_0": finalChain.goalRoomSourceIndex],
@@ -202,12 +198,9 @@ extension WorldRenderingTests {
             "y": goal.position.y,
             "z": goal.position.z,
         ]
-        let finalSimulation = try PlayerSimulation(
+        let finalSimulation = try GameSession(
             level: finalLevel,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: ready)
-            ),
+            world: (decodeTestWorld(ready)).rebased(onto: finalLevel),
             resumedAtTimestamp: 0
         )
         let finalFrame = finalSimulation.update(at: 0.2, input: .zero)
@@ -319,23 +312,21 @@ extension WorldRenderingTests {
         }
 
         func continuationObject(
-            _ simulation: PlayerSimulation
+            _ simulation: GameSession
         ) throws -> [String: Any] {
             try XCTUnwrap(
-                JSONSerialization.jsonObject(
-                    with: JSONEncoder().encode(simulation.continuation)
-                ) as? [String: Any]
+                testWorldObject(simulation.world)
             )
         }
 
         func aiming(
-            _ source: PlayerSimulation,
+            _ source: GameSession,
             at targetHandle: UInt32,
             timestamp: Double,
             level: Level
-        ) throws -> PlayerSimulation {
+        ) throws -> GameSession {
             let target = try XCTUnwrap(
-                source.level.objects.first { $0.handle == targetHandle },
+                source.runtimeLevel.objects.first { $0.handle == targetHandle },
                 "the current real projectile target must remain present"
             )
             var object = try continuationObject(source)
@@ -364,18 +355,15 @@ extension WorldRenderingTests {
             ]
             object["velocity"] = ["x": 0, "y": 0, "z": 0]
             object["angularVelocity"] = ["x": 0, "y": 0, "z": 0]
-            return try PlayerSimulation(
+            return try GameSession(
                 level: level,
-                continuation: JSONDecoder().decode(
-                    PlayerSimulationContinuation.self,
-                    from: JSONSerialization.data(withJSONObject: object)
-                ),
+                world: (decodeTestWorld(object)).rebased(onto: level),
                 resumedAtTimestamp: timestamp
             )
         }
 
         func destructionState(
-            _ simulation: PlayerSimulation
+            _ simulation: GameSession
         ) throws -> [String: Any] {
             let object = try continuationObject(simulation)
             let maneuver = try XCTUnwrap(
@@ -490,7 +478,7 @@ extension WorldRenderingTests {
             )
         )
 
-        let seed = PlayerSimulation(
+        let seed = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1234_5678
@@ -517,12 +505,9 @@ extension WorldRenderingTests {
         openingState["timerRemaining"] = Float(1_000)
         openingState["welcomeWasPresented"] = false
         preScript021["trainingOpeningState"] = openingState
-        var simulation = try PlayerSimulation(
+        var simulation = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: preScript021)
-            ),
+            world: (decodeTestWorld(preScript021)).rebased(onto: level),
             resumedAtTimestamp: 0
         )
 
@@ -608,7 +593,7 @@ extension WorldRenderingTests {
             )
             if volley == 3 {
                 XCTAssertTrue(
-                    simulation.level.objects.contains {
+                    simulation.runtimeLevel.objects.contains {
                         $0.handle == handoff.followBotObjectHandle
                     },
                     "FollowBot1 must survive three real two-bolt volleys at 10 shields"
@@ -627,7 +612,7 @@ extension WorldRenderingTests {
             "FollowBot1 real dying must start timer 11 through Script 037"
         )
         XCTAssertFalse(
-            simulation.level.objects.contains {
+            simulation.runtimeLevel.objects.contains {
                 $0.handle == handoff.followBotObjectHandle
             },
             "FollowBot1 real dying must remove the target"
@@ -667,7 +652,7 @@ extension WorldRenderingTests {
             )
             if volley == 3 {
                 XCTAssertTrue(
-                    simulation.level.objects.contains {
+                    simulation.runtimeLevel.objects.contains {
                         $0.handle == handoff.destroyBot1ObjectHandle
                     },
                     "DestroyBot1 must survive three real two-bolt volleys at 10 shields"
@@ -710,7 +695,7 @@ extension WorldRenderingTests {
                 input: .init(firesPrimaryWeapon: true)
             )
             XCTAssertTrue(
-                simulation.level.objects.contains {
+                simulation.runtimeLevel.objects.contains {
                     $0.handle == handoff.destroyBot2ObjectHandle
                 },
                 "DestroyBot2 must survive real volley \(volley) before strict-negative death"
@@ -730,7 +715,7 @@ extension WorldRenderingTests {
             input: .init(afterburner: 1, firesPrimaryWeapon: true)
         )
         XCTAssertFalse(
-            simulation.level.objects.contains {
+            simulation.runtimeLevel.objects.contains {
                 $0.handle == handoff.destroyBot2ObjectHandle
             },
             "DestroyBot2 real strict-negative death must remove the target in Script 036"

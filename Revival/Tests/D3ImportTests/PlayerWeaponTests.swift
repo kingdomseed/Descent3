@@ -160,7 +160,7 @@ extension WorldRenderingTests {
             y: player.position.y,
             z: player.position.z - 100
         )
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -185,9 +185,7 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(exactDue.systemsGameTime, 0.5, accuracy: 0.000_1)
         var object = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         var state = try XCTUnwrap(
             object["playerConcussionState"] as? [String: Any]
@@ -205,9 +203,7 @@ extension WorldRenderingTests {
             input: .init(firesSecondaryWeapon: true)
         )
         object = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         state = try XCTUnwrap(
             object["playerConcussionState"] as? [String: Any]
@@ -227,9 +223,7 @@ extension WorldRenderingTests {
             input: .init(firesSecondaryWeapon: true)
         )
         object = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         state = try XCTUnwrap(
             object["playerConcussionState"] as? [String: Any]
@@ -242,6 +236,144 @@ extension WorldRenderingTests {
         XCTAssertEqual(state["ammo"] as? Int, 2)
         XCTAssertEqual(state["nextFiringMaskIndex"] as? Int, 0)
         XCTAssertEqual(carried.systemsGameTime, 1.6, accuracy: 0.000_1)
+    }
+
+    func testFullExplosionListDropsOnlyTheVisualAndKeepsTheShockwave()
+        throws
+    {
+        // DoWeaponExploded makes the shockwave first (WeaponFire.cpp:3066),
+        // then asks VisEffectCreate for the visual, which returns -1 when the
+        // list is full (viseffect.cpp:522). The shockwave still acts.
+        let level = try makePlayerConcussionLevel()
+        let binding = try XCTUnwrap(
+            level.shipDefinitions.first?.playerConcussion
+        )
+        let simulation = GameSession(
+            level: level,
+            presentationReadyTimestamp: 0
+        )
+        let player = simulation.world.testPlayerObject
+        guard case let .room(playerRoom) = player.location else {
+            return XCTFail("indoor player")
+        }
+        simulation.world.playerConcussionState?.missiles = [
+            .init(
+                creationOrdinal: 0,
+                roomSourceIndex: playerRoom,
+                position: player.position,
+                orientation: player.orientation,
+                velocity: player.orientation.forward * 0.001,
+                lifeRemaining: 0.001
+            ),
+        ]
+        simulation.world.playerConcussionState?.explosions = (1...6).map {
+            .init(
+                creationOrdinal: UInt64($0),
+                roomSourceIndex: playerRoom,
+                position: player.position,
+                lifeRemaining: binding.explosionLifetime,
+                shockwaveLifeRemaining: 0,
+                damagedPlayer: true
+            )
+        }
+        simulation.world.playerConcussionState?.nextCreationOrdinal = 7
+        XCTAssertNoThrow(try simulation.world.validate(against: level))
+        let shieldsBefore = simulation.world.shields
+
+        let frame = simulation.update(at: 0.1, input: .zero)
+        let state = try XCTUnwrap(simulation.world.playerConcussionState)
+        XCTAssertEqual(state.missiles.count, 0, "the missile expired")
+        XCTAssertEqual(
+            state.explosions.filter(\.isPresented).map(\.creationOrdinal),
+            Array(1...6),
+            "the new visual was dropped, not swapped in"
+        )
+        let shockwave = try XCTUnwrap(state.explosions.last)
+        XCTAssertEqual(shockwave.creationOrdinal, 7)
+        XCTAssertFalse(shockwave.isPresented)
+        XCTAssertTrue(shockwave.damagedPlayer)
+        XCTAssertEqual(
+            simulation.world.shields,
+            shieldsBefore - binding.shockwaveDamage,
+            accuracy: 0.001,
+            "the new shockwave damages the player at its center"
+        )
+        XCTAssertEqual(frame.playerConcussionExplosions.count, 6)
+        XCTAssertNoThrow(try simulation.world.validate(against: level))
+        XCTAssertNoThrow(try updateMetalWorldPlan(
+            try makeMetalWorldPlan(
+                level: simulation.runtimeLevel,
+                playerView: frame.playerView
+            ),
+            level: simulation.level,
+            world: simulation.world,
+            frame: frame,
+            drawableAspect: 1
+        ))
+    }
+
+    func testFullSparkListTakesNoRandomDrawsForDroppedSparks() throws {
+        // CreateRandomLineSparks (viseffect.cpp:822) calls VisEffectCreate
+        // first and draws ps_rand only for a spark it allocated.
+        var level = try makePlayerConcussionLevel()
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        guard case let .room(playerRoom) = player.location else {
+            return XCTFail("indoor player")
+        }
+        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == 4_112
+        })
+        level.objects[robotIndex].position = .init(
+            x: player.position.x + player.orientation.forward.x * 15,
+            y: player.position.y + player.orientation.forward.y * 15,
+            z: player.position.z + player.orientation.forward.z * 15
+        )
+        level.objects[robotIndex].location = player.location
+        func run(sparks: Int) throws -> (UInt32, Int) {
+            let simulation = GameSession(
+                level: level,
+                presentationReadyTimestamp: 0,
+                authoritativeRandomSeed: 0x1234_5678
+            )
+            simulation.world.playerConcussionState?.sparks =
+                (0..<sparks).map {
+                    .init(
+                        creationOrdinal: UInt64($0),
+                        roomSourceIndex: playerRoom,
+                        position: player.position,
+                        velocity: player.orientation.up,
+                        size: 1,
+                        lifetime: 2,
+                        lifeRemaining: 2
+                    )
+                }
+            simulation.world.playerConcussionState?.nextCreationOrdinal =
+                UInt64(sparks)
+            _ = simulation.update(
+                at: 0.1,
+                input: .init(firesSecondaryWeapon: true)
+            )
+            let state = try XCTUnwrap(simulation.world.playerConcussionState)
+            return (
+                simulation.world.authoritativeRandomState,
+                state.sparks.count - sparks
+            )
+        }
+        let (openState, created) = try run(sparks: 0)
+        XCTAssertTrue((3...8).contains(created))
+        let (fullState, dropped) = try run(sparks: 48)
+        XCTAssertEqual(dropped, 0)
+        var advanced = fullState
+        for _ in 0..<(created * 6) {
+            advanced = advanced &* 214_013 &+ 2_531_011
+        }
+        XCTAssertEqual(
+            advanced,
+            openState,
+            "only the allocated sparks take their six draws"
+        )
     }
 
     func testRookieConcussionLaunchImpactShockwaveAndContinuationAreDeterministic()
@@ -261,23 +393,18 @@ extension WorldRenderingTests {
         )
         level.objects[robotIndex].location = player.location
 
-        let seed = PlayerSimulation(
+        let seed = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1234_5678
         )
         let continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(seed.continuation)
-            ) as? [String: Any]
+            testWorldObject(seed.world)
         )
-        let reached = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: continuationObject)
-        )
-        let simulation = try PlayerSimulation(
+        let reached = try decodeTestWorld(continuationObject)
+        let simulation = try GameSession(
             level: level,
-            continuation: reached,
+            world: reached.rebased(onto: level),
             resumedAtTimestamp: 100
         )
         let randomStateBefore = try XCTUnwrap(
@@ -301,9 +428,7 @@ extension WorldRenderingTests {
         XCTAssertTrue((3...8).contains(impact.playerConcussionSparks.count))
 
         var impactContinuation = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         let concussionState = try XCTUnwrap(
             impactContinuation["playerConcussionState"] as? [String: Any]
@@ -344,9 +469,7 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(premature.playerConcussionMissiles.count, 0)
         impactContinuation = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         let prematureState = try XCTUnwrap(
             impactContinuation["playerConcussionState"] as? [String: Any]
@@ -383,14 +506,14 @@ extension WorldRenderingTests {
             firstSpark["position"] as? [String: Double]
         )
 
-        let savedContinuation = simulation.continuation
+        let savedContinuation = simulation.world
         let expectedRestoredFrame = simulation.update(
             at: 100.3,
             input: .zero
         )
-        let restored = try PlayerSimulation(
+        let restored = try GameSession(
             level: level,
-            continuation: savedContinuation,
+            world: savedContinuation.rebased(onto: level),
             resumedAtTimestamp: 200
         )
         let restoredFrame = restored.update(at: 200, input: .zero)
@@ -438,15 +561,13 @@ extension WorldRenderingTests {
         )
         level.objects[blockerIndex].location = player.location
 
-        let blockedSimulation = PlayerSimulation(
+        let blockedSimulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x8765_4321
         )
         let before = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(blockedSimulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(blockedSimulation.world)
         )
         let blocked = blockedSimulation.update(
             at: 0.1,
@@ -458,9 +579,7 @@ extension WorldRenderingTests {
             $0.soundSourceName == "concmissilefire7.wav"
         })
         var after = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(blockedSimulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(blockedSimulation.world)
         )
         let blockedState = try XCTUnwrap(
             after["playerConcussionState"] as? [String: Any]
@@ -476,12 +595,9 @@ extension WorldRenderingTests {
         exhaustedState["ammo"] = 0
         exhaustedState["nextFireTime"] = 0
         after["playerConcussionState"] = exhaustedState
-        let exhaustedSimulation = try PlayerSimulation(
+        let exhaustedSimulation = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: after)
-            ),
+            world: (decodeTestWorld(after)).rebased(onto: level),
             resumedAtTimestamp: 10
         )
         let exhausted = exhaustedSimulation.update(
@@ -494,9 +610,7 @@ extension WorldRenderingTests {
         )
         XCTAssertTrue(exhausted.playerConcussionMissiles.isEmpty)
         let exhaustedAfter = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(exhaustedSimulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(exhaustedSimulation.world)
         )
         XCTAssertEqual(
             (exhaustedAfter["authoritativeRandomState"] as? NSNumber)?
@@ -518,15 +632,13 @@ extension WorldRenderingTests {
             }
             return sourceIndex
         }())
-        let seed = PlayerSimulation(
+        let seed = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1111_2222
         )
         var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(seed.continuation)
-            ) as? [String: Any]
+            testWorldObject(seed.world)
         )
         var concussionState = try XCTUnwrap(
             continuationObject["playerConcussionState"] as? [String: Any]
@@ -547,13 +659,10 @@ extension WorldRenderingTests {
         concussionState["ammo"] = 5
         concussionState["nextCreationOrdinal"] = 1
         continuationObject["playerConcussionState"] = concussionState
-        let timeoutContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: continuationObject)
-        )
-        let timeoutSimulation = try PlayerSimulation(
+        let timeoutContinuation = try decodeTestWorld(continuationObject)
+        let timeoutSimulation = try GameSession(
             level: level,
-            continuation: timeoutContinuation,
+            world: timeoutContinuation.rebased(onto: level),
             resumedAtTimestamp: 10
         )
         let timeout = timeoutSimulation.update(at: 10.1, input: .zero)
@@ -566,22 +675,6 @@ extension WorldRenderingTests {
         concussionState["missiles"] = [missile, missile]
         concussionState["ammo"] = 4
         continuationObject["playerConcussionState"] = concussionState
-        let hostile = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: continuationObject)
-        )
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: hostile,
-                resumedAtTimestamp: 20
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
 
         var impossibleConservation = concussionState
         impossibleConservation["missiles"] = (0..<6).map { ordinal in
@@ -592,47 +685,7 @@ extension WorldRenderingTests {
         impossibleConservation["ammo"] = 6
         impossibleConservation["nextCreationOrdinal"] = 6
         continuationObject["playerConcussionState"] = impossibleConservation
-        let impossible = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: continuationObject)
-        )
-        XCTAssertThrowsError(try PlayerSimulation(
-            level: level,
-            continuation: impossible,
-            resumedAtTimestamp: 20
-        )) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
 
-        var ordinalOverflow = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(seed.continuation)
-            ) as? [String: Any]
-        )
-        var ordinalOverflowState = try XCTUnwrap(
-            ordinalOverflow["playerConcussionState"] as? [String: Any]
-        )
-        ordinalOverflowState["nextCreationOrdinal"] = NSNumber(
-            value: UInt64.max - 59
-        )
-        ordinalOverflow["playerConcussionState"] = ordinalOverflowState
-        let overflowing = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: ordinalOverflow)
-        )
-        XCTAssertThrowsError(try PlayerSimulation(
-            level: level,
-            continuation: overflowing,
-            resumedAtTimestamp: 20
-        )) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
     }
 
     func testScript030RestoresBeforeSameFrameConcussionImpact() throws {
@@ -672,14 +725,12 @@ extension WorldRenderingTests {
             }
             return sourceIndex
         }())
-        let seed = PlayerSimulation(
+        let seed = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
         var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(seed.continuation)
-            ) as? [String: Any]
+            testWorldObject(seed.world)
         )
         continuationObject["shields"] = 1
         var openingState = try XCTUnwrap(
@@ -703,26 +754,20 @@ extension WorldRenderingTests {
             "shockwaveLifeRemaining": 0.1,
             "damagedObjectHandles": [],
             "damagedPlayer": false,
+            "isPresented": true,
         ]]
         concussionState["ammo"] = 5
         concussionState["nextCreationOrdinal"] = 1
         continuationObject["playerConcussionState"] = concussionState
-        let simulation = try PlayerSimulation(
+        let simulation = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: continuationObject
-                )
-            ),
+            world: (decodeTestWorld(continuationObject)).rebased(onto: level),
             resumedAtTimestamp: 10
         )
         let frame = simulation.update(at: 10.1, input: .zero)
         XCTAssertEqual(frame.shields, 31)
         let after = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         let afterOpening = try XCTUnwrap(
             after["trainingOpeningState"] as? [String: Any]
@@ -816,7 +861,7 @@ extension WorldRenderingTests {
             y: player.position.y - player.orientation.forward.y * 100,
             z: player.position.z - player.orientation.forward.z * 100
         )
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1234_5678
@@ -837,9 +882,7 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(simulation.energy, 99.85, accuracy: 0.000_01)
         var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         var guidebotState = try XCTUnwrap(
             continuationObject["trainingRobotGuidebotState"]
@@ -904,9 +947,7 @@ extension WorldRenderingTests {
         XCTAssertEqual(simulation.energy, 99.7, accuracy: 0.000_01)
 
         continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         guidebotState = try XCTUnwrap(
             continuationObject["trainingRobotGuidebotState"]
@@ -938,9 +979,7 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(simulation.energy, 99.55, accuracy: 0.000_01)
         let rebasedObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         let rebasedGuidebot = try XCTUnwrap(
             rebasedObject["trainingRobotGuidebotState"] as? [String: Any]
@@ -1047,7 +1086,7 @@ extension WorldRenderingTests {
             z: transformedForward.z / forwardMagnitude
         )
         let seed: UInt32 = 0x1234_5678
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: seed
@@ -1080,10 +1119,12 @@ extension WorldRenderingTests {
         )
         let retainedPlan = try updateMetalWorldPlan(
             try makeMetalWorldPlan(
-                level: simulation.level,
+                level: simulation.runtimeLevel,
                 playerView: frame.playerView
             ),
             level: simulation.level,
+            objects: simulation.world.objects,
+            roomStates: simulation.world.rooms,
             playerView: frame.playerView,
             trainingGuidebotYellowFlares:
                 frame.trainingGuidebotYellowFlares,
@@ -1102,9 +1143,7 @@ extension WorldRenderingTests {
             expectedState = expectedState &* 214_013 &+ 2_531_011
         }
         let continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         XCTAssertEqual(
             (continuationObject["authoritativeRandomState"] as? NSNumber)?
@@ -1147,7 +1186,7 @@ extension WorldRenderingTests {
             gunpointLocalPosition: .init(x: 0, y: 0, z: 600),
             gunpointLocalForward: stockBinding.gunpointLocalForward
         )
-        let blocked = PlayerSimulation(
+        let blocked = GameSession(
             level: replacing(level, shipDefinitions: [blockedShip]),
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: seed
@@ -1160,10 +1199,8 @@ extension WorldRenderingTests {
         XCTAssertFalse(blockedFrame.trainingOpeningFeedback.contains {
             $0.soundSourceName == "Flare.wav"
         })
-        var blockedObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(blocked.continuation)
-            ) as? [String: Any]
+        let blockedObject = try XCTUnwrap(
+            testWorldObject(blocked.world)
         )
         XCTAssertEqual(
             (blockedObject["authoritativeRandomState"] as? NSNumber)?
@@ -1178,7 +1215,7 @@ extension WorldRenderingTests {
             1
         )
 
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: seed
@@ -1202,21 +1239,19 @@ extension WorldRenderingTests {
             }.count,
             1
         )
-        let continuation = simulation.continuation
-        let restored = try PlayerSimulation(
+        let continuation = simulation.world
+        let restored = try GameSession(
             level: level,
-            continuation: continuation,
+            world: continuation.rebased(onto: level),
             resumedAtTimestamp: 2
         )
         let originalNext = simulation.update(at: 2.25, input: .zero)
         let restoredNext = restored.update(at: 2.25, input: .zero)
         XCTAssertEqual(originalNext, restoredNext)
-        XCTAssertEqual(simulation.continuation, restored.continuation)
+        XCTAssertEqual(simulation.world, restored.world)
 
         var capacityObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(continuation)
-            ) as? [String: Any]
+            testWorldObject(continuation)
         )
         capacityObject["authoritativeRandomState"] = NSNumber(value: seed)
         var capacityState = try XCTUnwrap(
@@ -1237,12 +1272,9 @@ extension WorldRenderingTests {
         capacityState["nextCreationOrdinal"] = 16
         capacityState["nextFireTime"] = 0
         capacityObject["playerYellowFlareState"] = capacityState
-        let capacity = try PlayerSimulation(
+        let capacity = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: capacityObject)
-            ),
+            world: (decodeTestWorld(capacityObject)).rebased(onto: level),
             resumedAtTimestamp: 3
         )
         let capacityFrame = capacity.update(
@@ -1259,9 +1291,7 @@ extension WorldRenderingTests {
                 expectedCapacityState &* 214_013 &+ 2_531_011
         }
         let capacityAfter = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(capacity.continuation)
-            ) as? [String: Any]
+            testWorldObject(capacity.world)
         )
         XCTAssertEqual(
             (capacityAfter["authoritativeRandomState"] as? NSNumber)?
@@ -1270,55 +1300,8 @@ extension WorldRenderingTests {
             "capacity failure adds no sound, carrier, or random draw"
         )
 
-        blockedObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(continuation)
-            ) as? [String: Any]
-        )
-        var hostileState = try XCTUnwrap(
-            blockedObject["playerYellowFlareState"] as? [String: Any]
-        )
-        hostileState["nextCreationOrdinal"] = 0
-        blockedObject["playerYellowFlareState"] = hostileState
-        let hostile = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: blockedObject)
-        )
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: hostile,
-                resumedAtTimestamp: 2
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
-        hostileState["nextCreationOrdinal"] = NSNumber(
-            value: UInt64.max
-        )
-        blockedObject["playerYellowFlareState"] = hostileState
-        let exhausted = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: blockedObject)
-        )
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: exhausted,
-                resumedAtTimestamp: 2
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
-
         let oldPackage = makeTrainingGuidebotYellowFlareLevel()
-        let silent = PlayerSimulation(
+        let silent = GameSession(
             level: oldPackage,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: seed
@@ -1328,7 +1311,7 @@ extension WorldRenderingTests {
             $0.soundSourceName == "Flare.wav"
         })
 
-        let legacyGuidebot = PlayerSimulation(
+        let legacyGuidebot = GameSession(
             level: oldPackage,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: seed
@@ -1338,9 +1321,7 @@ extension WorldRenderingTests {
             input: .init(deploysTrainingGuidebot: true)
         )
         var legacyObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(legacyGuidebot.continuation)
-            ) as? [String: Any]
+            testWorldObject(legacyGuidebot.world)
         )
         var legacyGuidebotState = try XCTUnwrap(
             legacyObject["trainingRobotGuidebotState"] as? [String: Any]
@@ -1357,12 +1338,9 @@ extension WorldRenderingTests {
         ]
         legacyGuidebotState["yellowFlares"] = []
         legacyObject["trainingRobotGuidebotState"] = legacyGuidebotState
-        let restoredLegacyGuidebot = try PlayerSimulation(
+        let restoredLegacyGuidebot = try GameSession(
             level: oldPackage,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: legacyObject)
-            ),
+            world: (decodeTestWorld(legacyObject)).rebased(onto: oldPackage),
             resumedAtTimestamp: 1
         )
         let legacyGuidebotFrame = restoredLegacyGuidebot.update(
@@ -1381,7 +1359,7 @@ extension WorldRenderingTests {
     {
         let level = try makePlayerYellowFlareLevel()
         let seed: UInt32 = 0x3141_5926
-        let initial = PlayerSimulation(
+        let initial = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: seed
@@ -1391,9 +1369,7 @@ extension WorldRenderingTests {
             input: .init(deploysTrainingGuidebot: true)
         )
         var dueObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(initial.continuation)
-            ) as? [String: Any]
+            testWorldObject(initial.world)
         )
         var dueGuidebot = try XCTUnwrap(
             dueObject["trainingRobotGuidebotState"] as? [String: Any]
@@ -1410,19 +1386,16 @@ extension WorldRenderingTests {
         ]
         dueGuidebot["yellowFlares"] = []
         dueObject["trainingRobotGuidebotState"] = dueGuidebot
-        let due = try PlayerSimulation(
+        let due = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: dueObject)
-            ),
+            world: (decodeTestWorld(dueObject)).rebased(onto: level),
             resumedAtTimestamp: 1
         )
         _ = due.update(at: 1.1, input: .zero)
         do {
-            _ = try PlayerSimulation(
+            _ = try GameSession(
                 level: level,
-                continuation: due.continuation,
+                world: due.world.rebased(onto: level),
                 resumedAtTimestamp: 1.15
             )
         } catch {
@@ -1430,7 +1403,7 @@ extension WorldRenderingTests {
             return
         }
 
-        let playerPrototypeSimulation = PlayerSimulation(
+        let playerPrototypeSimulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: seed
@@ -1440,11 +1413,7 @@ extension WorldRenderingTests {
             input: .init(firesPlayerFlare: true)
         )
         let playerPrototypeObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(
-                    playerPrototypeSimulation.continuation
-                )
-            ) as? [String: Any]
+            testWorldObject(playerPrototypeSimulation.world)
         )
         let playerPrototypeState = try XCTUnwrap(
             playerPrototypeObject["playerYellowFlareState"]
@@ -1455,9 +1424,7 @@ extension WorldRenderingTests {
         )
 
         var mixedObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(due.continuation)
-            ) as? [String: Any]
+            testWorldObject(due.world)
         )
         mixedObject["authoritativeRandomState"] = NSNumber(value: seed)
         mixedObject["frameDuration"] = 0.1
@@ -1486,15 +1453,12 @@ extension WorldRenderingTests {
         mixedGuidebot["yellowFlares"] = guidebotParents
         mixedGuidebot["yellowFlareParticles"] = []
         mixedObject["trainingRobotGuidebotState"] = mixedGuidebot
-        let mixedContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: mixedObject)
-        )
-        let mixed: PlayerSimulation
+        let mixedContinuation = try decodeTestWorld(mixedObject)
+        let mixed: GameSession
         do {
-            mixed = try PlayerSimulation(
+            mixed = try GameSession(
                 level: level,
-                continuation: mixedContinuation,
+                world: mixedContinuation.rebased(onto: level),
                 resumedAtTimestamp: 3
             )
         } catch {
@@ -1512,9 +1476,7 @@ extension WorldRenderingTests {
             return (expectedState >> 16) & 0x7fff
         }
         let resultObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(mixed.continuation)
-            ) as? [String: Any]
+            testWorldObject(mixed.world)
         )
         XCTAssertEqual(
             (resultObject["authoritativeRandomState"] as? NSNumber)?
@@ -1563,43 +1525,6 @@ extension WorldRenderingTests {
             accuracy: 0.000_001
         )
 
-        var collidingObject = mixedObject
-        var collidingPlayer = try XCTUnwrap(
-            collidingObject["playerYellowFlareState"] as? [String: Any]
-        )
-        var collidingGuidebot = try XCTUnwrap(
-            collidingObject["trainingRobotGuidebotState"] as? [String: Any]
-        )
-        var collidingPlayerParticle = try XCTUnwrap(playerParticles.first)
-        var collidingGuidebotParticle = try XCTUnwrap(
-            guidebotParticles.first
-        )
-        collidingPlayerParticle["generationOrdinal"] = 0
-        collidingGuidebotParticle["generationOrdinal"] = 0
-        collidingPlayer["parents"] = []
-        collidingPlayer["parentParticles"] = [collidingPlayerParticle]
-        collidingGuidebot["yellowFlares"] = []
-        collidingGuidebot["yellowFlareParticles"] = [
-            collidingGuidebotParticle
-        ]
-        collidingObject["playerYellowFlareState"] = collidingPlayer
-        collidingObject["trainingRobotGuidebotState"] = collidingGuidebot
-        let colliding = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: collidingObject)
-        )
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: colliding,
-                resumedAtTimestamp: 3.2
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
     }
 
     func testPlayerYellowFlareStrictLifetimeTimeoutFamilyAndBindingShape()
@@ -1631,7 +1556,7 @@ extension WorldRenderingTests {
             )
         )
 
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 7
@@ -1641,9 +1566,7 @@ extension WorldRenderingTests {
             input: .init(firesPlayerFlare: true)
         )
         var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         var state = try XCTUnwrap(
             continuationObject["playerYellowFlareState"]
@@ -1652,66 +1575,13 @@ extension WorldRenderingTests {
         var parents = try XCTUnwrap(
             state["parents"] as? [[String: Any]]
         )
-        let player = try XCTUnwrap(level.objects.first {
-            $0.handle == level.defaultPlayerBinding?.objectHandle
-        })
-        var hostileAttachmentObject = continuationObject
-        var hostileAttachmentState = state
-        var hostileAttachmentParents = parents
-        hostileAttachmentParents[0]["roomSourceIndex"] = {
-            if case let .room(room) = player.location { return room }
-            return -1
-        }()
-        hostileAttachmentParents[0]["position"] = [
-            "x": player.position.x,
-            "y": player.position.y,
-            "z": player.position.z,
-        ]
-        hostileAttachmentParents[0]["velocity"] = [
-            "x": 0, "y": 0, "z": 0,
-        ]
-        hostileAttachmentParents[0]["stuckObjectHandle"] = NSNumber(
-            value: player.handle
-        )
-        hostileAttachmentParents[0]["stuckObjectOffset"] = [
-            "x": 0, "y": 0, "z": 0,
-        ]
-        hostileAttachmentParents[0]["stuckObjectOrientation"] = [
-            "right": ["x": 0, "y": 1, "z": 0],
-            "up": ["x": -1, "y": 0, "z": 0],
-            "forward": ["x": 0, "y": 0, "z": 1],
-        ]
-        hostileAttachmentState["parents"] = hostileAttachmentParents
-        hostileAttachmentObject["playerYellowFlareState"] =
-            hostileAttachmentState
-        let hostileAttachment = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: hostileAttachmentObject
-            )
-        )
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: hostileAttachment,
-                resumedAtTimestamp: 0.1
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
         parents[0]["lifeRemaining"] = 0.1
         state["parents"] = parents
         continuationObject["playerYellowFlareState"] = state
-        let nearTimeout = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: continuationObject)
-        )
-        let restored = try PlayerSimulation(
+        let nearTimeout = try decodeTestWorld(continuationObject)
+        let restored = try GameSession(
             level: level,
-            continuation: nearTimeout,
+            world: nearTimeout.rebased(onto: level),
             resumedAtTimestamp: 0.1
         )
         let exactZero = restored.update(at: 0.2, input: .zero)
@@ -1767,10 +1637,12 @@ extension WorldRenderingTests {
         }
         let capacityPlan = try updateMetalWorldPlan(
             try makeMetalWorldPlan(
-                level: restored.level,
+                level: restored.runtimeLevel,
                 playerView: exactZero.playerView
             ),
             level: restored.level,
+            objects: restored.world.objects,
+            roomStates: restored.world.rooms,
             playerView: exactZero.playerView,
             trainingGuidebotYellowFlares: Array(
                 repeating: try XCTUnwrap(

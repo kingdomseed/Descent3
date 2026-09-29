@@ -933,20 +933,12 @@ extension CanonicalLevelTests {
             from: Data(contentsOf: URL(fileURLWithPath: path))
         )
         XCTAssertNoThrow(try stockLevel.validate())
-        let initialSimulation = PlayerSimulation(
+        let initialSimulation = GameSession(
             level: stockLevel,
             presentationReadyTimestamp: 0
         )
         var olderContinuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(
-                    initialSimulation.continuation
-                )
-            ) as? [String: Any]
-        )
-        XCTAssertEqual(
-            olderContinuationObject["schemaVersion"] as? Int,
-            7
+            testWorldObject(initialSimulation.world)
         )
         var olderOpeningState = try XCTUnwrap(
             olderContinuationObject["trainingOpeningState"]
@@ -957,20 +949,15 @@ extension CanonicalLevelTests {
         )
         olderContinuationObject["trainingOpeningState"] =
             olderOpeningState
-        let olderContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: olderContinuationObject
-            )
-        )
-        let restoredOlderSimulation = try PlayerSimulation(
+        let olderContinuation = try decodeTestWorld(olderContinuationObject)
+        let restoredOlderSimulation = try GameSession(
             level: stockLevel,
-            continuation: olderContinuation,
+            world: olderContinuation.rebased(onto: stockLevel),
             resumedAtTimestamp: 1
         )
         XCTAssertEqual(
-            restoredOlderSimulation.continuation,
-            initialSimulation.continuation
+            restoredOlderSimulation.world,
+            initialSimulation.world
         )
 
         let opening = try XCTUnwrap(stockLevel.trainingOpeningLesson)

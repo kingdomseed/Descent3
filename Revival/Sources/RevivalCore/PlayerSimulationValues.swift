@@ -190,6 +190,10 @@ struct PlayerConcussionExplosionState:
     var shockwaveLifeRemaining: Float
     var damagedObjectHandles: Set<UInt32> = []
     var damagedPlayer = false
+    /// False when the visual explosion could not be allocated. The entry
+    /// then carries only the shockwave, which DoWeaponExploded creates
+    /// before the visual (`WeaponFire.cpp:3066`).
+    var isPresented = true
 }
 
 struct PlayerConcussionSparkState:
@@ -214,6 +218,8 @@ struct PlayerConcussionState: Codable, Equatable, Sendable {
     var sparks: [PlayerConcussionSparkState] = []
 }
 
+let playerConcussionExplosionPresentationCapacity = 6
+let playerConcussionSparkPresentationCapacity = 48
 let trainingGuidebotYellowFlarePresentationCapacity = 6
 let trainingGuidebotYellowFlareParticlePresentationCapacity = 64
 let trainingGuidebotYellowFlareTimeoutExplosionPresentationCapacity = 1
@@ -539,70 +545,172 @@ struct PlayerRearViewState: Codable, Equatable, Sendable {
     let entryGameTime: Float
 }
 
-struct PlayerSimulationContinuation: Codable, Equatable, Sendable {
-    let schemaVersion: Int
-    let levelKey: String
-    let levelSHA256: String
-    let playerLocation: SpatialLocation
-    let playerPosition: Vector3
-    let playerOrientation: Matrix3
-    let frameDuration: Float
-    let gameTime: Float
-    let velocity: Vector3
-    let angularVelocity: Vector3
-    let turnrollFixedAngle: Float
-    let indoorAutoLevelMode: IndoorAutoLevelMode
-    let afterburnerFuel: Float
-    let afterburnerIsActive: Bool
-    let energy: Float
-    let afterburnerMagnitude: Float
-    let wiggleFalloff: Float
-    let lastThrustTime: Float
-    let authoritativeRandomState: UInt32?
-    let shields: Float?
-    let playerHeadlightIsOn: Bool?
-    let playerRearViewState: PlayerRearViewState?
-    let trainingOpeningState: TrainingOpeningState?
-    let trainingDodgeAttemptState: TrainingDodgeAttemptState?
-    let trainingManeuverFollowState:
-        TrainingManeuverFollowState?
-    let trainingGalleryBarrierState: TrainingGalleryBarrierState?
-    let trainingRobotGuidebotState: TrainingRobotGuidebotState?
-    let playerConcussionState: PlayerConcussionState?
-    let playerYellowFlareState: PlayerYellowFlareState?
-    let trainingCameraMonitorState: TrainingCameraMonitorState?
-    let trainingKillbotEntryState: TrainingKillbotEntryState?
-    let trainingRASBot1DeathState: TrainingRASBot1DeathState?
-    let trainingRASBot2DeathState: TrainingRASBot2DeathState?
-    let trainingRASBot3DeathState: TrainingRASBot3DeathState?
-    let trainingRASBot4DeathState: TrainingRASBot4DeathState?
-    let trainingLastBot1DeathState:
-        TrainingLastBot1DeathState?
-    let trainingLastBot2DeathState:
-        TrainingLastBot2DeathState?
-    let trainingLastBot3DeathState:
-        TrainingLastBot3DeathState?
-    let trainingLastBot4DeathState:
-        TrainingLastBot4DeathState?
-    let trainingLastBot5DeathState:
-        TrainingLastBot5DeathState?
-    let trainingInvulnerabilityPickupState: TrainingInvulnerabilityPickupState?
-    let trainingCloakPickupState: TrainingCloakPickupState?
-    let trainingLastRoomState: TrainingLastRoomState?
-    let trainingFinalRoomEntryState:
-        TrainingFinalRoomEntryState?
-    let trainingFinalBotsCompletionState:
-        TrainingFinalBotsCompletionState?
-    let trainingFinalGoalState: TrainingFinalGoalState?
-}
-
-enum PlayerSimulationContinuationError: Error, Equatable {
-    case unsupportedSchema
-    case levelIdentityMismatch
-    case invalidState
-}
 enum IndoorAutoLevelMode: Int, Codable, Sendable {
     case off = 0
     case standard = 1
     case newPlayer = 2
+}
+
+extension GameWorld {
+    /// The level-start state of the bespoke Training script types. Later M1
+    /// steps replace these with the Training level module.
+    mutating func initializeTrainingState(level: Level) {
+        let objects = objects
+        trainingOpeningState = level.trainingOpeningLesson.map {
+            TrainingOpeningState(timerRemaining: $0.welcomeDelay)
+        }
+        trainingDodgeAttemptState = level.trainingDodgeAttempt.map {
+            _ in TrainingDodgeAttemptState()
+        }
+        trainingManeuverFollowState =
+            level.trainingDodgeAttempt?.maneuverFollow.flatMap {
+                initialTrainingManeuverFollowState(
+                    objects: objects,
+                    lesson: $0
+                )
+            }
+        trainingGalleryBarrierState = level.trainingGalleryBarrier.map {
+            TrainingGalleryBarrierState(
+                markerLightDistance:
+                    trainingGalleryBarrierRendersFaces(
+                        in: level,
+                        barrier: $0
+                    )
+                    ? 0
+                    : $0.openMarkerLightDistance
+            )
+        }
+        trainingRobotGuidebotState = level.trainingRobotGuidebotChain.map {
+            TrainingRobotGuidebotState(
+                robotShields: $0.combat.robotShields,
+                yellowFlares: $0.yellowFlare == nil ? nil : [],
+                yellowFlareParticles:
+                    $0.yellowFlare == nil ? nil : [],
+                yellowFlareTimeoutExplosions:
+                    $0.yellowFlare?.timeout == nil ? nil : [],
+                yellowFlareTimeoutSparks:
+                    $0.yellowFlare?.timeout == nil ? nil : [],
+                yellowFlareTimeoutSparkParticles:
+                    $0.yellowFlare?.timeout == nil ? nil : [],
+                yellowFlareTimeoutReachedFollowingFrame:
+                    $0.yellowFlare?.timeout == nil ? nil : false,
+                lastMessageSoundTime: 0
+            )
+        }
+        trainingCameraMonitorState = level.trainingCameraMonitorChain.map {
+            _ in TrainingCameraMonitorState()
+        }
+        trainingKillbotEntryState =
+            level.trainingCameraMonitorChain?.returnToShip?.killbotEntry.map {
+                _ in TrainingKillbotEntryState()
+            }
+        trainingRASBot1DeathState = level.trainingRASBot1DeathChain.map {
+            TrainingRASBot1DeathState(shields: $0.combat.robotShields)
+        }
+        trainingRASBot2DeathState = level.trainingRASBot2DeathChain.map {
+            TrainingRASBot2DeathState(shields: $0.combat.robotShields)
+        }
+        trainingRASBot3DeathState = level.trainingRASBot3DeathChain.map {
+            TrainingRASBot3DeathState(shields: $0.combat.robotShields)
+        }
+        trainingRASBot4DeathState = level.trainingRASBot4DeathChain.map {
+            TrainingRASBot4DeathState(shields: $0.combat.robotShields)
+        }
+        trainingLastBot1DeathState = level.trainingLastBot1DeathChain.map {
+            TrainingLastBot1DeathState(shields: $0.combat.robotShields)
+        }
+        trainingLastBot2DeathState = level.trainingLastBot2DeathChain.map {
+            TrainingLastBot2DeathState(shields: $0.combat.robotShields)
+        }
+        trainingLastBot3DeathState = level.trainingLastBot3DeathChain.map {
+            TrainingLastBot3DeathState(shields: $0.combat.robotShields)
+        }
+        trainingLastBot4DeathState = level.trainingLastBot4DeathChain.map {
+            TrainingLastBot4DeathState(shields: $0.combat.robotShields)
+        }
+        trainingLastBot5DeathState = level.trainingLastBot5DeathChain.map {
+            TrainingLastBot5DeathState(shields: $0.combat.robotShields)
+        }
+        trainingInvulnerabilityPickupState =
+            level.trainingInvulnerabilityPickupChain.map {
+                _ in TrainingInvulnerabilityPickupState()
+            }
+        trainingCloakPickupState = level.trainingCloakPickupChain.map {
+            _ in TrainingCloakPickupState()
+        }
+        trainingLastRoomState = level.trainingLastRoomChain.map {
+            _ in TrainingLastRoomState()
+        }
+        trainingFinalRoomEntryState =
+            level.trainingFinalRoomEntryChain.map {
+                _ in TrainingFinalRoomEntryState()
+            }
+        trainingFinalBotsCompletionState =
+            level.trainingFinalBotsCompletionChain.map {
+                _ in TrainingFinalBotsCompletionState()
+            }
+        trainingFinalGoalState = level.trainingFinalGoalChain.map {
+            _ in TrainingFinalGoalState()
+        }
+    }
+}
+
+func initialTrainingManeuverFollowState(
+    objects: ObjectTable,
+    lesson: TrainingManeuverFollowLesson
+) -> TrainingManeuverFollowState? {
+    guard let followBot = objects[ObjectHandle(lesson.followBotObjectHandle)],
+          case let .room(roomSourceIndex) = followBot.location
+    else {
+        return nil
+    }
+    var state = TrainingManeuverFollowState(
+        roomSourceIndex: roomSourceIndex,
+        position: followBot.position,
+        orientation: followBot.orientation
+    )
+    if let handoff = lesson.destructionHandoff,
+       let destroyBot1 = objects[ObjectHandle(handoff.destroyBot1ObjectHandle)],
+       case let .room(destroyBot1Room) = destroyBot1.location {
+        state.destruction = .init(
+            followBotShields: handoff.combat.robotShields,
+            destroyBot1Motion: .init(
+                roomSourceIndex: destroyBot1Room,
+                position: destroyBot1.position,
+                orientation: destroyBot1.orientation
+            )
+        )
+    }
+    return state
+}
+
+func initialTrainingDestroyBot1DestructionState(
+    objects: ObjectTable,
+    handoff: TrainingFollowBotDestructionHandoff
+) -> TrainingDestroyBot1DestructionState? {
+    guard let destroyBot2 = objects[ObjectHandle(handoff.destroyBot2ObjectHandle)],
+          case let .room(roomSourceIndex) = destroyBot2.location
+    else {
+        return nil
+    }
+    return .init(
+        destroyBot1Shields: handoff.combat.robotShields,
+        destroyBot2Motion: .init(
+            roomSourceIndex: roomSourceIndex,
+            position: destroyBot2.position,
+            orientation: destroyBot2.orientation
+        )
+    )
+}
+
+func trainingGalleryBarrierRendersFaces(
+    in level: Level,
+    barrier: TrainingGalleryBarrier
+) -> Bool {
+    let room = level.rooms.first {
+        $0.sourceIndex == barrier.barrierRoomSourceIndex
+    }!
+    return barrier.orderedPortalIndices.allSatisfy {
+        room.portals[$0].flags & 1 != 0
+    }
 }

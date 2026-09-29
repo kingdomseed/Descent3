@@ -69,7 +69,7 @@ extension WorldRenderingTests {
             rooms: rooms,
             objects: objects
         )
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: contactLevel,
             presentationReadyTimestamp: 0
         )
@@ -91,14 +91,14 @@ extension WorldRenderingTests {
         XCTAssertEqual(frame.enabledPlayerControls, [.down])
         XCTAssertEqual(frame.enabledPlayerControls.rawValue, 32)
         let unchangedPortalRoomOne = try XCTUnwrap(
-            simulation.level.rooms.first { $0.sourceIndex == 2 }
+            simulation.runtimeLevel.rooms.first { $0.sourceIndex == 2 }
         )
         XCTAssertEqual(
             unchangedPortalRoomOne.portals.map(\.flags),
             portalRoomOneFlags
         )
         let openedRoom = try XCTUnwrap(
-            simulation.level.rooms.first {
+            simulation.runtimeLevel.rooms.first {
                 $0.sourceIndex == finishCourse.portalRoomSourceIndex
             }
         )
@@ -111,7 +111,7 @@ extension WorldRenderingTests {
                 originalPortalFlags[offset] & ~UInt32(1)
             )
             let connected = try XCTUnwrap(
-                simulation.level.rooms.first {
+                simulation.runtimeLevel.rooms.first {
                     $0.sourceIndex == portal.connectedRoom
                 }
             )
@@ -145,46 +145,17 @@ extension WorldRenderingTests {
             ]
         )
 
-        let restored = try PlayerSimulation(
+        let restored = try GameSession(
             level: baseLevel,
-            continuation: try JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONEncoder().encode(simulation.continuation)
-            ),
+            world: (try JSONDecoder().decode(
+                GameWorld.self,
+                from: JSONEncoder().encode(simulation.world)
+            )).rebased(onto: baseLevel),
             resumedAtTimestamp: 1
         )
         let restoredFrame = restored.update(at: 1.05, input: .zero)
         XCTAssertTrue(restoredFrame.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(restoredFrame.enabledPlayerControls.rawValue, 32)
-
-        var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
-        )
-        var hostileOpening = try XCTUnwrap(
-            continuationObject["trainingOpeningState"] as? [String: Any]
-        )
-        hostileOpening["enabledControls"] = 33
-        continuationObject["trainingOpeningState"] = hostileOpening
-        let hostile = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: continuationObject
-            )
-        )
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: baseLevel,
-                continuation: hostile,
-                resumedAtTimestamp: 2
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
 
         var compatibleLesson = try XCTUnwrap(
             baseLevel.trainingOpeningLesson
@@ -195,30 +166,18 @@ extension WorldRenderingTests {
             trainingOpeningLesson: compatibleLesson
         )
         XCTAssertNoThrow(try compatibleLevel.validate())
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: compatibleLevel,
-                continuation: simulation.continuation,
-                resumedAtTimestamp: 2.5
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
 
         var laterStartObjects = baseLevel.objects
         let laterStartIndex = try XCTUnwrap(
             laterStartObjects.firstIndex { $0.handle == 6_147 }
         )
         laterStartObjects[laterStartIndex].position =
-            simulation.continuation.playerPosition
+            simulation.world.playerPosition
         laterStartObjects[laterStartIndex].location =
-            simulation.continuation.playerLocation
-        let laterStart = try PlayerSimulation(
+            simulation.world.playerLocation
+        let laterStart = try GameSession(
             level: replacing(baseLevel, objects: laterStartObjects),
-            continuation: simulation.continuation,
+            world: simulation.world.rebased(onto: replacing(baseLevel, objects: laterStartObjects)),
             resumedAtTimestamp: 3
         )
         let laterStartFrame = laterStart.update(
@@ -227,7 +186,7 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(laterStartFrame.enabledPlayerControls.rawValue, 63)
         let laterStartPortalRoomTwo = try XCTUnwrap(
-            laterStart.level.rooms.first { $0.sourceIndex == 49 }
+            laterStart.runtimeLevel.rooms.first { $0.sourceIndex == 49 }
         )
         XCTAssertTrue(
             laterStartPortalRoomTwo.portals.allSatisfy { $0.flags & 1 == 0 }
@@ -272,7 +231,7 @@ extension WorldRenderingTests {
             texture: level.surfacePhysics[0].texture,
             halfExtent: 200
         )
-        let normalStart = PlayerSimulation(
+        let normalStart = GameSession(
             level: replacing(
                 level,
                 rooms: normalRooms,
@@ -286,9 +245,7 @@ extension WorldRenderingTests {
             63
         )
         var highBitContinuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(normalStart.continuation)
-            ) as? [String: Any]
+            testWorldObject(normalStart.world)
         )
         var highBitOpening = try XCTUnwrap(
             highBitContinuationObject["trainingOpeningState"]
@@ -296,12 +253,7 @@ extension WorldRenderingTests {
         )
         highBitOpening["enabledControls"] = 127
         highBitContinuationObject["trainingOpeningState"] = highBitOpening
-        let highBitContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: highBitContinuationObject
-            )
-        )
+        let highBitContinuation = try decodeTestWorld(highBitContinuationObject)
         var normalFinishObjects = level.objects
         let normalFinishIndex = try XCTUnwrap(
             normalFinishObjects.firstIndex {
@@ -312,13 +264,17 @@ extension WorldRenderingTests {
             highBitContinuation.playerPosition
         normalFinishObjects[normalFinishIndex].location =
             highBitContinuation.playerLocation
-        let normalFinish = try PlayerSimulation(
+        let normalFinish = try GameSession(
             level: replacing(
                 level,
                 rooms: normalRooms,
                 objects: normalFinishObjects
             ),
-            continuation: highBitContinuation,
+            world: highBitContinuation.rebased(onto: replacing(
+                level,
+                rooms: normalRooms,
+                objects: normalFinishObjects
+            )),
             resumedAtTimestamp: 5
         )
         let normalFinishFrame = normalFinish.update(
@@ -330,12 +286,12 @@ extension WorldRenderingTests {
             32
         )
         let normalPortalRoomOne = try XCTUnwrap(
-            normalFinish.level.rooms.first { $0.sourceIndex == 2 }
+            normalFinish.runtimeLevel.rooms.first { $0.sourceIndex == 2 }
         )
         XCTAssertEqual(normalPortalRoomOne.portals[0].flags & 1, 0)
         XCTAssertNotEqual(normalPortalRoomOne.portals[1].flags & 1, 0)
         let normalPortalRoomTwo = try XCTUnwrap(
-            normalFinish.level.rooms.first { $0.sourceIndex == 49 }
+            normalFinish.runtimeLevel.rooms.first { $0.sourceIndex == 49 }
         )
         XCTAssertTrue(
             normalPortalRoomTwo.portals.allSatisfy { $0.flags & 1 == 0 }
@@ -399,7 +355,7 @@ extension WorldRenderingTests {
             rooms: rooms,
             objects: objects
         )
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: contactLevel,
             presentationReadyTimestamp: 0
         )
@@ -420,7 +376,7 @@ extension WorldRenderingTests {
             UInt32(63)
         )
         let closedRoom = try XCTUnwrap(
-            simulation.level.rooms.first {
+            simulation.runtimeLevel.rooms.first {
                 $0.sourceIndex == startCourse.portalRoomSourceIndex
             }
         )
@@ -430,7 +386,7 @@ extension WorldRenderingTests {
         )
         let closedPortal = closedRoom.portals[startCourse.portalIndex]
         let closedReciprocalRoom = try XCTUnwrap(
-            simulation.level.rooms.first {
+            simulation.runtimeLevel.rooms.first {
                 $0.sourceIndex == closedPortal.connectedRoom
             }
         )
@@ -464,12 +420,12 @@ extension WorldRenderingTests {
             ]
         )
 
-        let restored = try PlayerSimulation(
+        let restored = try GameSession(
             level: baseLevel,
-            continuation: try JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONEncoder().encode(simulation.continuation)
-            ),
+            world: (try JSONDecoder().decode(
+                GameWorld.self,
+                from: JSONEncoder().encode(simulation.world)
+            )).rebased(onto: baseLevel),
             resumedAtTimestamp: 1
         )
         let restoredFrame = restored.update(at: 1.05, input: .zero)
@@ -477,32 +433,8 @@ extension WorldRenderingTests {
         XCTAssertEqual(restoredFrame.enabledPlayerControls.rawValue, 63)
 
         let continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
-        var hostileObject = continuationObject
-        var hostileOpening = try XCTUnwrap(
-            hostileObject["trainingOpeningState"] as? [String: Any]
-        )
-        hostileOpening["enabledControls"] = 62
-        hostileObject["trainingOpeningState"] = hostileOpening
-        let hostile = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: hostileObject)
-        )
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: baseLevel,
-                continuation: hostile,
-                resumedAtTimestamp: 2
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
 
         var preservedObject = continuationObject
         var preservedOpening = try XCTUnwrap(
@@ -511,15 +443,10 @@ extension WorldRenderingTests {
         )
         preservedOpening["enabledControls"] = 127
         preservedObject["trainingOpeningState"] = preservedOpening
-        let preserved = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: preservedObject
-            )
-        )
-        let preservedSimulation = try PlayerSimulation(
+        let preserved = try decodeTestWorld(preservedObject)
+        let preservedSimulation = try GameSession(
             level: baseLevel,
-            continuation: preserved,
+            world: preserved.rebased(onto: baseLevel),
             resumedAtTimestamp: 2.5
         )
         XCTAssertEqual(
@@ -539,18 +466,6 @@ extension WorldRenderingTests {
             trainingOpeningLesson: compatibleLesson
         )
         XCTAssertNoThrow(try compatibleLevel.validate())
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: compatibleLevel,
-                continuation: simulation.continuation,
-                resumedAtTimestamp: 3
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
     }
 
     @MainActor
@@ -627,31 +542,36 @@ extension WorldRenderingTests {
             return replacing(level, rooms: rooms, objects: objects)
         }
         func resumed(
-            _ continuation: PlayerSimulationContinuation,
+            _ continuation: GameWorld,
             contacting handle: UInt32,
             at timestamp: Double,
             level resumedLevel: Level? = nil
-        ) throws -> PlayerSimulation {
+        ) throws -> GameSession {
             let contactLevel = try contacting(
                 handle,
                 at: continuation.playerPosition
             )
-            return try PlayerSimulation(
+            return try GameSession(
                 level: resumedLevel.map {
                     replacing(
                         contactLevel,
                         trainingOpeningLesson: $0.trainingOpeningLesson
                     )
                 } ?? contactLevel,
-                continuation: continuation,
+                world: continuation.rebased(onto: resumedLevel.map {
+                    replacing(
+                        contactLevel,
+                        trainingOpeningLesson: $0.trainingOpeningLesson
+                    )
+                } ?? contactLevel),
                 resumedAtTimestamp: timestamp
             )
         }
         func advance(
-            _ continuation: PlayerSimulationContinuation,
+            _ continuation: GameWorld,
             contacting handle: UInt32,
             at timestamp: Double
-        ) throws -> PlayerSimulation {
+        ) throws -> GameSession {
             let simulation = try resumed(
                 continuation,
                 contacting: handle,
@@ -661,58 +581,58 @@ extension WorldRenderingTests {
             return simulation
         }
 
-        let firstForward = PlayerSimulation(
+        let firstForward = GameSession(
             level: try contacting(12_301, at: player.position),
             presentationReadyTimestamp: 0
         )
         _ = firstForward.update(at: 0.05, input: .zero)
         let firstLeftGoal = try advance(
-            firstForward.continuation,
+            firstForward.world,
             contacting: 12_299,
             at: 1
         )
         let returnUp = try advance(
-            firstLeftGoal.continuation,
+            firstLeftGoal.world,
             contacting: 12_300,
             at: 2
         )
         let returnDown = try advance(
-            returnUp.continuation,
+            returnUp.world,
             contacting: 18_441,
             at: 3
         )
         let repeatForward = try advance(
-            returnDown.continuation,
+            returnDown.world,
             contacting: 12_300,
             at: 4
         )
         let repeatForwardGoal = try advance(
-            repeatForward.continuation,
+            repeatForward.world,
             contacting: 12_301,
             at: 5
         )
         let repeatReturnLeft = try advance(
-            repeatForwardGoal.continuation,
+            repeatForwardGoal.world,
             contacting: 12_300,
             at: 6
         )
         let repeatReturnRight = try advance(
-            repeatReturnLeft.continuation,
+            repeatReturnLeft.world,
             contacting: 12_299,
             at: 7
         )
         let repeatReturnUp = try advance(
-            repeatReturnRight.continuation,
+            repeatReturnRight.world,
             contacting: 12_300,
             at: 8
         )
         let repeatReturnDown = try advance(
-            repeatReturnUp.continuation,
+            repeatReturnUp.world,
             contacting: 18_441,
             at: 9
         )
         let normal = try resumed(
-            repeatReturnDown.continuation,
+            repeatReturnDown.world,
             contacting: 12_300,
             at: 10
         )
@@ -754,7 +674,7 @@ extension WorldRenderingTests {
         )
 
         let openedRoom = try XCTUnwrap(
-            normal.level.rooms.first {
+            normal.runtimeLevel.rooms.first {
                 $0.sourceIndex == continueToCourse.portalRoomSourceIndex
             }
         )
@@ -767,7 +687,7 @@ extension WorldRenderingTests {
                 originalPortalFlags[offset] & ~UInt32(1)
             )
             let connected = try XCTUnwrap(
-                normal.level.rooms.first {
+                normal.runtimeLevel.rooms.first {
                     $0.sourceIndex == portal.connectedRoom
                 }
             )
@@ -787,19 +707,26 @@ extension WorldRenderingTests {
             }
         )
         courseObjects[courseIndex].position =
-            normal.continuation.playerPosition
+            normal.world.playerPosition
         courseObjects[courseIndex].location =
-            normal.continuation.playerLocation
-        let normalCourse = try PlayerSimulation(
+            normal.world.playerLocation
+        let normalCourse = try GameSession(
             level: replacing(
                 level,
                 rooms: try contacting(
                     startCourse.startCourseObjectHandle,
-                    at: normal.continuation.playerPosition
+                    at: normal.world.playerPosition
                 ).rooms,
                 objects: courseObjects
             ),
-            continuation: normal.continuation,
+            world: normal.world.rebased(onto: replacing(
+                level,
+                rooms: try contacting(
+                    startCourse.startCourseObjectHandle,
+                    at: normal.world.playerPosition
+                ).rooms,
+                objects: courseObjects
+            )),
             resumedAtTimestamp: 10.5
         )
         let normalCourseFrame = normalCourse.update(
@@ -821,7 +748,7 @@ extension WorldRenderingTests {
             63
         )
         let normalCoursePortalRoom = try XCTUnwrap(
-            normalCourse.level.rooms.first {
+            normalCourse.runtimeLevel.rooms.first {
                 $0.sourceIndex == startCourse.portalRoomSourceIndex
             }
         )
@@ -831,30 +758,17 @@ extension WorldRenderingTests {
                 .flags & 1,
             0
         )
-        var normalCourseContinuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(normal.continuation)
-            ) as? [String: Any]
-        )
-        var normalCourseOpening = try XCTUnwrap(
-            normalCourseContinuationObject["trainingOpeningState"]
-                as? [String: Any]
-        )
-        normalCourseOpening["startCourseWasPresented"] = true
-        normalCourseOpening["enabledControls"] = 63
-        normalCourseContinuationObject["trainingOpeningState"] =
-            normalCourseOpening
-        let restoredNormalCourse = try PlayerSimulation(
+        // Script 014 already closed the start-course portal in the saved
+        // world, so the restore needs no replay.
+        let restoredNormalCourse = try GameSession(
             level: try contacting(
                 12_300,
-                at: normal.continuation.playerPosition
+                at: normal.world.playerPosition
             ),
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: normalCourseContinuationObject
-                )
-            ),
+            world: normalCourse.world.rebased(onto: try contacting(
+                12_300,
+                at: normal.world.playerPosition
+            )),
             resumedAtTimestamp: 10.75
         )
         let restoredNormalCourseFrame = restoredNormalCourse.update(
@@ -869,7 +783,7 @@ extension WorldRenderingTests {
             63
         )
         let restoredNormalCoursePortalRoom = try XCTUnwrap(
-            restoredNormalCourse.level.rooms.first {
+            restoredNormalCourse.runtimeLevel.rooms.first {
                 $0.sourceIndex == startCourse.portalRoomSourceIndex
             }
         )
@@ -883,22 +797,25 @@ extension WorldRenderingTests {
             0
         )
 
-        let restored = try PlayerSimulation(
+        let restored = try GameSession(
             level: try contacting(
                 12_300,
-                at: normal.continuation.playerPosition
+                at: normal.world.playerPosition
             ),
-            continuation: try JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONEncoder().encode(normal.continuation)
-            ),
+            world: (try JSONDecoder().decode(
+                GameWorld.self,
+                from: JSONEncoder().encode(normal.world)
+            )).rebased(onto: try contacting(
+                12_300,
+                at: normal.world.playerPosition
+            )),
             resumedAtTimestamp: 11
         )
         let restoredFrame = restored.update(at: 11.05, input: .zero)
         XCTAssertTrue(restoredFrame.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(restoredFrame.enabledPlayerControls, [.down])
         let restoredRoom = try XCTUnwrap(
-            restored.level.rooms.first {
+            restored.runtimeLevel.rooms.first {
                 $0.sourceIndex == continueToCourse.portalRoomSourceIndex
             }
         )
@@ -907,74 +824,6 @@ extension WorldRenderingTests {
                 restoredRoom.portals[$0].flags & 1 == 0
             }
         )
-
-        let continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(normal.continuation)
-            ) as? [String: Any]
-        )
-        for (key, value) in [
-            ("repeatReturnDownWasPresented", false),
-            ("enabledControls", 16),
-        ] as [(String, Any)] {
-            var hostileObject = continuationObject
-            var hostileOpening = try XCTUnwrap(
-                hostileObject["trainingOpeningState"] as? [String: Any]
-            )
-            hostileOpening[key] = value
-            hostileObject["trainingOpeningState"] = hostileOpening
-            let hostile = try JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: hostileObject
-                )
-            )
-            XCTAssertThrowsError(
-                try PlayerSimulation(
-                    level: level,
-                    continuation: hostile,
-                    resumedAtTimestamp: 12
-                )
-            ) {
-                XCTAssertEqual(
-                    $0 as? PlayerSimulationContinuationError,
-                    .invalidState
-                )
-            }
-        }
-
-        var hostilePortalRooms = level.rooms
-        let hostilePortalRoomIndex = try XCTUnwrap(
-            hostilePortalRooms.firstIndex {
-                $0.sourceIndex == continueToCourse.portalRoomSourceIndex
-            }
-        )
-        for portalIndex in continueToCourse.orderedPortalIndices {
-            let portal =
-                hostilePortalRooms[hostilePortalRoomIndex]
-                    .portals[portalIndex]
-            hostilePortalRooms[hostilePortalRoomIndex]
-                .portals[portalIndex].flags &= ~UInt32(1)
-            let connectedRoomIndex = try XCTUnwrap(
-                hostilePortalRooms.firstIndex {
-                    $0.sourceIndex == portal.connectedRoom
-                }
-            )
-            hostilePortalRooms[connectedRoomIndex]
-                .portals[portal.connectedPortal].flags &= ~UInt32(1)
-        }
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: replacing(level, rooms: hostilePortalRooms),
-                continuation: normal.continuation,
-                resumedAtTimestamp: 12.5
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
 
         var compatibleLesson = try XCTUnwrap(
             level.trainingOpeningLesson
@@ -985,20 +834,8 @@ extension WorldRenderingTests {
             trainingOpeningLesson: compatibleLesson
         )
         XCTAssertNoThrow(try compatibleLevel.validate())
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: compatibleLevel,
-                continuation: normal.continuation,
-                resumedAtTimestamp: 13
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
         let compatibleSimulation = try resumed(
-            repeatReturnDown.continuation,
+            repeatReturnDown.world,
             contacting: 12_300,
             at: 14,
             level: compatibleLevel
@@ -1010,7 +847,7 @@ extension WorldRenderingTests {
         XCTAssertTrue(compatibleFrame.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(compatibleFrame.enabledPlayerControls, [.down])
         let compatibleRoom = try XCTUnwrap(
-            compatibleSimulation.level.rooms.first {
+            compatibleSimulation.runtimeLevel.rooms.first {
                 $0.sourceIndex == continueToCourse.portalRoomSourceIndex
             }
         )
@@ -1102,31 +939,36 @@ extension WorldRenderingTests {
             return replacing(level, rooms: rooms, objects: objects)
         }
         func resumed(
-            _ continuation: PlayerSimulationContinuation,
+            _ continuation: GameWorld,
             contacting handle: UInt32,
             at timestamp: Double,
             level resumedLevel: Level? = nil
-        ) throws -> PlayerSimulation {
+        ) throws -> GameSession {
             let contactLevel = try contacting(
                 handle,
                 at: continuation.playerPosition
             )
-            return try PlayerSimulation(
+            return try GameSession(
                 level: resumedLevel.map {
                     replacing(
                         contactLevel,
                         trainingOpeningLesson: $0.trainingOpeningLesson
                     )
                 } ?? contactLevel,
-                continuation: continuation,
+                world: continuation.rebased(onto: resumedLevel.map {
+                    replacing(
+                        contactLevel,
+                        trainingOpeningLesson: $0.trainingOpeningLesson
+                    )
+                } ?? contactLevel),
                 resumedAtTimestamp: timestamp
             )
         }
         func advance(
-            _ continuation: PlayerSimulationContinuation,
+            _ continuation: GameWorld,
             contacting handle: UInt32,
             at timestamp: Double
-        ) throws -> PlayerSimulation {
+        ) throws -> GameSession {
             let simulation = try resumed(
                 continuation,
                 contacting: handle,
@@ -1136,53 +978,53 @@ extension WorldRenderingTests {
             return simulation
         }
 
-        let firstForward = PlayerSimulation(
+        let firstForward = GameSession(
             level: try contacting(12_301, at: player.position),
             presentationReadyTimestamp: 0
         )
         _ = firstForward.update(at: 0.05, input: .zero)
         let firstLeftGoal = try advance(
-            firstForward.continuation,
+            firstForward.world,
             contacting: 12_299,
             at: 1
         )
         let returnUp = try advance(
-            firstLeftGoal.continuation,
+            firstLeftGoal.world,
             contacting: 12_300,
             at: 2
         )
         let returnDown = try advance(
-            returnUp.continuation,
+            returnUp.world,
             contacting: 18_441,
             at: 3
         )
         let repeatForward = try advance(
-            returnDown.continuation,
+            returnDown.world,
             contacting: 12_300,
             at: 4
         )
         let repeatForwardGoal = try advance(
-            repeatForward.continuation,
+            repeatForward.world,
             contacting: 12_301,
             at: 5
         )
         let repeatReturnLeft = try advance(
-            repeatForwardGoal.continuation,
+            repeatForwardGoal.world,
             contacting: 12_300,
             at: 6
         )
         let repeatReturnRight = try advance(
-            repeatReturnLeft.continuation,
+            repeatReturnLeft.world,
             contacting: 12_299,
             at: 7
         )
         let repeatReturnUp = try advance(
-            repeatReturnRight.continuation,
+            repeatReturnRight.world,
             contacting: 12_300,
             at: 8
         )
         let normalReturn = try resumed(
-            repeatReturnUp.continuation,
+            repeatReturnUp.world,
             contacting: 18_441,
             at: 9
         )
@@ -1233,8 +1075,8 @@ extension WorldRenderingTests {
 
         let restored = try resumed(
             try JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONEncoder().encode(normalReturn.continuation)
+                GameWorld.self,
+                from: JSONEncoder().encode(normalReturn.world)
             ),
             contacting: 18_441,
             at: 10
@@ -1242,43 +1084,6 @@ extension WorldRenderingTests {
         let restoredFrame = restored.update(at: 10.05, input: .zero)
         XCTAssertTrue(restoredFrame.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(restoredFrame.enabledPlayerControls, [.down])
-
-        let continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(normalReturn.continuation)
-            ) as? [String: Any]
-        )
-        for (key, value) in [
-            ("repeatReturnUpWasPresented", false),
-            ("downGoalWasReached", false),
-            ("upGoalWasReached", false),
-            ("enabledControls", 16),
-        ] as [(String, Any)] {
-            var hostileObject = continuationObject
-            var hostileOpening = try XCTUnwrap(
-                hostileObject["trainingOpeningState"] as? [String: Any]
-            )
-            hostileOpening[key] = value
-            hostileObject["trainingOpeningState"] = hostileOpening
-            let hostile = try JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: hostileObject
-                )
-            )
-            XCTAssertThrowsError(
-                try PlayerSimulation(
-                    level: level,
-                    continuation: hostile,
-                    resumedAtTimestamp: 11
-                )
-            ) {
-                XCTAssertEqual(
-                    $0 as? PlayerSimulationContinuationError,
-                    .invalidState
-                )
-            }
-        }
 
         var compatibleLesson = try XCTUnwrap(
             level.trainingOpeningLesson
@@ -1290,20 +1095,8 @@ extension WorldRenderingTests {
             trainingOpeningLesson: compatibleLesson
         )
         XCTAssertNoThrow(try compatibleLevel.validate())
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: compatibleLevel,
-                continuation: normalReturn.continuation,
-                resumedAtTimestamp: 11.5
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
         let compatibleSimulation = try resumed(
-            repeatReturnUp.continuation,
+            repeatReturnUp.world,
             contacting: 18_441,
             at: 12,
             level: compatibleLevel
@@ -1388,31 +1181,36 @@ extension WorldRenderingTests {
             return replacing(level, rooms: rooms, objects: objects)
         }
         func resumed(
-            _ continuation: PlayerSimulationContinuation,
+            _ continuation: GameWorld,
             contacting handle: UInt32,
             at timestamp: Double,
             level resumedLevel: Level? = nil
-        ) throws -> PlayerSimulation {
+        ) throws -> GameSession {
             let contactLevel = try contacting(
                 handle,
                 at: continuation.playerPosition
             )
-            return try PlayerSimulation(
+            return try GameSession(
                 level: resumedLevel.map {
                     replacing(
                         contactLevel,
                         trainingOpeningLesson: $0.trainingOpeningLesson
                     )
                 } ?? contactLevel,
-                continuation: continuation,
+                world: continuation.rebased(onto: resumedLevel.map {
+                    replacing(
+                        contactLevel,
+                        trainingOpeningLesson: $0.trainingOpeningLesson
+                    )
+                } ?? contactLevel),
                 resumedAtTimestamp: timestamp
             )
         }
         func advance(
-            _ continuation: PlayerSimulationContinuation,
+            _ continuation: GameWorld,
             contacting handle: UInt32,
             at timestamp: Double
-        ) throws -> PlayerSimulation {
+        ) throws -> GameSession {
             let simulation = try resumed(
                 continuation,
                 contacting: handle,
@@ -1422,48 +1220,48 @@ extension WorldRenderingTests {
             return simulation
         }
 
-        let firstForward = PlayerSimulation(
+        let firstForward = GameSession(
             level: try contacting(12_301, at: player.position),
             presentationReadyTimestamp: 0
         )
         _ = firstForward.update(at: 0.1, input: .zero)
         let firstLeftGoal = try advance(
-            firstForward.continuation,
+            firstForward.world,
             contacting: 12_299,
             at: 1
         )
         let returnUp = try advance(
-            firstLeftGoal.continuation,
+            firstLeftGoal.world,
             contacting: 12_300,
             at: 2
         )
         let returnDown = try advance(
-            returnUp.continuation,
+            returnUp.world,
             contacting: 18_441,
             at: 3
         )
         let repeatForward = try advance(
-            returnDown.continuation,
+            returnDown.world,
             contacting: 12_300,
             at: 4
         )
         let repeatForwardGoal = try advance(
-            repeatForward.continuation,
+            repeatForward.world,
             contacting: 12_301,
             at: 5
         )
         let repeatReturnLeft = try advance(
-            repeatForwardGoal.continuation,
+            repeatForwardGoal.world,
             contacting: 12_300,
             at: 6
         )
         let repeatReturnRight = try advance(
-            repeatReturnLeft.continuation,
+            repeatReturnLeft.world,
             contacting: 12_299,
             at: 7
         )
         let normalReturn = try resumed(
-            repeatReturnRight.continuation,
+            repeatReturnRight.world,
             contacting: 12_300,
             at: 8
         )
@@ -1488,8 +1286,8 @@ extension WorldRenderingTests {
 
         let restored = try resumed(
             try JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONEncoder().encode(normalReturn.continuation)
+                GameWorld.self,
+                from: JSONEncoder().encode(normalReturn.world)
             ),
             contacting: 12_300,
             at: 9
@@ -1505,33 +1303,33 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(restoredFrame.enabledPlayerControls, [.up])
 
-        let earlyDown = PlayerSimulation(
+        let earlyDown = GameSession(
             level: try contacting(18_441, at: player.position),
             presentationReadyTimestamp: 10
         )
         _ = earlyDown.update(at: 10.1, input: .zero)
         let earlyRepeat = try advance(
-            earlyDown.continuation,
+            earlyDown.world,
             contacting: 12_300,
             at: 11
         )
         let earlyForward = try advance(
-            earlyRepeat.continuation,
+            earlyRepeat.world,
             contacting: 12_301,
             at: 12
         )
         let earlyReturnLeft = try advance(
-            earlyForward.continuation,
+            earlyForward.world,
             contacting: 12_300,
             at: 13
         )
         let earlyReturnRight = try advance(
-            earlyReturnLeft.continuation,
+            earlyReturnLeft.world,
             contacting: 12_299,
             at: 14
         )
         let sharedStartGoal = try resumed(
-            earlyReturnRight.continuation,
+            earlyReturnRight.world,
             contacting: 12_300,
             at: 15
         )
@@ -1583,43 +1381,6 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(retainedVoice, "udown.osf")
 
-        let continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(normalReturn.continuation)
-            ) as? [String: Any]
-        )
-        for (key, value) in [
-            ("repeatReturnRightWasPresented", false),
-            ("rightGoalWasReached", false),
-            ("upGoalWasReached", false),
-            ("enabledControls", 8),
-        ] as [(String, Any)] {
-            var hostileObject = continuationObject
-            var hostileOpening = try XCTUnwrap(
-                hostileObject["trainingOpeningState"] as? [String: Any]
-            )
-            hostileOpening[key] = value
-            hostileObject["trainingOpeningState"] = hostileOpening
-            let hostile = try JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: hostileObject
-                )
-            )
-            XCTAssertThrowsError(
-                try PlayerSimulation(
-                    level: level,
-                    continuation: hostile,
-                    resumedAtTimestamp: 16
-                )
-            ) {
-                XCTAssertEqual(
-                    $0 as? PlayerSimulationContinuationError,
-                    .invalidState
-                )
-            }
-        }
-
         var compatibleLesson = try XCTUnwrap(
             level.trainingOpeningLesson
         )
@@ -1631,20 +1392,8 @@ extension WorldRenderingTests {
             trainingOpeningLesson: compatibleLesson
         )
         XCTAssertNoThrow(try compatibleLevel.validate())
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: compatibleLevel,
-                continuation: normalReturn.continuation,
-                resumedAtTimestamp: 16.5
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
         let compatibleSimulation = try resumed(
-            repeatReturnRight.continuation,
+            repeatReturnRight.world,
             contacting: 12_300,
             at: 17,
             level: compatibleLevel
@@ -1733,21 +1482,21 @@ extension WorldRenderingTests {
             return replacing(level, rooms: rooms, objects: objects)
         }
         func resumed(
-            _ continuation: PlayerSimulationContinuation,
+            _ continuation: GameWorld,
             contacting handle: UInt32,
             at timestamp: Double
-        ) throws -> PlayerSimulation {
-            try PlayerSimulation(
+        ) throws -> GameSession {
+            try GameSession(
                 level: contacting(handle, at: continuation.playerPosition),
-                continuation: continuation,
+                world: continuation.rebased(onto: contacting(handle, at: continuation.playerPosition)),
                 resumedAtTimestamp: timestamp
             )
         }
         func advance(
-            _ continuation: PlayerSimulationContinuation,
+            _ continuation: GameWorld,
             contacting handle: UInt32,
             at timestamp: Double
-        ) throws -> PlayerSimulation {
+        ) throws -> GameSession {
             let simulation = try resumed(
                 continuation,
                 contacting: handle,
@@ -1757,43 +1506,43 @@ extension WorldRenderingTests {
             return simulation
         }
 
-        let firstForward = PlayerSimulation(
+        let firstForward = GameSession(
             level: try contacting(12_301, at: player.position),
             presentationReadyTimestamp: 0
         )
         _ = firstForward.update(at: 0.1, input: .zero)
         let firstLeftGoal = try advance(
-            firstForward.continuation,
+            firstForward.world,
             contacting: 12_299,
             at: 1
         )
         let returnUp = try advance(
-            firstLeftGoal.continuation,
+            firstLeftGoal.world,
             contacting: 12_300,
             at: 2
         )
         let returnDown = try advance(
-            returnUp.continuation,
+            returnUp.world,
             contacting: 18_441,
             at: 3
         )
         let repeatForward = try advance(
-            returnDown.continuation,
+            returnDown.world,
             contacting: 12_300,
             at: 4
         )
         let repeatForwardGoal = try advance(
-            repeatForward.continuation,
+            repeatForward.world,
             contacting: 12_301,
             at: 5
         )
         let repeatReturnLeft = try advance(
-            repeatForwardGoal.continuation,
+            repeatForwardGoal.world,
             contacting: 12_300,
             at: 6
         )
         let normalReturn = try resumed(
-            repeatReturnLeft.continuation,
+            repeatReturnLeft.world,
             contacting: 12_299,
             at: 7
         )
@@ -1819,8 +1568,8 @@ extension WorldRenderingTests {
 
         let restored = try resumed(
             try JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONEncoder().encode(normalReturn.continuation)
+                GameWorld.self,
+                from: JSONEncoder().encode(normalReturn.world)
             ),
             contacting: 12_299,
             at: 8
@@ -1836,28 +1585,28 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(restoredFrame.enabledPlayerControls, [.right])
 
-        let earlyDown = PlayerSimulation(
+        let earlyDown = GameSession(
             level: try contacting(18_441, at: player.position),
             presentationReadyTimestamp: 9
         )
         _ = earlyDown.update(at: 9.1, input: .zero)
         let earlyRepeat = try advance(
-            earlyDown.continuation,
+            earlyDown.world,
             contacting: 12_300,
             at: 10
         )
         let earlyForward = try advance(
-            earlyRepeat.continuation,
+            earlyRepeat.world,
             contacting: 12_301,
             at: 11
         )
         let earlyReturnLeft = try advance(
-            earlyForward.continuation,
+            earlyForward.world,
             contacting: 12_300,
             at: 12
         )
         let sharedLeftGoal = try resumed(
-            earlyReturnLeft.continuation,
+            earlyReturnLeft.world,
             contacting: 12_299,
             at: 13
         )
@@ -1915,94 +1664,6 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(retainedVoice, "return2.osf")
 
-        var hostileOrderingObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(sharedLeftGoal.continuation)
-            ) as? [String: Any]
-        )
-        var hostileOrderingOpening = try XCTUnwrap(
-            hostileOrderingObject["trainingOpeningState"] as? [String: Any]
-        )
-        hostileOrderingOpening["rightGoalWasReached"] = false
-        hostileOrderingObject["trainingOpeningState"] = hostileOrderingOpening
-        let hostileOrdering = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: hostileOrderingObject
-            )
-        )
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: contacting(
-                    12_299,
-                    at: hostileOrdering.playerPosition
-                ),
-                continuation: hostileOrdering,
-                resumedAtTimestamp: 13.5
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
-
-        var hostileObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(normalReturn.continuation)
-            ) as? [String: Any]
-        )
-        var hostileOpening = try XCTUnwrap(
-            hostileObject["trainingOpeningState"] as? [String: Any]
-        )
-        hostileOpening["repeatReturnLeftWasPresented"] = false
-        hostileObject["trainingOpeningState"] = hostileOpening
-        let hostile = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: hostileObject)
-        )
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: hostile,
-                resumedAtTimestamp: 14
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
-
-        var hostileMaskObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(normalReturn.continuation)
-            ) as? [String: Any]
-        )
-        var hostileMaskOpening = try XCTUnwrap(
-            hostileMaskObject["trainingOpeningState"] as? [String: Any]
-        )
-        hostileMaskOpening["enabledControls"] = 4
-        hostileMaskObject["trainingOpeningState"] = hostileMaskOpening
-        let hostileMask = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: hostileMaskObject
-            )
-        )
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: hostileMask,
-                resumedAtTimestamp: 14.5
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
-
         var compatibleLesson = try XCTUnwrap(
             level.trainingOpeningLesson
         )
@@ -2015,28 +1676,16 @@ extension WorldRenderingTests {
             trainingOpeningLesson: compatibleLesson
         )
         XCTAssertNoThrow(try compatibleLevel.validate())
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: compatibleLevel,
-                continuation: normalReturn.continuation,
-                resumedAtTimestamp: 14.75
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
         let compatibleContactLevel = replacing(
             try contacting(
                 12_299,
-                at: repeatReturnLeft.continuation.playerPosition
+                at: repeatReturnLeft.world.playerPosition
             ),
             trainingOpeningLesson: compatibleLesson
         )
-        let compatibleSimulation = try PlayerSimulation(
+        let compatibleSimulation = try GameSession(
             level: compatibleContactLevel,
-            continuation: repeatReturnLeft.continuation,
+            world: repeatReturnLeft.world.rebased(onto: compatibleContactLevel),
             resumedAtTimestamp: 15
         )
         let compatibleFrame = compatibleSimulation.update(

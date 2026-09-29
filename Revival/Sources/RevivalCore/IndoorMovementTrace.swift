@@ -55,6 +55,9 @@ struct IndoorMovementTrace: Equatable, Sendable {
     let passedPortalFaces: [IndoorPortalCrossing]
 }
 
+/// Traces through the canonical portal flags. Import, editor, and
+/// load-time checks use this form; a running game passes its world's
+/// `RoomState` values.
 func traceIndoorMovement(
     in level: Level,
     startRoom: Int,
@@ -62,10 +65,35 @@ func traceIndoorMovement(
     end: Vector3,
     radius: Float
 ) -> IndoorMovementTrace {
+    traceIndoorMovement(
+        in: level,
+        roomStates: RoomState.canonical(level),
+        startRoom: startRoom,
+        start: start,
+        end: end,
+        radius: radius
+    )
+}
+
+func traceIndoorMovement(
+    in level: Level,
+    roomStates: [RoomState],
+    startRoom: Int,
+    start: Vector3,
+    end: Vector3,
+    radius: Float
+) -> IndoorMovementTrace {
     precondition(radius.isFinite && radius >= 0)
     precondition(isFinite(start) && isFinite(end))
+    precondition(roomStates.count == level.rooms.count)
 
     let rooms = Dictionary(uniqueKeysWithValues: level.rooms.map { ($0.sourceIndex, $0) })
+    let portalFlags = Dictionary(
+        uniqueKeysWithValues: zip(
+            level.rooms.map(\.sourceIndex),
+            roomStates.map(\.portalFlags)
+        )
+    )
     let surfacePhysics = Dictionary(
         uniqueKeysWithValues: level.surfacePhysics.map { ($0.texture, $0.behavior) }
     )
@@ -97,9 +125,8 @@ func traceIndoorMovement(
             }
 
             let portalIndex = face.portalIndex
-            let portal = portalIndex.map { room.portals[$0] }
             if indoorFaceIsPassable(
-                portal: portal,
+                portalFlags: portalIndex.map { portalFlags[roomIndex]![$0] },
                 face: face,
                 surfacePhysics: surfacePhysics
             ) {
@@ -206,18 +233,18 @@ func containingIndoorRoomSourceIndex(
 }
 
 private func indoorFaceIsPassable(
-    portal: LevelPortal?,
+    portalFlags: UInt32?,
     face: LevelFace,
     surfacePhysics: [SourceResource: SurfacePhysicsBehavior]
 ) -> Bool {
     if surfacePhysics[face.texture]! == .passThrough {
         return true
     }
-    guard let portal else { return false }
+    guard let portalFlags else { return false }
     let rendersFaces: UInt32 = 0x0000_0001
     let renderedFlythrough: UInt32 = 0x0000_0002
-    return portal.flags & rendersFaces == 0
-        || portal.flags & renderedFlythrough != 0
+    return portalFlags & rendersFaces == 0
+        || portalFlags & renderedFlythrough != 0
 }
 
 private struct IndoorFaceHit {

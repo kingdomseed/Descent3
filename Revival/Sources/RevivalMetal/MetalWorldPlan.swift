@@ -47,6 +47,10 @@ struct MetalLightCoronaDraw: Equatable, Sendable {
 
 struct MetalWorldPlan: Equatable, Sendable {
     let level: Level
+    /// The world values of the last extraction. A camera-only update
+    /// re-extracts against them.
+    let objects: ObjectTable
+    let roomStates: [RoomState]
     let camera: RoomCamera
     let startRoomSourceIndex: Int
     let excludedObjectHandle: UInt32?
@@ -181,6 +185,8 @@ private func makeMetalWorldPlan(
     }
     return MetalWorldPlan(
         level: level,
+        objects: ObjectTable(level: level),
+        roomStates: RoomState.canonical(level),
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex,
         excludedObjectHandle: excludedObjectHandle,
@@ -204,6 +210,8 @@ private func makeMetalWorldPlan(
 func updateMetalWorldPlan(
     _ prepared: MetalWorldPlan,
     level: Level,
+    objects: ObjectTable,
+    roomStates: [RoomState],
     playerView: PlayerView,
     presentationFrame: MetalPresentationFrame? = nil,
     trainingCameraMonitor: TrainingCameraMonitorFrame? = nil,
@@ -234,6 +242,8 @@ func updateMetalWorldPlan(
     try updateMetalWorldPlan(
         prepared,
         level: level,
+        objects: objects,
+        roomStates: roomStates,
         camera: playerView.camera,
         startRoomSourceIndex: playerView.roomSourceIndex,
         excludedObjectHandle: playerView.objectHandle,
@@ -272,6 +282,7 @@ func updateMetalWorldPlan(
 func updateMetalWorldPlan(
     _ prepared: MetalWorldPlan,
     level: Level,
+    world: GameWorld,
     frame: PlayerSimulationFrame,
     drawableAspect: Float
 ) throws -> MetalWorldPlan {
@@ -294,6 +305,8 @@ func updateMetalWorldPlan(
     return try updateMetalWorldPlan(
         prepared,
         level: level,
+        objects: world.objects,
+        roomStates: world.rooms,
         playerView: playerView,
         presentationFrame: .init(
             systemsFrameDuration: frame.systemsFrameDuration,
@@ -336,6 +349,8 @@ func updateMetalWorldPlan(
     try updateMetalWorldPlan(
         prepared,
         level: prepared.level,
+        objects: prepared.objects,
+        roomStates: prepared.roomStates,
         camera: camera,
         startRoomSourceIndex: prepared.startRoomSourceIndex,
         excludedObjectHandle: prepared.excludedObjectHandle,
@@ -364,6 +379,8 @@ func updateMetalWorldPlan(
 private func updateMetalWorldPlan(
     _ prepared: MetalWorldPlan,
     level: Level,
+    objects: ObjectTable,
+    roomStates: [RoomState],
     camera: RoomCamera,
     startRoomSourceIndex: Int,
     excludedObjectHandle: UInt32?,
@@ -395,6 +412,8 @@ private func updateMetalWorldPlan(
 ) throws -> MetalWorldPlan {
     let extraction = try extractWorldForRendering(
         level,
+        objects: objects,
+        roomStates: roomStates,
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex,
         excludedObjectHandle: excludedObjectHandle,
@@ -567,6 +586,8 @@ private func updateMetalWorldPlan(
     let auxiliaryExtraction = try trainingCameraMonitor.map {
         try extractWorldForRendering(
             level,
+            objects: objects,
+            roomStates: roomStates,
             camera: $0.camera,
             startRoomSourceIndex: $0.roomSourceIndex,
             excludedObjectHandle:
@@ -586,9 +607,8 @@ private func updateMetalWorldPlan(
         .map { draw in
             guard draw.objectHandle == excludedObjectHandle,
                 let trainingCloak,
-                let player = level.objects.first(where: {
-                    $0.handle == excludedObjectHandle
-                })
+                let excludedObjectHandle,
+                let player = objects[ObjectHandle(excludedObjectHandle)]
             else {
                 return draw
             }
@@ -696,9 +716,7 @@ private func updateMetalWorldPlan(
     if let distance = trainingDodgeMarkerLightDistance,
         distance > 0,
         let dodge = level.trainingDodgeAttempt,
-        let marker = level.objects.first(where: {
-            $0.handle == dodge.flashLightObjectHandle
-        }),
+        let marker = objects[ObjectHandle(dodge.flashLightObjectHandle)],
         let gameTime = presentationFrame?.systemsGameTime
     {
         let light = sourceTrainingMarkerLight(
@@ -724,9 +742,7 @@ private func updateMetalWorldPlan(
        let returnChain =
             level.trainingCameraMonitorChain?.returnToShip,
        let presentation = returnChain.markerLightPresentation,
-       let marker = level.objects.first(where: {
-           $0.handle == returnChain.markerLightObjectHandle
-       }),
+       let marker = objects[ObjectHandle(returnChain.markerLightObjectHandle)],
        let gameTime = presentationFrame?.systemsGameTime {
         let light = sourceTrainingMarkerLight(
             presentation,
@@ -749,9 +765,7 @@ private func updateMetalWorldPlan(
     if let distance = trainingLastRoomMarkerLightDistance,
        distance > 0,
        let chain = level.trainingLastRoomChain,
-       let marker = level.objects.first(where: {
-           $0.handle == chain.markerLightObjectHandle
-       }),
+       let marker = objects[ObjectHandle(chain.markerLightObjectHandle)],
        let gameTime = presentationFrame?.systemsGameTime {
         let light = sourceTrainingMarkerLight(
             chain.markerLightPresentation,
@@ -774,9 +788,7 @@ private func updateMetalWorldPlan(
     if let distance = trainingFinalBotsMarkerLightDistance,
        distance > 0,
        let chain = level.trainingFinalBotsCompletionChain,
-       let marker = level.objects.first(where: {
-           $0.handle == chain.markerLightObjectHandle
-       }),
+       let marker = objects[ObjectHandle(chain.markerLightObjectHandle)],
        let gameTime = presentationFrame?.systemsGameTime {
         let light = sourceTrainingMarkerLight(
             chain.markerLightPresentation,
@@ -871,6 +883,8 @@ private func updateMetalWorldPlan(
     }
     return MetalWorldPlan(
         level: level,
+        objects: objects,
+        roomStates: roomStates,
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex,
         excludedObjectHandle: excludedObjectHandle,
@@ -1519,8 +1533,6 @@ private func makeTrainingGuidebotYellowFlareParticleDraws(
     )
 }
 
-private let playerConcussionExplosionPresentationCapacity = 6
-private let playerConcussionSparkPresentationCapacity = 48
 
 private func makePreparedPlayerConcussionExplosionDraws(
     _ level: Level

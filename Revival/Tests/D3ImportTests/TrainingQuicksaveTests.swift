@@ -2,7 +2,7 @@ import AppKit
 import XCTest
 
 final class TrainingQuicksaveTests: XCTestCase {
-    func testTrainingQuicksaveRoundTripRestoresSchema7StateAndContinuesDeterministically()
+    func testTrainingQuicksaveRoundTripRestoresGameWorldAndContinuesDeterministically()
         throws
     {
         let root = try makeTemporarySaveRoot()
@@ -11,7 +11,7 @@ final class TrainingQuicksaveTests: XCTestCase {
         let package = makePackageReference()
         let level = makeTrainingRASBot1DeathLevel()
         try level.validate()
-        let original = PlayerSimulation(
+        let original = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1234_5678
@@ -20,27 +20,23 @@ final class TrainingQuicksaveTests: XCTestCase {
             at: 0.1,
             input: .init(deploysTrainingGuidebot: true)
         )
-        let saved = original.continuation
-        let saveFile = PlayerSaveFile(rootURL: root)
+        let saved = original.world
+        let saveFile = GameSaveFile(rootURL: root)
 
         try saveFile.save(
             profileID: profileID,
             package: package,
-            continuation: saved
+            world: saved,
+            level: level
         )
         let encoded = try Data(contentsOf: saveFile.quicksaveURL(
             profileID: profileID
         ))
-        let envelope = try JSONDecoder().decode(
-            PlayerSaveEnvelope.self,
-            from: encoded
-        )
-        XCTAssertEqual(envelope.schemaVersion, 1)
-        XCTAssertEqual(envelope.profileID, profileID)
-        XCTAssertEqual(envelope.package, package)
-        XCTAssertEqual(envelope.continuation, saved)
-        XCTAssertEqual(saved.schemaVersion, 7)
-        XCTAssertNotNil(saved.authoritativeRandomState)
+        let save = try JSONDecoder().decode(GameSave.self, from: encoded)
+        XCTAssertEqual(save.schemaVersion, 2)
+        XCTAssertEqual(save.profileID, profileID)
+        XCTAssertEqual(save.package, package)
+        XCTAssertEqual(save.world, saved)
         XCTAssertNotEqual(saved.authoritativeRandomState, 0x1234_5678)
 
         let restored = try saveFile.load(
@@ -49,15 +45,15 @@ final class TrainingQuicksaveTests: XCTestCase {
             baseLevel: level,
             resumedAtTimestamp: 100
         )
-        XCTAssertEqual(restored.continuation, saved)
+        XCTAssertEqual(restored.world, saved)
         XCTAssertEqual(
-            restored.continuation.authoritativeRandomState,
+            restored.world.authoritativeRandomState,
             saved.authoritativeRandomState
         )
         let originalNext = original.update(at: 0.2, input: .zero)
         let restoredNext = restored.update(at: 100.1, input: .zero)
         XCTAssertEqual(originalNext, restoredNext)
-        XCTAssertEqual(original.continuation, restored.continuation)
+        XCTAssertEqual(original.world, restored.world)
     }
 
     func testTrainingQuicksaveRejectsHostileFilesAndWrongIdentity() throws {
@@ -67,15 +63,16 @@ final class TrainingQuicksaveTests: XCTestCase {
         let package = makePackageReference()
         let level = makeTrainingRASBot1DeathLevel()
         try level.validate()
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
-        let saveFile = PlayerSaveFile(rootURL: root)
+        let saveFile = GameSaveFile(rootURL: root)
         try saveFile.save(
             profileID: profileID,
             package: package,
-            continuation: simulation.continuation
+            world: simulation.world,
+            level: level
         )
         let saveURL = saveFile.quicksaveURL(profileID: profileID)
         let validData = try Data(contentsOf: saveURL)
@@ -99,10 +96,10 @@ final class TrainingQuicksaveTests: XCTestCase {
         )
 
         try writeMutatedJSON(validData, to: saveURL) {
-            $0["schemaVersion"] = 2
+            $0["schemaVersion"] = 1
         }
         assertLoadError(
-            .unsupportedSaveSchema(2),
+            .unsupportedSaveSchema(1),
             saveFile: saveFile,
             profileID: profileID,
             package: package,
@@ -169,22 +166,23 @@ final class TrainingQuicksaveTests: XCTestCase {
         let profileID = UUID()
         let package = makePackageReference()
         let level = makeTrainingRASBot1DeathLevel()
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
         _ = simulation.update(at: 0.1, input: .zero)
-        let first = simulation.continuation
-        let saveFile = PlayerSaveFile(rootURL: root)
+        let first = simulation.world
+        let saveFile = GameSaveFile(rootURL: root)
         try saveFile.save(
             profileID: profileID,
             package: package,
-            continuation: first
+            world: first,
+            level: level
         )
         let saveURL = saveFile.quicksaveURL(profileID: profileID)
         let originalData = try Data(contentsOf: saveURL)
         _ = simulation.update(at: 0.2, input: .zero)
-        let replacement = simulation.continuation
+        let replacement = simulation.world
         XCTAssertNotEqual(replacement, first)
 
         let profileURL = saveURL.deletingLastPathComponent()
@@ -201,9 +199,10 @@ final class TrainingQuicksaveTests: XCTestCase {
         XCTAssertThrowsError(try saveFile.save(
             profileID: profileID,
             package: package,
-            continuation: replacement
+            world: replacement,
+            level: level
         )) {
-            guard let error = $0 as? PlayerSaveError,
+            guard let error = $0 as? GameSaveError,
                   case .writeFailed = error else {
                 return XCTFail("unexpected error: \($0)")
             }
@@ -215,7 +214,7 @@ final class TrainingQuicksaveTests: XCTestCase {
             baseLevel: level,
             resumedAtTimestamp: 10
         )
-        XCTAssertEqual(restored.continuation, first)
+        XCTAssertEqual(restored.world, first)
     }
 
     func testTrainingQuickloadFailurePreservesTheLiveSimulation() throws {
@@ -224,25 +223,30 @@ final class TrainingQuicksaveTests: XCTestCase {
         let profileID = UUID()
         let package = makePackageReference()
         let level = makeTrainingRASBot1DeathLevel()
-        let original = PlayerSimulation(
+        let original = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
         _ = original.update(at: 0.1, input: .zero)
-        let liveContinuation = original.continuation
+        let liveWorld = original.world
         var live = original
-        let saveFile = PlayerSaveFile(rootURL: root)
+        let saveFile = GameSaveFile(rootURL: root)
         try saveFile.save(
             profileID: profileID,
             package: package,
-            continuation: liveContinuation
+            world: liveWorld,
+            level: level
         )
         let saveURL = saveFile.quicksaveURL(profileID: profileID)
         let validData = try Data(contentsOf: saveURL)
         try writeMutatedJSON(validData, to: saveURL) {
-            var continuation = $0["continuation"] as! [String: Any]
-            continuation["levelSHA256"] = String(repeating: "f", count: 64)
-            $0["continuation"] = continuation
+            var world = $0["world"] as! [String: Any]
+            var objects = world["objects"] as! [String: Any]
+            var freeSlots = objects["freeSlots"] as! [Int]
+            freeSlots.append(freeSlots[0])
+            objects["freeSlots"] = freeSlots
+            world["objects"] = objects
+            $0["world"] = world
         }
 
         do {
@@ -253,12 +257,12 @@ final class TrainingQuicksaveTests: XCTestCase {
                 resumedAtTimestamp: 10
             )
             live = candidate
-            XCTFail("hostile continuation loaded")
+            XCTFail("hostile world loaded")
         } catch {
-            XCTAssertEqual(error as? PlayerSaveError, .invalidContinuation)
+            XCTAssertEqual(error as? GameSaveError, .invalidWorld(.freeList))
         }
         XCTAssertTrue(live === original)
-        XCTAssertEqual(live.continuation, liveContinuation)
+        XCTAssertEqual(live.world, liveWorld)
     }
 
     @MainActor
@@ -335,8 +339,8 @@ final class TrainingQuicksaveTests: XCTestCase {
     }
 
     private func assertLoadError(
-        _ expected: PlayerSaveError,
-        saveFile: PlayerSaveFile,
+        _ expected: GameSaveError,
+        saveFile: GameSaveFile,
         profileID: UUID,
         package: CanonicalPackageReference,
         level: Level,
@@ -350,7 +354,7 @@ final class TrainingQuicksaveTests: XCTestCase {
             resumedAtTimestamp: 10
         ), file: file, line: line) {
             XCTAssertEqual(
-                $0 as? PlayerSaveError,
+                $0 as? GameSaveError,
                 expected,
                 file: file,
                 line: line

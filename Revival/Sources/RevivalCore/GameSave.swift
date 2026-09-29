@@ -1,0 +1,886 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The save file: a Codable `GameWorld` plus the package fingerprint and the
+// pilot (architecture.md section 7). It replaces the legacy binary
+// SaveGameState and the script save events.
+
+import Foundation
+
+private let maximumGameSaveByteCount = 8 * 1_024 * 1_024
+private let quicksaveName = "quicksave.json"
+/// The largest magnitude of any saved number or vector component: game
+/// times, deadlines, timers, lifetimes, positions, and velocities. As a time
+/// it is about eleven days. It keeps every time-derived integer conversion,
+/// wrap loop, and squared vector length in range. The bound is symmetric
+/// because the source keeps some deadlines negative (for example the dodge
+/// turret's initial last-visible time of -14 s).
+private let maximumSavedMagnitude: Float = 1_000_000
+private let maximumSavedTime = maximumSavedMagnitude
+/// The largest effect creation ordinal a save may hold. A session creates
+/// far fewer effects, and the per-frame increments cannot overflow from it.
+private let maximumSavedCreationOrdinal: UInt64 = 1 << 48
+
+struct GameSave: Codable, Equatable, Sendable {
+    /// Schema 2 replaces player save schema 1, which wrapped continuation
+    /// schema 7.
+    static let currentSchemaVersion = 2
+
+    let schemaVersion: Int
+    /// The pilot.
+    let profileID: UUID
+    /// The package fingerprint.
+    let package: CanonicalPackageReference
+    let world: GameWorld
+
+    init(
+        profileID: UUID,
+        package: CanonicalPackageReference,
+        world: GameWorld
+    ) {
+        schemaVersion = Self.currentSchemaVersion
+        self.profileID = profileID
+        self.package = package
+        self.world = world
+    }
+}
+
+enum GameSaveError: Error, Equatable, LocalizedError {
+    case missingSave
+    case malformedSave
+    case unsupportedSaveSchema(Int)
+    case profileMismatch
+    case packageMismatch
+    case nonRegularFile
+    case tooLarge
+    case invalidWorld(GameWorldValidationError)
+    case readFailed(String)
+    case writeFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .missingSave:
+            "No quicksave exists for the selected pilot."
+        case .malformedSave:
+            "The quicksave is corrupt."
+        case let .unsupportedSaveSchema(version):
+            "The quicksave uses unsupported save schema \(version)."
+        case .profileMismatch:
+            "The quicksave belongs to a different pilot."
+        case .packageMismatch:
+            "The quicksave belongs to a different canonical package."
+        case .nonRegularFile:
+            "The quicksave is not a regular owned file."
+        case .tooLarge:
+            "The quicksave is larger than 8 MiB."
+        case .invalidWorld:
+            "The quicksave contains invalid game state."
+        case let .readFailed(message):
+            "Could not read the quicksave: \(message)"
+        case let .writeFailed(message):
+            "Could not write the quicksave: \(message)"
+        }
+    }
+}
+
+enum GameWorldValidationError: Error, Equatable, Sendable {
+    case objectTableShape
+    case objectHandle(slot: Int)
+    case freeList
+    case objectLocation(slot: Int)
+    case nonFiniteValue(String)
+    case missingPlayer
+    case roomState
+    case goals
+    case orientation(String)
+    case roomReference(String)
+    case objectReference(UInt32)
+    case indexOutOfRange(String)
+    case capacity(String)
+    case unexpectedState(String)
+    case outOfDomain(String)
+}
+
+extension GameWorld {
+    /// Structural validation, done once when a world crosses the save
+    /// boundary: slots and handles agree, the free list holds exactly the
+    /// free slots, required objects exist, room and object references are in
+    /// range, indices and array lengths fit what the runtime indexes, floats
+    /// are finite, and every saved orientation is an orthonormal basis.
+    func validate(against level: Level) throws(GameWorldValidationError) {
+        let capacity = ObjectTable.capacity
+        guard objects.slots.count == capacity,
+              objects.handles.count == capacity
+        else {
+            throw .objectTableShape
+        }
+        let roomSourceIndices = Set(level.rooms.map(\.sourceIndex))
+        for slot in 0..<capacity {
+            let handle = objects.handles[slot]
+            guard handle.slot == slot else {
+                throw .objectHandle(slot: slot)
+            }
+            guard let object = objects.slots[slot] else { continue }
+            guard object.handle == handle,
+                  handle.rawValue & ObjectHandle.countMask != 0
+            else {
+                throw .objectHandle(slot: slot)
+            }
+            switch object.location {
+            case let .room(room):
+                guard roomSourceIndices.contains(room) else {
+                    throw .objectLocation(slot: slot)
+                }
+            case let .terrainCell(cell):
+                guard (0..<65_536).contains(cell) else {
+                    throw .objectLocation(slot: slot)
+                }
+            }
+            guard isFinite(object.position) else {
+                throw .nonFiniteValue("object \(slot)")
+            }
+            guard abs(object.position.x) <= maximumSavedMagnitude,
+                  abs(object.position.y) <= maximumSavedMagnitude,
+                  abs(object.position.z) <= maximumSavedMagnitude
+            else {
+                throw .outOfDomain("object \(slot)")
+            }
+            guard isCanonicalRigidTransform(
+                position: object.position,
+                orientation: object.orientation
+            ) else {
+                throw .orientation("object \(slot)")
+            }
+        }
+        let freeSlots = Set(objects.freeSlots)
+        guard freeSlots.count == objects.freeSlots.count,
+              freeSlots == Set(
+                  (0..<capacity).filter { objects.slots[$0] == nil }
+              )
+        else {
+            throw .freeList
+        }
+
+        guard let binding = level.defaultPlayerBinding,
+              let player = objects[ObjectHandle(binding.objectHandle)],
+              player.type == .player,
+              case .room = player.location
+        else {
+            throw .missingPlayer
+        }
+
+        guard rooms.count == level.rooms.count,
+              zip(rooms, level.rooms).allSatisfy({
+                  $0.portalFlags.count == $1.portals.count
+              })
+        else {
+            throw .roomState
+        }
+        guard goals.count == level.goals.count,
+              zip(goals, level.goals).allSatisfy({ saved, canonical in
+                  saved.items.count == canonical.items.count
+                      && zip(saved.items, canonical.items).allSatisfy {
+                          $0.objectHandle == $1.objectHandle
+                      }
+              })
+        else {
+            throw .goals
+        }
+
+        let scalars: [(String, Float)] = [
+            ("frameDuration", frameDuration),
+            ("gameTime", gameTime),
+            ("turnrollFixedAngle", turnrollFixedAngle),
+            ("afterburnerFuel", afterburnerFuel),
+            ("energy", energy),
+            ("shields", shields),
+            ("afterburnerMagnitude", afterburnerMagnitude),
+            ("wiggleFalloff", wiggleFalloff),
+            ("lastThrustTime", lastThrustTime),
+        ]
+        for (name, value) in scalars where !value.isFinite {
+            throw .nonFiniteValue(name)
+        }
+        guard frameDuration >= 0, gameTime >= 0 else {
+            throw .nonFiniteValue("clock")
+        }
+        guard frameDuration <= maximumSavedTime else {
+            throw .outOfDomain("frameDuration")
+        }
+        guard gameTime <= maximumSavedTime else {
+            throw .outOfDomain("gameTime")
+        }
+        // The turnroll update keeps the angle within +/-32000.
+        guard abs(turnrollFixedAngle) <= 32_000 else {
+            throw .outOfDomain("turnrollFixedAngle")
+        }
+        guard isFinite(velocity), isFinite(angularVelocity) else {
+            throw .nonFiniteValue("player velocity")
+        }
+
+        let sweep = NestedStateSweep(roomSourceIndices: roomSourceIndices)
+        for child in Mirror(reflecting: self).children
+        where !["objects", "rooms", "goals"].contains(child.label) {
+            try sweep.visit(child.value, label: child.label ?? "")
+        }
+        try validateStateDefinitions(level: level)
+        try validateRequiredObjects(level: level)
+        try validateIndicesAndCapacities(level: level)
+        try validateNumericDomains(level: level)
+    }
+
+    /// Script and weapon state exists only when the level or ship defines
+    /// it, as `GameWorld(level:)` creates it. The runtime force-unwraps the
+    /// definition of any state it finds.
+    private func validateStateDefinitions(
+        level: Level
+    ) throws(GameWorldValidationError) {
+        let ship = level.defaultPlayerBinding.flatMap { binding in
+            level.shipDefinitions.first { $0.source == binding.ship }
+        }
+        let pairs: [(String, Bool, Bool)] = [
+            ("playerConcussionState", playerConcussionState != nil,
+             ship?.playerConcussion != nil),
+            ("playerYellowFlareState", playerYellowFlareState != nil,
+             level.shipDefinitions.first?.playerYellowFlare != nil),
+            ("trainingOpeningState", trainingOpeningState != nil,
+             level.trainingOpeningLesson != nil),
+            ("trainingDodgeAttemptState", trainingDodgeAttemptState != nil,
+             level.trainingDodgeAttempt != nil),
+            ("trainingManeuverFollowState",
+             trainingManeuverFollowState != nil,
+             level.trainingDodgeAttempt?.maneuverFollow != nil),
+            ("trainingGalleryBarrierState",
+             trainingGalleryBarrierState != nil,
+             level.trainingGalleryBarrier != nil),
+            ("trainingRobotGuidebotState",
+             trainingRobotGuidebotState != nil,
+             level.trainingRobotGuidebotChain != nil),
+            ("trainingCameraMonitorState",
+             trainingCameraMonitorState != nil,
+             level.trainingCameraMonitorChain != nil),
+            ("trainingKillbotEntryState", trainingKillbotEntryState != nil,
+             level.trainingCameraMonitorChain?.returnToShip?.killbotEntry
+                != nil),
+            ("trainingRASBot1DeathState", trainingRASBot1DeathState != nil,
+             level.trainingRASBot1DeathChain != nil),
+            ("trainingRASBot2DeathState", trainingRASBot2DeathState != nil,
+             level.trainingRASBot2DeathChain != nil),
+            ("trainingRASBot3DeathState", trainingRASBot3DeathState != nil,
+             level.trainingRASBot3DeathChain != nil),
+            ("trainingRASBot4DeathState", trainingRASBot4DeathState != nil,
+             level.trainingRASBot4DeathChain != nil),
+            ("trainingLastBot1DeathState", trainingLastBot1DeathState != nil,
+             level.trainingLastBot1DeathChain != nil),
+            ("trainingLastBot2DeathState", trainingLastBot2DeathState != nil,
+             level.trainingLastBot2DeathChain != nil),
+            ("trainingLastBot3DeathState", trainingLastBot3DeathState != nil,
+             level.trainingLastBot3DeathChain != nil),
+            ("trainingLastBot4DeathState", trainingLastBot4DeathState != nil,
+             level.trainingLastBot4DeathChain != nil),
+            ("trainingLastBot5DeathState", trainingLastBot5DeathState != nil,
+             level.trainingLastBot5DeathChain != nil),
+            ("trainingInvulnerabilityPickupState",
+             trainingInvulnerabilityPickupState != nil,
+             level.trainingInvulnerabilityPickupChain != nil),
+            ("trainingCloakPickupState", trainingCloakPickupState != nil,
+             level.trainingCloakPickupChain != nil),
+            ("trainingLastRoomState", trainingLastRoomState != nil,
+             level.trainingLastRoomChain != nil),
+            ("trainingFinalRoomEntryState",
+             trainingFinalRoomEntryState != nil,
+             level.trainingFinalRoomEntryChain != nil),
+            ("trainingFinalBotsCompletionState",
+             trainingFinalBotsCompletionState != nil,
+             level.trainingFinalBotsCompletionChain != nil),
+            ("trainingFinalGoalState", trainingFinalGoalState != nil,
+             level.trainingFinalGoalChain != nil),
+        ]
+        for (name, hasState, hasDefinition) in pairs
+        where hasState && !hasDefinition {
+            throw .unexpectedState(name)
+        }
+    }
+
+    /// Values the runtime normalizes, wraps, or converts to integers keep
+    /// the ranges the runtime itself produces.
+    private func validateNumericDomains(
+        level: Level
+    ) throws(GameWorldValidationError) {
+        func require(_ condition: Bool, _ name: String)
+            throws(GameWorldValidationError)
+        {
+            if !condition { throw .outOfDomain(name) }
+        }
+        func nonzero(_ vector: Vector3) -> Bool {
+            levelDot(vector, vector) > 0
+        }
+        if let state = trainingDodgeAttemptState {
+            // constrainedTrainingTurretAngle keeps every angle in 0...1.
+            try require(
+                state.turretAngles.allSatisfy { (0...1).contains($0) },
+                "trainingDodgeAttemptState.turretAngles"
+            )
+            try require(
+                state.projectiles.allSatisfy { nonzero($0.velocity) },
+                "trainingDodgeAttemptState.projectiles.velocity"
+            )
+        }
+        if let state = trainingRobotGuidebotState {
+            try require(
+                state.projectiles.allSatisfy { nonzero($0.velocity) },
+                "trainingRobotGuidebotState.projectiles.velocity"
+            )
+        }
+        // The player flare timeout reads the parent's creation ordinal
+        // without a check.
+        try require(
+            playerYellowFlareState?.parents.allSatisfy {
+                $0.creationOrdinal != nil
+            } ?? true,
+            "playerYellowFlareState.parents.creationOrdinal"
+        )
+        let ship = level.defaultPlayerBinding.flatMap { binding in
+            level.shipDefinitions.first { $0.source == binding.ship }
+        }
+        if let state = playerConcussionState,
+           let binding = ship?.playerConcussion {
+            // Expired entries are removed in the frame they expire, so a
+            // saved entry has life left and never more than it started with.
+            try require(
+                state.missiles.allSatisfy {
+                    $0.lifeRemaining > 0 && $0.lifeRemaining <= binding.lifetime
+                },
+                "playerConcussionState.missiles.lifeRemaining"
+            )
+            try require(
+                state.explosions.allSatisfy {
+                    $0.lifeRemaining > 0
+                        && $0.lifeRemaining <= binding.explosionLifetime
+                },
+                "playerConcussionState.explosions.lifeRemaining"
+            )
+            try require(
+                state.explosions.allSatisfy {
+                    abs($0.shockwaveLifeRemaining) <= maximumSavedTime
+                        && $0.shockwaveLifeRemaining
+                            <= binding.shockwaveDuration
+                },
+                "playerConcussionState.explosions.shockwaveLifeRemaining"
+            )
+            try require(
+                state.sparks.allSatisfy { nonzero($0.velocity) },
+                "playerConcussionState.sparks.velocity"
+            )
+            try require(
+                state.sparks.allSatisfy {
+                    $0.lifetime > 0 && $0.lifetime <= maximumSavedTime
+                        && $0.lifeRemaining <= $0.lifetime
+                        && $0.lifeRemaining >= -maximumSavedTime
+                },
+                "playerConcussionState.sparks.lifeRemaining"
+            )
+        }
+    }
+
+    /// Objects the runtime reads without an existence check. Level data
+    /// names them, and nothing deletes them during play.
+    private func validateRequiredObjects(
+        level: Level
+    ) throws(GameWorldValidationError) {
+        var required: [UInt32] = []
+        if let lesson = level.trainingOpeningLesson {
+            required.append(lesson.forwardGoalObjectHandle)
+            required += [
+                lesson.returnLeft?.startGoalObjectHandle,
+                lesson.returnUp?.startGoalObjectHandle,
+                lesson.repeatForward?.startGoalObjectHandle,
+                lesson.repeatReturnLeft?.startGoalObjectHandle,
+                lesson.returnRight?.leftGoalObjectHandle,
+                lesson.returnDown?.upGoalObjectHandle,
+                lesson.startCourse?.startCourseObjectHandle,
+                lesson.finishCourse?.finishCourseObjectHandle,
+            ].compactMap { $0 }
+        }
+        if trainingDodgeAttemptState != nil,
+           let dodge = level.trainingDodgeAttempt {
+            required.append(dodge.dodgeTurretObjectHandle)
+        }
+        for handle in required where objects[ObjectHandle(handle)] == nil {
+            throw .objectReference(handle)
+        }
+    }
+
+    /// Indices and array lengths that the runtime and the renderer's
+    /// fixed-capacity draw lists use directly.
+    private func validateIndicesAndCapacities(
+        level: Level
+    ) throws(GameWorldValidationError) {
+        func require(_ condition: Bool, _ name: String)
+            throws(GameWorldValidationError)
+        {
+            if !condition { throw .indexOutOfRange(name) }
+        }
+        func limit(_ count: Int, _ capacity: Int, _ name: String)
+            throws(GameWorldValidationError)
+        {
+            if count > capacity { throw .capacity(name) }
+        }
+        let ship = level.defaultPlayerBinding.flatMap { binding in
+            level.shipDefinitions.first { $0.source == binding.ship }
+        }
+
+        if let state = playerConcussionState {
+            guard let binding = ship?.playerConcussion else {
+                throw .indexOutOfRange("playerConcussionState")
+            }
+            try require(
+                (0..<min(binding.gunpoints.count, binding.fireWaits.count))
+                    .contains(state.nextFiringMaskIndex),
+                "playerConcussionState.nextFiringMaskIndex"
+            )
+            try limit(
+                state.missiles.count,
+                playerConcussionMissilePresentationCapacity,
+                "playerConcussionState.missiles"
+            )
+            try limit(
+                state.explosions.count(where: \.isPresented),
+                playerConcussionExplosionPresentationCapacity,
+                "playerConcussionState.explosions"
+            )
+            // Entries without a visual carry only a shockwave, an object in
+            // the source, so the object capacity bounds them.
+            try limit(
+                state.explosions.count,
+                ObjectTable.capacity,
+                "playerConcussionState.explosions"
+            )
+            try limit(
+                state.sparks.count,
+                playerConcussionSparkPresentationCapacity,
+                "playerConcussionState.sparks"
+            )
+        }
+        if let state = playerYellowFlareState {
+            try limit(
+                state.parents.count,
+                playerYellowFlarePresentationCapacity,
+                "playerYellowFlareState.parents"
+            )
+            try limit(
+                state.parentParticles.count,
+                playerYellowFlareParticlePresentationCapacity,
+                "playerYellowFlareState.parentParticles"
+            )
+            try limit(
+                state.timeoutExplosions.count,
+                playerYellowFlareTimeoutExplosionPresentationCapacity,
+                "playerYellowFlareState.timeoutExplosions"
+            )
+            try limit(
+                state.timeoutSparks.count,
+                playerYellowFlareTimeoutSparkPresentationCapacity,
+                "playerYellowFlareState.timeoutSparks"
+            )
+            try limit(
+                state.timeoutSparkParticles.count,
+                playerYellowFlareTimeoutSparkParticlePresentationCapacity,
+                "playerYellowFlareState.timeoutSparkParticles"
+            )
+        }
+        if let state = trainingRobotGuidebotState {
+            try limit(
+                state.projectiles.count,
+                trainingBlueLaserPresentationCapacity,
+                "trainingRobotGuidebotState.projectiles"
+            )
+            try limit(
+                state.yellowFlares?.count ?? 0,
+                trainingGuidebotYellowFlarePresentationCapacity,
+                "trainingRobotGuidebotState.yellowFlares"
+            )
+            try limit(
+                state.yellowFlareParticles?.count ?? 0,
+                trainingGuidebotYellowFlareParticlePresentationCapacity,
+                "trainingRobotGuidebotState.yellowFlareParticles"
+            )
+            try limit(
+                state.yellowFlareTimeoutExplosions?.count ?? 0,
+                trainingGuidebotYellowFlareTimeoutExplosionPresentationCapacity,
+                "trainingRobotGuidebotState.yellowFlareTimeoutExplosions"
+            )
+            try limit(
+                state.yellowFlareTimeoutSparks?.count ?? 0,
+                trainingGuidebotYellowFlareTimeoutSparkPresentationCapacity,
+                "trainingRobotGuidebotState.yellowFlareTimeoutSparks"
+            )
+            try limit(
+                state.yellowFlareTimeoutSparkParticles?.count ?? 0,
+                trainingGuidebotYellowFlareTimeoutSparkParticlePresentationCapacity,
+                "trainingRobotGuidebotState.yellowFlareTimeoutSparkParticles"
+            )
+            if let guidebot = state.guidebot {
+                try require(
+                    guidebot.route.points.indices
+                        .contains(guidebot.routePointIndex),
+                    "guidebot.routePointIndex"
+                )
+                let navigation = Dictionary(
+                    (level.indoorNavigation?.rooms ?? []).map {
+                        ($0.sourceIndex, $0.nodes.count)
+                    },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                try require(
+                    guidebot.route.nodeReferences.allSatisfy {
+                        (0..<(navigation[$0.roomSourceIndex] ?? 0))
+                            .contains($0.nodeIndex)
+                    },
+                    "guidebot.route.nodeReferences"
+                )
+            }
+        }
+        if let state = trainingDodgeAttemptState,
+           let dodge = level.trainingDodgeAttempt {
+            try require(
+                dodge.turret.gunpoints.indices
+                    .contains(state.firingMaskIndex),
+                "trainingDodgeAttemptState.firingMaskIndex"
+            )
+            let joints = dodge.turret.joints.count
+            try require(
+                state.turretAngles.count == joints,
+                "trainingDodgeAttemptState.turretAngles"
+            )
+            try require(
+                state.turretDirections.count == joints,
+                "trainingDodgeAttemptState.turretDirections"
+            )
+            try limit(
+                state.projectiles.count,
+                trainingDodgeProjectilePresentationCapacity,
+                "trainingDodgeAttemptState.projectiles"
+            )
+        }
+        func requirePath(_ path: Int?, node: Int, _ name: String)
+            throws(GameWorldValidationError)
+        {
+            guard let path else { return }
+            try require(
+                level.paths.indices.contains(path)
+                    && level.paths[path].nodes.indices.contains(node),
+                name
+            )
+        }
+        if let state = trainingManeuverFollowState {
+            try requirePath(
+                state.activePathIndex,
+                node: state.pathNodeIndex,
+                "trainingManeuverFollowState.activePathIndex"
+            )
+            if let destruction = state.destruction {
+                let bot1 = destruction.destroyBot1Motion
+                try requirePath(
+                    bot1.activePathIndex,
+                    node: bot1.pathNodeIndex,
+                    "destroyBot1Motion.activePathIndex"
+                )
+                if let bot2 =
+                    destruction.destroyBot1Destruction?.destroyBot2Motion {
+                    try requirePath(
+                        bot2.activePathIndex,
+                        node: bot2.pathNodeIndex,
+                        "destroyBot2Motion.activePathIndex"
+                    )
+                }
+            }
+        }
+    }
+}
+
+/// One reflective pass over the nested saved state. It checks what the
+/// runtime assumes of every value of a kind, wherever the value lives:
+/// orientations are orthonormal bases, vectors and floats are finite, room
+/// references name a level room, and stored object handles are well formed.
+/// Stored handles may name an object that has since been deleted, because
+/// the runtime looks them up optionally.
+private struct NestedStateSweep {
+    let roomSourceIndices: Set<Int>
+
+    func visit(_ value: Any, label: String) throws(GameWorldValidationError) {
+        switch value {
+        case let orientation as Matrix3:
+            guard isCanonicalRigidTransform(
+                position: .zero,
+                orientation: orientation
+            ) else {
+                throw .orientation(label)
+            }
+            return
+        case let vector as Vector3:
+            guard isFinite(vector) else { throw .nonFiniteValue(label) }
+            guard abs(vector.x) <= maximumSavedMagnitude,
+                  abs(vector.y) <= maximumSavedMagnitude,
+                  abs(vector.z) <= maximumSavedMagnitude
+            else {
+                throw .outOfDomain(label)
+            }
+            return
+        case let scalar as Float:
+            guard scalar.isFinite else { throw .nonFiniteValue(label) }
+            guard abs(scalar) <= maximumSavedMagnitude else {
+                throw .outOfDomain(label)
+            }
+            return
+        case let room as Int
+            where label == "roomSourceIndex" || label.hasSuffix("RoomSourceIndex"):
+            guard roomSourceIndices.contains(room) else {
+                throw .roomReference(label)
+            }
+            return
+        case let rooms as [Int] where label == "roomSourceIndices":
+            guard rooms.allSatisfy(roomSourceIndices.contains) else {
+                throw .roomReference(label)
+            }
+            return
+        case let counter as Int where label.wholeMatch(
+            of: /script\d+Count|scriptActionCounter/
+        ) != nil:
+            // Released scripts cap action counters at MAX_ACTION_CTR_VALUE
+            // (TrainingMission.cpp:251).
+            guard (0...trainingScriptActionCounterMaximum).contains(counter)
+            else {
+                throw .outOfDomain(label)
+            }
+            return
+        case let ordinal as UInt64
+            where label == "nextCreationOrdinal":
+            guard ordinal <= maximumSavedCreationOrdinal else {
+                throw .outOfDomain(label)
+            }
+            return
+        case let handle as UInt32 where label.hasSuffix("Handle"):
+            guard D3SourceIdentity.isValidHandle(handle) else {
+                throw .objectReference(handle)
+            }
+            return
+        case let handles as Set<UInt32> where label.hasSuffix("Handles"):
+            for handle in handles.sorted()
+            where !D3SourceIdentity.isValidHandle(handle) {
+                throw .objectReference(handle)
+            }
+            return
+        default:
+            break
+        }
+        let mirror = Mirror(reflecting: value)
+        for child in mirror.children {
+            // Optional and collection elements keep their field's label.
+            let childLabel = mirror.displayStyle == .optional
+                || mirror.displayStyle == .collection
+                || mirror.displayStyle == .set
+                ? label
+                : child.label ?? label
+            try visit(child.value, label: childLabel)
+        }
+    }
+}
+
+struct GameSaveFile: Sendable {
+    let rootURL: URL
+
+    static let revivalMac = Self(
+        rootURL: URL.applicationSupportDirectory
+            .appending(path: "Descent3Revival", directoryHint: .isDirectory)
+            .appending(path: "RevivalMac", directoryHint: .isDirectory)
+            .appending(path: "Saves", directoryHint: .isDirectory)
+    )
+
+    init(rootURL: URL) {
+        self.rootURL = rootURL.standardizedFileURL
+    }
+
+    func quicksaveURL(profileID: UUID) -> URL {
+        profileDirectoryURL(profileID: profileID).appending(path: quicksaveName)
+    }
+
+    /// Writes the save durably: the bytes go to a temporary file in the same
+    /// folder, are flushed, and then atomically replace the previous save.
+    /// An interrupted write leaves the previous save readable.
+    func save(
+        profileID: UUID,
+        package: CanonicalPackageReference,
+        world: GameWorld,
+        level: Level
+    ) throws {
+        do {
+            try package.validate()
+        } catch {
+            throw GameSaveError.packageMismatch
+        }
+        guard level.levelKey == package.levelKey else {
+            throw GameSaveError.packageMismatch
+        }
+        do {
+            try world.validate(against: level)
+        } catch {
+            throw GameSaveError.invalidWorld(error)
+        }
+
+        let profileURL = profileDirectoryURL(profileID: profileID)
+        let saveURL = quicksaveURL(profileID: profileID)
+        let temporaryURL = profileURL.appending(
+            path: ".\(quicksaveName).\(UUID().uuidString).tmp"
+        )
+        do {
+            try ensureOwnedDirectory(rootURL, createIntermediates: true)
+            try ensureOwnedDirectory(profileURL, createIntermediates: false)
+            if FileManager.default.fileExists(atPath: saveURL.path) {
+                try requireRegularSaveFile(saveURL)
+            }
+            let data = try canonicalJSONData(GameSave(
+                profileID: profileID,
+                package: package,
+                world: world
+            ))
+            guard data.count <= maximumGameSaveByteCount else {
+                throw GameSaveError.tooLarge
+            }
+            defer { try? FileManager.default.removeItem(at: temporaryURL) }
+            try data.write(to: temporaryURL, options: .withoutOverwriting)
+            let handle = try FileHandle(forWritingTo: temporaryURL)
+            try handle.synchronize()
+            try handle.close()
+            guard rename(temporaryURL.path, saveURL.path) == 0 else {
+                throw GameSaveError.writeFailed(
+                    String(cString: strerror(errno))
+                )
+            }
+        } catch let error as GameSaveError {
+            throw error
+        } catch {
+            throw GameSaveError.writeFailed(error.localizedDescription)
+        }
+    }
+
+    func load(
+        profileID: UUID,
+        package: CanonicalPackageReference,
+        baseLevel: Level,
+        resumedAtTimestamp: Double
+    ) throws -> GameSession {
+        let profileURL = profileDirectoryURL(profileID: profileID)
+        let saveURL = quicksaveURL(profileID: profileID)
+        guard FileManager.default.fileExists(atPath: saveURL.path) else {
+            throw GameSaveError.missingSave
+        }
+        do {
+            try requireOwnedDirectory(rootURL)
+            try requireOwnedDirectory(profileURL)
+            try requireRegularSaveFile(saveURL)
+        } catch let error as GameSaveError {
+            throw error
+        } catch {
+            throw GameSaveError.readFailed(error.localizedDescription)
+        }
+
+        let data: Data
+        do {
+            data = try Data(contentsOf: saveURL)
+        } catch {
+            throw GameSaveError.readFailed(error.localizedDescription)
+        }
+        guard data.count <= maximumGameSaveByteCount else {
+            throw GameSaveError.tooLarge
+        }
+        struct SchemaHeader: Decodable {
+            let schemaVersion: Int
+        }
+        let decoder = JSONDecoder()
+        let header: SchemaHeader
+        do {
+            header = try decoder.decode(SchemaHeader.self, from: data)
+        } catch {
+            throw GameSaveError.malformedSave
+        }
+        guard header.schemaVersion == GameSave.currentSchemaVersion else {
+            throw GameSaveError.unsupportedSaveSchema(header.schemaVersion)
+        }
+
+        let save: GameSave
+        do {
+            save = try decoder.decode(GameSave.self, from: data)
+            try save.package.validate()
+        } catch {
+            throw GameSaveError.malformedSave
+        }
+        guard save.profileID == profileID else {
+            throw GameSaveError.profileMismatch
+        }
+        guard save.package == package,
+              baseLevel.levelKey == package.levelKey
+        else {
+            throw GameSaveError.packageMismatch
+        }
+        do {
+            return try GameSession(
+                level: baseLevel,
+                world: save.world,
+                resumedAtTimestamp: resumedAtTimestamp
+            )
+        } catch let GameSessionRestoreError.invalidWorld(error) {
+            throw GameSaveError.invalidWorld(error)
+        }
+    }
+
+    private func profileDirectoryURL(profileID: UUID) -> URL {
+        rootURL.appending(
+            path: profileID.uuidString.lowercased(),
+            directoryHint: .isDirectory
+        )
+    }
+
+    private func ensureOwnedDirectory(
+        _ url: URL,
+        createIntermediates: Bool
+    ) throws {
+        do {
+            // A second save for the same pilot finds the folder in place.
+            if !FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.createDirectory(
+                    at: url,
+                    withIntermediateDirectories: createIntermediates
+                )
+            }
+            try requireOwnedDirectory(url)
+        } catch let error as GameSaveError {
+            throw error
+        } catch {
+            throw GameSaveError.writeFailed(error.localizedDescription)
+        }
+    }
+
+    private func requireOwnedDirectory(_ url: URL) throws {
+        let values = try url.resourceValues(
+            forKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+        )
+        guard values.isDirectory == true,
+              values.isSymbolicLink != true else {
+            throw GameSaveError.nonRegularFile
+        }
+    }
+
+    private func requireRegularSaveFile(_ url: URL) throws {
+        let values = try url.resourceValues(
+            forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
+        )
+        guard values.isRegularFile == true,
+              values.isSymbolicLink != true,
+              let byteCount = values.fileSize else {
+            throw GameSaveError.nonRegularFile
+        }
+        guard byteCount <= maximumGameSaveByteCount else {
+            throw GameSaveError.tooLarge
+        }
+    }
+}

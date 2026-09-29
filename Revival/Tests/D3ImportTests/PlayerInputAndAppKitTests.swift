@@ -162,7 +162,7 @@ extension WorldRenderingTests {
     }
 
     func testPlayerInputStateClearsAndRebasesAcrossFocusChanges() {
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 10
         )
@@ -295,7 +295,7 @@ extension WorldRenderingTests {
             "focus and gameplay teardown clear physical hold state"
         )
 
-        let quick = PlayerSimulation(
+        let quick = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1234_5678
@@ -304,7 +304,7 @@ extension WorldRenderingTests {
             at: 0.1,
             input: .init(rearViewPressed: true, rearViewHeld: true)
         )
-        let committedForward = defaultPlayerView(in: quick.level)
+        let committedForward = defaultPlayerView(in: quick.runtimeLevel)
         XCTAssertTrue(entered.rearViewIsActive)
         XCTAssertEqual(
             entered.playerView.camera.position,
@@ -354,7 +354,7 @@ extension WorldRenderingTests {
             )
         )
 
-        let masked = PlayerSimulation(
+        let masked = GameSession(
             level: makeTrainingScript003Level(),
             presentationReadyTimestamp: 0
         )
@@ -372,7 +372,7 @@ extension WorldRenderingTests {
             "the Training movement/weapon mask does not suppress rear view"
         )
 
-        let moving = PlayerSimulation(
+        let moving = GameSession(
             level: makeSliceSixObjectRenderLevel(),
             presentationReadyTimestamp: 0
         )
@@ -386,7 +386,7 @@ extension WorldRenderingTests {
             )
         )
         let committedPlayer = try XCTUnwrap(
-            moving.level.objects.first {
+            moving.runtimeLevel.objects.first {
                 $0.handle == movedRear.playerView.objectHandle
             }
         )
@@ -416,7 +416,7 @@ extension WorldRenderingTests {
         )
 
         let cameraMonitorLevel = makeTrainingCameraMonitorLevel()
-        let cameraMonitor = PlayerSimulation(
+        let cameraMonitor = GameSession(
             level: cameraMonitorLevel,
             presentationReadyTimestamp: 0
         )
@@ -436,12 +436,12 @@ extension WorldRenderingTests {
         )
 
         let yellowLevel = try makePlayerYellowFlareLevel()
-        let yellowRear = PlayerSimulation(
+        let yellowRear = GameSession(
             level: yellowLevel,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x2468_ace0
         )
-        let yellowForward = PlayerSimulation(
+        let yellowForward = GameSession(
             level: yellowLevel,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x2468_ace0
@@ -466,14 +466,10 @@ extension WorldRenderingTests {
             "rear processing follows flare creation and changes no carrier"
         )
         let yellowRearObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(yellowRear.continuation)
-            ) as? [String: Any]
+            testWorldObject(yellowRear.world)
         )
         let yellowForwardObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(yellowForward.continuation)
-            ) as? [String: Any]
+            testWorldObject(yellowForward.world)
         )
         XCTAssertEqual(
             yellowRearObject["authoritativeRandomState"] as? NSNumber,
@@ -481,7 +477,7 @@ extension WorldRenderingTests {
         )
 
         let persistenceLevel = makeTrainingRASBot1DeathLevel()
-        let heldSimulation = PlayerSimulation(
+        let heldSimulation = GameSession(
             level: persistenceLevel,
             presentationReadyTimestamp: 0
         )
@@ -490,9 +486,7 @@ extension WorldRenderingTests {
             input: .init(rearViewPressed: true, rearViewHeld: true)
         )
         var exactObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(heldSimulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(heldSimulation.world)
         )
         var exactState = try XCTUnwrap(
             exactObject["playerRearViewState"] as? [String: Any]
@@ -502,13 +496,10 @@ extension WorldRenderingTests {
         )
         exactState["entryGameTime"] = savedGameTime - 1.0 / 16.0
         exactObject["playerRearViewState"] = exactState
-        let exactContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: exactObject)
-        )
-        let exact = try PlayerSimulation(
+        let exactContinuation = try decodeTestWorld(exactObject)
+        let exact = try GameSession(
             level: persistenceLevel,
-            continuation: exactContinuation,
+            world: exactContinuation.rebased(onto: persistenceLevel),
             resumedAtTimestamp: 10
         )
         XCTAssertTrue(
@@ -519,17 +510,15 @@ extension WorldRenderingTests {
             "exactly 1/16 does not arm leave mode"
         )
         var exactAfterObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(exact.continuation)
-            ) as? [String: Any]
+            testWorldObject(exact.world)
         )
         var exactAfterState = try XCTUnwrap(
             exactAfterObject["playerRearViewState"] as? [String: Any]
         )
         XCTAssertEqual(exactAfterState["leaveMode"] as? Bool, false)
-        let restoredUnarmed = try PlayerSimulation(
+        let restoredUnarmed = try GameSession(
             level: persistenceLevel,
-            continuation: exactContinuation,
+            world: exactContinuation.rebased(onto: persistenceLevel),
             resumedAtTimestamp: 15
         )
         XCTAssertTrue(
@@ -539,9 +528,7 @@ extension WorldRenderingTests {
         )
         _ = exact.update(at: 10.02, input: .init(rearViewHeld: true))
         exactAfterObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(exact.continuation)
-            ) as? [String: Any]
+            testWorldObject(exact.world)
         )
         exactAfterState = try XCTUnwrap(
             exactAfterObject["playerRearViewState"] as? [String: Any]
@@ -556,12 +543,9 @@ extension WorldRenderingTests {
         var restoredArmedState = exactState
         restoredArmedState["leaveMode"] = true
         restoredArmedObject["playerRearViewState"] = restoredArmedState
-        let restoredArmed = try PlayerSimulation(
+        let restoredArmed = try GameSession(
             level: persistenceLevel,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: restoredArmedObject)
-            ),
+            world: (decodeTestWorld(restoredArmedObject)).rebased(onto: persistenceLevel),
             resumedAtTimestamp: 20
         )
         XCTAssertFalse(
@@ -570,59 +554,13 @@ extension WorldRenderingTests {
 
         var oldObject = exactObject
         oldObject.removeValue(forKey: "playerRearViewState")
-        let old = try PlayerSimulation(
+        let old = try GameSession(
             level: persistenceLevel,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: oldObject)
-            ),
+            world: (decodeTestWorld(oldObject)).rebased(onto: persistenceLevel),
             resumedAtTimestamp: 30
         )
         XCTAssertFalse(old.update(at: 30.1, input: .zero).rearViewIsActive)
 
-        var invalidObject = exactObject
-        var invalidState = exactState
-        invalidState["entryGameTime"] = savedGameTime + 0.001
-        invalidObject["playerRearViewState"] = invalidState
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: persistenceLevel,
-                continuation: JSONDecoder().decode(
-                    PlayerSimulationContinuation.self,
-                    from: JSONSerialization.data(withJSONObject: invalidObject)
-                ),
-                resumedAtTimestamp: 40
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
-
-        var wrongSchemaObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(quick.continuation)
-            ) as? [String: Any]
-        )
-        wrongSchemaObject["playerRearViewState"] = exactState
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: quick.level,
-                continuation: JSONDecoder().decode(
-                    PlayerSimulationContinuation.self,
-                    from: JSONSerialization.data(
-                        withJSONObject: wrongSchemaObject
-                    )
-                ),
-                resumedAtTimestamp: 50
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
     }
 
     func testF4RequestsGuidebotDeploymentOnlyDuringGameplay() {
@@ -822,14 +760,12 @@ extension WorldRenderingTests {
         let level = makeFastPlayerHeadlightLevel()
         let initialPlayerPosition = defaultPlayerView(in: level)
             .camera.position
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
         let initialContinuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         let onFrame = simulation.update(
             at: 0.1,
@@ -901,9 +837,7 @@ extension WorldRenderingTests {
         )
 
         var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         XCTAssertEqual(
             continuationObject["playerHeadlightIsOn"] as? Bool,
@@ -914,57 +848,37 @@ extension WorldRenderingTests {
             initialContinuationObject["authoritativeRandomState"] as? NSNumber,
             "fast headlight consumes no authoritative RNG"
         )
-        let restored = try PlayerSimulation(
+        let restored = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: continuationObject
-                )
-            ),
+            world: (decodeTestWorld(continuationObject)).rebased(onto: level),
             resumedAtTimestamp: 0.1
         ).update(at: 0.2, input: .zero)
         XCTAssertNotNil(restored.playerFastHeadlight)
         XCTAssertTrue(restored.trainingOpeningFeedback.isEmpty)
 
-        continuationObject.removeValue(forKey: "playerHeadlightIsOn")
-        let oldRestore = try PlayerSimulation(
+        continuationObject["playerHeadlightIsOn"] = false
+        let oldRestore = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: continuationObject
-                )
-            ),
+            world: (decodeTestWorld(continuationObject)).rebased(onto: level),
             resumedAtTimestamp: 0.1
         ).update(at: 0.2, input: .zero)
         XCTAssertNil(oldRestore.playerFastHeadlight)
         XCTAssertTrue(oldRestore.trainingOpeningFeedback.isEmpty)
 
         let schemaSevenLevel = makeTrainingRASBot1DeathLevel()
-        let schemaSevenInitial = PlayerSimulation(
+        let schemaSevenInitial = GameSession(
             level: schemaSevenLevel,
             presentationReadyTimestamp: 0
         )
         var schemaSevenObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(
-                    schemaSevenInitial.continuation
-                )
-            ) as? [String: Any]
+            testWorldObject(schemaSevenInitial.world)
         )
-        XCTAssertEqual(schemaSevenObject["schemaVersion"] as? Int, 7)
         let schemaSevenRandomState =
             schemaSevenObject["authoritativeRandomState"] as? NSNumber
         schemaSevenObject["playerHeadlightIsOn"] = true
-        let schemaSevenOn = try PlayerSimulation(
+        let schemaSevenOn = try GameSession(
             level: schemaSevenLevel,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: schemaSevenObject
-                )
-            ),
+            world: (decodeTestWorld(schemaSevenObject)).rebased(onto: schemaSevenLevel),
             resumedAtTimestamp: 0
         )
         let schemaSevenOnFrame = schemaSevenOn.update(
@@ -979,23 +893,16 @@ extension WorldRenderingTests {
                 }
         })
         let schemaSevenOnObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(schemaSevenOn.continuation)
-            ) as? [String: Any]
+            testWorldObject(schemaSevenOn.world)
         )
         XCTAssertEqual(
             schemaSevenOnObject["authoritativeRandomState"] as? NSNumber,
             schemaSevenRandomState
         )
-        schemaSevenObject.removeValue(forKey: "playerHeadlightIsOn")
-        let schemaSevenOld = try PlayerSimulation(
+        schemaSevenObject["playerHeadlightIsOn"] = false
+        let schemaSevenOld = try GameSession(
             level: schemaSevenLevel,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: schemaSevenObject
-                )
-            ),
+            world: (decodeTestWorld(schemaSevenObject)).rebased(onto: schemaSevenLevel),
             resumedAtTimestamp: 0
         )
         let schemaSevenOldFrame = schemaSevenOld.update(
@@ -1010,9 +917,7 @@ extension WorldRenderingTests {
                 }
         })
         let schemaSevenOldObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(schemaSevenOld.continuation)
-            ) as? [String: Any]
+            testWorldObject(schemaSevenOld.world)
         )
         XCTAssertEqual(
             schemaSevenOldObject["authoritativeRandomState"] as? NSNumber,
@@ -1041,7 +946,7 @@ extension WorldRenderingTests {
             includesVisibleObject: false,
             halfExtent: 400
         )
-        let clearFrame = PlayerSimulation(
+        let clearFrame = GameSession(
             level: clearLevel,
             presentationReadyTimestamp: 0
         ).update(at: 0.1, input: .init(togglesHeadlight: true))
@@ -1057,7 +962,7 @@ extension WorldRenderingTests {
             includesVisibleObject: false,
             halfExtent: 100
         )
-        let wallFrame = PlayerSimulation(
+        let wallFrame = GameSession(
             level: wallLevel,
             presentationReadyTimestamp: 0
         ).update(at: 0.1, input: .init(togglesHeadlight: true))

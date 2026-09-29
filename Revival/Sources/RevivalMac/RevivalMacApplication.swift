@@ -31,11 +31,11 @@ private final class RevivalMacApplicationDelegate: NSObject,
 
     private let library = CanonicalPackageLibrary.revivalMac
     private let profileLibrary = PilotProfileLibrary.revivalMac
-    private let playerSaveFile = PlayerSaveFile.revivalMac
+    private let playerSaveFile = GameSaveFile.revivalMac
     private var window: NSWindow?
     private var renderer: MetalWorldRenderer?
     private var gameplayView: RevivalGameplayView?
-    private var simulation: PlayerSimulation?
+    private var simulation: GameSession?
     private var activePackage: ActivatedCanonicalPackage?
     private var profileRecord: PilotProfileLibraryRecord?
     private var activeProfileID: UUID?
@@ -255,7 +255,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             playerView: defaultPlayerView(in: activation.level)
         )
         let presentationReadyTimestamp = ProcessInfo.processInfo.systemUptime
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: activation.level,
             presentationReadyTimestamp: presentationReadyTimestamp
         )
@@ -310,7 +310,11 @@ private final class RevivalMacApplicationDelegate: NSObject,
                             .ambientEngineSoundSourceName,
                     rooms: simulation.level.rooms
                 )
-                try renderer.update(level: simulation.level, frame: frame)
+                try renderer.update(
+                    level: simulation.level,
+                    world: simulation.world,
+                    frame: frame
+                )
                 if frame.trainingFinalGoal != nil {
                     renderer.setFrameUpdate(nil)
                     if let completionStatus {
@@ -556,7 +560,8 @@ private final class RevivalMacApplicationDelegate: NSObject,
                 try playerSaveFile.save(
                     profileID: activeProfileID,
                     package: activePackage.reference,
-                    continuation: simulation.continuation
+                    world: simulation.world,
+                    level: simulation.level
                 )
                 resumeAfterPlayerSave(simulation, gameplayView: gameplayView)
                 setStatus(
@@ -573,7 +578,11 @@ private final class RevivalMacApplicationDelegate: NSObject,
                 candidate.stopTime(at: timestamp)
                 try renderer.update(
                     level: candidate.level,
-                    playerView: defaultPlayerView(in: candidate.level)
+                    world: candidate.world,
+                    playerView: defaultPlayerView(
+                        in: candidate.level,
+                        objects: candidate.world.objects
+                    )
                 )
                 gameplayView.setGameplayActive(false)
                 candidate.startTime(at: ProcessInfo.processInfo.systemUptime)
@@ -598,7 +607,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
     }
 
     private func resumeAfterPlayerSave(
-        _ simulation: PlayerSimulation,
+        _ simulation: GameSession,
         gameplayView: RevivalGameplayView
     ) {
         playerInput.setGameplayActive(

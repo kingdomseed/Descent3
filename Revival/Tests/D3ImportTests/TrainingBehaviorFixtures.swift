@@ -1230,7 +1230,7 @@ func replacingTrainingRoom(
 func script050ReadyContinuation(
     in level: Level,
     timerRemaining: Float = 1.5
-) throws -> PlayerSimulationContinuation {
+) throws -> GameWorld {
     let chain = try XCTUnwrap(level.trainingFinalRoomEntryChain)
     let room = try XCTUnwrap(level.rooms.first {
         $0.sourceIndex == chain.triggerRoomSourceIndex
@@ -1254,14 +1254,12 @@ func script050ReadyContinuation(
         canonicalFaceNormal(room: room, face: face)
     )
     let playerRadius = defaultPlayerView(in: level).collisionRadius
-    let initial = PlayerSimulation(
+    let initial = GameSession(
         level: level,
         presentationReadyTimestamp: 0
     )
     var object = try XCTUnwrap(
-        JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(initial.continuation)
-        ) as? [String: Any]
+        testWorldObject(initial.world)
     )
     for key in [
         "trainingRASBot1DeathState",
@@ -1301,10 +1299,21 @@ func script050ReadyContinuation(
         "y": -normal.y * 100,
         "z": -normal.z * 100,
     ]
-    return try JSONDecoder().decode(
-        PlayerSimulationContinuation.self,
-        from: JSONSerialization.data(withJSONObject: object)
-    )
+    // The world those producer states imply: the four robots and the two
+    // pickups are gone, and Script 048 opened the last-room barrier.
+    var world = try decodeTestWorld(object)
+    for handle in [
+        level.trainingRASBot1DeathChain?.robotObjectHandle,
+        level.trainingRASBot2DeathChain?.robotObjectHandle,
+        level.trainingRASBot3DeathChain?.robotObjectHandle,
+        level.trainingRASBot4DeathChain?.robotObjectHandle,
+        level.trainingInvulnerabilityPickupChain?.pickupObjectHandle,
+        level.trainingCloakPickupChain?.pickupObjectHandle,
+    ] {
+        world.objects.delete(ObjectHandle(try XCTUnwrap(handle)))
+    }
+    openTrainingLastRoomBarrier(in: &world, level: level)
+    return world
 }
 
 func assertTrainingGuidebotReturnBarrier(

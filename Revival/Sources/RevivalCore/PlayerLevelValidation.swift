@@ -220,6 +220,7 @@ extension Level {
             do {
                 presentationFaces = try extractSourceVisibleWorld(
                     self,
+                    roomStates: RoomState.canonical(self),
                     camera: .trainingRoom3,
                     startRoomSourceIndex: 3,
                     portalBlends: Dictionary(

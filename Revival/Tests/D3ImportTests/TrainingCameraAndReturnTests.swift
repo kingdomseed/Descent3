@@ -12,7 +12,7 @@ extension WorldRenderingTests {
             if case let .room(room) = securityCamera.location { return room }
             return nil
         }())
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -34,28 +34,28 @@ extension WorldRenderingTests {
         )
         XCTAssertNil(pickup.trainingCameraMonitor)
         XCTAssertFalse(
-            simulation.level.objectPresentations.contains {
+            simulation.runtimeLevel.objectPresentations.contains {
                 $0.objectHandle == chain.pickupObjectHandle
                     && $0.isVisible
             }
         )
         XCTAssertTrue(
-            simulation.level.objects.contains {
+            simulation.runtimeLevel.objects.contains {
                 $0.handle == chain.pickupObjectHandle
             }
         )
 
         let heldContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONEncoder().encode(simulation.continuation)
+            GameWorld.self,
+            from: JSONEncoder().encode(simulation.world)
         )
-        let restored = try PlayerSimulation(
+        let restored = try GameSession(
             level: level,
-            continuation: heldContinuation,
+            world: heldContinuation.rebased(onto: level),
             resumedAtTimestamp: 100
         )
         XCTAssertFalse(
-            restored.level.objectPresentations.contains {
+            restored.runtimeLevel.objectPresentations.contains {
                 $0.objectHandle == chain.pickupObjectHandle
                     && $0.isVisible
             }
@@ -93,17 +93,17 @@ extension WorldRenderingTests {
                     - securityCamera.orientation.forward.z
             )
         )
-        XCTAssertFalse(restored.level.objects.contains {
+        XCTAssertFalse(restored.runtimeLevel.objects.contains {
             $0.handle == chain.pickupObjectHandle
         })
 
         let usedContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONEncoder().encode(restored.continuation)
+            GameWorld.self,
+            from: JSONEncoder().encode(restored.world)
         )
-        let resumedPopup = try PlayerSimulation(
+        let resumedPopup = try GameSession(
             level: level,
-            continuation: usedContinuation,
+            world: usedContinuation.rebased(onto: level),
             resumedAtTimestamp: 200
         )
         let afterReload = resumedPopup.update(at: 200.1, input: .zero)
@@ -137,7 +137,7 @@ extension WorldRenderingTests {
         let level = makeTrainingCameraMonitorLevel()
         try level.validate()
         let chain = try XCTUnwrap(level.trainingCameraMonitorChain)
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -154,11 +154,7 @@ extension WorldRenderingTests {
         let returnRandomState = try XCTUnwrap(
             (
                 try XCTUnwrap(
-                    JSONSerialization.jsonObject(
-                        with: JSONEncoder().encode(
-                            simulation.continuation
-                        )
-                    ) as? [String: Any]
+                    testWorldObject(simulation.world)
                 )["authoritativeRandomState"] as? NSNumber
             )?.uint32Value
         )
@@ -202,10 +198,10 @@ extension WorldRenderingTests {
             50
         )
         assertTrainingGuidebotReturnBarrier(
-            level: simulation.level,
+            level: simulation.runtimeLevel,
             rendersFaces: false
         )
-        XCTAssertFalse(simulation.level.objectPresentations.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objectPresentations.contains {
             $0.objectHandle
                 == level.trainingRobotGuidebotChain?.guidebotObjectHandle
                 && $0.isVisible
@@ -213,11 +209,7 @@ extension WorldRenderingTests {
         let completedRandomState = try XCTUnwrap(
             (
                 try XCTUnwrap(
-                    JSONSerialization.jsonObject(
-                        with: JSONEncoder().encode(
-                            simulation.continuation
-                        )
-                    ) as? [String: Any]
+                    testWorldObject(simulation.world)
                 )["authoritativeRandomState"] as? NSNumber
             )?.uint32Value
         )
@@ -234,12 +226,12 @@ extension WorldRenderingTests {
         XCTAssertTrue(postReturnFrame.trainingOpeningFeedback.isEmpty)
 
         let continuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONEncoder().encode(simulation.continuation)
+            GameWorld.self,
+            from: JSONEncoder().encode(simulation.world)
         )
-        let restored = try PlayerSimulation(
+        let restored = try GameSession(
             level: level,
-            continuation: continuation,
+            world: continuation.rebased(onto: level),
             resumedAtTimestamp: 100
         )
         let afterReload = restored.update(at: 100.1, input: .zero)
@@ -251,48 +243,8 @@ extension WorldRenderingTests {
             chain.returnToShip?.openMarkerLightDistance
         )
         assertTrainingGuidebotReturnBarrier(
-            level: restored.level,
+            level: restored.runtimeLevel,
             rendersFaces: false
-        )
-
-        var legacyTerminalObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(continuation)
-            ) as? [String: Any]
-        )
-        legacyTerminalObject.removeValue(
-            forKey: "authoritativeRandomState"
-        )
-        var legacyTerminalState = try XCTUnwrap(
-            legacyTerminalObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        for key in [
-            "guidebotMode",
-            "guidebotModeTime",
-            "nextAmbientTime",
-            "timeUntilNextPlayerVisibilityCheck",
-            "timeUntilNextFlare",
-            "nextPowerupCheckTime",
-            "lastMessageSoundTime",
-            "returnTime",
-            "returnGreetingWasPresented",
-        ] {
-            legacyTerminalState.removeValue(forKey: key)
-        }
-        legacyTerminalObject["trainingRobotGuidebotState"] =
-            legacyTerminalState
-        XCTAssertNoThrow(
-            try PlayerSimulation(
-                level: level,
-                continuation: JSONDecoder().decode(
-                    PlayerSimulationContinuation.self,
-                    from: JSONSerialization.data(
-                        withJSONObject: legacyTerminalObject
-                    )
-                ),
-                resumedAtTimestamp: 200
-            )
         )
     }
 
@@ -436,14 +388,12 @@ extension WorldRenderingTests {
             level.soundClips.count
         )
         try level.validate()
-        let initialSimulation = PlayerSimulation(
+        let initialSimulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
         var initialContinuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(initialSimulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(initialSimulation.world)
         )
         var initialGalleryState = try XCTUnwrap(
             initialContinuationObject["trainingGalleryBarrierState"]
@@ -453,21 +403,14 @@ extension WorldRenderingTests {
         initialGalleryState["markerLightDistance"] = 0
         initialContinuationObject["trainingGalleryBarrierState"] =
             initialGalleryState
-        let gallerySimulation = try PlayerSimulation(
+        let gallerySimulation = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: initialContinuationObject
-                )
-            ),
+            world: (decodeTestWorld(initialContinuationObject)).rebased(onto: level),
             resumedAtTimestamp: 0
         )
         gallerySimulation.destroyTrainingRobot(handle: 4_112)
         var readyContinuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(gallerySimulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(gallerySimulation.world)
         )
         var readyRobotState = try XCTUnwrap(
             readyContinuationObject["trainingRobotGuidebotState"]
@@ -478,14 +421,9 @@ extension WorldRenderingTests {
         readyRobotState["enabledControlHUDIsVisible"] = false
         readyContinuationObject["trainingRobotGuidebotState"] =
             readyRobotState
-        let simulation = try PlayerSimulation(
+        let simulation = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: readyContinuationObject
-                )
-            ),
+            world: (decodeTestWorld(readyContinuationObject)).rebased(onto: level),
             resumedAtTimestamp: 0
         )
 
@@ -565,9 +503,7 @@ extension WorldRenderingTests {
             $0.handle == level.defaultPlayerBinding?.objectHandle
         })
         var releaseContinuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         releaseContinuationObject["playerPosition"] = [
             "x": canonicalPlayer.position.x,
@@ -599,24 +535,19 @@ extension WorldRenderingTests {
             "z": Float.zero,
         ]
         releaseContinuationObject["frameDuration"] = Float.zero
-        let releaseSimulation = try PlayerSimulation(
+        let releaseSimulation = try GameSession(
             level: level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: releaseContinuationObject
-                )
-            ),
+            world: (decodeTestWorld(releaseContinuationObject)).rebased(onto: level),
             resumedAtTimestamp: 100
         )
         XCTAssertTrue(
             releaseSimulation.trainingGuidebotReleaseCommandIsAvailable
         )
-        let player = try XCTUnwrap(releaseSimulation.level.objects.first {
+        let player = try XCTUnwrap(releaseSimulation.runtimeLevel.objects.first {
             $0.handle
                 == releaseSimulation.level.defaultPlayerBinding?.objectHandle
         })
-        let inheritedVelocity = releaseSimulation.continuation.velocity
+        let inheritedVelocity = releaseSimulation.world.velocity
         let feedbackCountBeforeRelease =
             script039Frame.trainingOpeningFeedback.count
         let releaseStateBefore = try XCTUnwrap(
@@ -677,15 +608,13 @@ extension WorldRenderingTests {
         XCTAssertFalse(
             releaseSimulation.trainingGuidebotReleaseCommandIsAvailable
         )
-        XCTAssertTrue(releaseSimulation.level.objectPresentations.contains {
+        XCTAssertTrue(releaseSimulation.runtimeLevel.objectPresentations.contains {
             $0.objectHandle
                 == level.trainingRobotGuidebotChain?.guidebotObjectHandle
                 && $0.isVisible
         })
         let releasedContinuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(releaseSimulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(releaseSimulation.world)
         )
         let releasedState = try XCTUnwrap(
             releasedContinuationObject["trainingRobotGuidebotState"]
@@ -721,11 +650,7 @@ extension WorldRenderingTests {
                 input: .zero
             )
             let continuationObject = try XCTUnwrap(
-                JSONSerialization.jsonObject(
-                    with: JSONEncoder().encode(
-                        releaseSimulation.continuation
-                    )
-                ) as? [String: Any]
+                testWorldObject(releaseSimulation.world)
             )
             let state = try XCTUnwrap(
                 continuationObject["trainingRobotGuidebotState"]
@@ -978,36 +903,24 @@ extension WorldRenderingTests {
             )
         )
         let ambientContinuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(releaseSimulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(releaseSimulation.world)
         )
         XCTAssertNil(ambientContinuationObject["guidebotAmbientEngineActive"])
 
-        let continuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: releasedContinuationObject
-            )
-        )
-        let restored = try PlayerSimulation(
+        let continuation = try decodeTestWorld(releasedContinuationObject)
+        let restored = try GameSession(
             level: level,
-            continuation: continuation,
+            world: continuation.rebased(onto: level),
             resumedAtTimestamp: 200
         )
         let silent = restored.update(at: 200.1, input: .zero)
         XCTAssertNotNil(silent.trainingGuidebot)
         XCTAssertTrue(silent.trainingOpeningFeedback.isEmpty)
 
-        let ambientContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: ambientContinuationObject
-            )
-        )
-        let restoredAmbient = try PlayerSimulation(
+        let ambientContinuation = try decodeTestWorld(ambientContinuationObject)
+        let restoredAmbient = try GameSession(
             level: level,
-            continuation: ambientContinuation,
+            world: ambientContinuation.rebased(onto: level),
             resumedAtTimestamp: 250
         )
         let resumedAmbient = restoredAmbient.update(
@@ -1061,14 +974,9 @@ extension WorldRenderingTests {
             from: JSONSerialization.data(withJSONObject: compatibleLevelObject)
         )
         try compatibleLevel.validate()
-        let compatibleSimulation = try PlayerSimulation(
+        let compatibleSimulation = try GameSession(
             level: compatibleLevel,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: releaseContinuationObject
-                )
-            ),
+            world: (decodeTestWorld(releaseContinuationObject)).rebased(onto: compatibleLevel),
             resumedAtTimestamp: 300
         )
         let compatibleRelease = compatibleSimulation.update(
@@ -1112,100 +1020,12 @@ extension WorldRenderingTests {
                 .invalidDependency("Training robot Guidebot chain")
             )
         }
-
-        var mismatchedPlayerObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(continuation)
-            ) as? [String: Any]
-        )
-        var mismatchedPlayerPosition = try XCTUnwrap(
-            mismatchedPlayerObject["playerPosition"] as? [String: Any]
-        )
-        mismatchedPlayerPosition["x"] = try XCTUnwrap(
-            mismatchedPlayerPosition["x"] as? Double
-        ) + 10
-        mismatchedPlayerObject["playerPosition"] =
-            mismatchedPlayerPosition
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: JSONDecoder().decode(
-                    PlayerSimulationContinuation.self,
-                    from: JSONSerialization.data(
-                        withJSONObject: mismatchedPlayerObject
-                    )
-                ),
-                resumedAtTimestamp: 200
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
-
-        var hostileObject = try XCTUnwrap(
-            ambientContinuationObject
-        )
-        var hostileState = try XCTUnwrap(
-            hostileObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        var hostileGuidebot = try XCTUnwrap(
-            hostileState["guidebot"] as? [String: Any]
-        )
-        func offsetX(_ key: String, in object: inout [String: Any])
-            throws
-        {
-            var value = try XCTUnwrap(object[key] as? [String: Any])
-            value["x"] = try XCTUnwrap(value["x"] as? Double) + 10_000
-            object[key] = value
-        }
-        for key in [
-            "spawnPosition",
-            "allocationStartPosition",
-            "position",
-            "destination",
-            "routeDestination",
-        ] {
-            try offsetX(key, in: &hostileGuidebot)
-        }
-        var hostileRoute = try XCTUnwrap(
-            hostileGuidebot["route"] as? [String: Any]
-        )
-        var hostilePoints = try XCTUnwrap(
-            hostileRoute["points"] as? [[String: Any]]
-        )
-        hostilePoints[0]["x"] = try XCTUnwrap(
-            hostilePoints[0]["x"] as? Double
-        ) + 10_000
-        hostileRoute["points"] = hostilePoints
-        hostileGuidebot["route"] = hostileRoute
-        hostileState["guidebot"] = hostileGuidebot
-        hostileObject["trainingRobotGuidebotState"] = hostileState
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: JSONDecoder().decode(
-                    PlayerSimulationContinuation.self,
-                    from: JSONSerialization.data(
-                        withJSONObject: hostileObject
-                    )
-                ),
-                resumedAtTimestamp: 200
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
     }
     func testGuidebotReturnTracksLivePlayerMovementInSameFrame()
         throws
     {
         let level = makeTrainingCameraMonitorLevel()
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -1246,7 +1066,7 @@ extension WorldRenderingTests {
             halfExtent: 100
         )
         level.rooms.append(targetRoom)
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -1261,9 +1081,7 @@ extension WorldRenderingTests {
         )
         let guidebot = try XCTUnwrap(requested.trainingGuidebot)
         var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         var playerLocation = try XCTUnwrap(
             continuationObject["playerLocation"] as? [String: Any]
@@ -1275,15 +1093,10 @@ extension WorldRenderingTests {
             "y": targetPosition.y,
             "z": targetPosition.z,
         ]
-        let movedPlayerContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: continuationObject
-            )
-        )
-        let restored = try PlayerSimulation(
+        let movedPlayerContinuation = try decodeTestWorld(continuationObject)
+        let restored = try GameSession(
             level: level,
-            continuation: movedPlayerContinuation,
+            world: movedPlayerContinuation.rebased(onto: level),
             resumedAtTimestamp: 100
         )
 
@@ -1462,6 +1275,7 @@ extension WorldRenderingTests {
         )
         let allocated = try trainingGuidebotRoute(
             in: level,
+            roomStates: RoomState.canonical(level),
             startRoomSourceIndex: 3,
             start: start,
             startForward: .init(x: 1, y: 0, z: 0),
@@ -1470,7 +1284,7 @@ extension WorldRenderingTests {
             radius: max(0, guidebotDefinition.collisionRadius - 0.1)
         ).get()
         XCTAssertEqual(allocated.mode, .roomPortals)
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -1481,9 +1295,7 @@ extension WorldRenderingTests {
         _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
 
         var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         continuationObject["playerLocation"] = [
             "room": ["_0": 1],
@@ -1493,15 +1305,10 @@ extension WorldRenderingTests {
             "y": destination.y,
             "z": destination.z,
         ]
-        let movedPlayerContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: continuationObject
-            )
-        )
-        let restored = try PlayerSimulation(
+        let movedPlayerContinuation = try decodeTestWorld(continuationObject)
+        let restored = try GameSession(
             level: level,
-            continuation: movedPlayerContinuation,
+            world: movedPlayerContinuation.rebased(onto: level),
             resumedAtTimestamp: 100
         )
 
@@ -1544,56 +1351,9 @@ extension WorldRenderingTests {
             50
         )
         assertTrainingGuidebotReturnBarrier(
-            level: restored.level,
+            level: restored.runtimeLevel,
             rendersFaces: false
         )
-    }
-
-    func testContinuationRejectsUnrequestedGuidebotReturnTask() throws {
-        let level = makeTrainingCameraMonitorLevel()
-        let simulation = PlayerSimulation(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        _ = simulation.update(
-            at: 0.1,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-        var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
-        )
-        var robotState = try XCTUnwrap(
-            continuationObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        XCTAssertEqual(robotState["returnWasRequested"] as? Bool, false)
-        var guidebot = try XCTUnwrap(
-            robotState["guidebot"] as? [String: Any]
-        )
-        guidebot["task"] = "returnToShip"
-        robotState["guidebot"] = guidebot
-        continuationObject["trainingRobotGuidebotState"] = robotState
-        let hostileContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(
-                withJSONObject: continuationObject
-            )
-        )
-
-        XCTAssertThrowsError(
-            try PlayerSimulation(
-                level: level,
-                continuation: hostileContinuation,
-                resumedAtTimestamp: 100
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? PlayerSimulationContinuationError,
-                .invalidState
-            )
-        }
     }
 
     func testCameraMonitorPickupCompletesLocateGoalAcrossReload() throws {
@@ -1610,24 +1370,24 @@ extension WorldRenderingTests {
                 done: false
             ),
         ])
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
 
         _ = simulation.update(at: 0.1, input: .zero)
 
-        let completedGoal = try XCTUnwrap(simulation.level.goals.first {
+        let completedGoal = try XCTUnwrap(simulation.runtimeLevel.goals.first {
             $0.name == "Locate the Camera Monitor"
         })
         XCTAssertEqual(completedGoal.status, 1_036)
         XCTAssertEqual(completedGoal.items.map(\.done), [true])
-        let restored = try PlayerSimulation(
+        let restored = try GameSession(
             level: level,
-            continuation: simulation.continuation,
+            world: simulation.world.rebased(onto: level),
             resumedAtTimestamp: 100
         )
-        let restoredGoal = try XCTUnwrap(restored.level.goals.first {
+        let restoredGoal = try XCTUnwrap(restored.runtimeLevel.goals.first {
             $0.name == "Locate the Camera Monitor"
         })
         XCTAssertEqual(restoredGoal.status, 1_036)
@@ -1750,7 +1510,7 @@ extension WorldRenderingTests {
             objects: level.objects,
             trainingCameraMonitorChain: movedChain
         )
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -1814,12 +1574,12 @@ extension WorldRenderingTests {
                 > radius * radius
         }
         let contactLevel = makeSliceTenContactLevel(clearance: 20)
-        let baseline = PlayerSimulation(
+        let baseline = GameSession(
             level: contactLevel,
             presentationReadyTimestamp: 0
         )
         _ = baseline.update(at: 2, input: .zero)
-        let start = defaultPlayerView(in: baseline.level).camera.position
+        let start = defaultPlayerView(in: baseline.runtimeLevel).camera.position
         let baselineFrame = baseline.update(
             at: 4,
             input: .init(forward: 1, sideways: 1)
@@ -1902,7 +1662,7 @@ extension WorldRenderingTests {
             objects: contactLevel.objects + [pickup],
             trainingCameraMonitorChain: chain
         )
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )

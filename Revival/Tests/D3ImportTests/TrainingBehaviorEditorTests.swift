@@ -26,7 +26,7 @@ extension EditorProjectTests {
             project.trainingManeuverFollowSourceDiagnostic,
             "TrainingMission.cpp Scripts 021,022,024,023,025,026 / ManuverRoomCenter 2063 / FollowBot1 8200 / stock orientation-editable FollowLoop1 path 0 nodes 13 flags 0x900104 + GoToDie path 1 nodes 1 flags 0x1100 / slot 0 priority 3 / runtime path failure: invalidPath|movementBlocked"
         )
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
@@ -757,7 +757,7 @@ extension EditorProjectTests {
         }
         XCTAssertTrue(didTrigger)
         assertTrainingGalleryBarrierRendering(
-            in: simulation.level,
+            in: simulation.runtimeLevel,
             rendersFaces: true
         )
         assertTrainingGalleryBarrierRendering(
@@ -889,7 +889,7 @@ extension EditorProjectTests {
             input: .init(usesInventory: true)
         )
         XCTAssertNotNil(used.trainingCameraMonitor)
-        XCTAssertNotEqual(simulation.level, reopened.project.level)
+        XCTAssertNotEqual(simulation.runtimeLevel, reopened.project.level)
         reopened.returnToEditor(renderingWorld: false)
         XCTAssertNil(reopened.playSession)
         XCTAssertEqual(
@@ -1005,7 +1005,7 @@ extension EditorProjectTests {
         }
         XCTAssertTrue(didEnter)
         assertTrainingGuidebotReturnBarrierRendering(
-            in: simulation.level,
+            in: simulation.runtimeLevel,
             rendersFaces: true
         )
         assertTrainingGuidebotReturnBarrierRendering(
@@ -1107,7 +1107,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         simulation.destroyTrainingRASBot1(handle: robot.handle)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == robot.handle
         })
         XCTAssertTrue(reopened.project.level.objects.contains {
@@ -1207,7 +1207,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         simulation.destroyTrainingRASBot2(handle: robot.handle)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == robot.handle
         })
         XCTAssertTrue(reopened.project.level.objects.contains {
@@ -1307,7 +1307,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         simulation.destroyTrainingRASBot3(handle: robot.handle)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == robot.handle
         })
         XCTAssertTrue(reopened.project.level.objects.contains {
@@ -1407,7 +1407,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         simulation.destroyTrainingRASBot4(handle: robot.handle)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == robot.handle
         })
         XCTAssertTrue(reopened.project.level.objects.contains {
@@ -1507,7 +1507,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         simulation.destroyTrainingLastBot1(handle: robot.handle)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == robot.handle
         })
         XCTAssertTrue(reopened.project.level.objects.contains {
@@ -1607,7 +1607,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         simulation.destroyTrainingLastBot2(handle: robot.handle)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == robot.handle
         })
         XCTAssertTrue(reopened.project.level.objects.contains {
@@ -1707,7 +1707,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         simulation.destroyTrainingLastBot3(handle: robot.handle)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == robot.handle
         })
         XCTAssertTrue(reopened.project.level.objects.contains {
@@ -1807,7 +1807,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         simulation.destroyTrainingLastBot4(handle: robot.handle)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == robot.handle
         })
         XCTAssertTrue(reopened.project.level.objects.contains {
@@ -1907,7 +1907,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         simulation.destroyTrainingLastBot5(handle: robot.handle)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == robot.handle
         })
         XCTAssertTrue(reopened.project.level.objects.contains {
@@ -2011,7 +2011,7 @@ extension EditorProjectTests {
         simulation.destroyTrainingLastBot4(handle: 2_082)
         simulation.destroyTrainingLastBot5(handle: 2_083)
         _ = simulation.update(at: 0.1, input: .zero)
-        let playBarrier = try XCTUnwrap(simulation.level.rooms.first {
+        let playBarrier = try XCTUnwrap(simulation.runtimeLevel.rooms.first {
             $0.sourceIndex == 16
         })
         let projectBarrier = try XCTUnwrap(
@@ -2129,9 +2129,7 @@ extension EditorProjectTests {
         simulation.destroyTrainingLastBot5(handle: 2_083)
         _ = simulation.update(at: 0.1, input: .zero)
         var ready = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         ready["playerLocation"] = ["room": ["_0": 17]]
         ready["playerPosition"] = [
@@ -2139,12 +2137,9 @@ extension EditorProjectTests {
             "y": goal.position.y,
             "z": goal.position.z,
         ]
-        let collisionSimulation = try PlayerSimulation(
+        let collisionSimulation = try GameSession(
             level: session.level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: ready)
-            ),
+            world: (decodeTestWorld(ready)).rebased(onto: session.level),
             resumedAtTimestamp: 0
         )
         let frame = collisionSimulation.update(at: 0.2, input: .zero)
@@ -2256,11 +2251,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(
-                    initialSimulation.continuation
-                )
-            ) as? [String: Any]
+            testWorldObject(initialSimulation.world)
         )
         let room = try XCTUnwrap(
             session.level.rooms.first { $0.sourceIndex == 12 }
@@ -2275,14 +2266,9 @@ extension EditorProjectTests {
             "y": room.pathPoint.y,
             "z": room.pathPoint.z,
         ]
-        let simulation = try PlayerSimulation(
+        let simulation = try GameSession(
             level: session.level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: continuationObject
-                )
-            ),
+            world: (decodeTestWorld(continuationObject)).rebased(onto: session.level),
             resumedAtTimestamp: 0
         )
         let frame = simulation.update(at: 0.1, input: .init())
@@ -2294,7 +2280,7 @@ extension EditorProjectTests {
             accuracy: 0.000_1
         )
         XCTAssertFalse(
-            simulation.level.objects.contains {
+            simulation.runtimeLevel.objects.contains {
                 $0.handle == pickup.handle
             })
         XCTAssertTrue(
@@ -2406,9 +2392,7 @@ extension EditorProjectTests {
             presentationReadyTimestamp: 0
         )
         var continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(initial.continuation)
-            ) as? [String: Any]
+            testWorldObject(initial.world)
         )
         continuationObject["playerLocation"] = [
             "room": ["_0": 11]
@@ -2418,28 +2402,23 @@ extension EditorProjectTests {
             "y": pickup.position.y,
             "z": pickup.position.z,
         ]
-        let simulation = try PlayerSimulation(
+        let simulation = try GameSession(
             level: session.level,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(
-                    withJSONObject: continuationObject
-                )
-            ),
+            world: (decodeTestWorld(continuationObject)).rebased(onto: session.level),
             resumedAtTimestamp: 0
         )
         let frame = simulation.update(at: 0.1, input: .zero)
         XCTAssertEqual(frame.trainingCloak?.phase, .fadingOut)
-        XCTAssertFalse(simulation.level.objects.contains {
+        XCTAssertFalse(simulation.runtimeLevel.objects.contains {
             $0.handle == pickup.handle
         })
         XCTAssertTrue(reopened.project.level.objects.contains {
             $0.handle == pickup.handle
         })
 
-        let script050 = try PlayerSimulation(
+        let script050 = try GameSession(
             level: session.level,
-            continuation: try script050ReadyContinuation(in: session.level),
+            world: (try script050ReadyContinuation(in: session.level)).rebased(onto: session.level),
             resumedAtTimestamp: 0
         )
         let entryFrame = script050.update(at: 0.1, input: .zero)
@@ -2642,9 +2621,7 @@ extension EditorProjectTests {
             up: node0.up
         )
         var midpointObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(simulation.continuation)
-            ) as? [String: Any]
+            testWorldObject(simulation.world)
         )
         midpointObject["frameDuration"] = 0.1
         var midpointState = try XCTUnwrap(
@@ -2662,18 +2639,15 @@ extension EditorProjectTests {
         midpointState["activePathIndex"] = 0
         midpointState["pathNodeIndex"] = 1
         midpointObject["trainingManeuverFollowState"] = midpointState
-        let midpointContinuation = try JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: midpointObject)
-        )
-        let editedInterpolation = try PlayerSimulation(
+        let midpointContinuation = try decodeTestWorld(midpointObject)
+        let editedInterpolation = try GameSession(
             level: runtimeLevel,
-            continuation: midpointContinuation,
+            world: midpointContinuation.rebased(onto: runtimeLevel),
             resumedAtTimestamp: 47.4
         )
-        let baseInterpolation = try PlayerSimulation(
+        let baseInterpolation = try GameSession(
             level: baseRuntimeLevel,
-            continuation: midpointContinuation,
+            world: midpointContinuation.rebased(onto: baseRuntimeLevel),
             resumedAtTimestamp: 47.4
         )
         let editedFrame = editedInterpolation.update(
@@ -2707,19 +2681,21 @@ extension EditorProjectTests {
 
         let editedPlan = try updateMetalWorldPlan(
             try makeMetalWorldPlan(
-                level: editedInterpolation.level,
+                level: editedInterpolation.runtimeLevel,
                 playerView: editedFrame.playerView
             ),
             level: editedInterpolation.level,
+            world: editedInterpolation.world,
             frame: editedFrame,
             drawableAspect: 1
         )
         let basePlan = try updateMetalWorldPlan(
             try makeMetalWorldPlan(
-                level: baseInterpolation.level,
+                level: baseInterpolation.runtimeLevel,
                 playerView: baseFrame.playerView
             ),
             level: baseInterpolation.level,
+            world: baseInterpolation.world,
             frame: baseFrame,
             drawableAspect: 1
         )
@@ -2732,11 +2708,10 @@ extension EditorProjectTests {
         XCTAssertEqual(editedDraw.model, baseDraw.model)
         XCTAssertNotEqual(editedDraw.vertices, baseDraw.vertices)
 
-        let savedContinuation = editedInterpolation.continuation
-        XCTAssertEqual(savedContinuation.schemaVersion, 7)
-        let restored = try PlayerSimulation(
+        let savedContinuation = editedInterpolation.world
+        let restored = try GameSession(
             level: runtimeLevel,
-            continuation: savedContinuation,
+            world: savedContinuation.rebased(onto: runtimeLevel),
             resumedAtTimestamp: 47.5
         )
         let liveNext = editedInterpolation.update(at: 47.6, input: .zero)
@@ -2759,8 +2734,8 @@ extension EditorProjectTests {
         )
         XCTAssertTrue(restoredNext.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(
-            restored.continuation.authoritativeRandomState,
-            editedInterpolation.continuation.authoritativeRandomState
+            restored.world.authoritativeRandomState,
+            editedInterpolation.world.authoritativeRandomState
         )
 
         reopened.returnToEditor(renderingWorld: false)
@@ -2960,12 +2935,10 @@ private func makePathNodeOrientationRuntimeLevel(
 
 private func makeScript021ReadySimulation(
     level: Level
-) throws -> PlayerSimulation {
-    let seed = PlayerSimulation(level: level, presentationReadyTimestamp: 0)
+) throws -> GameSession {
+    let seed = GameSession(level: level, presentationReadyTimestamp: 0)
     var object = try XCTUnwrap(
-        JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(seed.continuation)
-        ) as? [String: Any]
+        testWorldObject(seed.world)
     )
     var dodge = try XCTUnwrap(
         object["trainingDodgeAttemptState"] as? [String: Any]
@@ -2988,12 +2961,9 @@ private func makeScript021ReadySimulation(
     opening["timerRemaining"] = Float(1_000)
     opening["welcomeWasPresented"] = false
     object["trainingOpeningState"] = opening
-    return try PlayerSimulation(
+    return try GameSession(
         level: level,
-        continuation: JSONDecoder().decode(
-            PlayerSimulationContinuation.self,
-            from: JSONSerialization.data(withJSONObject: object)
-        ),
+        world: (decodeTestWorld(object)).rebased(onto: level),
         resumedAtTimestamp: 0
     )
 }

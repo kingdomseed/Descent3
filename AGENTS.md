@@ -25,7 +25,7 @@ Skills are in `.agents/skills/`: `revival-source-translation`, `revival-game-run
 5. **No retail data in Git.** Tests use synthetic fixtures. Real-content tests are opt-in by environment variable.
 6. **Simple code:** concrete types, one simulation owner (`GameWorld`), no ECS, event bus, job system, or single-implementation protocols. Files: 4,000-line soft stop, 5,000 hard maximum.
 7. **Test first** for behavior changes. Full suite green before commit.
-8. **Review and verification run on Codex:** `gpt-6-astra` at medium or high, or `gpt-6-sol` at xhigh (commands in `engineering.md` section 6). Use Claude Sonnet for retrieval, and Claude Opus for design and implementation.
+8. **Review and verification run on Codex:** `gpt-6.1-sol` at xhigh by default; `gpt-6-astra` at high only for big reviews (large diffs, milestone exits). Commands are in `engineering.md` section 6. Use Claude Sonnet for retrieval, and Claude Opus for design and implementation.
 9. **Clean up every process you start.** A task is not done until the `pgrep` check in `engineering.md` section 3 prints `clean`.
 10. **One plan.** Update `docs/revival/plan.md` in place (tick the item, and edit "Current state" in a few lines). Do not create other plan, status, or diary files.
 

@@ -375,7 +375,7 @@ struct PlayerInputState: Sendable {
 
     mutating func setGameplayActive(
         _ active: Bool,
-        simulation: PlayerSimulation?,
+        simulation: GameSession?,
         at timestamp: Double
     ) {
         precondition(timestamp.isFinite)

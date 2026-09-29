@@ -66,7 +66,11 @@ func extractPreparedRoomDrawItems(
         .sorted(by: { $0.sourceIndex < $1.sourceIndex }) {
         for faceIndex in room.faces.indices {
             let face = room.faces[faceIndex]
-            guard faceIsRenderable(room, face: face) else { continue }
+            guard faceIsRenderable(
+                room,
+                face: face,
+                portalFlags: room.portals.map(\.flags)
+            ) else { continue }
             guard let material = materialByTexture[face.texture] else {
                 throw RoomRenderExtractionError.missingMaterial(face.texture.sourceName)
             }
@@ -102,11 +106,14 @@ func extractPreparedModelDrawItems(
         uniqueKeysWithValues: level.presentationMaterials.map { ($0.texture, $0) }
     )
     var items: [ModelDrawItem] = []
-    for object in level.objects {
-        guard object.handle != excludedObjectHandle,
+    // GPU preparation covers the level's initial placement, the eager
+    // working set loaded with the level.
+    for object in ObjectTable(level: level) {
+        guard object.handle.rawValue != excludedObjectHandle,
               case let .room(roomSourceIndex) = object.location,
               component.contains(roomSourceIndex),
-              let presentation = presentationByHandle[object.handle] else {
+              let presentation = presentationByHandle[object.handle.rawValue]
+        else {
             continue
         }
         var seen: Set<SourceResource> = []
@@ -127,6 +134,7 @@ func extractPreparedModelDrawItems(
     return items
 }
 
+/// Extracts the level at its initial placement and canonical portal flags.
 func extractWorldForRendering(
     _ level: Level,
     camera: RoomCamera,
@@ -135,8 +143,32 @@ func extractWorldForRendering(
     presentationGameTime: Float = 0,
     trainingDodgeTurretAngles: [Float] = []
 ) throws -> WorldRenderExtraction {
+    try extractWorldForRendering(
+        level,
+        objects: ObjectTable(level: level),
+        roomStates: RoomState.canonical(level),
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        excludedObjectHandle: excludedObjectHandle,
+        presentationGameTime: presentationGameTime,
+        trainingDodgeTurretAngles: trainingDodgeTurretAngles
+    )
+}
+
+/// Extracts a running world: its objects and its current portal flags.
+func extractWorldForRendering(
+    _ level: Level,
+    objects: ObjectTable,
+    roomStates: [RoomState],
+    camera: RoomCamera,
+    startRoomSourceIndex: Int,
+    excludedObjectHandle: UInt32?,
+    presentationGameTime: Float = 0,
+    trainingDodgeTurretAngles: [Float] = []
+) throws -> WorldRenderExtraction {
     let visibility = try extractSourceVisibleWorld(
         level,
+        roomStates: roomStates,
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex,
         portalBlends: Dictionary(
@@ -158,9 +190,16 @@ func extractWorldForRendering(
     let facesByRoom = Dictionary(grouping: visibility.faces, by: \.roomSourceIndex)
     for roomSourceIndex in visibility.visibleRoomSourceIndices.reversed() {
         let room = roomBySourceIndex[roomSourceIndex]!
+        let roomIndex = level.rooms.firstIndex {
+            $0.sourceIndex == roomSourceIndex
+        }!
         for faceIndex in (facesByRoom[roomSourceIndex] ?? []).map(\.faceIndex).sorted() {
             let face = room.faces[faceIndex]
-            guard faceIsRenderable(room, face: face) else { continue }
+            guard faceIsRenderable(
+                room,
+                face: face,
+                portalFlags: roomStates[roomIndex].portalFlags
+            ) else { continue }
             guard let material = materialByTexture[face.texture] else {
                 throw RoomRenderExtractionError.missingMaterial(face.texture.sourceName)
             }
@@ -189,6 +228,8 @@ func extractWorldForRendering(
     }
     let lightCoronas = try extractSourceLightCoronas(
         level,
+        objects: objects,
+        roomStates: roomStates,
         camera: camera,
         visibility: visibility,
         startRoomSourceIndex: startRoomSourceIndex,
@@ -196,6 +237,7 @@ func extractWorldForRendering(
     )
     let objectPresentation = extractObjectPresentation(
         level,
+        objects: objects,
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex,
         visibility: visibility,
@@ -217,6 +259,7 @@ func extractWorldForRendering(
 
 private func extractObjectPresentation(
     _ level: Level,
+    objects: ObjectTable,
     camera: RoomCamera,
     startRoomSourceIndex: Int,
     visibility: SourceVisibleWorld,
@@ -236,18 +279,21 @@ private func extractObjectPresentation(
     )
     let visibleRooms = Set(visibility.visibleRoomSourceIndices)
     let view = CameraView(camera)
-    var accepted: [(depth: Float, ordinal: Int, object: PlacedObject,
+    var accepted: [(depth: Float, ordinal: Int, object: GameObject,
                     presentation: ObjectPresentationReference, model: CanonicalModel)] = []
-    for (ordinal, object) in level.objects.enumerated() {
-        guard object.handle != excludedObjectHandle,
-              let presentation = presentationByHandle[object.handle],
-              presentation.isVisible,
+    for (ordinal, object) in objects.enumerated() {
+        guard object.handle.rawValue != excludedObjectHandle,
+              let presentation = presentationByHandle[object.handle.rawValue],
+              object.renderType == .polyobj,
               case let .room(roomSourceIndex) = object.location,
               visibleRooms.contains(roomSourceIndex),
               let primary = modelBySource[presentation.primaryModel] else {
             continue
         }
-        let size = sourceObjectPresentationSize(model: primary, objectType: object.type)
+        let size = sourceObjectPresentationSize(
+            model: primary,
+            objectType: object.type.rawValue
+        )
         guard sourceObjectIsPortalSafe(
             object,
             size: size,
@@ -268,7 +314,7 @@ private func extractObjectPresentation(
         $0.depth == $1.depth ? $0.ordinal < $1.ordinal : $0.depth > $1.depth
     }
     return (
-        accepted.map { $0.object.handle },
+        accepted.map { $0.object.handle.rawValue },
         accepted.flatMap {
             makeModelDrawItems(
                 object: $0.object,
@@ -277,7 +323,7 @@ private func extractObjectPresentation(
                 camera: camera,
                 presentationGameTime: presentationGameTime,
                 turretAnglesBySubmodel:
-                    $0.object.handle
+                    $0.object.handle.rawValue
                     == level.trainingDodgeAttempt?
                     .dodgeTurretObjectHandle
                     ? Dictionary(
@@ -315,7 +361,7 @@ func sourceObjectPresentationSize(
 }
 
 private func sourceObjectIsPortalSafe(
-    _ object: PlacedObject,
+    _ object: GameObject,
     size: Float,
     startRoomSourceIndex: Int,
     clipWindowsByRoom: [Int: [SourceClipWindow]],
@@ -502,7 +548,7 @@ func rotate(
 }
 
 private func makeModelDrawItems(
-    object: PlacedObject,
+    object: GameObject,
     model: CanonicalModel,
     materialByTexture: [SourceResource: PresentationMaterial],
     camera: RoomCamera,
@@ -569,7 +615,7 @@ private func makeModelDrawItems(
                 )
             }
             let item = ModelDrawItem(
-                objectHandle: object.handle,
+                objectHandle: object.handle.rawValue,
                 roomSourceIndex: roomSourceIndex,
                 model: model.source,
                 submodelIndex: submodel.sourceIndex,
@@ -637,7 +683,7 @@ private func makeModelDrawItems(
                 blend = .sourceAlpha(opacity: 255)
             }
             let item = ModelDrawItem(
-                objectHandle: object.handle,
+                objectHandle: object.handle.rawValue,
                 roomSourceIndex: roomSourceIndex,
                 model: model.source,
                 submodelIndex: submodel.sourceIndex,
@@ -715,29 +761,17 @@ func extractTrainingDodgeProjectileDrawItems(
             : Vector3(x: 1, y: 0, z: 0)
         let right = sourceVectorNormalized(sourceVectorCross(referenceUp, forward))
         let up = sourceVectorCross(forward, right)
-        let object = PlacedObject(
-            handle: UInt32.max - UInt32(slot),
-            type: 5,
-            storedID: 0,
-            definition: nil,
-            instanceName: nil,
-            flags: 0,
-            doorShields: nil,
+        let object = GameObject(
+            handle: ObjectHandle(UInt32.max - UInt32(slot)),
+            type: .weapon,
+            renderType: .polyobj,
             location: .room(projectile.roomSourceIndex),
             position: projectile.position,
             orientation: .init(
                 right: right,
                 up: up,
                 forward: forward
-            ),
-            containsType: 0,
-            containsID: 0,
-            containsCount: 0,
-            lifeLeft: 0,
-            soundSource: nil,
-            inertScriptName: nil,
-            inertModuleName: nil,
-            lightmapSubmodels: []
+            )
         )
         return makeModelDrawItems(
             object: object,
@@ -749,7 +783,7 @@ func extractTrainingDodgeProjectileDrawItems(
     }
 }
 
-private let trainingBlueLaserPresentationCapacity = 40
+let trainingBlueLaserPresentationCapacity = 40
 let playerConcussionMissilePresentationCapacity = 6
 
 func extractPreparedTrainingBlueLaserDrawItems(
@@ -815,34 +849,23 @@ func extractTrainingBlueLaserDrawItems(
             : Vector3(x: 1, y: 0, z: 0)
         let right = sourceVectorNormalized(sourceVectorCross(referenceUp, forward))
         let up = sourceVectorCross(forward, right)
-        let object = PlacedObject(
-            handle:
+        let object = GameObject(
+            handle: ObjectHandle(
                 UInt32.max
                     - UInt32(
                         trainingBlueLaserPresentationCapacity
                     )
-                    - UInt32(slot),
-            type: 5,
-            storedID: 0,
-            definition: nil,
-            instanceName: nil,
-            flags: 0,
-            doorShields: nil,
+                    - UInt32(slot)
+            ),
+            type: .weapon,
+            renderType: .polyobj,
             location: .room(projectile.roomSourceIndex),
             position: projectile.position,
             orientation: .init(
                 right: right,
                 up: up,
                 forward: forward
-            ),
-            containsType: 0,
-            containsID: 0,
-            containsCount: 0,
-            lifeLeft: 0,
-            soundSource: nil,
-            inertScriptName: nil,
-            inertModuleName: nil,
-            lightmapSubmodels: []
+            )
         )
         return makeModelDrawItems(
             object: object,
@@ -899,25 +922,15 @@ func extractPlayerConcussionMissileDrawItems(
         }
     )
     return missiles.enumerated().flatMap { slot, missile in
-        let object = PlacedObject(
-            handle: UInt32.max - 6_000 - UInt32(slot),
-            type: 5,
-            storedID: binding.weapon.storedIndex,
-            definition: binding.weapon,
-            instanceName: nil,
-            flags: 0,
-            doorShields: nil,
+        let object = GameObject(
+            handle: ObjectHandle(
+                UInt32.max - 6_000 - UInt32(slot)
+            ),
+            type: .weapon,
+            renderType: .polyobj,
             location: .room(missile.roomSourceIndex),
             position: missile.position,
-            orientation: missile.orientation,
-            containsType: 0,
-            containsID: 0,
-            containsCount: 0,
-            lifeLeft: 0,
-            soundSource: nil,
-            inertScriptName: nil,
-            inertModuleName: nil,
-            lightmapSubmodels: []
+            orientation: missile.orientation
         )
         return makeModelDrawItems(
             object: object,
@@ -991,25 +1004,15 @@ func extractTrainingGuidebotYellowFlareDrawItems(
         }
     )
     return flares.enumerated().flatMap { slot, flare in
-        let object = PlacedObject(
-            handle: UInt32.max - 1_000 - UInt32(slot),
-            type: 5,
-            storedID: definition.source.storedIndex,
-            definition: definition.source,
-            instanceName: nil,
-            flags: 0,
-            doorShields: nil,
+        let object = GameObject(
+            handle: ObjectHandle(
+                UInt32.max - 1_000 - UInt32(slot)
+            ),
+            type: .weapon,
+            renderType: .polyobj,
             location: .room(flare.roomSourceIndex),
             position: flare.position,
-            orientation: flare.orientation,
-            containsType: 0,
-            containsID: 0,
-            containsCount: 0,
-            lifeLeft: flare.lifeRemaining,
-            soundSource: nil,
-            inertScriptName: nil,
-            inertModuleName: nil,
-            lightmapSubmodels: []
+            orientation: flare.orientation
         )
         return makeModelDrawItems(
             object: object,
@@ -1039,6 +1042,8 @@ private func accumulatedModelOffsets(_ model: CanonicalModel) -> [Vector3] {
 
 func extractSourceLightCoronas(
     _ level: Level,
+    objects: ObjectTable,
+    roomStates: [RoomState],
     camera: RoomCamera,
     visibility: SourceVisibleWorld,
     startRoomSourceIndex: Int,
@@ -1070,6 +1075,8 @@ func extractSourceLightCoronas(
             from: camera.position,
             to: geometry.center,
             level: level,
+            objects: objects,
+            roomStates: roomStates,
             visibleRoomSourceIndices: visibility.visibleRoomSourceIndices,
             startRoomSourceIndex: startRoomSourceIndex,
             excludedObjectHandle: excludedObjectHandle
@@ -1128,6 +1135,8 @@ private func sourceCoronaRayIsOccluded(
     from origin: Vector3,
     to destination: Vector3,
     level: Level,
+    objects: ObjectTable,
+    roomStates: [RoomState],
     visibleRoomSourceIndices: [Int],
     startRoomSourceIndex: Int,
     excludedObjectHandle: UInt32?
@@ -1138,6 +1147,7 @@ private func sourceCoronaRayIsOccluded(
     let visibleRooms = Set(visibleRoomSourceIndices)
     if case let .wallHit(contact) = traceIndoorMovement(
         in: level,
+        roomStates: roomStates,
         startRoom: startRoomSourceIndex,
         start: origin,
         end: destination,
@@ -1151,19 +1161,19 @@ private func sourceCoronaRayIsOccluded(
     let modelBySource = Dictionary(
         uniqueKeysWithValues: level.models.map { ($0.source, $0) }
     )
-    for object in level.objects {
-        guard object.handle != excludedObjectHandle,
-              object.type == 2 || object.type == 4,
+    for object in objects {
+        guard object.handle.rawValue != excludedObjectHandle,
+              object.type == .robot || object.type == .player,
               case let .room(roomSourceIndex) = object.location,
               visibleRooms.contains(roomSourceIndex),
-              let presentation = presentationByHandle[object.handle],
-              presentation.isVisible,
+              let presentation = presentationByHandle[object.handle.rawValue],
+              object.renderType == .polyobj,
               let model = modelBySource[presentation.primaryModel] else {
             continue
         }
         let radius = sourceObjectPresentationSize(
             model: model,
-            objectType: object.type
+            objectType: object.type.rawValue
         )
         let originToCenter = object.position - origin
         let projectedDistance = dot(originToCenter, direction)
@@ -1179,12 +1189,19 @@ private func sourceCoronaRayIsOccluded(
 
 func extractSourceVisibleWorld(
     _ level: Level,
+    roomStates: [RoomState],
     camera: RoomCamera,
     startRoomSourceIndex: Int,
     portalBlends: [SourceResource: PresentationBlend]
 ) throws -> SourceVisibleWorld {
     let roomBySourceIndex = Dictionary(
         uniqueKeysWithValues: level.rooms.map { ($0.sourceIndex, $0) }
+    )
+    let portalFlagsByRoom = Dictionary(
+        uniqueKeysWithValues: zip(
+            level.rooms.map(\.sourceIndex),
+            roomStates.map(\.portalFlags)
+        )
     )
     guard roomBySourceIndex[startRoomSourceIndex] != nil else {
         throw RoomRenderExtractionError.missingRoom(startRoomSourceIndex)
@@ -1199,7 +1216,8 @@ func extractSourceVisibleWorld(
 
     func renderPastPortal(_ room: LevelRoom, portalIndex: Int) throws -> Bool {
         let portal = room.portals[portalIndex]
-        guard portal.flags & 0x0000_0001 != 0 else { return true }
+        let flags = portalFlagsByRoom[room.sourceIndex]![portalIndex]
+        guard flags & 0x0000_0001 != 0 else { return true }
         let face = room.faces[portal.faceIndex]
         guard let blend = portalBlends[face.texture] else {
             throw RoomRenderExtractionError.missingMaterial(face.texture.sourceName)
@@ -1232,7 +1250,9 @@ func extractSourceVisibleWorld(
                     faceIndex: portal.faceIndex,
                     connectedRoom: portal.connectedRoom,
                     connectedPortal: portal.connectedPortal,
-                    presentation: portal.flags & 0x0000_0001 != 0
+                    presentation:
+                        portalFlagsByRoom[roomSourceIndex]![portalIndex]
+                            & 0x0000_0001 != 0
                         ? .renderedSurface
                         : .openBoundary
                 )
@@ -1281,7 +1301,11 @@ func extractSourceVisibleWorld(
         faces: visibleRoomSourceIndices.flatMap { roomSourceIndex in
             let room = roomBySourceIndex[roomSourceIndex]!
             return (visibleFacesByRoom[roomSourceIndex] ?? []).sorted().compactMap {
-                faceIsRenderable(room, face: room.faces[$0])
+                faceIsRenderable(
+                    room,
+                    face: room.faces[$0],
+                    portalFlags: portalFlagsByRoom[roomSourceIndex]!
+                )
                     ? SourceVisibleFace(roomSourceIndex: roomSourceIndex, faceIndex: $0)
                     : nil
             }
@@ -1306,9 +1330,13 @@ func sourceConvexRoomContains(_ point: Vector3, in room: LevelRoom) -> Bool {
     }
 }
 
-private func faceIsRenderable(_ room: LevelRoom, face: LevelFace) -> Bool {
+private func faceIsRenderable(
+    _ room: LevelRoom,
+    face: LevelFace,
+    portalFlags: [UInt32]
+) -> Bool {
     guard let portalIndex = face.portalIndex else { return true }
-    return room.portals[portalIndex].flags & 0x0000_0001 != 0
+    return portalFlags[portalIndex] & 0x0000_0001 != 0
 }
 
 private func makeDrawItem(

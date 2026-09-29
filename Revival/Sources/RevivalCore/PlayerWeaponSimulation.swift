@@ -2,9 +2,9 @@
 
 import Foundation
 
-extension PlayerSimulation {
+extension GameSession {
     func firePlayerYellowFlare(
-        from player: PlacedObject,
+        from player: GameObject,
         roomSourceIndex: Int,
         systemsFrameDuration: Float,
         systemsGameTime: Float
@@ -31,6 +31,7 @@ extension PlayerSimulation {
             )
         let muzzleTrace = traceIndoorMovement(
             in: level,
+            roomStates: world.rooms,
             startRoom: roomSourceIndex,
             start: player.position,
             end: muzzle,
@@ -63,7 +64,7 @@ extension PlayerSimulation {
                 systemsGameTime - definition.particleInterval.nextUp,
             presentedLightDistance: definition.lightDistance,
             creationOrdinal: ordinal,
-            parentObjectHandle: player.handle
+            parentObjectHandle: player.handle.rawValue
         ))
         playerYellowFlareState = state
         return .init(
@@ -82,7 +83,7 @@ extension PlayerSimulation {
     }
 
     func firePlayerConcussion(
-        from player: PlacedObject,
+        from player: GameObject,
         roomSourceIndex: Int,
         binding: PlayerConcussionBinding,
         state: inout PlayerConcussionState,
@@ -98,7 +99,8 @@ extension PlayerSimulation {
         }
         guard gameTime >= state.nextFireTime,
               state.nextCreationOrdinal < UInt64.max,
-              state.missiles.count < 6 else {
+              state.missiles.count
+                < playerConcussionMissilePresentationCapacity else {
             return nil
         }
         let maskIndex = state.nextFiringMaskIndex
@@ -107,6 +109,7 @@ extension PlayerSimulation {
             + transform(gunpoint.localPosition, by: player.orientation)
         let wallTrace = traceIndoorMovement(
             in: level,
+            roomStates: world.rooms,
             startRoom: roomSourceIndex,
             start: player.position,
             end: muzzlePosition,
@@ -117,13 +120,14 @@ extension PlayerSimulation {
             ? vectorDistance(player.position, wallTrace.finalPosition)
                 / muzzleDistance
             : 1
-        let objectObstructsMuzzle = level.objects.contains { object in
+        let objectObstructsMuzzle = world.objects.contains { object in
             guard object.handle != player.handle,
                   case let .room(objectRoom) = object.location,
                   wallTrace.visitedRoomSourceIndices.contains(objectRoom),
                   let presentation = level.objectPresentations.first(where: {
-                      $0.objectHandle == object.handle && $0.isVisible
+                      $0.objectHandle == object.handle.rawValue
                   }),
+                  object.renderType == .polyobj,
                   let model = level.models.first(where: {
                       $0.source == presentation.primaryModel
                   }),
@@ -203,6 +207,7 @@ extension PlayerSimulation {
             let end = start + missile.velocity * duration
             let trace = traceIndoorMovement(
                 in: level,
+                roomStates: world.rooms,
                 startRoom: missile.roomSourceIndex,
                 start: start,
                 end: end,
@@ -212,14 +217,15 @@ extension PlayerSimulation {
             let wallFraction = distance > 0
                 ? vectorDistance(start, trace.finalPosition) / distance
                 : 1
-            let objectHit = level.objects.compactMap {
-                object -> (PlacedObject, Float)? in
-                guard object.handle != playerHandle,
+            let objectHit = world.objects.compactMap {
+                object -> (GameObject, Float)? in
+                guard object.handle.rawValue != playerHandle,
                       case let .room(objectRoom) = object.location,
                       trace.visitedRoomSourceIndices.contains(objectRoom),
                       let presentation = level.objectPresentations.first(where: {
-                          $0.objectHandle == object.handle && $0.isVisible
+                          $0.objectHandle == object.handle.rawValue
                       }),
+                      object.renderType == .polyobj,
                       let model = level.models.first(where: {
                           $0.source == presentation.primaryModel
                       }),
@@ -239,8 +245,8 @@ extension PlayerSimulation {
             let directObjectHandle: UInt32?
             if let objectHit, objectHit.1 <= wallFraction + 0.000_1 {
                 impactPosition = start + (end - start) * objectHit.1
-                directObjectHandle = objectHit.0.type == 2
-                    ? objectHit.0.handle
+                directObjectHandle = objectHit.0.type == .robot
+                    ? objectHit.0.handle.rawValue
                     : nil
             } else if case .noHit = trace.outcome {
                 missile.position = trace.finalPosition
@@ -258,12 +264,19 @@ extension PlayerSimulation {
             }
             let ordinal = state.nextCreationOrdinal
             state.nextCreationOrdinal += 1
+            // DoWeaponExploded (WeaponFire.cpp:3066) makes the shockwave
+            // first, then asks VisEffectCreate for the visual, which returns
+            // -1 when the list is full (viseffect.cpp:522). A full list
+            // drops only the visual; the shockwave still acts.
+            let presentedCount = state.explosions.count(where: \.isPresented)
             state.explosions.append(.init(
                 creationOrdinal: ordinal,
                 roomSourceIndex: trace.containingRoomSourceIndex,
                 position: impactPosition!,
                 lifeRemaining: binding.explosionLifetime,
-                shockwaveLifeRemaining: binding.shockwaveDuration
+                shockwaveLifeRemaining: binding.shockwaveDuration,
+                isPresented: presentedCount
+                    < playerConcussionExplosionPresentationCapacity
             ))
             impacts.append(.init(
                 roomSourceIndex: trace.containingRoomSourceIndex,
@@ -413,9 +426,7 @@ extension PlayerSimulation {
             if let handle = flare.stuckObjectHandle,
                let localPosition = flare.stuckObjectOffset,
                let localOrientation = flare.stuckObjectOrientation,
-               let object = level.objects.first(where: {
-                   $0.handle == handle
-               }),
+               let object = world.objects[ObjectHandle(handle)],
                case let .room(roomSourceIndex) = object.location {
                 flare.position = object.position
                     + transform(localPosition, by: object.orientation)
@@ -430,6 +441,7 @@ extension PlayerSimulation {
                 let end = start + flare.velocity * duration
                 let trace = traceIndoorMovement(
                     in: level,
+                    roomStates: world.rooms,
                     startRoom: flare.roomSourceIndex,
                     start: start,
                     end: end,
@@ -440,17 +452,18 @@ extension PlayerSimulation {
                     ? vectorDistance(start, trace.finalPosition) / distance
                     : 1
                 let age = definition.lifetime - flare.lifeRemaining
-                let nearestObjectHit = level.objects.compactMap {
-                    object -> (PlacedObject, Float)? in
+                let nearestObjectHit = world.objects.compactMap {
+                    object -> (GameObject, Float)? in
                     guard case let .room(objectRoom) = object.location,
                           trace.visitedRoomSourceIndices.contains(objectRoom),
                           age >= 3
-                            || object.handle != flare.parentObjectHandle,
+                            || object.handle.rawValue
+                                != flare.parentObjectHandle,
                           let presentation =
                             level.objectPresentations.first(where: {
-                                $0.objectHandle == object.handle
-                                    && $0.isVisible
+                                $0.objectHandle == object.handle.rawValue
                             }),
+                          object.renderType == .polyobj,
                           let model = level.models.first(where: {
                               $0.source == presentation.primaryModel
                           }),
@@ -467,7 +480,7 @@ extension PlayerSimulation {
                    hit.1 <= wallFraction + 0.000_1 {
                     flare.position = start + (end - start) * hit.1
                     flare.velocity = .zero
-                    flare.stuckObjectHandle = hit.0.handle
+                    flare.stuckObjectHandle = hit.0.handle.rawValue
                     flare.stuckObjectOffset = inverseTransform(
                         flare.position - hit.0.position,
                         by: hit.0.orientation

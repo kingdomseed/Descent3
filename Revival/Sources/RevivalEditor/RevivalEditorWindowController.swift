@@ -50,7 +50,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
     private var selectedObjectHandle: UInt32?
     private var selectedPlayerStartHandle: UInt32?
     private var placementOwner = RevivalEditorPlacementOwner.object
-    private var playSimulation: PlayerSimulation?
+    private var playSimulation: GameSession?
     private var playerInput = PlayerInputState()
     private var soloPauseIsOpen = false
     private var soloPauseWasAcknowledged = false
@@ -1031,6 +1031,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                         )
                         try renderer.update(
                             level: simulation.level,
+                            world: simulation.world,
                             frame: frame
                         )
                         self.setStatus(

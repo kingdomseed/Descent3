@@ -17,7 +17,7 @@ extension WorldRenderingTests {
         }
 
         let level = makeTrainingRobotGuidebotLevel()
-        let simulation = PlayerSimulation(
+        let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1234_5678
@@ -107,7 +107,7 @@ extension WorldRenderingTests {
         let goal = try XCTUnwrap(finalLevel.objects.first {
             $0.handle == finalChain.goalObjectHandle
         })
-        let initialFinalSimulation = PlayerSimulation(
+        let initialFinalSimulation = GameSession(
             level: finalLevel,
             presentationReadyTimestamp: 0
         )
@@ -123,11 +123,7 @@ extension WorldRenderingTests {
         initialFinalSimulation.destroyTrainingLastBot5(handle: 2_083)
         _ = initialFinalSimulation.update(at: 0.1, input: .zero)
         var ready = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(
-                    initialFinalSimulation.continuation
-                )
-            ) as? [String: Any]
+            testWorldObject(initialFinalSimulation.world)
         )
         ready["playerLocation"] = [
             "room": ["_0": finalChain.goalRoomSourceIndex],
@@ -137,12 +133,9 @@ extension WorldRenderingTests {
             "y": goal.position.y,
             "z": goal.position.z,
         ]
-        let finalSimulation = try PlayerSimulation(
+        let finalSimulation = try GameSession(
             level: finalLevel,
-            continuation: JSONDecoder().decode(
-                PlayerSimulationContinuation.self,
-                from: JSONSerialization.data(withJSONObject: ready)
-            ),
+            world: (decodeTestWorld(ready)).rebased(onto: finalLevel),
             resumedAtTimestamp: 0
         )
         let finalFrame = finalSimulation.update(at: 0.2, input: .zero)

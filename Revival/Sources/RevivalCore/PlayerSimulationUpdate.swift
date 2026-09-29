@@ -2,7 +2,7 @@
 
 import Foundation
 
-extension PlayerSimulation {
+extension GameSession {
     private func advancePlayerAndGuidebotYellowFlares(
         duration systemsFrameDuration: Float,
         gameTime systemsGameTime: Float
@@ -58,10 +58,8 @@ extension PlayerSimulation {
         let systemsGameTime = gameTime
 
         let binding = level.defaultPlayerBinding!
-        let objectIndex = level.objects.firstIndex {
-            $0.handle == binding.objectHandle
-        }!
-        var object = level.objects[objectIndex]
+        let playerHandle = ObjectHandle(binding.objectHandle)
+        var object = world.objects[playerHandle]!
         let controlsAreSuspended =
             trainingFinalGoalState?.endLevelWasRequested == true
         let currentEnabledControls = controlsAreSuspended
@@ -123,14 +121,7 @@ extension PlayerSimulation {
                 chain.completionTimerDuration
             trainingCameraMonitorState = state
             cameraMonitorWasUsedThisFrame = true
-            level.objects.removeAll {
-                $0.handle == chain.pickupObjectHandle
-            }
-            setObjectPresentationVisibility(
-                in: &level,
-                handle: chain.pickupObjectHandle,
-                isVisible: false
-            )
+            world.objects.delete(ObjectHandle(chain.pickupObjectHandle))
         }
         if input.deploysTrainingGuidebot {
             if trainingGuidebotReleaseCommandIsAvailable {
@@ -247,7 +238,7 @@ extension PlayerSimulation {
                     + linearThrustOrientation.right.z * input.sideways
             )
         )
-        let view = defaultPlayerView(in: level)
+        let view = defaultPlayerView(in: level, objects: world.objects)
         var position = object.position
         var roomSourceIndex = startRoom
         var trainingForwardGoalWasReachedThisFrame = false
@@ -284,6 +275,7 @@ extension PlayerSimulation {
             let traceStart = position
             let trace = traceIndoorMovement(
                 in: level,
+                roomStates: world.rooms,
                 startRoom: roomSourceIndex,
                 start: position,
                 end: position + linearThrustOrientation.up * wiggle,
@@ -293,6 +285,7 @@ extension PlayerSimulation {
                 trainingCameraMonitorWasHitThisFrame
                 || trainingCameraMonitorPickupWasHit(
                     in: level,
+                    objects: world.objects,
                     state: trainingCameraMonitorState,
                     playerStart: traceStart,
                     playerEnd: trace.finalPosition,
@@ -304,6 +297,7 @@ extension PlayerSimulation {
                 trainingInvulnerabilityPickupWasHitThisFrame
                 || trainingInvulnerabilityPickupWasHit(
                     in: level,
+                    objects: world.objects,
                     state: trainingInvulnerabilityPickupState,
                     playerStart: traceStart,
                     playerEnd: trace.finalPosition,
@@ -315,6 +309,7 @@ extension PlayerSimulation {
                 trainingCloakPickupWasHitThisFrame
                 || trainingCloakPickupWasHit(
                     in: level,
+                    objects: world.objects,
                     state: trainingCloakPickupState,
                     playerStart: traceStart,
                     playerEnd: trace.finalPosition,
@@ -326,6 +321,7 @@ extension PlayerSimulation {
                 trainingFinalGoalWasHitThisFrame
                 || trainingFinalGoalWasHit(
                     in: level,
+                    objects: world.objects,
                     state: trainingFinalGoalState,
                     finalBotsState: trainingFinalBotsCompletionState,
                     playerStart: traceStart,
@@ -356,6 +352,7 @@ extension PlayerSimulation {
                 trainingForwardGoalWasReachedThisFrame =
                     trainingForwardGoalWasReached(
                         in: level,
+                        objects: world.objects,
                         lesson: lesson,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
@@ -366,6 +363,7 @@ extension PlayerSimulation {
                 trainingStartGoalWasReachedThisFrame =
                     trainingStartGoalWasReached(
                         in: level,
+                        objects: world.objects,
                         lesson: lesson,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
@@ -377,6 +375,7 @@ extension PlayerSimulation {
                     trainingStartCourseWasReachedThisFrame =
                         trainingStartCourseWasReached(
                             in: level,
+                            objects: world.objects,
                             lesson: startCourse,
                             playerStart: traceStart,
                             playerEnd: trace.finalPosition,
@@ -389,6 +388,7 @@ extension PlayerSimulation {
                     trainingFinishCourseWasReachedThisFrame =
                         trainingFinishCourseWasReached(
                             in: level,
+                            objects: world.objects,
                             lesson: finishCourse,
                             playerStart: traceStart,
                             playerEnd: trace.finalPosition,
@@ -401,6 +401,7 @@ extension PlayerSimulation {
                     trainingLeftGoalWasReachedThisFrame =
                         trainingLeftGoalWasReached(
                             in: level,
+                            objects: world.objects,
                             lesson: returnRight,
                             playerStart: traceStart,
                             playerEnd: trace.finalPosition,
@@ -419,6 +420,7 @@ extension PlayerSimulation {
                     trainingDownGoalWasReachedThisFrame =
                         trainingDownGoalWasReached(
                             in: level,
+                            objects: world.objects,
                             lesson: returnDown,
                             playerStart: traceStart,
                             playerEnd: trace.finalPosition,
@@ -459,6 +461,7 @@ extension PlayerSimulation {
             let traceStart = position
             let trace = traceIndoorMovement(
                 in: level,
+                roomStates: world.rooms,
                 startRoom: roomSourceIndex,
                 start: position,
                 end: integrated.position,
@@ -468,6 +471,7 @@ extension PlayerSimulation {
                 trainingCameraMonitorWasHitThisFrame
                 || trainingCameraMonitorPickupWasHit(
                     in: level,
+                    objects: world.objects,
                     state: trainingCameraMonitorState,
                     playerStart: traceStart,
                     playerEnd: trace.finalPosition,
@@ -479,6 +483,7 @@ extension PlayerSimulation {
                 trainingInvulnerabilityPickupWasHitThisFrame
                 || trainingInvulnerabilityPickupWasHit(
                     in: level,
+                    objects: world.objects,
                     state: trainingInvulnerabilityPickupState,
                     playerStart: traceStart,
                     playerEnd: trace.finalPosition,
@@ -490,6 +495,7 @@ extension PlayerSimulation {
                 trainingCloakPickupWasHitThisFrame
                 || trainingCloakPickupWasHit(
                     in: level,
+                    objects: world.objects,
                     state: trainingCloakPickupState,
                     playerStart: traceStart,
                     playerEnd: trace.finalPosition,
@@ -501,6 +507,7 @@ extension PlayerSimulation {
                 trainingFinalGoalWasHitThisFrame
                 || trainingFinalGoalWasHit(
                     in: level,
+                    objects: world.objects,
                     state: trainingFinalGoalState,
                     finalBotsState: trainingFinalBotsCompletionState,
                     playerStart: traceStart,
@@ -532,6 +539,7 @@ extension PlayerSimulation {
                 trainingForwardGoalWasReachedThisFrame =
                     trainingForwardGoalWasReached(
                         in: level,
+                        objects: world.objects,
                         lesson: lesson,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
@@ -545,6 +553,7 @@ extension PlayerSimulation {
                 trainingStartGoalWasReachedThisFrame =
                     trainingStartGoalWasReached(
                         in: level,
+                        objects: world.objects,
                         lesson: lesson,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
@@ -559,6 +568,7 @@ extension PlayerSimulation {
                 trainingStartCourseWasReachedThisFrame =
                     trainingStartCourseWasReached(
                         in: level,
+                        objects: world.objects,
                         lesson: startCourse,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
@@ -573,6 +583,7 @@ extension PlayerSimulation {
                 trainingFinishCourseWasReachedThisFrame =
                     trainingFinishCourseWasReached(
                         in: level,
+                        objects: world.objects,
                         lesson: finishCourse,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
@@ -586,6 +597,7 @@ extension PlayerSimulation {
                 trainingLeftGoalWasReachedThisFrame =
                     trainingLeftGoalWasReached(
                         in: level,
+                        objects: world.objects,
                         lesson: returnRight,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
@@ -608,6 +620,7 @@ extension PlayerSimulation {
                 trainingDownGoalWasReachedThisFrame =
                     trainingDownGoalWasReached(
                         in: level,
+                        objects: world.objects,
                         lesson: returnDown,
                         playerStart: traceStart,
                         playerEnd: trace.finalPosition,
@@ -666,13 +679,10 @@ extension PlayerSimulation {
         if remainingDuration > 0 {
             velocity = .zero
         }
-        let movedPlayerIndex = level.objects.firstIndex {
-            $0.handle == binding.objectHandle
-        }!
-        level.objects[movedPlayerIndex].position = position
-        level.objects[movedPlayerIndex].location = .room(roomSourceIndex)
+        world.objects[playerHandle]!.position = position
+        world.objects[playerHandle]!.location = .room(roomSourceIndex)
         let playerFastHeadlight = playerHeadlightIsOn
-            ? fastPlayerHeadlight(from: level.objects[movedPlayerIndex])
+            ? fastPlayerHeadlight(from: world.objects[playerHandle]!)
             : nil
         advancePlayerAndGuidebotYellowFlares(
             duration: systemsFrameDuration,
@@ -684,7 +694,7 @@ extension PlayerSimulation {
         )
         let guidebotAdvanceEvent = advanceTrainingGuidebot(
             duration: systemsFrameDuration,
-            player: level.objects[movedPlayerIndex],
+            player: world.objects[playerHandle]!,
             playerRadius: ship.presentationSize * 0.8
         )
         guidebotEnteredShipThisFrame =
@@ -732,7 +742,7 @@ extension PlayerSimulation {
         advanceTrainingDodgeAndManeuverLesson(
             object: object,
             view: view,
-            movedPlayerIndex: movedPlayerIndex,
+            playerHandle: playerHandle,
             systemsFrameDuration: systemsFrameDuration,
             systemsGameTime: systemsGameTime,
             followBotTimer11StartedThisFrame:
@@ -764,14 +774,7 @@ extension PlayerSimulation {
             if state.remainingDuration == nil {
                 state.wasConsumed = true
                 state.remainingDuration = chain.duration
-                level.objects.removeAll {
-                    $0.handle == chain.pickupObjectHandle
-                }
-                setObjectPresentationVisibility(
-                    in: &level,
-                    handle: chain.pickupObjectHandle,
-                    isVisible: false
-                )
+                world.objects.delete(ObjectHandle(chain.pickupObjectHandle))
                 trainingOpeningFeedback.append(
                     .init(
                         hudMessages: [chain.activatedMessage],
@@ -801,14 +804,7 @@ extension PlayerSimulation {
                 state.wasConsumed = true
                 state.phase = .fadingOut
                 state.phaseRemaining = chain.fadeDuration
-                level.objects.removeAll {
-                    $0.handle == chain.pickupObjectHandle
-                }
-                setObjectPresentationVisibility(
-                    in: &level,
-                    handle: chain.pickupObjectHandle,
-                    isVisible: false
-                )
+                world.objects.delete(ObjectHandle(chain.pickupObjectHandle))
                 trainingOpeningFeedback.append(.init(
                     hudMessages: [chain.activatedMessage],
                     voiceSourceName: "",
@@ -839,7 +835,7 @@ extension PlayerSimulation {
             state.timerRemaining = chain.timerDuration
             trainingLastRoomState = state
             trainingLastRoomWasTriggeredThisFrame = true
-            openTrainingLastRoomBarrier(in: &level)
+            openTrainingLastRoomBarrier(in: &world, level: level)
         }
         if var state = trainingFinalBotsCompletionState,
             !state.wasTriggered,
@@ -856,7 +852,7 @@ extension PlayerSimulation {
             state.timerRemaining = chain.timerDuration
             trainingFinalBotsCompletionState = state
             trainingFinalBotsWasTriggeredThisFrame = true
-            openTrainingFinalBotsBarrier(in: &level)
+            openTrainingFinalBotsBarrier(in: &world, level: level)
         }
         if guidebotReturnWasRequestedThisFrame,
             let chain = level.trainingCameraMonitorChain?.returnToShip
@@ -884,7 +880,7 @@ extension PlayerSimulation {
                     chain.openMarkerLightDistance
                 cameraState.script058WasPresented = true
                 trainingCameraMonitorState = cameraState
-                openTrainingGuidebotReturnBarrier(in: &level)
+                openTrainingGuidebotReturnBarrier(in: &world, level: level)
                 trainingOpeningFeedback.append(.init(
                     hudMessages: [chain.successMessage],
                     voiceSourceName: chain.successVoiceSourceName,
@@ -904,14 +900,10 @@ extension PlayerSimulation {
             state.isHeld = true
             trainingCameraMonitorState = state
             completeTrainingCameraMonitorLocateGoal(
-                in: &level,
+                in: &world,
                 pickupObjectHandle: chain.pickupObjectHandle
             )
-            setObjectPresentationVisibility(
-                in: &level,
-                handle: chain.pickupObjectHandle,
-                isVisible: false
-            )
+            world.setObjectRendered(chain.pickupObjectHandle, false)
             trainingOpeningFeedback.append(.init(
                 hudMessages: [chain.pickupMessage],
                 voiceSourceName: chain.pickupVoiceSourceName,
@@ -940,7 +932,7 @@ extension PlayerSimulation {
                 voicePrecedesHUDMessages: true
             ))
             galleryState.markerLightDistance = 0
-            closeTrainingGalleryBarrier(in: &level)
+            closeTrainingGalleryBarrier(in: &world, level: level)
             if var robotState = trainingRobotGuidebotState {
                 robotState.controlsWereRestored = false
                 trainingRobotGuidebotState = robotState
@@ -961,7 +953,7 @@ extension PlayerSimulation {
                 voiceSourceName: chain.entryVoiceSourceName,
                 voicePrecedesHUDMessages: false
             ))
-            closeTrainingKillbotEntryBarrier(in: &level)
+            closeTrainingKillbotEntryBarrier(in: &world, level: level)
             trainingKillbotEntryState = state
         }
         if var state = trainingFinalRoomEntryState,
@@ -976,7 +968,7 @@ extension PlayerSimulation {
                 voiceSourceName: "",
                 voicePrecedesHUDMessages: true
             ))
-            closeTrainingLastRoomBarrier(in: &level)
+            closeTrainingLastRoomBarrier(in: &world, level: level)
             trainingOpeningFeedback.append(.init(
                 hudMessages: [chain.instructionMessage],
                 voiceSourceName: chain.voiceSourceName,
@@ -1167,7 +1159,7 @@ extension PlayerSimulation {
         )
     }
     private func advanceIndoorPlayerRotation(
-        object: inout PlacedObject,
+        object: inout GameObject,
         binding: DefaultPlayerBinding,
         orientation: inout Matrix3,
         input: InputSnapshot,
@@ -1258,10 +1250,8 @@ extension PlayerSimulation {
         }
         orientation = sourceOrthogonalized(orientation)
         object.orientation = orientation
-        let orientedPlayerIndex = level.objects.firstIndex {
-            $0.handle == binding.objectHandle
-        }!
-        level.objects[orientedPlayerIndex].orientation = orientation
+        world.objects[ObjectHandle(binding.objectHandle)]!.orientation =
+            orientation
     }
 
     private func finalizePlayerSimulationFrame(
@@ -1288,6 +1278,7 @@ extension PlayerSimulation {
 
         let cameraMonitorFrame = trainingCameraMonitorFrame(
             level: level,
+            world: world,
             state: trainingCameraMonitorState
         )
         let finalGoalFrame: TrainingFinalGoalFrame? =
@@ -1394,6 +1385,7 @@ extension PlayerSimulation {
             finalGoalFrame == nil && playerRearViewState != nil
         let forwardPlayerView = defaultPlayerView(
             in: level,
+            objects: world.objects,
             projection: projection
         )
 
@@ -1482,7 +1474,8 @@ extension PlayerSimulation {
                 } ?? [],
             playerConcussionExplosions:
                 ship.playerConcussion.map { concussion in
-                    playerConcussionState?.explosions.map { explosion in
+                    playerConcussionState?.explosions.filter(\.isPresented)
+                        .map { explosion in
                         let age = concussion.explosionLifetime
                             - explosion.lifeRemaining
                         let frameIndex = min(
@@ -1900,7 +1893,7 @@ extension PlayerSimulation {
                openingState.repeatReturnDownWasPresented == true,
                trainingStartGoalWasReachedThisFrame,
                let continueToCourse = lesson.continueToCourse {
-                openTrainingContinueToCoursePortals(in: &level)
+                openTrainingContinueToCoursePortals(in: &world, level: level)
                 trainingOpeningFeedback.append(TrainingOpeningFeedback(
                     hudMessages: [continueToCourse.instruction],
                     voiceSourceName: continueToCourse.voiceSourceName,
@@ -1911,7 +1904,7 @@ extension PlayerSimulation {
             if openingState.startCourseWasPresented != true,
                trainingStartCourseWasReachedThisFrame,
                let startCourse = lesson.startCourse {
-                closeTrainingStartCoursePortal(in: &level)
+                closeTrainingStartCoursePortal(in: &world, level: level)
                 trainingOpeningFeedback.append(TrainingOpeningFeedback(
                     hudMessages: [startCourse.instruction],
                     voiceSourceName: startCourse.voiceSourceName,
@@ -1930,7 +1923,7 @@ extension PlayerSimulation {
                 openingState.enabledControls = PlayerControlMask(
                     rawValue: finishCourse.enabledControlMask
                 )
-                openTrainingFinishCoursePortals(in: &level)
+                openTrainingFinishCoursePortals(in: &world, level: level)
                 trainingOpeningFeedback.append(TrainingOpeningFeedback(
                     hudMessages: [finishCourse.successMessage],
                     voiceSourceName: finishCourse.voiceSourceName,
@@ -1958,9 +1951,9 @@ extension PlayerSimulation {
     }
 
     func advanceTrainingDodgeAndManeuverLesson(
-        object: PlacedObject,
+        object: GameObject,
         view: PlayerView,
-        movedPlayerIndex: Int,
+        playerHandle: ObjectHandle,
         systemsFrameDuration: Float,
         systemsGameTime: Float,
         followBotTimer11StartedThisFrame: Bool,
@@ -1981,10 +1974,8 @@ extension PlayerSimulation {
             let followObjectTimerConsumesFrame =
                 trainingManeuverFollowState?.objectTimerRemaining
                     != nil
-            let player = level.objects[movedPlayerIndex]
-            let turret = level.objects.first {
-                $0.handle == dodge.dodgeTurretObjectHandle
-            }!
+            let player = world.objects[playerHandle]!
+            let turret = world.objects[ObjectHandle(dodge.dodgeTurretObjectHandle)]!
 
             if dodgeState.turretIsPowered,
                 dodgeState.script017Count == 0,
@@ -2014,6 +2005,7 @@ extension PlayerSimulation {
                 {
                     let visibility = traceIndoorMovement(
                         in: level,
+                        roomStates: world.rooms,
                         startRoom: turretRoom,
                         start: turret.position,
                         end: player.position,
@@ -2159,12 +2151,17 @@ extension PlayerSimulation {
                             trainingDodgeSpreadDirection(fire.forward)
                         let muzzleTrace = traceIndoorMovement(
                             in: level,
+                            roomStates: world.rooms,
                             startRoom: turretRoom,
                             start: turret.position,
                             end: fire.position,
                             radius: 0
                         )
-                        if case .noHit = muzzleTrace.outcome {
+                        // A full list drops the new projectile, as a
+                        // failed ObjCreate does (object.cpp:1605).
+                        if case .noHit = muzzleTrace.outcome,
+                           dodgeState.projectiles.count
+                            < trainingDodgeProjectilePresentationCapacity {
                             dodgeState.projectiles.append(
                                 .init(
                                     roomSourceIndex: turretRoom,
@@ -2214,6 +2211,7 @@ extension PlayerSimulation {
                     + projectile.velocity * systemsFrameDuration
                 let trace = traceIndoorMovement(
                     in: level,
+                    roomStates: world.rooms,
                     startRoom: projectile.roomSourceIndex,
                     start: projectile.position,
                     end: end,
@@ -2264,9 +2262,8 @@ extension PlayerSimulation {
 
             if dodgeState.script033Count < 1,
                 case .room(35) = player.location,
-                let startDodge = level.objects.first(where: {
-                    $0.handle == dodge.startDodgeObjectHandle
-                }),
+                let startDodge =
+                    world.objects[ObjectHandle(dodge.startDodgeObjectHandle)],
                 segmentSphereHitFraction(
                     start: object.position,
                     end: player.position,
@@ -2285,7 +2282,8 @@ extension PlayerSimulation {
                     trainingOpeningState = openingState
                 }
                 setTrainingDodgePortalRenderState(
-                    in: &level,
+                    in: &world,
+                    level: level,
                     roomSourceIndex: dodge.portalRoomTwoSourceIndex,
                     portalIndices: dodge.orderedPortalIndices,
                     rendersFaces: true
@@ -2304,9 +2302,8 @@ extension PlayerSimulation {
             if let exit = dodge.dodgeExit,
                 (dodgeState.script019Count ?? 0) < 1,
                 case .room(35) = player.location,
-                let doneDodgeingGoal = level.objects.first(where: {
-                    $0.handle == exit.objectHandle
-                }),
+                let doneDodgeingGoal =
+                    world.objects[ObjectHandle(exit.objectHandle)],
                 segmentSphereHitFraction(
                     start: object.position,
                     end: player.position,
@@ -2319,7 +2316,8 @@ extension PlayerSimulation {
                 dodgeState.markerLightDistance =
                     exit.markerLightDistance
                 setTrainingDodgePortalRenderState(
-                    in: &level,
+                    in: &world,
+                    level: level,
                     roomSourceIndex: exit.portalRoomSourceIndex,
                     portalIndices: exit.orderedPortalIndices,
                     rendersFaces: false
@@ -2350,9 +2348,8 @@ extension PlayerSimulation {
                maneuverState.script021Count < 1,
                dodgeState.script020Count > 0,
                case .room(37) = player.location,
-               let maneuver = level.objects.first(where: {
-                   $0.handle == lesson.maneuverObjectHandle
-               }),
+               let maneuver =
+                   world.objects[ObjectHandle(lesson.maneuverObjectHandle)],
                segmentSphereHitFraction(
                    start: object.position,
                    end: player.position,
@@ -2370,7 +2367,8 @@ extension PlayerSimulation {
                     trainingOpeningState = openingState
                 }
                 setTrainingDodgePortalRenderState(
-                    in: &level,
+                    in: &world,
+                    level: level,
                     roomSourceIndex: lesson.portalRoomSourceIndex,
                     portalIndices: lesson.orderedPortalIndices,
                     rendersFaces: true
@@ -2475,7 +2473,8 @@ extension PlayerSimulation {
                     dodgeState.markerLightDistance =
                         dodge.successMarkerLightDistance
                     setTrainingDodgePortalRenderState(
-                        in: &level,
+                        in: &world,
+                        level: level,
                         roomSourceIndex:
                             dodge.portalRoomThreeSourceIndex,
                         portalIndices: dodge.orderedPortalIndices,
@@ -2666,12 +2665,10 @@ extension PlayerSimulation {
                         destruction.destroyBot1TeamFlags =
                             handoff.movingTeamFlags
                         destruction.destroyBot1IsVisible = true
-                        setObjectPresentationVisibility(
-                            in: &level,
-                            handle:
+                        world.setObjectRendered(
                                 handoff.destroyBot1ObjectHandle,
-                            isVisible: true
-                        )
+                                true
+                            )
                         trainingOpeningFeedback.append(
                             .init(
                                 hudMessages: [
@@ -2690,7 +2687,7 @@ extension PlayerSimulation {
                         )
                         destruction.destroyBot1Destruction =
                             initialTrainingDestroyBot1DestructionState(
-                                level: level,
+                                objects: world.objects,
                                 handoff: handoff
                             )
                         destruction.script027Count = min(
@@ -2748,7 +2745,7 @@ extension PlayerSimulation {
                     }
                 }
                 trainingManeuverFollowState = maneuverState
-                restoreTrainingFollowBotPresentation()
+                syncTrainingFollowBotObject()
             }
             trainingDodgeAttemptState = dodgeState
         }
@@ -2797,6 +2794,7 @@ private func trainingFinalRoomEntryTriggerWasCrossed(
 }
 private func trainingCameraMonitorPickupWasHit(
     in level: Level,
+    objects: ObjectTable,
     state: TrainingCameraMonitorState?,
     playerStart: Vector3,
     playerEnd: Vector3,
@@ -2807,9 +2805,7 @@ private func trainingCameraMonitorPickupWasHit(
           !state.isHeld,
           !state.wasUsed,
           let chain = level.trainingCameraMonitorChain,
-          let pickup = level.objects.first(where: {
-              $0.handle == chain.pickupObjectHandle
-          }),
+          let pickup = objects[ObjectHandle(chain.pickupObjectHandle)],
           case let .room(pickupRoomSourceIndex) = pickup.location,
           visitedRoomSourceIndices.contains(pickupRoomSourceIndex) else {
         return false
@@ -2824,6 +2820,7 @@ private func trainingCameraMonitorPickupWasHit(
 
 private func trainingInvulnerabilityPickupWasHit(
     in level: Level,
+    objects: ObjectTable,
     state: TrainingInvulnerabilityPickupState?,
     playerStart: Vector3,
     playerEnd: Vector3,
@@ -2833,9 +2830,7 @@ private func trainingInvulnerabilityPickupWasHit(
     guard let state,
         !state.wasConsumed,
         let chain = level.trainingInvulnerabilityPickupChain,
-        let pickup = level.objects.first(where: {
-            $0.handle == chain.pickupObjectHandle
-        }),
+        let pickup = objects[ObjectHandle(chain.pickupObjectHandle)],
         pickup.location == .room(chain.pickupRoomSourceIndex),
         visitedRoomSourceIndices.contains(
             chain.pickupRoomSourceIndex
@@ -2853,6 +2848,7 @@ private func trainingInvulnerabilityPickupWasHit(
 
 private func trainingCloakPickupWasHit(
     in level: Level,
+    objects: ObjectTable,
     state: TrainingCloakPickupState?,
     playerStart: Vector3,
     playerEnd: Vector3,
@@ -2862,9 +2858,7 @@ private func trainingCloakPickupWasHit(
     guard let state,
         !state.wasConsumed,
         let chain = level.trainingCloakPickupChain,
-        let pickup = level.objects.first(where: {
-            $0.handle == chain.pickupObjectHandle
-        }),
+        let pickup = objects[ObjectHandle(chain.pickupObjectHandle)],
         pickup.location == .room(chain.pickupRoomSourceIndex),
         visitedRoomSourceIndices.contains(chain.pickupRoomSourceIndex)
     else {
@@ -2880,6 +2874,7 @@ private func trainingCloakPickupWasHit(
 
 private func trainingFinalGoalWasHit(
     in level: Level,
+    objects: ObjectTable,
     state: TrainingFinalGoalState?,
     finalBotsState: TrainingFinalBotsCompletionState?,
     playerStart: Vector3,
@@ -2891,9 +2886,7 @@ private func trainingFinalGoalWasHit(
           !state.endLevelWasRequested,
           finalBotsState?.wasTriggered == true,
           let chain = level.trainingFinalGoalChain,
-          let goal = level.objects.first(where: {
-              $0.handle == chain.goalObjectHandle
-          }),
+          let goal = objects[ObjectHandle(chain.goalObjectHandle)],
           goal.location == .room(chain.goalRoomSourceIndex),
           visitedRoomSourceIndices.contains(
               chain.goalRoomSourceIndex
@@ -2950,7 +2943,7 @@ private func constrainedTrainingTurretAngle(
 private func trainingDodgeGunTransform(
     level: Level,
     dodge: TrainingDodgeAttempt,
-    turret: PlacedObject,
+    turret: GameObject,
     angles: [Float],
     restPosition: Vector3
 ) -> TrainingDodgeGunTransform {
@@ -3043,7 +3036,7 @@ private func trainingDodgeGunTransform(
 private func trainingDodgeAimDot(
     level: Level,
     dodge: TrainingDodgeAttempt,
-    turret: PlacedObject,
+    turret: GameObject,
     angles: [Float],
     target: Vector3
 ) -> Float {
@@ -3059,337 +3052,177 @@ private func trainingDodgeAimDot(
         sourceVectorNormalized(target - aim.position)
     )
 }
-func closeTrainingGalleryBarrier(in level: inout Level) {
+func closeTrainingGalleryBarrier(in world: inout GameWorld, level: Level) {
     guard let barrier = level.trainingGalleryBarrier else { return }
-    let barrierRoomIndex = level.rooms.firstIndex {
-        $0.sourceIndex == barrier.barrierRoomSourceIndex
-    }!
     for portalIndex in barrier.orderedPortalIndices {
-        let portal =
-            level.rooms[barrierRoomIndex].portals[portalIndex]
-        level.rooms[barrierRoomIndex].portals[portalIndex].flags |= 1
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        level.rooms[connectedRoomIndex]
-            .portals[portal.connectedPortal].flags |= 1
+        world.setPortalRenderFaces(
+            true,
+            roomSourceIndex: barrier.barrierRoomSourceIndex,
+            portalIndex: portalIndex,
+            level: level
+        )
     }
 }
 
 func setTrainingDodgePortalRenderState(
-    in level: inout Level,
+    in world: inout GameWorld,
+    level: Level,
     roomSourceIndex: Int,
     portalIndices: [Int],
     rendersFaces: Bool
 ) {
-    let roomIndex = level.rooms.firstIndex {
-        $0.sourceIndex == roomSourceIndex
-    }!
     for portalIndex in portalIndices {
-        let portal = level.rooms[roomIndex].portals[portalIndex]
-        if rendersFaces {
-            level.rooms[roomIndex].portals[portalIndex].flags |= 1
-        } else {
-            level.rooms[roomIndex].portals[portalIndex].flags &= ~UInt32(1)
-        }
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        if rendersFaces {
-            level.rooms[connectedRoomIndex]
-                .portals[portal.connectedPortal].flags |= 1
-        } else {
-            level.rooms[connectedRoomIndex]
-                .portals[portal.connectedPortal].flags &= ~UInt32(1)
-        }
-    }
-}
-
-func trainingContinueToCoursePortalsHaveRenderState(
-    in level: Level,
-    lesson: TrainingContinueToCourseLesson,
-    rendersFaces: Bool
-) -> Bool {
-    return lesson.orderedPortalIndices.allSatisfy { portalIndex in
-        trainingPortalPairHasRenderState(
-            in: level,
-            roomSourceIndex: lesson.portalRoomSourceIndex,
+        world.setPortalRenderFaces(
+            rendersFaces,
+            roomSourceIndex: roomSourceIndex,
             portalIndex: portalIndex,
-            rendersFaces: rendersFaces
+            level: level
         )
     }
 }
 
-func openTrainingContinueToCoursePortals(in level: inout Level) {
-    guard let lesson =
-            level.trainingOpeningLesson?.continueToCourse,
-          let roomIndex = level.rooms.firstIndex(where: {
-              $0.sourceIndex == lesson.portalRoomSourceIndex
-          })
-    else {
+func openTrainingContinueToCoursePortals(
+    in world: inout GameWorld,
+    level: Level
+) {
+    guard let lesson = level.trainingOpeningLesson?.continueToCourse else {
         return
     }
-    for portalIndex in lesson.orderedPortalIndices {
-        let portal = level.rooms[roomIndex].portals[portalIndex]
-        level.rooms[roomIndex].portals[portalIndex].flags &= ~UInt32(1)
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        level.rooms[connectedRoomIndex]
-            .portals[portal.connectedPortal].flags &= ~UInt32(1)
-    }
-}
-
-func trainingFinishCoursePortalsHaveRenderState(
-    in level: Level,
-    lesson: TrainingFinishCourseLesson,
-    rendersFaces: Bool
-) -> Bool {
-    lesson.orderedPortalIndices.allSatisfy { portalIndex in
-        trainingPortalPairHasRenderState(
-            in: level,
-            roomSourceIndex: lesson.portalRoomSourceIndex,
-            portalIndex: portalIndex,
-            rendersFaces: rendersFaces
-        )
-    }
-}
-
-func openTrainingFinishCoursePortals(in level: inout Level) {
-    guard let lesson = level.trainingOpeningLesson?.finishCourse,
-          let roomIndex = level.rooms.firstIndex(where: {
-              $0.sourceIndex == lesson.portalRoomSourceIndex
-          })
-    else {
-        return
-    }
-    for portalIndex in lesson.orderedPortalIndices {
-        let portal = level.rooms[roomIndex].portals[portalIndex]
-        level.rooms[roomIndex].portals[portalIndex].flags &= ~UInt32(1)
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        level.rooms[connectedRoomIndex]
-            .portals[portal.connectedPortal].flags &= ~UInt32(1)
-    }
-}
-
-func trainingStartCoursePortalHasRenderState(
-    in level: Level,
-    lesson: TrainingStartCourseLesson,
-    rendersFaces: Bool
-) -> Bool {
-    trainingPortalPairHasRenderState(
-        in: level,
+    setTrainingDodgePortalRenderState(
+        in: &world,
+        level: level,
         roomSourceIndex: lesson.portalRoomSourceIndex,
-        portalIndex: lesson.portalIndex,
-        rendersFaces: rendersFaces
+        portalIndices: lesson.orderedPortalIndices,
+        rendersFaces: false
     )
 }
 
-func trainingPortalPairHasRenderState(
-    in level: Level,
-    roomSourceIndex: Int,
-    portalIndex: Int,
-    rendersFaces: Bool
-) -> Bool {
-    guard let room = level.rooms.first(where: {
-        $0.sourceIndex == roomSourceIndex
-    }),
-          room.portals.indices.contains(portalIndex)
-    else {
-        return false
-    }
-    let portal = room.portals[portalIndex]
-    let expectedBit: UInt32 = rendersFaces ? 1 : 0
-    guard portal.flags & 1 == expectedBit,
-          let connectedRoom = level.rooms.first(where: {
-              $0.sourceIndex == portal.connectedRoom
-          }),
-          connectedRoom.portals.indices.contains(portal.connectedPortal)
-    else {
-        return false
-    }
-    let reciprocal = connectedRoom.portals[portal.connectedPortal]
-    return reciprocal.connectedRoom == room.sourceIndex
-        && reciprocal.connectedPortal == portalIndex
-        && reciprocal.flags & 1 == expectedBit
-}
-
-func closeTrainingStartCoursePortal(in level: inout Level) {
-    guard let lesson = level.trainingOpeningLesson?.startCourse,
-          let roomIndex = level.rooms.firstIndex(where: {
-              $0.sourceIndex == lesson.portalRoomSourceIndex
-          })
-    else {
+func openTrainingFinishCoursePortals(in world: inout GameWorld, level: Level) {
+    guard let lesson = level.trainingOpeningLesson?.finishCourse else {
         return
     }
-    let portal = level.rooms[roomIndex].portals[lesson.portalIndex]
-    level.rooms[roomIndex].portals[lesson.portalIndex].flags |= 1
-    let connectedRoomIndex = level.rooms.firstIndex {
-        $0.sourceIndex == portal.connectedRoom
-    }!
-    level.rooms[connectedRoomIndex]
-        .portals[portal.connectedPortal].flags |= 1
+    setTrainingDodgePortalRenderState(
+        in: &world,
+        level: level,
+        roomSourceIndex: lesson.portalRoomSourceIndex,
+        portalIndices: lesson.orderedPortalIndices,
+        rendersFaces: false
+    )
 }
 
-func openTrainingGalleryBarrier(in level: inout Level) {
+func closeTrainingStartCoursePortal(in world: inout GameWorld, level: Level) {
+    guard let lesson = level.trainingOpeningLesson?.startCourse else {
+        return
+    }
+    world.setPortalRenderFaces(
+        true,
+        roomSourceIndex: lesson.portalRoomSourceIndex,
+        portalIndex: lesson.portalIndex,
+        level: level
+    )
+}
+
+func openTrainingGalleryBarrier(in world: inout GameWorld, level: Level) {
     guard let barrier = level.trainingGalleryBarrier else { return }
-    let barrierRoomIndex = level.rooms.firstIndex {
-        $0.sourceIndex == barrier.barrierRoomSourceIndex
-    }!
-    for portalIndex in barrier.orderedPortalIndices {
-        let portal =
-            level.rooms[barrierRoomIndex].portals[portalIndex]
-        level.rooms[barrierRoomIndex].portals[portalIndex].flags &= ~UInt32(1)
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        level.rooms[connectedRoomIndex]
-            .portals[portal.connectedPortal].flags &= ~UInt32(1)
-    }
+    setTrainingDodgePortalRenderState(
+        in: &world,
+        level: level,
+        roomSourceIndex: barrier.barrierRoomSourceIndex,
+        portalIndices: barrier.orderedPortalIndices,
+        rendersFaces: false
+    )
 }
 
-func openTrainingGuidebotReturnBarrier(in level: inout Level) {
-    guard let barrier =
-            level.trainingCameraMonitorChain?.returnToShip,
-          let barrierRoomIndex = level.rooms.firstIndex(where: {
-              $0.sourceIndex == barrier.barrierRoomSourceIndex
-          }) else {
+func openTrainingGuidebotReturnBarrier(
+    in world: inout GameWorld,
+    level: Level
+) {
+    guard let barrier = level.trainingCameraMonitorChain?.returnToShip else {
         return
     }
-    for portalIndex in barrier.orderedPortalIndices {
-        let portal =
-            level.rooms[barrierRoomIndex].portals[portalIndex]
-        level.rooms[barrierRoomIndex].portals[portalIndex].flags
-            &= ~UInt32(1)
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        level.rooms[connectedRoomIndex]
-            .portals[portal.connectedPortal].flags &= ~UInt32(1)
-    }
+    setTrainingDodgePortalRenderState(
+        in: &world,
+        level: level,
+        roomSourceIndex: barrier.barrierRoomSourceIndex,
+        portalIndices: barrier.orderedPortalIndices,
+        rendersFaces: false
+    )
 }
 
-func openTrainingLastRoomBarrier(in level: inout Level) {
-    guard let chain = level.trainingLastRoomChain,
-        let roomIndex = level.rooms.firstIndex(where: {
-            $0.sourceIndex == chain.barrierRoomSourceIndex
-        })
+func openTrainingLastRoomBarrier(in world: inout GameWorld, level: Level) {
+    guard let chain = level.trainingLastRoomChain else { return }
+    setTrainingDodgePortalRenderState(
+        in: &world,
+        level: level,
+        roomSourceIndex: chain.barrierRoomSourceIndex,
+        portalIndices: chain.orderedPortalIndices,
+        rendersFaces: false
+    )
+}
+
+func openTrainingFinalBotsBarrier(in world: inout GameWorld, level: Level) {
+    guard let chain = level.trainingFinalBotsCompletionChain else { return }
+    setTrainingDodgePortalRenderState(
+        in: &world,
+        level: level,
+        roomSourceIndex: chain.barrierRoomSourceIndex,
+        portalIndices: chain.orderedPortalIndices,
+        rendersFaces: false
+    )
+}
+
+func closeTrainingLastRoomBarrier(in world: inout GameWorld, level: Level) {
+    guard let chain = level.trainingLastRoomChain else { return }
+    setTrainingDodgePortalRenderState(
+        in: &world,
+        level: level,
+        roomSourceIndex: chain.barrierRoomSourceIndex,
+        portalIndices: chain.orderedPortalIndices,
+        rendersFaces: true
+    )
+}
+
+func closeTrainingKillbotEntryBarrier(
+    in world: inout GameWorld,
+    level: Level
+) {
+    guard let barrier = level.trainingCameraMonitorChain?.returnToShip,
+          let entry = barrier.killbotEntry
     else {
         return
     }
-    for portalIndex in chain.orderedPortalIndices {
-        let portal = level.rooms[roomIndex].portals[portalIndex]
-        level.rooms[roomIndex].portals[portalIndex].flags &= ~UInt32(1)
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        level.rooms[connectedRoomIndex]
-            .portals[portal.connectedPortal].flags &= ~UInt32(1)
-    }
-}
-
-func openTrainingFinalBotsBarrier(in level: inout Level) {
-    guard let chain = level.trainingFinalBotsCompletionChain,
-          let roomIndex = level.rooms.firstIndex(where: {
-              $0.sourceIndex == chain.barrierRoomSourceIndex
-          })
-    else {
-        return
-    }
-    for portalIndex in chain.orderedPortalIndices {
-        let portal = level.rooms[roomIndex].portals[portalIndex]
-        level.rooms[roomIndex].portals[portalIndex].flags
-            &= ~UInt32(1)
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        level.rooms[connectedRoomIndex]
-            .portals[portal.connectedPortal].flags &= ~UInt32(1)
-    }
-}
-
-func closeTrainingLastRoomBarrier(in level: inout Level) {
-    guard let chain = level.trainingLastRoomChain,
-        let roomIndex = level.rooms.firstIndex(where: {
-            $0.sourceIndex == chain.barrierRoomSourceIndex
-        })
-    else {
-        return
-    }
-    for portalIndex in chain.orderedPortalIndices {
-        let portal = level.rooms[roomIndex].portals[portalIndex]
-        level.rooms[roomIndex].portals[portalIndex].flags |= 1
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        level.rooms[connectedRoomIndex]
-            .portals[portal.connectedPortal].flags |= 1
-    }
-}
-
-func trainingKillbotEntryBarrierRendersFaces(
-    in level: Level
-) -> Bool {
-    guard let barrier =
-            level.trainingCameraMonitorChain?.returnToShip,
-          let entry = barrier.killbotEntry,
-          let room = level.rooms.first(where: {
-              $0.sourceIndex == barrier.barrierRoomSourceIndex
-          }) else {
-        return false
-    }
-    return entry.orderedPortalIndices.allSatisfy {
-        room.portals[$0].flags & 1 != 0
-    }
-}
-
-func closeTrainingKillbotEntryBarrier(in level: inout Level) {
-    guard let barrier =
-            level.trainingCameraMonitorChain?.returnToShip,
-          let entry = barrier.killbotEntry,
-          let barrierRoomIndex = level.rooms.firstIndex(where: {
-              $0.sourceIndex == barrier.barrierRoomSourceIndex
-          }) else {
-        return
-    }
-    for portalIndex in entry.orderedPortalIndices {
-        let portal =
-            level.rooms[barrierRoomIndex].portals[portalIndex]
-        level.rooms[barrierRoomIndex].portals[portalIndex].flags |= 1
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        level.rooms[connectedRoomIndex]
-            .portals[portal.connectedPortal].flags |= 1
-    }
+    setTrainingDodgePortalRenderState(
+        in: &world,
+        level: level,
+        roomSourceIndex: barrier.barrierRoomSourceIndex,
+        portalIndices: entry.orderedPortalIndices,
+        rendersFaces: true
+    )
 }
 
 private func trainingForwardGoalWasReached(
     in level: Level,
+    objects: ObjectTable,
     lesson: TrainingOpeningLesson,
     playerStart: Vector3,
     playerEnd: Vector3,
     playerRadius: Float,
     visitedRoomSourceIndices: [Int]
 ) -> Bool {
-    let target = level.objects.first {
-        $0.handle == lesson.forwardGoalObjectHandle
-    }!
+    let target = objects[ObjectHandle(lesson.forwardGoalObjectHandle)]!
     guard case let .room(targetRoomSourceIndex) = target.location,
           visitedRoomSourceIndices.contains(targetRoomSourceIndex) else {
         return false
     }
     let presentation = level.objectPresentations.first {
-        $0.objectHandle == target.handle
+        $0.objectHandle == target.handle.rawValue
     }!
     let model = level.models.first {
         $0.source == presentation.primaryModel
     }!
     let targetRadius = sourceObjectPresentationSize(
         model: model,
-        objectType: target.type
+        objectType: target.type.rawValue
     )
     return trainingOpeningGoalWasReached(
         target: target,
@@ -3403,6 +3236,7 @@ private func trainingForwardGoalWasReached(
 
 private func trainingStartGoalWasReached(
     in level: Level,
+    objects: ObjectTable,
     lesson: TrainingOpeningLesson,
     playerStart: Vector3,
     playerEnd: Vector3,
@@ -3436,9 +3270,7 @@ private func trainingStartGoalWasReached(
     guard let (targetHandle, collisionRadius) = targetAndRadius else {
         return false
     }
-    let target = level.objects.first {
-        $0.handle == targetHandle
-    }!
+    let target = objects[ObjectHandle(targetHandle)]!
     return trainingOpeningGoalWasReached(
         target: target,
         targetRadius: collisionRadius,
@@ -3451,15 +3283,14 @@ private func trainingStartGoalWasReached(
 
 private func trainingLeftGoalWasReached(
     in level: Level,
+    objects: ObjectTable,
     lesson: TrainingReturnRightLesson,
     playerStart: Vector3,
     playerEnd: Vector3,
     playerRadius: Float,
     visitedRoomSourceIndices: [Int]
 ) -> Bool {
-    let target = level.objects.first {
-        $0.handle == lesson.leftGoalObjectHandle
-    }!
+    let target = objects[ObjectHandle(lesson.leftGoalObjectHandle)]!
     return trainingOpeningGoalWasReached(
         target: target,
         targetRadius: lesson.collisionRadius,
@@ -3472,15 +3303,14 @@ private func trainingLeftGoalWasReached(
 
 private func trainingDownGoalWasReached(
     in level: Level,
+    objects: ObjectTable,
     lesson: TrainingReturnDownLesson,
     playerStart: Vector3,
     playerEnd: Vector3,
     playerRadius: Float,
     visitedRoomSourceIndices: [Int]
 ) -> Bool {
-    let target = level.objects.first {
-        $0.handle == lesson.upGoalObjectHandle
-    }!
+    let target = objects[ObjectHandle(lesson.upGoalObjectHandle)]!
     return trainingOpeningGoalWasReached(
         target: target,
         targetRadius: lesson.collisionRadius,
@@ -3493,15 +3323,14 @@ private func trainingDownGoalWasReached(
 
 private func trainingStartCourseWasReached(
     in level: Level,
+    objects: ObjectTable,
     lesson: TrainingStartCourseLesson,
     playerStart: Vector3,
     playerEnd: Vector3,
     playerRadius: Float,
     visitedRoomSourceIndices: [Int]
 ) -> Bool {
-    let target = level.objects.first {
-        $0.handle == lesson.startCourseObjectHandle
-    }!
+    let target = objects[ObjectHandle(lesson.startCourseObjectHandle)]!
     return trainingOpeningGoalWasReached(
         target: target,
         targetRadius: lesson.collisionRadius,
@@ -3514,15 +3343,14 @@ private func trainingStartCourseWasReached(
 
 private func trainingFinishCourseWasReached(
     in level: Level,
+    objects: ObjectTable,
     lesson: TrainingFinishCourseLesson,
     playerStart: Vector3,
     playerEnd: Vector3,
     playerRadius: Float,
     visitedRoomSourceIndices: [Int]
 ) -> Bool {
-    let target = level.objects.first {
-        $0.handle == lesson.finishCourseObjectHandle
-    }!
+    let target = objects[ObjectHandle(lesson.finishCourseObjectHandle)]!
     return trainingOpeningGoalWasReached(
         target: target,
         targetRadius: lesson.collisionRadius,
@@ -3534,7 +3362,7 @@ private func trainingFinishCourseWasReached(
 }
 
 private func trainingOpeningGoalWasReached(
-    target: PlacedObject,
+    target: GameObject,
     targetRadius: Float,
     playerStart: Vector3,
     playerEnd: Vector3,

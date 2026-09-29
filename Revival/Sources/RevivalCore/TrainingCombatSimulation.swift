@@ -2,10 +2,10 @@
 
 import Foundation
 
-extension PlayerSimulation {
+extension GameSession {
     func advanceTrainingCombat(
         input: InputSnapshot,
-        object: PlacedObject,
+        object: GameObject,
         ship: CanonicalShipDefinition,
         startRoom: Int,
         systemsFrameDuration: Float,
@@ -30,14 +30,19 @@ extension PlayerSimulation {
                         + object.orientation.right * gunpoint.x
                         + object.orientation.up * gunpoint.y
                         + object.orientation.forward * gunpoint.z
-                    state.projectiles.append(.init(
-                        roomSourceIndex: startRoom,
-                        position: position,
-                        velocity:
-                            object.orientation.forward
-                                * combat.projectileSpeed,
-                        lifeRemaining: combat.projectileLifetime
-                    ))
+                    // A weapon object that ObjCreate cannot allocate is not
+                    // fired (object.cpp:1605); a full list drops it.
+                    if state.projectiles.count
+                        < trainingBlueLaserPresentationCapacity {
+                        state.projectiles.append(.init(
+                            roomSourceIndex: startRoom,
+                            position: position,
+                            velocity:
+                                object.orientation.forward
+                                    * combat.projectileSpeed,
+                            lifeRemaining: combat.projectileLifetime
+                        ))
+                    }
                 }
                 energy -= combat.batteryEnergyCost
                 let previousDeadline = state.nextPrimaryFireTime
@@ -79,7 +84,7 @@ extension PlayerSimulation {
             let handoff =
                 level.trainingDodgeAttempt?.maneuverFollow?
                     .destructionHandoff
-            let followBot: PlacedObject? = handoff.flatMap {
+            let followBot: GameObject? = handoff.flatMap {
                 handoff in
                 guard maneuverState?.script026Count ?? 0 > 0,
                       followBotDestructionState?
@@ -87,11 +92,9 @@ extension PlayerSimulation {
                 else {
                     return nil
                 }
-                return level.objects.first {
-                    $0.handle == handoff.followBotObjectHandle
-                }
+                return world.objects[ObjectHandle(handoff.followBotObjectHandle)]
             }
-            let destroyBot1: PlacedObject? = handoff.flatMap {
+            let destroyBot1: GameObject? = handoff.flatMap {
                 handoff in
                 guard followBotDestructionState?
                         .script027Count ?? 0 > 0,
@@ -102,20 +105,15 @@ extension PlayerSimulation {
                 else {
                     return nil
                 }
-                return level.objects.first {
-                    $0.handle == handoff.destroyBot1ObjectHandle
-                }
+                return world.objects[ObjectHandle(handoff.destroyBot1ObjectHandle)]
             }
-            let robot = level.objects.first { robot in
-                guard robot.handle
-                        == chain.destroyRobotObjectHandle
-                else {
-                    return false
-                }
+            let robot = world.objects[
+                ObjectHandle(chain.destroyRobotObjectHandle)
+            ].flatMap { robot -> GameObject? in
                 guard let handoff else {
-                    return true
+                    return robot
                 }
-                return robot.handle
+                return robot.handle.rawValue
                         == handoff.destroyBot2ObjectHandle
                     && destroyBot1DestructionState?
                         .script028Count ?? 0 > 0
@@ -126,60 +124,44 @@ extension PlayerSimulation {
                     && destroyBot1DestructionState?
                         .destroyBot2Motion.activePathIndex
                         == handoff.movingPathIndex
+                    ? robot
+                    : nil
             }
             let rasBot1Chain = level.trainingRASBot1DeathChain
             let rasBot1 = rasBot1Chain.flatMap { rasBot1Chain in
-                level.objects.first {
-                    $0.handle == rasBot1Chain.robotObjectHandle
-                }
+                world.objects[ObjectHandle(rasBot1Chain.robotObjectHandle)]
             }
             let rasBot2Chain = level.trainingRASBot2DeathChain
             let rasBot2 = rasBot2Chain.flatMap { rasBot2Chain in
-                level.objects.first {
-                    $0.handle == rasBot2Chain.robotObjectHandle
-                }
+                world.objects[ObjectHandle(rasBot2Chain.robotObjectHandle)]
             }
             let rasBot3Chain = level.trainingRASBot3DeathChain
             let rasBot3 = rasBot3Chain.flatMap { rasBot3Chain in
-                level.objects.first {
-                    $0.handle == rasBot3Chain.robotObjectHandle
-                }
+                world.objects[ObjectHandle(rasBot3Chain.robotObjectHandle)]
             }
             let rasBot4Chain = level.trainingRASBot4DeathChain
             let rasBot4 = rasBot4Chain.flatMap { rasBot4Chain in
-                level.objects.first {
-                    $0.handle == rasBot4Chain.robotObjectHandle
-                }
+                world.objects[ObjectHandle(rasBot4Chain.robotObjectHandle)]
             }
             let lastBot1Chain = level.trainingLastBot1DeathChain
             let lastBot1 = lastBot1Chain.flatMap { lastBot1Chain in
-                level.objects.first {
-                    $0.handle == lastBot1Chain.robotObjectHandle
-                }
+                world.objects[ObjectHandle(lastBot1Chain.robotObjectHandle)]
             }
             let lastBot2Chain = level.trainingLastBot2DeathChain
             let lastBot2 = lastBot2Chain.flatMap { lastBot2Chain in
-                level.objects.first {
-                    $0.handle == lastBot2Chain.robotObjectHandle
-                }
+                world.objects[ObjectHandle(lastBot2Chain.robotObjectHandle)]
             }
             let lastBot3Chain = level.trainingLastBot3DeathChain
             let lastBot3 = lastBot3Chain.flatMap { lastBot3Chain in
-                level.objects.first {
-                    $0.handle == lastBot3Chain.robotObjectHandle
-                }
+                world.objects[ObjectHandle(lastBot3Chain.robotObjectHandle)]
             }
             let lastBot4Chain = level.trainingLastBot4DeathChain
             let lastBot4 = lastBot4Chain.flatMap { lastBot4Chain in
-                level.objects.first {
-                    $0.handle == lastBot4Chain.robotObjectHandle
-                }
+                world.objects[ObjectHandle(lastBot4Chain.robotObjectHandle)]
             }
             let lastBot5Chain = level.trainingLastBot5DeathChain
             let lastBot5 = lastBot5Chain.flatMap { lastBot5Chain in
-                level.objects.first {
-                    $0.handle == lastBot5Chain.robotObjectHandle
-                }
+                world.objects[ObjectHandle(lastBot5Chain.robotObjectHandle)]
             }
             var rasBot1State = trainingRASBot1DeathState
             var rasBot2State = trainingRASBot2DeathState
@@ -199,12 +181,12 @@ extension PlayerSimulation {
                     radius: Float
                 )
                 var targets: [ConcussionTarget] = []
-                func addTarget(_ object: PlacedObject?, radius: Float?) {
+                func addTarget(_ object: GameObject?, radius: Float?) {
                     guard let object, let radius,
                           case let .room(roomSourceIndex) = object.location
                     else { return }
                     targets.append((
-                        object.handle,
+                        object.handle.rawValue,
                         roomSourceIndex,
                         object.position,
                         radius
@@ -224,29 +206,29 @@ extension PlayerSimulation {
                 addTarget(lastBot5, radius: lastBot5Chain?.combat.robotCollisionRadius)
 
                 func applyDamage(to handle: UInt32, amount: Float) -> Bool {
-                    if handle == robot?.handle {
+                    if handle == robot?.handle.rawValue {
                         state.robotShields -= amount
-                    } else if handle == followBot?.handle {
+                    } else if handle == followBot?.handle.rawValue {
                         followBotDestructionState?.followBotShields -= amount
-                    } else if handle == destroyBot1?.handle {
+                    } else if handle == destroyBot1?.handle.rawValue {
                         destroyBot1DestructionState?.destroyBot1Shields -= amount
-                    } else if handle == rasBot1?.handle {
+                    } else if handle == rasBot1?.handle.rawValue {
                         rasBot1State?.shields -= amount
-                    } else if handle == rasBot2?.handle {
+                    } else if handle == rasBot2?.handle.rawValue {
                         rasBot2State?.shields -= amount
-                    } else if handle == rasBot3?.handle {
+                    } else if handle == rasBot3?.handle.rawValue {
                         rasBot3State?.shields -= amount
-                    } else if handle == rasBot4?.handle {
+                    } else if handle == rasBot4?.handle.rawValue {
                         rasBot4State?.shields -= amount
-                    } else if handle == lastBot1?.handle {
+                    } else if handle == lastBot1?.handle.rawValue {
                         lastBot1State?.shields -= amount
-                    } else if handle == lastBot2?.handle {
+                    } else if handle == lastBot2?.handle.rawValue {
                         lastBot2State?.shields -= amount
-                    } else if handle == lastBot3?.handle {
+                    } else if handle == lastBot3?.handle.rawValue {
                         lastBot3State?.shields -= amount
-                    } else if handle == lastBot4?.handle {
+                    } else if handle == lastBot4?.handle.rawValue {
                         lastBot4State?.shields -= amount
-                    } else if handle == lastBot5?.handle {
+                    } else if handle == lastBot5?.handle.rawValue {
                         lastBot5State?.shields -= amount
                     } else {
                         return false
@@ -277,7 +259,7 @@ extension PlayerSimulation {
                 }
                 let impacts = advancePlayerConcussionMissiles(
                     duration: systemsFrameDuration,
-                    playerHandle: object.handle,
+                    playerHandle: object.handle.rawValue,
                     binding: concussion,
                     state: &concussionState
                 )
@@ -304,6 +286,16 @@ extension PlayerSimulation {
                     let sparkCount = 3
                         + Int(nextAuthoritativeRandomValue() % 6)
                     for _ in 0..<sparkCount {
+                        // CreateRandomLineSparks (viseffect.cpp:822) asks
+                        // VisEffectCreate first; it returns -1 when the list
+                        // is full (viseffect.cpp:522), and the spark takes no
+                        // random draws.
+                        guard concussionState.sparks.count
+                            < playerConcussionSparkPresentationCapacity
+                        else {
+                            concussionState.nextCreationOrdinal += 1
+                            continue
+                        }
                         let rawDirection = Vector3(
                             x: Float(Int(nextAuthoritativeRandomValue() % 100) - 50),
                             y: Float(nextAuthoritativeRandomValue() % 100),
@@ -370,6 +362,7 @@ extension PlayerSimulation {
                             .damagedObjectHandles.insert(target.handle)
                         let visibility = traceIndoorMovement(
                             in: level,
+                            roomStates: world.rooms,
                             startRoom: explosion.roomSourceIndex,
                             start: explosion.position,
                             end: target.position,
@@ -400,6 +393,7 @@ extension PlayerSimulation {
                         concussionState.explosions[index].damagedPlayer = true
                         let visibility = traceIndoorMovement(
                             in: level,
+                            roomStates: world.rooms,
                             startRoom: explosion.roomSourceIndex,
                             start: explosion.position,
                             end: object.position,
@@ -433,6 +427,7 @@ extension PlayerSimulation {
                     + projectile.velocity * systemsFrameDuration
                 let trace = traceIndoorMovement(
                     in: level,
+                    roomStates: world.rooms,
                     startRoom: projectile.roomSourceIndex,
                     start: projectile.position,
                     end: end,

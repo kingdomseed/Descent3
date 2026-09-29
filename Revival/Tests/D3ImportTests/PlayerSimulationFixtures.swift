@@ -481,3 +481,143 @@ func makeSliceElevenTrappedLevel(clearance: Float) -> Level {
     rooms[roomIndex] = trappedRoom
     return replacing(level, rooms: rooms)
 }
+
+/// Decodes a `GameWorld` JSON object for a test. The optional keys
+/// `playerLocation`, `playerPosition`, and `playerOrientation` place the
+/// player object, so a test can start a saved world with the player anywhere.
+func decodeTestWorld(_ object: [String: Any]) throws -> GameWorld {
+    var object = object
+    let placement = [
+        ("playerLocation", "location"),
+        ("playerPosition", "position"),
+        ("playerOrientation", "orientation"),
+    ]
+    if placement.contains(where: { object[$0.0] != nil }) {
+        var objects = try XCTUnwrap(object["objects"] as? [String: Any])
+        var slots = try XCTUnwrap(objects["slots"] as? [Any])
+        let playerSlot = try XCTUnwrap(slots.firstIndex {
+            ($0 as? [String: Any])?["type"] as? Int
+                == Int(ObjectType.player.rawValue)
+        })
+        var player = try XCTUnwrap(slots[playerSlot] as? [String: Any])
+        for (key, field) in placement {
+            if let value = object.removeValue(forKey: key) {
+                player[field] = value
+            }
+        }
+        slots[playerSlot] = player
+        objects["slots"] = slots
+        object["objects"] = objects
+    }
+    return try JSONDecoder().decode(
+        GameWorld.self,
+        from: JSONSerialization.data(withJSONObject: object)
+    )
+}
+
+extension GameWorld {
+    /// The single player object of a Training test world.
+    var testPlayerObject: GameObject {
+        objects.first { $0.type == .player }!
+    }
+    var playerLocation: SpatialLocation { testPlayerObject.location }
+    var playerPosition: Vector3 { testPlayerObject.position }
+    var playerOrientation: Matrix3 { testPlayerObject.orientation }
+}
+
+extension GameSession {
+    /// The canonical level with this session's world applied: current object
+    /// placement (deleted objects dropped), render types, portal flags, and
+    /// goals. Tests read runtime state through it; the runtime never does.
+    var runtimeLevel: Level {
+        var composed = level
+        composed.objects = level.objects.compactMap { placed in
+            guard let object = world.objects[ObjectHandle(placed.handle)] else {
+                return nil
+            }
+            var placed = placed
+            placed.location = object.location
+            placed.position = object.position
+            placed.orientation = object.orientation
+            return placed
+        }
+        for roomIndex in composed.rooms.indices {
+            for portalIndex in composed.rooms[roomIndex].portals.indices {
+                composed.rooms[roomIndex].portals[portalIndex].flags =
+                    world.rooms[roomIndex].portalFlags[portalIndex]
+            }
+        }
+        composed.objectPresentations = level.objectPresentations.map {
+            ObjectPresentationReference(
+                objectHandle: $0.objectHandle,
+                primaryModel: $0.primaryModel,
+                mediumModel: $0.mediumModel,
+                lowModel: $0.lowModel,
+                dyingModel: $0.dyingModel,
+                mediumDistance: $0.mediumDistance,
+                lowDistance: $0.lowDistance,
+                isVisible: world.objects[ObjectHandle($0.objectHandle)]?
+                    .renderType == .polyobj
+            )
+        }
+        composed.goals = world.goals
+        return composed
+    }
+}
+
+extension GameWorld {
+    /// A saved Training world restored into a test level whose placement or
+    /// goals a test edited (for example a goal moved into contact). Static
+    /// objects take the level's placement. The player, and the objects whose
+    /// motion Training state owns, keep the saved placement. Deleted objects
+    /// stay deleted.
+    func rebased(onto level: Level) -> GameWorld {
+        var world = self
+        let handoff = level.trainingDodgeAttempt?.maneuverFollow?
+            .destructionHandoff
+        let moving = Set([
+            level.defaultPlayerBinding?.objectHandle,
+            level.trainingRobotGuidebotChain?.guidebotObjectHandle,
+            level.trainingDodgeAttempt?.maneuverFollow?.followBotObjectHandle,
+            handoff?.destroyBot1ObjectHandle,
+            handoff?.destroyBot2ObjectHandle,
+        ].compactMap { $0 })
+        for placed in level.objects where !moving.contains(placed.handle) {
+            let handle = ObjectHandle(placed.handle)
+            guard var object = world.objects[handle] else { continue }
+            object.location = placed.location
+            object.position = placed.position
+            object.orientation = placed.orientation
+            world.objects[handle] = object
+        }
+        // Goals are level data a test may edit; keep the saved completion.
+        world.goals = level.goals
+        if let camera = trainingCameraMonitorState,
+           camera.isHeld || camera.wasUsed,
+           let chain = level.trainingCameraMonitorChain {
+            completeTrainingCameraMonitorLocateGoal(
+                in: &world,
+                pickupObjectHandle: chain.pickupObjectHandle
+            )
+        }
+        return world
+    }
+}
+
+/// Encodes a `GameWorld` as a JSON object for a test to edit. It adds the
+/// player object's placement as `playerLocation`, `playerPosition`, and
+/// `playerOrientation`, which `decodeTestWorld` reads back.
+func testWorldObject(_ world: GameWorld) throws -> [String: Any]? {
+    guard var object = try JSONSerialization.jsonObject(
+        with: JSONEncoder().encode(world)
+    ) as? [String: Any] else {
+        return nil
+    }
+    let player = try JSONSerialization.jsonObject(
+        with: JSONEncoder().encode(world.testPlayerObject)
+    ) as? [String: Any]
+    object["playerLocation"] = player?["location"]
+    object["playerPosition"] = player?["position"]
+    object["playerOrientation"] = player?["orientation"]
+    return object
+}
