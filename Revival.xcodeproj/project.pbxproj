@@ -58,6 +58,8 @@
 		BB0000000000000000000018 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
 		BB0000000000000000000019 /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
 		BB000000000000000000001A /* TrainingLevelValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000006 /* TrainingLevelValidationTests.swift */; };
+		DC0000000000000000000013 /* TrainingLevelValidationTests+ControlLessons.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000013 /* TrainingLevelValidationTests+ControlLessons.swift */; };
+		DC0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift */; };
 		BB000000000000000000001B /* IndoorMovementTraceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000007 /* IndoorMovementTraceTests.swift */; };
 		B1000000000000000000000E /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
 		B1000000000000000000000F /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
@@ -179,7 +181,10 @@
 		DB0000000000000000000032 /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
 		DC0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift */; };
 		DC0000000000000000000002 /* TrainingOpeningLessonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000002 /* TrainingOpeningLessonTests.swift */; };
+		DC0000000000000000000019 /* TrainingOpeningLessonTests+EarlyScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000019 /* TrainingOpeningLessonTests+EarlyScripts.swift */; };
 		DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000003 /* TrainingGuidebotTests.swift */; };
+		DC0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift */; };
+		DC0000000000000000000016 /* TrainingGuidebotTests+Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */; };
 		DC0000000000000000000004 /* TrainingCameraAndReturnTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */; };
 		DC0000000000000000000005 /* TrainingCombatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000005 /* TrainingCombatTests.swift */; };
 		DC0000000000000000000006 /* TrainingMissionCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */; };
@@ -189,6 +194,8 @@
 		DC000000000000000000000A /* WorldRenderExtractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000A /* WorldRenderExtractionTests.swift */; };
 		DC000000000000000000000B /* WorldRenderFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000B /* WorldRenderFixtures.swift */; };
 		DC000000000000000000000C /* TrainingBehaviorFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000C /* TrainingBehaviorFixtures.swift */; };
+		DC0000000000000000000017 /* TrainingBehaviorFixtures+Guidebot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000017 /* TrainingBehaviorFixtures+Guidebot.swift */; };
+		DC0000000000000000000018 /* TrainingBehaviorFixtures+FinalRooms.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000018 /* TrainingBehaviorFixtures+FinalRooms.swift */; };
 		DC000000000000000000000D /* PlayerSimulationFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000D /* PlayerSimulationFixtures.swift */; };
 		DC000000000000000000000E /* SoloPauseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000E /* SoloPauseTests.swift */; };
 		DC000000000000000000000F /* LiveEnergyHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000F /* LiveEnergyHUDTests.swift */; };
@@ -228,6 +235,8 @@
 		BA0000000000000000000004 /* LevelAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelAssembly.swift; sourceTree = "<group>"; };
 		BA0000000000000000000005 /* IndoorMovementTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorMovementTrace.swift; sourceTree = "<group>"; };
 		BA0000000000000000000006 /* TrainingLevelValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLevelValidationTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000013 /* TrainingLevelValidationTests+ControlLessons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLevelValidationTests+ControlLessons.swift"; sourceTree = "<group>"; };
+		DA0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLevelValidationTests+LaterLessons.swift"; sourceTree = "<group>"; };
 		BA0000000000000000000007 /* IndoorMovementTraceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorMovementTraceTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000008 /* D3LV127Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127Decoder.swift; sourceTree = "<group>"; };
 		B20000000000000000000009 /* CanonicalPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalPackage.swift; sourceTree = "<group>"; };
@@ -266,7 +275,10 @@
 		D9000000000000000000000A /* WorldRenderExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtraction.swift; sourceTree = "<group>"; };
 		DA0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDodgeAndManeuverTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000002 /* TrainingOpeningLessonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingOpeningLessonTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000019 /* TrainingOpeningLessonTests+EarlyScripts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingOpeningLessonTests+EarlyScripts.swift"; sourceTree = "<group>"; };
 		DA0000000000000000000003 /* TrainingGuidebotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingGuidebotTests.swift; sourceTree = "<group>"; };
+		DA0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingGuidebotTests+YellowFlare.swift"; sourceTree = "<group>"; };
+		DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingGuidebotTests+Route.swift"; sourceTree = "<group>"; };
 		DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingCameraAndReturnTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000005 /* TrainingCombatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingCombatTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingMissionCompletionTests.swift; sourceTree = "<group>"; };
@@ -276,6 +288,8 @@
 		DA000000000000000000000A /* WorldRenderExtractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtractionTests.swift; sourceTree = "<group>"; };
 		DA000000000000000000000B /* WorldRenderFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderFixtures.swift; sourceTree = "<group>"; };
 		DA000000000000000000000C /* TrainingBehaviorFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingBehaviorFixtures.swift; sourceTree = "<group>"; };
+		DA0000000000000000000017 /* TrainingBehaviorFixtures+Guidebot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingBehaviorFixtures+Guidebot.swift"; sourceTree = "<group>"; };
+		DA0000000000000000000018 /* TrainingBehaviorFixtures+FinalRooms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingBehaviorFixtures+FinalRooms.swift"; sourceTree = "<group>"; };
 		DA000000000000000000000D /* PlayerSimulationFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationFixtures.swift; sourceTree = "<group>"; };
 		DA000000000000000000000E /* SoloPauseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoloPauseTests.swift; sourceTree = "<group>"; };
 		DA000000000000000000000F /* LiveEnergyHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEnergyHUDTests.swift; sourceTree = "<group>"; };
@@ -480,7 +494,10 @@
 				BD0000000000000000000001 /* TrainingBehaviorEditorTests.swift */,
 				DA0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift */,
 				DA0000000000000000000002 /* TrainingOpeningLessonTests.swift */,
+				DA0000000000000000000019 /* TrainingOpeningLessonTests+EarlyScripts.swift */,
 				DA0000000000000000000003 /* TrainingGuidebotTests.swift */,
+				DA0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift */,
+				DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */,
 				DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */,
 				DA0000000000000000000005 /* TrainingCombatTests.swift */,
 				DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */,
@@ -490,6 +507,8 @@
 				DA000000000000000000000A /* WorldRenderExtractionTests.swift */,
 				DA000000000000000000000B /* WorldRenderFixtures.swift */,
 				DA000000000000000000000C /* TrainingBehaviorFixtures.swift */,
+				DA0000000000000000000017 /* TrainingBehaviorFixtures+Guidebot.swift */,
+				DA0000000000000000000018 /* TrainingBehaviorFixtures+FinalRooms.swift */,
 				DA000000000000000000000D /* PlayerSimulationFixtures.swift */,
 				DA000000000000000000000E /* SoloPauseTests.swift */,
 				DA0000000000000000000012 /* SoloHelpTests.swift */,
@@ -497,6 +516,8 @@
 				DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */,
 				DA0000000000000000000011 /* LiveShieldsHUDTests.swift */,
 				BA0000000000000000000006 /* TrainingLevelValidationTests.swift */,
+				DA0000000000000000000013 /* TrainingLevelValidationTests+ControlLessons.swift */,
+				DA0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift */,
 				BA0000000000000000000007 /* IndoorMovementTraceTests.swift */,
 				B20000000000000000000006 /* CanonicalLevelTests.swift */,
 				B2000000000000000000000A /* D3ImportOperationTests.swift */,
@@ -830,7 +851,10 @@
 				C40000000000000000000005 /* PlayerSimulationPresentation.swift in Sources */,
 				DC0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift in Sources */,
 				DC0000000000000000000002 /* TrainingOpeningLessonTests.swift in Sources */,
+				DC0000000000000000000019 /* TrainingOpeningLessonTests+EarlyScripts.swift in Sources */,
 				DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */,
+				DC0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift in Sources */,
+				DC0000000000000000000016 /* TrainingGuidebotTests+Route.swift in Sources */,
 				DC0000000000000000000004 /* TrainingCameraAndReturnTests.swift in Sources */,
 				DC0000000000000000000005 /* TrainingCombatTests.swift in Sources */,
 				DC0000000000000000000006 /* TrainingMissionCompletionTests.swift in Sources */,
@@ -840,6 +864,8 @@
 				DC000000000000000000000A /* WorldRenderExtractionTests.swift in Sources */,
 				DC000000000000000000000B /* WorldRenderFixtures.swift in Sources */,
 				DC000000000000000000000C /* TrainingBehaviorFixtures.swift in Sources */,
+				DC0000000000000000000017 /* TrainingBehaviorFixtures+Guidebot.swift in Sources */,
+				DC0000000000000000000018 /* TrainingBehaviorFixtures+FinalRooms.swift in Sources */,
 				DC000000000000000000000D /* PlayerSimulationFixtures.swift in Sources */,
 				DC000000000000000000000E /* SoloPauseTests.swift in Sources */,
 				DC0000000000000000000012 /* SoloHelpTests.swift in Sources */,
@@ -876,6 +902,8 @@
 				B10000000000000000000003 /* PreparedRetailProfile.swift in Sources */,
 				B10000000000000000000005 /* TrainingMission.swift in Sources */,
 				BB000000000000000000001A /* TrainingLevelValidationTests.swift in Sources */,
+				DC0000000000000000000013 /* TrainingLevelValidationTests+ControlLessons.swift in Sources */,
+				DC0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift in Sources */,
 				BB000000000000000000001B /* IndoorMovementTraceTests.swift in Sources */,
 				B10000000000000000000009 /* CanonicalLevelTests.swift in Sources */,
 				B10000000000000000000014 /* D3ImportOperationTests.swift in Sources */,

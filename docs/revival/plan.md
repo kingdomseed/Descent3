@@ -6,12 +6,15 @@ Keep this file short. When you finish an item, tick it and edit "Current state".
 
 ## Current state
 
-- **Milestone:** M1, Runtime foundation (not started). M0 (reset) is done on branch `revival/replan-2026-09`.
+- **Milestone:** M1, Runtime foundation. Step 1 is done. M0 (reset) is done on branch `revival/replan-2026-09`.
 - **Game today:** Training is playable to completion in RevivalMac from imported content. Flight, collision, timing, the indoor Metal renderer, Guide-Bot, Training scripts, pause, HUD text, quicksave, F1 help, and pilot profiles work. Each Training script is a bespoke Swift type, with no general object or script runtime. M1 fixes that.
-- **Code:** ~45.7k Swift lines in `Revival/Sources` and ~47.6k in `Revival/Tests`, of which ~70% is Training-specific. Over the 4,000-line soft stop: four Training test files (4,236–4,766 lines). `Level.swift` is at 3,947.
+- **Code:** ~45.7k Swift lines in `Revival/Sources` and ~47.6k in `Revival/Tests`, of which ~70% is Training-specific. No file is over 4,000 lines. `Level.swift` is at 3,947.
 - **Last product commit:** `24701a09` (FollowLoop1 path-node authoring). It is pushed.
 - **Toolchain:** Xcode 27.0 release, Swift 6.4, macOS 27 dev machine, deployment floor macOS/iOS 26.
-- **Blockers:** none.
+- **Test baseline (Release, full suite):** 433 tests: 419 pass, 9 fail, 5 skipped.
+  - Five failures need local owned content (four `testOwned*` tests, plus `testTrainingMessagesRequireScript006GoDown`).
+  - Four are real failures on HEAD: `testKillbotEntryClosesPortalRoom5AndRunsTimedInstructionAcrossReload`, `testScript060ActiveGoalCommandReachesCameraMonitorThenReturnsToLivePlayer`, `testTrainingOpeningPreservesGoalThenTimerFeedbackOnTheSameFrame` (an extra empty sound entry), and `testTrainingScript008RepeatsForwardGoalReturnInReleasedOrderAndRestores`.
+- **Blockers:** The Metal Toolchain is not installed with Xcode 27.0, so the app targets fail at the `metal` shader step. Fix: `xcodebuild -downloadComponent MetalToolchain` (needs owner approval to download).
 
 ## Milestones
 
@@ -34,7 +37,8 @@ At the start of every milestone: recheck the upstream and fork heads (`sources.m
 
 Each step lands green: the build passes, Training is playable in RevivalMac, and quicksave/quickload still work. A behavior step adds a focused test first. A behavior-neutral move uses the existing suite as its guard. Each step deletes the bespoke Training code it replaces. The detailed design is in `architecture.md`, sections 2–7.
 
-- [ ] **1. Split oversized test files.** A behavior-neutral split of the four test files over 4,000 lines, done before they grow further. Fixtures go to helper files. Guard: the existing suite.
+- [x] **1. Split oversized test files.** A behavior-neutral split of the four test files over 4,000 lines, done before they grow further. Fixtures go to helper files. Guard: the existing suite.
+- [ ] **1b. Green baseline.** Install the Metal Toolchain. Fix or re-scope the four real failures above, so every later step starts from a known-green suite.
 - [ ] **2. `GameWorld` + object table + save, in one slice.** Add `ObjectHandle`, `GameObject`, and `ObjectTable` (translated from `object.h:642` and `object.cpp:1605–1707`, LIFO free list, signature wrap). Move game time, frame duration, RNG, players, mutable room and portal state, the object table, **and the existing Training state structs** into `struct GameWorld` in the same change. Move **every** reader and writer of `level.objects` (for example `PlayerSimulationUpdate.swift:60` and `PlayerSimulation.swift:1624`) to the table at once. `PlayerSimulation` becomes `GameSession { var world }`. `GameSave` = Codable `GameWorld` plus the package fingerprint and pilot. It replaces continuation schema 7 and its `validTraining*Continuation` functions, so quicksave stays complete through every later step. Tests: allocation order, stale-handle rejection, and save round-trip then advance (`architecture.md` section 7).
 - [ ] **3. Generic script data in the package (additive).** D3Import adds the level script name, object script names and custom data, the `.msg` string table, and canonical sound and voice keys (package schema 12). The old Training fields stay until their steps below delete them. Test: the synthetic D3L produces these fields.
 - [ ] **4. Osiris dispatch, timers, level start.** Add `ScriptEvent`, `ObjectScripts`, the `continueChain` and `continueDefault` results, `callObjectEvent`/`callLevelEvent`/`callTriggerEvent`, and `OsirisTimers`. Add `LevelModule.trainingMission` with `EVT_LEVELSTART` (Script 000) and timer 0 (Script 002). Add the DALLAS functions those need (`aObjHide`, `aSetLevelTimer`, `aShowHUDMessage`, `aSoundPlaySteamingText`, `aToggle*PlayerControl`, `aObjSetLighting*`, `aAISetState`). Test: at the 0.1 s initial delta, the 1.0 s timer fires on the 11th frame, then `welcome.osf` plays and two HUD messages show.
