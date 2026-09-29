@@ -1,39 +1,41 @@
-# Descent 3 revival
+# Descent 3 Revival
 
-This repository is the working home for a complete Apple-native Descent 3 revival: a new Swift and Metal game, native multiplayer and replay, and an integrated creator suite capable of building and publishing new levels and campaigns. Phase 10 is the complete version 1.0 release; Phase 11 is post-1.0 visual and experiential development.
+A native Apple version of Descent 3, translated from the GPL-released C++ source into Swift 6.4 and Metal 4. You need your own retail copy of the game. A one-way importer converts it into Revival's content format.
 
-The selected product is an Apple-native semantic translation and modernization:
+**Status:** Pilot Training plays to completion on Mac. The work now moves Training onto a general game runtime, then brings up the full campaign. See [the plan](docs/revival/plan.md).
 
-- the Swift 6.4 compiler toolchain in Swift 6 language mode for host code, using Xcode 27 beta until the stable Xcode 27 release;
-- MSL and direct Metal 4 graphics;
-- Apple Silicon player applications for macOS 26+, iOS 26+ and iPadOS 26+, using Metal 4 with Apple GPU family 7 as the candidate mobile release floor pending representative release evidence, with the editor and importer remaining Mac-only;
-- one-way conversion from owned retail formats into canonical content;
-- an explicit source-faithful old/new variable-time handoff followed by one measured scheduler decision, evidence-grown behavior authoring, new saves, replay, and modern multiplayer;
-- one canonical content and world model shared by the Mac player, universal iPhone/iPad player, editor, validator and publisher, with separately owned runtime and document values;
-- no C++ runtime, OpenGL, SDL, Wine, Game Porting Toolkit runtime, native Osiris module, backward export, or original network contract.
+## Build
 
-Functional completeness is mandatory. The translation preserves reachable game and creative semantics while replacing old ABIs, platform APIs, formats, dialogs, protocols, and implementation baggage. Read [REVIVAL.md](REVIVAL.md) for the charter, [Source translation discipline](docs/revival/source-translation.md) for file accounting and the bounded fog-of-war preflight, [Functional completeness](docs/revival/functional-completeness.md) for scope, [Current implementation plan](docs/revival/current-plan.md) for the live state, next packets, blockers and ownership, and [AGENTS.md](AGENTS.md) for binding implementation rules.
+Requires Xcode 27 and an Apple silicon Mac. The apps run on macOS 26 or later.
 
-At every new phase, milestone checkpoint, dependency island, subsystem, or material code group, the team challenges the proposed boundary against the source and current evidence before implementation. This routine preflight may confirm the plan unchanged; it does not presume a defect or authorize unbounded analysis.
+```bash
+xcodebuild -project Revival.xcodeproj -scheme RevivalMac -configuration Release \
+  -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO build
+```
 
-## Repository state
+Tests, import, and more: [docs/revival/engineering.md](docs/revival/engineering.md).
 
-The repository currently contains the GPL-released [`DescentDevelopers/Descent3`](https://github.com/DescentDevelopers/Descent3) tree at pinned source commit `156cba8aafd997d27deb0902ba6026bcdcc1cfaf`, local exploratory fixes, verified retail-data tooling, and the new architecture documents.
+## Documentation
 
-The C++ tree is the systematic translation source, and the retained runnable build is one historical reference evidence source, but neither is linked into the new product. They stay through Phase 10 until every relevant source file and every runtime, campaign, editor, DALLAS and Osiris behavior, multiplayer, replay, and utility row is implemented and verified, deliberately replaced, or explicitly excluded.
+| Doc | Contents |
+|---|---|
+| [product.md](docs/revival/product.md) | What 1.0 is, what comes after, and the non-goals |
+| [plan.md](docs/revival/plan.md) | Current state, milestones, next work, and the level checklist |
+| [architecture.md](docs/revival/architecture.md) | Modules, `GameWorld`, frame order, the script runtime, saves, and intentional differences |
+| [engineering.md](docs/revival/engineering.md) | Toolchain, build and test, the work loop, review, and cleanup |
+| [sources.md](docs/revival/sources.md) | Source pins, fork corrections, retail data, and rights |
+| [history.md](docs/revival/history.md) | The first attempt (July–August 2026), and where the old docs went |
+| [AGENTS.md](AGENTS.md) | Rules for AI agents |
 
-Phase 1 establishes the `D3Import`, `RevivalMac`, universal `RevivalMobile`, and `RevivalEditor` products. `RevivalCore` and `RevivalMetal` name code-ownership boundaries whose build-target shape follows the first real code. D3Import converts the complete Training D3L into canonical content on Mac; RevivalMac and RevivalEditor establish the shared resident-world and Metal slice first, then RevivalMobile composes that proven path through UIKit without creating another implementation. One selected room is the first rendering and editing acceptance slice.
+## Repository layout
 
-Each document under `docs/revival/` declares whether it is a binding contract, an execution record, or non-normative evidence. [AGENTS.md](AGENTS.md) and the accepted contracts govern current work; the [Current implementation plan](docs/revival/current-plan.md) is the single living execution record beneath them. [Historical discovery](docs/revival/discovery.md) and the [legacy M4 build procedure](docs/revival/macos-arm64-build.md) preserve evidence without defining the product architecture.
+- `Revival/`, `Revival.xcodeproj`: the Swift products (D3Import, RevivalMac, RevivalMobile, RevivalEditor).
+- The other top-level folders (`Descent3/`, `physics/`, `scripts/`, and so on): the pinned [DescentDevelopers/Descent3](https://github.com/DescentDevelopers/Descent3) C++ tree at `156cba8a`. This is the translation source. It is not linked into the Swift products. Its own docs are [BUILD.md](BUILD.md), [USAGE.md](USAGE.md), and [CHANGELOG.md](CHANGELOG.md).
 
 ## Retail content
 
-No retail game assets are included. Original and converted retail content stays outside Git. Version 1.0 requires each user to own and import a supported prepared retail installation on Mac; RevivalMobile consumes only the transferred canonical package and therefore still requires access to that Mac conversion path. Version 1.0 does not promise raw-disc preparation, additional storefront profiles, mobile retail parsing or bundled replacement assets. The verified local source profile uses owned original CDs, Mercenary, and the official 1.4 update. See [Retail data and provenance](docs/revival/retail-data.md) and [One-way content pipeline](docs/revival/content-pipeline.md).
-
-## Historical upstream documents
-
-[BUILD.md](BUILD.md), [USAGE.md](USAGE.md), [CHANGELOG.md](CHANGELOG.md), and [THIRD_PARTY.md](THIRD_PARTY.md) describe the retained community C++ engine. They remain useful for archaeology and license provenance but do not define the Swift/Metal product workflow. [Legacy source artifacts](legacy/README.md) and retained C++ maintenance tools are likewise evidence, not Revival implementation guidance.
+No game data is included. Retail and converted content stays out of Git. See [sources.md](docs/revival/sources.md).
 
 ## License
 
-The released source is GPL-3.0-or-later as stated in its source headers. New project code derived from or translated from that source will remain compatible with GPL-3.0-or-later. Retail media keeps its original ownership and is not covered by the code license.
+GPL-3.0-or-later, as the released source. Translated code keeps that license. Retail media keeps its original ownership. See [THIRD_PARTY.md](THIRD_PARTY.md).

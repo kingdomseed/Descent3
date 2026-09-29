@@ -1,198 +1,150 @@
-# Architecture decision: native semantic translation
+# Architecture
 
-- Status: accepted, amended
-- Date: July 18, 2026
-- Authority: binding product architecture
+Status: core design. Updated 2026-09-29. It replaces the old `architecture.md`, `world-loading.md`, `behavior-system.md`, `content-pipeline.md`, `creator-suite.md`, and `adaptive-music.md`.
 
-## Decision
+Legacy line numbers refer to the pinned source `156cba8a`.
 
-Build a complete Apple-native Descent 3 game and creator suite with the Swift 6.4 compiler toolchain in Swift 6 language mode and with MSL and direct Metal 4. Use the current Xcode 27 beta for initial product work and move to stable Xcode 27 when released without retaining a Swift 6.3 compatibility path. Reach that product through dependency-ordered semantic translation of the pinned released source, keeping the native player and editor runnable together as capability moves across.
+## 1. Modules
 
-The player targets arm64 Macs running macOS 26 or later and Metal 4-capable iPhone and iPad devices running iOS or iPadOS 26 or later. Apple GPU family 7 or newer is the candidate mobile release floor pending representative floor evidence. RevivalEditor, D3Import, and dedicated no-window hosting remain macOS-only. The concrete shells use AppKit or UIKit, and the product uses MetalKit, GameController, AVFoundation, AVAudioEngine, AVAudioSession, Model I/O, Network, CryptoKit, Foundation, and OSLog directly where applicable. UIKit owns the RevivalMobile application lifecycle and is its default UI framework. SwiftUI may host a bounded current view only when it has a concrete technical or product advantage and does not introduce another `@main`, lifecycle, navigation stack, state owner, renderer path, or unnecessary bridge around the Metal game view.
+| Module (source dir) | Owns | Must not |
+|---|---|---|
+| **D3Import** | Reading every retail format. Writing the canonical package. | Be linked into a player app. |
+| **RevivalCore** | Canonical content types, `GameWorld` (all mutable game state), the object table, frame loop, physics, AI, weapons, the Osiris/DALLAS script API, level scripts, saves. | Import AppKit, UIKit, Metal, AVFoundation, or retail formats. |
+| **RevivalMetal** | The one Metal 4 renderer and MSL shaders. It draws values that Core extracts. | Hold game state. Have a second backend. |
+| **RevivalAppKit / RevivalMac** | Window, `MTKView`, display loop, input sampling, `AVAudioEngine` audio, movies, menus, HUD view, file locations, first-run import UX. | Contain game rules. |
+| **RevivalMobile** | UIKit shell (post-1.0 feature work, but kept compiling). | Read retail data. |
+| **RevivalEditor** | NSDocument creator tool (post-1.0 feature work, but kept compiling). | Have its own renderer or loader. |
 
-Shipping targets contain no C or C++ engine code, Objective-C++ bridge, Rust runtime, OpenGL renderer, SDL layer, Wine or Game Porting Toolkit runtime, Vulkan translation layer, Metal-cpp host, or native legacy module.
+Each module is currently a source folder compiled into the app targets. Split one out into a real build target only if measured build time needs it. The likely first split is `RevivalScripts` for the level scripts.
 
-That shipping boundary does not make the source incidental. The C++ tree is the default translation specification for original data flow, ordering, formulas, resource dependency discovery and lifetime, gameplay, rendering, and editor workflows until the native counterpart is verified. [Source translation discipline](source-translation.md) defines file-level accountability and deliberate modernization.
+## 2. Runtime owners
 
-The [roadmap](roadmap.md) and accepted contracts govern scope and phase order. The [current implementation plan](current-plan.md) is the single living execution-state record beneath them: it names the active slice, current blockers, next work, and developer ownership. The integration owner updates it as work lands or the active sequence changes; it cannot amend this architecture or become a competing source of product scope.
+```
+Level (immutable, canonical)  ─┐
+GameTables (immutable pages)  ─┼─►  GameWorld (struct, all mutable state, Codable = save)
+                               │        objects: ObjectTable   players   rooms (mutable parts)
+                               │        timers   goals   matcens   visEffects   levelModule   rng   clock
+GameSession (class, per app) ──┘   owns `var world`, wall clock, pause depth, input queue, presentation queue
+```
 
-## Approved iPhone and iPad amendment
+- **`GameWorld`** is a struct mutated only through `mutating` methods on one `inout` path. A Codable snapshot of it **is** the save file. An editor play-test copies it later, which costs nothing because it is a value.
+- **`GameSession`** replaces the old `PlayerSimulation` class. It holds only non-authoritative wall-clock, pause, and presentation state.
+- **`Level`** holds initial placement and geometry only. Runtime objects live in the `ObjectTable`, never in `level.objects`.
+- **`GameTables`** are the imported pages: objinfo (generic), robot, weapon, ship, powerup, sound, door, and texture.
 
-The prior rule targeted only macOS and listed iOS outside the roadmap. The user approved a binding product amendment on July 15, 2026: version 1.0 now includes one universal iPhone and iPad player while preserving the native Mac player and macOS creator product.
+## 3. Object table (translated from `object.h` and `object.cpp`)
 
-The selected replacement is a concrete UIKit `RevivalMobile` shell over the same RevivalCore, RevivalMetal, canonical package, scheduler, resident `Level`, save, replay, and multiplayer state used by RevivalMac. It is landscape-first, supports safe-area and drawable-size changes, samples touch and physical-controller input into the same explicit input value, and owns iOS/iPadOS scene, storage, audio-session, signing, and distribution behavior directly. UIKit remains the simplest default for the shell and ordinary UI. A localized SwiftUI component is allowed only under the bounded advantage rule above; converting the root shell or duplicating app state is a binding architecture change, not ordinary view implementation. This does not authorize a platform protocol, renderer backend, second loader, mobile scheduler, mobile package schema, or resident-Mac/streaming-mobile split.
+- 1,500 slots (`MAX_OBJECTS`). Keep the legacy **last-freed-first-reused** free list and allocation (`object.cpp:1605–1639`). Iterate in ascending slot order. Guide-Bot evidence already depends on exact slot numbers.
+- `ObjectHandle` is the slot plus a signature (`object.h:642–644`), with the handle count and wrap from `object.cpp:1704–1707`. `world.objects[handle]` checks the signature, so a stale handle returns `nil` (as `ObjGet`, `object.cpp:3231`).
+- `GameObject` translates `object_external_struct.h:401`: type, id, flags, name, room or terrain cell, position, orientation, size, shields, lifeleft, parent, attach, movement info, control info, AI frame, effects, weapon batteries, polymodel state, and scripts. C unions become enums with associated values. Multiplayer-only fields are dropped until P3.
 
-D3Import remains the sole legacy-format reader and remains a macOS signed helper. RevivalMobile imports only Mac-produced canonical packages through the system file picker, validates and atomically installs them through the same native-package rules as RevivalMac, and copies them into app-owned storage. The mobile version 1.0 product therefore requires access to a Mac that can perform retail conversion. RevivalEditor and dedicated no-window hosting also remain macOS-only; the mobile player still receives applicable campaign, replay, listen-host, join, and stock multiplayer capability.
+## 4. Frame order (`GameLoop.cpp` `GameFrame`, :2869)
 
-The initial mobile deployment target is iOS and iPadOS 26 or later, with Apple GPU family 7 or newer as the candidate release floor. Early target, generic-device build, simulator, and shared-path composition may proceed whenever useful. Missing physical devices, signing, or development-team setup does not block D3Import, shared Core and Metal work, RevivalMac, RevivalEditor, or any Phase 1–7 slice or phase. Required direct mobile integration begins in Phase 8; applicable multiplayer and release evidence follows in Phases 9 and 10. Before public beta or release claims Apple GPU family 7 support, the project verifies a representative floor-device matrix or raises the released floor to the oldest hardware it can support with evidence. The public distribution channel remains an evidence-gated release decision because rights, GPL obligations, App Review access to functional content, signing, regional availability, and the channel's enabled device families must be resolved without redistributing proprietary retail data. If the App Store is selected, App Store Connect availability is restricted to the approved iPhone and iPad boundary; visionOS and running the iPhone/iPad app on Apple Silicon Macs remain disabled unless separately approved and tested.
+`GameWorld.gameFrame(controls:)` runs once per frame in this order. Rendering is outside the world, except for step 13.
 
-## Decision levels
+1. `ProcessKeys` and `ProcessButtons` (:2956) → apply the input snapshot.
+2. `AIFrameAll` (:2964 → `AImain.cpp:6211`).
+3. `ObjDoFrameAll` (:2973 → `object.cpp:2926`). See the per-object order below.
+4. `DoMatcensFrame` (:2977).
+5. `Level_goals.DoFrame` (:2982).
+6. `DoorwayDoFrame` (:2987).
+7. `DoPlayerFrame` (:2992).
+8. Weather, ambient sounds, and terrain sound (:2997–3006). These emit sound requests.
+9. Level `EVT_INTERVAL` (:3013).
+10. `Osiris_ProcessTimers` (:3014).
+11. `Cinematic_Frame` (:3017).
+12. `GameProcessMusic` (:3025). This runs even when paused.
+13. Render (:3051). **The render pass feeds AI**: it produces `AI_RenderedList` and `OF_RENDERED`. So the room/portal visibility pass runs in Core, and Metal consumes its result.
+14. `ProcessNormalEvents` (:3059).
+15. `CalcFrameTime`, then `Gametime += Frametime` (:3087–3090). See the timing contract.
+16. Destroyed lights and LOD reset (:3095–3098).
 
-Three kinds of statement must not be confused:
+**Per object** (`ObjDoFrame`, ascending slots): lifeleft decrement → control (AI, weapon, explosion, debris, dying) → animation → lifeleft timeout and dead flag → movement (physics, then `ObjCheckTriggers`) → effects → special player work (fuel, secret, room damage) → object `EVT_INTERVAL` → object light. After the loop: physics-linked objects → `VisEffectMoveAll` → `ObjDeleteDead`. For each dead object, `ObjDeleteDead` (`object.cpp:2004`) informs level goals, removes inventory, sends `EVT_CHILD_DIED` to the parent, and **then** sends `EVT_DESTROY`. Keep that order.
 
-1. Product decisions define the Apple-native platform, complete game and creator scope, one-way retail boundary, rights rules, and absence of a shipping legacy runtime.
-2. Current implementation decisions select one concrete path for the next phase. They remain binding while implemented and change through a recorded amendment, not through parallel options.
-3. Research hypotheses identify questions to measure. They do not constrain production types, package schemas, or tests before evidence promotes them.
+## 5. Timing contract (ratified; keep)
 
-The resident authoritative world with source-faithful asset paging, the explicit old/new variable-time handoff, and the early shared editor/player loop are current implementation decisions. Spatial streaming and a fixed simulation tick are later hypotheses, not hidden Phase 1 requirements. The public Internet multiplayer topology is also a current research hypothesis: the product requires an affordable native Internet outcome, but no project-operated relay or service executable is preselected.
+One explicit variable-delta scheduler. No fixed-step mode.
 
-## Product and fidelity boundary
+1. Frame systems and `EVT_INTERVAL` get the **previous** `Frametime` and the **pre-update** `Gametime`.
+2. The frame-cap wait happens first. Then `CalcFrameTime` stores the **new** duration, and `Gametime` advances **before** the tail work.
+3. The initial `Frametime` is 0.1 s at static/`InitGame` time only, so a 1-second timer fires on the 11th frame.
+4. Pause, focus loss, and suspension rebase the clock with no catch-up.
+5. The display timestamp is sampled after the renderer admits the frame and before simulation.
 
-The first content track reconstructs Training, the base campaign and secrets, and Mercenary. Multiplayer, replay, a complete native creator suite, and a native mod SDK remain committed. [Functional completeness](functional-completeness.md) defines the inventory and completion rule.
+**RNG:** one authoritative stream, `state = state &* 214013 &+ 2531011`, stored in `GameWorld`. All translated code draws from it in source order, including the presentation sparks that the original also took from it.
 
-The initial translation preserves reachable behavior and structure that affect:
+## 6. Scripts (Osiris and DALLAS)
 
-- controls, flight, collision, AI, weapons, objects, goals, and campaign flow;
-- update and event order, elapsed-time use, and state transitions;
-- room, portal, terrain, visibility, lighting, material, and presentation semantics;
-- the resident level world, eager working-set paging, reachable lazy paging, and load/unload behavior;
-- editor inspection, mutation, save, validation, play, and return workflows;
-- multiplayer, replay, behavior, and utility capabilities as their phases arrive.
+### Legacy shape
 
-The translation does not preserve MFC or Win32 UI, OpenGL and SDL APIs, native module ABIs, raw memory layout, global mode switching, duplicated editor/runtime compilation, old saves or packets, page-database locks, historical defects, or backward export.
+- Each level has a script module (`scripts/<Level>.cpp`). Most of it is generated by the DALLAS editor, plus hand-written custom blocks. It calls three API layers: `DallasFuncs.cpp` (~230 `aXxx` actions and `qXxx` queries), which calls `osiris_predefs.cpp` (108 `osipf_*` functions) and `multisafe.cpp` (132 `MSAFE_*` ops).
+- The game module (`AIGame.cpp`, `AIGame3.cpp`, `generic.cpp`, `clutter.cpp`) provides default per-object scripts: Guide-Bot, thief, and robot behaviors.
+- Scope for 1.0: 27 level scripts with ~117,500 executable C++ lines and ~2,800 DALLAS scripts, plus 26,553 lines of game module. Training uses 31 distinct DALLAS functions. The campaigns use 243.
 
-Every deliberate behavior change records the source baseline, observable evidence, native choice, and verification. A modernization cannot be smuggled into a “faithful” translation without that record.
+### Native shape
 
-## Swift and Apple frameworks
+- **Engine API:** `extension GameWorld` methods translated from `osiris_predefs.cpp` and `multisafe.cpp`, with plain domain names (for example `setPortalRender(room:portal:state:doubleSided:)`). The `MSAFE_*` opcode multiplexing becomes named methods.
+- **DALLAS API:** `extension GameWorld` methods that **keep the DALLAS names** (`aObjGhostSet`, `qObjShields`, and so on), so each translation can be diffed line by line against the C++. The `dfInit`/`dfSave` state becomes `struct DallasState: Codable`.
+- **Level scripts:** a closed, compiled-in set:
+  `enum LevelModule: Codable { case none, trainingMission(TrainingMissionState), level1(Level1State), … }`, with `switch` dispatch. Every script is known at compile time. Codable gives the save for free. There is no protocol, registry, or dynamic loading.
+- **Game-module scripts:** `enum DefaultScript: Codable { case guideBot(GuideBotState), … }`, stored on the object. This replaces Osiris instance memory.
+- **Files:** `RevivalCore/Scripts/Levels/<LegacyName>.swift`, one per legacy script. A large script splits by legacy class range (`Merc3.swift`, `Merc3+Custom.swift`), each file ≤ 4,000 lines. Each file starts with its legacy source path and a GPL notice.
+- **Level-specific code lives only in these files.** Generic systems never name a level, a script, or a named object. The one exception is the `LevelModule` and `DefaultScript` case lists and their dispatch `switch` (in `Scripts/LevelModule.swift` and `Scripts/DefaultScript.swift`). They may name each script, but they contain no behavior.
 
-Swift gives the game, importer, tests, applications, and editor one language and one ownership model. Use value types and direct ownership first. Borrowing, spans, noncopyable values, explicit specialization, and small audited unsafe regions are available when release-build profiling demonstrates a need; they are not a reason to pre-optimize.
+### Dispatch (translated from `Osiris_CallEvent`, `OsirisLoadandBind.cpp:2111`)
 
-Apple's TrueType interpreter migration is useful evidence for a method—clear ownership, corpus tests, and profile-guided removal of overhead—not a performance prediction or engine template. [Primary technical sources](primary-source-index.md#swift-engine-code-and-performance) preserves that evidence and its limits.
+- Object events go to the slots in this order: custom (level module, per object) → level (by page name) → mission → default (game module). Each slot stops the chain unless it returns `continueChain`. A separate `continueDefault` result (`OsirisLoadandBind.cpp:2251`) tells the engine whether to run its own default action. For example, inventory use removes the item only when the script returns `continueDefault` (`Inventory.cpp:819`). Carry both flags.
+- An `EVT_AI_NOTIFY` first sends the derived `EVT_AIN_*` sub-event to the same slot.
+- Level events go to the one level module. Trigger events go to the trigger scripts.
+- Timers are a Codable array. Their semantics come from `Osiris_CreateTimer`, `Osiris_ProcessTimers`, and `Osiris_CancelTimer`, including `EVT_TIMERCANCEL` on object death.
+- Save/restore events are dropped, because Codable replaces them.
 
-Call Apple frameworks directly. RevivalMac and RevivalEditor own AppKit; RevivalMobile owns UIKit and AVAudioSession. A bounded SwiftUI component, when justified by a current advantage, remains hosted by that UIKit shell and receives only the state it needs. Shared code receives canonical domain values such as the input snapshot and application transition, not a generic interface whose only purpose is hiding AppKit, UIKit, SwiftUI, Metal, GameController, AVFoundation, or Network.
+The event producers to reach, with their sites: collide (`collide.cpp:2493`), damaged (`damage.cpp:1342`), destroy (`object.cpp:2040`), created and AI-init (`ObjScript.cpp:206`), AI-notify (`AImain.cpp:2992–3264`), AI-frame (`AImain.cpp:5528`), use (`Inventory.cpp:819`), change-seg (`object.cpp:3163`), doors (`doorway.cpp:293/474`), matcen (`matcen.cpp:439`), goals (`levelgoal.cpp:195/1134/1274`), player dies and respawn (`damage.cpp:770`, `Player.cpp:2472`), movies (`gamecinematics.cpp`), level start and end (`Mission.cpp:1696/1706`), and timers.
 
-## Rendering
+**Reentrancy rule:** scripts re-enter the engine and each other synchronously (`osipf_CallObjectEvent`, and the timer and destroy paths). Handlers are `static func (event, inout GameWorld)`. Read module state from the world each time. Never hold a local copy across an action call, because Swift exclusivity forbids it and the C++ always saw the latest value.
 
-Metal is the only renderer. There is no backend interface or fallback renderer. RevivalMac, RevivalMobile, and RevivalEditor all use RevivalMetal.
+### Translation volume
 
-Start by translating the original visible result and traversal through a small explicit forward pass sequence:
+A disposable, non-shipping **DALLAS translator** may convert the generated action blocks into Swift source that is reviewed and committed. It is a dev tool under `tools/`, is never linked into a product, and is deleted once the campaign scripts are done. Hand-written custom blocks are translated by hand.
 
-1. lightmapped opaque world and models;
-2. alpha and additive effects;
-3. HUD, cockpit, and interface;
-4. presentation.
+## 7. Content package, saves, and audio state
 
-Add mirrors, specular faces, scorch decals, procedural fire and water, volumetric lighting, declared blend modes, animated textures, UV sliding, destroyable surfaces, and other ledgered paths when the first source dependency and scene requires them. A complete effect inventory does not justify a render graph, generic material framework, deferred renderer, or second visibility architecture.
+- Format and rules: see the `d3-content-import` skill. It is deterministic JSON plus Apple-readable media. Each level is complete.
+- Current package schema: **11**. The Training-specific fields added in schemas 7–11 are removed in M1, and the package moves to **schema 12** with generic data: game tables, script names, object script bindings, message tables, and canonical sound, model, and texture keys.
+- Other schemas today: player save 1, continuation 7 (replaced by `GameSave` over `GameWorld` in M1), pilot profile 1, package record 1, creator project 4.
+- During development the only migration is reimport. Pre-M1 quicksaves stop loading after M1, which is acceptable because nothing has shipped.
 
-Indoor rendering begins with the released room-and-portal traversal and observable clipping rules. When the first outdoor island arrives, outdoor rendering begins with the released terrain representation, geometry LOD, and texture-segment selection with its UV, tile, and rotation behavior. Megacells are editor texture-pattern data, not an evidenced runtime LOD mechanism. Through Phase 7, representative native images and M4 profiles may support an explicit simplification while retaining the corresponding physical mobile validation for Phase 8; a missing device cannot hold the earlier island open.
+### Saves
 
-## World loading and lifetime
+- `GameSave` = Codable `GameWorld` plus the package fingerprint and the pilot. It holds only logical state: no Metal, audio, or AppKit objects, no audio buffers, and no playback positions.
+- Load validates structure once: slots and handles are consistent, room, path, and object references are in range, and floats are finite. A package fingerprint mismatch is refused with a diagnostic.
+- **Continuation contract.** A world saved at frame N, loaded, and advanced with the same inputs must match the uninterrupted world at every later frame. Test this for each state family you add (objects, AI, scripts, timers, RNG, inventory, and so on).
+- **Durable write.** Write to a temporary file in the same folder, then atomically replace. An interrupted write leaves the previous save readable.
+- Save slots, names, and thumbnails are M4 work. Quicksave and quickload use a fixed per-pilot slot until then.
 
-The production load unit is one complete canonical `Level`, matching the original D3L world boundary. In Phase 1, D3Import converts the complete Training D3L and RevivalMac and RevivalEditor first load the resulting complete canonical `Level`; RevivalMobile may compile and compose that same proven path early, while Phase 8 supplies the required direct mobile integration evidence. One selected room is only the first visible and editable acceptance slice. A synthetic one-room level may be a focused fixture but never becomes a second package or runtime mode.
+### Audio and music ownership
 
-The current implementation keeps that authoritative level world resident until exit. It starts presentation preparation with the source-evidenced `PageInAllData` working set, then permits later source-reachable assets to be prepared directly from canonical content and retained for the rest of the level. The current package contains the complete level topology and every dependency reachable through the currently translated product path. It expands when a later phase makes another path executable, rather than analyzing all Osiris, matcen, and dynamic-spawn possibilities before their work begins. The runtime never reopens retail formats, and the design does not claim that every GPU resource existed before original level activation.
+- Core emits **sound requests** (play, stop, 3D position, volume, looping, priority) and holds the **logical music state**: the current region, the pending transition, and the theme, as in `d3music.cpp` and `music/`. That logical state is part of `GameWorld` and the save.
+- RevivalMac owns the `AVAudioEngine` graph, the buffers, streaming, and playback positions. None of these are saved. On load, the music restarts from the saved logical region.
+- The sound bump and rate-limit corrections in `sources.md` apply in the request layer.
 
-Both player shells and the editor use the same dependency rules and resident presentation path. For replacement, validate the successor's canonical CPU content while the current world remains active. At the commit boundary, stop new submissions, wait for final GPU use, and release the old presentation owner before preparing the successor. Failure before commit preserves the old world; failure afterward enters a clear unloaded error state. The design does not silently require two complete GPU level sets. An iOS or iPadOS memory warning may trigger this ordinary drain-and-release path and an explicit unloaded or recoverable error; it does not create partial eviction or a second mobile lifetime mode.
+## 8. Level load and lifetime
 
-Do not add world cells, camera-demand envelopes, prefetch shells, stream blobs, LRU policy, or a resident/streaming switch. [World loading and residency](world-loading.md) defines the M4 and applicable mobile-development evidence gate after the complete playable Training Mission and its amendment rule. Before public beta or release claims the candidate Apple GPU family 7 floor, the selected lifetime path must pass representative floor evidence or the released floor must be raised. Streaming remains possible only as a measured replacement that leaves one path across platforms.
+- The load unit is one complete level, as in the original. The whole level stays resident. There is no streaming, cells, or LRU.
+- Eager working set = the `PageInAllData` set (ship, static effects and sounds, room textures, terrain, placed-object dependencies). Later-reached assets load from canonical content and stay until level exit.
+- Replacement: validate the new content on the CPU → stop submissions → wait for the last GPU use → release the old world → build the new `GameWorld` → prepare Metal resources → activate. A failure before release keeps the old world. A failure after it leaves an explicit "unloaded" error.
+- Visibility: indoor uses the translated room/portal traversal and clipping. Outdoor uses the translated terrain geometry LOD, texture-segment selection, and UV/tile/rotation. Megacells are editor data, not a runtime LOD.
 
-## Initial product and ownership graph
+## 9. Intentional differences from the original
 
-Phase 1 establishes four executable products around two required code-ownership boundaries. Work begins with D3Import, the shared ownership areas, RevivalMac, and RevivalEditor; RevivalMobile may compose proven shared work early and remains required for version 1.0, but direct physical mobile closure is deferred to Phase 8:
-
-    D3Import
-    RevivalMac     -> RevivalCore ownership + RevivalMetal ownership
-    RevivalMobile  -> RevivalCore ownership + RevivalMetal ownership
-    RevivalEditor  -> RevivalCore ownership + RevivalMetal ownership
-
-D3Import is a separate signed macOS command-line helper launched for explicit retail import. `RevivalCore` and `RevivalMetal` name dependency directions and framework exclusions; the first real code decides whether either deserves a separate build target. Phase 0 researches an affordable 2026 Internet-multiplayer topology in parallel without shaping Phase 1 code. A later service target is added only if the accepted direction requires an operable public-service boundary. Target count is an execution result, not constitutional law; RevivalMobile exists because UIKit lifecycle, touch input, sandboxed storage, audio-session, signing, and distribution form a concrete application boundary, not to host another game implementation.
-
-Each executable shell emits its own platform diagnostics directly and presents or reports structured source-linked failures returned by RevivalCore. RevivalCore may define domain error values, but it owns no logger, retained-log store, telemetry path, or upload service.
-
-### D3Import
-
-D3Import is the only shipping component that reads the supported owned retail containers and formats. It translates legacy naming, precedence, HOG, level, model, texture, lightmap, font, sound, score, movie, and related semantics into canonical native content as required by the current campaign slice.
-
-It traces the original eager `PageInAllData` working set and the lazy-page paths reached by the currently translated product path, including object initialization and later matcen or behavior-driven spawns when those paths enter the product. It writes ordinary checked canonical files for one complete `Level` and its current reachable dependency manifest; it does not mislabel the historical eager pass as complete closure, invent a room-scope production package, or require future behavior analysis early.
-
-### RevivalCore
-
-RevivalCore contains canonical content, complete level-world values, simulation, collision, objects, AI, weapons, goals, behavior state, validation, saves, replay, multiplayer state, and package rules. It imports no AppKit, UIKit, Metal, AVFoundation, or retail-format code.
-
-Start with concrete domain types and contiguous collections. The original file and global layout informs ordering and dependencies but does not dictate Swift module or type boundaries.
-
-### RevivalMetal
-
-RevivalMetal contains the concrete direct Metal renderer, resource creation, level-owned presentation lifetime, and MSL. It renders the same canonical world model for separately owned player, editor, and play-session values. It has no renderer protocol, general asset manager, or knowledge of retail formats.
-
-### RevivalMac
-
-RevivalMac owns the player application and its explicit session transitions, NSWindow and MTKView, display loop, input sampling, audio and adaptive-score presentation, movies, haptics, text input, profile and settings UI, file locations, signing, import UX, native-package intake and local-library lifecycle, operational-diagnostic presentation and retention, and level-load presentation. RevivalCore validates canonical package identity, revision, dependency and content relationships; RevivalMac stages, promotes, activates, disables, replaces, or removes packages and preserves the prior active set when intake fails. It composes RevivalCore and RevivalMetal directly.
-
-A later no-window dedicated-host mode reuses RevivalCore without initializing rendering, audio, or player UI. It is not a second simulation framework.
-
-### RevivalMobile
-
-RevivalMobile is one universal UIKit player application for iPhone and iPad. It owns `UIWindowScene` lifecycle, `MTKView`, display callbacks, safe areas and supported drawable sizes, landscape presentation, touch and physical-controller sampling, AVAudioSession configuration and interruption or route handling, mobile profile and settings UI, app-owned file locations, canonical-package selection and intake, local-library lifecycle, operational-diagnostic presentation and retention, signing, and the accepted distribution channel. It composes RevivalCore and RevivalMetal directly.
-
-The mobile shell never launches D3Import or reads a prepared retail installation. The user selects a Mac-produced canonical package through the system document picker; RevivalMobile copies it into destination-adjacent app-owned staging, applies the same hostile native-package validation and activation rules as RevivalMac, and preserves the prior active set on failure. Cancellation, revoked file-provider access, insufficient storage, background suspension, and orderly teardown have explicit outcomes. Durable install state is committed atomically before suspension; because abrupt process death may arrive without a cleanup callback, the next launch discards abandoned staging and recovers the prior active set. None of these cases creates a cloud service or second package mechanism.
-
-Touch gameplay is mandatory for the mobile version. The Phase 8 mobile input packet selects one direct native mechanism against the then-current UIKit, GameController, Metal 4, and shared `InputSnapshot` paths; `GCVirtualController` is a candidate, not a pre-implementation architecture requirement. Ordinary UIKit touch remains responsible for interface interaction unless a bounded SwiftUI component has an independently justified current role. Touch and physical-controller values feed the same explicit input snapshot. UIKit scene transitions call the same typed Core pause, resume, load, play, failure, and completion transitions as the Mac shell. Suspension clears transient input, stops presentation work, coordinates audio, and rebases time on resume without catch-up. Platform adaptations remain concrete; there is no `Platform`, `Window`, `Audio`, `FileSystem`, or `InputBackend` abstraction whose only purpose is hiding Apple frameworks.
-
-### RevivalEditor
-
-RevivalEditor begins in Phase 1 as the permanent native AppKit document application. Its first world slice derives an editable project value from the read-only canonical base, displays it with the shared Metal path, supports selection and one real edit with named undo/redo, saves and reopens, starts a disposable play-session copy through the shipping loader and simulation types, and returns to the document. “Shared world” means shared types and production paths, not one mutable instance simultaneously owned by editor and play.
-
-The editor grows slice by slice into world, terrain, game-data, behavior, campaign, presentation, baking, validation, playtest, and publishing workspaces. AppKit owns document, window, menu, undo, and accessibility behavior. Do not recreate those services with a generic reactive store, command bus, service layer, preview package system, or job framework.
-
-Add immutable snapshots and stale-result checks to the first real asynchronous editor operation that needs them. Do not prescribe a universal generation counter, fixed overlay allocation, or background-document resource protocol before the product exercises those cases.
-
-### Public Internet multiplayer
-
-The required product outcome is native LAN and Internet hosting, discovery, joining, security, and explicit failure behavior from both player products without requiring the project to operate an unaffordable always-on service. Phase 0 examines current direct, player-hosted, community-operated, platform-provided, and third-party-supported approaches, including their real reachability, privacy, abuse, deployment, continuity, and recurring-cost properties. That work is a bounded research record and creates no Phase 1 transport types.
-
-Phase 9 selects one operable topology through the [Internet multiplayer study](internet-multiplayer-study.md), then ratifies its transport, record protection, authority, prediction, outage, and operational contracts against the final simulation. Bonjour and Network remain the direct native starting point for LAN; RevivalMobile also owns the required local-network usage description, Bonjour service declarations, permission-denial recovery, and physical-device verification. The Internet path uses the native or provider boundaries selected by current evidence; CryptoKit is used only when that topology needs project-owned record protection. A service executable, relay, rendezvous system, or external integration exists only if the accepted topology needs it. The released source's 32 network/player-slot infrastructure and listen/dedicated slot accounting remain scale capabilities, while each stock mode initially preserves its source-supported player limit, including four-player campaign co-op. Dedicated no-window hosting remains a Mac-only application capability.
-
-## Execution model
-
-The runtime uses one main-owner variable-delta game and display loop. It explicitly passes the old `Frametime` and pre-update `Gametime` through systems, current procedural presentation, and future `EVT_INTERVAL` translation. It preserves the static/`InitGame` 0.1-second initialization and nested pause clock rebasing. No Swift code reads mutable global timing state.
-
-Phase 3 ratified this explicit variable-delta scheduler as the sole production model. A controlled jitter trace and bounded 120 Hz research cadence consume the same 0.25 seconds of old-delta systems time. Constant forward flight agrees within `1e-5` velocity and `3e-4` position. The carrier/contact discriminator retains the same ramp endpoint, wall identity and room while exposing the intended cadence-sensitive source feel: velocity differs by `2.575747` and lateral position by `0.2375`, inside declared `2.6` and `0.24` comparison bounds rather than being misreported as cadence invariant. The afterburner/wiggle case retains fuel within `4e-6`, velocity within `1e-4`, position within `1.6e-3`, falloff exactly and portal ownership exactly. Those cadence comparisons are sensitivity evidence, not source-native traces or a claim that every subsystem is cadence invariant.
-
-A separate ignored released-source capture supplies the source-native reference. The same 30-frame room-3 portal script and measured-delta sequence run through released C++ and the shipping Swift simulation cross into room 4 on frame 17 and first contact room 4 face 26 on frame 28. Before contact, maximum component differences are `0.001128` position, `0.006272` velocity and `0.000098` forward orientation; across the two response frames they remain within `0.092799` position, `0.136762` velocity and `0.000111` orientation. Old/new frame time, pre/post game time, fuel and wiggle falloff differ only at Float representation scale. Separate characterization tests continue to own formulas, collision outcomes, orientation, pause and old/new handoff. A fixed-step rewrite supplied no measured current benefit, would deliberately change the reached source carrier/contact result, and would require new catch-up, interpolation, input, collision and event rules, so no fixed scheduler, compatibility flag or second mode remains.
-
-The display timestamp is sampled after the renderer admits a callback by finding a reusable frame slot and obtaining the current drawable and render-pass descriptor, but before simulation, procedural updates or Metal command encoding. The newly stored duration is the actual interval between those admitted samples rather than the released post-render/post-cap tail measurement or an ideal display deadline. A callback rejected for missing presentation, slot, drawable or render-pass descriptor does not advance simulation; lifecycle and focus pauses rebase the clock and do not catch up. Future replay records and consumes the explicit selected deltas through this same model rather than introducing a fixed replay scheduler. The reached water procedural derives a canonical 60 Hz visual tick from pre-update game time and applies the maintained descendant's exact two-through-eight missed-tick replay rule; a first, discontinuous or larger-than-eight demand evaluates only the current tick. That presentation normalization is not a second simulation clock or scheduler.
-
-The main owner holds mutable game state. Each concrete player shell samples its Apple input sources into one explicit value passed into the translated step. Background work is limited to operations that actually block: import, file I/O, media conversion, resource preparation, and real editor bakes or publication. Do not add a simulation thread, actor graph, task per entity, work-stealing scheduler, or lock-free queue without a measured missed budget.
-
-## World and behavior model
-
-Use explicit domain types such as PlayerShip, Robot, Projectile, Door, Pickup, Room, Portal, and Terrain. This is not a generic ECS. Begin with the source-supported relationships and ordinary Swift functions; change layout only after a measured loop benefits.
-
-Behavior implementation starts with canonical direct typed Swift functions for the actual Training dependency chain, including generated DALLAS ranges and handwritten code. Preserve events, order, timers, variables, persistence, and engine operations required by the slice. Working evidence across generated DALLAS, handwritten/custom, timer or persistent-state, and presentation-oriented behavior selects the required version 1.0 reusable human-authored representation and its one runtime path. It is not a complete speculative VM designed before the first script runs. Broader mechanics or a later replacement executor require a concrete limitation and a new evidence-led decision.
-
-Shipping packages never contain native executable code. Creator-facing behavior authoring must provide the useful DALLAS and Osiris capabilities without their generated C++, compiler integration, DLL ABI, or unrestricted engine function table; it does not predetermine a second runtime representation.
-
-Flying AI begins by translating the released room/portal, outdoor-region, node, path, clearance, steering, and recovery semantics used by the first robot. Simplify or replace them only after observable routes and failure cases exist.
-
-## Content, saves, and compatibility
-
-The only legacy-format boundary is the macOS one-way importer. The game and editor consume canonical native content and never reach back into the retail installation. RevivalMobile consumes only a transferred canonical package. Version 1.0 requires a user-owned supported prepared retail installation and a Mac for conversion; additional source profiles, raw-media preparation, mobile retail conversion, and project-owned replacement assets are later decisions.
-
-The product writes new native projects, packages, saves, and replay. It does not import or export retail saves or demos, provide original multiplayer interoperability, load binary modules, or export D3L/HOG/editor data.
-
-Use the simplest current schemas. Add public migrations and semantic revision machinery when a released user-authored format or persistent state creates that obligation, not before. The first public native-package workflow still has an explicit hostile boundary: validate identity, rights metadata, hashes, declared dependencies, paths and bounded media before canonical construction; stage beside the destination; and atomically promote or leave the prior installed set untouched. This is a local content-library contract, not a marketplace, cloud account, automatic updater, or mandatory package-signing platform.
-
-## Licensing and data rights
-
-Project code derived from or translated from the released source remains compatible with GPL-3.0-or-later and records provenance in the source-translation ledger.
-
-Retail art, audio, movies, maps, fonts, and related media remain proprietary. Original and converted retail media stay outside Git. Replacement content requires independently established rights and provenance.
-
-## Rejected directions
-
-The project rejects:
-
-- shipping or permanently linking the C++ engine;
-- retaining OpenGL, SDL, Wine, GPTK, Metal-cpp, or an Objective-C++ bridge as a product layer;
-- a literal one-to-one Swift file/class transcription that preserves legacy boundaries;
-- a greenfield engine that ignores source ordering and behavior in favor of speculative abstractions;
-- parallel legacy/modern schedulers, loaders, renderers, world models, or editor paths;
-- prebuilding spatial streaming, a general behavior VM, a job system, ECS, render graph, asset manager, or package platform before a real slice demonstrates the need;
-- generic cross-platform abstractions or platform backends; the approved concrete AppKit and UIKit shells are product targets, not a portability framework.
-
-## Consequences
-
-The project accepts that the first native code may look closer to the source semantics than the final product. That traceability is deliberate. Once a working slice and measurements exist, refactoring can remove legacy-shaped complexity without guessing about what it did.
-
-The result remains one native implementation and product suite: Swift host code, MSL shaders, direct Apple frameworks, one renderer, one current scheduler, one current resource-lifetime path, one canonical world model, and one human-first creator application.
+| Area | Original | Revival | Why |
+|---|---|---|---|
+| Content | Reads HOG/D3L at runtime and pages lazily | Canonical package, dependencies resolved at import | One-way importer; runtime has no retail readers |
+| Saves | Binary `SaveGameState` plus script save events | Codable `GameWorld`, validated structurally at load, written atomically | Simpler; the old engine trusted its saves |
+| Opacity | Byte-truncated | `Float` | No visible loss |
+| Renderer | OpenGL/Direct3D immediate mode | Retained Metal 4 renderer, same visual contract | Platform |
+| HUD text (pre-M4) | Font-based colored text | Green monospaced text (red when low) | Temporary until the HUD port in M4 |
+| F1 help (pre-M4) | Help screen | Native alert listing the implemented controls | Temporary until the menus port in M4 |
+| Guide-Bot route | Cached CBOA/NODE tables | Route derived from reciprocal portals; a blocked same-room allocation takes the route, not the `AISR_SEES_GOAL` shortcut | Accepted correction |
+| Fixes | Known bugs | Corrections listed in `sources.md` | Adopted fork fixes |
+| Platform | Win32, SDL, DLL scripts, OpenGL | AppKit, UIKit, compiled Swift scripts, Metal | Apple-native |

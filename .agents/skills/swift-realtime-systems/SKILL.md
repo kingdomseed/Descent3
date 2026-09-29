@@ -1,104 +1,78 @@
 ---
 name: swift-realtime-systems
-description: Translate, implement, review, and profile Descent 3 timing, simulation ownership, numeric semantics, and hot data paths in direct Swift 6 without speculative concurrency or optimization machinery.
+description: Translate and implement Descent 3 frame timing, the game loop, simulation ownership, numeric fidelity, and hot data paths in direct Swift 6.4. Use for scheduler, physics, object update order, RNG, or performance work.
 ---
 
 # Swift realtime systems
 
-Transfer the current source scheduler and simulation semantics into one readable Swift implementation, then change them only through evidence. This skill is for simulation and timing work, not import, rendering, or a generic engine architecture.
+Read first: `docs/revival/architecture.md` (runtime, timing contract), `docs/revival/engineering.md`.
 
-## Authority and required reading
+## Toolchain
 
-This skill implements, and cannot amend:
+- Swift 6.4 compiler in Swift 6 language mode (`SWIFT_VERSION = 6.0`), from Xcode 27.0 release. "Swift 6.4 language mode" is not a thing: the compiler version and the language mode are separate.
+- Use 6.4 features only when they simplify a real contract:
+  - `weak let` and `~Sendable` where they state an invariant.
+  - Awaited cleanup in `defer`, and `withTaskCancellationShield`, only at import and editor async boundaries. Never in simulation.
+  - `Span`, `InlineArray`, and `UniqueArray` only after a Release profile shows a hot path.
+  - SE-0508 changed `init` accessors. Fix any source break directly.
+- Swift Testing: XCTest and Swift Testing assertions now interoperate. Use `--repeat-until` to prove or disprove a flaky timing test.
 
-- [`AGENTS.md`](../../../AGENTS.md)
-- [`docs/revival/architecture.md`](../../../docs/revival/architecture.md)
-- [`docs/revival/source-translation.md`](../../../docs/revival/source-translation.md)
-- [`docs/revival/source-translation-ledger.md`](../../../docs/revival/source-translation-ledger.md)
-- [`docs/revival/engineering-principles.md`](../../../docs/revival/engineering-principles.md)
-- [`docs/revival/test-driven-development.md`](../../../docs/revival/test-driven-development.md)
-- [`docs/revival/roadmap.md`](../../../docs/revival/roadmap.md)
-- [`docs/revival/current-plan.md`](../../../docs/revival/current-plan.md)
-- [`docs/revival/verification.md`](../../../docs/revival/verification.md)
+## Translate the game loop faithfully
 
-Use the Swift 6.4 compiler toolchain in Swift 6 language mode from Xcode 27. During the beta window, use the current Xcode 27 beta; when stable Xcode 27 ships, replace the beta toolchain and delete any beta-only workaround. Compiler version and language mode are distinct; do not call it “Swift 6.4 language mode.” Do not maintain source flags, package branches, or alternate implementations for Swift 6.3. Use `current-plan.md` to select the active Mac/shared packet, early mobile compatibility work, or Phase 8+ mobile integration without forking the simulation path.
+The primary spec is `Descent3/GameLoop.cpp` (`GameFrame`) and the systems it calls, in their order. Keep that order in the single simulation owner (`GameWorld`, see `architecture.md`).
 
-Use Swift 6.4 features only when they simplify a real contract. Awaited cleanup inside an ordinary `defer` may make cleanup clearer at an actual asynchronous import, media, or editor-operation boundary; it does not make simulation asynchronous. Iteration over noncopyable `Span` or `InlineArray` is a measured hot-path option, not the starting data model. `anyAppleOS` availability syntax does not justify a portability layer, and `@diagnose` belongs only on a real project-owned API contract. Toolchain improvements do not create work by themselves.
+Before code:
+1. Name the result, and trace its legacy entry point, callers, call order, time reads, globals, and side effects.
+2. Note only the numeric hazards actually present: evaluation order, Float32 order, truncation, signedness, sentinel values, iteration order, aliasing.
+3. Write one failing test through the production step, then implement.
 
-## Translate one observable system island
+## Timing contract (ratified; keep)
 
-Before production code:
+One explicit variable-delta scheduler. No fixed-step mode, and no second mode.
 
-1. Name the current simulation result and trace its legacy entry point, callers, order, elapsed-time reads, side effects, numeric conversions, globals, pauses, and editor-hosted path.
-2. Add every involved file and important symbol to the source-translation ledger and capture a reference trace or source checkpoint.
-3. Identify only the semantic hazards present: evaluation order, Float32 operation order, truncation, signedness, sentinel values, iteration order, aliasing, lifetime, or reentrancy.
-4. Write one focused test through the production path and observe its intended red before implementing the contract.
-5. Make the smallest direct Swift change, observe green, then simplify without changing the protected result.
+1. Frame systems and `EVT_INTERVAL` receive the **previous** `Frametime` and the **pre-update** `Gametime`, passed explicitly.
+2. The frame-cap wait happens at the source point.
+3. `CalcFrameTime` stores the **new** duration after the wait.
+4. `GameFrame` advances `Gametime` by the new duration **before** the remaining tail work.
+5. The initial `Frametime` is 0.1 s at static/`InitGame` time only, not on every level reset.
+6. Nested `StopTime`/`StartTime`, focus loss, and suspension rebase the monotonic clock. There is no catch-up delta.
+7. The display timestamp is sampled after the renderer admits the frame (drawable ready) and before simulation. A rejected frame does not advance the simulation.
 
-Do not translate files alphabetically, create a Swift file per C++ file, or build a layer of compiling stubs. Finish the checkpoint selected for the dependency island through every shell applicable to that checkpoint. Through Phase 7, a Mac/shared timing packet closes without a separate mobile gate; early mobile builds or simulator checks prove only their reached compatibility wiring. Phase 8 integrates the same simulation implementation with physical mobile input and lifecycle. Missing devices, signing, or development-team setup cannot hold Phase 1–7 open.
+No system reads a mutable global time, input, or mode. Pass time and one `InputSnapshot` through the owner.
 
-## Current timing contract
+Weapon fire cadence uses the corrected rule in `sources.md` (inclusive readiness, overshoot kept only within one continuous burst). Check it against this timing contract.
 
-The first scheduler is one explicit variable-delta implementation, not a compatibility mode:
+## Random numbers
 
-1. Frame systems and `EVT_INTERVAL` receive the previous `Frametime` and pre-update `Gametime` explicitly.
-2. Frame-cap waiting occurs at the source-supported point.
-3. `CalcFrameTime` measures and stores the new duration after the wait.
-4. `GameFrame` advances `Gametime` with that new duration before the remaining source-ordered tail work.
-5. The static and `InitGame` initialization value is 0.1 seconds; do not silently apply it to every level reset.
-6. Nested `StopTime` and `StartTime`, focus loss, suspension, and resume rebase the monotonic clock without a giant catch-up delta.
-
-No system reads mutable global `Frametime`, `Gametime`, input, or function-mode state. Pass the prior-frame elapsed value, pre-update game time, and one input snapshot directly through the single simulation owner.
-
-A controlled monotonic-clock seam is allowed because production crosses that nondeterministic boundary. Keep it smaller than the timing behavior; it is not a scheduler protocol, dependency-injection container, or alternate runtime mode.
-
-Phase 3 captures flight, collision, input ramps, interval events, animation, pause, and editor-play traces, then makes one formal decision: ratify bounded variable delta or translate all current consumers to one fixed tick and delete the variable scheduler. Never ship both. Fixed 120 Hz, catch-up limits, interpolation, and replay determinism are not Phase 1 facts.
+One authoritative simulation RNG: the released `state = state &* 214013 &+ 2531011` LCG. It is seeded by the simulation and saved with the game. Keep the original coupling between presentation and gameplay random calls unless `architecture.md` lists a difference.
 
 ## Numeric fidelity
 
-- Use finite `Float32` where the source semantics and Metal-facing values require it. Convert a higher-resolution platform duration at the evidenced boundary rather than casually spreading `Double` through translated formulas.
-- Preserve observable operation and update order before optimization. Record a deliberate difference before reassociation, fused operations, changed rounding, alternate accumulation, or collection reordering.
-- Reject NaN, infinity, malformed indices, and impossible enum or reference values when untrusted data becomes canonical. Trusted simulation code relies on those invariants instead of repeating defensive branches.
-- Do not depend on `Dictionary` or `Set` iteration order for observable behavior.
-- Do not invent fixed-point math, a deterministic-math library, semantic numeric versions, or exact whole-world hashes before the final scheduler, replay, or multiplayer evidence requires them.
+- Use `Float` (Float32) where the original does. Convert platform `Double` durations at the boundary.
+- Keep operation order. Record any deliberate change to rounding, fusing, or accumulation.
+- Reject NaN, infinity, and bad indices when data becomes canonical. Trusted code does not re-check.
+- Never depend on `Dictionary` or `Set` order for behavior.
 
-## Direct ownership and data
+## Ownership and data
 
-- Keep one mutable simulation owner and direct source-ordered calls.
-- Start with structs, enums, free functions, `ContiguousArray`, and readable array-of-structs storage. Use classes only for framework objects or genuine shared identity.
-- Give stable IDs only to values whose identity must survive collection movement, editor selection, persistence, or references.
-- Keep Metal, AppKit, UIKit, audio, and retail-format objects outside canonical simulation, save, replay, and network values.
-- Use Swift concurrency for real blocking I/O, import, media conversion, and measured long editor work. Pass immutable inputs and add cancellation or stale-result rejection at the first operation that can actually race.
+- One mutable simulation owner. Direct calls in source order.
+- Structs, enums, free functions, `ContiguousArray`, array-of-structs. Use classes only for framework objects or real shared identity.
+- The object table follows `object.h`: handle = index plus signature. Do not add a new identity system.
+- No Metal, AppKit, UIKit, or audio objects in simulation or save values.
+- Concurrency only for blocking I/O, import, media, and long editor jobs.
+- Do not add: actors per entity, a simulation thread, a job system, ECS, an event bus, dependency injection, a custom allocator, or protocols with one implementation.
+- Do not use `@unchecked Sendable`, `nonisolated(unsafe)`, `Unmanaged`, unsafe pointers, or forced inlining without a measured need, a written invariant, and a test.
 
-Reject an actor graph, actor or task per entity, simulation thread, lock-free queue, work stealing, job system, ECS, event bus, dependency-injection framework, generic scheduler, custom allocator, or protocol around one implementation. Strict concurrency is a correctness check, not a reason to make the simulation concurrent.
+## Verify and profile
 
-Do not use `@unchecked Sendable`, `nonisolated(unsafe)`, unchecked continuations, `Unmanaged`, unsafe pointers, `unsafeBitCast`, forced inlining, specialization attributes, or unchecked optimization to silence diagnostics or speculate about speed. A measured hot path may earn the smallest such mechanism only with a written invariant, focused red/green protection, an optimized before/after profile, and independent review.
+- Controlled-clock tests: previous-`Frametime` use, post-cap storage, `Gametime` advance order, 0.1 s init, and pause rebasing.
+- Characterization tolerances used so far: exact, 1e-6, 1e-5, 2e-4, 1e-3. The room 3 → 4 flight replay matches the C++ reference (crossing at frame 17, contact with room 4 face 26 at frame 28).
+- Profile only Release builds on the M4, with Instruments. In Swift host code, look for `memmove`, copy-on-write copies, retain and release traffic, exclusivity checks, unspecialized generics, and closure allocation. These are leads, not proof of a defect.
+- Review by Codex (see `engineering.md`, section 6).
 
-## Verification and profiling
+## Sources
 
-Focused controlled-clock tests cover one contract at a time:
-
-- old `Frametime` and pre-update `Gametime` consumption;
-- post-cap measurement, new-duration storage, `Gametime` advance, and tail order;
-- 0.1-second initialization at its actual entry points;
-- nested pause and resume rebasing;
-- the current input, flight, collision, portal, interval, timer, or animation trace.
-
-Record the exact red command and intended failure, green command and pass, affected suite, reference input, tolerances, and every deliberate difference. Tests exercise the shipping simulation step; do not test an imitation or add product visibility solely for tests.
-
-Profile only optimized builds on the recorded M4 for applicable Mac/shared claims and, beginning with Phase 8, on physical iPhone and iPad development hardware for affected mobile claims. Measure the representative update path, allocations, copies, retain/release work, collection layout, and CPU budget with Instruments. Change the smallest responsible function or storage only after a reproducible missed budget or regression, then rerun functional evidence and the same profile on every affected reference device. Unavailable mobile hardware, signing, or development-team setup does not block a Phase 1–7 timing packet. Exact support-floor certification remains public-beta or release evidence. Zero allocations, `Span`, `InlineArray`, noncopyable types, borrowing, and layout changes are possible measured conclusions, not starting architecture.
-
-When a profile attributes time to Swift host code, inspect unexpected `memmove`, copy-on-write copies, `swift_retain`, `swift_release`, `swift_beginAccess`, `swift_endAccess`, unspecialized generic calls, protocol witness dispatch, and closure or task allocation. Their presence is a lead, not a defect. Swift 6.4 `PerformanceHints` may be enabled as warnings during the focused investigation; do not turn them into project-wide errors or abstraction bans.
-
-Run `rtk git diff --check` for every change. Once targets exist, use the exact focused `rtk swift test` or `rtk xcodebuild` invocation and record what it proves; do not invent a generic scheme or hide results behind a wrapper.
-
-## Primary method sources
-
-Use the maintained [Primary technical source index](../../../docs/revival/primary-source-index.md#swift-engine-code-and-performance) before repeating web research. It records why each source matters and what it cannot prove.
-
-- Apple, [Xcode releases and Swift compiler/language-mode matrix](https://developer.apple.com/support/xcode), [Xcode 27 release notes](https://developer.apple.com/documentation/xcode-release-notes/xcode-27-release-notes), and [What's new in Swift 6.4](https://developer.apple.com/swift/whats-new/)
-- Swift.org, [current installation and snapshot status](https://www.swift.org/install/macos/) and the [Swift 6.4 release process](https://forums.swift.org/t/swift-6-4-release-process/85421)
-- Swift compiler documentation, [Language mode and tools version](https://docs.swift.org/compiler/documentation/diagnostics/error-in-future-swift-version/)
-- Apple, [Adopting strict concurrency in Swift 6 apps](https://developer.apple.com/documentation/swift/adoptingswift6)
-- Apple, [Explore Swift performance](https://developer.apple.com/videos/play/wwdc2024/10217/) and [Improve memory usage and performance with Swift](https://developer.apple.com/videos/play/wwdc2025/312/)
-- Swift.org, [Swift at Apple: Migrating the TrueType Hinting Interpreter](https://www.swift.org/blog/migrating-truetype-hinting-to-swift/), useful for source-equivalent outputs, direct ownership, corpus evidence, and profile-guided optimization. Its interop bridge, coverage ratio, numeric design, unsafe regions, spans, and performance result are not requirements or predictions for this game.
+- [Swift 6.4 released](https://www.swift.org/blog/swift-6.4-released/)
+- [Xcode 27 release notes](https://developer.apple.com/documentation/xcode-release-notes/xcode-27-release-notes)
+- [Adopting strict concurrency in Swift 6 apps](https://developer.apple.com/documentation/swift/adoptingswift6)
+- WWDC24 [Explore Swift performance](https://developer.apple.com/videos/play/wwdc2024/10217/), and WWDC25 [Improve memory usage and performance with Swift](https://developer.apple.com/videos/play/wwdc2025/312/)

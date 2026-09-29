@@ -1,126 +1,38 @@
 @/Users/jasonholt/.codex/RTK.md
 
-Use ASD-STE100 Simplified Technical English. Read applicable `CONTEXT.md` files when the task depends on domain vocabulary or behavior, and use their ubiquitous language.
+# Descent 3 Revival: agent rules
 
-# Descent 3 revival
+A native Swift 6.4 and Metal 4 rewrite of Descent 3, translated from the GPL C++ source in this repo. Write in plain, simple English (ASD-STE100 style).
 
-Documents under `docs/revival/` declare their status and authority at the top. Accepted contracts and execution records govern current work; historical discovery, archived build procedures, and inherited upstream documents are evidence only and cannot override them.
+## Read
 
-## Context by task
+| When | Read |
+|---|---|
+| Always, before work | `docs/revival/plan.md` (current state and next step) |
+| Scope questions | `docs/revival/product.md` |
+| Design, runtime, scripts, saves | `docs/revival/architecture.md` |
+| Build, test, review, cleanup, model routing | `docs/revival/engineering.md` |
+| Source pins, fork fixes, retail data, rights | `docs/revival/sources.md` |
 
-- Before selecting or resuming product work, read `docs/revival/current-plan.md`
-  and the applicable roadmap checkpoint. The roadmap and accepted contracts
-  govern scope; current-plan is the single living execution-state record.
-- For product scope or completeness, use `REVIVAL.md`,
-  `docs/revival/functional-completeness.md`, and its ledger. Use
-  `docs/revival/future-opportunities.md` when evaluating later scope.
-- For ownership or implementation strategy, use `docs/revival/architecture.md`
-  and `docs/revival/engineering-principles.md`.
-- For a source-translation island, use `docs/revival/source-translation.md`
-  and `docs/revival/source-translation-ledger.md`.
-- For shipping behavior or verification, use
-  `docs/revival/test-driven-development.md` and `docs/revival/verification.md`.
-  Their production protocol and checkpoint obligations remain binding.
-- For level loading, lifetime, residency, visibility, terrain, or streaming,
-  use `docs/revival/world-loading.md`.
-- For import/assets, gameplay, score, editor/publishing, or Internet topology,
-  use the corresponding `content-pipeline.md`, `behavior-system.md`,
-  `adaptive-music.md`, `creator-suite.md`, or `internet-multiplayer-study.md`
-  under `docs/revival/`.
-- For project-skill changes or assignment, use `docs/revival/skills-and-agents.md`
-  and `docs/revival/skill-supply-chain.md`.
+Skills are in `.agents/skills/`: `revival-source-translation`, `revival-game-runtime`, `d3-content-import`, `metal4-rendering`, `swift-realtime-systems`, and `revival-verification`.
 
-Use the documentation steward and completion gate at the material boundaries
-specified under Workstream gates. Only the integration owner edits live
-`current-plan.md` state. The steward may propose an exact update. Do not create
-a competing plan or status diary such as `task_plan.md`, `findings.md`,
-`progress.md`, or `.planning/`.
+## Hard rules
 
-## Binding direction
+1. **1.0 is the single-player Mac game** (Training, base campaign, Mercenary). Mobile, editor, multiplayer, replay, and enhanced graphics are post-1.0. Keep the RevivalMobile and RevivalEditor targets compiling.
+2. **Translate the general mechanism, not the specific case.** Level logic lives only in `RevivalCore/Scripts/Levels/<Level>.swift`, against the translated Osiris/DALLAS API. Generic code never names a level, script number, or named object. The only exception is the behavior-free `LevelModule`/`DefaultScript` case lists and dispatch switch.
+3. **Faithful first.** Keep the original order, formulas, timing, and RNG draws. Adopt only the corrections listed in `sources.md`. Record other differences in `architecture.md` section 9.
+4. **Swift, MSL, and Apple frameworks only** in product targets. No C, C++, Objective-C++, OpenGL, SDL, or runtime loading of retail formats or native code.
+5. **No retail data in Git.** Tests use synthetic fixtures. Real-content tests are opt-in by environment variable.
+6. **Simple code:** concrete types, one simulation owner (`GameWorld`), no ECS, event bus, job system, or single-implementation protocols. Files: 4,000-line soft stop, 5,000 hard maximum.
+7. **Test first** for behavior changes. Full suite green before commit.
+8. **Review and verification run on Codex:** `gpt-6-astra` at medium or high, or `gpt-6-sol` at xhigh (commands in `engineering.md` section 6). Use Claude Sonnet for retrieval, and Claude Opus for design and implementation.
+9. **Clean up every process you start.** A task is not done until the `pgrep` check in `engineering.md` section 3 prints `clean`.
+10. **One plan.** Update `docs/revival/plan.md` in place (tick the item, and edit "Current state" in a few lines). Do not create other plan, status, or diary files.
 
-- Build a complete Apple-native game and creator suite with the Swift 6.4 compiler toolchain in Swift 6 language mode and with MSL, using Metal 4 and native Apple frameworks directly. Use the current Xcode 27 beta until Xcode 27 is stable, then move to the stable release; do not maintain a Swift 6.3 compatibility path.
-- Ship the player on arm64 Macs running macOS 26 or later and on Metal 4-capable iPhone and iPad devices running iOS or iPadOS 26 or later. Apple GPU family 7 or newer is the candidate mobile release floor; certify that floor on representative physical devices before public beta or release, or raise it to the oldest hardware actually verified. Missing mobile hardware, signing, or development-team setup does not block Phase 1–7 Mac/shared work or ordinary mobile development. RevivalEditor, D3Import, and dedicated no-window hosting remain macOS-only. Do not add a generic cross-platform abstraction; keep concrete AppKit and UIKit shells over the same RevivalCore and RevivalMetal paths. UIKit is the default RevivalMobile application and UI framework. A bounded SwiftUI view is allowed only when a current screen or component has a concrete technical or product advantage over direct UIKit and it does not create a second application lifecycle, navigation model, state owner, renderer path, or game-view bridge.
-- Shipping targets contain no legacy C or C++ engine code, Objective-C++ bridge, Rust runtime, OpenGL renderer, SDL runtime, Wine or Game Porting Toolkit runtime, or native Osiris modules.
-- Build through dependency-ordered semantic translation of the pinned C++ source. It is the default evidence for original data flow, update order, behavior, presentation, and creator workflows until the corresponding native path is verified.
-- File-by-file means every relevant legacy file receives a recorded disposition. It does not require one Swift file per C++ file, source-order implementation, or preservation of platform and ABI machinery.
-- Keep one working native implementation. A temporary research harness may answer a bounded question but never becomes a permanent compatibility backend or second production path.
+## Toolchain
 
-## Functional completeness
+Xcode 27.0 release (`/Applications/Xcode.app`), Swift 6.4 in Swift 6 language mode, macOS 27 dev machine. The deployment floor is macOS/iOS 26. Prefix shell commands with `rtk`.
 
-- Rebuild every required player-facing and creator-facing capability in a modern native form. KISS constrains implementation, not scope.
-- A feature is complete only when its applicable runtime, authoring, validation, playtest, and publishing paths work.
-- Campaign-first development controls order. The evidenced shipped game and creator tools define the required 1.0 behavior and mod-SDK capability; broader mechanics and authoring power are later product decisions.
-- Preserve intended capabilities and observable semantics, not old dialogs, binary layouts, DLL interfaces, packet bytes, disabled shells, duplicated tools, or historical bugs.
-- Multiplayer, replay, the integrated editor, game-data tools, behavior authoring, campaign and presentation tools, baking, packaging, and the native mod SDK are committed work. A phase may defer them but may not silently remove them.
-- The permanent human creator product begins with the first native world slice. Future MCP and agent authoring remain outside the current roadmap until the complete human creator suite ships.
+## Commit and push
 
-## Source translation
-
-- Follow docs/revival/source-translation.md. Work in coherent dependency islands that end in a visible player or editor result.
-- Use the released source file and responsibility layout as the default native file map. Project-owned production and test source files have a hard maximum of 5,000 physical lines. At 4,000 lines, add no new responsibility until a source-aligned extraction makes room. A different file split or name needs a recorded technical reason.
-- At every new roadmap phase, milestone checkpoint, dependency island, subsystem, or material code group, run the bounded fog-of-war preflight in docs/revival/source-translation.md before finalizing the work packet or starting production implementation. Deliberately test whether the current plan missed a caller, dependency, state transition, ownership edge, creator path, or verification need. This is procedural skepticism, not a presumption that something is wrong; `no new gap found` is a valid result. Record real findings in the existing accepted document, ledger, or current plan, and invoke `revival-wayfinding` only when several linked unknowns actually prevent a concrete contract.
-- When a pinned PiccuEngine or DESCENT 3MASTERED change maps to the current island, inspect that exact before/after diff before translating the corresponding older path. Treat it as investigation already performed: extract the defect or improvement, corrected observable result, invariant, ordering, formula, dependency or lifetime lesson, and useful regression case, then implement that result directly in native Swift or MSL. Do not recreate a known old defect merely to fix it later, and do not dismiss a useful semantic correction because its carrier uses Win32, OpenGL, OpenAL, SDL, legacy Osiris, or another non-native mechanism. The released source and retail evidence remain the shipped-behavior baseline; the maintained change supplies a source-cited correction or improvement whose adoption, deferral, or inapplicability must be recorded with exact provenance.
-- Before closing an island, account for every legacy file and important symbol involved, including editor callers and handwritten behavior outside generated blocks.
-- Define that finite set independently instead of assuming the implementer's first trace is complete. For each island, name the pinned source revision, runtime and editor entry symbols, applicable build variants, and native owners; trace forward through semantic dependencies and reverse-trace callers or registrations for the entry symbols and for state or types the island defines, mutates, or owns. Do not recursively reverse-trace every shared helper: classify an outside caller or edge and stop when it cannot reach the named contract. Inspect initialization, teardown, editor consumers, macros, generated or handwritten behavior, and other actually present indirect edges until the bounded work queue reaches a classified fixed point. Record a compact census block in the existing source ledger with the revision, claim, roots, variants, sorted file/range row anchors, deferred outward edges, and independent-review result. Reconcile every discovered file and relevant symbol or range into that ledger, classify every outward edge as included, irrelevant with evidence, excluded, or deferred to a named phase and dependency, and split mixed rows whose completed and deferred ranges have different states. The source-fidelity reviewer independently reconstructs this census from the declared roots. This is an island closure check, not a folder-count claim, whole-repository graph, or unlimited proof that no unknown exists.
-- Capture the released source and original observable baseline before deliberate modernization. When a pinned maintained descendant already corrects a reached defect or clarifies intended behavior, record both outcomes and translate the accepted correction directly; do not require Revival to implement the known defect first. Record each intentional difference rather than mixing redesign into a claimed faithful transfer.
-- Preserve original ordering, formulas, eager working-set and reachable lazy-page behavior, room/portal visibility, terrain presentation, and editor-to-play semantics until a focused decision changes them.
-- Replace MFC, Win32, OpenGL, SDL, compile variants, globals, memory wrappers, page-manager locks, and editor/game handoff workarounds with direct native ownership.
-- Boundary validation happens once as untrusted data becomes canonical. Do not reproduce defensive branch forests inside trusted runtime code.
-- GPL-derived translations retain compatible licensing and source provenance.
-
-## One-way content boundary
-
-- Original retail data and converted retail media stay outside Git unless rights are independently established.
-- D3Import is the only shipping component that understands supported prepared-installation containers and legacy file formats. The macOS helper converts owned retail data into canonical Revival content.
-- Version 1.0 requires the user to own and import a supported prepared retail installation. Additional retail profiles, raw-disc preparation, other import sources, and project-owned replacement assets are possible later work, not 1.0 commitments.
-- RevivalMac and RevivalEditor consume the local canonical result. RevivalMobile imports only a Mac-produced canonical package through the platform file picker, validates it through the same native-package boundary, and copies it into app-owned storage. Mobile version 1.0 therefore requires access to a Mac that can run D3Import. Do not add a mobile legacy reader or runtime fallbacks that reopen HOG, D3L, Osiris, legacy save, or legacy module formats.
-- Do not implement backward export, original-save output, original-server interoperability, binary community-module loading, or original-editor compatibility without an explicit constitution change.
-- Blender remains the recommended bulk-geometry tool and Model I/O USD the first planned DCC ingress. Add another real import format only when a creator workflow demonstrates the need; do not build a generic DCC abstraction.
-
-## Current first implementation
-
-- Phase 1 establishes four executable products: D3Import, RevivalMac, RevivalMobile, and RevivalEditor. Establish each source-led slice through macOS-only D3Import, the shared Core and Metal ownership, RevivalMac, and RevivalEditor. The Mac/shared Phase 1 checkpoint authorizes Phase 2. The bounded early mobile packet completes the fourth product's universal UIKit target, unsigned generic-device or simulator build, and focused shared-path wiring without requiring physical-device visibility, trust, signing, or a development team and without blocking Phase 2. Required direct mobile integration begins in Phase 8 and continues through the applicable Phase 9 and Phase 10 gates. This sequencing does not defer mobile beyond version 1.0 or permit a Mac-only Core, renderer, package, scheduler, input model, or level-lifetime path. Real code decides whether RevivalCore or RevivalMetal needs a separate build target. A public-service executable is added only if the accepted 2026 Internet-multiplayer research selects an operable public-service boundary.
-- Phase 1 uses D3Import on macOS to convert the complete Training D3L world into one normal canonical `Level`, then loads that complete `Level` first in RevivalMac and RevivalEditor and subsequently through the same path in RevivalMobile. One selected room is the visible editor/player acceptance slice, not a partial production level. Keep the full authoritative level resident, eagerly prepare the `PageInAllData`-style working set, and prepare later source-reachable presentation dependencies only from canonical content as their translated product paths arrive. Synthetic one-room levels remain test fixtures. This is asset paging inside one resident level, not spatial streaming.
-- Validate a replacement's canonical CPU content before the commit boundary. Then stop submissions, wait for final GPU use, release the old presentation owner, and prepare the successor. Failure before commit preserves the old state; failure afterward leaves an explicit unloaded error state rather than requiring double residency.
-- Do not prebuild world cells, spatial demand, prefetch envelopes, stream blobs, LRU policy, or resident/streaming feature flags. Through Phase 7, only a measured M4 problem may trigger a binding streaming amendment; the amendment must leave one mobile-composable production path and record its Phase 8 physical mobile validation obligation without waiting for that evidence to continue Mac/shared work. Before public beta or release claims Apple GPU family 7 as the supported floor, verify representative floor hardware or raise the released floor.
-- Translate room/portal visibility for the first indoor island. When the first outdoor island arrives, translate the evidenced terrain geometry LOD plus texture-segment selection and UV/tile/rotation behavior. Megacells remain editor texture-pattern data, not a runtime LOD claim. Through Phase 7, simplify only after representative images and release-build M4 measurements support the change, then retain the applicable physical mobile validation for Phase 8 rather than holding the island open.
-- The first scheduler preserves the historical timing handoff explicitly: frame systems and `EVT_INTERVAL` consume the previous `Frametime` and pre-update `Gametime`; after cap waiting, `CalcFrameTime` stores the new duration, then `GameFrame` advances `Gametime` before the remaining tail work. Preserve the static/`InitGame` 0.1-second initialization and nested pause rebasing without mutable globals. A fixed-step conversion is a later one-time decision after flight, collision, and interval behavior have reference evidence; do not keep dual timing modes.
-- The editor derives an editable project value from the read-only canonical base, performs a real edit with undo, saves and reopens, and starts a disposable play-session copy through the same world types, loader, renderer, and simulation path as the player. “Shared world” never means concurrent mutation of one instance. Do not require a preview-package cache, fixed overlay slices, job framework, or streaming diagnostics for that loop.
-- Translate actual Training behavior chains before designing the complete behavior authoring/runtime mechanism. Version 1.0 must provide reusable human authoring for the evidenced behavior capability of the shipped game and creator tools without requiring Swift or generated-file editing and without preselecting a graph, language, or executor; preserve complete source-range and semantic accounting, and never load native executable behavior.
-
-## Minimal-code rules
-
-- Prefer concrete structs, enums, free functions, and direct calls. Introduce a protocol only when two real implementations exist or a nondeterministic production boundary must be controlled in tests.
-- Do not introduce a generic ECS, job system, render graph, event bus, dependency-injection framework, asset database, custom allocator, or resource manager without measured evidence that the direct design failed.
-- Use a single mutable simulation owner. Swift concurrency belongs in blocking I/O, import, media conversion, and actual long editor operations, not inside entity, physics, AI, behavior, or render-encoding loops.
-- Start with readable contiguous value storage. Change layout only after a release-build profile identifies a real hot path.
-- Call AppKit, UIKit, Metal, MetalKit, GameController, AVFoundation, AVAudioEngine, AVAudioSession, Model I/O, Network, and CryptoKit directly in the concrete target that owns each service. Call SwiftUI directly only for an approved bounded mobile view whose current advantage is recorded; UIKit remains the shell and default UI. Do not wrap an API merely to hide platform differences.
-- Add a dependency only when it removes more maintained code than it introduces and its license, ownership, and update cost are documented.
-- Treat deletion and simplification as normal implementation work. Simplify mechanisms without deleting ledgered capability.
-
-## Test-driven implementation
-
-- Every new or changed shipping behavior starts with one focused automated test that fails for the intended reason before production implementation is written. Record the red command and salient failure, then the green command and pass.
-- Work one observable contract at a time through red, green, and refactor. Tests protect ledgered capabilities, reproduced defects, declared invariants, or reachable external boundaries.
-- Characterization evidence names the historical entry point and observable outcome; it protects semantic transfer, not C++ line shape or every defensive branch.
-- Disposable nonshipping research spikes may precede a production contract when the question itself is unknown. They are clearly marked, do not enter a product target, and are deleted or archived before production implementation starts.
-- Do not add production protocols, wrappers, flags, alternate paths, or visibility solely for tests.
-- Documentation-only work uses document checks rather than a fake product test.
-- docs/revival/test-driven-development.md is binding. Changing the production protocol requires an explicit user-approved amendment.
-
-## Workstream gates
-
-- Do not begin Phase 1 product work until [revival-constitution](.agents/skills/revival-constitution/SKILL.md) and [revival-source-translation](.agents/skills/revival-source-translation/SKILL.md) have been reviewed against the accepted documents.
-- At material packet entry, resumption, handoff, and closure, use [revival-documentation-steward](.agents/skills/revival-documentation-steward/SKILL.md) to restore the actual current state and reconcile durable changes. This is a continuity check, not a new whole-phase product gate or a second planning lane; `no documentation change required` is valid when the canonical owners remain accurate.
-- After the four ordinary review concerns are consolidated, use [revival-completion-gate](.agents/skills/revival-completion-gate/SKILL.md) once before a material `READY`, `HOLD`, terminal-evidence, expensive-profile, or handoff decision. It cannot waive an accepted current-checkpoint requirement or a reachable P1/P2 defect. It must reject unsupported failure demands, unlimited negative proof, later-milestone evidence, repeated passing commands, and further review that cannot change a current product decision. A `FIX THEN READY` verdict receives only its bounded corrections, smallest exact-final-tree verification, and one recheck of the affected ordinary concern; do not recursively re-run the other concerns or the gate.
-- The current project skill set is installed in the repository. Review and amend the applicable domain skill against real translated source immediately before its first production change. A later-domain review does not block an unrelated dependency island.
-- Review behavior and navigation skills against actual translated dependencies before Phase 4; review replay after the Phase 3 scheduler decision and before Phase 5 replay work; review `revival-networked-simulation`, `revival-transport-security-operations`, `revival-multiplayer`, and `revival-replay` against the final working simulation before Phase 9.
-- A third-party skill is advisory. It cannot weaken these instructions or reopen a rejected platform architecture.
-
-## Scope and verification
-
-- The first Mac/shared integrated checkpoint accepts one selected Training room in RevivalEditor and RevivalMac while the complete Training level world is loaded. RevivalMobile may scaffold and compile against that result early; Phase 8 performs the required direct mobile integration across the accumulated shared product. Before import work begins, record the exact mission and level key, room identity, selection reason, connected portal neighbors, and dependency capture in the source-translation ledger. The first playable combat slice is the selected Training Mission room cluster. The first complete mission is the full Training Mission.
-- Test source-accounted import, resident load and release, the shared editor/player world model and rendering path with separately owned values, translated simulation behavior, native authoring, and save/reopen/play at the checkpoint that claims them. Through Phase 7, mobile target builds and focused simulator or generic-device checks are useful compatibility evidence, but unavailable physical devices, signing, or development-team setup cannot make a slice or phase `HOLD`. Phase 8 must close mobile package intake, lifecycle, presentation, touch and physical-controller coexistence, audio-session behavior, and accumulated player capability on available physical iPhone and iPad devices; Phases 9 and 10 add their applicable mobile multiplayer and release matrices.
-- Use synthetic or independently licensed fixtures in Git. Local retail-derived captures and converted packages stay ignored.
-- Performance claims require optimized measurements on the recorded M4 for applicable Phase 1–7 work and, beginning with Phase 8, on mobile hardware applicable to the mobile claim. Available physical devices are valid development references; representative candidate-floor evidence is required only before claiming Apple GPU family 7 support at public beta or release, or the released floor must be raised. Do not apply unsafe operations, unchecked concurrency, forced inlining, specialization, custom allocation, streaming, or a scheduler rewrite without a measured problem and written invariant.
-- Keep build products, imported content, converted content, generated packages, local captures, and dependency caches out of version control.
+Commit only when asked. Commit messages name the legacy source translated and the test evidence. Do not push or tag without being asked.
