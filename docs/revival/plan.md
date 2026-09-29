@@ -6,12 +6,12 @@ Keep this file short. When you finish an item, tick it and edit "Current state".
 
 ## Current state
 
-- **Milestone:** M1, Runtime foundation. Steps 1, 1b, and 2 are done (step 2 is uncommitted, pending review). M0 (reset) is done on branch `revival/replan-2026-09`.
+- **Milestone:** M1, Runtime foundation. Steps 1, 1b, and 2 are done. Next: step 2b. M0 (reset) is done on branch `revival/replan-2026-09`.
 - **Game today:** Training is playable to completion in RevivalMac from imported content. Flight, collision, timing, the indoor Metal renderer, Guide-Bot, Training scripts, pause, HUD text, quicksave, F1 help, and pilot profiles work. Each Training script is a bespoke Swift type, with no general object or script runtime. M1 fixes that.
 - **Code:** ~42.7k Swift lines in `Revival/Sources` and ~45.1k in `Revival/Tests`, most of it still Training-specific. All mutable state is in `GameWorld` (objects in `ObjectTable`), owned by `GameSession`; quicksave is `GameSave` schema 2. No file is over 4,000 lines. `Level.swift` is at 3,947.
-- **Last product commit:** `24701a09` (FollowLoop1 path-node authoring). It is pushed.
+- **Last commit:** `28b51203` (M1 step 2). `origin` has up to `ff4ca602` (M0); the M1 commits are local.
 - **Toolchain:** Xcode 27.0 release, Swift 6.4, macOS 27 dev machine, deployment floor macOS/iOS 26.
-- **Test baseline (Release, full suite):** 437 tests: 427 pass, 5 fail, 5 skipped. The five failures need local owned content (four `testOwned*` tests, plus `testTrainingMessagesRequireScript006GoDown`).
+- **Test baseline (Release, full suite):** 443 tests: 433 pass, 5 fail, 5 skipped. The five failures need local owned content (four `testOwned*` tests, plus `testTrainingMessagesRequireScript006GoDown`).
 - **Blockers:** None. The Metal Toolchain is installed, and RevivalMac, RevivalEditor, and RevivalMobile build.
 
 ## Milestones
