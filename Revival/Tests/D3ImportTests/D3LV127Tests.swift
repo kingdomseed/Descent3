@@ -1157,7 +1157,7 @@ final class D3LV127Tests: XCTestCase {
     }
 }
 
-private func makeSyntheticD3LV127(
+func makeSyntheticD3LV127(
     padNameTables: Bool = false,
     lightmapPaddingCount: Int = 0,
     terrainHeightPaddingCount: Int = 0,
@@ -1167,6 +1167,8 @@ private func makeSyntheticD3LV127(
     objectTypes: [UInt8] = [],
     objectHandles: [UInt32]? = nil,
     objectStoredIDs: [UInt16]? = nil,
+    objectNames: [String]? = nil,
+    objectScriptOverrides: [(script: String, module: String)]? = nil,
     terrainSoundCount: UInt32 = 0,
     movingTextureCount: UInt32 = 0,
     roomTextureIndex: UInt16 = 0,
@@ -1234,6 +1236,8 @@ private func makeSyntheticD3LV127(
             types: objectTypes,
             handles: objectHandles,
             storedIDs: objectStoredIDs,
+            names: objectNames,
+            scriptOverrides: objectScriptOverrides,
             lightmapFaceCount: objectLightmapFaceCount
         )
     )
@@ -1471,17 +1475,21 @@ private func makeSyntheticObjects(
     types: [UInt8],
     handles: [UInt32]? = nil,
     storedIDs: [UInt16]? = nil,
+    names: [String]? = nil,
+    scriptOverrides: [(script: String, module: String)]? = nil,
     lightmapFaceCount: UInt16? = nil
 ) -> Data {
     precondition(handles == nil || handles?.count == types.count)
     precondition(storedIDs == nil || storedIDs?.count == types.count)
+    precondition(names == nil || names?.count == types.count)
+    precondition(scriptOverrides == nil || scriptOverrides?.count == types.count)
     var data = Data()
     data.appendLittleEndian(UInt32(types.count))
     for (index, type) in types.enumerated() {
         data.appendLittleEndian(handles?[index] ?? UInt32(0x800 + index))
         data.append(type)
         data.appendLittleEndian(storedIDs?[index] ?? UInt16(0))
-        data.appendCString("")
+        data.appendCString(names?[index] ?? "")
         data.appendLittleEndian(UInt32(0))
         if type == 17 { data.appendLittleEndian(Int16(0)) }
         data.appendLittleEndian(Int32(2))
@@ -1491,7 +1499,14 @@ private func makeSyntheticObjects(
         data.appendVector(.init(x: 0, y: 0, z: 1))
         data.append(contentsOf: [0, 0, 0])
         data.appendFloat(0)
-        data.append(contentsOf: [0, 0])
+        // LoadLevel.cpp:1718 custom default script and module overrides.
+        for value in [
+            scriptOverrides?[index].script ?? "",
+            scriptOverrides?[index].module ?? "",
+        ] {
+            data.append(UInt8(value.utf8.count))
+            data.append(contentsOf: value.utf8)
+        }
         if let lightmapFaceCount {
             data.append(UInt8(1))
             data.append(UInt8(1))

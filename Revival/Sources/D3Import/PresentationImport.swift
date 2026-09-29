@@ -1234,7 +1234,7 @@ private func readTableUInt32(_ data: Data, at offset: Int) -> UInt32 {
         | UInt32(data[offset + 3]) << 24
 }
 
-private struct RetailPageCursor {
+struct RetailPageCursor {
     let data: Data
     var offset = 0
 

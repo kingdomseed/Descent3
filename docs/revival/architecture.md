@@ -110,7 +110,7 @@ A disposable, non-shipping **DALLAS translator** may convert the generated actio
 ## 7. Content package, saves, and audio state
 
 - Format and rules: see the `d3-content-import` skill. It is deterministic JSON plus Apple-readable media. Each level is complete.
-- Current package schema: **11**. The Training-specific fields added in schemas 7–11 are removed in M1, and the package moves to **schema 12** with generic data: game tables, script names, object script bindings, message tables, and canonical sound, model, and texture keys.
+- Current package schema: **12**. It adds `Level.scripting`: the level script name (the lowercased level file stem, `OsirisLoadandBind.cpp:893`), one binding per scriptable object (name, default module as a lowercased stem, default page name, `OsirisLoadandBind.cpp:1427`), the `.msg` table, and the stream and sound names the compiled level script lists, mapped to canonical clip keys. Schema 11 packages still load, with no script data, until M1 step 10 deletes the Training-specific fields added in schemas 7–11. Game tables and model and texture keys come later.
 - Other schemas today: `GameSave` 2 (a Codable `GameWorld` plus the package reference and the pilot; it replaced player save 1 and continuation 7 in M1 step 2), pilot profile 1, package record 1, creator project 4.
 - During development the only migration is reimport. Pre-M1 quicksaves stop loading after M1, which is acceptable because nothing has shipped.
 

@@ -3181,6 +3181,23 @@ func runD3Import(
             movingInstruction: messages["Movingbotintro"]!,
             voiceSourceName: "kill1.osf"
         )
+    // Package schema 12 (LevelScriptImport.swift). Archives in cfile search
+    // order: the mission, then the base archives in reverse opening order.
+    level = level.addingScripting(try importLevelScripting(
+        level: level,
+        levelFileName: mission.mineSourceName,
+        archives: [
+            (trainingFile, training, trainingArchive),
+            (extra13File, extra13, extra13Archive),
+            (mercFile, merc, mercArchive),
+            (extraFile, extra, extraArchive),
+            (d3File, d3, d3Archive),
+        ].map {
+            .init(relativePath: $0.0.relativePath, data: $0.1.data, archive: $0.2)
+        },
+        table: tableData,
+        overlay: overlayData
+    ))
     let playerView = defaultPlayerView(in: level)
     let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
     precondition(

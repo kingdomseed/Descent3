@@ -72,7 +72,7 @@ extension Level {
             let forwardLengths = concussion.gunpoints.map {
                 sqrt(levelDot($0.localForward, $0.localForward))
             }
-            guard schemaVersion == 11,
+            guard schemaVersion >= 11,
                   concussion.batteryIndex == 10,
                   concussion.firingMasks == [1, 2],
                   concussion.weapon.sourceName == "Concussion",
@@ -158,7 +158,7 @@ extension Level {
                 flare.gunpointLocalForward,
                 flare.gunpointLocalForward
             ))
-            guard schemaVersion == 11,
+            guard schemaVersion >= 11,
                   flare.batteryIndex == 20,
                   flare.firingMask == 1,
                   flare.weapon == yellow?.source,

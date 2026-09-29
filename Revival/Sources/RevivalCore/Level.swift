@@ -12,7 +12,7 @@ private func canonicalPCM16ByteCount(
     return byteOverflow ? nil : byteCount
 }
 struct Level: Codable, Equatable, Sendable {
-    let schemaVersion: Int
+    private(set) var schemaVersion: Int
     let missionKey: String
     let levelKey: String
     let source: LevelSource
@@ -61,6 +61,8 @@ struct Level: Codable, Equatable, Sendable {
     private(set) var soundClips: [CanonicalSoundClip]
     let dependencyManifest: DependencyManifest
     let sourceChunks: [SourceChunkRecord]
+    /// Schema 12 generic script data (LevelScripting.swift). Absent before 12.
+    private(set) var scripting: LevelScripting? = nil
 
     init(
         schemaVersion: Int = 9,
@@ -156,6 +158,14 @@ struct Level: Codable, Equatable, Sendable {
         self.sourceChunks = sourceChunks
     }
 
+    /// Package schema 12: adds the generic level script data.
+    func addingScripting(_ scripting: LevelScripting) -> Level {
+        var level = self
+        level.schemaVersion = 12
+        level.scripting = scripting
+        return level
+    }
+
     func validate() throws {
         try validate(
             allowImportStagingPresentation: false,
@@ -211,12 +221,15 @@ struct Level: Codable, Equatable, Sendable {
                 && trainingCameraMonitorChain != nil
                 && trainingRASBot1DeathChain != nil
                 && _soundClips.wasPresent
+            || schemaVersion == 12 && _soundClips.wasPresent
         ),
+              (scripting != nil) == (schemaVersion == 12),
               source.d3lvVersion == 127,
               !missionKey.isEmpty, !levelKey.isEmpty else {
             throw LevelValidationError.invalidIdentity
         }
         try validateSource(source)
+        try validateScripting()
         try validateLightmaps(lightmaps)
         try validatePresentation(
             materials: presentationMaterials,
@@ -3291,6 +3304,7 @@ enum LevelValidationError: Error, Equatable {
     case duplicateDependency
     case invalidSourceChunk(String)
     case invalidCount(String)
+    case invalidScripting(String)
 }
 
 struct DependencyIdentity: Hashable {
