@@ -355,7 +355,7 @@ extension WorldRenderingTests {
             trainingPlayerControlMask(
                 galleryWasTriggered: true,
                 controlsWereRestored: true,
-                openingControls: [.reverse]
+                controllerBitflags: [.reverse]
             ),
             .all
         )

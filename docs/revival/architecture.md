@@ -84,7 +84,7 @@ One explicit variable-delta scheduler. No fixed-step mode.
 ### Native shape
 
 - **Engine API:** `extension GameWorld` methods translated from `osiris_predefs.cpp` and `multisafe.cpp`, with plain domain names (for example `setPortalRender(room:portal:state:doubleSided:)`). The `MSAFE_*` opcode multiplexing becomes named methods.
-- **DALLAS API:** `extension GameWorld` methods that **keep the DALLAS names** (`aObjGhostSet`, `qObjShields`, and so on), so each translation can be diffed line by line against the C++. The `dfInit`/`dfSave` state becomes `struct DallasState: Codable`.
+- **DALLAS API:** `extension GameWorld` methods that **keep the DALLAS names** (`aObjGhostSet`, `qObjShields`, and so on), so each translation can be diffed line by line against the C++. The `dfInit`/`dfSave` state becomes `struct DallasState: Codable`, held in each level module's state (each module DLL had its own copy). Actions that the app presents (HUD messages, streamed sounds) append to `GameWorld.presentationRequests`. `GameSession` moves them into the frame's presentation list before the update returns, so a save never holds any.
 - **Level scripts:** a closed, compiled-in set:
   `enum LevelModule: Codable { case none, trainingMission(TrainingMissionState), level1(Level1State), … }`, with `switch` dispatch. Every script is known at compile time. Codable gives the save for free. There is no protocol, registry, or dynamic loading.
 - **Game-module scripts:** `enum DefaultScript: Codable { case guideBot(GuideBotState), … }`, stored on the object. This replaces Osiris instance memory.
@@ -93,15 +93,17 @@ One explicit variable-delta scheduler. No fixed-step mode.
 
 ### Dispatch (translated from `Osiris_CallEvent`, `OsirisLoadandBind.cpp:2111`)
 
-- Object events go to the slots in this order: custom (level module, per object) → level (by page name) → mission → default (game module). Each slot stops the chain unless it returns `continueChain`. A separate `continueDefault` result (`OsirisLoadandBind.cpp:2251`) tells the engine whether to run its own default action. For example, inventory use removes the item only when the script returns `continueDefault` (`Inventory.cpp:819`). Carry both flags.
+- Object events go to the slots in this order: custom (level module, per object) → level (by page name) → mission → default (game module). `ObjectScripts` holds the custom and level slots now. The default slot joins with the `AIGame` scripts (M1 step 8). No mission module exists yet. Each slot stops the chain unless it returns `continueChain`. A separate `continueDefault` result (`OsirisLoadandBind.cpp:2251`) tells the engine whether to run its own default action. For example, inventory use removes the item only when the script returns `continueDefault` (`Inventory.cpp:819`). Carry both flags.
 - An `EVT_AI_NOTIFY` first sends the derived `EVT_AIN_*` sub-event to the same slot.
-- Level events go to the one level module. Trigger events go to the trigger scripts.
-- Timers are a Codable array. Their semantics come from `Osiris_CreateTimer`, `Osiris_ProcessTimers`, and `Osiris_CancelTimer`, including `EVT_TIMERCANCEL` on object death.
+- Level events go to the one level module. Trigger events go to the trigger scripts. An `EVT_AI_NOTIFY` to a level or trigger script sends the event first and then the goal child event, whose result wins (`OsirisLoadandBind.cpp:1988`).
+- A module resolves its names (`Object_handles`, `Message_strings`) from the immutable `Level` at each use. That gives the values `InitializeDLL` resolved once, and keeps them out of the save.
+- Level start (`GameWorld.init`): reset the timers, load the module, send `EVT_LEVELSTART`, then bind every object in slot order and send `EVT_AI_INIT` (AI objects) and `EVT_CREATED` (`gamesequence.cpp:1584-1600`, `Mission.cpp:1687`, `ObjScript.cpp:164`). A restored save does none of this.
+- Timers are a Codable array. Their semantics come from `Osiris_CreateTimer`, `Osiris_ProcessTimers`, and `Osiris_CancelTimer`, including `EVT_TIMERCANCEL` on object death. They run after the level `EVT_INTERVAL` with the pre-update `Gametime`. The dying-player detonator check arrives with player death (M1 step 7).
 - Save/restore events are dropped, because Codable replaces them.
 
 The event producers to reach, with their sites: collide (`collide.cpp:2493`), damaged (`damage.cpp:1342`), destroy (`object.cpp:2040`), created and AI-init (`ObjScript.cpp:206`), AI-notify (`AImain.cpp:2992–3264`), AI-frame (`AImain.cpp:5528`), use (`Inventory.cpp:819`), change-seg (`object.cpp:3163`), doors (`doorway.cpp:293/474`), matcen (`matcen.cpp:439`), goals (`levelgoal.cpp:195/1134/1274`), player dies and respawn (`damage.cpp:770`, `Player.cpp:2472`), movies (`gamecinematics.cpp`), level start and end (`Mission.cpp:1696/1706`), and timers.
 
-**Reentrancy rule:** scripts re-enter the engine and each other synchronously (`osipf_CallObjectEvent`, and the timer and destroy paths). Handlers are `static func (event, inout GameWorld)`. Read module state from the world each time. Never hold a local copy across an action call, because Swift exclusivity forbids it and the C++ always saw the latest value.
+**Reentrancy rule:** scripts re-enter the engine and each other synchronously (`osipf_CallObjectEvent`, and the timer and destroy paths). Handlers are `static func (event, inout GameWorld, Level) -> ChainFlags`; the `Level` is immutable content. Read module state from the world each time. Never hold a local copy across an action call, because Swift exclusivity forbids it and the C++ always saw the latest value.
 
 ### Translation volume
 

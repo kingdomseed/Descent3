@@ -255,10 +255,6 @@ struct TrainingDodgeAttempt: Codable, Equatable, Sendable {
 
 struct TrainingOpeningLesson: Codable, Equatable, Sendable {
     var forwardGoalObjectHandle: UInt32
-    let welcomeDelay: Float
-    let welcomeMessage: String
-    let forwardInstruction: String
-    let welcomeVoiceSourceName: String
     let successMessage: String
     let reverseInstruction: String
     let successVoiceSourceName: String

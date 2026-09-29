@@ -498,13 +498,8 @@ extension WorldRenderingTests {
         dodgeState["turretIsPowered"] = false
         dodgeState["markerLightDistance"] = 50
         preScript021["trainingDodgeAttemptState"] = dodgeState
-        var openingState = try XCTUnwrap(
-            preScript021["trainingOpeningState"] as? [String: Any]
-        )
-        openingState["enabledControls"] = 63
-        openingState["timerRemaining"] = Float(1_000)
-        openingState["welcomeWasPresented"] = false
-        preScript021["trainingOpeningState"] = openingState
+        preScript021["playerControllerBitflags"] = 63
+        try deferringOsirisTimers(&preScript021, to: 1_000)
         var simulation = try GameSession(
             level: level,
             world: (decodeTestWorld(preScript021)).rebased(onto: level),

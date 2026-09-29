@@ -229,7 +229,6 @@ struct Level: Codable, Equatable, Sendable {
             throw LevelValidationError.invalidIdentity
         }
         try validateSource(source)
-        try validateScripting()
         try validateLightmaps(lightmaps)
         try validatePresentation(
             materials: presentationMaterials,
@@ -492,12 +491,7 @@ struct Level: Codable, Equatable, Sendable {
         }
         if let lesson = trainingOpeningLesson {
             let clipNames = Set(voiceClips.map { $0.sourceName.lowercased() })
-            guard lesson.welcomeDelay.isFinite,
-                  lesson.welcomeDelay > 0,
-                  isNonempty(lesson.welcomeMessage),
-                  isNonempty(lesson.forwardInstruction),
-                  isNonempty(lesson.welcomeVoiceSourceName),
-                  isNonempty(lesson.successMessage),
+            guard isNonempty(lesson.successMessage),
                   isNonempty(lesson.reverseInstruction),
                   isNonempty(lesson.successVoiceSourceName),
                   let target = objects.first(where: {
@@ -507,7 +501,6 @@ struct Level: Codable, Equatable, Sendable {
                   objectPresentations.contains(where: {
                       $0.objectHandle == target.handle && !$0.isVisible
                   }),
-                  clipNames.contains(lesson.welcomeVoiceSourceName.lowercased()),
                   clipNames.contains(lesson.successVoiceSourceName.lowercased()) else {
                 throw LevelValidationError.invalidDependency(
                     "Training opening lesson"
@@ -2576,7 +2569,6 @@ struct Level: Codable, Equatable, Sendable {
                   missionKey == "descent3.mission.pilot-training",
                   levelKey == "descent3.level.training-mission",
                   lesson.forwardGoalObjectHandle == 12_301,
-                  lesson.welcomeDelay == 1,
                   welcome?.sourceEntryIndex == 38,
                   welcome?.sampleRate == 22_050,
                   welcome?.channelCount == 1,
@@ -3179,6 +3171,8 @@ struct Level: Codable, Equatable, Sendable {
                 throw LevelValidationError.invalidSourceChunk(chunk.name)
             }
         }
+        // Script data last: it names content the checks above cover.
+        try validateScripting()
     }
 
     private static func defaultSurfacePhysics(for rooms: [LevelRoom]) -> [SurfacePhysicsEntry] {

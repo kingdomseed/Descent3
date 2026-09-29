@@ -1391,8 +1391,11 @@ extension CanonicalLevelTests {
         )
 
         lesson.repeatForward = repeatForward
+        // A package without the level script data (schema 9): the
+        // Training module would name the removed clips.
         var stockLevel = replacing(
             isolatedLevel,
+            schemaVersion: 9,
             trainingOpeningLesson: lesson,
             voiceClips: isolatedLevel.voiceClips.filter {
                 !["left1.osf", "return2.osf", "up1.osf"].contains(

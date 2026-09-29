@@ -70,7 +70,7 @@ extension GameSession {
                 controlsWereRestored:
                     trainingRobotGuidebotState?
                         .controlsWereRestored == true,
-                openingControls: trainingOpeningState?.enabledControls
+                controllerBitflags: world.playerControllerBitflags
             )
         let input = controlsAreSuspended
             ? InputSnapshot.zero
@@ -1126,6 +1126,14 @@ extension GameSession {
                 trainingFinishCourseWasReachedThisFrame,
             trainingOpeningFeedback: &trainingOpeningFeedback
         )
+        // DoPlayerFrame, the level EVT_INTERVAL, then Osiris_ProcessTimers
+        // (GameLoop.cpp:2992, :3013-3014), with the previous Frametime and
+        // the pre-update Gametime.
+        world.doPlayerInvulnerabilityFrame(frameTime: systemsFrameDuration)
+        world.osirisProcessTimers(level: level)
+        trainingOpeningFeedback.append(
+            contentsOf: takeScriptPresentation()
+        )
         if var state = trainingKillbotEntryState,
            state.wasTriggered,
            !state.followupWasPresented,
@@ -1412,8 +1420,8 @@ extension GameSession {
                         controlsWereRestored:
                             trainingRobotGuidebotState?
                                 .controlsWereRestored == true,
-                        openingControls:
-                            trainingOpeningState?.enabledControls
+                        controllerBitflags:
+                            world.playerControllerBitflags
                     )
                     : PlayerControlMask(rawValue: 0),
             showsEnabledPlayerControls:
@@ -1421,7 +1429,7 @@ extension GameSession {
                     && (
                         trainingRobotGuidebotState?
                             .enabledControlHUDIsVisible
-                            ?? (trainingOpeningState != nil)
+                            ?? world.hudShowControls
                     ),
             trainingOpeningFeedback: trainingOpeningFeedback,
             playerFastHeadlight:
@@ -1701,8 +1709,8 @@ extension GameSession {
             if !openingState.forwardGoalWasReached,
                trainingForwardGoalWasReachedThisFrame {
                 openingState.forwardGoalWasReached = true
-                openingState.enabledControls.remove(.forward)
-                openingState.enabledControls.insert(.reverse)
+                world.playerControllerBitflags.remove(.forward)
+                world.playerControllerBitflags.insert(.reverse)
                 trainingOpeningFeedback.append(contentsOf: [
                     TrainingOpeningFeedback(
                         hudMessages: [lesson.successMessage],
@@ -1720,8 +1728,8 @@ extension GameSession {
                openingState.repeatForwardGoalWasPresented != true,
                trainingForwardGoalWasReachedThisFrame,
                let repeatForwardGoal = lesson.repeatForwardGoal {
-                openingState.enabledControls.remove(.forward)
-                openingState.enabledControls.insert(.reverse)
+                world.playerControllerBitflags.remove(.forward)
+                world.playerControllerBitflags.insert(.reverse)
                 trainingOpeningFeedback.append(TrainingOpeningFeedback(
                     hudMessages: [repeatForwardGoal.reverseInstruction],
                     voiceSourceName: "",
@@ -1734,20 +1742,20 @@ extension GameSession {
                openingState.returnGoalWasReached != true,
                trainingStartGoalWasReachedThisFrame,
                let returnLeft = lesson.returnLeft {
-                openingState.enabledControls.remove(.reverse)
+                world.playerControllerBitflags.remove(.reverse)
                 trainingOpeningFeedback.append(TrainingOpeningFeedback(
                     hudMessages: [returnLeft.instruction],
                     voiceSourceName: returnLeft.voiceSourceName,
                     voicePrecedesHUDMessages: false
                 ))
-                openingState.enabledControls.insert(.left)
+                world.playerControllerBitflags.insert(.left)
                 openingState.returnGoalWasReached = true
             }
             if openingState.rightGoalWasReached != true,
                trainingLeftGoalWasReachedThisFrame,
                let returnRight = lesson.returnRight {
-                openingState.enabledControls.remove(.left)
-                openingState.enabledControls.insert(.right)
+                world.playerControllerBitflags.remove(.left)
+                world.playerControllerBitflags.insert(.right)
                 trainingOpeningFeedback.append(contentsOf: [
                     TrainingOpeningFeedback(
                         hudMessages: [returnRight.successMessage],
@@ -1766,8 +1774,8 @@ extension GameSession {
                openingState.upGoalWasReached != true,
                trainingStartGoalWasReachedThisFrame,
                let returnUp = lesson.returnUp {
-                openingState.enabledControls.remove(.right)
-                openingState.enabledControls.insert(.up)
+                world.playerControllerBitflags.remove(.right)
+                world.playerControllerBitflags.insert(.up)
                 trainingOpeningFeedback.append(contentsOf: [
                     TrainingOpeningFeedback(
                         hudMessages: [returnUp.successMessage],
@@ -1795,13 +1803,13 @@ extension GameSession {
                     voiceSourceName: "",
                     voicePrecedesHUDMessages: false
                 ))
-                openingState.enabledControls.remove(.up)
+                world.playerControllerBitflags.remove(.up)
                 trainingOpeningFeedback.append(TrainingOpeningFeedback(
                     hudMessages: [],
                     voiceSourceName: returnDown.voiceSourceName,
                     voicePrecedesHUDMessages: false
                 ))
-                openingState.enabledControls.insert(.down)
+                world.playerControllerBitflags.insert(.down)
                 openingState.downGoalWasReached = true
             }
             if openingState.downGoalWasReached == true,
@@ -1830,21 +1838,21 @@ extension GameSession {
                         voicePrecedesHUDMessages: false
                     ),
                 ])
-                openingState.enabledControls.remove(.down)
-                openingState.enabledControls.insert(.forward)
+                world.playerControllerBitflags.remove(.down)
+                world.playerControllerBitflags.insert(.forward)
                 openingState.repeatForwardWasPresented = true
             }
             if openingState.repeatReturnLeftWasPresented != true,
                openingState.repeatForwardGoalWasPresented == true,
                trainingStartGoalWasReachedThisFrame,
                let repeatReturnLeft = lesson.repeatReturnLeft {
-                openingState.enabledControls.remove(.reverse)
+                world.playerControllerBitflags.remove(.reverse)
                 trainingOpeningFeedback.append(TrainingOpeningFeedback(
                     hudMessages: [repeatReturnLeft.instruction],
                     voiceSourceName: repeatReturnLeft.voiceSourceName,
                     voicePrecedesHUDMessages: true
                 ))
-                openingState.enabledControls.insert(.left)
+                world.playerControllerBitflags.insert(.left)
                 openingState.repeatReturnLeftWasPresented = true
             }
             if openingState.repeatReturnRightWasPresented != true,
@@ -1857,16 +1865,16 @@ extension GameSession {
                     voicePrecedesHUDMessages: false,
                     soundSourceName: repeatReturnRight.soundLogicalName
                 ))
-                openingState.enabledControls.remove(.left)
-                openingState.enabledControls.insert(.right)
+                world.playerControllerBitflags.remove(.left)
+                world.playerControllerBitflags.insert(.right)
                 openingState.repeatReturnRightWasPresented = true
             }
             if openingState.repeatReturnUpWasPresented != true,
                openingState.repeatReturnRightWasPresented == true,
                trainingStartGoalWasReachedThisFrame,
                let repeatReturnUp = lesson.repeatReturnUp {
-                openingState.enabledControls.remove(.right)
-                openingState.enabledControls.insert(.up)
+                world.playerControllerBitflags.remove(.right)
+                world.playerControllerBitflags.insert(.up)
                 trainingOpeningFeedback.append(TrainingOpeningFeedback(
                     hudMessages: [repeatReturnUp.instruction],
                     voiceSourceName: repeatReturnUp.voiceSourceName,
@@ -1885,8 +1893,8 @@ extension GameSession {
                     soundSourceName: repeatReturnDown.soundLogicalName,
                     soundEventVolume: 1
                 ))
-                openingState.enabledControls.remove(.up)
-                openingState.enabledControls.insert(.down)
+                world.playerControllerBitflags.remove(.up)
+                world.playerControllerBitflags.insert(.down)
                 openingState.repeatReturnDownWasPresented = true
             }
             if openingState.continueToCourseWasPresented != true,
@@ -1910,7 +1918,7 @@ extension GameSession {
                     voiceSourceName: startCourse.voiceSourceName,
                     voicePrecedesHUDMessages: false
                 ))
-                openingState.enabledControls.formUnion(
+                world.playerControllerBitflags.formUnion(
                     PlayerControlMask(
                         rawValue: startCourse.enabledControlMask
                     )
@@ -1920,7 +1928,7 @@ extension GameSession {
             if openingState.finishCourseWasPresented != true,
                trainingFinishCourseWasReachedThisFrame,
                let finishCourse = lesson.finishCourse {
-                openingState.enabledControls = PlayerControlMask(
+                world.playerControllerBitflags = PlayerControlMask(
                     rawValue: finishCourse.enabledControlMask
                 )
                 openTrainingFinishCoursePortals(in: &world, level: level)
@@ -1931,20 +1939,6 @@ extension GameSession {
                     trailingHUDMessages: [finishCourse.instruction]
                 ))
                 openingState.finishCourseWasPresented = true
-            }
-            if !openingState.welcomeWasPresented {
-                openingState.timerRemaining -= systemsFrameDuration
-                if openingState.timerRemaining <= 0.000_001 {
-                    openingState.welcomeWasPresented = true
-                    trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                        hudMessages: [
-                            lesson.welcomeMessage,
-                            lesson.forwardInstruction,
-                        ],
-                        voiceSourceName: lesson.welcomeVoiceSourceName,
-                        voicePrecedesHUDMessages: false
-                    ))
-                }
             }
             trainingOpeningState = openingState
         }
@@ -2273,13 +2267,12 @@ extension GameSession {
                         + view.collisionRadius
                 ) != nil
             {
-                if var openingState = trainingOpeningState {
-                    let raw = openingState.enabledControls.rawValue
-                    openingState.enabledControls = .init(
+                if trainingOpeningState != nil {
+                    let raw = world.playerControllerBitflags.rawValue
+                    world.playerControllerBitflags = .init(
                         rawValue: (raw & ~dodge.disabledControlMask)
                             | dodge.enabledDodgeControlMask
                     )
-                    trainingOpeningState = openingState
                 }
                 setTrainingDodgePortalRenderState(
                     in: &world,
@@ -2322,13 +2315,12 @@ extension GameSession {
                     portalIndices: exit.orderedPortalIndices,
                     rendersFaces: false
                 )
-                if var openingState = trainingOpeningState {
-                    openingState.enabledControls = .init(
+                if trainingOpeningState != nil {
+                    world.playerControllerBitflags = .init(
                         rawValue:
-                            openingState.enabledControls.rawValue
+                            world.playerControllerBitflags.rawValue
                             & ~exit.disabledControlMask
                     )
-                    trainingOpeningState = openingState
                 }
                 trainingOpeningFeedback.append(
                     .init(
@@ -2360,11 +2352,10 @@ extension GameSession {
                ) != nil
             {
                 dodgeState.markerLightDistance = 0
-                if var openingState = trainingOpeningState {
-                    openingState.enabledControls = .init(
+                if trainingOpeningState != nil {
+                    world.playerControllerBitflags = .init(
                         rawValue: lesson.headingControlMask
                     )
-                    trainingOpeningState = openingState
                 }
                 setTrainingDodgePortalRenderState(
                     in: &world,
@@ -2481,12 +2472,11 @@ extension GameSession {
                         rendersFaces: false
                     )
                     dodgeState.turretIsPowered = false
-                    if var openingState = trainingOpeningState {
-                        openingState.enabledControls.formUnion(
+                    if trainingOpeningState != nil {
+                        world.playerControllerBitflags.formUnion(
                             .init(
                                 rawValue: dodge.successControlMask
                             ))
-                        trainingOpeningState = openingState
                     }
                     trainingOpeningFeedback.append(
                         .init(
@@ -2554,16 +2544,13 @@ extension GameSession {
                         if maneuverState.script023Count < 1,
                            maneuverState.script024Count > 0
                         {
-                            if var openingState =
-                                    trainingOpeningState
-                            {
-                                openingState.enabledControls =
+                            if trainingOpeningState != nil {
+                                world.playerControllerBitflags =
                                     .init(
                                         rawValue:
                                             lesson
                                             .rotationalControlMask
                                     )
-                                trainingOpeningState = openingState
                             }
                             trainingOpeningFeedback.append(
                                 .init(
@@ -2589,15 +2576,12 @@ extension GameSession {
                         if maneuverState.script024Count < 1,
                            maneuverState.script022Count > 0
                         {
-                            if var openingState =
-                                    trainingOpeningState
-                            {
-                                openingState.enabledControls =
+                            if trainingOpeningState != nil {
+                                world.playerControllerBitflags =
                                     .init(
                                         rawValue:
                                             lesson.bankControlMask
                                     )
-                                trainingOpeningState = openingState
                             }
                             trainingOpeningFeedback.append(
                                 .init(
@@ -2615,15 +2599,12 @@ extension GameSession {
                         if maneuverState.script022Count < 1,
                            maneuverState.script021Count > 0
                         {
-                            if var openingState =
-                                    trainingOpeningState
-                            {
-                                openingState.enabledControls =
+                            if trainingOpeningState != nil {
+                                world.playerControllerBitflags =
                                     .init(
                                         rawValue:
                                             lesson.pitchControlMask
                                     )
-                                trainingOpeningState = openingState
                             }
                             trainingOpeningFeedback.append(
                                 .init(
@@ -2665,6 +2646,12 @@ extension GameSession {
                         destruction.destroyBot1TeamFlags =
                             handoff.movingTeamFlags
                         destruction.destroyBot1IsVisible = true
+                        // Script 027 unghosts DestroyBot1, which Script 000
+                        // ghosted (TrainingMission.cpp:1563).
+                        world.aObjGhostSet(
+                            0,
+                            ObjectHandle(handoff.destroyBot1ObjectHandle)
+                        )
                         world.setObjectRendered(
                                 handoff.destroyBot1ObjectHandle,
                                 true
@@ -2708,15 +2695,12 @@ extension GameSession {
                     if timer <= 0.000_001 {
                         maneuverState.objectTimerRemaining = nil
                         if maneuverState.script025Count > 0 {
-                            if var openingState =
-                                    trainingOpeningState
-                            {
-                                openingState.enabledControls.formUnion(
+                            if trainingOpeningState != nil {
+                                world.playerControllerBitflags.formUnion(
                                     .init(
                                         rawValue:
                                             lesson.weaponControlMask
                                     ))
-                                trainingOpeningState = openingState
                             }
                             assignTrainingFollowBotPath(
                                 lesson.destroyPathIndex,

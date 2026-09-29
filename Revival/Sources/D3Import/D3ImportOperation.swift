@@ -1609,10 +1609,6 @@ func runD3Import(
     let openingLevel = playerLevel.addingTrainingOpeningLesson(
         .init(
             forwardGoalObjectHandle: forwardGoal.handle,
-            welcomeDelay: 1,
-            welcomeMessage: messages["Welcome"]!,
-            forwardInstruction: messages["GoForward"]!,
-            welcomeVoiceSourceName: "welcome.osf",
             successMessage: messages["GoodJob"]!,
             reverseInstruction: messages["GoBackwards"]!,
             successVoiceSourceName: "return1.osf",

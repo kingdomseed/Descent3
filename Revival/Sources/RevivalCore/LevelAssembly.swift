@@ -98,7 +98,7 @@ extension Level {
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingObjectPresentation(
@@ -190,7 +190,7 @@ extension Level {
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     var hasPlayerPresentation: Bool {
@@ -236,7 +236,7 @@ extension Level {
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingDefaultPlayerShip(
@@ -311,7 +311,7 @@ extension Level {
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingOpeningLesson(
@@ -415,7 +415,7 @@ extension Level {
                 historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingGalleryBarrier(
@@ -473,7 +473,7 @@ extension Level {
                     dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingRobotGuidebotChain(
@@ -645,7 +645,7 @@ extension Level {
                     dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingCameraMonitorChain(
@@ -726,7 +726,7 @@ extension Level {
                     dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingRASBot1DeathChain(
@@ -769,7 +769,7 @@ extension Level {
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingRASBot2DeathChain(
@@ -812,7 +812,7 @@ extension Level {
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingRASBot3DeathChain(
@@ -855,7 +855,7 @@ extension Level {
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingRASBot4DeathChain(
@@ -898,7 +898,7 @@ extension Level {
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingLastBot1DeathChain(
@@ -946,7 +946,7 @@ extension Level {
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingLastBot2DeathChain(
@@ -1042,7 +1042,7 @@ extension Level {
                     dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
         level.trainingLastBot2DeathChain =
             trainingLastBot2DeathChain
         level.trainingLastBot3DeathChain =
@@ -1145,7 +1145,7 @@ extension Level {
                     dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingCloakPickupChain(
@@ -1230,7 +1230,7 @@ extension Level {
                     dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingLastRoomChain(
@@ -1277,7 +1277,7 @@ extension Level {
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 
     func addingTrainingFinalRoomEntryChain(
@@ -1340,6 +1340,6 @@ extension Level {
                     dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
-        )
+        ).preservingScripting(of: self)
     }
 }

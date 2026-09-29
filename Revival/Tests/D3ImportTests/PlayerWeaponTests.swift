@@ -737,7 +737,7 @@ extension WorldRenderingTests {
             continuationObject["trainingOpeningState"] as? [String: Any]
         )
         openingState["startCourseWasPresented"] = true
-        openingState["enabledControls"] = try XCTUnwrap(
+        continuationObject["playerControllerBitflags"] = try XCTUnwrap(
             level.trainingOpeningLesson?.startCourse?.enabledControlMask
         )
         continuationObject["trainingOpeningState"] = openingState
@@ -996,7 +996,7 @@ extension WorldRenderingTests {
             trainingPlayerControlMask(
                 galleryWasTriggered: true,
                 controlsWereRestored: false,
-                openingControls: .all
+                controllerBitflags: .all
             ).contains(.primaryWeapon)
         )
     }

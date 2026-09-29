@@ -50,6 +50,23 @@ struct GameWorld: Codable, Equatable, Sendable {
     var playerRearViewState: PlayerRearViewState?
     var playerConcussionState: PlayerConcussionState?
     var playerYellowFlareState: PlayerYellowFlareState?
+    /// `Players[0].controller_bitflags`. InitPlayerNewShip enables every
+    /// control (Player.cpp:1554).
+    var playerControllerBitflags = PlayerControlMask.all
+    /// `Players[0].invulnerable_time` while PLAYER_FLAGS_INVULNERABLE is
+    /// set; `nil` while it is clear.
+    var playerInvulnerableTime: Float?
+    /// Hud_show_controls (hud.cpp:503).
+    var hudShowControls = false
+
+    // Osiris.
+    /// The loaded level module and its state.
+    var levelModule = LevelModule.none
+    var osirisTimers = OsirisTimers()
+    /// HUD messages and streamed sounds that scripts requested during the
+    /// current update. The session moves them to the frame's presentation
+    /// before the update returns, so a saved world has none.
+    var presentationRequests: [ScriptPresentationRequest] = []
 
     // Training script state. These move into the Training level module in
     // later M1 steps.
@@ -80,8 +97,8 @@ struct GameWorld: Codable, Equatable, Sendable {
     var trainingSessionOutcome: TrainingSessionOutcome?
 
     /// The world at level start: the placed objects in their stored slots,
-    /// the canonical portal flags and goals, and the initial ship and script
-    /// state.
+    /// the canonical portal flags and goals, the initial ship and script
+    /// state, and then the level start scripts (EVT_LEVELSTART).
     init(level: Level, authoritativeRandomSeed: UInt32 = 1) {
         precondition(level.defaultPlayerBinding != nil)
         let binding = level.defaultPlayerBinding!
@@ -95,6 +112,7 @@ struct GameWorld: Codable, Equatable, Sendable {
         playerYellowFlareState = level.shipDefinitions.first?
             .playerYellowFlare == nil ? nil : .init()
         initializeTrainingState(level: level)
+        startLevelScripts(level: level)
     }
 
     /// `MSAFE_OBJECT_NO_RENDER` and its inverse (`multisafe.cpp:1733`).

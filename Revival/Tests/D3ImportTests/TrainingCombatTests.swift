@@ -477,16 +477,10 @@ extension WorldRenderingTests {
         continuationObject["frameDuration"] = 0.1
         continuationObject["gameTime"] = 1
         continuationObject["energy"] = 50.1
-        var openingState = try XCTUnwrap(
-            continuationObject["trainingOpeningState"]
-                as? [String: Any]
-        )
-        openingState["enabledControls"] =
+        continuationObject["playerControllerBitflags"] =
             lesson.rotationalControlMask
             | lesson.weaponControlMask
-        openingState["timerRemaining"] = Float(1_000)
-        continuationObject["trainingOpeningState"] =
-            openingState
+        try deferringOsirisTimers(&continuationObject, to: 1_000)
         var galleryState = try XCTUnwrap(
             continuationObject["trainingGalleryBarrierState"]
                 as? [String: Any]

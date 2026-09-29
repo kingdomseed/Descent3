@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Translated from Descent3/object.h (handle masks, :640-644),
-// Descent3/object_external.h (OBJ_ and RT_ constants, :153-266), and
-// lib/object_external_struct.h (struct object, :401).
+// Descent3/object_external.h (OBJ_ and RT_ constants, :153-266),
+// lib/object_external_struct.h (struct object, :401, and light_info), and
+// Descent3/aistruct_external.h (AIF_DISABLED, :362).
 
 import Foundation
 
@@ -96,4 +97,39 @@ struct GameObject: Codable, Equatable, Sendable {
     var location: SpatialLocation
     var position: Vector3
     var orientation: Matrix3
+    /// The OF_ flags (`object_external.h:269-301`).
+    var flags: UInt32 = 0
+    /// `dummy_type`: the real type of a ghosted (OBJ_DUMMY) object.
+    var dummyType: ObjectType? = nil
+    /// The object's own `lighting_info` after ObjSetLocalLighting. `nil`
+    /// uses the object page's lighting.
+    var localLighting: ObjectLocalLighting? = nil
+    /// `ai_info` of a CT_AI object. The object page decides CT_AI
+    /// (objinit.cpp:807); the page import in M2 fills it.
+    var ai: ObjectAIFrame? = nil
+    /// `osiris_script`: the bound scripts.
+    var scripts: ObjectScripts? = nil
+}
+
+extension GameObject {
+    /// OF_DESTROYABLE (`object_external.h:279`).
+    static let destroyableFlag: UInt32 = 0x0000_0400
+}
+
+/// The script-set fields of `light_info` (MSAFE_OBJECT_LIGHT_DIST and
+/// MSAFE_OBJECT_LIGHT_COLOR, multisafe.cpp:1821-1841). A field that no
+/// script set keeps the page value, so it is `nil` here.
+struct ObjectLocalLighting: Codable, Equatable, Sendable {
+    /// `light_distance`.
+    var lightDistance: Float?
+    /// `red_light1`, `green_light1`, `blue_light1`.
+    var color: Vector3?
+}
+
+/// The `ai_frame` fields the runtime uses.
+struct ObjectAIFrame: Codable, Equatable, Sendable {
+    /// AIF_DISABLED (aistruct_external.h:362).
+    static let disabledFlag: UInt32 = 0x0000_4000
+
+    var flags: UInt32 = 0
 }

@@ -53,7 +53,8 @@ struct ObjectTable: Codable, Equatable, Sendable {
                     : .none,
                 location: placed.location,
                 position: placed.position,
-                orientation: placed.orientation
+                orientation: placed.orientation,
+                flags: placed.flags
             )
         }
         resetFreeSlots()

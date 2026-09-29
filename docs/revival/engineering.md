@@ -40,7 +40,7 @@ rtk xcodebuild -quiet build -project Revival.xcodeproj -scheme RevivalMobile \
 
 ### Tests that use real Training content
 
-Some tests read an owned `level.json` path from an environment variable (for example `REVIVAL_SCRIPT015_OWNED_LEVEL`, `REVIVAL_DODGE_OWNED_LEVEL`). The retained package is at `runtime-data/revival-evidence/current-training-schema11/training.revival/levels/descent3.level.training-mission/level.json` (SHA-256 `ff61f9b2f36c4d4a0631927c51dda4f4f159d2bec0cf0277b50f166b554deee1`). The Xcode test host cannot read the `Documents` folder. Copy the package to `/private/tmp/`, check the hash, and point the variable at the copy. Milestone M1 replaces these per-script variables with one: `REVIVAL_TRAINING_PACKAGE`.
+Some tests read an owned `level.json` path from an environment variable (for example `REVIVAL_SCRIPT015_OWNED_LEVEL`, `REVIVAL_DODGE_OWNED_LEVEL`). The retained package is at `runtime-data/revival-evidence/current-training-schema11/training.revival/levels/descent3.level.training-mission/level.json` (SHA-256 `ff61f9b2f36c4d4a0631927c51dda4f4f159d2bec0cf0277b50f166b554deee1`). The Xcode test host cannot read the `Documents` folder. Copy the package to `/private/tmp/`, check the hash, and point the variable at the copy. Milestone M1 replaces these per-script variables with one: `REVIVAL_TRAINING_PACKAGE`, the path of an imported `training.revival` package (schema 12). It is in use from M1 step 4 (`TrainingMissionScriptTests`).
 
 ### Import real content
 

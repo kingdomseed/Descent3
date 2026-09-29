@@ -93,7 +93,7 @@ struct PlayerControlMask: OptionSet, Codable, Equatable, Sendable {
 func trainingPlayerControlMask(
     galleryWasTriggered: Bool,
     controlsWereRestored: Bool,
-    openingControls: PlayerControlMask?
+    controllerBitflags: PlayerControlMask
 ) -> PlayerControlMask {
     if controlsWereRestored {
         return .all
@@ -101,7 +101,7 @@ func trainingPlayerControlMask(
     if galleryWasTriggered {
         return PlayerControlMask(rawValue: 0)
     }
-    return openingControls ?? .all
+    return controllerBitflags
 }
 
 extension InputSnapshot {

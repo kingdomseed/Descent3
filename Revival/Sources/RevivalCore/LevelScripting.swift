@@ -180,3 +180,24 @@ private func isCanonicalModuleName(_ name: String) -> Bool {
             $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "_")
         }
 }
+
+extension Level {
+    /// osipf_FindObjectName (osiris_predefs.cpp:3378): the handle of the
+    /// lowest-slot object with this name (stricmp), or OBJECT_HANDLE_NONE.
+    /// Only placed objects have names, and the level scripts look them up
+    /// once at InitializeDLL, so the placed objects answer it.
+    func findObjectName(_ name: String) -> ObjectHandle {
+        objects
+            .filter {
+                $0.instanceName?.caseInsensitiveCompare(name) == .orderedSame
+            }
+            .min { $0.slot < $1.slot }
+            .map { ObjectHandle($0.handle) } ?? .none
+    }
+
+    /// This level with the script data of `source`, if it has any. The
+    /// assembly steps rebuild a level from its fields, which would drop it.
+    func preservingScripting(of source: Level) -> Level {
+        source.scripting.map(addingScripting) ?? self
+    }
+}

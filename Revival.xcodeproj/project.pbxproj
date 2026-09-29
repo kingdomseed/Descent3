@@ -7,6 +7,44 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7A1400000000000000000001 /* TrainingMissionScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A14000000000000000000F0 /* TrainingMissionScriptTests.swift */; };
+		7A1300000000000000000001 /* OsirisTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A13000000000000000000F0 /* OsirisTests.swift */; };
+		7A1200000000000000000001 /* LevelScriptFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A12000000000000000000F0 /* LevelScriptFixtures.swift */; };
+		7A1100000000000000000005 /* AIMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11000000000000000000F0 /* AIMain.swift */; };
+		7A1100000000000000000004 /* AIMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11000000000000000000F0 /* AIMain.swift */; };
+		7A1100000000000000000003 /* AIMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11000000000000000000F0 /* AIMain.swift */; };
+		7A1100000000000000000002 /* AIMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11000000000000000000F0 /* AIMain.swift */; };
+		7A1100000000000000000001 /* AIMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11000000000000000000F0 /* AIMain.swift */; };
+		7A1000000000000000000005 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A10000000000000000000F0 /* Player.swift */; };
+		7A1000000000000000000004 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A10000000000000000000F0 /* Player.swift */; };
+		7A1000000000000000000003 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A10000000000000000000F0 /* Player.swift */; };
+		7A1000000000000000000002 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A10000000000000000000F0 /* Player.swift */; };
+		7A1000000000000000000001 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A10000000000000000000F0 /* Player.swift */; };
+		7A0F00000000000000000005 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		7A0F00000000000000000004 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		7A0F00000000000000000003 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		7A0F00000000000000000002 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		7A0F00000000000000000001 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		7A0E00000000000000000005 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
+		7A0E00000000000000000004 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
+		7A0E00000000000000000003 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
+		7A0E00000000000000000002 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
+		7A0E00000000000000000001 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
+		7A0D00000000000000000005 /* DallasFuncs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0D000000000000000000F0 /* DallasFuncs.swift */; };
+		7A0D00000000000000000004 /* DallasFuncs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0D000000000000000000F0 /* DallasFuncs.swift */; };
+		7A0D00000000000000000003 /* DallasFuncs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0D000000000000000000F0 /* DallasFuncs.swift */; };
+		7A0D00000000000000000002 /* DallasFuncs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0D000000000000000000F0 /* DallasFuncs.swift */; };
+		7A0D00000000000000000001 /* DallasFuncs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0D000000000000000000F0 /* DallasFuncs.swift */; };
+		7A0C00000000000000000005 /* OsirisLoadandBind+Timers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0C000000000000000000F0 /* OsirisLoadandBind+Timers.swift */; };
+		7A0C00000000000000000004 /* OsirisLoadandBind+Timers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0C000000000000000000F0 /* OsirisLoadandBind+Timers.swift */; };
+		7A0C00000000000000000003 /* OsirisLoadandBind+Timers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0C000000000000000000F0 /* OsirisLoadandBind+Timers.swift */; };
+		7A0C00000000000000000002 /* OsirisLoadandBind+Timers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0C000000000000000000F0 /* OsirisLoadandBind+Timers.swift */; };
+		7A0C00000000000000000001 /* OsirisLoadandBind+Timers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0C000000000000000000F0 /* OsirisLoadandBind+Timers.swift */; };
+		7A0B00000000000000000005 /* OsirisLoadandBind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0B000000000000000000F0 /* OsirisLoadandBind.swift */; };
+		7A0B00000000000000000004 /* OsirisLoadandBind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0B000000000000000000F0 /* OsirisLoadandBind.swift */; };
+		7A0B00000000000000000003 /* OsirisLoadandBind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0B000000000000000000F0 /* OsirisLoadandBind.swift */; };
+		7A0B00000000000000000002 /* OsirisLoadandBind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0B000000000000000000F0 /* OsirisLoadandBind.swift */; };
+		7A0B00000000000000000001 /* OsirisLoadandBind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0B000000000000000000F0 /* OsirisLoadandBind.swift */; };
 		7A0A00000000000000000005 /* TrainingMission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0A000000000000000000F0 /* TrainingMission.swift */; };
 		7A0A00000000000000000004 /* TrainingMission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0A000000000000000000F0 /* TrainingMission.swift */; };
 		7A0A00000000000000000003 /* TrainingMission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0A000000000000000000F0 /* TrainingMission.swift */; };
@@ -241,6 +279,16 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		7A14000000000000000000F0 /* TrainingMissionScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingMissionScriptTests.swift; sourceTree = "<group>"; };
+		7A13000000000000000000F0 /* OsirisTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsirisTests.swift; sourceTree = "<group>"; };
+		7A12000000000000000000F0 /* LevelScriptFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScriptFixtures.swift; sourceTree = "<group>"; };
+		7A11000000000000000000F0 /* AIMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIMain.swift; sourceTree = "<group>"; };
+		7A10000000000000000000F0 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
+		7A0F000000000000000000F0 /* Multisafe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Multisafe.swift; sourceTree = "<group>"; };
+		7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DallasFuncs+Objects.swift"; sourceTree = "<group>"; };
+		7A0D000000000000000000F0 /* DallasFuncs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DallasFuncs.swift; sourceTree = "<group>"; };
+		7A0C000000000000000000F0 /* OsirisLoadandBind+Timers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OsirisLoadandBind+Timers.swift"; sourceTree = "<group>"; };
+		7A0B000000000000000000F0 /* OsirisLoadandBind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsirisLoadandBind.swift; sourceTree = "<group>"; };
 		7A0A000000000000000000F0 /* TrainingMission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingMission.swift; sourceTree = "<group>"; };
 		7A09000000000000000000F0 /* LevelModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelModule.swift; sourceTree = "<group>"; };
 		7A07000000000000000000F0 /* LevelScriptImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScriptImport.swift; sourceTree = "<group>"; };
@@ -390,6 +438,10 @@
 			isa = PBXGroup;
 			children = (
 				7A09000000000000000000F0 /* LevelModule.swift */,
+				7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */,
+				7A0D000000000000000000F0 /* DallasFuncs.swift */,
+				7A0C000000000000000000F0 /* OsirisLoadandBind+Timers.swift */,
+				7A0B000000000000000000F0 /* OsirisLoadandBind.swift */,
 				7A08000000000000000000A1 /* Levels */,
 			);
 			path = Scripts;
@@ -479,6 +531,9 @@
 			children = (
 				7A08000000000000000000A0 /* Scripts */,
 				7A06000000000000000000F0 /* LevelScripting.swift */,
+				7A11000000000000000000F0 /* AIMain.swift */,
+				7A10000000000000000000F0 /* Player.swift */,
+				7A0F000000000000000000F0 /* Multisafe.swift */,
 				H20000000000000000000001 /* PilotProfile.swift */,
 				E90000000000000000000001 /* GameSave.swift */,
 				7A03000000000000000000F0 /* ObjectTable.swift */,
@@ -551,6 +606,9 @@
 				7A05000000000000000000F0 /* LevelScriptImportTests.swift */,
 				E90000000000000000000002 /* TrainingQuicksaveTests.swift */,
 				7A04000000000000000000F0 /* GameSaveTests.swift */,
+				7A14000000000000000000F0 /* TrainingMissionScriptTests.swift */,
+				7A13000000000000000000F0 /* OsirisTests.swift */,
+				7A12000000000000000000F0 /* LevelScriptFixtures.swift */,
 				7A01000000000000000000F0 /* ObjectTableTests.swift */,
 				F20000000000000000000003 /* RevivalMobilePresentationStateTests.swift */,
 				D20000000000000000000001 /* MetalWorldPlanTests.swift */,
@@ -788,6 +846,13 @@
 				7A0900000000000000000001 /* LevelModule.swift in Sources */,
 				7A0700000000000000000001 /* LevelScriptImport.swift in Sources */,
 				7A0600000000000000000001 /* LevelScripting.swift in Sources */,
+				7A1100000000000000000001 /* AIMain.swift in Sources */,
+				7A1000000000000000000001 /* Player.swift in Sources */,
+				7A0F00000000000000000001 /* Multisafe.swift in Sources */,
+				7A0E00000000000000000001 /* DallasFuncs+Objects.swift in Sources */,
+				7A0D00000000000000000001 /* DallasFuncs.swift in Sources */,
+				7A0C00000000000000000001 /* OsirisLoadandBind+Timers.swift in Sources */,
+				7A0B00000000000000000001 /* OsirisLoadandBind.swift in Sources */,
 				EA0000000000000000000001 /* GameSave.swift in Sources */,
 				7A0300000000000000000001 /* ObjectTable.swift in Sources */,
 				7A0200000000000000000001 /* GameObject.swift in Sources */,
@@ -832,6 +897,13 @@
 				7A0A00000000000000000002 /* TrainingMission.swift in Sources */,
 				7A0900000000000000000002 /* LevelModule.swift in Sources */,
 				7A0600000000000000000002 /* LevelScripting.swift in Sources */,
+				7A1100000000000000000002 /* AIMain.swift in Sources */,
+				7A1000000000000000000002 /* Player.swift in Sources */,
+				7A0F00000000000000000002 /* Multisafe.swift in Sources */,
+				7A0E00000000000000000002 /* DallasFuncs+Objects.swift in Sources */,
+				7A0D00000000000000000002 /* DallasFuncs.swift in Sources */,
+				7A0C00000000000000000002 /* OsirisLoadandBind+Timers.swift in Sources */,
+				7A0B00000000000000000002 /* OsirisLoadandBind.swift in Sources */,
 				EA0000000000000000000002 /* GameSave.swift in Sources */,
 				7A0300000000000000000002 /* ObjectTable.swift in Sources */,
 				7A0200000000000000000002 /* GameObject.swift in Sources */,
@@ -874,6 +946,13 @@
 				7A0A00000000000000000003 /* TrainingMission.swift in Sources */,
 				7A0900000000000000000003 /* LevelModule.swift in Sources */,
 				7A0600000000000000000003 /* LevelScripting.swift in Sources */,
+				7A1100000000000000000003 /* AIMain.swift in Sources */,
+				7A1000000000000000000003 /* Player.swift in Sources */,
+				7A0F00000000000000000003 /* Multisafe.swift in Sources */,
+				7A0E00000000000000000003 /* DallasFuncs+Objects.swift in Sources */,
+				7A0D00000000000000000003 /* DallasFuncs.swift in Sources */,
+				7A0C00000000000000000003 /* OsirisLoadandBind+Timers.swift in Sources */,
+				7A0B00000000000000000003 /* OsirisLoadandBind.swift in Sources */,
 				EA0000000000000000000003 /* GameSave.swift in Sources */,
 				7A0300000000000000000003 /* ObjectTable.swift in Sources */,
 				7A0200000000000000000003 /* GameObject.swift in Sources */,
@@ -919,9 +998,19 @@
 				7A0900000000000000000004 /* LevelModule.swift in Sources */,
 				7A0700000000000000000002 /* LevelScriptImport.swift in Sources */,
 				7A0600000000000000000004 /* LevelScripting.swift in Sources */,
+				7A1100000000000000000004 /* AIMain.swift in Sources */,
+				7A1000000000000000000004 /* Player.swift in Sources */,
+				7A0F00000000000000000004 /* Multisafe.swift in Sources */,
+				7A0E00000000000000000004 /* DallasFuncs+Objects.swift in Sources */,
+				7A0D00000000000000000004 /* DallasFuncs.swift in Sources */,
+				7A0C00000000000000000004 /* OsirisLoadandBind+Timers.swift in Sources */,
+				7A0B00000000000000000004 /* OsirisLoadandBind.swift in Sources */,
 				7A0500000000000000000001 /* LevelScriptImportTests.swift in Sources */,
 				EA0000000000000000000006 /* TrainingQuicksaveTests.swift in Sources */,
 				7A0400000000000000000001 /* GameSaveTests.swift in Sources */,
+				7A1400000000000000000001 /* TrainingMissionScriptTests.swift in Sources */,
+				7A1300000000000000000001 /* OsirisTests.swift in Sources */,
+				7A1200000000000000000001 /* LevelScriptFixtures.swift in Sources */,
 				7A0100000000000000000001 /* ObjectTableTests.swift in Sources */,
 				EA0000000000000000000004 /* GameSave.swift in Sources */,
 				7A0300000000000000000004 /* ObjectTable.swift in Sources */,
@@ -1010,6 +1099,13 @@
 				7A0A00000000000000000005 /* TrainingMission.swift in Sources */,
 				7A0900000000000000000005 /* LevelModule.swift in Sources */,
 				7A0600000000000000000005 /* LevelScripting.swift in Sources */,
+				7A1100000000000000000005 /* AIMain.swift in Sources */,
+				7A1000000000000000000005 /* Player.swift in Sources */,
+				7A0F00000000000000000005 /* Multisafe.swift in Sources */,
+				7A0E00000000000000000005 /* DallasFuncs+Objects.swift in Sources */,
+				7A0D00000000000000000005 /* DallasFuncs.swift in Sources */,
+				7A0C00000000000000000005 /* OsirisLoadandBind+Timers.swift in Sources */,
+				7A0B00000000000000000005 /* OsirisLoadandBind.swift in Sources */,
 				EA0000000000000000000005 /* GameSave.swift in Sources */,
 				7A0300000000000000000005 /* ObjectTable.swift in Sources */,
 				7A0200000000000000000005 /* GameObject.swift in Sources */,

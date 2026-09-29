@@ -457,6 +457,9 @@ final class GameSession {
         if destroyBot1Destruction.script028Count < 1 {
             destruction.destroyBot1IsVisible = false
             destruction.destroyBot2IsVisible = true
+            // Script 028 unghosts DestroyBot2, which Script 000 ghosted
+            // (TrainingMission.cpp:2019).
+            world.aObjGhostSet(0, ObjectHandle(handoff.destroyBot2ObjectHandle))
             world.setObjectRendered(handoff.destroyBot2ObjectHandle, true)
             assignTrainingAuthoredPath(
                 handoff.movingPathIndex,
@@ -602,6 +605,33 @@ final class GameSession {
             // SinglePlayerPostLevelResults presents no objective rows.
             objectives: []
         )
+    }
+
+    /// Moves the script presentation requests of this update into the
+    /// frame's presentation list, in request order. A streamed file name
+    /// becomes the level's canonical voice key (package schema 12). The
+    /// voice path plays each clip at its imported volume, and every
+    /// translated call passes volume 1.
+    func takeScriptPresentation() -> [TrainingOpeningFeedback] {
+        let requests = world.presentationRequests
+        world.presentationRequests = []
+        return requests.map { request in
+            switch request {
+            case let .hudMessage(message):
+                TrainingOpeningFeedback(
+                    hudMessages: [message],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false
+                )
+            case let .streamedAudio(name, _):
+                TrainingOpeningFeedback(
+                    hudMessages: [],
+                    voiceSourceName: level.scripting?.streamedAudio
+                        .first { $0.name == name }?.key ?? name,
+                    voicePrecedesHUDMessages: false
+                )
+            }
+        }
     }
 
     func stopTime(at timestamp: Double) {

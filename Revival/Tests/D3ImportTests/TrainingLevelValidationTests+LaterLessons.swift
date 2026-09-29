@@ -413,10 +413,6 @@ extension CanonicalLevelTests {
         let goalHandle: UInt32 = 12_301
         let lesson = TrainingOpeningLesson(
             forwardGoalObjectHandle: goalHandle,
-            welcomeDelay: 1,
-            welcomeMessage: "Welcome",
-            forwardInstruction: "Forward",
-            welcomeVoiceSourceName: "welcome.osf",
             successMessage: "Excellent",
             reverseInstruction: "Reverse",
             successVoiceSourceName: "return1.osf"
@@ -574,13 +570,9 @@ extension CanonicalLevelTests {
                 level,
                 trainingOpeningLesson: .init(
                     forwardGoalObjectHandle: lesson.forwardGoalObjectHandle,
-                    welcomeDelay: lesson.welcomeDelay,
-                    welcomeMessage: lesson.welcomeMessage,
-                    forwardInstruction: lesson.forwardInstruction,
-                    welcomeVoiceSourceName: "missing.osf",
                     successMessage: lesson.successMessage,
                     reverseInstruction: lesson.reverseInstruction,
-                    successVoiceSourceName: lesson.successVoiceSourceName
+                    successVoiceSourceName: "missing.osf"
                 )
             )
         )

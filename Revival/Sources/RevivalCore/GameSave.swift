@@ -223,6 +223,7 @@ extension GameWorld {
             try sweep.visit(child.value, label: child.label ?? "")
         }
         try validateStateDefinitions(level: level)
+        try validateScriptState(level: level)
         try validateRequiredObjects(level: level)
         try validateIndicesAndCapacities(level: level)
         try validateNumericDomains(level: level)
@@ -298,6 +299,69 @@ extension GameWorld {
         for (name, hasState, hasDefinition) in pairs
         where hasState && !hasDefinition {
             throw .unexpectedState(name)
+        }
+    }
+
+    /// Osiris and object script state: the level module is the one the
+    /// level names, timer handles name their entries, ghost and lighting
+    /// fields are consistent, and no presentation request is pending.
+    private func validateScriptState(
+        level: Level
+    ) throws(GameWorldValidationError) {
+        func require(_ condition: Bool, _ name: String)
+            throws(GameWorldValidationError)
+        {
+            if !condition { throw .unexpectedState(name) }
+        }
+        try require(presentationRequests.isEmpty, "presentationRequests")
+        try require(
+            levelModule.isValidSavedState(
+                forLoaded: LevelModule.load(level: level)
+            ),
+            "levelModule"
+        )
+        try require(
+            osirisTimers.entries.count == OsirisTimers.capacity,
+            "osirisTimers"
+        )
+        for (index, timer) in osirisTimers.entries.enumerated() {
+            // Osiris_CreateTimer takes repeat counts of -1 (endless) or
+            // more; the processor decrements them.
+            try require(timer.repeatCount >= -1, "osirisTimers.repeatCount")
+            if case let .trigger(number) = timer.owner {
+                try require(
+                    level.triggers.indices.contains(number),
+                    "osirisTimers.trigger"
+                )
+            }
+            if timer.isUsed {
+                try require(
+                    OsirisTimers.slot(of: timer.handle) == index,
+                    "osirisTimers.handle"
+                )
+            }
+        }
+        for object in objects {
+            try require(
+                (object.type == .dummy) == (object.dummyType != nil)
+                    && object.dummyType != .dummy,
+                "object \(object.handle.slot) dummyType"
+            )
+            // Bound scripts are exactly the ones the level module gives.
+            try require(
+                object.scripts == osirisScripts(for: object, level: level),
+                "object \(object.handle.slot) scripts"
+            )
+            if let lighting = object.localLighting {
+                let distance = lighting.lightDistance ?? 0
+                guard distance.isFinite,
+                      distance >= 0,
+                      distance <= maximumSavedMagnitude,
+                      lighting.color.map(isFinite) ?? true
+                else {
+                    throw .nonFiniteValue("object \(object.handle.slot)")
+                }
+            }
         }
     }
 

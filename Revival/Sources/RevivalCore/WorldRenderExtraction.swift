@@ -282,7 +282,10 @@ private func extractObjectPresentation(
     var accepted: [(depth: Float, ordinal: Int, object: GameObject,
                     presentation: ObjectPresentationReference, model: CanonicalModel)] = []
     for (ordinal, object) in objects.enumerated() {
+        // RenderObject draws no OBJ_DUMMY (ghosted) object
+        // (renderobject.cpp:1214).
         guard object.handle.rawValue != excludedObjectHandle,
+              object.type != .dummy,
               let presentation = presentationByHandle[object.handle.rawValue],
               object.renderType == .polyobj,
               case let .room(roomSourceIndex) = object.location,

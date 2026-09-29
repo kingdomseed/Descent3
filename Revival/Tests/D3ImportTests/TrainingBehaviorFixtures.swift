@@ -70,30 +70,32 @@ func makeTrainingGalleryBarrierLevel() -> Level {
         special: triggerFace.special
     )
     level = replacing(level, triggers: [trigger])
-    return level.addingTrainingGalleryBarrier(
-        .init(
-            triggerName: trigger.name,
-            triggerRoomSourceIndex: trigger.roomIndex,
-            triggerFaceIndex: trigger.faceIndex,
-            barrierRoomSourceIndex: 2,
-            orderedPortalIndices: [1, 0],
-            markerLightObjectHandle: 6_163,
-            openMarkerLightDistance: 50,
-            successMessage: "Excellent!",
-            guidebotInstruction:
-                "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
-            voiceSourceName: "guidebota.osf"
-        ),
-        voiceClip: .init(
-            sourceName: "guidebota.osf",
-            sourceEntryIndex: 0,
-            sampleRate: 22_050,
-            channelCount: 1,
-            frameCount: 1,
-            pcm16LittleEndian: Data(repeating: 0, count: 2),
-            pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
-            sourceArchive: "missions/training.mn3",
-            sourceSHA256: String(repeating: "a", count: 64)
+    return rescriptedTrainingLevel(
+        level.addingTrainingGalleryBarrier(
+            .init(
+                triggerName: trigger.name,
+                triggerRoomSourceIndex: trigger.roomIndex,
+                triggerFaceIndex: trigger.faceIndex,
+                barrierRoomSourceIndex: 2,
+                orderedPortalIndices: [1, 0],
+                markerLightObjectHandle: 6_163,
+                openMarkerLightDistance: 50,
+                successMessage: "Excellent!",
+                guidebotInstruction:
+                    "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
+                voiceSourceName: "guidebota.osf"
+            ),
+            voiceClip: .init(
+                sourceName: "guidebota.osf",
+                sourceEntryIndex: 0,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: Data(repeating: 0, count: 2),
+                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: String(repeating: "a", count: 64)
+            )
         )
     )
 }
@@ -161,13 +163,9 @@ func makeTrainingScript003Level() -> Level {
             sourceSHA256: String(repeating: "a", count: 64)
         )
     }
-    return level.addingTrainingOpeningLesson(
+    let scripted = level.addingTrainingOpeningLesson(
         .init(
             forwardGoalObjectHandle: 12_301,
-            welcomeDelay: 1,
-            welcomeMessage: "Welcome to the Descent 3 Training session.",
-            forwardInstruction: "Move forward until you stop.",
-            welcomeVoiceSourceName: "welcome.osf",
             successMessage: "Excellent!",
             reverseInstruction:
                 "Now use the reverse Key to return to where you started!",
@@ -313,8 +311,23 @@ func makeTrainingScript003Level() -> Level {
                 sourceSHA256: String(repeating: "b", count: 64),
                 importVolume: 0.7
             ),
+            .init(
+                logicalName: "PupC1",
+                sourceName: "Powerup pickup.wav",
+                sourceEntryIndex: 1,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: pcm,
+                pcmSHA256: canonicalSHA256(pcm),
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: String(repeating: "b", count: 64),
+                importVolume: 1
+            ),
         ]
     )
+    // Script 000 and Script 002 come from the Training level module.
+    return addingTrainingMissionScripting(scripted)
 }
 
 func makeTrainingScript015Level() -> Level {
@@ -513,19 +526,21 @@ func makeTrainingScript015Level() -> Level {
         state: "presentation-payload-imported",
         provenance: "synthetic Script 015 fixture"
     )
-    return replacing(
-        level,
-        rooms: level.rooms,
-        objects: level.objects,
-        models: level.models + [finishModel],
-        objectPresentations: level.objectPresentations,
-        trainingOpeningLesson: lesson,
-        voiceClips: level.voiceClips + [proceed2],
-        dependencyManifest: .init(
-            current: level.dependencyManifest.current
-                + [modelDependency, dependency],
-            historicalEagerBaseline:
-                level.dependencyManifest.historicalEagerBaseline
+    return rescriptedTrainingLevel(
+        replacing(
+            level,
+            rooms: level.rooms,
+            objects: level.objects,
+            models: level.models + [finishModel],
+            objectPresentations: level.objectPresentations,
+            trainingOpeningLesson: lesson,
+            voiceClips: level.voiceClips + [proceed2],
+            dependencyManifest: .init(
+                current: level.dependencyManifest.current
+                    + [modelDependency, dependency],
+                historicalEagerBaseline:
+                    level.dependencyManifest.historicalEagerBaseline
+            )
         )
     )
 }
@@ -1198,7 +1213,9 @@ func makeTrainingDodgeAttemptLevel() -> Level {
             "Now keep moving forward into the next room.",
         voiceSourceName: "proceed4.osf"
     )
-    return level
+    return rescriptedTrainingLevel(
+        level
+    )
 }
 
 func replacingTrainingRoom(
@@ -1486,7 +1503,9 @@ func makeTrainingGuidebotBlockedMovementLevel() -> Level {
             ]
         )
     )
-    return level
+    return rescriptedTrainingLevel(
+        level
+    )
 }
 
 func assertTrainingGalleryBarrier(

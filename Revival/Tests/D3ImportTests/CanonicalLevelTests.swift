@@ -2389,7 +2389,11 @@ func replacing(
         ?? level.trainingFinalBotsCompletionChain
     replaced.trainingFinalGoalChain =
         trainingFinalGoalChain ?? level.trainingFinalGoalChain
-    return replaced
+    // Package schema 12 keeps the level's script data, bound again to the
+    // replaced objects and clips.
+    return replaced.schemaVersion == 12 && level.scripting != nil
+        ? rescriptedTrainingLevel(replaced.preservingScripting(of: level))
+        : replaced
 }
 
 func replacing(

@@ -103,14 +103,8 @@ extension WorldRenderingTests {
         dodgeState["turretIsPowered"] = false
         dodgeState["markerLightDistance"] = 50
         continuationObject["trainingDodgeAttemptState"] = dodgeState
-        var openingState = try XCTUnwrap(
-            continuationObject["trainingOpeningState"]
-                as? [String: Any]
-        )
-        openingState["enabledControls"] = 63
-        openingState["timerRemaining"] = Float(1_000)
-        openingState["welcomeWasPresented"] = false
-        continuationObject["trainingOpeningState"] = openingState
+        continuationObject["playerControllerBitflags"] = 63
+        try deferringOsirisTimers(&continuationObject, to: 1_000)
         let continuation = try decodeTestWorld(continuationObject)
         let simulation = try GameSession(
             level: level,
@@ -829,13 +823,7 @@ extension WorldRenderingTests {
         var reachedHighBitObject = try XCTUnwrap(
             testWorldObject(earlyContinuation)
         )
-        var reachedHighBitOpening = try XCTUnwrap(
-            reachedHighBitObject["trainingOpeningState"]
-                as? [String: Any]
-        )
-        reachedHighBitOpening["enabledControls"] = 65
-        reachedHighBitObject["trainingOpeningState"] =
-            reachedHighBitOpening
+        reachedHighBitObject["playerControllerBitflags"] = 65
         let reachedHighBitContinuation = try decodeTestWorld(reachedHighBitObject)
         let restoredEarly = try GameSession(
             level: restoreLevel,
@@ -857,13 +845,7 @@ extension WorldRenderingTests {
         var earlyThenSuccessObject = try XCTUnwrap(
             testWorldObject(earlyContinuation)
         )
-        var earlyThenSuccessOpening = try XCTUnwrap(
-            earlyThenSuccessObject["trainingOpeningState"]
-                as? [String: Any]
-        )
-        earlyThenSuccessOpening["enabledControls"] = 67
-        earlyThenSuccessObject["trainingOpeningState"] =
-            earlyThenSuccessOpening
+        earlyThenSuccessObject["playerControllerBitflags"] = 67
         var earlyThenSuccessState = try XCTUnwrap(
             earlyThenSuccessObject["trainingDodgeAttemptState"]
                 as? [String: Any]

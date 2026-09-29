@@ -2954,13 +2954,8 @@ private func makeScript021ReadySimulation(
     dodge["turretIsPowered"] = false
     dodge["markerLightDistance"] = 50
     object["trainingDodgeAttemptState"] = dodge
-    var opening = try XCTUnwrap(
-        object["trainingOpeningState"] as? [String: Any]
-    )
-    opening["enabledControls"] = 63
-    opening["timerRemaining"] = Float(1_000)
-    opening["welcomeWasPresented"] = false
-    object["trainingOpeningState"] = opening
+    object["playerControllerBitflags"] = 63
+    try deferringOsirisTimers(&object, to: 1_000)
     return try GameSession(
         level: level,
         world: (decodeTestWorld(object)).rebased(onto: level),

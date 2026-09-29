@@ -247,12 +247,7 @@ extension WorldRenderingTests {
         var highBitContinuationObject = try XCTUnwrap(
             testWorldObject(normalStart.world)
         )
-        var highBitOpening = try XCTUnwrap(
-            highBitContinuationObject["trainingOpeningState"]
-                as? [String: Any]
-        )
-        highBitOpening["enabledControls"] = 127
-        highBitContinuationObject["trainingOpeningState"] = highBitOpening
+        highBitContinuationObject["playerControllerBitflags"] = 127
         let highBitContinuation = try decodeTestWorld(highBitContinuationObject)
         var normalFinishObjects = level.objects
         let normalFinishIndex = try XCTUnwrap(
@@ -437,12 +432,7 @@ extension WorldRenderingTests {
         )
 
         var preservedObject = continuationObject
-        var preservedOpening = try XCTUnwrap(
-            preservedObject["trainingOpeningState"]
-                as? [String: Any]
-        )
-        preservedOpening["enabledControls"] = 127
-        preservedObject["trainingOpeningState"] = preservedOpening
+        preservedObject["playerControllerBitflags"] = 127
         let preserved = try decodeTestWorld(preservedObject)
         let preservedSimulation = try GameSession(
             level: baseLevel,

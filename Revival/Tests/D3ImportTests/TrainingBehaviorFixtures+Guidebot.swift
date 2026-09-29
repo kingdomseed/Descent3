@@ -322,7 +322,9 @@ func makeTrainingManeuverFollowLevel() -> Level {
             circleDistance: 25
         )
     )
-    return level
+    return rescriptedTrainingLevel(
+        level
+    )
 }
 
 func makeTrainingMovingTargetHandoffLevel() -> Level {
@@ -514,7 +516,9 @@ func makeTrainingMovingTargetHandoffLevel() -> Level {
                 "Now destroy 2 more robots. This time they will be moving.",
             voiceSourceName: "kill1.osf"
         )
-    return level
+    return rescriptedTrainingLevel(
+        level
+    )
 }
 
 private func pathNode(
@@ -644,48 +648,50 @@ func makeTrainingRobotGuidebotLevel() -> Level {
                 level.dependencyManifest.historicalEagerBaseline
         )
     )
-    return level.addingTrainingRobotGuidebotChain(
-        .init(
-            destroyRobotObjectHandle: 4_112,
-            guidebotObjectHandle: 6_164,
-            destroyRobotRoomSourceIndex: 2,
-            destroyRobotFlags: 5_121,
-            destructionDelay: 2,
-            destructionMessage: "Excellent!",
-            exitInstruction:
-                "Now go through the open doorway, and into the next room.",
-            destructionVoiceSourceName: "proceed5.osf",
-            deployedGuidebotObjectType: 2,
-            deployedGuidebotMessage:
-                "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
-            deployedGuidebotVoiceSourceName: "guidebotb.osf",
-            combat: .stockTraining,
-            guidebot: .stockTraining
-        ),
-        voiceClips: [
+    return rescriptedTrainingLevel(
+        level.addingTrainingRobotGuidebotChain(
             .init(
-                sourceName: "proceed5.osf",
-                sourceEntryIndex: 1,
-                sampleRate: 22_050,
-                channelCount: 1,
-                frameCount: 1,
-                pcm16LittleEndian: Data(repeating: 0, count: 2),
-                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
-                sourceArchive: "missions/training.mn3",
-                sourceSHA256: String(repeating: "b", count: 64)
+                destroyRobotObjectHandle: 4_112,
+                guidebotObjectHandle: 6_164,
+                destroyRobotRoomSourceIndex: 2,
+                destroyRobotFlags: 5_121,
+                destructionDelay: 2,
+                destructionMessage: "Excellent!",
+                exitInstruction:
+                    "Now go through the open doorway, and into the next room.",
+                destructionVoiceSourceName: "proceed5.osf",
+                deployedGuidebotObjectType: 2,
+                deployedGuidebotMessage:
+                    "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
+                deployedGuidebotVoiceSourceName: "guidebotb.osf",
+                combat: .stockTraining,
+                guidebot: .stockTraining
             ),
-            .init(
-                sourceName: "guidebotb.osf",
-                sourceEntryIndex: 2,
-                sampleRate: 22_050,
-                channelCount: 1,
-                frameCount: 1,
-                pcm16LittleEndian: Data(repeating: 0, count: 2),
-                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
-                sourceArchive: "missions/training.mn3",
-                sourceSHA256: String(repeating: "c", count: 64)
-            ),
-        ]
+            voiceClips: [
+                .init(
+                    sourceName: "proceed5.osf",
+                    sourceEntryIndex: 1,
+                    sampleRate: 22_050,
+                    channelCount: 1,
+                    frameCount: 1,
+                    pcm16LittleEndian: Data(repeating: 0, count: 2),
+                    pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+                    sourceArchive: "missions/training.mn3",
+                    sourceSHA256: String(repeating: "b", count: 64)
+                ),
+                .init(
+                    sourceName: "guidebotb.osf",
+                    sourceEntryIndex: 2,
+                    sampleRate: 22_050,
+                    channelCount: 1,
+                    frameCount: 1,
+                    pcm16LittleEndian: Data(repeating: 0, count: 2),
+                    pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+                    sourceArchive: "missions/training.mn3",
+                    sourceSHA256: String(repeating: "c", count: 64)
+                ),
+            ]
+        )
     )
 }
 
@@ -904,18 +910,20 @@ func makeTrainingGuidebotYellowFlareLevel() -> Level {
             provenance: "synthetic Yellow flare fixture"
         ),
     ]
-    return replacing(
-        level,
-        presentationMaterials:
-            level.presentationMaterials
-                + particleMaterials + [explosionMaterial],
-        models: level.models + [flareModel],
-        trainingRobotGuidebotChain: boundChain,
-        soundClips: level.soundClips + [sound],
-        dependencyManifest: .init(
-            current: dependencies,
-            historicalEagerBaseline:
-                level.dependencyManifest.historicalEagerBaseline
+    return rescriptedTrainingLevel(
+        replacing(
+            level,
+            presentationMaterials:
+                level.presentationMaterials
+                    + particleMaterials + [explosionMaterial],
+            models: level.models + [flareModel],
+            trainingRobotGuidebotChain: boundChain,
+            soundClips: level.soundClips + [sound],
+            dependencyManifest: .init(
+                current: dependencies,
+                historicalEagerBaseline:
+                    level.dependencyManifest.historicalEagerBaseline
+            )
         )
     )
 }
@@ -1202,92 +1210,94 @@ func makeTrainingCameraMonitorLevel() -> Level {
             ),
         ]
     )
-    return level.addingTrainingCameraMonitorChain(
-        .init(
-            pickupObjectHandle: 6_167,
-            securityCameraObjectHandle: 6_183,
-            pickupCollisionRadius: 2,
-            pickupMessage:
-                "Excellent.  You now have the Camera Monitor.  Press the Use Inventory key to activate it!",
-            pickupVoiceSourceName: "guidebotc.osf",
-            pickupSoundSourceName: "PupC.wav",
-            useMessage:
-                "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
-            useVoiceSourceName: "guidebotd.osf",
-            popupDuration: 10,
-            popupZoom: 1,
-            cameraGunpointIndex: 0,
-            cameraLocalPosition: .zero,
-            cameraLocalForward: .init(x: 0, y: 0, z: -1),
-            completionTimerDuration: 2,
-            returnToShip: .init(
-                markerLightObjectHandle: 10_245,
-                markerLightPresentation: .init(
-                    primaryColor: .init(x: 1, y: 0.25, z: 0),
-                    secondaryColor: .zero,
-                    timeInterval: 0.5,
-                    flickerDistance: 0.2,
-                    directionalDot: 0,
-                    flags: 4,
-                    timebits: .max,
-                    angle: 0,
-                    lightingRenderType: 2
+    return rescriptedTrainingLevel(
+        level.addingTrainingCameraMonitorChain(
+            .init(
+                pickupObjectHandle: 6_167,
+                securityCameraObjectHandle: 6_183,
+                pickupCollisionRadius: 2,
+                pickupMessage:
+                    "Excellent.  You now have the Camera Monitor.  Press the Use Inventory key to activate it!",
+                pickupVoiceSourceName: "guidebotc.osf",
+                pickupSoundSourceName: "PupC.wav",
+                useMessage:
+                    "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
+                useVoiceSourceName: "guidebotd.osf",
+                popupDuration: 10,
+                popupZoom: 1,
+                cameraGunpointIndex: 0,
+                cameraLocalPosition: .zero,
+                cameraLocalForward: .init(x: 0, y: 0, z: -1),
+                completionTimerDuration: 2,
+                returnToShip: .init(
+                    markerLightObjectHandle: 10_245,
+                    markerLightPresentation: .init(
+                        primaryColor: .init(x: 1, y: 0.25, z: 0),
+                        secondaryColor: .zero,
+                        timeInterval: 0.5,
+                        flickerDistance: 0.2,
+                        directionalDot: 0,
+                        flags: 4,
+                        timebits: .max,
+                        angle: 0,
+                        lightingRenderType: 2
+                    ),
+                    barrierRoomSourceIndex: 2,
+                    orderedPortalIndices: [0, 1],
+                    openMarkerLightDistance: 50,
+                    returnMessage: "GB: Returning to ship.",
+                    returnSoundSourceName: "GBotAcceptOrder.wav",
+                    arrivalMessage: "GB: Entering ship!",
+                    successMessage: "Excellent!",
+                    successVoiceSourceName: "proceed6.osf"
+                )
+            ),
+            voiceClips: [
+                syntheticVoiceClip(
+                    name: "guidebotc.osf",
+                    sourceEntryIndex: 6,
+                    sourceHash: "1"
                 ),
-                barrierRoomSourceIndex: 2,
-                orderedPortalIndices: [0, 1],
-                openMarkerLightDistance: 50,
-                returnMessage: "GB: Returning to ship.",
-                returnSoundSourceName: "GBotAcceptOrder.wav",
-                arrivalMessage: "GB: Entering ship!",
-                successMessage: "Excellent!",
-                successVoiceSourceName: "proceed6.osf"
-            )
-        ),
-        voiceClips: [
-            syntheticVoiceClip(
-                name: "guidebotc.osf",
-                sourceEntryIndex: 6,
-                sourceHash: "1"
-            ),
-            syntheticVoiceClip(
-                name: "guidebotd.osf",
-                sourceEntryIndex: 7,
-                sourceHash: "2"
-            ),
-            syntheticVoiceClip(
-                name: "proceed6.osf",
-                sourceEntryIndex: 26,
-                sourceHash: "4"
-            ),
-        ],
-        soundClips: [
-            .init(
-                logicalName: "PupC1",
-                sourceName: "PupC.wav",
-                sourceEntryIndex: 3,
-                sampleRate: 22_050,
-                channelCount: 1,
-                frameCount: 1,
-                pcm16LittleEndian: Data(repeating: 0, count: 2),
-                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
-                sourceArchive: "missions/training.mn3",
-                sourceSHA256: String(repeating: "3", count: 64),
-                importVolume: 1
-            ),
-            .init(
-                logicalName: "GBotAcceptOrder1",
-                sourceName: "GBotAcceptOrder.wav",
-                sourceEntryIndex: 1_257,
-                sampleRate: 22_050,
-                channelCount: 1,
-                frameCount: 1,
-                pcm16LittleEndian: Data(repeating: 0, count: 2),
-                pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
-                sourceArchive: "missions/training.mn3",
-                sourceSHA256: String(repeating: "5", count: 64),
-                importVolume: 1
-            ),
-        ]
+                syntheticVoiceClip(
+                    name: "guidebotd.osf",
+                    sourceEntryIndex: 7,
+                    sourceHash: "2"
+                ),
+                syntheticVoiceClip(
+                    name: "proceed6.osf",
+                    sourceEntryIndex: 26,
+                    sourceHash: "4"
+                ),
+            ],
+            soundClips: [
+                .init(
+                    logicalName: "PupC1",
+                    sourceName: "PupC.wav",
+                    sourceEntryIndex: 3,
+                    sampleRate: 22_050,
+                    channelCount: 1,
+                    frameCount: 1,
+                    pcm16LittleEndian: Data(repeating: 0, count: 2),
+                    pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+                    sourceArchive: "missions/training.mn3",
+                    sourceSHA256: String(repeating: "3", count: 64),
+                    importVolume: 1
+                ),
+                .init(
+                    logicalName: "GBotAcceptOrder1",
+                    sourceName: "GBotAcceptOrder.wav",
+                    sourceEntryIndex: 1_257,
+                    sampleRate: 22_050,
+                    channelCount: 1,
+                    frameCount: 1,
+                    pcm16LittleEndian: Data(repeating: 0, count: 2),
+                    pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
+                    sourceArchive: "missions/training.mn3",
+                    sourceSHA256: String(repeating: "5", count: 64),
+                    importVolume: 1
+                ),
+            ]
+        )
     )
 }
 
@@ -1401,30 +1411,32 @@ func makeTrainingKillbotEntryLevel(
             )
             : candidate
     } + [trigger]
-    return replacing(
-        level,
-        rooms: rooms,
-        triggers: triggers,
-        surfacePhysics: level.surfacePhysics,
-        trainingGalleryBarrier: syntheticGallery,
-        trainingCameraMonitorChain: updatedCamera,
-        voiceClips: level.voiceClips + addedVoices,
-        dependencyManifest: .init(
-            current: level.dependencyManifest.current
-                + addedVoices.map {
-                    .init(
-                        category: "voice",
-                        source: .init(
-                            storedIndex: $0.sourceEntryIndex,
-                            sourceName: $0.sourceName
-                        ),
-                        state: "canonical-pcm-imported",
-                        provenance:
-                            "\($0.sourceArchive) \($0.sourceSHA256)"
-                    )
-                },
-            historicalEagerBaseline:
-                level.dependencyManifest.historicalEagerBaseline
+    return rescriptedTrainingLevel(
+        replacing(
+            level,
+            rooms: rooms,
+            triggers: triggers,
+            surfacePhysics: level.surfacePhysics,
+            trainingGalleryBarrier: syntheticGallery,
+            trainingCameraMonitorChain: updatedCamera,
+            voiceClips: level.voiceClips + addedVoices,
+            dependencyManifest: .init(
+                current: level.dependencyManifest.current
+                    + addedVoices.map {
+                        .init(
+                            category: "voice",
+                            source: .init(
+                                storedIndex: $0.sourceEntryIndex,
+                                sourceName: $0.sourceName
+                            ),
+                            state: "canonical-pcm-imported",
+                            provenance:
+                                "\($0.sourceArchive) \($0.sourceSHA256)"
+                        )
+                    },
+                historicalEagerBaseline:
+                    level.dependencyManifest.historicalEagerBaseline
+            )
         )
     )
 }

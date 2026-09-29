@@ -45,17 +45,19 @@ func makeTrainingRASBot1DeathLevel() -> Level {
         mediumDistance: nil,
         lowDistance: nil
     ))
-    return level.addingTrainingRASBot1DeathChain(.init(
-        robotObjectHandle: 2_074,
-        robotRoomSourceIndex: {
-            guard case let .room(roomSourceIndex) = player.location else {
-                preconditionFailure("Synthetic Training player is indoor")
-            }
-            return roomSourceIndex
-        }(),
-        robotFlags: 5_121,
-        combat: .stockTraining
-    ))
+    return rescriptedTrainingLevel(
+        level.addingTrainingRASBot1DeathChain(.init(
+            robotObjectHandle: 2_074,
+            robotRoomSourceIndex: {
+                guard case let .room(roomSourceIndex) = player.location else {
+                    preconditionFailure("Synthetic Training player is indoor")
+                }
+                return roomSourceIndex
+            }(),
+            robotFlags: 5_121,
+            combat: .stockTraining
+        ))
+    )
 }
 
 func makeTrainingRASBot2DeathLevel() -> Level {
@@ -107,17 +109,19 @@ func makeTrainingRASBot2DeathLevel() -> Level {
         mediumDistance: nil,
         lowDistance: nil
     ))
-    return level.addingTrainingRASBot2DeathChain(.init(
-        robotObjectHandle: 2_075,
-        robotRoomSourceIndex: {
-            guard case let .room(roomSourceIndex) = player.location else {
-                preconditionFailure("Synthetic Training player is indoor")
-            }
-            return roomSourceIndex
-        }(),
-        robotFlags: 5_121,
-        combat: .stockTraining
-    ))
+    return rescriptedTrainingLevel(
+        level.addingTrainingRASBot2DeathChain(.init(
+            robotObjectHandle: 2_075,
+            robotRoomSourceIndex: {
+                guard case let .room(roomSourceIndex) = player.location else {
+                    preconditionFailure("Synthetic Training player is indoor")
+                }
+                return roomSourceIndex
+            }(),
+            robotFlags: 5_121,
+            combat: .stockTraining
+        ))
+    )
 }
 
 func makeTrainingRASBot3DeathLevel() -> Level {
@@ -208,12 +212,14 @@ func makeTrainingRASBot3DeathLevel() -> Level {
         mediumDistance: nil,
         lowDistance: nil
     ))
-    return level.addingTrainingRASBot3DeathChain(.init(
-        robotObjectHandle: 2_077,
-        robotRoomSourceIndex: 42,
-        robotFlags: 5_121,
-        combat: .stockTraining
-    ))
+    return rescriptedTrainingLevel(
+        level.addingTrainingRASBot3DeathChain(.init(
+            robotObjectHandle: 2_077,
+            robotRoomSourceIndex: 42,
+            robotFlags: 5_121,
+            combat: .stockTraining
+        ))
+    )
 }
 
 func makeTrainingRASBot4DeathLevel() -> Level {
@@ -298,12 +304,14 @@ func makeTrainingRASBot4DeathLevel() -> Level {
         mediumDistance: nil,
         lowDistance: nil
     ))
-    return level.addingTrainingRASBot4DeathChain(.init(
-        robotObjectHandle: 2_078,
-        robotRoomSourceIndex: 0,
-        robotFlags: 5_121,
-        combat: .stockTraining
-    ))
+    return rescriptedTrainingLevel(
+        level.addingTrainingRASBot4DeathChain(.init(
+            robotObjectHandle: 2_078,
+            robotRoomSourceIndex: 0,
+            robotFlags: 5_121,
+            combat: .stockTraining
+        ))
+    )
 }
 
 func makeTrainingInvulnerabilityPickupLevel() -> Level {
@@ -434,20 +442,22 @@ func makeTrainingInvulnerabilityPickupLevel() -> Level {
         sourceSHA256: template.sourceSHA256,
         importVolume: 0.5
     )
-    return level.addingTrainingInvulnerabilityPickupChain(
-        .init(
-            pickupObjectHandle: 2_076,
-            pickupRoomSourceIndex: 12,
-            pickupObjectFlags: 5_120,
-            pickupCollisionRadius: model.collisionRadius,
-            duration: 30,
-            activatedMessage: "Invulnerability On",
-            expiredMessage: "Invulnerability Off",
-            pickupSoundSourceName: "Power03.wav",
-            activatedSoundSourceName: "Invon.wav",
-            expiredSoundSourceName: "Invoff.wav"
-        ),
-        soundClips: [pickup, activated, expired]
+    return rescriptedTrainingLevel(
+        level.addingTrainingInvulnerabilityPickupChain(
+            .init(
+                pickupObjectHandle: 2_076,
+                pickupRoomSourceIndex: 12,
+                pickupObjectFlags: 5_120,
+                pickupCollisionRadius: model.collisionRadius,
+                duration: 30,
+                activatedMessage: "Invulnerability On",
+                expiredMessage: "Invulnerability Off",
+                pickupSoundSourceName: "Power03.wav",
+                activatedSoundSourceName: "Invon.wav",
+                expiredSoundSourceName: "Invoff.wav"
+            ),
+            soundClips: [pickup, activated, expired]
+        )
     )
 }
 
@@ -853,29 +863,31 @@ func makeTrainingCloakPickupLevel() -> Level {
         inertModuleName: nil,
         lightmapSubmodels: []
     ))
-    return lastRoomLevel.addingTrainingLastRoomChain(.init(
-        barrierRoomSourceIndex: 44,
-        orderedPortalIndices: [1, 0],
-        markerLightObjectHandle: 4_117,
-        markerLightPresentation: .init(
-            primaryColor: .init(x: 1, y: 0.25, z: 0),
-            secondaryColor: .zero,
-            timeInterval: 0.5,
-            flickerDistance: 0.2,
-            directionalDot: 0,
-            flags: 4,
-            timebits: .max,
-            angle: 0,
-            lightingRenderType: 2
-        ),
-        openMarkerLightDistance: 50,
-        timerDuration: 2,
-        completionMessages: [
-            "Excellent!",
-            "Now proceed through the doorway that just opened to begin the last stage of your training.",
-        ],
-        completionVoiceSourceName: "proceed5.osf"
-    ))
+    return rescriptedTrainingLevel(
+        lastRoomLevel.addingTrainingLastRoomChain(.init(
+            barrierRoomSourceIndex: 44,
+            orderedPortalIndices: [1, 0],
+            markerLightObjectHandle: 4_117,
+            markerLightPresentation: .init(
+                primaryColor: .init(x: 1, y: 0.25, z: 0),
+                secondaryColor: .zero,
+                timeInterval: 0.5,
+                flickerDistance: 0.2,
+                directionalDot: 0,
+                flags: 4,
+                timebits: .max,
+                angle: 0,
+                lightingRenderType: 2
+            ),
+            openMarkerLightDistance: 50,
+            timerDuration: 2,
+            completionMessages: [
+                "Excellent!",
+                "Now proceed through the doorway that just opened to begin the last stage of your training.",
+            ],
+            completionVoiceSourceName: "proceed5.osf"
+        ))
+    )
 }
 
 func makeTrainingFinalRoomEntryLevel() -> Level {
@@ -897,22 +909,24 @@ func makeTrainingFinalRoomEntryLevel() -> Level {
         activator: 1
     )
     let pcm = Data(repeating: 0, count: 2)
-    return replacing(
-        level,
-        triggers: level.triggers + [trigger]
-    ).addingTrainingFinalRoomEntryChain(
-        chain,
-        voiceClip: .init(
-            sourceName: chain.voiceSourceName,
-            sourceEntryIndex: 16,
-            sampleRate: 22_050,
-            channelCount: 1,
-            frameCount: 1,
-            pcm16LittleEndian: pcm,
-            pcmSHA256: canonicalSHA256(pcm),
-            sourceArchive: "missions/training.mn3",
-            sourceSHA256:
-                "7348ded9ee2c6735ea712b52647f0bfa7478a508c03c10af5f837741a836c67f"
+    return rescriptedTrainingLevel(
+        replacing(
+            level,
+            triggers: level.triggers + [trigger]
+        ).addingTrainingFinalRoomEntryChain(
+            chain,
+            voiceClip: .init(
+                sourceName: chain.voiceSourceName,
+                sourceEntryIndex: 16,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: pcm,
+                pcmSHA256: canonicalSHA256(pcm),
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256:
+                    "7348ded9ee2c6735ea712b52647f0bfa7478a508c03c10af5f837741a836c67f"
+            )
         )
     )
 }
@@ -1002,12 +1016,14 @@ func makeTrainingLastBot1DeathLevel() -> Level {
         mediumDistance: nil,
         lowDistance: nil
     ))
-    return level.addingTrainingLastBot1DeathChain(.init(
-        robotObjectHandle: 4_127,
-        robotRoomSourceIndex: 14,
-        robotFlags: 5_121,
-        combat: .stockTraining
-    ))
+    return rescriptedTrainingLevel(
+        level.addingTrainingLastBot1DeathChain(.init(
+            robotObjectHandle: 4_127,
+            robotRoomSourceIndex: 14,
+            robotFlags: 5_121,
+            combat: .stockTraining
+        ))
+    )
 }
 
 func makeTrainingLastBot2DeathLevel() -> Level {
@@ -1095,12 +1111,14 @@ func makeTrainingLastBot2DeathLevel() -> Level {
         mediumDistance: lastBot1Presentation.mediumDistance,
         lowDistance: lastBot1Presentation.lowDistance
     ))
-    return level.addingTrainingLastBot2DeathChain(.init(
-        robotObjectHandle: 2_080,
-        robotRoomSourceIndex: 46,
-        robotFlags: 5_121,
-        combat: .stockTraining
-    ))
+    return rescriptedTrainingLevel(
+        level.addingTrainingLastBot2DeathChain(.init(
+            robotObjectHandle: 2_080,
+            robotRoomSourceIndex: 46,
+            robotFlags: 5_121,
+            combat: .stockTraining
+        ))
+    )
 }
 
 func makeTrainingLastBot3DeathLevel() -> Level {
@@ -1188,12 +1206,14 @@ func makeTrainingLastBot3DeathLevel() -> Level {
         mediumDistance: lastBot2Presentation.mediumDistance,
         lowDistance: lastBot2Presentation.lowDistance
     ))
-    return level.addingTrainingLastBot3DeathChain(.init(
-        robotObjectHandle: 2_081,
-        robotRoomSourceIndex: 47,
-        robotFlags: 5_121,
-        combat: .stockTraining
-    ))
+    return rescriptedTrainingLevel(
+        level.addingTrainingLastBot3DeathChain(.init(
+            robotObjectHandle: 2_081,
+            robotRoomSourceIndex: 47,
+            robotFlags: 5_121,
+            combat: .stockTraining
+        ))
+    )
 }
 
 func makeTrainingLastBot4DeathLevel() -> Level {
@@ -1234,12 +1254,14 @@ func makeTrainingLastBot4DeathLevel() -> Level {
         mediumDistance: lastBot3Presentation.mediumDistance,
         lowDistance: lastBot3Presentation.lowDistance
     ))
-    return level.addingTrainingLastBot4DeathChain(.init(
-        robotObjectHandle: 2_082,
-        robotRoomSourceIndex: 47,
-        robotFlags: 5_121,
-        combat: .stockTraining
-    ))
+    return rescriptedTrainingLevel(
+        level.addingTrainingLastBot4DeathChain(.init(
+            robotObjectHandle: 2_082,
+            robotRoomSourceIndex: 47,
+            robotFlags: 5_121,
+            combat: .stockTraining
+        ))
+    )
 }
 
 func makeTrainingLastBot5DeathLevel() -> Level {
@@ -1323,12 +1345,14 @@ func makeTrainingLastBot5DeathLevel() -> Level {
         mediumDistance: lastBot4Presentation.mediumDistance,
         lowDistance: lastBot4Presentation.lowDistance
     ))
-    return level.addingTrainingLastBot5DeathChain(.init(
-        robotObjectHandle: 2_083,
-        robotRoomSourceIndex: 48,
-        robotFlags: 5_121,
-        combat: .stockTraining
-    ))
+    return rescriptedTrainingLevel(
+        level.addingTrainingLastBot5DeathChain(.init(
+            robotObjectHandle: 2_083,
+            robotRoomSourceIndex: 48,
+            robotFlags: 5_121,
+            combat: .stockTraining
+        ))
+    )
 }
 
 func makeTrainingFinalBotsCompletionLevel() -> Level {
@@ -1468,18 +1492,20 @@ func makeTrainingFinalBotsCompletionLevel() -> Level {
         completionVoiceSourceName: "done.osf"
     )
     let pcm = Data(repeating: 0, count: 2)
-    return level.addingTrainingFinalBotsCompletionChain(
-        chain,
-        voiceClip: .init(
-            sourceName: chain.completionVoiceSourceName,
-            sourceEntryIndex: 9,
-            sampleRate: 22_050,
-            channelCount: 1,
-            frameCount: 1,
-            pcm16LittleEndian: pcm,
-            pcmSHA256: canonicalSHA256(pcm),
-            sourceArchive: "missions/training.mn3",
-            sourceSHA256: canonicalSHA256(pcm)
+    return rescriptedTrainingLevel(
+        level.addingTrainingFinalBotsCompletionChain(
+            chain,
+            voiceClip: .init(
+                sourceName: chain.completionVoiceSourceName,
+                sourceEntryIndex: 9,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: pcm,
+                pcmSHA256: canonicalSHA256(pcm),
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: canonicalSHA256(pcm)
+            )
         )
     )
 }
@@ -1567,10 +1593,12 @@ func makeTrainingFinalGoalLevel() -> Level {
         ),
         models: models
     )
-    return level.addingTrainingFinalGoalChain(.init(
-        goalObjectHandle: goal.handle,
-        goalRoomSourceIndex: 17,
-        goalObjectFlags: goal.flags,
-        goalCollisionRadius: Float(bitPattern: 0x40a0_84bf)
-    ))
+    return rescriptedTrainingLevel(
+        level.addingTrainingFinalGoalChain(.init(
+            goalObjectHandle: goal.handle,
+            goalRoomSourceIndex: 17,
+            goalObjectFlags: goal.flags,
+            goalCollisionRadius: Float(bitPattern: 0x40a0_84bf)
+        ))
+    )
 }

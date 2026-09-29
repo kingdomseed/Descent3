@@ -3,8 +3,6 @@
 import Foundation
 
 struct TrainingOpeningState: Codable, Equatable, Sendable {
-    var timerRemaining: Float
-    var welcomeWasPresented = false
     var forwardGoalWasReached = false
     var returnGoalWasReached: Bool? = nil
     var rightGoalWasReached: Bool? = nil
@@ -20,7 +18,6 @@ struct TrainingOpeningState: Codable, Equatable, Sendable {
     var startCourseWasPresented: Bool? = nil
     var finishCourseWasPresented: Bool? = nil
     var script030Count: Int? = nil
-    var enabledControls: PlayerControlMask = [.forward]
 }
 
 struct TrainingGalleryBarrierState: Codable, Equatable, Sendable {
@@ -556,8 +553,8 @@ extension GameWorld {
     /// steps replace these with the Training level module.
     mutating func initializeTrainingState(level: Level) {
         let objects = objects
-        trainingOpeningState = level.trainingOpeningLesson.map {
-            TrainingOpeningState(timerRemaining: $0.welcomeDelay)
+        trainingOpeningState = level.trainingOpeningLesson.map { _ in
+            TrainingOpeningState()
         }
         trainingDodgeAttemptState = level.trainingDodgeAttempt.map {
             _ in TrainingDodgeAttemptState()

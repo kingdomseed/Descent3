@@ -9,9 +9,32 @@ final class GameSaveTests: XCTestCase {
             warmupFrames: 18,
             followFrames: 40,
             atSave: { session in
+                // Script 002 ran on frame 11.
                 XCTAssertEqual(
-                    session.world.trainingOpeningState?.welcomeWasPresented,
-                    true
+                    session.world.testTrainingMission?.script002Count,
+                    1
+                )
+            }
+        )
+    }
+
+    /// Timers and level module state (Osiris_ProcessTimers,
+    /// OsirisLoadandBind.cpp:2285): a world saved while Script 000's 1 s
+    /// level timer is pending fires Script 002 on the same frame as the
+    /// uninterrupted world.
+    func testSavedWorldAdvancesIdenticallyAcrossPendingLevelTimer() throws {
+        try assertSaveContinuation(
+            level: makeTrainingScript003Level(),
+            warmupFrames: 5,
+            followFrames: 10,
+            atSave: { session in
+                XCTAssertEqual(
+                    session.world.osirisTimers.entries.count(where: \.isUsed),
+                    1
+                )
+                XCTAssertEqual(
+                    session.world.testTrainingMission?.script002Count,
+                    0
                 )
             }
         )

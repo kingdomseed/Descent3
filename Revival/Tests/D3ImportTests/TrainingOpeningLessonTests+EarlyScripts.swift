@@ -196,8 +196,11 @@ extension WorldRenderingTests {
         compatibleLesson.repeatReturnUp = nil
         compatibleLesson.repeatReturnDown = nil
         compatibleLesson.continueToCourse = nil
+        // A package without the level script data (schema 9): the
+        // Training module would name lright.osf.
         let compatibleLevel = replacing(
             level,
+            schemaVersion: 9,
             trainingOpeningLesson: compatibleLesson,
             voiceClips: level.voiceClips.filter {
                 $0.sourceName != "lright.osf"
@@ -459,8 +462,11 @@ extension WorldRenderingTests {
         compatibleLesson.repeatReturnUp = nil
         compatibleLesson.repeatReturnDown = nil
         compatibleLesson.continueToCourse = nil
+        // A package without the level script data (schema 9): the
+        // Training module would name lright.osf.
         let compatibleLevel = replacing(
             level,
+            schemaVersion: 9,
             trainingOpeningLesson: compatibleLesson,
             voiceClips: level.voiceClips.filter {
                 $0.sourceName != "lright.osf"
@@ -657,7 +663,7 @@ extension WorldRenderingTests {
         )
         unrelatedBitsOpening["forwardGoalWasReached"] = true
         unrelatedBitsOpening["returnGoalWasReached"] = true
-        unrelatedBitsOpening["enabledControls"] = 36
+        unrelatedBitsObject["playerControllerBitflags"] = 36
         unrelatedBitsObject["trainingOpeningState"] = unrelatedBitsOpening
         let unrelatedBitsContinuation = try decodeTestWorld(unrelatedBitsObject)
         let unrelatedBitsRepeat = try resumed(
@@ -1145,10 +1151,6 @@ extension WorldRenderingTests {
         )
         let lesson = TrainingOpeningLesson(
             forwardGoalObjectHandle: goalHandle,
-            welcomeDelay: 1,
-            welcomeMessage: "Welcome to the Descent 3 Training session.",
-            forwardInstruction: "Move forward until you stop.",
-            welcomeVoiceSourceName: "welcome.osf",
             successMessage: "Excellent!",
             reverseInstruction: "Now use the reverse Key to return to where you started!",
             successVoiceSourceName: "return1.osf",
@@ -1183,7 +1185,9 @@ extension WorldRenderingTests {
                 voiceSourceName: "up1.osf"
             )
         )
-        level = level.addingTrainingOpeningLesson(lesson, voiceClips: [])
+        level = addingTrainingMissionScripting(
+            level.addingTrainingOpeningLesson(lesson, voiceClips: [])
+        )
 
         let unconditionalPlayer = try XCTUnwrap(
             level.objects.first {
@@ -1565,24 +1569,27 @@ extension WorldRenderingTests {
             level: timerLevel,
             presentationReadyTimestamp: 0
         )
-        for frameIndex in 1...9 {
+        // Script 000's 1 s level timer fires with the pre-update Gametime
+        // on the 11th 0.1 s frame (Osiris_ProcessTimers).
+        for frameIndex in 1...10 {
             let frame = timerOnly.update(
                 at: Double(frameIndex) * 0.1,
                 input: .zero
             )
             XCTAssertTrue(frame.trainingOpeningFeedback.isEmpty)
         }
-        let welcome = timerOnly.update(at: 1, input: .zero)
+        let welcome = timerOnly.update(at: 1.1, input: .zero)
         XCTAssertEqual(
-            welcome.trainingOpeningFeedback,
-            [.init(
-                hudMessages: [
-                    "Welcome to the Descent 3 Training session.",
-                    "Move forward until you stop.",
-                ],
-                voiceSourceName: "welcome.osf",
-                voicePrecedesHUDMessages: false
-            )]
+            welcome.trainingOpeningFeedback.map(\.hudMessages),
+            [
+                ["Welcome to the Descent 3 Training session."],
+                [],
+                ["Move forward until you stop."],
+            ]
+        )
+        XCTAssertEqual(
+            welcome.trainingOpeningFeedback.map(\.voiceSourceName),
+            ["", "welcome.osf", ""]
         )
         XCTAssertEqual(welcome.enabledPlayerControls, [.forward])
 
@@ -1810,61 +1817,6 @@ extension WorldRenderingTests {
 
     }
 
-    func testTrainingOpeningPreservesGoalThenTimerFeedbackOnTheSameFrame() throws {
-        var level = makeSliceSixObjectRenderLevel()
-        let goalHandle: UInt32 = 12_301
-        let playerIndex = try XCTUnwrap(
-            level.objects.firstIndex { $0.handle == 2_048 }
-        )
-        let goalIndex = try XCTUnwrap(
-            level.objects.firstIndex { $0.handle == goalHandle }
-        )
-        level.objects[goalIndex].position = .init(
-            x: level.objects[playerIndex].position.x,
-            y: level.objects[playerIndex].position.y,
-            z: level.objects[playerIndex].position.z + 0.5
-        )
-        level.objects[goalIndex].location = level.objects[playerIndex].location
-        level = level.addingTrainingOpeningLesson(
-            .init(
-                forwardGoalObjectHandle: goalHandle,
-                welcomeDelay: 0.1,
-                welcomeMessage: "Welcome",
-                forwardInstruction: "Forward",
-                welcomeVoiceSourceName: "welcome.osf",
-                successMessage: "Excellent",
-                reverseInstruction: "Reverse",
-                successVoiceSourceName: "return1.osf"
-            ),
-            voiceClips: []
-        )
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        let simultaneous = simulation.update(
-            at: 0.1,
-            input: .init(forward: 1)
-        )
-        // Script 001 (TrainingMission.cpp:1633-1635) shows "Excellent",
-        // streams return1.osf, then shows the reverse instruction as a
-        // separate HUD message before the level timer's welcome feedback.
-        XCTAssertEqual(
-            simultaneous.trainingOpeningFeedback.map(\.voiceSourceName),
-            ["return1.osf", "", "welcome.osf"]
-        )
-        XCTAssertEqual(
-            simultaneous.trainingOpeningFeedback.map(\.hudMessages),
-            [["Excellent"], ["Reverse"], ["Welcome", "Forward"]]
-        )
-        XCTAssertEqual(
-            RevivalGameplayView.trainingMessageLineCount(
-                for: simultaneous.trainingOpeningFeedback
-            ),
-            4
-        )
-    }
-
     func testTrainingOpeningGoalContactStaysOnReachedIndoorTrace() throws {
         var level = makeSliceSixObjectRenderLevel()
         let playerIndex = try XCTUnwrap(
@@ -1901,16 +1853,13 @@ extension WorldRenderingTests {
         level = level.addingTrainingOpeningLesson(
             .init(
                 forwardGoalObjectHandle: goalHandle,
-                welcomeDelay: 1,
-                welcomeMessage: "Welcome",
-                forwardInstruction: "Forward",
-                welcomeVoiceSourceName: "welcome.osf",
                 successMessage: "Excellent",
                 reverseInstruction: "Reverse",
                 successVoiceSourceName: "return1.osf"
             ),
             voiceClips: []
         )
+        level = addingTrainingMissionScripting(level)
 
         let frame = GameSession(
             level: level,
