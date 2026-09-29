@@ -1675,4 +1675,90 @@ extension WorldRenderingTests {
         )
         XCTAssertFalse(capacityPlan.draws.isEmpty)
     }
+
+    func testConcussionKillOfDestroyRobotOpensGalleryBarrier() throws {
+        // A real concussion missile kills DestroyBot2 (4112). The kill opens
+        // the gallery barrier portals and their reciprocals, as the
+        // double-sided aPortalRenderSet does (DallasFuncs.cpp:1098).
+        var level = try makePlayerConcussionLevel()
+        // The room graph must be reciprocal, as Level.validate requires
+        // (invalidPortal, nonreciprocalPortal).
+        for room in level.rooms {
+            for (portalIndex, portal) in room.portals.enumerated() {
+                let connected = try XCTUnwrap(level.rooms.first {
+                    $0.sourceIndex == portal.connectedRoom
+                })
+                XCTAssertTrue(
+                    connected.portals.indices.contains(portal.connectedPortal),
+                    "room \(room.sourceIndex) portal \(portalIndex)"
+                )
+                guard connected.portals.indices.contains(
+                    portal.connectedPortal
+                ) else { continue }
+                let inverse = connected.portals[portal.connectedPortal]
+                XCTAssertEqual(inverse.connectedRoom, room.sourceIndex)
+                XCTAssertEqual(inverse.connectedPortal, portalIndex)
+            }
+        }
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == 4_112
+        })
+        level.objects[robotIndex].position = .init(
+            x: player.position.x + player.orientation.forward.x * 15,
+            y: player.position.y + player.orientation.forward.y * 15,
+            z: player.position.z + player.orientation.forward.z * 15
+        )
+        level.objects[robotIndex].location = player.location
+        let simulation = GameSession(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x1234_5678
+        )
+        // One direct hit (9) kills it. The shockwave pushes the robot off
+        // the line of fire, so later missiles would miss.
+        simulation.world.trainingRobotGuidebotState?.robotShields = 5
+
+        var time: Double = 0
+        while simulation.world.trainingRobotGuidebotState?.robotWasDestroyed
+            == false, time < 10
+        {
+            time += 0.1
+            _ = simulation.update(
+                at: time,
+                input: .init(firesSecondaryWeapon: true)
+            )
+        }
+        XCTAssertEqual(
+            simulation.world.trainingRobotGuidebotState?.robotWasDestroyed,
+            true
+        )
+        for _ in 0..<30 {
+            time += 0.1
+            _ = simulation.update(at: time, input: .zero)
+        }
+
+        let barrier = try XCTUnwrap(level.trainingGalleryBarrier)
+        let roomIndex = try XCTUnwrap(level.rooms.firstIndex {
+            $0.sourceIndex == barrier.barrierRoomSourceIndex
+        })
+        for portalIndex in barrier.orderedPortalIndices {
+            XCTAssertEqual(
+                simulation.world.rooms[roomIndex].portalFlags[portalIndex] & 1,
+                0
+            )
+            let portal = level.rooms[roomIndex].portals[portalIndex]
+            let connectedIndex = try XCTUnwrap(level.rooms.firstIndex {
+                $0.sourceIndex == portal.connectedRoom
+            })
+            XCTAssertEqual(
+                simulation.world.rooms[connectedIndex]
+                    .portalFlags[portal.connectedPortal] & 1,
+                0
+            )
+        }
+        XCTAssertNoThrow(try simulation.world.validate(against: level))
+    }
 }

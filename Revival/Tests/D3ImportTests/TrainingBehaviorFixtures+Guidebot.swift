@@ -694,14 +694,7 @@ func makeTrainingGuidebotYellowFlareLevel() -> Level {
     let roomIndex = level.rooms.firstIndex { $0.sourceIndex == 1 }!
     let room = level.rooms[roomIndex]
     level.rooms[roomIndex] = addingSourceContainmentShell(
-        to: .init(
-            sourceIndex: room.sourceIndex,
-            name: room.name,
-            pathPoint: room.pathPoint,
-            vertices: [],
-            faces: [],
-            portals: []
-        ),
+        to: room,
         center: room.pathPoint,
         texture: level.surfacePhysics[0].texture,
         halfExtent: 500
