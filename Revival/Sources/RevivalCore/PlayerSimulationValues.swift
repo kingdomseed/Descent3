@@ -2,24 +2,6 @@
 
 import Foundation
 
-struct TrainingOpeningState: Codable, Equatable, Sendable {
-    var forwardGoalWasReached = false
-    var returnGoalWasReached: Bool? = nil
-    var rightGoalWasReached: Bool? = nil
-    var upGoalWasReached: Bool? = nil
-    var downGoalWasReached: Bool? = nil
-    var repeatForwardWasPresented: Bool? = nil
-    var repeatForwardGoalWasPresented: Bool? = nil
-    var repeatReturnLeftWasPresented: Bool? = nil
-    var repeatReturnRightWasPresented: Bool? = nil
-    var repeatReturnUpWasPresented: Bool? = nil
-    var repeatReturnDownWasPresented: Bool? = nil
-    var continueToCourseWasPresented: Bool? = nil
-    var startCourseWasPresented: Bool? = nil
-    var finishCourseWasPresented: Bool? = nil
-    var script030Count: Int? = nil
-}
-
 struct TrainingGalleryBarrierState: Codable, Equatable, Sendable {
     var wasTriggered = false
     var markerLightDistance: Float
@@ -392,13 +374,11 @@ struct TrainingDodgeProjectileState:
 struct TrainingDodgeAttemptState:
     Codable, Equatable, Sendable
 {
-    var script033Count = 0
     var script016Count = 0
     var script017Count = 0
     var script019Count: Int? = nil
     var script018Count = 0
     var script020Count = 0
-    var triggerTimerRemaining: Float?
     var successTimerRemaining: Float?
     var almostDoneTimerRemaining: Float?
     var turretIsPowered = false
@@ -553,9 +533,6 @@ extension GameWorld {
     /// steps replace these with the Training level module.
     mutating func initializeTrainingState(level: Level) {
         let objects = objects
-        trainingOpeningState = level.trainingOpeningLesson.map { _ in
-            TrainingOpeningState()
-        }
         trainingDodgeAttemptState = level.trainingDodgeAttempt.map {
             _ in TrainingDodgeAttemptState()
         }

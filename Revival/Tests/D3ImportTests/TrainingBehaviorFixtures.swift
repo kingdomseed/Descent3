@@ -100,43 +100,14 @@ func makeTrainingGalleryBarrierLevel() -> Level {
     )
 }
 
+/// The Training opening lessons' level (TrainingMission.cpp Scripts
+/// 000-015): the Slice 6 room with the opening goals, the streams and the
+/// MenuBeepEnter sound the scripts play, room 2 named PortalRoom1, and the
+/// Training level module.
 func makeTrainingScript003Level() -> Level {
-    let level = makeSliceSixObjectRenderLevel()
-    let startGoalHandle: UInt32 = 12_300
-    let presentation = level.objectPresentations.first {
-        $0.objectHandle == startGoalHandle
-    }!
-    let model = level.models.first {
-        $0.source == presentation.primaryModel
-    }!
-    let leftGoalHandle: UInt32 = 12_299
-    let leftPresentation = level.objectPresentations.first {
-        $0.objectHandle == leftGoalHandle
-    }!
-    let leftModel = level.models.first {
-        $0.source == leftPresentation.primaryModel
-    }!
-    let forwardGoalHandle: UInt32 = 12_301
-    let forwardPresentation = level.objectPresentations.first {
-        $0.objectHandle == forwardGoalHandle
-    }!
-    let forwardModel = level.models.first {
-        $0.source == forwardPresentation.primaryModel
-    }!
-    let upGoalHandle: UInt32 = 18_441
-    let upGoalPresentation = level.objectPresentations.first {
-        $0.objectHandle == upGoalHandle
-    }!
-    let upGoalModel = level.models.first {
-        $0.source == upGoalPresentation.primaryModel
-    }!
-    let startCourseHandle: UInt32 = 6_147
-    let startCoursePresentation = level.objectPresentations.first {
-        $0.objectHandle == startCourseHandle
-    }!
-    let startCourseModel = level.models.first {
-        $0.source == startCoursePresentation.primaryModel
-    }!
+    var level = makeSliceSixObjectRenderLevel()
+    let portalRoomOne = level.rooms.firstIndex { $0.sourceIndex == 2 }!
+    level.rooms[portalRoomOne].name = "PortalRoom1"
     let pcm = Data(repeating: 0, count: 2)
     let clips = [
         ("welcome.osf", 38),
@@ -163,139 +134,7 @@ func makeTrainingScript003Level() -> Level {
             sourceSHA256: String(repeating: "a", count: 64)
         )
     }
-    let scripted = level.addingTrainingOpeningLesson(
-        .init(
-            forwardGoalObjectHandle: 12_301,
-            successMessage: "Excellent!",
-            reverseInstruction:
-                "Now use the reverse Key to return to where you started!",
-            successVoiceSourceName: "return1.osf",
-            returnLeft: .init(
-                startGoalObjectHandle: startGoalHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: model,
-                    objectType: 7
-                ),
-                instruction: "Now Go Left until you stop.",
-                voiceSourceName: "left1.osf"
-            ),
-            returnRight: .init(
-                leftGoalObjectHandle: leftGoalHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: leftModel,
-                    objectType: 7
-                ),
-                successMessage: "Excellent!",
-                instruction:
-                    "Now Slide right until you return to the start position.",
-                voiceSourceName: "return2.osf"
-            ),
-            returnUp: .init(
-                startGoalObjectHandle: startGoalHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: model,
-                    objectType: 7
-                ),
-                successMessage: "Excellent!",
-                instruction: "Now Slide up  until you stop.",
-                voiceSourceName: "up1.osf"
-            ),
-            returnDown: .init(
-                upGoalObjectHandle: 18_441,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: model,
-                    objectType: 7
-                ),
-                successMessage: "Excellent!",
-                instruction:
-                    "Now Slide down until you return to the start position.",
-                voiceSourceName: "return3.osf"
-            ),
-            repeatForward: .init(
-                startGoalObjectHandle: startGoalHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: model,
-                    objectType: 7
-                ),
-                successMessage: "Excellent!",
-                repeatMessage: "Let's repeat the exercise we just did.",
-                forwardInstruction: "Move forward until you stop.",
-                voiceSourceName: "repeat.osf"
-            ),
-            repeatForwardGoal: .init(
-                forwardGoalObjectHandle: forwardGoalHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: forwardModel,
-                    objectType: 7
-                ),
-                reverseInstruction:
-                    "Now use the reverse Key to return to where you started!",
-                soundLogicalName: "MenuBeepEnter"
-            ),
-            repeatReturnLeft: .init(
-                startGoalObjectHandle: startGoalHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: model,
-                    objectType: 7
-                ),
-                instruction: "Now Go Left until you stop.",
-                voiceSourceName: "lright.osf"
-            ),
-            repeatReturnRight: .init(
-                leftGoalObjectHandle: leftGoalHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: leftModel,
-                    objectType: 7
-                ),
-                instruction:
-                    "Now Slide right until you return to the start position.",
-                soundLogicalName: "MenuBeepEnter"
-            ),
-            repeatReturnUp: .init(
-                startGoalObjectHandle: startGoalHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: model,
-                    objectType: 7
-                ),
-                instruction: "Now Slide up  until you stop.",
-                voiceSourceName: "udown.osf"
-            ),
-            repeatReturnDown: .init(
-                upGoalObjectHandle: upGoalHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: upGoalModel,
-                    objectType: 7
-                ),
-                instruction:
-                    "Now Slide down until you return to the start position.",
-                soundLogicalName: "MenuBeepEnter"
-            ),
-            continueToCourse: .init(
-                startGoalObjectHandle: startGoalHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: model,
-                    objectType: 7
-                ),
-                portalRoomSourceIndex: 2,
-                orderedPortalIndices: [0, 1],
-                instruction:
-                    "Continue Sliding down to start the next step.",
-                voiceSourceName: "proceed1.osf"
-            ),
-            startCourse: .init(
-                startCourseObjectHandle: startCourseHandle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: startCourseModel,
-                    objectType: 7
-                ),
-                portalRoomSourceIndex: 2,
-                portalIndex: 1,
-                instruction:
-                    "Now, manuever through this tunnel using the sliding skills you just learned.",
-                voiceSourceName: "intro1.osf",
-                enabledControlMask: 63
-            )
-        ),
+    let scripted = level.addingAudioClips(
         voiceClips: clips,
         soundClips: [
             .init(
@@ -485,20 +324,6 @@ func makeTrainingScript015Level() -> Level {
         connections: [(0, 49, 1, true)]
     ))
 
-    var lesson = level.trainingOpeningLesson!
-    lesson.finishCourse = .init(
-        finishCourseObjectHandle: 6_150,
-        collisionRadius: sourceObjectPresentationSize(
-            model: finishModel,
-            objectType: 7
-        ),
-        portalRoomSourceIndex: 49,
-        orderedPortalIndices: [0, 1],
-        successMessage: "Excellent!",
-        instruction: "Continue Sliding down to start the next step.",
-        voiceSourceName: "proceed2.osf",
-        enabledControlMask: 32
-    )
     let pcm = Data(repeating: 0, count: 2)
     let proceed2 = CanonicalVoiceClip(
         sourceName: "proceed2.osf",
@@ -533,7 +358,6 @@ func makeTrainingScript015Level() -> Level {
             objects: level.objects,
             models: level.models + [finishModel],
             objectPresentations: level.objectPresentations,
-            trainingOpeningLesson: lesson,
             voiceClips: level.voiceClips + [proceed2],
             dependencyManifest: .init(
                 current: level.dependencyManifest.current

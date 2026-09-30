@@ -417,19 +417,14 @@ final class GameSaveTests: XCTestCase {
 
     func testLoadValidationRejectsMissingRequiredObjects() throws {
         let level = makeTrainingMovingTargetHandoffLevel()
-        let lesson = try XCTUnwrap(level.trainingOpeningLesson)
         let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
         let world = GameSession(level: level, presentationReadyTimestamp: 0)
             .world
+        // A script goal is found by handle at each use, so a world without
+        // it still loads (ObjGet returns NULL, object.cpp:3231).
         var missingGoal = world
-        missingGoal.objects.delete(
-            ObjectHandle(lesson.forwardGoalObjectHandle)
-        )
-        assertRejected(
-            .objectReference(lesson.forwardGoalObjectHandle),
-            missingGoal,
-            level: level
-        )
+        missingGoal.objects.delete(level.findObjectName("ForwardGoal"))
+        XCTAssertNoThrow(try missingGoal.validate(against: level))
         var missingTurret = world
         missingTurret.objects.delete(
             ObjectHandle(dodge.dodgeTurretObjectHandle)
@@ -518,7 +513,9 @@ final class GameSaveTests: XCTestCase {
             level: dodgeLevel
         )
         var scriptCounter = dodgeWorld
-        scriptCounter.trainingOpeningState?.script030Count = Int.max
+        var counters = try XCTUnwrap(scriptCounter.testTrainingMission)
+        counters.script030Count = Int.max
+        scriptCounter.levelModule = .trainingMission(counters)
         assertRejected(
             .outOfDomain("script030Count"),
             scriptCounter,

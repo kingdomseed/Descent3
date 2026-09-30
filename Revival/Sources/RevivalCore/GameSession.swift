@@ -126,10 +126,6 @@ final class GameSession {
         get { world.playerYellowFlareState }
         set { world.playerYellowFlareState = newValue }
     }
-    var trainingOpeningState: TrainingOpeningState? {
-        get { world.trainingOpeningState }
-        set { world.trainingOpeningState = newValue }
-    }
     var trainingDodgeAttemptState: TrainingDodgeAttemptState? {
         get { world.trainingDodgeAttemptState }
         set { world.trainingDodgeAttemptState = newValue }
@@ -611,7 +607,8 @@ final class GameSession {
     /// frame's presentation list, in request order. A streamed file name
     /// becomes the level's canonical voice key (package schema 12). The
     /// voice path plays each clip at its imported volume, and every
-    /// translated call passes volume 1.
+    /// translated call passes volume 1. A 2D sound plays its sound clip at
+    /// the clip's import volume times the requested volume.
     func takeScriptPresentation() -> [TrainingOpeningFeedback] {
         let requests = world.presentationRequests
         world.presentationRequests = []
@@ -629,6 +626,14 @@ final class GameSession {
                     voiceSourceName: level.scripting?.streamedAudio
                         .first { $0.name == name }?.key ?? name,
                     voicePrecedesHUDMessages: false
+                )
+            case let .sound2D(index, volume):
+                TrainingOpeningFeedback(
+                    hudMessages: [],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false,
+                    soundSourceName: level.soundClips[index].logicalName,
+                    soundEventVolume: volume
                 )
             }
         }

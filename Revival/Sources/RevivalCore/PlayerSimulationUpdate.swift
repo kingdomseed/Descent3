@@ -77,16 +77,6 @@ extension GameSession {
             : input.applying(currentEnabledControls)
         var playerHeadlightFeedback: TrainingOpeningFeedback?
         var playerConcussionFeedback: [TrainingOpeningFeedback] = []
-        if var state = trainingOpeningState,
-           state.startCourseWasPresented == true,
-           shields < 50 {
-            shields = 50
-            state.script030Count = min(
-                (state.script030Count ?? 0) + 1,
-                trainingScriptActionCounterMaximum
-            )
-            trainingOpeningState = state
-        }
         if input.togglesHeadlight {
             playerHeadlightIsOn.toggle()
             playerHeadlightFeedback = TrainingOpeningFeedback(
@@ -241,12 +231,8 @@ extension GameSession {
         let view = defaultPlayerView(in: level, objects: world.objects)
         var position = object.position
         var roomSourceIndex = startRoom
-        var trainingForwardGoalWasReachedThisFrame = false
-        var trainingStartGoalWasReachedThisFrame = false
-        var trainingStartCourseWasReachedThisFrame = false
-        var trainingFinishCourseWasReachedThisFrame = false
-        var trainingLeftGoalWasReachedThisFrame = false
-        var trainingDownGoalWasReachedThisFrame = false
+        // The objects hit this frame (ignore_obj_list, physics.cpp:1535).
+        var collidedObjects: [ObjectHandle] = []
         var trainingGalleryWasCrossedThisFrame = false
         var trainingKillbotEntryWasCrossedThisFrame = false
         var trainingFinalRoomEntryWasCrossedThisFrame = false
@@ -348,88 +334,6 @@ extension GameSession {
                     in: level,
                     passedPortalFaces: trace.passedPortalFaces
                 )
-            if let lesson = level.trainingOpeningLesson {
-                trainingForwardGoalWasReachedThisFrame =
-                    trainingForwardGoalWasReached(
-                        in: level,
-                        objects: world.objects,
-                        lesson: lesson,
-                        playerStart: traceStart,
-                        playerEnd: trace.finalPosition,
-                        playerRadius: view.collisionRadius,
-                        visitedRoomSourceIndices:
-                            trace.visitedRoomSourceIndices
-                    )
-                trainingStartGoalWasReachedThisFrame =
-                    trainingStartGoalWasReached(
-                        in: level,
-                        objects: world.objects,
-                        lesson: lesson,
-                        playerStart: traceStart,
-                        playerEnd: trace.finalPosition,
-                        playerRadius: view.collisionRadius,
-                        visitedRoomSourceIndices:
-                            trace.visitedRoomSourceIndices
-                    )
-                if let startCourse = lesson.startCourse {
-                    trainingStartCourseWasReachedThisFrame =
-                        trainingStartCourseWasReached(
-                            in: level,
-                            objects: world.objects,
-                            lesson: startCourse,
-                            playerStart: traceStart,
-                            playerEnd: trace.finalPosition,
-                            playerRadius: view.collisionRadius,
-                            visitedRoomSourceIndices:
-                                trace.visitedRoomSourceIndices
-                        )
-                }
-                if let finishCourse = lesson.finishCourse {
-                    trainingFinishCourseWasReachedThisFrame =
-                        trainingFinishCourseWasReached(
-                            in: level,
-                            objects: world.objects,
-                            lesson: finishCourse,
-                            playerStart: traceStart,
-                            playerEnd: trace.finalPosition,
-                            playerRadius: view.collisionRadius,
-                            visitedRoomSourceIndices:
-                                trace.visitedRoomSourceIndices
-                        )
-                }
-                if let returnRight = lesson.returnRight {
-                    trainingLeftGoalWasReachedThisFrame =
-                        trainingLeftGoalWasReached(
-                            in: level,
-                            objects: world.objects,
-                            lesson: returnRight,
-                            playerStart: traceStart,
-                            playerEnd: trace.finalPosition,
-                            playerRadius: view.collisionRadius,
-                            visitedRoomSourceIndices:
-                                trace.visitedRoomSourceIndices
-                        )
-                }
-                if trainingOpeningState?.downGoalWasReached != true
-                    || (
-                        trainingOpeningState?
-                            .repeatReturnDownWasPresented != true
-                        && lesson.repeatReturnDown != nil
-                    ),
-                   let returnDown = lesson.returnDown {
-                    trainingDownGoalWasReachedThisFrame =
-                        trainingDownGoalWasReached(
-                            in: level,
-                            objects: world.objects,
-                            lesson: returnDown,
-                            playerStart: traceStart,
-                            playerEnd: trace.finalPosition,
-                            playerRadius: view.collisionRadius,
-                            visitedRoomSourceIndices:
-                                trace.visitedRoomSourceIndices
-                        )
-                }
-            }
             if case .noHit = trace.outcome {
                 position = trace.finalPosition
                 roomSourceIndex = trace.containingRoomSourceIndex
@@ -459,7 +363,11 @@ extension GameSession {
                 duration: remainingDuration
             )
             let traceStart = position
-            let trace = traceIndoorMovement(
+            // fvi_FindIntersection returns the nearest hit, a wall or an
+            // object (physics.cpp:986-1080). The walls come from the
+            // current portal flags, so a script that changed them during an
+            // earlier object hit of this frame is seen here.
+            let wallTrace = traceIndoorMovement(
                 in: level,
                 roomStates: world.rooms,
                 startRoom: roomSourceIndex,
@@ -467,6 +375,27 @@ extension GameSession {
                 end: integrated.position,
                 radius: view.collisionRadius
             )
+            let objectHit = world.nearestMoveObjectHit(
+                playerHandle,
+                start: traceStart,
+                end: wallTrace.finalPosition,
+                radius: view.collisionRadius,
+                visitedRoomSourceIndices: wallTrace.visitedRoomSourceIndices,
+                ignored: collidedObjects,
+                level: level
+            )
+            let trace = objectHit.map { hit in
+                let move = wallTrace.finalPosition - traceStart
+                let length = sqrt(dot(move, move))
+                return traceIndoorMovement(
+                    in: level,
+                    roomStates: world.rooms,
+                    startRoom: roomSourceIndex,
+                    start: traceStart,
+                    end: traceStart + move * (hit.distance / length),
+                    radius: view.collisionRadius
+                )
+            } ?? wallTrace
             trainingCameraMonitorWasHitThisFrame =
                 trainingCameraMonitorWasHitThisFrame
                 || trainingCameraMonitorPickupWasHit(
@@ -534,100 +463,36 @@ extension GameSession {
                     in: level,
                     passedPortalFaces: trace.passedPortalFaces
                 )
-            if !trainingForwardGoalWasReachedThisFrame,
-               let lesson = level.trainingOpeningLesson {
-                trainingForwardGoalWasReachedThisFrame =
-                    trainingForwardGoalWasReached(
-                        in: level,
-                        objects: world.objects,
-                        lesson: lesson,
-                        playerStart: traceStart,
-                        playerEnd: trace.finalPosition,
-                        playerRadius: view.collisionRadius,
-                        visitedRoomSourceIndices:
-                            trace.visitedRoomSourceIndices
-                    )
-            }
-            if !trainingStartGoalWasReachedThisFrame,
-               let lesson = level.trainingOpeningLesson {
-                trainingStartGoalWasReachedThisFrame =
-                    trainingStartGoalWasReached(
-                        in: level,
-                        objects: world.objects,
-                        lesson: lesson,
-                        playerStart: traceStart,
-                        playerEnd: trace.finalPosition,
-                        playerRadius: view.collisionRadius,
-                        visitedRoomSourceIndices:
-                            trace.visitedRoomSourceIndices
-                    )
-            }
-            if !trainingStartCourseWasReachedThisFrame,
-               let startCourse =
-                    level.trainingOpeningLesson?.startCourse {
-                trainingStartCourseWasReachedThisFrame =
-                    trainingStartCourseWasReached(
-                        in: level,
-                        objects: world.objects,
-                        lesson: startCourse,
-                        playerStart: traceStart,
-                        playerEnd: trace.finalPosition,
-                        playerRadius: view.collisionRadius,
-                        visitedRoomSourceIndices:
-                            trace.visitedRoomSourceIndices
-                    )
-            }
-            if !trainingFinishCourseWasReachedThisFrame,
-               let finishCourse =
-                    level.trainingOpeningLesson?.finishCourse {
-                trainingFinishCourseWasReachedThisFrame =
-                    trainingFinishCourseWasReached(
-                        in: level,
-                        objects: world.objects,
-                        lesson: finishCourse,
-                        playerStart: traceStart,
-                        playerEnd: trace.finalPosition,
-                        playerRadius: view.collisionRadius,
-                        visitedRoomSourceIndices:
-                            trace.visitedRoomSourceIndices
-                    )
-            }
-            if !trainingLeftGoalWasReachedThisFrame,
-               let returnRight = level.trainingOpeningLesson?.returnRight {
-                trainingLeftGoalWasReachedThisFrame =
-                    trainingLeftGoalWasReached(
-                        in: level,
-                        objects: world.objects,
-                        lesson: returnRight,
-                        playerStart: traceStart,
-                        playerEnd: trace.finalPosition,
-                        playerRadius: view.collisionRadius,
-                        visitedRoomSourceIndices:
-                            trace.visitedRoomSourceIndices
-                    )
-            }
-            if !trainingDownGoalWasReachedThisFrame,
-               (
-                   trainingOpeningState?.downGoalWasReached != true
-                    || (
-                        trainingOpeningState?
-                            .repeatReturnDownWasPresented != true
-                        && level.trainingOpeningLesson?
-                            .repeatReturnDown != nil
-                    )
-               ),
-               let returnDown = level.trainingOpeningLesson?.returnDown {
-                trainingDownGoalWasReachedThisFrame =
-                    trainingDownGoalWasReached(
-                        in: level,
-                        objects: world.objects,
-                        lesson: returnDown,
-                        playerStart: traceStart,
-                        playerEnd: trace.finalPosition,
-                        playerRadius: view.collisionRadius,
-                        visitedRoomSourceIndices:
-                            trace.visitedRoomSourceIndices
-                    )
+            // HIT_OBJECT (physics.cpp:1503-1560): the player stops at the
+            // hit point, the remaining time shrinks by the distance moved,
+            // collide_two_objects runs, and a powerup goes on the ignore list.
+            // The count-- (:1556) means a powerup hit does not use up a loop.
+            // The wiggle move ignores powerups (FQ_IGNORE_POWERUPS, :796).
+            if let objectHit {
+                let attemptedDistance =
+                    vectorDistance(position, integrated.position)
+                let movedDistance = vectorDistance(
+                    position,
+                    trace.finalPosition
+                )
+                let priorRemainingDuration = remainingDuration
+                remainingDuration = priorRemainingDuration
+                    * ((attemptedDistance - movedDistance) / attemptedDistance)
+                let movedTime = priorRemainingDuration - remainingDuration
+                if movedTime > 0.0001 {
+                    velocity = (trace.finalPosition - position) / movedTime
+                }
+                position = trace.finalPosition
+                roomSourceIndex = trace.containingRoomSourceIndex
+                world.objects[playerHandle]!.position = position
+                world.objects[playerHandle]!.location = .room(roomSourceIndex)
+                collidedObjects.append(objectHit.handle)
+                world.collideTwoObjects(
+                    playerHandle,
+                    objectHit.handle,
+                    level: level
+                )
+                continue
             }
             guard case let .wallHit(contact) = trace.outcome else {
                 position = trace.finalPosition
@@ -1110,26 +975,17 @@ extension GameSession {
             }
             trainingRobotGuidebotState = state
         }
-        advanceTrainingOpeningLesson(
-            systemsFrameDuration: systemsFrameDuration,
-            trainingForwardGoalWasReachedThisFrame:
-                trainingForwardGoalWasReachedThisFrame,
-            trainingStartGoalWasReachedThisFrame:
-                trainingStartGoalWasReachedThisFrame,
-            trainingLeftGoalWasReachedThisFrame:
-                trainingLeftGoalWasReachedThisFrame,
-            trainingDownGoalWasReachedThisFrame:
-                trainingDownGoalWasReachedThisFrame,
-            trainingStartCourseWasReachedThisFrame:
-                trainingStartCourseWasReachedThisFrame,
-            trainingFinishCourseWasReachedThisFrame:
-                trainingFinishCourseWasReachedThisFrame,
-            trainingOpeningFeedback: &trainingOpeningFeedback
-        )
         // DoPlayerFrame, the level EVT_INTERVAL, then Osiris_ProcessTimers
         // (GameLoop.cpp:2992, :3013-3014), with the previous Frametime and
         // the pre-update Gametime.
         world.doPlayerInvulnerabilityFrame(frameTime: systemsFrameDuration)
+        world.osirisCallLevelEvent(
+            .interval(
+                frameTime: systemsFrameDuration,
+                gameTime: systemsGameTime
+            ),
+            level: level
+        )
         world.osirisProcessTimers(level: level)
         trainingOpeningFeedback.append(
             contentsOf: takeScriptPresentation()
@@ -1694,256 +1550,6 @@ extension GameSession {
         )
     }
 
-    func advanceTrainingOpeningLesson(
-        systemsFrameDuration: Float,
-        trainingForwardGoalWasReachedThisFrame: Bool,
-        trainingStartGoalWasReachedThisFrame: Bool,
-        trainingLeftGoalWasReachedThisFrame: Bool,
-        trainingDownGoalWasReachedThisFrame: Bool,
-        trainingStartCourseWasReachedThisFrame: Bool,
-        trainingFinishCourseWasReachedThisFrame: Bool,
-        trainingOpeningFeedback: inout [TrainingOpeningFeedback]
-    ) {
-        if var openingState = trainingOpeningState,
-           let lesson = level.trainingOpeningLesson {
-            if !openingState.forwardGoalWasReached,
-               trainingForwardGoalWasReachedThisFrame {
-                openingState.forwardGoalWasReached = true
-                world.playerControllerBitflags.remove(.forward)
-                world.playerControllerBitflags.insert(.reverse)
-                trainingOpeningFeedback.append(contentsOf: [
-                    TrainingOpeningFeedback(
-                        hudMessages: [lesson.successMessage],
-                        voiceSourceName: lesson.successVoiceSourceName,
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [lesson.reverseInstruction],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                ])
-            }
-            if openingState.repeatForwardWasPresented == true,
-               openingState.repeatForwardGoalWasPresented != true,
-               trainingForwardGoalWasReachedThisFrame,
-               let repeatForwardGoal = lesson.repeatForwardGoal {
-                world.playerControllerBitflags.remove(.forward)
-                world.playerControllerBitflags.insert(.reverse)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [repeatForwardGoal.reverseInstruction],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false,
-                    soundSourceName: repeatForwardGoal.soundLogicalName
-                ))
-                openingState.repeatForwardGoalWasPresented = true
-            }
-            if openingState.forwardGoalWasReached,
-               openingState.returnGoalWasReached != true,
-               trainingStartGoalWasReachedThisFrame,
-               let returnLeft = lesson.returnLeft {
-                world.playerControllerBitflags.remove(.reverse)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [returnLeft.instruction],
-                    voiceSourceName: returnLeft.voiceSourceName,
-                    voicePrecedesHUDMessages: false
-                ))
-                world.playerControllerBitflags.insert(.left)
-                openingState.returnGoalWasReached = true
-            }
-            if openingState.rightGoalWasReached != true,
-               trainingLeftGoalWasReachedThisFrame,
-               let returnRight = lesson.returnRight {
-                world.playerControllerBitflags.remove(.left)
-                world.playerControllerBitflags.insert(.right)
-                trainingOpeningFeedback.append(contentsOf: [
-                    TrainingOpeningFeedback(
-                        hudMessages: [returnRight.successMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [returnRight.instruction],
-                        voiceSourceName: returnRight.voiceSourceName,
-                        voicePrecedesHUDMessages: true
-                    ),
-                ])
-                openingState.rightGoalWasReached = true
-            }
-            if openingState.rightGoalWasReached == true,
-               openingState.upGoalWasReached != true,
-               trainingStartGoalWasReachedThisFrame,
-               let returnUp = lesson.returnUp {
-                world.playerControllerBitflags.remove(.right)
-                world.playerControllerBitflags.insert(.up)
-                trainingOpeningFeedback.append(contentsOf: [
-                    TrainingOpeningFeedback(
-                        hudMessages: [returnUp.successMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [returnUp.instruction],
-                        voiceSourceName: returnUp.voiceSourceName,
-                        voicePrecedesHUDMessages: true
-                    ),
-                ])
-                openingState.upGoalWasReached = true
-            }
-            if openingState.downGoalWasReached != true,
-               trainingDownGoalWasReachedThisFrame,
-               let returnDown = lesson.returnDown {
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [returnDown.successMessage],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false
-                ))
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [returnDown.instruction],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false
-                ))
-                world.playerControllerBitflags.remove(.up)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [],
-                    voiceSourceName: returnDown.voiceSourceName,
-                    voicePrecedesHUDMessages: false
-                ))
-                world.playerControllerBitflags.insert(.down)
-                openingState.downGoalWasReached = true
-            }
-            if openingState.downGoalWasReached == true,
-               openingState.repeatForwardWasPresented != true,
-               trainingStartGoalWasReachedThisFrame,
-               let repeatForward = lesson.repeatForward {
-                trainingOpeningFeedback.append(contentsOf: [
-                    TrainingOpeningFeedback(
-                        hudMessages: [repeatForward.successMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [repeatForward.repeatMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [repeatForward.forwardInstruction],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: false
-                    ),
-                    TrainingOpeningFeedback(
-                        hudMessages: [],
-                        voiceSourceName: repeatForward.voiceSourceName,
-                        voicePrecedesHUDMessages: false
-                    ),
-                ])
-                world.playerControllerBitflags.remove(.down)
-                world.playerControllerBitflags.insert(.forward)
-                openingState.repeatForwardWasPresented = true
-            }
-            if openingState.repeatReturnLeftWasPresented != true,
-               openingState.repeatForwardGoalWasPresented == true,
-               trainingStartGoalWasReachedThisFrame,
-               let repeatReturnLeft = lesson.repeatReturnLeft {
-                world.playerControllerBitflags.remove(.reverse)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [repeatReturnLeft.instruction],
-                    voiceSourceName: repeatReturnLeft.voiceSourceName,
-                    voicePrecedesHUDMessages: true
-                ))
-                world.playerControllerBitflags.insert(.left)
-                openingState.repeatReturnLeftWasPresented = true
-            }
-            if openingState.repeatReturnRightWasPresented != true,
-               openingState.repeatReturnLeftWasPresented == true,
-               trainingLeftGoalWasReachedThisFrame,
-               let repeatReturnRight = lesson.repeatReturnRight {
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [repeatReturnRight.instruction],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false,
-                    soundSourceName: repeatReturnRight.soundLogicalName
-                ))
-                world.playerControllerBitflags.remove(.left)
-                world.playerControllerBitflags.insert(.right)
-                openingState.repeatReturnRightWasPresented = true
-            }
-            if openingState.repeatReturnUpWasPresented != true,
-               openingState.repeatReturnRightWasPresented == true,
-               trainingStartGoalWasReachedThisFrame,
-               let repeatReturnUp = lesson.repeatReturnUp {
-                world.playerControllerBitflags.remove(.right)
-                world.playerControllerBitflags.insert(.up)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [repeatReturnUp.instruction],
-                    voiceSourceName: repeatReturnUp.voiceSourceName,
-                    voicePrecedesHUDMessages: true
-                ))
-                openingState.repeatReturnUpWasPresented = true
-            }
-            if openingState.repeatReturnDownWasPresented != true,
-               openingState.repeatReturnUpWasPresented == true,
-               trainingDownGoalWasReachedThisFrame,
-               let repeatReturnDown = lesson.repeatReturnDown {
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [repeatReturnDown.instruction],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false,
-                    soundSourceName: repeatReturnDown.soundLogicalName,
-                    soundEventVolume: 1
-                ))
-                world.playerControllerBitflags.remove(.up)
-                world.playerControllerBitflags.insert(.down)
-                openingState.repeatReturnDownWasPresented = true
-            }
-            if openingState.continueToCourseWasPresented != true,
-               openingState.repeatReturnDownWasPresented == true,
-               trainingStartGoalWasReachedThisFrame,
-               let continueToCourse = lesson.continueToCourse {
-                openTrainingContinueToCoursePortals(in: &world, level: level)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [continueToCourse.instruction],
-                    voiceSourceName: continueToCourse.voiceSourceName,
-                    voicePrecedesHUDMessages: true
-                ))
-                openingState.continueToCourseWasPresented = true
-            }
-            if openingState.startCourseWasPresented != true,
-               trainingStartCourseWasReachedThisFrame,
-               let startCourse = lesson.startCourse {
-                closeTrainingStartCoursePortal(in: &world, level: level)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [startCourse.instruction],
-                    voiceSourceName: startCourse.voiceSourceName,
-                    voicePrecedesHUDMessages: false
-                ))
-                world.playerControllerBitflags.formUnion(
-                    PlayerControlMask(
-                        rawValue: startCourse.enabledControlMask
-                    )
-                )
-                openingState.startCourseWasPresented = true
-            }
-            if openingState.finishCourseWasPresented != true,
-               trainingFinishCourseWasReachedThisFrame,
-               let finishCourse = lesson.finishCourse {
-                world.playerControllerBitflags = PlayerControlMask(
-                    rawValue: finishCourse.enabledControlMask
-                )
-                openTrainingFinishCoursePortals(in: &world, level: level)
-                trainingOpeningFeedback.append(TrainingOpeningFeedback(
-                    hudMessages: [finishCourse.successMessage],
-                    voiceSourceName: finishCourse.voiceSourceName,
-                    voicePrecedesHUDMessages: false,
-                    trailingHUDMessages: [finishCourse.instruction]
-                ))
-                openingState.finishCourseWasPresented = true
-            }
-            trainingOpeningState = openingState
-        }
-    }
-
     func advanceTrainingDodgeAndManeuverLesson(
         object: GameObject,
         view: PlayerView,
@@ -1956,8 +1562,6 @@ extension GameSession {
         if var dodgeState = trainingDodgeAttemptState,
             let dodge = level.trainingDodgeAttempt
         {
-            let triggerTimerConsumesFrame =
-                dodgeState.triggerTimerRemaining != nil
             var almostDoneTimerConsumesFrame =
                 dodgeState.almostDoneTimerRemaining != nil
             var successTimerConsumesFrame =
@@ -2254,44 +1858,6 @@ extension GameSession {
             }
             dodgeState.projectiles = survivingProjectiles
 
-            if dodgeState.script033Count < 1,
-                case .room(35) = player.location,
-                let startDodge =
-                    world.objects[ObjectHandle(dodge.startDodgeObjectHandle)],
-                segmentSphereHitFraction(
-                    start: object.position,
-                    end: player.position,
-                    center: startDodge.position,
-                    radius:
-                        dodge.startDodgeCollisionRadius
-                        + view.collisionRadius
-                ) != nil
-            {
-                if trainingOpeningState != nil {
-                    let raw = world.playerControllerBitflags.rawValue
-                    world.playerControllerBitflags = .init(
-                        rawValue: (raw & ~dodge.disabledControlMask)
-                            | dodge.enabledDodgeControlMask
-                    )
-                }
-                setTrainingDodgePortalRenderState(
-                    in: &world,
-                    level: level,
-                    roomSourceIndex: dodge.portalRoomTwoSourceIndex,
-                    portalIndices: dodge.orderedPortalIndices,
-                    rendersFaces: true
-                )
-                trainingOpeningFeedback.append(
-                    .init(
-                        hudMessages: [dodge.introduction],
-                        voiceSourceName:
-                            dodge.introductionVoiceSourceName,
-                        voicePrecedesHUDMessages: true
-                    ))
-                dodgeState.triggerTimerRemaining = dodge.triggerDelay
-                dodgeState.script033Count += 1
-            }
-
             if let exit = dodge.dodgeExit,
                 (dodgeState.script019Count ?? 0) < 1,
                 case .room(35) = player.location,
@@ -2315,7 +1881,7 @@ extension GameSession {
                     portalIndices: exit.orderedPortalIndices,
                     rendersFaces: false
                 )
-                if trainingOpeningState != nil {
+                if world.levelModule != .none {
                     world.playerControllerBitflags = .init(
                         rawValue:
                             world.playerControllerBitflags.rawValue
@@ -2352,7 +1918,7 @@ extension GameSession {
                ) != nil
             {
                 dodgeState.markerLightDistance = 0
-                if trainingOpeningState != nil {
+                if world.levelModule != .none {
                     world.playerControllerBitflags = .init(
                         rawValue: lesson.headingControlMask
                     )
@@ -2405,32 +1971,6 @@ extension GameSession {
                 }
             }
 
-            if var timer = dodgeState.triggerTimerRemaining {
-                if triggerTimerConsumesFrame {
-                    timer -= systemsFrameDuration
-                }
-                if timer <= 0.000_001,
-                    dodgeState.script016Count < 1
-                {
-                    dodgeState.triggerTimerRemaining = nil
-                    shields = dodge.restoredPlayerShields
-                    trainingOpeningFeedback.append(
-                        .init(
-                            hudMessages: [dodge.instruction],
-                            voiceSourceName: "",
-                            voicePrecedesHUDMessages: true
-                        ))
-                    dodgeState.successTimerRemaining =
-                        dodge.successDelay
-                    dodgeState.almostDoneTimerRemaining =
-                        dodge.almostDoneDelay
-                    dodgeState.turretIsPowered = true
-                    dodgeState.nextFireTime = systemsGameTime
-                    dodgeState.script016Count += 1
-                } else {
-                    dodgeState.triggerTimerRemaining = timer
-                }
-            }
             if var timer = dodgeState.almostDoneTimerRemaining {
                 if almostDoneTimerConsumesFrame {
                     timer -= systemsFrameDuration
@@ -2472,7 +2012,7 @@ extension GameSession {
                         rendersFaces: false
                     )
                     dodgeState.turretIsPowered = false
-                    if trainingOpeningState != nil {
+                    if world.levelModule != .none {
                         world.playerControllerBitflags.formUnion(
                             .init(
                                 rawValue: dodge.successControlMask
@@ -2544,7 +2084,7 @@ extension GameSession {
                         if maneuverState.script023Count < 1,
                            maneuverState.script024Count > 0
                         {
-                            if trainingOpeningState != nil {
+                            if world.levelModule != .none {
                                 world.playerControllerBitflags =
                                     .init(
                                         rawValue:
@@ -2576,7 +2116,7 @@ extension GameSession {
                         if maneuverState.script024Count < 1,
                            maneuverState.script022Count > 0
                         {
-                            if trainingOpeningState != nil {
+                            if world.levelModule != .none {
                                 world.playerControllerBitflags =
                                     .init(
                                         rawValue:
@@ -2599,7 +2139,7 @@ extension GameSession {
                         if maneuverState.script022Count < 1,
                            maneuverState.script021Count > 0
                         {
-                            if trainingOpeningState != nil {
+                            if world.levelModule != .none {
                                 world.playerControllerBitflags =
                                     .init(
                                         rawValue:
@@ -2695,7 +2235,7 @@ extension GameSession {
                     if timer <= 0.000_001 {
                         maneuverState.objectTimerRemaining = nil
                         if maneuverState.script025Count > 0 {
-                            if trainingOpeningState != nil {
+                            if world.levelModule != .none {
                                 world.playerControllerBitflags.formUnion(
                                     .init(
                                         rawValue:
@@ -3065,47 +2605,6 @@ func setTrainingDodgePortalRenderState(
     }
 }
 
-func openTrainingContinueToCoursePortals(
-    in world: inout GameWorld,
-    level: Level
-) {
-    guard let lesson = level.trainingOpeningLesson?.continueToCourse else {
-        return
-    }
-    setTrainingDodgePortalRenderState(
-        in: &world,
-        level: level,
-        roomSourceIndex: lesson.portalRoomSourceIndex,
-        portalIndices: lesson.orderedPortalIndices,
-        rendersFaces: false
-    )
-}
-
-func openTrainingFinishCoursePortals(in world: inout GameWorld, level: Level) {
-    guard let lesson = level.trainingOpeningLesson?.finishCourse else {
-        return
-    }
-    setTrainingDodgePortalRenderState(
-        in: &world,
-        level: level,
-        roomSourceIndex: lesson.portalRoomSourceIndex,
-        portalIndices: lesson.orderedPortalIndices,
-        rendersFaces: false
-    )
-}
-
-func closeTrainingStartCoursePortal(in world: inout GameWorld, level: Level) {
-    guard let lesson = level.trainingOpeningLesson?.startCourse else {
-        return
-    }
-    world.setPortalRenderFaces(
-        true,
-        roomSourceIndex: lesson.portalRoomSourceIndex,
-        portalIndex: lesson.portalIndex,
-        level: level
-    )
-}
-
 func openTrainingGalleryBarrier(in world: inout GameWorld, level: Level) {
     guard let barrier = level.trainingGalleryBarrier else { return }
     setTrainingDodgePortalRenderState(
@@ -3184,195 +2683,25 @@ func closeTrainingKillbotEntryBarrier(
     )
 }
 
-private func trainingForwardGoalWasReached(
-    in level: Level,
-    objects: ObjectTable,
-    lesson: TrainingOpeningLesson,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    let target = objects[ObjectHandle(lesson.forwardGoalObjectHandle)]!
-    guard case let .room(targetRoomSourceIndex) = target.location,
-          visitedRoomSourceIndices.contains(targetRoomSourceIndex) else {
-        return false
+extension GameWorld {
+    /// The bespoke dodge lesson's start, until M1 step 6 translates Script
+    /// 016 (TrainingMission.cpp:1870-1880). The Training module calls it
+    /// from StartDodge's EVT_TIMER 8, the timer Script 033 sets, so it runs
+    /// at Osiris_ProcessTimers (GameLoop.cpp:3014).
+    mutating func startTrainingDodgeAttempt(level: Level) {
+        guard var state = trainingDodgeAttemptState,
+              let dodge = level.trainingDodgeAttempt,
+              state.script016Count < 1
+        else {
+            return
+        }
+        shields = dodge.restoredPlayerShields
+        addHUDMessage(dodge.instruction)
+        state.successTimerRemaining = dodge.successDelay
+        state.almostDoneTimerRemaining = dodge.almostDoneDelay
+        state.turretIsPowered = true
+        state.nextFireTime = gameTime
+        state.script016Count += 1
+        trainingDodgeAttemptState = state
     }
-    let presentation = level.objectPresentations.first {
-        $0.objectHandle == target.handle.rawValue
-    }!
-    let model = level.models.first {
-        $0.source == presentation.primaryModel
-    }!
-    let targetRadius = sourceObjectPresentationSize(
-        model: model,
-        objectType: target.type.rawValue
-    )
-    return trainingOpeningGoalWasReached(
-        target: target,
-        targetRadius: targetRadius,
-        playerStart: playerStart,
-        playerEnd: playerEnd,
-        playerRadius: playerRadius,
-        visitedRoomSourceIndices: visitedRoomSourceIndices
-    )
-}
-
-private func trainingStartGoalWasReached(
-    in level: Level,
-    objects: ObjectTable,
-    lesson: TrainingOpeningLesson,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    let targetAndRadius: (UInt32, Float)?
-    if let returnLeft = lesson.returnLeft {
-        targetAndRadius = (
-            returnLeft.startGoalObjectHandle,
-            returnLeft.collisionRadius
-        )
-    } else if let returnUp = lesson.returnUp {
-        targetAndRadius = (
-            returnUp.startGoalObjectHandle,
-            returnUp.collisionRadius
-        )
-    } else if let repeatForward = lesson.repeatForward {
-        targetAndRadius = (
-            repeatForward.startGoalObjectHandle,
-            repeatForward.collisionRadius
-        )
-    } else if let repeatReturnLeft = lesson.repeatReturnLeft {
-        targetAndRadius = (
-            repeatReturnLeft.startGoalObjectHandle,
-            repeatReturnLeft.collisionRadius
-        )
-    } else {
-        targetAndRadius = nil
-    }
-    guard let (targetHandle, collisionRadius) = targetAndRadius else {
-        return false
-    }
-    let target = objects[ObjectHandle(targetHandle)]!
-    return trainingOpeningGoalWasReached(
-        target: target,
-        targetRadius: collisionRadius,
-        playerStart: playerStart,
-        playerEnd: playerEnd,
-        playerRadius: playerRadius,
-        visitedRoomSourceIndices: visitedRoomSourceIndices
-    )
-}
-
-private func trainingLeftGoalWasReached(
-    in level: Level,
-    objects: ObjectTable,
-    lesson: TrainingReturnRightLesson,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    let target = objects[ObjectHandle(lesson.leftGoalObjectHandle)]!
-    return trainingOpeningGoalWasReached(
-        target: target,
-        targetRadius: lesson.collisionRadius,
-        playerStart: playerStart,
-        playerEnd: playerEnd,
-        playerRadius: playerRadius,
-        visitedRoomSourceIndices: visitedRoomSourceIndices
-    )
-}
-
-private func trainingDownGoalWasReached(
-    in level: Level,
-    objects: ObjectTable,
-    lesson: TrainingReturnDownLesson,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    let target = objects[ObjectHandle(lesson.upGoalObjectHandle)]!
-    return trainingOpeningGoalWasReached(
-        target: target,
-        targetRadius: lesson.collisionRadius,
-        playerStart: playerStart,
-        playerEnd: playerEnd,
-        playerRadius: playerRadius,
-        visitedRoomSourceIndices: visitedRoomSourceIndices
-    )
-}
-
-private func trainingStartCourseWasReached(
-    in level: Level,
-    objects: ObjectTable,
-    lesson: TrainingStartCourseLesson,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    let target = objects[ObjectHandle(lesson.startCourseObjectHandle)]!
-    return trainingOpeningGoalWasReached(
-        target: target,
-        targetRadius: lesson.collisionRadius,
-        playerStart: playerStart,
-        playerEnd: playerEnd,
-        playerRadius: playerRadius,
-        visitedRoomSourceIndices: visitedRoomSourceIndices
-    )
-}
-
-private func trainingFinishCourseWasReached(
-    in level: Level,
-    objects: ObjectTable,
-    lesson: TrainingFinishCourseLesson,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    let target = objects[ObjectHandle(lesson.finishCourseObjectHandle)]!
-    return trainingOpeningGoalWasReached(
-        target: target,
-        targetRadius: lesson.collisionRadius,
-        playerStart: playerStart,
-        playerEnd: playerEnd,
-        playerRadius: playerRadius,
-        visitedRoomSourceIndices: visitedRoomSourceIndices
-    )
-}
-
-private func trainingOpeningGoalWasReached(
-    target: GameObject,
-    targetRadius: Float,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    guard case let .room(targetRoomSourceIndex) = target.location,
-          visitedRoomSourceIndices.contains(targetRoomSourceIndex) else {
-        return false
-    }
-    let movement = playerEnd - playerStart
-    let lengthSquared = dot(movement, movement)
-    let fraction: Float
-    if lengthSquared > 0 {
-        fraction = max(
-            0,
-            min(
-                1,
-                dot(target.position - playerStart, movement) / lengthSquared
-            )
-        )
-    } else {
-        fraction = 0
-    }
-    let closest = playerStart + movement * fraction
-    let separation = target.position - closest
-    let collisionRadius = playerRadius + targetRadius
-    return dot(separation, separation) <= collisionRadius * collisionRadius
 }

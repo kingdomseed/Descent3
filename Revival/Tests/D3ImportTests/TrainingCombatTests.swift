@@ -492,7 +492,7 @@ extension WorldRenderingTests {
             continuationObject["trainingDodgeAttemptState"]
                 as? [String: Any]
         )
-        dodgeState["script033Count"] = 1
+        try setTrainingCounter(&continuationObject, "script033Count", 1)
         dodgeState["script016Count"] = 1
         dodgeState["script017Count"] = 1
         dodgeState["script019Count"] = 1

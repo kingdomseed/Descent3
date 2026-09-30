@@ -7,18 +7,51 @@
 // ClearGlobalActionCtrs (:251-330, only the counters used below),
 // InitializeDLL (:916), GetGOScriptID (:1007), GetTriggerScriptID (:1264),
 // GetCOScriptList (:1280), the custom block's player functions (:519-640),
-// and the level script's EVT_LEVELSTART (Script 000, :1457) and EVT_TIMER
-// (Script 002, :1501). The other scripts are still the bespoke Training
-// code; M1 steps 5-9 move them here.
+// the level script's EVT_INTERVAL (Script 030, :1385), EVT_LEVELSTART
+// (Script 000, :1457), and EVT_TIMER (Script 002, :1501), and the EVT_COLLIDE
+// handlers of the opening and return lessons: CustomObjectScript_300D
+// (Scripts 001 and 008, :1633), _300C (003, 005, 007, 009, 011, 013, :1662),
+// _300B (004 and 010, :1745), _4809 (006 and 012, :1778), _1803 (014,
+// :1811), _1806 (015, :1829), and _100A (033, :1851; its EVT_TIMER calls the
+// bespoke Script 016 start). The other scripts are
+// still the bespoke Training code; M1 steps 6-9 move them here.
 
 /// The Training module's state: the DALLAS globals of the module
 /// (ScriptActionCtr_nnn and the DallasFuncs variables).
 struct TrainingMissionState: Codable, Equatable, Sendable {
-    /// ScriptActionCtr_000.
+    /// ScriptActionCtr_000 to ScriptActionCtr_015.
     var script000Count: Int = 0
-    /// ScriptActionCtr_002.
+    var script001Count: Int = 0
     var script002Count: Int = 0
+    var script003Count: Int = 0
+    var script004Count: Int = 0
+    var script005Count: Int = 0
+    var script006Count: Int = 0
+    var script007Count: Int = 0
+    var script008Count: Int = 0
+    var script009Count: Int = 0
+    var script010Count: Int = 0
+    var script011Count: Int = 0
+    var script012Count: Int = 0
+    var script013Count: Int = 0
+    var script014Count: Int = 0
+    var script015Count: Int = 0
+    /// ScriptActionCtr_033.
+    var script033Count: Int = 0
+    /// ScriptActionCtr_030.
+    var script030Count: Int = 0
     var dallas = DallasState.dfInit()
+
+    /// Every action counter, for save validation.
+    var actionCounters: [Int] {
+        [
+            script000Count, script001Count, script002Count, script003Count,
+            script004Count, script005Count, script006Count, script007Count,
+            script008Count, script009Count, script010Count, script011Count,
+            script012Count, script013Count, script014Count, script015Count,
+            script033Count, script030Count,
+        ]
+    }
 }
 
 enum TrainingMissionScript {
@@ -35,6 +68,12 @@ enum TrainingMissionScript {
         "ForwardGoal", "CameraMonitor", "RASBot1", "RASBot2", "RASBot3",
         "RASBot4", "InvulnPowerup2", "CloakPowerup2", "LastBot1",
         "LastBot2", "LastBot3", "LastBot4", "LastBot5", "SecurityCamera",
+    ]
+
+    /// Room_names (TrainingMission.cpp:844).
+    static let roomNames = [
+        "PortalRoom1", "PortalRoom2", "PortalRoom3", "PortalRoom4",
+        "PortalRoom5", "PortalRoom6", "PortalRoom7",
     ]
 
     /// Trigger_names (TrainingMission.cpp:849).
@@ -98,8 +137,7 @@ enum TrainingMissionScript {
     /// Save validation: the counters stay in their range, and the DALLAS
     /// arrays keep their fixed sizes.
     static func isValidSavedState(_ state: TrainingMissionState) -> Bool {
-        let counters = [state.script000Count, state.script002Count]
-        return counters.allSatisfy { (0...maximumActionCounter).contains($0) }
+        return state.actionCounters.allSatisfy { (0...maximumActionCounter).contains($0) }
             && state.dallas.spewHandles.count
                 == DallasState.maximumSpewHandles
             && state.dallas.soundHandles.count
@@ -112,6 +150,16 @@ enum TrainingMissionScript {
     /// Object_handles[index]: Scrpt_FindObjectName(Object_names[index]).
     static func objectHandle(_ index: Int, level: Level) -> ObjectHandle {
         level.findObjectName(objectNames[index])
+    }
+
+    /// Room_indexes[index]: Scrpt_FindRoomName(Room_names[index]).
+    static func roomIndex(_ index: Int, level: Level) -> Int {
+        level.findRoomName(roomNames[index])
+    }
+
+    /// Sound_indexes[index]: Scrpt_FindSoundName(Sound_names[index]).
+    static func soundIndex(_ index: Int, level: Level) -> Int {
+        level.findSoundName(soundNames[index])
     }
 
     /// Message_strings[index]: GetMessage(Message_names[index])
@@ -154,11 +202,11 @@ enum TrainingMissionScript {
         return nil
     }
 
-    /// The custom object and trigger scripts. The events they handle
-    /// (EVT_COLLIDE, EVT_DESTROY, EVT_USE, EVT_TIMER) are still produced by
-    /// the bespoke Training code, so every event that reaches them now takes
-    /// their `CONTINUE_CHAIN | CONTINUE_DEFAULT` return
-    /// (for example TrainingMission.cpp:1657).
+    /// The custom object scripts' CallEvent. Each DALLAS-generated handler
+    /// returns CONTINUE_CHAIN | CONTINUE_DEFAULT (for example
+    /// TrainingMission.cpp:1657). The handlers of the later lessons are
+    /// still the bespoke Training code, so the events that reach them now
+    /// only take that return.
     static func callCustomObjectEvent(
         id: Int32,
         event: ScriptEvent,
@@ -166,7 +214,20 @@ enum TrainingMissionScript {
         world: inout GameWorld,
         level: Level
     ) -> ChainFlags {
-        .all
+        switch (id, event) {
+        case (0x001, .collide): collideForwardGoal(world: &world, level: level)
+        case (0x002, .collide): collideStartGoal(world: &world, level: level)
+        case (0x003, .collide): collideLeftGoal(world: &world, level: level)
+        case (0x004, .collide): collideUpGoal(world: &world, level: level)
+        case (0x005, .collide): collideStartCourse(world: &world, level: level)
+        case (0x006, .collide): collideFinishCourse(world: &world, level: level)
+        case (0x007, .collide):
+            collideStartDodge(me: me, world: &world, level: level)
+        case let (0x007, .timer(timerID, _)):
+            timerStartDodge(id: timerID, world: &world, level: level)
+        default: break
+        }
+        return .all
     }
 
     static func callTriggerEvent(
@@ -185,6 +246,8 @@ enum TrainingMissionScript {
         level: Level
     ) -> ChainFlags {
         switch event {
+        case .interval:
+            levelInterval(world: &world, level: level)
         case .levelStart:
             levelStart(world: &world, level: level)
         case .timer:
@@ -193,6 +256,21 @@ enum TrainingMissionScript {
             break
         }
         return .all
+    }
+
+    /// EVT_INTERVAL (TrainingMission.cpp:1347-1456). Only Script 030 is
+    /// translated; the other interval scripts are still bespoke.
+    private static func levelInterval(world: inout GameWorld, level: Level) {
+        // Script 030: Keep sheilds up
+        if (world.trainingMission.script014Count > 0) == true,
+           world.qObjShields(world.qGetPlayerObj(0, level: level)) < 50 {
+            world.aObjSetShields(world.qGetPlayerObj(0, level: level), 50)
+
+            // Increment the script action counter
+            if world.trainingMission.script030Count < maximumActionCounter {
+                world.trainingMission.script030Count += 1
+            }
+        }
     }
 
     /// EVT_LEVELSTART (TrainingMission.cpp:1457-1500).
@@ -257,6 +335,217 @@ enum TrainingMissionScript {
             if world.trainingMission.script002Count < maximumActionCounter {
                 world.trainingMission.script002Count += 1
             }
+        }
+    }
+}
+
+extension TrainingMissionScript {
+    /// Increments a ScriptActionCtr up to MAX_ACTION_CTR_VALUE.
+    private static func increment(
+        _ counter: WritableKeyPath<TrainingMissionState, Int>,
+        world: inout GameWorld
+    ) {
+        if world.trainingMission[keyPath: counter] < maximumActionCounter {
+            world.trainingMission[keyPath: counter] += 1
+        }
+    }
+
+    /// CustomObjectScript_300D EVT_COLLIDE, ForwardGoal
+    /// (TrainingMission.cpp:1633-1660).
+    static func collideForwardGoal(world: inout GameWorld, level: Level) {
+        // Script 001: FirstGoal
+        if world.trainingMission.script001Count < 1 {
+            world.aShowHUDMessage(message(0, level: level))
+            world.aSoundPlaySteamingText("return1.osf", 1)
+            world.aShowHUDMessage(message(1, level: level))
+            world.aTogglePlayerControl(0, 0, 1, level: level)
+            world.aTogglePlayerControl(1, 0, 2, level: level)
+            increment(\.script001Count, world: &world)
+        }
+
+        // Script 008: Repeat Forward Goal
+        if world.trainingMission.script008Count < 1,
+           (world.trainingMission.script007Count > 0) == true {
+            world.aSoundPlay2D(soundIndex(0, level: level), 1, level: level)
+            world.aTogglePlayerControl(0, 0, 1, level: level)
+            world.aTogglePlayerControl(1, 0, 2, level: level)
+            world.aShowHUDMessage(message(1, level: level))
+            increment(\.script008Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_300C EVT_COLLIDE, StartGoal
+    /// (TrainingMission.cpp:1662-1743).
+    static func collideStartGoal(world: inout GameWorld, level: Level) {
+        // Script 003: Return to Start from Forward Goal
+        if world.trainingMission.script003Count < 1,
+           (world.trainingMission.script001Count > 0) == true {
+            world.aShowHUDMessage(message(4, level: level))
+            world.aTogglePlayerControl(0, 0, 2, level: level)
+            world.aSoundPlaySteamingText("left1.osf", 1)
+            world.aTogglePlayerControl(1, 0, 4, level: level)
+            increment(\.script003Count, world: &world)
+        }
+
+        // Script 005: Return to Start From Left Goal
+        if world.trainingMission.script005Count < 1,
+           (world.trainingMission.script004Count > 0) == true {
+            world.aTogglePlayerControl(0, 0, 8, level: level)
+            world.aTogglePlayerControl(1, 0, 16, level: level)
+            world.aShowHUDMessage(message(0, level: level))
+            world.aSoundPlaySteamingText("up1.osf", 1)
+            world.aShowHUDMessage(message(6, level: level))
+            increment(\.script005Count, world: &world)
+        }
+
+        // Script 007: Return to Start from Up Goal
+        if world.trainingMission.script007Count < 1,
+           (world.trainingMission.script006Count > 0) == true {
+            world.aShowHUDMessage(message(0, level: level))
+            world.aShowHUDMessage(message(8, level: level))
+            world.aShowHUDMessage(message(3, level: level))
+            world.aSoundPlaySteamingText("repeat.osf", 1)
+            world.aTogglePlayerControl(0, 0, 32, level: level)
+            world.aTogglePlayerControl(1, 0, 1, level: level)
+            increment(\.script007Count, world: &world)
+        }
+
+        // Script 009: Return to Start from Repeat Forward Goal
+        if world.trainingMission.script009Count < 1,
+           (world.trainingMission.script008Count > 0) == true {
+            world.aTogglePlayerControl(0, 0, 2, level: level)
+            world.aSoundPlaySteamingText("lright.osf", 1)
+            world.aTogglePlayerControl(1, 0, 4, level: level)
+            world.aShowHUDMessage(message(4, level: level))
+            increment(\.script009Count, world: &world)
+        }
+
+        // Script 011: Return to Start from Repeat Left Goal
+        if world.trainingMission.script011Count < 1,
+           (world.trainingMission.script010Count > 0) == true {
+            world.aTogglePlayerControl(0, 0, 8, level: level)
+            world.aTogglePlayerControl(1, 0, 16, level: level)
+            world.aSoundPlaySteamingText("udown.osf", 1)
+            world.aShowHUDMessage(message(6, level: level))
+            increment(\.script011Count, world: &world)
+        }
+
+        // Script 013: Return to start from Repeat Up Goal
+        if world.trainingMission.script013Count < 1,
+           (world.trainingMission.script012Count > 0) == true {
+            world.aPortalRenderSet(0, 0, roomIndex(0, level: level), true, level: level)
+            world.aPortalRenderSet(0, 1, roomIndex(0, level: level), true, level: level)
+            world.aSoundPlaySteamingText("proceed1.osf", 1)
+            world.aShowHUDMessage(message(9, level: level))
+            increment(\.script013Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_300B EVT_COLLIDE, LeftGoal
+    /// (TrainingMission.cpp:1745-1776).
+    static func collideLeftGoal(world: inout GameWorld, level: Level) {
+        // Script 004: Left Goal
+        if world.trainingMission.script004Count < 1 {
+            world.aTogglePlayerControl(0, 0, 4, level: level)
+            world.aTogglePlayerControl(1, 0, 8, level: level)
+            world.aShowHUDMessage(message(0, level: level))
+            world.aSoundPlaySteamingText("return2.osf", 1)
+            world.aShowHUDMessage(message(5, level: level))
+            increment(\.script004Count, world: &world)
+        }
+
+        // Script 010: Repeat Left Goal
+        if world.trainingMission.script010Count < 1,
+           (world.trainingMission.script009Count > 0) == true {
+            world.aSoundPlay2D(soundIndex(0, level: level), 1, level: level)
+            world.aTogglePlayerControl(0, 0, 4, level: level)
+            world.aTogglePlayerControl(1, 0, 8, level: level)
+            world.aShowHUDMessage(message(5, level: level))
+            increment(\.script010Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_4809 EVT_COLLIDE, UpGoal
+    /// (TrainingMission.cpp:1778-1809).
+    static func collideUpGoal(world: inout GameWorld, level: Level) {
+        // Script 006: Up Goal
+        if world.trainingMission.script006Count < 1 {
+            world.aShowHUDMessage(message(0, level: level))
+            world.aShowHUDMessage(message(7, level: level))
+            world.aTogglePlayerControl(0, 0, 16, level: level)
+            world.aSoundPlaySteamingText("return3.osf", 1)
+            world.aTogglePlayerControl(1, 0, 32, level: level)
+            increment(\.script006Count, world: &world)
+        }
+
+        // Script 012: Repeat Up Goal
+        if world.trainingMission.script012Count < 1,
+           (world.trainingMission.script011Count > 0) == true {
+            world.aSoundPlay2D(soundIndex(0, level: level), 1, level: level)
+            world.aTogglePlayerControl(0, 0, 16, level: level)
+            world.aTogglePlayerControl(1, 0, 32, level: level)
+            world.aShowHUDMessage(message(7, level: level))
+            increment(\.script012Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_1803 EVT_COLLIDE, StartCourse
+    /// (TrainingMission.cpp:1811-1827).
+    static func collideStartCourse(world: inout GameWorld, level: Level) {
+        // Script 014: Start Course
+        if world.trainingMission.script014Count < 1 {
+            world.aPortalRenderSet(1, 1, roomIndex(0, level: level), true, level: level)
+            world.aShowHUDMessage(message(10, level: level))
+            world.aSoundPlaySteamingText("Intro1.osf", 1)
+            world.aTogglePlayerControl(1, 0, 63, level: level)
+            increment(\.script014Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_1806 EVT_COLLIDE, FinishCourse
+    /// (TrainingMission.cpp:1829-1849).
+    static func collideFinishCourse(world: inout GameWorld, level: Level) {
+        // Script 015: Finish Course
+        if world.trainingMission.script015Count < 1 {
+            world.aToggleAllPlayerControls(0, 0, level: level)
+            world.aTogglePlayerControl(1, 0, 32, level: level)
+            world.aPortalRenderSet(0, 0, roomIndex(1, level: level), true, level: level)
+            world.aPortalRenderSet(0, 1, roomIndex(1, level: level), true, level: level)
+            world.aShowHUDMessage(message(0, level: level))
+            world.aSoundPlaySteamingText("proceed2.osf", 1)
+            world.aShowHUDMessage(message(9, level: level))
+            increment(\.script015Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_100A EVT_TIMER, StartDodge
+    /// (TrainingMission.cpp:1868-1882). Script 016's actions are still the
+    /// bespoke dodge lesson's start (M1 step 6 translates them); its
+    /// ScriptActionCtr_016 is that lesson's `script016Count`.
+    static func timerStartDodge(id: Int32, world: inout GameWorld, level: Level) {
+        // Script 016: Start Dodge
+        if id == 8 {
+            world.startTrainingDodgeAttempt(level: level)
+        }
+    }
+
+    /// CustomObjectScript_100A EVT_COLLIDE, StartDodge
+    /// (TrainingMission.cpp:1851-1867).
+    static func collideStartDodge(
+        me: ObjectHandle,
+        world: inout GameWorld,
+        level: Level
+    ) {
+        // Script 033: Start Dodge Timer Delay
+        if world.trainingMission.script033Count < 1 {
+            world.aTogglePlayerControl(0, 0, 3, level: level)
+            world.aTogglePlayerControl(1, 0, 60, level: level)
+            world.aPortalRenderSet(1, 0, roomIndex(1, level: level), true, level: level)
+            world.aPortalRenderSet(1, 1, roomIndex(1, level: level), true, level: level)
+            world.aSoundPlaySteamingText("intro2.osf", 1)
+            world.aShowHUDMessage(message(11, level: level))
+            world.aSetObjectTimer(me, 10, 8)
+            increment(\.script033Count, world: &world)
         }
     }
 }

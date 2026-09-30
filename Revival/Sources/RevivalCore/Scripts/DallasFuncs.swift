@@ -3,9 +3,9 @@
 // Translated from scripts/DallasFuncs.cpp and scripts/DallasFuncs.h
 // (Descent 3, Copyright (C) 2024 Parallax Software, GPL-3.0-or-later): the
 // DALLAS variables (DallasFuncs.cpp:916-926, DallasFuncs.h:6-40), dfInit
-// (:961), aShowHUDMessage (:1227), aSetLevelTimer (:2477), and
-// aSoundPlaySteaming (:2795, which aSoundPlaySteamingText names,
-// DallasFuncs.h:137). The DALLAS names are kept so each call can be checked
+// (:961), aPortalRenderSet (:1098), aShowHUDMessage (:1227),
+// aSetLevelTimer (:2477), aSoundPlay2D (:2748), and aSoundPlaySteaming
+// (:2795, which aSoundPlaySteamingText names, DallasFuncs.h:137). The DALLAS names are kept so each call can be checked
 // against the C++ line by line.
 
 /// A DALLAS user variable (`user_var`, DallasFuncs.h:6).
@@ -75,5 +75,29 @@ extension GameWorld {
     /// without OTF_REPEATER.
     mutating func aSetLevelTimer(_ time: Float, _ id: Int32) {
         osirisCreateTimer(.init(target: .level, id: id, interval: time))
+    }
+
+    /// aSoundPlay2D (DallasFuncs.cpp:2748): MSAFE_SOUND_2D for all players.
+    /// `soundnum` is a Sound_indexes value (`Level.findSoundName`).
+    mutating func aSoundPlay2D(_ soundnum: Int, _ volume: Float, level: Level) {
+        playSound2D(soundnum, volume: volume, level: level)
+    }
+
+    /// aPortalRenderSet (DallasFuncs.cpp:1098): MSAFE_ROOM_PORTAL_RENDER.
+    /// `roomnum` is a Room_indexes value (`Level.findRoomName`).
+    mutating func aPortalRenderSet(
+        _ state: Int32,
+        _ portalnum: Int,
+        _ roomnum: Int,
+        _ doublesided: Bool,
+        level: Level
+    ) {
+        setPortalRender(
+            room: roomnum,
+            portal: portalnum,
+            state: state != 0,
+            doubleSided: doublesided,
+            level: level
+        )
     }
 }

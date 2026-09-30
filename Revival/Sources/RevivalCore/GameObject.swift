@@ -112,8 +112,12 @@ struct GameObject: Codable, Equatable, Sendable {
 }
 
 extension GameObject {
+    /// OF_DEAD (`object_external.h:270`).
+    static let deadFlag: UInt32 = 0x0000_0002
     /// OF_DESTROYABLE (`object_external.h:279`).
     static let destroyableFlag: UInt32 = 0x0000_0400
+    /// OF_NO_OBJECT_COLLISIONS (`object_external.h:286`).
+    static let noObjectCollisionsFlag: UInt32 = 0x0001_0000
 }
 
 /// The script-set fields of `light_info` (MSAFE_OBJECT_LIGHT_DIST and

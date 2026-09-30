@@ -3,8 +3,9 @@
 // Translated from scripts/DallasFuncs.cpp (Descent 3, Copyright (C) 2024
 // Parallax Software, GPL-3.0-or-later): the object actions
 // aObjSetLightingDist (:2035), aObjSetLightingColor (:2057),
-// aObjGhostSet (:2896), aObjHide (:2916), aObjMakeInvuln (:2937), and
-// aAISetState (:3330).
+// aObjSetShields (:1849), aSetObjectTimer (:2451), aObjGhostSet (:2896),
+// aObjHide (:2916), aObjMakeInvuln (:2937), aAISetState (:3330), and the
+// query qObjShields (:5593).
 
 extension GameWorld {
     /// aObjSetLightingDist (DallasFuncs.cpp:2035).
@@ -45,5 +46,26 @@ extension GameWorld {
     /// aAISetState (DallasFuncs.cpp:3330): AI_PowerSwitch.
     mutating func aAISetState(_ state: Int32, _ object: ObjectHandle) {
         aiPowerSwitch(object, on: state != 0)
+    }
+
+    /// aObjSetShields (DallasFuncs.cpp:1849): MSAFE_OBJECT_SHIELDS.
+    mutating func aObjSetShields(_ objref: ObjectHandle, _ shields: Float) {
+        setObjectShields(objref, shields)
+    }
+
+    /// qObjShields (DallasFuncs.cpp:5593): MSAFE_OBJECT_SHIELDS, or -1 for
+    /// a stale handle.
+    func qObjShields(_ objref: ObjectHandle) -> Float {
+        objectShields(objref)
+    }
+
+    /// aSetObjectTimer (DallasFuncs.cpp:2451): a one-shot object timer
+    /// with no detonator.
+    mutating func aSetObjectTimer(
+        _ objref: ObjectHandle,
+        _ time: Float,
+        _ id: Int32
+    ) {
+        osirisCreateTimer(.init(target: .object(objref), id: id, interval: time))
     }
 }

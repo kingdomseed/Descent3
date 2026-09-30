@@ -1377,19 +1377,6 @@ func editorIdleStatusMessage(
     let status =
         "Editing \(level.metadata.name) — \(level.rooms.count) complete resident rooms — source room \(selection.room.sourceIndex), face \(selection.face.faceIndex) selected — \(project.semanticDiff.count) authored changes."
     let sourceDiagnostics = [
-        project.trainingReturnLeftSourceDiagnostic,
-        project.trainingReturnRightSourceDiagnostic,
-        project.trainingReturnUpSourceDiagnostic,
-        project.trainingReturnDownSourceDiagnostic,
-        project.trainingRepeatForwardSourceDiagnostic,
-        project.trainingRepeatForwardGoalSourceDiagnostic,
-        project.trainingRepeatReturnLeftSourceDiagnostic,
-        project.trainingRepeatReturnRightSourceDiagnostic,
-        project.trainingRepeatReturnUpSourceDiagnostic,
-        project.trainingRepeatReturnDownSourceDiagnostic,
-        project.trainingContinueToCourseSourceDiagnostic,
-        project.trainingStartCourseSourceDiagnostic,
-        project.trainingFinishCourseSourceDiagnostic,
         project.trainingDodgeAttemptSourceDiagnostic,
         project.trainingManeuverFollowSourceDiagnostic,
         project.trainingGalleryBarrierSourceDiagnostic,

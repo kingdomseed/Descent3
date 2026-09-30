@@ -195,6 +195,26 @@ extension Level {
             .map { ObjectHandle($0.handle) } ?? .none
     }
 
+    /// osipf_FindRoomName (osiris_predefs.cpp:3358): the number of the
+    /// lowest room with this name (stricmp), or -1. A room number is the
+    /// room's source index, the index of `Rooms[]`.
+    func findRoomName(_ name: String) -> Int {
+        rooms
+            .filter { $0.name?.caseInsensitiveCompare(name) == .orderedSame }
+            .map(\.sourceIndex)
+            .min() ?? -1
+    }
+
+    /// osipf_FindSoundName (osiris_predefs.cpp:3356) and FindSoundName
+    /// (sndlib/soundload.cpp:560): the index of the first sound whose page
+    /// name matches (stricmp), or -1. The level's sound clips are its
+    /// loaded sound table.
+    func findSoundName(_ name: String) -> Int {
+        soundClips.firstIndex {
+            $0.logicalName.caseInsensitiveCompare(name) == .orderedSame
+        } ?? -1
+    }
+
     /// This level with the script data of `source`, if it has any. The
     /// assembly steps rebuild a level from its fields, which would drop it.
     func preservingScripting(of source: Level) -> Level {

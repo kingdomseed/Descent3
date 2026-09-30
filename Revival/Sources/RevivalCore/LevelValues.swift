@@ -201,6 +201,9 @@ struct LevelFace: Codable, Equatable, Sendable {
 }
 
 struct LevelPortal: Codable, Equatable, Sendable {
+    /// PF_RENDER_FACES (room_external.h:155).
+    static let renderFacesFlag: UInt32 = 1
+
     var flags: UInt32
     let faceIndex: Int
     let connectedRoom: Int

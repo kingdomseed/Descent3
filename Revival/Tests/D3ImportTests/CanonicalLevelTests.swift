@@ -2278,7 +2278,6 @@ func replacing(
     shipDefinitions: [CanonicalShipDefinition]? = nil,
     defaultPlayerBinding: DefaultPlayerBinding? = nil,
     objectPresentations: [ObjectPresentationReference]? = nil,
-    trainingOpeningLesson: TrainingOpeningLesson? = nil,
     trainingDodgeAttempt: TrainingDodgeAttempt? = nil,
     trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
     trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
@@ -2335,8 +2334,6 @@ func replacing(
         shipDefinitions: shipDefinitions ?? level.shipDefinitions,
         defaultPlayerBinding: defaultPlayerBinding ?? level.defaultPlayerBinding,
         objectPresentations: objectPresentations ?? level.objectPresentations,
-        trainingOpeningLesson:
-            trainingOpeningLesson ?? level.trainingOpeningLesson,
         trainingDodgeAttempt:
             trainingDodgeAttempt ?? level.trainingDodgeAttempt,
         trainingGalleryBarrier:

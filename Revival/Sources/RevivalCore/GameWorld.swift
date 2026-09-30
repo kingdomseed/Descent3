@@ -70,7 +70,6 @@ struct GameWorld: Codable, Equatable, Sendable {
 
     // Training script state. These move into the Training level module in
     // later M1 steps.
-    var trainingOpeningState: TrainingOpeningState?
     var trainingDodgeAttemptState: TrainingDodgeAttemptState?
     var trainingManeuverFollowState: TrainingManeuverFollowState?
     var trainingGalleryBarrierState: TrainingGalleryBarrierState?
@@ -122,31 +121,21 @@ struct GameWorld: Codable, Equatable, Sendable {
             isRendered ? .polyobj : .none
     }
 
-    /// Sets or clears PF_RENDER_FACES on a portal and on its reciprocal
-    /// portal, as a double-sided `aPortalRenderSet` does
-    /// (`DallasFuncs.cpp:1098`, `MSAFE_ROOM_PORTAL_RENDER` in
-    /// `multisafe.cpp:1447`).
+    /// A double-sided `aPortalRenderSet` (`DallasFuncs.cpp:1098`) on a
+    /// portal of the room with this source index.
     mutating func setPortalRenderFaces(
         _ rendersFaces: Bool,
         roomSourceIndex: Int,
         portalIndex: Int,
         level: Level
     ) {
-        let roomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == roomSourceIndex
-        }!
-        let portal = level.rooms[roomIndex].portals[portalIndex]
-        let connectedRoomIndex = level.rooms.firstIndex {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        if rendersFaces {
-            rooms[roomIndex].portalFlags[portalIndex] |= 1
-            rooms[connectedRoomIndex].portalFlags[portal.connectedPortal] |= 1
-        } else {
-            rooms[roomIndex].portalFlags[portalIndex] &= ~UInt32(1)
-            rooms[connectedRoomIndex].portalFlags[portal.connectedPortal]
-                &= ~UInt32(1)
-        }
+        setPortalRender(
+            room: roomSourceIndex,
+            portal: portalIndex,
+            state: rendersFaces,
+            doubleSided: true,
+            level: level
+        )
     }
 
 }

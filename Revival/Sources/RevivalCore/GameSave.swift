@@ -243,8 +243,6 @@ extension GameWorld {
              ship?.playerConcussion != nil),
             ("playerYellowFlareState", playerYellowFlareState != nil,
              level.shipDefinitions.first?.playerYellowFlare != nil),
-            ("trainingOpeningState", trainingOpeningState != nil,
-             level.trainingOpeningLesson != nil),
             ("trainingDodgeAttemptState", trainingDodgeAttemptState != nil,
              level.trainingDodgeAttempt != nil),
             ("trainingManeuverFollowState",
@@ -452,19 +450,6 @@ extension GameWorld {
         level: Level
     ) throws(GameWorldValidationError) {
         var required: [UInt32] = []
-        if let lesson = level.trainingOpeningLesson {
-            required.append(lesson.forwardGoalObjectHandle)
-            required += [
-                lesson.returnLeft?.startGoalObjectHandle,
-                lesson.returnUp?.startGoalObjectHandle,
-                lesson.repeatForward?.startGoalObjectHandle,
-                lesson.repeatReturnLeft?.startGoalObjectHandle,
-                lesson.returnRight?.leftGoalObjectHandle,
-                lesson.returnDown?.upGoalObjectHandle,
-                lesson.startCourse?.startCourseObjectHandle,
-                lesson.finishCourse?.finishCourseObjectHandle,
-            ].compactMap { $0 }
-        }
         if trainingDodgeAttemptState != nil,
            let dodge = level.trainingDodgeAttempt {
             required.append(dodge.dodgeTurretObjectHandle)

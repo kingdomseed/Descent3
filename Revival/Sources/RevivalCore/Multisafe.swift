@@ -7,8 +7,10 @@
 // (:1577), MSAFE_OBJECT_PLAYER_CMASK (:1583), MSAFE_OBJECT_GHOST and
 // MSAFE_OBJECT_UNGHOST (:1739, :1752), MSAFE_OBJECT_INVULNERABLE (:1768),
 // MSAFE_OBJECT_LIGHT_DIST (:1821), MSAFE_OBJECT_LIGHT_COLOR (:1832),
-// MSAFE_SOUND_STREAMING (:1939), and MSAFE_MISC_HUD_MESSAGE (:2021), with
-// ObjGhostObject and ObjUnGhostObject (Descent3/object.cpp:3463, :3483).
+// MSAFE_SOUND_STREAMING (:1939), MSAFE_SOUND_2D (:1955), and
+// MSAFE_MISC_HUD_MESSAGE (:2021), MSAFE_ROOM_PORTAL_RENDER (:1447), and
+// MSAFE_OBJECT_SHIELDS (get :851, set :1563), with ObjGhostObject and
+// ObjUnGhostObject (Descent3/object.cpp:3463, :3483).
 // MSAFE_OBJECT_NO_RENDER is `GameWorld.setObjectRendered`. Multiplayer
 // routing is dropped: the only player is slot 0.
 
@@ -19,6 +21,9 @@ enum ScriptPresentationRequest: Codable, Equatable, Sendable {
     case hudMessage(String)
     /// MSAFE_SOUND_STREAMING for all players: StreamPlay(name, volume).
     case streamedAudio(name: String, volume: Float)
+    /// MSAFE_SOUND_2D for all players: Play2dSound(index, volume). The
+    /// index is a `Level.soundClips` index (`Level.findSoundName`).
+    case sound2D(index: Int, volume: Float)
 }
 
 extension GameWorld {
@@ -147,5 +152,74 @@ extension GameWorld {
     /// step 8.
     mutating func addHUDMessage(_ message: String) {
         presentationRequests.append(.hudMessage(message))
+    }
+
+    /// MSAFE_SOUND_2D for all players (multisafe.cpp:1955). An invalid
+    /// index plays nothing, as Play2dSound returns -1.
+    mutating func playSound2D(_ index: Int, volume: Float, level: Level) {
+        guard level.soundClips.indices.contains(index) else { return }
+        presentationRequests.append(.sound2D(index: index, volume: volume))
+    }
+
+    /// MSAFE_ROOM_PORTAL_RENDER (multisafe.cpp:1447): sets or clears
+    /// PF_RENDER_FACES on a portal and, when `doubleSided`, on the portal
+    /// on its other side. `room` is a room number (a source index). An
+    /// invalid room or portal does nothing (VALIDATE_ROOM_PORTAL). The
+    /// PF_CHANGED and RCF_PORTAL_RENDER flags only mark render caches, which
+    /// Revival does not keep.
+    mutating func setPortalRender(
+        room: Int,
+        portal: Int,
+        state: Bool,
+        doubleSided: Bool,
+        level: Level
+    ) {
+        guard let roomIndex = level.rooms.firstIndex(where: {
+                  $0.sourceIndex == room
+              }),
+              level.rooms[roomIndex].portals.indices.contains(portal)
+        else {
+            return
+        }
+        func set(_ roomIndex: Int, _ portalIndex: Int) {
+            if state {
+                rooms[roomIndex].portalFlags[portalIndex] |=
+                    LevelPortal.renderFacesFlag
+            } else {
+                rooms[roomIndex].portalFlags[portalIndex] &=
+                    ~LevelPortal.renderFacesFlag
+            }
+        }
+        set(roomIndex, portal)
+        guard doubleSided else { return }
+        let connection = level.rooms[roomIndex].portals[portal]
+        let connectedIndex = level.rooms.firstIndex {
+            $0.sourceIndex == connection.connectedRoom
+        }!
+        set(connectedIndex, connection.connectedPortal)
+    }
+
+    /// MSAFE_OBJECT_SHIELDS read (multisafe.cpp:851): -1 for a stale
+    /// handle. The player's shields are `shields`. Other objects get their
+    /// shields with Damage (M1 step 7); no translated script reads them
+    /// before then.
+    func objectShields(_ handle: ObjectHandle) -> Float {
+        guard let object = objects[handle] else { return -1 }
+        precondition(
+            object.type == .player,
+            "Object shields other than the player's arrive with Damage."
+        )
+        return shields
+    }
+
+    /// MSAFE_OBJECT_SHIELDS write (multisafe.cpp:1563). A stale handle
+    /// does nothing. OF_AI_DEATH is not modeled yet; a player never has it.
+    mutating func setObjectShields(_ handle: ObjectHandle, _ value: Float) {
+        guard let object = objects[handle] else { return }
+        precondition(
+            object.type == .player,
+            "Object shields other than the player's arrive with Damage."
+        )
+        shields = value
     }
 }

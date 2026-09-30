@@ -82,7 +82,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -174,7 +173,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: newObjectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -223,7 +221,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -295,7 +292,6 @@ extension Level {
             shipDefinitions: [ship],
             defaultPlayerBinding: binding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -314,42 +310,14 @@ extension Level {
         ).preservingScripting(of: self)
     }
 
-    func addingTrainingOpeningLesson(
-        _ lesson: TrainingOpeningLesson,
-        voiceClips: [CanonicalVoiceClip],
+    /// This level with more imported voice and sound clips and their
+    /// dependency records.
+    func addingAudioClips(
+        voiceClips addedVoiceClips: [CanonicalVoiceClip],
         soundClips addedSoundClips: [CanonicalSoundClip] = []
     ) -> Level {
-        let lessonPresentations = objectPresentations.map { presentation in
-            let hiddenHandles = [
-                lesson.forwardGoalObjectHandle,
-                lesson.returnLeft?.startGoalObjectHandle,
-                lesson.returnRight?.leftGoalObjectHandle,
-                lesson.returnUp?.startGoalObjectHandle,
-                lesson.returnDown?.upGoalObjectHandle,
-                lesson.repeatForwardGoal?.forwardGoalObjectHandle,
-                lesson.repeatReturnLeft?.startGoalObjectHandle,
-                lesson.repeatReturnRight?.leftGoalObjectHandle,
-                lesson.repeatReturnUp?.startGoalObjectHandle,
-                lesson.repeatReturnDown?.upGoalObjectHandle,
-                lesson.startCourse?.startCourseObjectHandle,
-                lesson.finishCourse?.finishCourseObjectHandle,
-            ]
-            guard hiddenHandles.contains(presentation.objectHandle) else {
-                return presentation
-            }
-            return ObjectPresentationReference(
-                objectHandle: presentation.objectHandle,
-                primaryModel: presentation.primaryModel,
-                mediumModel: presentation.mediumModel,
-                lowModel: presentation.lowModel,
-                dyingModel: presentation.dyingModel,
-                mediumDistance: presentation.mediumDistance,
-                lowDistance: presentation.lowDistance,
-                isVisible: false
-            )
-        }
         var dependencies = dependencyManifest.current
-        for clip in voiceClips {
+        for clip in addedVoiceClips {
             dependencies.append(
                 .init(
                     category: "voice",
@@ -398,8 +366,7 @@ extension Level {
             models: models,
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: lessonPresentations,
-            trainingOpeningLesson: lesson,
+            objectPresentations: objectPresentations,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -408,11 +375,12 @@ extension Level {
             trainingRASBot3DeathChain: trainingRASBot3DeathChain,
             trainingRASBot4DeathChain: trainingRASBot4DeathChain,
             trainingLastBot1DeathChain: trainingLastBot1DeathChain,
-            voiceClips: voiceClips,
+            voiceClips: voiceClips + addedVoiceClips,
             soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
                 current: dependencies,
-                historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
+                historicalEagerBaseline:
+                    dependencyManifest.historicalEagerBaseline
             ),
             sourceChunks: sourceChunks
         ).preservingScripting(of: self)
@@ -456,7 +424,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: barrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -628,7 +595,6 @@ extension Level {
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations:
                 objectPresentations + [guidebotPresentation],
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: chain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -709,7 +675,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: chain,
@@ -756,7 +721,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -799,7 +763,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -842,7 +805,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -885,7 +847,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -928,7 +889,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -1019,7 +979,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -1127,7 +1086,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -1210,7 +1168,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -1260,7 +1217,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
@@ -1318,7 +1274,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingOpeningLesson: trainingOpeningLesson,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,

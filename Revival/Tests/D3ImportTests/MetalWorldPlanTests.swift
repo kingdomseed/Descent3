@@ -289,6 +289,9 @@ final class MetalWorldPlanTests: XCTestCase {
             level: level,
             presentationReadyTimestamp: 0
         )
+        // The player starts on StartDodge at rest; its contact is the
+        // collide_two_objects call of a move into it.
+        simulation.collidePlayer(with: "StartDodge")
         var frame = simulation.update(at: 0.1, input: .zero)
         var timestamp = 0.1
         for _ in 0..<180 where frame.trainingDodgeProjectiles.isEmpty {

@@ -688,33 +688,10 @@ extension WorldRenderingTests {
 
     }
 
-    func testScript030RestoresBeforeSameFrameConcussionImpact() throws {
-        var level = try makePlayerConcussionLevel()
-        let openingLevel = makeTrainingScript003Level()
-        let existingVoiceNames = Set(level.voiceClips.map(\.sourceName))
-        let addedVoices = openingLevel.voiceClips.filter {
-            !existingVoiceNames.contains($0.sourceName)
-        }
-        let existingDependencies = Set(
-            level.dependencyManifest.current.map {
-                "\($0.category):\($0.source.storedIndex):\($0.source.sourceName)"
-            }
-        )
-        let addedDependencies = openingLevel.dependencyManifest.current.filter {
-            $0.category == "voice"
-                && !existingDependencies.contains(
-                "\($0.category):\($0.source.storedIndex):\($0.source.sourceName)"
-            )
-        }
-        level = replacing(
-            level,
-            trainingOpeningLesson: openingLevel.trainingOpeningLesson,
-            voiceClips: level.voiceClips + addedVoices,
-            dependencyManifest: .init(
-                current: level.dependencyManifest.current + addedDependencies,
-                historicalEagerBaseline:
-                    level.dependencyManifest.historicalEagerBaseline
-            )
+    func testScript030RestoresAfterSameFrameConcussionImpact() throws {
+        // The concussion level with the Training level module.
+        let level = addingTrainingMissionScripting(
+            try makePlayerConcussionLevel()
         )
         let player = try XCTUnwrap(level.objects.first {
             $0.handle == level.defaultPlayerBinding?.objectHandle
@@ -733,14 +710,8 @@ extension WorldRenderingTests {
             testWorldObject(seed.world)
         )
         continuationObject["shields"] = 1
-        var openingState = try XCTUnwrap(
-            continuationObject["trainingOpeningState"] as? [String: Any]
-        )
-        openingState["startCourseWasPresented"] = true
-        continuationObject["playerControllerBitflags"] = try XCTUnwrap(
-            level.trainingOpeningLesson?.startCourse?.enabledControlMask
-        )
-        continuationObject["trainingOpeningState"] = openingState
+        // After Script 014 (TrainingMission.cpp:1814-1817).
+        continuationObject["playerControllerBitflags"] = 63
         var concussionState = try XCTUnwrap(
             continuationObject["playerConcussionState"] as? [String: Any]
         )
@@ -759,20 +730,25 @@ extension WorldRenderingTests {
         concussionState["ammo"] = 5
         concussionState["nextCreationOrdinal"] = 1
         continuationObject["playerConcussionState"] = concussionState
+        var continuation = try decodeTestWorld(continuationObject)
+            .rebased(onto: level)
+        var counters = try XCTUnwrap(continuation.testTrainingMission)
+        counters.script014Count = 1
+        continuation.levelModule = .trainingMission(counters)
         let simulation = try GameSession(
             level: level,
-            world: (decodeTestWorld(continuationObject)).rebased(onto: level),
+            world: continuation,
             resumedAtTimestamp: 10
         )
+        // The impact lands during the object frames (1 - 19). Script 030
+        // runs later in the level EVT_INTERVAL (GameLoop.cpp:3013,
+        // TrainingMission.cpp:1386-1388) and restores 50 in the same frame.
         let frame = simulation.update(at: 10.1, input: .zero)
-        XCTAssertEqual(frame.shields, 31)
-        let after = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        let afterOpening = try XCTUnwrap(
-            after["trainingOpeningState"] as? [String: Any]
-        )
-        XCTAssertEqual(afterOpening["script030Count"] as? Int, 1)
+        XCTAssertEqual(frame.shields, 50)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script030Count, 1)
+        // The next frame's shields are 50, so Script 030 does not run again.
+        _ = simulation.update(at: 10.2, input: .zero)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script030Count, 1)
     }
 
     @MainActor

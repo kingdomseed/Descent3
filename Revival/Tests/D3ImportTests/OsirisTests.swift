@@ -364,4 +364,88 @@ final class OsirisTests: XCTestCase {
         world.doPlayerInvulnerabilityFrame(frameTime: 0.1)
         XCTAssertNil(world.playerInvulnerableTime)
     }
+
+    // MARK: Collide (physics/collide.cpp, physics/findintersection.cpp)
+
+    /// collide_two_objects sends EVT_COLLIDE to A with it = B, then to B
+    /// with it = A (collide.cpp:2488-2496).
+    func testCollideSendsEventToBothObjectsInLegacyOrder() {
+        let a = ObjectHandle(0x0800)
+        let b = ObjectHandle(0x1003)
+        let calls = collideScriptEvents(a, b)
+        XCTAssertEqual(calls.map(\.me), [a, b])
+        XCTAssertEqual(calls.map(\.event), [.collide(it: b), .collide(it: a)])
+    }
+
+    /// Each object's EVT_COLLIDE goes through its own script chain: the
+    /// player (no Training script) first, then the powerup's custom
+    /// script, which runs Script 001.
+    func testCollideTwoObjectsRunsTheHitObjectsCustomScript() throws {
+        let level = makeTrainingScript003Level()
+        var world = GameWorld(level: level)
+        let player = try XCTUnwrap(level.defaultPlayerBinding).objectHandle
+        let forwardGoal = level.findObjectName("ForwardGoal")
+        XCTAssertNil(world.objects[ObjectHandle(player)]?.scripts)
+        XCTAssertEqual(
+            world.objects[forwardGoal]?.scripts,
+            ObjectScripts(custom: 0x001, level: nil)
+        )
+        world.collideTwoObjects(ObjectHandle(player), forwardGoal, level: level)
+        XCTAssertEqual(world.testTrainingMission?.script001Count, 1)
+        XCTAssertEqual(world.presentationRequests, [
+            .hudMessage("Excellent!"),
+            .streamedAudio(name: "return1.osf", volume: 1),
+            .hudMessage(trainingText("GoBackwards")),
+        ])
+    }
+
+    /// CollideInit (collide.cpp:2585-2624): the player and a powerup check
+    /// sphere against sphere; the pairs whose response is not translated
+    /// yet check nothing.
+    func testCollisionResultPairsPlayerWithPowerup() {
+        XCTAssertEqual(collisionResult(.player, .powerup), .sphereSphere)
+        XCTAssertEqual(collisionResult(.powerup, .player), .sphereSphere)
+        XCTAssertEqual(collisionResult(.powerup, .powerup), .nothing)
+        XCTAssertEqual(collisionResult(.player, .dummy), .nothing)
+    }
+
+    /// check_vector_to_sphere_1 with initial collisions
+    /// (findintersection.cpp:1174-1245).
+    func testVectorToSphereHitsOnEntryOrAtAnInsideStart() {
+        let origin = Vector3.zero
+        let ahead = Vector3(x: 0, y: 0, z: 10)
+        // Entry: the center is 8 ahead, the radius 2.
+        XCTAssertEqual(
+            checkVectorToSphere(
+                start: origin, end: ahead,
+                center: Vector3(x: 0, y: 0, z: 8), radius: 2
+            ),
+            6
+        )
+        // A start inside the sphere hits at 0 while the move closes in.
+        XCTAssertEqual(
+            checkVectorToSphere(
+                start: origin, end: ahead,
+                center: Vector3(x: 0, y: 0, z: 1), radius: 2
+            ),
+            0
+        )
+        // No move, a move away, a pass to the side, and a stop short miss.
+        XCTAssertNil(checkVectorToSphere(
+            start: origin, end: origin,
+            center: Vector3(x: 0, y: 0, z: 1), radius: 2
+        ))
+        XCTAssertNil(checkVectorToSphere(
+            start: origin, end: Vector3(x: 0, y: 0, z: -10),
+            center: Vector3(x: 0, y: 0, z: 1), radius: 2
+        ))
+        XCTAssertNil(checkVectorToSphere(
+            start: origin, end: ahead,
+            center: Vector3(x: 3, y: 0, z: 5), radius: 2
+        ))
+        XCTAssertNil(checkVectorToSphere(
+            start: origin, end: ahead,
+            center: Vector3(x: 0, y: 0, z: 13), radius: 2
+        ))
+    }
 }

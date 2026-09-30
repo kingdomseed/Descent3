@@ -487,12 +487,11 @@ extension WorldRenderingTests {
         var dodgeState = try XCTUnwrap(
             preScript021["trainingDodgeAttemptState"] as? [String: Any]
         )
-        dodgeState["script033Count"] = 1
+        try setTrainingCounter(&preScript021, "script033Count", 1)
         dodgeState["script016Count"] = 1
         dodgeState["script017Count"] = 1
         dodgeState["script018Count"] = 0
         dodgeState["script020Count"] = 1
-        dodgeState["triggerTimerRemaining"] = nil
         dodgeState["successTimerRemaining"] = nil
         dodgeState["almostDoneTimerRemaining"] = nil
         dodgeState["turretIsPowered"] = false

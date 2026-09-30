@@ -21,10 +21,15 @@
 		7A1000000000000000000002 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A10000000000000000000F0 /* Player.swift */; };
 		7A1000000000000000000001 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A10000000000000000000F0 /* Player.swift */; };
 		7A0F00000000000000000005 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		7A2000000000000000000001 /* Collide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A20000000000000000000F0 /* Collide.swift */; };
 		7A0F00000000000000000004 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		7A2000000000000000000002 /* Collide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A20000000000000000000F0 /* Collide.swift */; };
 		7A0F00000000000000000003 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		7A2000000000000000000003 /* Collide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A20000000000000000000F0 /* Collide.swift */; };
 		7A0F00000000000000000002 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		7A2000000000000000000004 /* Collide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A20000000000000000000F0 /* Collide.swift */; };
 		7A0F00000000000000000001 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		7A2000000000000000000005 /* Collide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A20000000000000000000F0 /* Collide.swift */; };
 		7A0E00000000000000000005 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
 		7A0E00000000000000000004 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
 		7A0E00000000000000000003 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
@@ -114,7 +119,6 @@
 		BB0000000000000000000018 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
 		BB0000000000000000000019 /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
 		BB000000000000000000001A /* TrainingLevelValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000006 /* TrainingLevelValidationTests.swift */; };
-		DC0000000000000000000013 /* TrainingLevelValidationTests+ControlLessons.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000013 /* TrainingLevelValidationTests+ControlLessons.swift */; };
 		DC0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift */; };
 		BB000000000000000000001B /* IndoorMovementTraceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000007 /* IndoorMovementTraceTests.swift */; };
 		B1000000000000000000000E /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
@@ -236,8 +240,6 @@
 		DB0000000000000000000031 /* SourceVectorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000009 /* SourceVectorMath.swift */; };
 		DB0000000000000000000032 /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
 		DC0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift */; };
-		DC0000000000000000000002 /* TrainingOpeningLessonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000002 /* TrainingOpeningLessonTests.swift */; };
-		DC0000000000000000000019 /* TrainingOpeningLessonTests+EarlyScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000019 /* TrainingOpeningLessonTests+EarlyScripts.swift */; };
 		DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000003 /* TrainingGuidebotTests.swift */; };
 		DC0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift */; };
 		DC0000000000000000000016 /* TrainingGuidebotTests+Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */; };
@@ -285,6 +287,7 @@
 		7A11000000000000000000F0 /* AIMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIMain.swift; sourceTree = "<group>"; };
 		7A10000000000000000000F0 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		7A0F000000000000000000F0 /* Multisafe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Multisafe.swift; sourceTree = "<group>"; };
+		7A20000000000000000000F0 /* Collide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Collide.swift; sourceTree = "<group>"; };
 		7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DallasFuncs+Objects.swift"; sourceTree = "<group>"; };
 		7A0D000000000000000000F0 /* DallasFuncs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DallasFuncs.swift; sourceTree = "<group>"; };
 		7A0C000000000000000000F0 /* OsirisLoadandBind+Timers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OsirisLoadandBind+Timers.swift"; sourceTree = "<group>"; };
@@ -318,7 +321,6 @@
 		BA0000000000000000000004 /* LevelAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelAssembly.swift; sourceTree = "<group>"; };
 		BA0000000000000000000005 /* IndoorMovementTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorMovementTrace.swift; sourceTree = "<group>"; };
 		BA0000000000000000000006 /* TrainingLevelValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLevelValidationTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000013 /* TrainingLevelValidationTests+ControlLessons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLevelValidationTests+ControlLessons.swift"; sourceTree = "<group>"; };
 		DA0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLevelValidationTests+LaterLessons.swift"; sourceTree = "<group>"; };
 		BA0000000000000000000007 /* IndoorMovementTraceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorMovementTraceTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000008 /* D3LV127Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127Decoder.swift; sourceTree = "<group>"; };
@@ -357,8 +359,6 @@
 		D90000000000000000000009 /* SourceVectorMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceVectorMath.swift; sourceTree = "<group>"; };
 		D9000000000000000000000A /* WorldRenderExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtraction.swift; sourceTree = "<group>"; };
 		DA0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDodgeAndManeuverTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000002 /* TrainingOpeningLessonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingOpeningLessonTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000019 /* TrainingOpeningLessonTests+EarlyScripts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingOpeningLessonTests+EarlyScripts.swift"; sourceTree = "<group>"; };
 		DA0000000000000000000003 /* TrainingGuidebotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingGuidebotTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingGuidebotTests+YellowFlare.swift"; sourceTree = "<group>"; };
 		DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingGuidebotTests+Route.swift"; sourceTree = "<group>"; };
@@ -534,6 +534,7 @@
 				7A11000000000000000000F0 /* AIMain.swift */,
 				7A10000000000000000000F0 /* Player.swift */,
 				7A0F000000000000000000F0 /* Multisafe.swift */,
+				7A20000000000000000000F0 /* Collide.swift */,
 				H20000000000000000000001 /* PilotProfile.swift */,
 				E90000000000000000000001 /* GameSave.swift */,
 				7A03000000000000000000F0 /* ObjectTable.swift */,
@@ -615,8 +616,6 @@
 				C20000000000000000000004 /* EditorProjectTests.swift */,
 				BD0000000000000000000001 /* TrainingBehaviorEditorTests.swift */,
 				DA0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift */,
-				DA0000000000000000000002 /* TrainingOpeningLessonTests.swift */,
-				DA0000000000000000000019 /* TrainingOpeningLessonTests+EarlyScripts.swift */,
 				DA0000000000000000000003 /* TrainingGuidebotTests.swift */,
 				DA0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift */,
 				DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */,
@@ -638,7 +637,6 @@
 				DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */,
 				DA0000000000000000000011 /* LiveShieldsHUDTests.swift */,
 				BA0000000000000000000006 /* TrainingLevelValidationTests.swift */,
-				DA0000000000000000000013 /* TrainingLevelValidationTests+ControlLessons.swift */,
 				DA0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift */,
 				BA0000000000000000000007 /* IndoorMovementTraceTests.swift */,
 				B20000000000000000000006 /* CanonicalLevelTests.swift */,
@@ -849,6 +847,7 @@
 				7A1100000000000000000001 /* AIMain.swift in Sources */,
 				7A1000000000000000000001 /* Player.swift in Sources */,
 				7A0F00000000000000000001 /* Multisafe.swift in Sources */,
+				7A2000000000000000000005 /* Collide.swift in Sources */,
 				7A0E00000000000000000001 /* DallasFuncs+Objects.swift in Sources */,
 				7A0D00000000000000000001 /* DallasFuncs.swift in Sources */,
 				7A0C00000000000000000001 /* OsirisLoadandBind+Timers.swift in Sources */,
@@ -900,6 +899,7 @@
 				7A1100000000000000000002 /* AIMain.swift in Sources */,
 				7A1000000000000000000002 /* Player.swift in Sources */,
 				7A0F00000000000000000002 /* Multisafe.swift in Sources */,
+				7A2000000000000000000004 /* Collide.swift in Sources */,
 				7A0E00000000000000000002 /* DallasFuncs+Objects.swift in Sources */,
 				7A0D00000000000000000002 /* DallasFuncs.swift in Sources */,
 				7A0C00000000000000000002 /* OsirisLoadandBind+Timers.swift in Sources */,
@@ -949,6 +949,7 @@
 				7A1100000000000000000003 /* AIMain.swift in Sources */,
 				7A1000000000000000000003 /* Player.swift in Sources */,
 				7A0F00000000000000000003 /* Multisafe.swift in Sources */,
+				7A2000000000000000000003 /* Collide.swift in Sources */,
 				7A0E00000000000000000003 /* DallasFuncs+Objects.swift in Sources */,
 				7A0D00000000000000000003 /* DallasFuncs.swift in Sources */,
 				7A0C00000000000000000003 /* OsirisLoadandBind+Timers.swift in Sources */,
@@ -1001,6 +1002,7 @@
 				7A1100000000000000000004 /* AIMain.swift in Sources */,
 				7A1000000000000000000004 /* Player.swift in Sources */,
 				7A0F00000000000000000004 /* Multisafe.swift in Sources */,
+				7A2000000000000000000002 /* Collide.swift in Sources */,
 				7A0E00000000000000000004 /* DallasFuncs+Objects.swift in Sources */,
 				7A0D00000000000000000004 /* DallasFuncs.swift in Sources */,
 				7A0C00000000000000000004 /* OsirisLoadandBind+Timers.swift in Sources */,
@@ -1028,8 +1030,6 @@
 				C30000000000000000000005 /* PlayerInput.swift in Sources */,
 				C40000000000000000000005 /* PlayerSimulationPresentation.swift in Sources */,
 				DC0000000000000000000001 /* TrainingDodgeAndManeuverTests.swift in Sources */,
-				DC0000000000000000000002 /* TrainingOpeningLessonTests.swift in Sources */,
-				DC0000000000000000000019 /* TrainingOpeningLessonTests+EarlyScripts.swift in Sources */,
 				DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */,
 				DC0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift in Sources */,
 				DC0000000000000000000016 /* TrainingGuidebotTests+Route.swift in Sources */,
@@ -1080,7 +1080,6 @@
 				B10000000000000000000003 /* PreparedRetailProfile.swift in Sources */,
 				B10000000000000000000005 /* MissionFile.swift in Sources */,
 				BB000000000000000000001A /* TrainingLevelValidationTests.swift in Sources */,
-				DC0000000000000000000013 /* TrainingLevelValidationTests+ControlLessons.swift in Sources */,
 				DC0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift in Sources */,
 				BB000000000000000000001B /* IndoorMovementTraceTests.swift in Sources */,
 				B10000000000000000000009 /* CanonicalLevelTests.swift in Sources */,
@@ -1102,6 +1101,7 @@
 				7A1100000000000000000005 /* AIMain.swift in Sources */,
 				7A1000000000000000000005 /* Player.swift in Sources */,
 				7A0F00000000000000000005 /* Multisafe.swift in Sources */,
+				7A2000000000000000000001 /* Collide.swift in Sources */,
 				7A0E00000000000000000005 /* DallasFuncs+Objects.swift in Sources */,
 				7A0D00000000000000000005 /* DallasFuncs.swift in Sources */,
 				7A0C00000000000000000005 /* OsirisLoadandBind+Timers.swift in Sources */,

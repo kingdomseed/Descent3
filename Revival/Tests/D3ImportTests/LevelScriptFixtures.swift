@@ -1,13 +1,24 @@
 import XCTest
 
-/// The Training messages the synthetic fixtures use for Script 002.
+/// The Training messages the synthetic fixtures use (retail text of
+/// TrainingMission.msg for the names Scripts 000-015 and 033 show).
 let fixtureTrainingMessages = [
-    LevelScriptMessage(
-        name: "Welcome",
-        text: "Welcome to the Descent 3 Training session."
+    ("GoodJob", "Excellent!"),
+    ("GoBackwards", "Now use the reverse Key to return to where you started!"),
+    ("Welcome", "Welcome to the Descent 3 Training session."),
+    ("GoForward", "Move forward until you stop."),
+    ("GoLeft", "Now Go Left until you stop."),
+    ("GoRight", "Now Slide right until you return to the start position."),
+    ("GoUp", "Now Slide up  until you stop."),
+    ("GoDown", "Now Slide down until you return to the start position."),
+    ("Repeat", "Let's repeat the exercise we just did."),
+    ("ContinueToCourse", "Continue Sliding down to start the next step."),
+    (
+        "CourseInstructions",
+        "Now, manuever through this tunnel using the sliding skills you just learned."
     ),
-    LevelScriptMessage(name: "GoForward", text: "Move forward until you stop."),
-]
+    ("DodgeIntro", "Next you are going to practice dodging."),
+].map { LevelScriptMessage(name: $0.0, text: $0.1) }
 
 /// The level with Training script data (package schema 12), so the world
 /// loads the Training level module. Every scriptable object gets a binding,
@@ -141,6 +152,19 @@ func renamed(_ object: PlacedObject, _ name: String?) -> PlacedObject {
     )
 }
 
+/// The world with its Training action counters changed, as a script that
+/// already ran leaves them.
+func settingTrainingCounters(
+    _ world: GameWorld,
+    _ change: (inout TrainingMissionState) -> Void
+) -> GameWorld {
+    var world = world
+    var state = world.testTrainingMission!
+    change(&state)
+    world.levelModule = .trainingMission(state)
+    return world
+}
+
 extension GameWorld {
     /// The Training module state, or `nil` when another module is loaded.
     var testTrainingMission: TrainingMissionState? {
@@ -172,4 +196,105 @@ func deferringOsirisTimers(
 func rescriptedTrainingLevel(_ level: Level) -> Level {
     guard let scripting = level.scripting else { return level }
     return addingTrainingMissionScripting(level, messages: scripting.messages)
+}
+
+/// The powerups whose EVT_COLLIDE the Training opening scripts handle.
+let trainingOpeningGoalNames = [
+    "ForwardGoal", "StartGoal", "LeftGoal", "UpGoal", "StartCourse",
+    "FinishCourse", "StartDodge",
+]
+
+extension GameSession {
+    /// Moves every Training opening goal 2,000 units behind the player, so
+    /// no move reaches one.
+    func parkTrainingGoals() {
+        let player = world.testPlayerObject
+        for name in trainingOpeningGoalNames {
+            let handle = level.findObjectName(name)
+            guard var goal = world.objects[handle] else { continue }
+            goal.location = player.location
+            goal.position = player.position
+                + Vector3(x: 0, y: 0, z: -2_000)
+            world.objects[handle] = goal
+        }
+    }
+
+    /// Flies the player into the named object in the frame at `timestamp`:
+    /// the object waits 3 units ahead in the player's room, and the player
+    /// moves toward it at 30 units per second. The other opening goals are
+    /// parked first. A player at rest hits nothing
+    /// (check_vector_to_sphere_1, findintersection.cpp:1194).
+    @discardableResult
+    func touch(_ name: String, at timestamp: Double) -> PlayerSimulationFrame {
+        parkTrainingGoals()
+        let player = world.testPlayerObject
+        let handle = level.findObjectName(name)
+        var goal = world.objects[handle]!
+        goal.location = player.location
+        goal.position = player.position + Vector3(x: 0, y: 0, z: 3)
+        world.objects[handle] = goal
+        world.velocity = Vector3(x: 0, y: 0, z: 30)
+        let frame = update(at: timestamp, input: .zero)
+        world.velocity = .zero
+        parkTrainingGoals()
+        return frame
+    }
+}
+
+/// A frame's presentation as `hud:`, `voice:`, and `sound:` entries, in
+/// request order.
+func presentationLog(_ frame: PlayerSimulationFrame) -> [String] {
+    frame.trainingOpeningFeedback.flatMap { feedback -> [String] in
+        var log = feedback.soundSourceName.map { ["sound:\($0)"] } ?? []
+        let voice = feedback.voiceSourceName.isEmpty
+            ? [] : ["voice:\(feedback.voiceSourceName)"]
+        let hud = feedback.hudMessages.map { "hud:\($0)" }
+        log += feedback.voicePrecedesHUDMessages ? voice + hud : hud + voice
+        return log + feedback.trailingHUDMessages.map { "hud:\($0)" }
+    }
+}
+
+/// The retail text of a Training message name (`fixtureTrainingMessages`).
+func trainingText(_ name: String) -> String {
+    fixtureTrainingMessages.first { $0.name == name }!.text
+}
+
+extension GameSession {
+    /// The collide_two_objects call (collide.cpp:2493) that the player's
+    /// move into the named object makes. Tests that start the player on a
+    /// goal at rest use it: a move that does not close in hits nothing.
+    func collidePlayer(with name: String) {
+        world.collideTwoObjects(
+            world.testPlayerObject.handle,
+            level.findObjectName(name),
+            level: level
+        )
+    }
+}
+
+/// Sets one Training action counter in a test world object, as a script
+/// that already ran leaves it.
+func setTrainingCounter(
+    _ object: inout [String: Any],
+    _ name: String,
+    _ value: Int
+) throws {
+    var module = try XCTUnwrap(object["levelModule"] as? [String: Any])
+    var training = try XCTUnwrap(
+        module["trainingMission"] as? [String: Any]
+    )
+    var state = try XCTUnwrap(training["_0"] as? [String: Any])
+    state[name] = value
+    training["_0"] = state
+    module["trainingMission"] = training
+    object["levelModule"] = module
+}
+
+/// The used Osiris timer 8 on StartDodge (Script 033,
+/// TrainingMission.cpp:1860), if any.
+func startDodgeTimer(_ session: GameSession) -> OsirisTimer? {
+    let startDodge = session.level.findObjectName("StartDodge")
+    return session.world.osirisTimers.entries.first {
+        $0.isUsed && $0.owner == .object(startDodge) && $0.id == 8
+    }
 }

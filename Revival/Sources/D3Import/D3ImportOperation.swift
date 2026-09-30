@@ -1137,72 +1137,11 @@ func runD3Import(
     let messages = try parseTrainingMessages(
         trainingData.subdata(in: messageEntry.payloadRange)
     )
-    let forwardGoal = playerLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("ForwardGoal") == .orderedSame
-    }!
-    let startGoal = playerLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("StartGoal") == .orderedSame
-    }!
-    let leftGoal = playerLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("LeftGoal") == .orderedSame
-    }!
-    let upGoal = playerLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("UpGoal") == .orderedSame
-    }!
-    let startCourse = playerLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("StartCourse")
-            == .orderedSame
-    }!
-    let finishCourse = playerLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("FinishCourse")
-            == .orderedSame
-    }!
-    let startGoalPresentation = playerLevel.objectPresentations.first {
-        $0.objectHandle == startGoal.handle
-    }!
-    let startGoalModel = playerLevel.models.first {
-        $0.source == startGoalPresentation.primaryModel
-    }!
-    let leftGoalPresentation = playerLevel.objectPresentations.first {
-        $0.objectHandle == leftGoal.handle
-    }!
-    let leftGoalModel = playerLevel.models.first {
-        $0.source == leftGoalPresentation.primaryModel
-    }!
-    let upGoalPresentation = playerLevel.objectPresentations.first {
-        $0.objectHandle == upGoal.handle
-    }!
-    let upGoalModel = playerLevel.models.first {
-        $0.source == upGoalPresentation.primaryModel
-    }!
-    let startCoursePresentation = playerLevel.objectPresentations.first {
-        $0.objectHandle == startCourse.handle
-    }!
-    let startCourseModel = playerLevel.models.first {
-        $0.source == startCoursePresentation.primaryModel
-    }!
-    let finishCoursePresentation = playerLevel.objectPresentations.first {
-        $0.objectHandle == finishCourse.handle
-    }!
-    let finishCourseModel = playerLevel.models.first {
-        $0.source == finishCoursePresentation.primaryModel
-    }!
-    let portalRoomOne = playerLevel.rooms.first {
-        $0.name?.caseInsensitiveCompare("PortalRoom1") == .orderedSame
-    }!
     let portalRoomTwo = playerLevel.rooms.first {
         $0.name?.caseInsensitiveCompare("PortalRoom2") == .orderedSame
     }!
     precondition(
-        portalRoomOne.sourceIndex == 2
-            && portalRoomOne.portals.count == 2
-            && portalRoomOne.portals[0].faceIndex == 0
-            && portalRoomOne.portals[0].connectedRoom == 1
-            && portalRoomOne.portals[0].connectedPortal == 0
-            && portalRoomOne.portals[1].faceIndex == 1
-            && portalRoomOne.portals[1].connectedRoom == 3
-            && portalRoomOne.portals[1].connectedPortal == 0
-            && portalRoomTwo.sourceIndex == 49
+        portalRoomTwo.sourceIndex == 49
             && portalRoomTwo.portals.count == 2
             && portalRoomTwo.portals[0].faceIndex == 1
             && portalRoomTwo.portals[0].connectedRoom == 35
@@ -1210,176 +1149,6 @@ func runD3Import(
             && portalRoomTwo.portals[1].faceIndex == 0
             && portalRoomTwo.portals[1].connectedRoom == 50
             && portalRoomTwo.portals[1].connectedPortal == 0
-    )
-    let forwardGoalPresentation = playerLevel.objectPresentations.first {
-        $0.objectHandle == forwardGoal.handle
-    }!
-    let forwardGoalModel = playerLevel.models.first {
-        $0.source == forwardGoalPresentation.primaryModel
-    }!
-    precondition(
-        forwardGoal.handle == 12_301
-            && forwardGoal.type == 7
-            && forwardGoal.storedID == 67
-            && forwardGoal.definition?.storedIndex == 67
-            && forwardGoal.definition?.referenceRuntimeIndex == 68
-            && forwardGoal.definition?.sourceName == "Invisiblepowerup"
-            && forwardGoal.instanceName == "ForwardGoal"
-            && forwardGoal.flags == 36_864
-            && forwardGoal.location == .room(1)
-            && forwardGoal.position
-                == .init(x: 2_060.4836, y: -131.22517, z: 2_310.928)
-            && forwardGoal.orientation
-                == .init(
-                    right: .init(x: -0.997_518_1, y: 0, z: 0.070_410_63),
-                    up: .init(x: 0, y: 1, z: 0),
-                    forward: .init(x: -0.070_410_63, y: 0, z: -0.997_518_1)
-                )
-            && forwardGoal.containsType == 255
-            && forwardGoal.containsID == 0
-            && forwardGoal.containsCount == 0
-            && forwardGoal.lifeLeft == 0
-            && forwardGoalPresentation.primaryModel
-                == .init(
-                    storedIndex: 6,
-                    sourceName: "invisiblepowerup.OOF"
-                )
-            && sourceObjectPresentationSize(
-                model: forwardGoalModel,
-                objectType: forwardGoal.type
-            ) == 10.052_409
-            && startGoal.handle == 12_300
-            && startGoal.type == 7
-            && startGoal.storedID == 67
-            && startGoal.definition?.referenceRuntimeIndex == 68
-            && startGoal.instanceName == "StartGoal"
-            && startGoal.flags == 36_864
-            && startGoal.location == .room(1)
-            && startGoal.position
-                == .init(x: 2_062.7678, y: -134.19601, z: 2_201.679)
-            && startGoal.orientation
-                == .init(
-                    right: .init(x: -1, y: 0, z: 0),
-                    up: .init(x: 0, y: 1, z: 0),
-                    forward: .init(x: 0, y: 0, z: -1)
-                )
-            && startGoalPresentation.primaryModel.sourceName
-                == "invisiblepowerup.OOF"
-            && leftGoal.handle == 12_299
-            && leftGoal.type == 7
-            && leftGoal.storedID == 67
-            && leftGoal.definition?.referenceRuntimeIndex == 68
-            && leftGoal.instanceName == "LeftGoal"
-            && leftGoal.flags == 4_352
-            && leftGoal.location == .room(1)
-            && leftGoal.position
-                == .init(x: 1_958.2805, y: -131.22517, z: 2_205.8071)
-            && leftGoal.orientation
-                == .init(
-                    right: .init(x: -1, y: 0, z: 0),
-                    up: .init(x: 0, y: 1, z: -0),
-                    forward: .init(x: -0, y: -0, z: -1)
-                )
-            && leftGoalPresentation.primaryModel.sourceName
-                == "invisiblepowerup.OOF"
-            && upGoal.handle == 18_441
-            && upGoal.type == 7
-            && upGoal.storedID == 67
-            && upGoal.definition?.storedIndex == 67
-            && upGoal.definition?.referenceRuntimeIndex == 68
-            && upGoal.definition?.sourceName == "Invisiblepowerup"
-            && upGoal.instanceName == "UpGoal"
-            && upGoal.flags == 4_352
-            && upGoal.location == .room(1)
-            && upGoal.position
-                == .init(x: 2_060.6682, y: -25.897497, z: 2_204.6843)
-            && upGoal.orientation
-                == .init(
-                    right: .init(x: -1, y: 0, z: 0),
-                    up: .init(x: 0, y: 1, z: -0),
-                    forward: .init(x: -0, y: -0, z: -1)
-                )
-            && upGoalPresentation.primaryModel
-                == .init(
-                    storedIndex: 6,
-                    sourceName: "invisiblepowerup.OOF"
-                )
-            && startCourse.handle == 6_147
-            && startCourse.type == 7
-            && startCourse.storedID == 67
-            && startCourse.definition?.storedIndex == 67
-            && startCourse.definition?.referenceRuntimeIndex == 68
-            && startCourse.definition?.sourceName == "Invisiblepowerup"
-            && startCourse.instanceName == "StartCourse"
-            && startCourse.flags == 4_096
-            && startCourse.location == .room(3)
-            && startCourse.position
-                == .init(
-                    x: 2_061.4604,
-                    y: -230.09009,
-                    z: 2_203.0276
-                )
-            && startCourse.orientation
-                == .init(
-                    right: .init(x: -1, y: 0, z: 0),
-                    up: .init(x: 0, y: 1, z: -0),
-                    forward: .init(x: -0, y: -0, z: -1)
-                )
-            && startCourse.containsType == 255
-            && startCourse.containsID == 0
-            && startCourse.containsCount == 0
-            && startCourse.lifeLeft == 0
-            && startCourse.soundSource == nil
-            && startCourse.inertScriptName == nil
-            && startCourse.inertModuleName == nil
-            && startCourse.lightmapSubmodels.isEmpty
-            && startCoursePresentation.primaryModel
-                == .init(
-                    storedIndex: 6,
-                    sourceName: "invisiblepowerup.OOF"
-                )
-            && sourceObjectPresentationSize(
-                model: startCourseModel,
-                objectType: startCourse.type
-            ) == 10.052_409
-            && finishCourse.handle == 6_150
-            && finishCourse.type == 7
-            && finishCourse.storedID == 67
-            && finishCourse.definition?.storedIndex == 67
-            && finishCourse.definition?.referenceRuntimeIndex == 68
-            && finishCourse.definition?.sourceName == "Invisiblepowerup"
-            && finishCourse.instanceName == "FinishCourse"
-            && finishCourse.flags == 4_096
-            && finishCourse.location == .room(50)
-            && finishCourse.position
-                == .init(
-                    x: 2_062.5024,
-                    y: -650.74756,
-                    z: 2_206.0369
-                )
-            && finishCourse.orientation
-                == .init(
-                    right: .init(x: -1, y: 0, z: 0),
-                    up: .init(x: 0, y: 1, z: -0),
-                    forward: .init(x: -0, y: -0, z: -1)
-                )
-            && finishCourse.containsType == 255
-            && finishCourse.containsID == 0
-            && finishCourse.containsCount == 0
-            && finishCourse.lifeLeft == 0
-            && finishCourse.soundSource == nil
-            && finishCourse.inertScriptName == nil
-            && finishCourse.inertModuleName == nil
-            && finishCourse.lightmapSubmodels.isEmpty
-            && finishCoursePresentation.primaryModel
-                == .init(
-                    storedIndex: 6,
-                    sourceName: "invisiblepowerup.OOF"
-                )
-            && sourceObjectPresentationSize(
-                model: finishCourseModel,
-                objectType: finishCourse.type
-            ) == 10.052_409
     )
     let voiceNames = [
         "Welcome.osf",
@@ -1606,144 +1375,9 @@ func runD3Import(
                 == "35eaf843ad66e61a1f5c46f68ced68d5fbec8580dc8e1c8d115e374349f5a96f"
             && guidebotAmbientEngineSoundClip.importVolume == 0.1
     )
-    let openingLevel = playerLevel.addingTrainingOpeningLesson(
-        .init(
-            forwardGoalObjectHandle: forwardGoal.handle,
-            successMessage: messages["GoodJob"]!,
-            reverseInstruction: messages["GoBackwards"]!,
-            successVoiceSourceName: "return1.osf",
-            returnLeft: .init(
-                startGoalObjectHandle: startGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: startGoalModel,
-                    objectType: startGoal.type
-                ),
-                instruction: messages["GoLeft"]!,
-                voiceSourceName: "left1.osf"
-            ),
-            returnRight: .init(
-                leftGoalObjectHandle: leftGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: leftGoalModel,
-                    objectType: leftGoal.type
-                ),
-                successMessage: messages["GoodJob"]!,
-                instruction: messages["GoRight"]!,
-                voiceSourceName: "return2.osf"
-            ),
-            returnUp: .init(
-                startGoalObjectHandle: startGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: startGoalModel,
-                    objectType: startGoal.type
-                ),
-                successMessage: messages["GoodJob"]!,
-                instruction: messages["GoUp"]!,
-                voiceSourceName: "up1.osf"
-            ),
-            returnDown: .init(
-                upGoalObjectHandle: upGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: upGoalModel,
-                    objectType: upGoal.type
-                ),
-                successMessage: messages["GoodJob"]!,
-                instruction: messages["GoDown"]!,
-                voiceSourceName: "return3.osf"
-            ),
-            repeatForward: .init(
-                startGoalObjectHandle: startGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: startGoalModel,
-                    objectType: startGoal.type
-                ),
-                successMessage: messages["GoodJob"]!,
-                repeatMessage: messages["Repeat"]!,
-                forwardInstruction: messages["GoForward"]!,
-                voiceSourceName: "repeat.osf"
-            ),
-            repeatForwardGoal: .init(
-                forwardGoalObjectHandle: forwardGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: forwardGoalModel,
-                    objectType: forwardGoal.type
-                ),
-                reverseInstruction: messages["GoBackwards"]!,
-                soundLogicalName: menuBeepPage.logicalName
-            ),
-            repeatReturnLeft: .init(
-                startGoalObjectHandle: startGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: startGoalModel,
-                    objectType: startGoal.type
-                ),
-                instruction: messages["GoLeft"]!,
-                voiceSourceName: "lright.osf"
-            ),
-            repeatReturnRight: .init(
-                leftGoalObjectHandle: leftGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: leftGoalModel,
-                    objectType: leftGoal.type
-                ),
-                instruction: messages["GoRight"]!,
-                soundLogicalName: menuBeepPage.logicalName
-            ),
-            repeatReturnUp: .init(
-                startGoalObjectHandle: startGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: startGoalModel,
-                    objectType: startGoal.type
-                ),
-                instruction: messages["GoUp"]!,
-                voiceSourceName: "udown.osf"
-            ),
-            repeatReturnDown: .init(
-                upGoalObjectHandle: upGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: upGoalModel,
-                    objectType: upGoal.type
-                ),
-                instruction: messages["GoDown"]!,
-                soundLogicalName: menuBeepPage.logicalName
-            ),
-            continueToCourse: .init(
-                startGoalObjectHandle: startGoal.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: startGoalModel,
-                    objectType: startGoal.type
-                ),
-                portalRoomSourceIndex: portalRoomOne.sourceIndex,
-                orderedPortalIndices: [0, 1],
-                instruction: messages["ContinueToCourse"]!,
-                voiceSourceName: "proceed1.osf"
-            ),
-            startCourse: .init(
-                startCourseObjectHandle: startCourse.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: startCourseModel,
-                    objectType: startCourse.type
-                ),
-                portalRoomSourceIndex: portalRoomOne.sourceIndex,
-                portalIndex: 1,
-                instruction: messages["CourseInstructions"]!,
-                voiceSourceName: "intro1.osf",
-                enabledControlMask: 63
-            ),
-            finishCourse: .init(
-                finishCourseObjectHandle: finishCourse.handle,
-                collisionRadius: sourceObjectPresentationSize(
-                    model: finishCourseModel,
-                    objectType: finishCourse.type
-                ),
-                portalRoomSourceIndex: portalRoomTwo.sourceIndex,
-                orderedPortalIndices: [0, 1],
-                successMessage: messages["GoodJob"]!,
-                instruction: messages["ContinueToCourse"]!,
-                voiceSourceName: "proceed2.osf",
-                enabledControlMask: 32
-            )
-        ),
+    // The streams and sounds the Training level module and the bespoke
+    // lessons play.
+    let openingLevel = playerLevel.addingAudioClips(
         voiceClips: [
             voiceClips[0],
             voiceClips[1],
@@ -3194,8 +2828,18 @@ func runD3Import(
         table: tableData,
         overlay: overlayData
     ))
+    // The first frame renders the world after the level start scripts
+    // (Script 000 hides the goal powerups, TrainingMission.cpp:1461-1495).
     let playerView = defaultPlayerView(in: level)
-    let initialExtraction = try extractWorldForRendering(level, playerView: playerView)
+    let startWorld = GameWorld(level: level)
+    let initialExtraction = try extractWorldForRendering(
+        level,
+        objects: startWorld.objects,
+        roomStates: startWorld.rooms,
+        camera: playerView.camera,
+        startRoomSourceIndex: playerView.roomSourceIndex,
+        excludedObjectHandle: playerView.objectHandle
+    )
     precondition(
         initialExtraction.opaqueDrawItems.count
             + initialExtraction.translucentDrawItems.count == 232

@@ -393,7 +393,7 @@ extension CanonicalLevelTests {
             hostileDuration
         )
     }
-    func testSchemaNineRejectsHostileTrainingLessonAndVoiceMutations() throws {
+    func testStockTrainingPackageRejectsHostileOpeningVoiceMutations() throws {
         let base = makeSliceSixObjectRenderLevel()
         let archive = "missions/training.mn3"
         let stockSource = replacing(
@@ -409,13 +409,6 @@ extension CanonicalLevelTests {
             missionKey: "descent3.mission.pilot-training",
             levelKey: "descent3.level.training-mission",
             source: stockSource
-        )
-        let goalHandle: UInt32 = 12_301
-        let lesson = TrainingOpeningLesson(
-            forwardGoalObjectHandle: goalHandle,
-            successMessage: "Excellent",
-            reverseInstruction: "Reverse",
-            successVoiceSourceName: "return1.osf"
         )
         let clips = [
             CanonicalVoiceClip(
@@ -476,10 +469,7 @@ extension CanonicalLevelTests {
                 levelKey: "hostile.renamed-level"
             )
         )
-        let level = stockBase.addingTrainingOpeningLesson(
-            lesson,
-            voiceClips: clips
-        )
+        let level = stockBase.addingAudioClips(voiceClips: clips)
         assertValidationError(
             .invalidDependency("Training opening package"),
             level
@@ -533,46 +523,6 @@ extension CanonicalLevelTests {
                         + wrongStockDependencies,
                     historicalEagerBaseline:
                         base.dependencyManifest.historicalEagerBaseline
-                )
-            )
-        )
-        var visiblePresentations = level.objectPresentations
-        let goalPresentationIndex = try XCTUnwrap(
-            visiblePresentations.firstIndex {
-                $0.objectHandle == lesson.forwardGoalObjectHandle
-            }
-        )
-        let hiddenGoal = visiblePresentations[goalPresentationIndex]
-        visiblePresentations[goalPresentationIndex] = ObjectPresentationReference(
-            objectHandle: hiddenGoal.objectHandle,
-            primaryModel: hiddenGoal.primaryModel,
-            mediumModel: hiddenGoal.mediumModel,
-            lowModel: hiddenGoal.lowModel,
-            dyingModel: hiddenGoal.dyingModel,
-            mediumDistance: hiddenGoal.mediumDistance,
-            lowDistance: hiddenGoal.lowDistance,
-            isVisible: true
-        )
-        assertValidationError(
-            .invalidDependency("Training opening lesson"),
-            replacing(level, objectPresentations: visiblePresentations)
-        )
-
-        var missingTarget = lesson
-        missingTarget.forwardGoalObjectHandle = 999_999
-        assertValidationError(
-            .invalidDependency("Training opening lesson"),
-            replacing(level, trainingOpeningLesson: missingTarget)
-        )
-        assertValidationError(
-            .invalidDependency("Training opening lesson"),
-            replacing(
-                level,
-                trainingOpeningLesson: .init(
-                    forwardGoalObjectHandle: lesson.forwardGoalObjectHandle,
-                    successMessage: lesson.successMessage,
-                    reverseInstruction: lesson.reverseInstruction,
-                    successVoiceSourceName: "missing.osf"
                 )
             )
         )

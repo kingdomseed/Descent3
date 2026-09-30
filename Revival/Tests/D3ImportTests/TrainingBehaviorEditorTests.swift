@@ -109,140 +109,8 @@ extension EditorProjectTests {
             }
         )
         XCTAssertEqual(
-            document.project.trainingReturnUpSourceDiagnostic,
-            "TrainingMission.cpp Script 005 / StartGoal handle 12300 / up1.osf"
-        )
-        XCTAssertEqual(
-            document.project.trainingReturnDownSourceDiagnostic,
-            "TrainingMission.cpp Script 006 / UpGoal handle 18441 / return3.osf"
-        )
-        XCTAssertEqual(
-            document.project.trainingRepeatForwardSourceDiagnostic,
-            "TrainingMission.cpp Script 007 / StartGoal handle 12300 / repeat.osf"
-        )
-        XCTAssertEqual(
-            document.project.trainingRepeatForwardGoalSourceDiagnostic,
-            "TrainingMission.cpp Script 008 / ForwardGoal handle 12301 / MenuBeepEnter"
-        )
-        XCTAssertEqual(
-            document.project.trainingRepeatReturnLeftSourceDiagnostic,
-            "TrainingMission.cpp Script 009 / StartGoal handle 12300 / lright.osf"
-        )
-        XCTAssertEqual(
-            document.project.trainingRepeatReturnRightSourceDiagnostic,
-            "TrainingMission.cpp Script 010 / LeftGoal handle 12299 / MenuBeepEnter"
-        )
-        XCTAssertEqual(
-            document.project.trainingRepeatReturnUpSourceDiagnostic,
-            "TrainingMission.cpp Script 011 / StartGoal handle 12300 / udown.osf"
-        )
-        XCTAssertEqual(
-            document.project.trainingRepeatReturnDownSourceDiagnostic,
-            "TrainingMission.cpp Script 012 / UpGoal handle 18441 / MenuBeepEnter"
-        )
-        XCTAssertEqual(
-            document.project.trainingContinueToCourseSourceDiagnostic,
-            "TrainingMission.cpp Script 013 / StartGoal handle 12300 / PortalRoom1 portals 0,1 / proceed1.osf"
-        )
-        XCTAssertEqual(
-            document.project.trainingStartCourseSourceDiagnostic,
-            "TrainingMission.cpp Script 014 / StartCourse handle 6147 / PortalRoom1 portal 1 / Intro1.osf"
-        )
-        XCTAssertEqual(
-            document.project.trainingFinishCourseSourceDiagnostic,
-            "TrainingMission.cpp Script 015 / FinishCourse handle 6150 / PortalRoom2 portals 0,1 / proceed2.osf"
-        )
-        XCTAssertEqual(
             document.project.trainingDodgeAttemptSourceDiagnostic,
             "TrainingMission.cpp Scripts 033,016,017,018,020,019 / StartDodge 4106 / DoneDodgeingGoal 12302 / DodgeTurrett 8199 / FlashLight-1 4120 / PortalRoom2+3 portals 0,1 / intro2.osf+almost.osf+proceed3.osf+proceed4.osf"
-        )
-        XCTAssertEqual(
-            document.project.trainingReturnRightSourceDiagnostic,
-            "TrainingMission.cpp Script 004 / LeftGoal handle 12299 / return2.osf"
-        )
-        XCTAssertEqual(
-            document.project.trainingReturnLeftSourceDiagnostic,
-            "TrainingMission.cpp Script 003 / StartGoal handle 12300 / left1.osf"
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 005 / StartGoal handle 12300 / up1.osf"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 006 / UpGoal handle 18441 / return3.osf"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 008 / ForwardGoal handle 12301 / MenuBeepEnter"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 009 / StartGoal handle 12300 / lright.osf"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 010 / LeftGoal handle 12299 / MenuBeepEnter"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 011 / StartGoal handle 12300 / udown.osf"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 012 / UpGoal handle 18441 / MenuBeepEnter"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 013 / StartGoal handle 12300 / PortalRoom1 portals 0,1 / proceed1.osf"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 014 / StartCourse handle 6147 / PortalRoom1 portal 1 / Intro1.osf"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 015 / FinishCourse handle 6150 / PortalRoom2 portals 0,1 / proceed2.osf"
-            )
         )
         XCTAssertTrue(
             editorIdleStatusMessage(
@@ -250,30 +118,6 @@ extension EditorProjectTests {
                 selection: document.editorSelection
             ).contains(
                 "TrainingMission.cpp Scripts 033,016,017,018,020,019 / StartDodge 4106"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 007 / StartGoal handle 12300 / repeat.osf"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 004 / LeftGoal handle 12299 / return2.osf"
-            )
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Script 003 / StartGoal handle 12300 / left1.osf"
             )
         )
 
@@ -505,51 +349,18 @@ extension EditorProjectTests {
 
         let playSession = reopened.makePlaySession()
         reopened.commitPlaySession(playSession, renderingWorld: false)
-        XCTAssertEqual(
-            playSession.level.trainingOpeningLesson?.returnUp?
-                .startGoalObjectHandle,
-            startGoal.handle
-        )
-        XCTAssertEqual(
-            playSession.level.trainingOpeningLesson?.returnRight?
-                .leftGoalObjectHandle,
-            leftGoal.handle
-        )
-        XCTAssertEqual(
-            playSession.level.trainingOpeningLesson?.returnDown?
-                .upGoalObjectHandle,
-            upGoal.handle
-        )
-        XCTAssertEqual(
-            playSession.level.trainingOpeningLesson?.repeatForward?
-                .startGoalObjectHandle,
-            startGoal.handle
-        )
-        XCTAssertEqual(
-            playSession.level.trainingOpeningLesson?.repeatForwardGoal?
-                .forwardGoalObjectHandle,
-            forwardGoal.handle
-        )
-        XCTAssertEqual(
-            playSession.level.trainingOpeningLesson?.repeatReturnLeft?
-                .startGoalObjectHandle,
-            startGoal.handle
-        )
-        XCTAssertEqual(
-            playSession.level.trainingOpeningLesson?.repeatReturnRight?
-                .leftGoalObjectHandle,
-            leftGoal.handle
-        )
-        XCTAssertEqual(
-            playSession.level.trainingOpeningLesson?.repeatReturnUp?
-                .startGoalObjectHandle,
-            startGoal.handle
-        )
-        XCTAssertEqual(
-            playSession.level.trainingOpeningLesson?.finishCourse?
-                .finishCourseObjectHandle,
-            finishCourse.handle
-        )
+        // The Training module finds its goals by name in the play level.
+        for (name, goal) in [
+            ("StartGoal", startGoal), ("LeftGoal", leftGoal),
+            ("UpGoal", upGoal), ("ForwardGoal", forwardGoal),
+            ("FinishCourse", finishCourse),
+        ] {
+            XCTAssertEqual(
+                playSession.level.findObjectName(name),
+                ObjectHandle(goal.handle),
+                name
+            )
+        }
         XCTAssertEqual(
             playSession.level.trainingDodgeAttempt?.dodgeExit,
             reopened.project.level.trainingDodgeAttempt?.dodgeExit
@@ -2943,12 +2754,11 @@ private func makeScript021ReadySimulation(
     var dodge = try XCTUnwrap(
         object["trainingDodgeAttemptState"] as? [String: Any]
     )
-    dodge["script033Count"] = 1
+    try setTrainingCounter(&object, "script033Count", 1)
     dodge["script016Count"] = 1
     dodge["script017Count"] = 1
     dodge["script018Count"] = 0
     dodge["script020Count"] = 1
-    dodge["triggerTimerRemaining"] = nil
     dodge["successTimerRemaining"] = nil
     dodge["almostDoneTimerRemaining"] = nil
     dodge["turretIsPowered"] = false

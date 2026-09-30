@@ -92,12 +92,11 @@ extension WorldRenderingTests {
             continuationObject["trainingDodgeAttemptState"]
                 as? [String: Any]
         )
-        dodgeState["script033Count"] = 1
+        try setTrainingCounter(&continuationObject, "script033Count", 1)
         dodgeState["script016Count"] = 1
         dodgeState["script017Count"] = 1
         dodgeState["script018Count"] = 0
         dodgeState["script020Count"] = 1
-        dodgeState["triggerTimerRemaining"] = nil
         dodgeState["successTimerRemaining"] = nil
         dodgeState["almostDoneTimerRemaining"] = nil
         dodgeState["turretIsPowered"] = false
@@ -169,20 +168,14 @@ extension WorldRenderingTests {
             XCTAssertEqual(reciprocal.flags & 1, 1)
         }
 
-        var earlyManeuverObject = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        var earlyManeuverOpening = try XCTUnwrap(
-            earlyManeuverObject["trainingOpeningState"]
-                as? [String: Any]
-        )
-        earlyManeuverOpening["startCourseWasPresented"] = true
-        earlyManeuverOpening["finishCourseWasPresented"] = true
-        earlyManeuverObject["trainingOpeningState"] =
-            earlyManeuverOpening
+        // Scripts 014 and 015 already ran.
+        let earlyManeuver = settingTrainingCounters(simulation.world) {
+            $0.script014Count = 1
+            $0.script015Count = 1
+        }
         let earlyManeuverRestore = try GameSession(
             level: level,
-            world: (decodeTestWorld(earlyManeuverObject)).rebased(onto: level),
+            world: earlyManeuver.rebased(onto: level),
             resumedAtTimestamp: 0.1
         ).update(at: 0.1, input: .zero)
         XCTAssertEqual(
@@ -850,15 +843,12 @@ extension WorldRenderingTests {
             earlyThenSuccessObject["trainingDodgeAttemptState"]
                 as? [String: Any]
         )
-        earlyThenSuccessState["script033Count"] = 1
+        try setTrainingCounter(&earlyThenSuccessObject, "script033Count", 1)
         earlyThenSuccessState["script016Count"] = 1
         earlyThenSuccessState["script017Count"] = 1
         earlyThenSuccessState["script019Count"] = 1
         earlyThenSuccessState["markerLightDistance"] = 50
         earlyThenSuccessState["turretIsPowered"] = false
-        earlyThenSuccessState.removeValue(
-            forKey: "triggerTimerRemaining"
-        )
         earlyThenSuccessState.removeValue(
             forKey: "successTimerRemaining"
         )
@@ -1035,15 +1025,16 @@ extension WorldRenderingTests {
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 1
         )
+        // The player starts on StartDodge at rest; its contact is the
+        // collide_two_objects call of a move into it.
+        simulation.collidePlayer(with: "StartDodge")
         var timestamp = 0.1
         let contact = simulation.update(at: timestamp, input: .zero)
         XCTAssertEqual(contact.enabledPlayerControls.rawValue, 60)
         XCTAssertEqual(try randomState(simulation), 1)
+        // Script 033's timer 8 on StartDodge starts the dodge in 10 s.
         XCTAssertEqual(
-            try XCTUnwrap(
-                try dodgeState(simulation)["triggerTimerRemaining"]
-                    as? Double
-            ),
+            try XCTUnwrap(startDodgeTimer(simulation)).end,
             10,
             accuracy: 0.000_001
         )
@@ -1304,19 +1295,17 @@ extension WorldRenderingTests {
             level: level,
             presentationReadyTimestamp: 0
         )
+        // The player starts on StartDodge at rest; its contact is the
+        // collide_two_objects call of a move into it.
+        simulation.collidePlayer(with: "StartDodge")
         var frame = simulation.update(at: 0.1, input: .zero)
         XCTAssertEqual(frame.enabledPlayerControls.rawValue, 60)
-        XCTAssertEqual(
-            frame.trainingOpeningFeedback,
-            [
-                .init(
-                    hudMessages: [dodge.introduction],
-                    voiceSourceName:
-                        dodge.introductionVoiceSourceName,
-                    voicePrecedesHUDMessages: true
-                )
-            ]
-        )
+        // Script 033 (TrainingMission.cpp:1858-1859): the stream, then
+        // DodgeIntro.
+        XCTAssertEqual(presentationLog(frame), [
+            "voice:\(dodge.introductionVoiceSourceName)",
+            "hud:\(dodge.introduction)",
+        ])
         let closedPortalRoomTwo = try XCTUnwrap(
             simulation.runtimeLevel.rooms.first {
                 $0.sourceIndex == dodge.portalRoomTwoSourceIndex
@@ -1375,7 +1364,7 @@ extension WorldRenderingTests {
             continuationObject["trainingDodgeAttemptState"]
                 as? [String: Any]
         )
-        XCTAssertEqual(dodgeState["script033Count"] as? Int, 1)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script033Count, 1)
         XCTAssertEqual(dodgeState["script016Count"] as? Int, 1)
         XCTAssertEqual(dodgeState["script017Count"] as? Int, 0)
         XCTAssertEqual(dodgeState["script018Count"] as? Int, 2)
@@ -1449,6 +1438,9 @@ extension WorldRenderingTests {
             level: level,
             presentationReadyTimestamp: 0
         )
+        // The player starts on StartDodge at rest; its contact is the
+        // collide_two_objects call of a move into it.
+        simulation.collidePlayer(with: "StartDodge")
 
         var timestamp = 0.0
         var fireCount = 0
@@ -1607,9 +1599,7 @@ extension WorldRenderingTests {
     {
         var level = makeTrainingDodgeAttemptLevel()
         let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
-        let startCourse = try XCTUnwrap(
-            level.trainingOpeningLesson?.startCourse
-        )
+        let startCourseHandle = level.findObjectName("StartCourse").rawValue
         let startDodgeIndex = try XCTUnwrap(
             level.objects.firstIndex {
                 $0.handle == dodge.startDodgeObjectHandle
@@ -1617,7 +1607,7 @@ extension WorldRenderingTests {
         )
         let startCourseIndex = try XCTUnwrap(
             level.objects.firstIndex {
-                $0.handle == startCourse.startCourseObjectHandle
+                $0.handle == startCourseHandle
             }
         )
         let playerIndex = try XCTUnwrap(
@@ -1643,6 +1633,9 @@ extension WorldRenderingTests {
             level: level,
             presentationReadyTimestamp: 0
         )
+        // The player starts on the goals at rest; each contact is the
+        // collide_two_objects call of a move into it.
+        simulation.collidePlayer(with: "StartCourse")
         let startCourseFrame = simulation.update(at: 0.1, input: .zero)
         XCTAssertEqual(
             startCourseFrame.enabledPlayerControls.rawValue & 63,
@@ -1669,6 +1662,7 @@ extension WorldRenderingTests {
             world: movedToDodge.rebased(onto: level),
             resumedAtTimestamp: 1
         )
+        atDodge.collidePlayer(with: "StartDodge")
         let contactFrame = atDodge.update(at: 1.1, input: .zero)
         XCTAssertEqual(contactFrame.enabledPlayerControls.rawValue & 63, 60)
 
@@ -1704,13 +1698,16 @@ extension WorldRenderingTests {
             level: level,
             presentationReadyTimestamp: 0
         )
+        // The player starts on StartDodge at rest; its contact is the
+        // collide_two_objects call of a move into it.
+        simulation.collidePlayer(with: "StartDodge")
 
         var timestamp: TimeInterval = 0.1
         _ = simulation.update(at: timestamp, input: .zero)
         var dodgeState = try encodedDodgeState(simulation.world)
         XCTAssertEqual(
-            try XCTUnwrap(dodgeState["triggerTimerRemaining"] as? Double),
-            Double(dodge.triggerDelay),
+            try XCTUnwrap(startDodgeTimer(simulation)).end,
+            dodge.triggerDelay,
             accuracy: 0.000_001
         )
 
