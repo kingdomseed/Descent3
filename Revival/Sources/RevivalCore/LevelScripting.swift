@@ -56,6 +56,36 @@ struct ObjectScriptBinding: Codable, Equatable, Sendable {
     let defaultScriptName: String?
 }
 
+/// The data one compiled game module looks up by name
+/// (Osiris_LoadGameModule, OsirisLoadandBind.cpp:1146).
+struct GameModuleScripting: Codable, Equatable, Sendable {
+    /// The canonical module name, for example `aigame`.
+    let module: String
+    /// The module's string table (`<module>.str`, CreateStringTable,
+    /// Descent3/localization.cpp:265), English, in index order. The module
+    /// reads it with `TXT(index)`.
+    let strings: [String]
+    /// The sound pages the module plays by name, in
+    /// `GameModuleReferences.soundNames` order.
+    let sounds: [GameModuleSoundReference]
+}
+
+/// A sound page a game module plays, mapped to the level's sound clip.
+struct GameModuleSoundReference: Codable, Equatable, Sendable {
+    /// SPF_LOOPED, SPF_OBJ_UPDATE, and SPF_LISTENER_UPDATE
+    /// (sndlib/ssl_lib.h:366-373).
+    static let loopedFlag: Int32 = 1
+    static let objectUpdateFlag: Int32 = 4
+    static let listenerUpdateFlag: Int32 = 128
+
+    /// The page name as the module writes it.
+    let name: String
+    /// The canonical clip key (`CanonicalSoundClip.logicalName`).
+    let key: String
+    /// The sound page's SPF_ flags.
+    let flags: Int32
+}
+
 struct LevelScriptMessage: Codable, Equatable, Sendable {
     let name: String
     let text: String
@@ -230,6 +260,83 @@ extension Level {
         var level = source.scripting.map(addingScripting) ?? self
         level.objectInfos = source.objectInfos
         level.weapons = source.weapons
+        level.gameModules = source.gameModules
+        level.boaTables = source.boaTables
         return level
+    }
+
+    /// The compiled game modules the level's objects reach: through their
+    /// level binding, or, for an object the level does not bind (one made
+    /// at run time, such as AIInitAll's Guide-Bot), through its page.
+    var reachedGameModules: [String] {
+        var names = Set<String>()
+        for binding in scripting?.objects ?? [] {
+            if let module = binding.defaultModuleName,
+               let script = binding.defaultScriptName,
+               DefaultScript.scriptID(module: module, pageName: script)
+                != nil {
+                names.insert(module)
+            }
+        }
+        for info in objectInfos ?? [] {
+            if let module = info.moduleName,
+               DefaultScript.scriptID(
+                   module: module,
+                   pageName: info.defaultScriptName
+               ) != nil {
+                names.insert(module)
+            }
+        }
+        return names.sorted()
+    }
+
+    /// Structural checks of the game module data: exactly the reached
+    /// modules, each with its whole string table and the sound pages it
+    /// plays, whose keys name the level's clips.
+    func validateGameModules() throws {
+        func require(_ condition: Bool, _ what: String) throws {
+            guard condition else {
+                throw LevelValidationError.invalidScripting(what)
+            }
+        }
+        let modules = gameModules ?? []
+        try require(
+            modules.map(\.module) == reachedGameModules,
+            "game modules"
+        )
+        let soundKeys = Set(soundClips.map(\.logicalName))
+        for module in modules {
+            guard let references = DefaultScript.references(
+                module: module.module
+            ) else {
+                throw LevelValidationError.invalidScripting("game modules")
+            }
+            try require(
+                module.strings.count >= references.stringCount
+                    && module.sounds.map(\.name) == references.soundNames
+                    && module.sounds.allSatisfy {
+                        $0.key.caseInsensitiveCompare($0.name) == .orderedSame
+                            && soundKeys.contains($0.key)
+                    },
+                "game module \(module.module)"
+            )
+            // The object pages the module creates (Obj_FindID) are in the
+            // object table.
+            try require(
+                references.objectPageNames.allSatisfy { name in
+                    (objectInfos ?? []).contains {
+                        $0.name.caseInsensitiveCompare(name) == .orderedSame
+                    }
+                },
+                "game module \(module.module) object pages"
+            )
+        }
+        for info in objectInfos ?? [] {
+            try require(
+                info.moduleName.map(isCanonicalModuleName) != false
+                    && info.scriptNameOverride.map { !$0.isEmpty } != false,
+                "object info \(info.name) module"
+            )
+        }
     }
 }

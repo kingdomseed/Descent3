@@ -93,11 +93,6 @@ extension GameSession {
                 soundEventVolume: 1
             )
         }
-        let cameraMonitorWasUsedAtFrameStart =
-            trainingCameraMonitorState?.wasUsed == true
-        var guidebotReturnWasRequestedThisFrame = false
-        var guidebotActiveGoalFeedback: TrainingOpeningFeedback?
-        var guidebotReleaseFeedback: TrainingOpeningFeedback?
         var cameraMonitorWasUsedThisFrame = false
         if input.usesInventory,
            var state = trainingCameraMonitorState,
@@ -115,31 +110,10 @@ extension GameSession {
             cameraMonitorWasUsedThisFrame = true
             world.objects.delete(ObjectHandle(chain.pickupObjectHandle))
         }
-        if input.deploysTrainingGuidebot {
-            if trainingGuidebotReleaseCommandIsAvailable {
-                guidebotReleaseFeedback = releaseTrainingGuidebot(
-                    from: object,
-                    playerVelocity: velocity,
-                    gameTime: systemsGameTime
-                )
-            } else if cameraMonitorWasUsedAtFrameStart,
-               trainingRobotGuidebotState?.guidebotIsDeployed == true {
-                guidebotReturnWasRequestedThisFrame =
-                    requestTrainingGuidebotReturn(to: object)
-            } else {
-                deployTrainingGuidebot(
-                    from: object,
-                    playerVelocity: velocity,
-                    gameTime: systemsGameTime
-                )
-            }
-        }
-        if input.requestsTrainingGuidebotActiveGoal {
-            guidebotActiveGoalFeedback =
-                requestTrainingGuidebotActiveGoal(
-                    at: systemsGameTime
-                )
-        }
+        // ProcessKeys (GameLoop.cpp:1493): a buddy menu command goes to the
+        // Guide-Bot (BuddyProcessCommand, buddymenu.cpp:452). Until the buddy
+        // menu (M1 step 8c), the two Guide-Bot inputs pick the command.
+        sendTrainingGuidebotMenuCommand(input)
         let ship = level.shipDefinitions.first { $0.source == binding.ship }!
         guard case let .room(startRoom) = object.location else {
             preconditionFailure("The Slice 10 player simulation is indoor.")
@@ -179,7 +153,6 @@ extension GameSession {
             input: input,
             systemsGameTime: systemsGameTime
         )
-        var guidebotEnteredShipThisFrame = false
         var orientation = object.orientation
         if input.directLookPitchRadians != 0 || input.directLookYawRadians != 0 {
             orientation = sourceMatrixMultiply(
@@ -556,6 +529,8 @@ extension GameSession {
         }
         world.objects[playerHandle]!.position = position
         world.objects[playerHandle]!.location = .room(roomSourceIndex)
+        // The player's EVT_INTERVAL ends its ObjDoFrame (object.cpp:2868).
+        world.objectIntervalEvent(playerHandle, level: level)
         // The rest of ObjDoFrameAll's loop, then ObjDeleteDead
         // (object.cpp:2969-3004).
         world.objDoFrameSlots(
@@ -570,51 +545,14 @@ extension GameSession {
             duration: systemsFrameDuration,
             gameTime: systemsGameTime
         )
-        let guidebotFlareFeedback = advanceTrainingGuidebotTiming(
-            duration: systemsFrameDuration,
-            gameTime: systemsGameTime
-        )
-        let guidebotAdvanceEvent = advanceTrainingGuidebot(
-            duration: systemsFrameDuration,
-            player: world.objects[playerHandle]!,
-            playerRadius: ship.presentationSize * 0.8
-        )
-        guidebotEnteredShipThisFrame =
-            guidebotAdvanceEvent == .enteredShip
+        createTrainingGuidebotFlareShots(gameTime: systemsGameTime)
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
         if let playerHeadlightFeedback {
             trainingOpeningFeedback.append(playerHeadlightFeedback)
         }
-        if let guidebotReleaseFeedback {
-            trainingOpeningFeedback.append(guidebotReleaseFeedback)
-        }
-        if let guidebotActiveGoalFeedback {
-            trainingOpeningFeedback.append(guidebotActiveGoalFeedback)
-        }
         if let playerFlareFeedback {
             trainingOpeningFeedback.append(playerFlareFeedback)
-        }
-        if let guidebotFlareFeedback {
-            trainingOpeningFeedback.append(guidebotFlareFeedback)
-        }
-        if guidebotAdvanceEvent == .reachedActiveGoal,
-           let soundSourceName =
-                level.trainingCameraMonitorChain?.returnToShip?
-                    .returnSoundSourceName {
-            trainingOpeningFeedback.append(
-                trainingGuidebotFeedback(
-                    "GB: I am at the goal, coming back to get you.",
-                    requestedSoundSourceName: soundSourceName,
-                    at: systemsGameTime
-                )
-            )
-        }
-        if guidebotAdvanceEvent == .returnedToPlayer,
-           let greeting = completeTrainingGuidebotReturn(
-               at: systemsGameTime
-           ) {
-            trainingOpeningFeedback.append(greeting)
         }
         if trainingFinalGoalWasHitThisFrame,
            var state = trainingFinalGoalState,
@@ -685,44 +623,6 @@ extension GameSession {
             }
             trainingCloakPickupState = state
         }
-        if guidebotReturnWasRequestedThisFrame,
-            let chain = level.trainingCameraMonitorChain?.returnToShip
-        {
-            trainingOpeningFeedback.append(
-                trainingGuidebotFeedback(
-                    chain.returnMessage,
-                    requestedSoundSourceName:
-                        chain.returnSoundSourceName,
-                    at: systemsGameTime
-                )
-            )
-        }
-        if guidebotEnteredShipThisFrame,
-           let chain = level.trainingCameraMonitorChain?.returnToShip {
-            trainingOpeningFeedback.append(.init(
-                hudMessages: [chain.arrivalMessage],
-                voiceSourceName: "",
-                voicePrecedesHUDMessages: true
-            ))
-            if var cameraState = trainingCameraMonitorState,
-               cameraState.wasUsed,
-               !cameraState.script058WasPresented {
-                cameraState.returnMarkerLightDistance =
-                    chain.openMarkerLightDistance
-                cameraState.script058WasPresented = true
-                trainingCameraMonitorState = cameraState
-                openTrainingGuidebotReturnBarrier(in: &world, level: level)
-                trainingOpeningFeedback.append(.init(
-                    hudMessages: [chain.successMessage],
-                    voiceSourceName: chain.successVoiceSourceName,
-                    voicePrecedesHUDMessages: true
-                ))
-            }
-            if var guidebotState = trainingRobotGuidebotState {
-                guidebotState.arrivalFeedbackWasPresented = true
-                trainingRobotGuidebotState = guidebotState
-            }
-        }
         if var state = trainingCameraMonitorState,
            !state.isHeld,
            !state.wasUsed,
@@ -747,6 +647,27 @@ extension GameSession {
             trainingOpeningFeedback.append(.init(
                 hudMessages: [chain.useMessage],
                 voiceSourceName: chain.useVoiceSourceName,
+                voicePrecedesHUDMessages: true
+            ))
+        }
+        // Script 058 (TrainingMission.cpp:1443, the level EVT_INTERVAL): the
+        // Guide-Bot is not a robot (in the ship, or none) after the Camera
+        // Monitor was used. EVT_USE (Script 059) comes first in the frame,
+        // from the keys.
+        // It moves to TrainingMission.swift in M1 step 8c.
+        if let chain = level.trainingCameraMonitorChain?.returnToShip,
+           var cameraState = trainingCameraMonitorState,
+           cameraState.wasUsed,
+           !cameraState.script058WasPresented,
+           world.objectType(world.buddyHandle) != .robot {
+            cameraState.returnMarkerLightDistance =
+                chain.openMarkerLightDistance
+            cameraState.script058WasPresented = true
+            trainingCameraMonitorState = cameraState
+            openTrainingGuidebotReturnBarrier(in: &world, level: level)
+            trainingOpeningFeedback.append(.init(
+                hudMessages: [chain.successMessage],
+                voiceSourceName: chain.successVoiceSourceName,
                 voicePrecedesHUDMessages: true
             ))
         }
@@ -875,8 +796,11 @@ extension GameSession {
         if var state = trainingRobotGuidebotState,
             let chain = level.trainingRobotGuidebotChain
         {
+            // Script 060 (TrainingMission.cpp:1431): the Guide-Bot is out
+            // (qObjIsType(qGetBuddyObj(0), OBJ_ROBOT)) after Script 032. It
+            // moves to TrainingMission.swift in M1 step 8c.
             if !state.guidebotContinuationWasPresented,
-               state.guidebotIsDeployed,
+               world.objectType(world.buddyHandle) == .robot,
                 trainingGalleryBarrierState?.wasTriggered == true
             {
                 trainingOpeningFeedback.append(
@@ -903,6 +827,9 @@ extension GameSession {
             level: level
         )
         world.osirisProcessTimers(level: level)
+        // The sound frame stops the linked sounds of gone or ghosted objects
+        // (hlsoundlib.cpp:722).
+        world.stopSoundsOfGoneObjects()
         trainingOpeningFeedback.append(
             contentsOf: takeScriptPresentation()
         )
@@ -1382,16 +1309,19 @@ extension GameSession {
                         .killbotEntry?.closedMarkerLightDistance
                     : trainingCameraMonitorState?
                         .returnMarkerLightDistance,
-            trainingGuidebot:
-                trainingRobotGuidebotState?.guidebot?.frame,
-            trainingGuidebotAmbientEngineIsActive:
-                trainingRobotGuidebotState.map { state in
-                    state.guidebotIsDeployed
-                        && !state.guidebotEnteredShip
-                        && state.guidebot != nil
-                        && state.guidebotMode == .ambient
-                        && (state.guidebotModeTime ?? 0) > 0
-                } ?? false,
+            objectSoundLoops: world.soundSystem.objectLoops.compactMap { loop in
+                guard let object = world.objects[loop.object],
+                      case let .room(room) = object.location
+                else {
+                    return nil
+                }
+                return ObjectSoundLoopFrame(
+                    handle: loop.handle,
+                    soundName: level.soundClips[loop.soundIndex].logicalName,
+                    roomSourceIndex: room,
+                    position: object.position
+                )
+            },
             trainingCameraMonitor: cameraMonitorFrame,
             trainingInvulnerabilityRemaining:
                 trainingInvulnerabilityPickupState?.remainingDuration,

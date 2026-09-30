@@ -28,7 +28,7 @@ struct Level: Codable, Equatable, Sendable {
     let playerStartFlags: [UInt32]
     let indoorNavigation: IndoorNavigationGraph?
     let lightmaps: LightmapCatalog
-    let surfacePhysics: [SurfacePhysicsEntry]
+    var surfacePhysics: [SurfacePhysicsEntry]
     let presentationMaterials: [PresentationMaterial]
     let presentationCoronaAssets: [PresentationCoronaAsset]
     var models: [CanonicalModel]
@@ -58,6 +58,14 @@ struct Level: Codable, Equatable, Sendable {
     var objectInfos: [CanonicalObjectInfo]? = nil
     /// Weapons[] for the weapons those pages fire (ObjectInfo.swift).
     var weapons: [CanonicalWeapon]? = nil
+    /// The data of each compiled game module the objects reach
+    /// (`reachedGameModules`, LevelScripting.swift), in module name order.
+    /// Absent before M1 step 8b.
+    var gameModules: [GameModuleScripting]? = nil
+    /// The BOA tables the level file stores (the CBOA chunk,
+    /// BOATables.swift), when they match the level. Absent before M1 step
+    /// 8b; the runtime then makes them as MakeBOA would.
+    var boaTables: BOATables? = nil
 
     init(
         schemaVersion: Int = 9,
@@ -218,6 +226,13 @@ struct Level: Codable, Equatable, Sendable {
         }
         guard Set(rooms.map(\.sourceIndex)).count == rooms.count else {
             throw LevelValidationError.duplicateRoom
+        }
+        // compute_costs asserts num_portals <= MAX_PATH_PORTALS
+        // (BOA.cpp:883); BOA_cost_array has that many columns.
+        guard rooms.allSatisfy({
+            $0.portals.count <= BOATables.maximumPathPortals
+        }) else {
+            throw LevelValidationError.invalidCount("room portals")
         }
         try validateSurfacePhysics(
             surfacePhysics,
@@ -1452,6 +1467,10 @@ struct Level: Codable, Equatable, Sendable {
         try validateObjectTables()
         // Script data last: it names content the checks above cover.
         try validateScripting()
+        try validateGameModules()
+        if let boaTables, !boaTables.isValid(for: self) {
+            throw LevelValidationError.invalidCount("boaTables")
+        }
     }
 
     private static func defaultSurfacePhysics(for rooms: [LevelRoom]) -> [SurfacePhysicsEntry] {

@@ -210,26 +210,87 @@ extension GameWorld {
     }
 
     /// MSAFE_OBJECT_SHIELDS read (multisafe.cpp:851): -1 for a stale
-    /// handle. The player's shields are `shields`. Other objects get their
-    /// shields with Damage (M1 step 7); no translated script reads them
-    /// before then.
+    /// handle. The player's shields are `shields`.
     func objectShields(_ handle: ObjectHandle) -> Float {
         guard let object = objects[handle] else { return -1 }
-        precondition(
-            object.type == .player,
-            "Object shields other than the player's arrive with Damage."
-        )
-        return shields
+        return object.type == .player ? shields : object.shields
     }
 
-    /// MSAFE_OBJECT_SHIELDS write (multisafe.cpp:1563). A stale handle
-    /// does nothing. OF_AI_DEATH is not modeled yet; a player never has it.
+    /// MSAFE_OBJECT_SHIELDS write (multisafe.cpp:1563): the shields, and
+    /// OF_AI_DEATH clears. A stale handle does nothing.
     mutating func setObjectShields(_ handle: ObjectHandle, _ value: Float) {
         guard let object = objects[handle] else { return }
-        precondition(
-            object.type == .player,
-            "Object shields other than the player's arrive with Damage."
+        if object.type == .player {
+            shields = value
+        } else {
+            objects[handle]?.shields = value
+        }
+        objects[handle]?.flags &= ~GameObject.aiDeathFlag
+    }
+
+    /// MSAFE_INVEN_ADD_TYPE_ID (multisafe.cpp:2179) for a non-weapon type:
+    /// Inventory::Add on the player the handle names.
+    mutating func inventoryAddTypeID(
+        _ player: ObjectHandle,
+        type: ObjectType,
+        id: Int
+    ) {
+        guard objects[player]?.type == .player else { return }
+        playerInventory.add(type: type.rawValue, id: id)
+    }
+
+    /// MSAFE_INVEN_REMOVE (multisafe.cpp:2191) for a non-weapon type.
+    mutating func inventoryRemove(
+        _ player: ObjectHandle,
+        type: ObjectType,
+        id: Int
+    ) {
+        guard objects[player]?.type == .player else { return }
+        playerInventory.remove(type: type.rawValue, id: id)
+    }
+
+    /// MSAFE_OBJECT_REMOVE (multisafe.cpp:1759): SetObjectDeadFlag, and the
+    /// powerup pickup sound when asked. The scripts that call it without
+    /// setting `playsound` pass no sound here.
+    mutating func objectRemove(_ handle: ObjectHandle, playSound: Bool) {
+        guard objects[handle] != nil else { return }
+        objects[handle]?.flags |= GameObject.deadFlag
+        if playSound {
+            play3DSound("Powerup pickup")
+        }
+    }
+
+    /// MSAFE_OBJECT_FIRE_WEAPON (multisafe.cpp:1529): FireWeaponFromObject
+    /// for a weapon page the level holds. Until generic flares (M1 step 8d),
+    /// a weapon the level's bespoke flare definition names goes to that
+    /// path (`fireBespokeFlareFromObject`).
+    mutating func objectFireWeapon(
+        _ handle: ObjectHandle,
+        weapon: Int,
+        gunpoint: Int,
+        level: Level
+    ) {
+        guard objects[handle] != nil,
+              weapon >= 0,
+              let weapons = level.weapons,
+              weapons.indices.contains(weapon)
+        else {
+            return
+        }
+        if fireBespokeFlareFromObject(
+            handle,
+            weaponName: weapons[weapon].name,
+            level: level
+        ) {
+            return
+        }
+        fireWeaponFromObject(
+            handle,
+            weaponName: weapons[weapon].name,
+            gunpoint: gunpoint,
+            forceForward: false,
+            forceTarget: false,
+            level: level
         )
-        shields = value
     }
 }

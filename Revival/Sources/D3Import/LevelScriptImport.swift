@@ -136,6 +136,12 @@ func levelScriptName(levelFileName: String) throws -> String {
     return name
 }
 
+/// The canonical name of a page's game module, or nil when the page names
+/// none or a name get_full_path_to_module cannot use.
+func canonicalGameModuleName(_ fileName: String) -> String? {
+    fileName.isEmpty ? nil : canonicalModuleName(fileName)
+}
+
 /// get_full_path_to_module (OsirisLoadandBind.cpp:884): a module is known by
 /// its lowercased file stem, so `AIGame`, `AIGame.dll`, and `aigame` name the
 /// same module (Osiris_FindLoadedModule, :773).

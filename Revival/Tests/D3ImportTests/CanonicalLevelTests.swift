@@ -2359,6 +2359,8 @@ func replacing(
         trainingFinalGoalChain ?? level.trainingFinalGoalChain
     replaced.objectInfos = level.objectInfos
     replaced.weapons = level.weapons
+    replaced.gameModules = level.gameModules
+    replaced.boaTables = level.boaTables
     // Package schema 12 keeps the level's script data, bound again to the
     // replaced objects and clips.
     return replaced.schemaVersion == 12 && level.scripting != nil

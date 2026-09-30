@@ -117,22 +117,33 @@ struct ChainFlags: OptionSet, Equatable, Sendable {
     static let all: ChainFlags = [.continueChain, .continueDefault]
 }
 
-/// The scripts bound to one object (tOSIRISScript). Each slot holds a script
-/// id in the level module. The mission and default (game module) slots join
-/// this list when their modules are translated (M1 step 8 adds the
-/// `AIGame` default scripts); until then no object has them.
+/// The scripts bound to one object (tOSIRISScript). The custom and level
+/// slots hold a script id in the level module; the default slot holds the
+/// game-module script instance with its state. No mission module exists,
+/// so no object has a mission script.
 struct ObjectScripts: Codable, Equatable, Sendable {
     /// The custom object script (COS) id from GetCOScriptList.
     var custom: Int32?
     /// The level module's generic object script (GOS) id from
     /// GetGOScriptID.
     var level: Int32?
+    /// The default script: the instance the object's game module made for
+    /// its page name (GetGOScriptID and CreateInstance).
+    var defaultScript: DefaultScript? = nil
+
+    /// Whether both bind the same scripts, whatever the default script's
+    /// state.
+    func hasSameBinding(as other: ObjectScripts?) -> Bool {
+        custom == other?.custom && level == other?.level
+            && defaultScript?.id == other?.defaultScript?.id
+    }
 }
 
 /// A bound slot, in Osiris_CallEvent's chain order.
 enum ObjectScriptSlot: Equatable, Sendable {
     case custom(Int32)
     case level(Int32)
+    case defaultScript
 }
 
 extension ScriptEvent {
@@ -206,11 +217,14 @@ func osirisCallSingleScript(
 }
 
 extension ObjectScripts {
-    /// The bound slots in chain order (custom, level, then mission and
-    /// default when those exist).
+    /// The bound slots in chain order: custom, level, and default
+    /// (OsirisLoadandBind.cpp:2177-2250).
     var chain: [ObjectScriptSlot] {
-        [custom.map(ObjectScriptSlot.custom), level.map(ObjectScriptSlot.level)]
-            .compactMap { $0 }
+        [
+            custom.map(ObjectScriptSlot.custom),
+            level.map(ObjectScriptSlot.level),
+            defaultScript.map { _ in ObjectScriptSlot.defaultScript },
+        ].compactMap { $0 }
     }
 }
 
@@ -246,17 +260,38 @@ extension GameWorld {
         }
         let customOnly =
             realType.rawValue == LevelScripting.customOnlyObjectType
-        let pageName = customOnly
-            ? nil
-            : level.scripting?.objects
-                .first { $0.objectHandle == handle.rawValue }?
-                .defaultScriptName
+        // A placed object has the default module and page name the level
+        // gives it (with its custom defaults); an object made at run time
+        // has its page's (:1459-1484).
+        let defaults: (module: String?, pageName: String?)
+        if customOnly {
+            defaults = (nil, nil)
+        } else if let binding = level.scripting?.objects
+            .first(where: { $0.objectHandle == handle.rawValue }) {
+            defaults = (binding.defaultModuleName, binding.defaultScriptName)
+        } else if let index = object.info,
+                  let infos = level.objectInfos,
+                  infos.indices.contains(index) {
+            let info = infos[index]
+            defaults = (info.moduleName, info.defaultScriptName)
+        } else {
+            defaults = (nil, nil)
+        }
         var scripts = ObjectScripts()
-        if let pageName {
+        if let pageName = defaults.pageName {
             scripts.level = levelModule.genericScriptID(
                 pageName: pageName,
                 isDoor: realType == .door
             )
+            // Osiris_LoadGameModule (:1146) and the module's GetGOScriptID
+            // and CreateInstance (:1500-1540).
+            if let module = defaults.module,
+               let id = DefaultScript.scriptID(
+                   module: module,
+                   pageName: pageName
+               ) {
+                scripts.defaultScript = DefaultScript(id)
+            }
         }
         scripts.custom = levelModule.customScriptList(level: level)
             .first { $0.handle == handle }?.id
@@ -288,6 +323,13 @@ extension GameWorld {
                 LevelModule.callGenericObjectEvent(
                     id: id,
                     event: event,
+                    me: handle,
+                    world: &self,
+                    level: level
+                )
+            case .defaultScript:
+                DefaultScript.callEvent(
+                    event,
                     me: handle,
                     world: &self,
                     level: level

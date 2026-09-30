@@ -501,7 +501,7 @@ private func makeLevelScriptArchives() -> [LevelScriptArchive] {
     ]
 }
 
-private func makeLevelScriptArchive(
+func makeLevelScriptArchive(
     relativePath: String,
     entries: [(String, Data)]
 ) -> LevelScriptArchive {

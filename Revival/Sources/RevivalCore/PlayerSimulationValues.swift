@@ -6,18 +6,12 @@ struct TrainingGalleryBarrierState: Codable, Equatable, Sendable {
     var wasTriggered = false
 }
 
+/// The bespoke Training state that the translated scripts still leave to
+/// Swift: the Script 060 presentation and its control restore (M1 step 8c)
+/// and the Guide-Bot's flares (M1 step 8d). The Guide-Bot itself is the
+/// AIGame GuideBot script (AIGame+GuideBot.swift).
 struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
-    var guidebotIsDeployed = false
-    var guidebot: TrainingGuidebotRuntimeState?
     var guidebotContinuationWasPresented = false
-    var activeGoalWasReached: Bool? = nil
-    var guidebotMode: TrainingGuidebotMode? = nil
-    var guidebotModeTime: Float? = nil
-    var nextAmbientTime: Float? = nil
-    var timeUntilNextPlayerVisibilityCheck: Float? = nil
-    var timeUntilNextFlare: Float? = nil
-    var yellowFlareGoalSlots:
-        TrainingGuidebotYellowFlareGoalSlots? = nil
     var yellowFlares:
         [TrainingGuidebotYellowFlareState]? = nil
     var yellowFlareParticles:
@@ -29,26 +23,17 @@ struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
     var yellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleState]? = nil
     var yellowFlareTimeoutReachedFollowingFrame: Bool? = nil
-    var nextPowerupCheckTime: Float? = nil
-    var lastMessageSoundTime: Float? = nil
-    var returnTime: Float? = nil
-    var returnGreetingWasPresented: Bool? = nil
-    var returnWasRequested = false
-    var guidebotEnteredShip = false
-    var arrivalFeedbackWasPresented = false
     var controlsWereRestored = false
 }
 
-struct TrainingGuidebotYellowFlareGoalSlots:
-    Codable, Equatable, Sendable
-{
-    var slot1IsUsed: Bool
-    var slot2IsUsed: Bool
-    var slot3IsUsed: Bool
-
-    var isEligible: Bool {
-        slot1IsUsed && !slot2IsUsed && !slot3IsUsed
-    }
+/// A flare the Guide-Bot fired this frame (MSAFE_OBJECT_FIRE_WEAPON), at
+/// the Guide-Bot's place then. The session makes the bespoke flare after
+/// the flares move, until generic flares (M1 step 8d).
+struct TrainingGuidebotFlareShot: Codable, Equatable, Sendable {
+    let parent: ObjectHandle
+    let roomSourceIndex: Int
+    let position: Vector3
+    let orientation: Matrix3
 }
 
 struct TrainingGuidebotYellowFlareState:
@@ -206,60 +191,6 @@ struct TrainingFinalRoomEntryState:
     var wasTriggered = false
 }
 
-enum TrainingGuidebotTask: String, Codable, Equatable, Sendable {
-    case outbound
-    case activeGoal
-    case returnToPlayer
-    case escortPlayer
-    case returnToShip
-}
-
-enum TrainingGuidebotMode: String, Codable, Equatable, Sendable {
-    case birth
-    case ambient
-}
-
-enum TrainingGuidebotAdvanceEvent: Equatable {
-    case reachedActiveGoal
-    case returnedToPlayer
-    case enteredShip
-}
-
-struct TrainingGuidebotRuntimeState:
-    Codable, Equatable, Sendable
-{
-    let spawnPosition: Vector3
-    var roomSourceIndex: Int
-    var position: Vector3
-    let orientation: Matrix3
-    let spawnVelocity: Vector3
-    var velocity: Vector3
-    var destination: Vector3
-    var route: TrainingGuidebotRoute
-    var routeFailure: TrainingGuidebotRouteError?
-    var routePointIndex: Int
-    var activeSteeringMode: TrainingGuidebotSteeringMode
-    var task: TrainingGuidebotTask
-    var allocationStartPosition: Vector3
-    var allocationStartForward: Vector3
-    var routeDestination: Vector3
-    var routeDestinationRoomSourceIndex: Int
-
-    var frame: TrainingGuidebotFrame {
-        .init(
-            spawnPosition: spawnPosition,
-            roomSourceIndex: roomSourceIndex,
-            position: position,
-            orientation: orientation,
-            spawnVelocity: spawnVelocity,
-            velocity: velocity,
-            destination: destination,
-            route: route,
-            routeFailure: routeFailure,
-            activeSteeringMode: activeSteeringMode
-        )
-    }
-}
 
 struct PlayerRearViewState: Codable, Equatable, Sendable {
     var leaveMode: Bool
@@ -291,8 +222,7 @@ extension GameWorld {
                 yellowFlareTimeoutSparkParticles:
                     $0.yellowFlare?.timeout == nil ? nil : [],
                 yellowFlareTimeoutReachedFollowingFrame:
-                    $0.yellowFlare?.timeout == nil ? nil : false,
-                lastMessageSoundTime: 0
+                    $0.yellowFlare?.timeout == nil ? nil : false
             )
         }
         trainingCameraMonitorState = level.trainingCameraMonitorChain.map {

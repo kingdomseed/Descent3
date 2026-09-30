@@ -64,8 +64,11 @@ extension GameSession {
             orientation: orientation,
             velocity: forward * definition.speed,
             lifeRemaining: definition.lifetime,
+            // Due on the first advance. (`gameTime` less the next float
+            // above the interval rounded back to `gameTime` less the
+            // interval after about 0.25 s, so the first drop was lost.)
             lastParticleDropTime:
-                systemsGameTime - definition.particleInterval.nextUp,
+                systemsGameTime - definition.particleInterval * 2,
             presentedLightDistance: definition.lightDistance,
             creationOrdinal: ordinal,
             parentObjectHandle: player.handle.rawValue
@@ -248,6 +251,17 @@ extension GameSession {
                           trace.visitedRoomSourceIndices.contains(objectRoom),
                           age >= 3
                             || object.handle.rawValue
+                                != flare.parentObjectHandle,
+                          // A weapon does not collide with OBJ_DUMMY (a
+                          // ghosted object, such as the Guide-Bot in the
+                          // ship) or a powerup (CollideInit,
+                          // collide.cpp:2585-2640).
+                          object.type != .dummy, object.type != .powerup,
+                          // fvi skips an object with the same parent
+                          // (ObjectsAreRelated, findintersection.cpp:3364),
+                          // such as the newly born Guide-Bot.
+                          object.parent == .none
+                            || object.parent.rawValue
                                 != flare.parentObjectHandle,
                           let presentation =
                             level.objectPresentations.first(where: {

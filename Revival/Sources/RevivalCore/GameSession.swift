@@ -25,6 +25,7 @@ final class GameSession {
     ) {
         precondition(presentationReadyTimestamp.isFinite)
         precondition(level.defaultPlayerBinding != nil)
+        let level = level.withLoadedBOATables()
         self.level = level
         world = GameWorld(
             level: level,
@@ -41,6 +42,7 @@ final class GameSession {
         resumedAtTimestamp: Double
     ) throws {
         precondition(resumedAtTimestamp.isFinite)
+        let level = level.withLoadedBOATables()
         do {
             try world.validate(against: level)
         } catch {

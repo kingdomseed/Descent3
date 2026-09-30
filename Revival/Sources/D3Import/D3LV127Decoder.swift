@@ -109,7 +109,12 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
         lightmaps: lightmaps,
         exactTraining: source.levelSHA256 == "915a561cd3bd720d88bffed72fe41b4ff711c287711f060ecd9696e2cd5f7d41"
     )
-    let level = Level(
+    let boaTables = try parseBOATables(
+        payloads["CBOA"]!,
+        rooms: rooms,
+        terrain: terrain
+    )
+    var level = Level(
         missionKey: "descent3.mission.pilot-training",
         levelKey: "descent3.level.training-mission",
         source: source,
@@ -129,8 +134,98 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
         dependencyManifest: manifest,
         sourceChunks: sourceChunks
     )
+    level.boaTables = boaTables
     try level.validateForImportStaging()
     return level
+}
+
+/// BOA_VERSION (BOA.cpp:142).
+private let boaVersion: Int32 = 25
+
+/// BOAGetMineChecksum (BOA.cpp:1200) over the level file's rooms and
+/// terrain, with the C int arithmetic of the original (wrapping). `nil`
+/// when a face names a missing vertex or portal, or a vertex coordinate is
+/// not a finite value whose floor fits a C int: the level is malformed.
+func boaMineChecksum(rooms: [LevelRoom], terrain: LevelTerrain) -> Int32? {
+    func floorInt(_ value: Float) -> Int32? {
+        guard value.isFinite else { return nil }
+        let floored = Double(value).rounded(.down)
+        guard floored >= Double(Int32.min), floored <= Double(Int32.max)
+        else {
+            return nil
+        }
+        return Int32(floored)
+    }
+    var total: Int32 = 0
+    for room in rooms {
+        let i = Int32(room.sourceIndex)
+        for face in room.faces {
+            if let portalIndex = face.portalIndex,
+               !room.portals.indices.contains(portalIndex) {
+                return nil
+            }
+            for corner in face.corners {
+                guard room.vertices.indices.contains(corner.vertexIndex),
+                      let x = floorInt(room.vertices[corner.vertexIndex].x),
+                      let y = floorInt(room.vertices[corner.vertexIndex].y),
+                      let z = floorInt(room.vertices[corner.vertexIndex].z)
+                else {
+                    return nil
+                }
+                total &+= x &+ y &+ z
+            }
+            total &+= Int32(face.corners.count) << 4
+            if let portalIndex = face.portalIndex {
+                total &+= Int32(portalIndex)
+                total &+= Int32(
+                    bitPattern: room.portals[portalIndex].flags & (32 | 64 | 2)
+                )
+            }
+        }
+        total &+= Int32(room.faces.count) << 8
+        total &+= Int32(room.portals.count) << (i % 16)
+        total &+= i
+    }
+    for height in terrain.heights { total &+= Int32(height) }
+    total &+= boaVersion << 24
+    return total
+}
+
+/// ReadBOAChunk (LoadLevel.cpp:3050) for a version 127 file: the stored
+/// BOA_Array and BOA_cost_array. MakeBOA keeps them only when the stored
+/// mine checksum matches the level (BOA.cpp:2029); otherwise it remakes
+/// them at load, and the package leaves them out for the runtime to make.
+private func parseBOATables(
+    _ data: Data,
+    rooms: [LevelRoom],
+    terrain: LevelTerrain
+) throws -> BOATables? {
+    var cursor = LegacyCursor(data: data, section: "CBOA")
+    let mineChecksum = try cursor.readInt32()
+    _ = try cursor.readInt32()  // BOA_vis_checksum
+    let maximumRoom = Int(try cursor.readInt32())
+    let maximumPathPortals = Int(try cursor.readInt32())
+    let highest = rooms.map(\.sourceIndex).max() ?? -1
+    guard maximumRoom == highest + BOATables.maximumTerrainRegions,
+          maximumPathPortals == BOATables.maximumPathPortals
+    else {
+        throw D3LV127DecodeError.invalidCount(section: "CBOA")
+    }
+    let size = maximumRoom + 1
+    var array: [UInt16] = []
+    array.reserveCapacity(size * size)
+    for _ in 0..<(size * size) { array.append(try cursor.readUInt16()) }
+    var costs: [Float] = []
+    costs.reserveCapacity(size * maximumPathPortals)
+    for _ in 0..<(size * maximumPathPortals) {
+        costs.append(try cursor.readFloat())
+    }
+    guard let checksum = boaMineChecksum(rooms: rooms, terrain: terrain)
+    else {
+        throw D3LV127DecodeError.invalidReference("CBOA checksum geometry")
+    }
+    guard mineChecksum == checksum else { return nil }
+    return BOATables(highestRoomIndex: highest, array: array, costs: costs)
 }
 
 private func parseIndoorNavigation(
@@ -1180,7 +1275,9 @@ private func chunkDisposition(
             : "canonical-metadata"
     case "TSND", "MTCN":
         return "validated-empty"
-    case "CNBS", "CBOA", "AABB":
+    case "CBOA":
+        return "canonical-boa-tables-when-checksum-matches"
+    case "CNBS", "AABB":
         return "derived-cache-excluded"
     case "NODE":
         return "canonical-indoor-boundary-navigation"

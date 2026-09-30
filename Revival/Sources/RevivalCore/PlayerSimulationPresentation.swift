@@ -92,8 +92,9 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame]
     let trainingGuidebotReturnMarkerLightDistance: Float?
-    let trainingGuidebot: TrainingGuidebotFrame?
-    let trainingGuidebotAmbientEngineIsActive: Bool
+    /// The playing looping sounds linked to an object (SoundSystem.swift),
+    /// at the object's place this frame.
+    let objectSoundLoops: [ObjectSoundLoopFrame]
     let trainingCameraMonitor: TrainingCameraMonitorFrame?
     let trainingInvulnerabilityRemaining: Float?
     let trainingCloak: TrainingCloakFrame?
@@ -271,55 +272,14 @@ struct TrainingCameraMonitorFrame: Equatable, Sendable {
     let remainingDuration: Float
 }
 
-enum TrainingGuidebotRouteMode: String, Codable, Equatable, Sendable {
-    case direct
-    case boundaryNodes
-    case roomPortals
-}
-
-struct IndoorNavigationNodeReference:
-    Codable, Equatable, Hashable, Sendable
-{
-    let roomSourceIndex: Int
-    let nodeIndex: Int
-}
-
-struct TrainingGuidebotRoute: Codable, Equatable, Sendable {
-    let mode: TrainingGuidebotRouteMode
-    let points: [Vector3]
-    let roomSourceIndices: [Int]
-    let nodeReferences: [IndoorNavigationNodeReference]
-}
-
-enum TrainingGuidebotSteeringMode:
-    String, Codable, Equatable, Sendable
-{
-    case direct
-    case allocatedRoute
-    case stopped
-}
-
-struct TrainingGuidebotFrame: Equatable, Sendable {
-    let spawnPosition: Vector3
+/// A looping object sound for the app to play at the object's place.
+struct ObjectSoundLoopFrame: Equatable, Sendable {
+    /// The sound handle.
+    let handle: Int32
+    /// The sound clip's logical name.
+    let soundName: String
     let roomSourceIndex: Int
     let position: Vector3
-    let orientation: Matrix3
-    let spawnVelocity: Vector3
-    let velocity: Vector3
-    let destination: Vector3
-    let route: TrainingGuidebotRoute
-    let routeFailure: TrainingGuidebotRouteError?
-    let activeSteeringMode: TrainingGuidebotSteeringMode
-}
-
-enum TrainingGuidebotRouteError:
-    String, Error, Codable, Equatable, Sendable
-{
-    case noBOAPath
-    case unverifiedBoundaryNodes
-    case noVisibleBoundaryNode
-    case noBoundaryNodePath
-    case noRoomPortalPath
 }
 
 /// The player view at the level's initial placement.

@@ -469,3 +469,24 @@ private func normalized(_ vector: Vector3) -> Vector3? {
     guard magnitude > 0 else { return nil }
     return scaled(vector, 1 / magnitude)
 }
+
+/// fvi_FindIntersection in one room with FQ_SOLID_PORTALS and no objects
+/// (as IsPathPointValid asks, BOA.cpp:1288): whether a sphere of `radius`
+/// moving from `start` to `end` touches any face of the room, portal faces
+/// included.
+func indoorRoomSweepHitsFace(
+    room: LevelRoom,
+    start: Vector3,
+    end: Vector3,
+    radius: Float
+) -> Bool {
+    let movement = levelSubtract(end, start)
+    for face in room.faces
+    where canonicalFaceNormal(room: room, face: face) != nil {
+        if sweptSphereFaceHit(room: room, face: face, start: start,
+                              movement: movement, radius: radius) != nil {
+            return true
+        }
+    }
+    return false
+}

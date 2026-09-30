@@ -20,6 +20,11 @@ struct RetailGenericPage: Equatable, Sendable {
     let type: UInt8
     /// `image_name`: the primary model.
     let primaryModelName: String
+    /// `module_name` (version 18): the game module of the page's default
+    /// script.
+    let moduleName: String
+    /// `script_name_override` (version 19).
+    let scriptNameOverride: String
     let size: Float
     let lightDistance: Float
     let lighting: ObjectLightPresentation
@@ -132,8 +137,10 @@ private func readRetailGenericPage(
     let score = Int16(bitPattern: try cursor.readUInt16())  // version >= 24
     if type == 7, version >= 25 { try cursor.skip(2) }  // ammo_count
     _ = try cursor.readCString(allowEmpty: true)   // script name
-    if version >= 18 { _ = try cursor.readCString(allowEmpty: true) }
-    if version >= 19 { _ = try cursor.readCString(allowEmpty: true) }
+    let moduleName = version >= 18
+        ? try cursor.readCString(allowEmpty: true) : ""
+    let scriptNameOverride = version >= 19
+        ? try cursor.readCString(allowEmpty: true) : ""
     if try cursor.readUInt8() != 0 {
         _ = try cursor.readCString(allowEmpty: true)   // description
     }
@@ -332,6 +339,8 @@ private func readRetailGenericPage(
         name: name,
         type: type,
         primaryModelName: primaryModelName,
+        moduleName: moduleName,
+        scriptNameOverride: scriptNameOverride,
         size: size,
         lightDistance: lightDistance,
         lighting: .init(
@@ -633,23 +642,10 @@ extension Level {
                     ))
                 }
             }
-            infos.append(.init(
-                name: page.name,
-                type: page.type,
-                flags: page.flags,
-                size: page.size,
-                hitPoints: page.hitPoints,
-                lightDistance: page.lightDistance,
-                lighting: page.lighting,
-                ai: controlsAI ? page.ai : nil,
+            infos.append(try Self.canonicalObjectInfo(
+                page,
                 weaponBatteries: batteries,
-                score: page.score,
-                impact: page.impact,
-                deathTypes: page.deathTypes,
-                explodeSound: page.explodeSoundName.isEmpty
-                    ? "" : try soundKey(page.explodeSoundName),
-                deathSpew: page.deathSpew,
-                physics: page.physics
+                soundKey: soundKey
             ))
         }
         // The pages a death makes objects from without placing them: the
@@ -680,24 +676,10 @@ extension Level {
             else {
                 continue
             }
-            infos.append(.init(
-                name: page.name,
-                type: page.type,
-                flags: page.flags,
-                size: page.size,
-                hitPoints: page.hitPoints,
-                lightDistance: page.lightDistance,
-                lighting: page.lighting,
-                ai: page.flags & CanonicalObjectInfo.controlAIFlag != 0
-                    ? page.ai : nil,
+            infos.append(try Self.canonicalObjectInfo(
+                page,
                 weaponBatteries: [],
-                score: page.score,
-                impact: page.impact,
-                deathTypes: page.deathTypes,
-                explodeSound: page.explodeSoundName.isEmpty
-                    ? "" : try soundKey(page.explodeSoundName),
-                deathSpew: page.deathSpew,
-                physics: page.physics
+                soundKey: soundKey
             ))
         }
         // The ship batteries fire from the ship model's battery 0
@@ -757,48 +739,11 @@ extension Level {
         }
         var weapons: [CanonicalWeapon] = []
         for name in weaponNames {
-            let page = try weapon(name)
-            // The sounds the runtime plays: WSI_IMPACT_WALL, WSI_FLYING,
-            // and WSI_IMPACT_ROBOT (weapon.h:263-265).
-            let sounds = try page.soundLogicalNames.enumerated().map {
-                index, sound in
-                [1, 2, 3].contains(index) && !sound.isEmpty
-                    ? try soundKey(sound) : ""
-            }
-            let usesModel = page.weaponFlags
-                & (CanonicalWeapon.imageBitmapFlag
-                    | CanonicalWeapon.imageVClipFlag) == 0
-            weapons.append(.init(
-                name: page.name,
-                flags: page.weaponFlags,
-                model: usesModel ? weaponModel(page.fireImageName) : nil,
-                size: page.modelPageSize,
-                customSize: page.customSize,
-                mass: page.mass,
-                drag: page.drag,
-                physicsFlags: page.physicsFlags,
-                speed: page.speed,
-                fullThrust: page.fullThrust,
-                lifetime: page.lifetime,
-                playerDamage: page.playerDamage,
-                genericDamage: page.genericDamage,
-                sounds: sounds + Array(repeating: "", count: 7 - sounds.count),
-                impact: .init(
-                    size: page.impactSize,
-                    time: page.impactTime,
-                    playerDamage: page.impactPlayerDamage,
-                    genericDamage: page.impactGenericDamage,
-                    force: page.impactForce
-                ),
-                explosion: .init(
-                    hasImage: !page.explosionTextureName.isEmpty,
-                    frames: page.explosionTextureName.isEmpty
-                        ? [] : explosionFrames(page.explosionTextureName),
-                    lifetime: page.explosionLifetime,
-                    size: page.explosionSize
-                ),
-                lightDistance: page.lightDistance,
-                lighting: page.lightPresentation
+            weapons.append(try Self.canonicalWeapon(
+                try weapon(name),
+                weaponModel: weaponModel,
+                explosionFrames: explosionFrames,
+                soundKey: soundKey
             ))
         }
         level.models = models.map { model in
@@ -818,6 +763,89 @@ extension Level {
             weapons.flatMap { $0.explosion?.frames ?? [] },
             provenance:
                 "manage/weaponpage.cpp:653-901; Descent3/WeaponFire.cpp:3058-3201"
+        )
+    }
+
+    /// The canonical weapon of a retail weapon page (weaponpage.cpp:782):
+    /// its model (unless the page draws a bitmap or vclip), and the sounds
+    /// the runtime plays: WSI_IMPACT_WALL, WSI_FLYING, and WSI_IMPACT_ROBOT
+    /// (weapon.h:263-265).
+    static func canonicalWeapon(
+        _ page: RetailWeaponPresentationSelection,
+        weaponModel: (String) -> SourceResource?,
+        explosionFrames: (String) -> [SourceResource],
+        soundKey: (String) throws -> String
+    ) throws -> CanonicalWeapon {
+        let sounds = try page.soundLogicalNames.enumerated().map {
+            index, sound in
+            [1, 2, 3].contains(index) && !sound.isEmpty
+                ? try soundKey(sound) : ""
+        }
+        let usesModel = page.weaponFlags
+            & (CanonicalWeapon.imageBitmapFlag
+                | CanonicalWeapon.imageVClipFlag) == 0
+        return .init(
+            name: page.name,
+            flags: page.weaponFlags,
+            model: usesModel ? weaponModel(page.fireImageName) : nil,
+            size: page.modelPageSize,
+            customSize: page.customSize,
+            mass: page.mass,
+            drag: page.drag,
+            physicsFlags: page.physicsFlags,
+            speed: page.speed,
+            fullThrust: page.fullThrust,
+            lifetime: page.lifetime,
+            playerDamage: page.playerDamage,
+            genericDamage: page.genericDamage,
+            sounds: sounds + Array(repeating: "", count: 7 - sounds.count),
+            impact: .init(
+                size: page.impactSize,
+                time: page.impactTime,
+                playerDamage: page.impactPlayerDamage,
+                genericDamage: page.impactGenericDamage,
+                force: page.impactForce
+            ),
+            explosion: .init(
+                hasImage: !page.explosionTextureName.isEmpty,
+                frames: page.explosionTextureName.isEmpty
+                    ? [] : explosionFrames(page.explosionTextureName),
+                lifetime: page.explosionLifetime,
+                size: page.explosionSize
+            ),
+            lightDistance: page.lightDistance,
+            lighting: page.lightPresentation
+        )
+    }
+
+    /// The canonical object_info of a retail generic page (ObjInit,
+    /// objinit.cpp:807) with the given weapon batteries.
+    static func canonicalObjectInfo(
+        _ page: RetailGenericPage,
+        weaponBatteries: [CanonicalWeaponBattery],
+        soundKey: (String) throws -> String
+    ) throws -> CanonicalObjectInfo {
+        .init(
+            name: page.name,
+            type: page.type,
+            flags: page.flags,
+            size: page.size,
+            hitPoints: page.hitPoints,
+            lightDistance: page.lightDistance,
+            lighting: page.lighting,
+            ai: page.flags & CanonicalObjectInfo.controlAIFlag != 0
+                ? page.ai : nil,
+            weaponBatteries: weaponBatteries,
+            score: page.score,
+            impact: page.impact,
+            deathTypes: page.deathTypes,
+            explodeSound: page.explodeSoundName.isEmpty
+                ? "" : try soundKey(page.explodeSoundName),
+            deathSpew: page.deathSpew,
+            physics: page.physics,
+            moduleName: canonicalGameModuleName(page.moduleName),
+            scriptNameOverride: page.scriptNameOverride.isEmpty
+                ? nil : page.scriptNameOverride
         )
     }
 }

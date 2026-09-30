@@ -139,8 +139,9 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertEqual(
             physics,
             [
-                .init(texture: wall, behavior: .blocking),
-                .init(texture: flythrough, behavior: .passThrough),
+                .init(texture: wall, behavior: .blocking, textureFlags: 0),
+                .init(texture: flythrough, behavior: .passThrough,
+                      textureFlags: 0x0001_0000),
             ]
         )
     }
@@ -161,7 +162,8 @@ final class D3LV127Tests: XCTestCase {
                 overlay: Data(),
                 textures: [forceField]
             ),
-            [.init(texture: forceField, behavior: .forceField)]
+            [.init(texture: forceField, behavior: .forceField,
+                   textureFlags: 0x0000_0020)]
         )
     }
 
@@ -1112,6 +1114,29 @@ final class D3LV127Tests: XCTestCase {
         }
     }
 
+    /// ReadBOAChunk keeps the stored tables only when BOAGetMineChecksum
+    /// matches them (BOA.cpp:1200, :2029); otherwise MakeBOA remakes them.
+    func testKeepsStoredBOATablesOnlyWhenTheMineChecksumMatches() throws {
+        let stale = try parseD3LV127(
+            makeSyntheticD3LV127(),
+            source: syntheticSource
+        )
+        XCTAssertNil(stale.boaTables)
+        let checksum = try XCTUnwrap(boaMineChecksum(
+            rooms: stale.rooms,
+            terrain: stale.terrain
+        ))
+        XCTAssertNotEqual(checksum, 0)
+        let level = try parseD3LV127(
+            makeSyntheticD3LV127(boaChecksum: checksum),
+            source: syntheticSource
+        )
+        let tables = try XCTUnwrap(level.boaTables)
+        XCTAssertEqual(tables.highestRoomIndex, 2)
+        XCTAssertEqual(tables.entry(2, 2), 2)
+        XCTAssertEqual(tables.cost(2, 0), -1)
+    }
+
     func testDecodesACompleteSyntheticResidentLevel() throws {
         let level = try parseD3LV127(
             makeSyntheticD3LV127(),
@@ -1294,7 +1319,8 @@ func makeSyntheticD3LV127(
     objectLightmapFaceCount: UInt16? = nil,
     volumeLightWidth: Int32? = nil,
     gravity: Float = -32.2,
-    navigationPayload: Data = Data()
+    navigationPayload: Data = Data(),
+    boaChecksum: Int32 = 0
 ) -> Data {
     var level = Data("D3LV".utf8)
     level.appendLittleEndian(Int32(127))
@@ -1356,7 +1382,21 @@ func makeSyntheticD3LV127(
     )
     level.appendChunk("TRIG", payload: emptyCount)
     level.appendChunk("CNBS", payload: Data())
-    level.appendChunk("CBOA", payload: Data())
+    // WriteBOAChunk (LoadLevel.cpp:4678) for the one room, room 2
+    // (Highest_room_index 2): each room leads to itself, and every cost is
+    // -1.
+    var boa = Data()
+    boa.appendLittleEndian(boaChecksum)
+    boa.appendLittleEndian(Int32(0))
+    boa.appendLittleEndian(Int32(10))
+    boa.appendLittleEndian(Int32(40))
+    for i in 0..<11 {
+        for _ in 0..<11 { boa.appendLittleEndian(Int16(i)) }
+    }
+    for _ in 0..<(11 * 40) { boa.appendLittleEndian(Float(-1).bitPattern) }
+    boa.appendLittleEndian(Int32(0))
+    boa.appendLittleEndian(Int32(0))
+    level.appendChunk("CBOA", payload: boa)
     level.appendChunk("NODE", payload: navigationPayload)
     level.appendChunk("AABB", payload: Data())
     var movingTextures = Data()

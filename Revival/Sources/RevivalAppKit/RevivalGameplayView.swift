@@ -105,7 +105,7 @@ final class RevivalGameplayView: MTKView {
     private var pilotProfileIDs: [UUID] = []
     private var trainingVoicePlayer: AVAudioPlayer?
     private var trainingSoundPlayers: [AVAudioPlayer] = []
-    private var trainingGuidebotAmbientEnginePlayer: AVAudioPlayer?
+    private var objectSoundLoopPlayer: AVAudioPlayer?
     private var pausedTrainingVoicePlayer: AVAudioPlayer?
     private var pausedTrainingSoundPlayers: [AVAudioPlayer] = []
     private var pausedTrainingGuidebotAmbientEnginePlayer: AVAudioPlayer?
@@ -475,7 +475,7 @@ final class RevivalGameplayView: MTKView {
             trainingVoicePlayer = nil
             trainingSoundPlayers.forEach { $0.stop() }
             trainingSoundPlayers.removeAll()
-            stopTrainingGuidebotAmbientEngine()
+            stopObjectSoundLoop()
             clearPausedTrainingAudio()
             cameraMonitorBorder.isHidden = true
         }
@@ -485,7 +485,6 @@ final class RevivalGameplayView: MTKView {
         frame: PlayerSimulationFrame,
         voiceClips: [CanonicalVoiceClip],
         soundClips: [CanonicalSoundClip] = [],
-        guidebotAmbientEngineSoundSourceName: String? = nil,
         rooms: [LevelRoom] = []
     ) throws {
         if let finalGoal = frame.trainingFinalGoal {
@@ -505,7 +504,7 @@ final class RevivalGameplayView: MTKView {
             trainingVoicePlayer = nil
             trainingSoundPlayers.forEach { $0.stop() }
             trainingSoundPlayers.removeAll()
-            stopTrainingGuidebotAmbientEngine()
+            stopObjectSoundLoop()
             trainingEndLevelLabel.stringValue =
                 Self.trainingPostLevelResultText(
                     finalGoal.postLevelResult
@@ -618,9 +617,8 @@ final class RevivalGameplayView: MTKView {
         } else {
             invulnerabilityMonitorRing.isHidden = true
         }
-        updateTrainingGuidebotAmbientEngine(
+        updateObjectSoundLoop(
             frame: frame,
-            soundSourceName: guidebotAmbientEngineSoundSourceName,
             soundClips: soundClips,
             rooms: rooms
         )
@@ -763,34 +761,32 @@ final class RevivalGameplayView: MTKView {
         }
     }
 
-    private func updateTrainingGuidebotAmbientEngine(
+    /// Plays the frame's looping object sound (the Guide-Bot's engine,
+    /// the only one before the audio port in M2) at the object's place.
+    private func updateObjectSoundLoop(
         frame: PlayerSimulationFrame,
-        soundSourceName: String?,
         soundClips: [CanonicalSoundClip],
         rooms: [LevelRoom]
     ) {
-        guard frame.trainingGuidebotAmbientEngineIsActive,
-              let soundSourceName,
-              let mix = Self.trainingGuidebotAmbientEngineSpatialMix(
+        guard let loop = frame.objectSoundLoops.first,
+              let mix = Self.objectSoundLoopSpatialMix(
                 frame: frame,
                 rooms: rooms
               ),
               let clip = soundClips.first(where: {
-                  $0.sourceName.caseInsensitiveCompare(soundSourceName)
+                  $0.logicalName.caseInsensitiveCompare(loop.soundName)
                     == .orderedSame
-                    || $0.logicalName.caseInsensitiveCompare(soundSourceName)
-                        == .orderedSame
               }) else {
-            stopTrainingGuidebotAmbientEngine()
+            stopObjectSoundLoop()
             return
         }
 
-        if let player = trainingGuidebotAmbientEnginePlayer {
+        if let player = objectSoundLoopPlayer {
             player.volume = clip.importVolume * mix.volumeScale
             player.pan = mix.pan
             if !player.isPlaying, !player.play() {
                 player.stop()
-                trainingGuidebotAmbientEnginePlayer = nil
+                objectSoundLoopPlayer = nil
             }
             return
         }
@@ -802,41 +798,40 @@ final class RevivalGameplayView: MTKView {
             player.pan = mix.pan
             player.prepareToPlay()
             guard player.play() else { return }
-            trainingGuidebotAmbientEnginePlayer = player
+            objectSoundLoopPlayer = player
         } catch {
-            trainingGuidebotAmbientEnginePlayer = nil
+            objectSoundLoopPlayer = nil
         }
     }
 
-    private func stopTrainingGuidebotAmbientEngine() {
-        trainingGuidebotAmbientEnginePlayer?.stop()
-        trainingGuidebotAmbientEnginePlayer = nil
+    private func stopObjectSoundLoop() {
+        objectSoundLoopPlayer?.stop()
+        objectSoundLoopPlayer = nil
     }
 
-    static func trainingGuidebotAmbientEngineSpatialMix(
+    static func objectSoundLoopSpatialMix(
         frame: PlayerSimulationFrame,
         rooms: [LevelRoom]
     ) -> (volumeScale: Float, pan: Float)? {
-        guard frame.trainingGuidebotAmbientEngineIsActive,
-              let guidebot = frame.trainingGuidebot else {
+        guard let loop = frame.objectSoundLoops.first else {
             return nil
         }
-        return trainingGuidebotAmbientEngineSpatialMix(
-            sourcePosition: guidebot.position,
-            sourceRoomSourceIndex: guidebot.roomSourceIndex,
+        return objectSoundSpatialMix(
+            sourcePosition: loop.position,
+            sourceRoomSourceIndex: loop.roomSourceIndex,
             listener: frame.playerView,
             rooms: rooms
         )
     }
 
-    static func trainingGuidebotAmbientEngineSpatialMix(
+    static func objectSoundSpatialMix(
         sourcePosition: Vector3,
         sourceRoomSourceIndex: Int,
         listener: PlayerView,
         rooms: [LevelRoom]
     ) -> (volumeScale: Float, pan: Float)? {
         let camera = listener.camera
-        guard let routed = trainingGuidebotAmbientEngineSpatialRoute(
+        guard let routed = objectSoundSpatialRoute(
             sourcePosition: sourcePosition,
             sourceRoomSourceIndex: sourceRoomSourceIndex,
             listener: listener,
@@ -877,7 +872,7 @@ final class RevivalGameplayView: MTKView {
         return (volumeScale * routed.doorVolumeScale, pan)
     }
 
-    private static func trainingGuidebotAmbientEngineSpatialRoute(
+    private static func objectSoundSpatialRoute(
         sourcePosition: Vector3,
         sourceRoomSourceIndex: Int,
         listener: PlayerView,
@@ -1106,7 +1101,7 @@ final class RevivalGameplayView: MTKView {
         trainingSoundPlayers.removeAll { !$0.isPlaying }
         pausedTrainingSoundPlayers = trainingSoundPlayers
         pausedTrainingSoundPlayers.forEach { $0.pause() }
-        if let player = trainingGuidebotAmbientEnginePlayer,
+        if let player = objectSoundLoopPlayer,
            player.isPlaying {
             player.pause()
             pausedTrainingGuidebotAmbientEnginePlayer = player
@@ -1122,7 +1117,7 @@ final class RevivalGameplayView: MTKView {
             player.play()
         }
         if pausedTrainingGuidebotAmbientEnginePlayer
-            === trainingGuidebotAmbientEnginePlayer {
+            === objectSoundLoopPlayer {
             pausedTrainingGuidebotAmbientEnginePlayer?.play()
         }
         clearPausedTrainingAudio()

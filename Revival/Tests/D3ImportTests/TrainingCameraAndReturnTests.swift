@@ -65,6 +65,9 @@ extension WorldRenderingTests {
             at: 100.1,
             input: .init(usesInventory: true)
         )
+        // This level has no Guide-Bot (qGetBuddyObj is not a robot), so
+        // Script 058 (TrainingMission.cpp:1444) follows the use in the
+        // same frame's level EVT_INTERVAL.
         XCTAssertEqual(
             used.trainingOpeningFeedback,
             [.init(
@@ -72,6 +75,10 @@ extension WorldRenderingTests {
                     "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
                 ],
                 voiceSourceName: "guidebotd.osf",
+                voicePrecedesHUDMessages: true
+            ), .init(
+                hudMessages: ["Excellent!"],
+                voiceSourceName: "proceed6.osf",
                 voicePrecedesHUDMessages: true
             )]
         )
@@ -133,44 +140,70 @@ extension WorldRenderingTests {
         )
     }
 
+    /// The return command (GBC_RETURN_TO_SHIP, AIGame.cpp:5143) sends the
+    /// Guide-Bot into the player; the collision enters the ship
+    /// (DoCollide :5510, SetMode(GBM_ENTER_SHIP) :4628), and the bespoke
+    /// Script 058 bridge sees it back in the ship once (TrainingMission.cpp:1443).
     func testGuidebotReturnCollisionRunsScript058OnceAcrossReload() throws {
-        let level = makeTrainingCameraMonitorLevel()
+        let level = withTrainingGuideBot(makeTrainingCameraMonitorLevel())
         try level.validate()
         let chain = try XCTUnwrap(level.trainingCameraMonitorChain)
         let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
-
+        var timestamp = 0.1
         _ = simulation.update(
-            at: 0.1,
+            at: timestamp,
             input: .init(deploysTrainingGuidebot: true)
         )
-        _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
+        timestamp += 0.1
+        _ = simulation.update(at: timestamp, input: .init(usesInventory: true))
+        // GBM_BIRTH lasts until mode_time > 1.2 s (AIGame.cpp:5893), and the
+        // menu offers the return command only in GBM_AMBIENT (:4892).
+        simulation.runFrames(14, from: &timestamp)
+        XCTAssertEqual(
+            simulation.world.testGuideBot?.mode,
+            GuideBotScript.ambientMode
+        )
+        timestamp += 0.1
         let requested = simulation.update(
-            at: 0.3,
+            at: timestamp,
             input: .init(deploysTrainingGuidebot: true)
         )
-        let returnRandomState = try XCTUnwrap(
-            (
-                try XCTUnwrap(
-                    testWorldObject(simulation.world)
-                )["authoritativeRandomState"] as? NSNumber
-            )?.uint32Value
+        XCTAssertEqual(hudMessages([requested]), ["GB: Returning to ship."])
+        // DoInit set last_sound_time at level start (AIGame.cpp:5683), so
+        // DoMessage plays no sound before 2.5 s (:4542).
+        XCTAssertFalse(soundNames([requested]).contains("GBotAcceptOrder1"))
+        XCTAssertEqual(simulation.world.testGuideBot?.isMarkedForPickup, true)
+
+        // The fixture's Buddybot model is flat, so its move never touches
+        // the ship's sphere (RESULT_CHECK_POLY_SPHERE); once the parent link
+        // is gone (AIGame.cpp:6045) and it is at the player, the test gives
+        // the pair's contact (collide_two_objects).
+        for _ in 1...100 {
+            timestamp += 0.1
+            simulation.update(at: timestamp, input: .zero)
+            if let guideBot = simulation.world.testGuideBotObject,
+               guideBot.parent == .none,
+               simulation.world.objectDistance(
+                   guideBot.handle,
+                   simulation.world.testPlayerObject.handle,
+                   subtractingSizes: true
+               ) < 0 {
+                break
+            }
+        }
+        XCTAssertEqual(simulation.world.testGuideBotObject?.parent, ObjectHandle.none)
+        simulation.world.collideTwoObjects(
+            simulation.world.buddyHandle,
+            simulation.world.testPlayerObject.handle,
+            level: simulation.level
         )
-        XCTAssertEqual(requested.trainingOpeningFeedback, [
-            .init(
-                hudMessages: ["GB: Returning to ship."],
-                voiceSourceName: "",
-                voicePrecedesHUDMessages: true
-            ),
-        ])
         var completed: PlayerSimulationFrame?
-        for frameIndex in 4...100 {
-            let frame = simulation.update(
-                at: Double(frameIndex) * 0.1,
-                input: .zero
-            )
+        for _ in 1...300 {
+            timestamp += 0.1
+            let frame = simulation.update(at: timestamp, input: .zero)
             if frame.trainingOpeningFeedback.contains(where: {
                 $0.voiceSourceName == "proceed6.osf"
             }) {
@@ -179,20 +212,19 @@ extension WorldRenderingTests {
             }
         }
         let script058 = try XCTUnwrap(completed)
-        XCTAssertEqual(script058.trainingOpeningFeedback, [
-            .init(
-                hudMessages: ["GB: Entering ship!"],
-                voiceSourceName: "",
-                voicePrecedesHUDMessages: true
-            ),
-            .init(
-                hudMessages: ["Excellent!"],
-                voiceSourceName: "proceed6.osf",
-                voicePrecedesHUDMessages: true
-            ),
-        ])
-        XCTAssertNil(script058.trainingGuidebot)
-        XCTAssertFalse(script058.trainingGuidebotAmbientEngineIsActive)
+        XCTAssertEqual(
+            Set(hudMessages([script058])),
+            ["GB: Entering ship!", "Excellent!"]
+        )
+        XCTAssertEqual(
+            simulation.world.objectType(simulation.world.buddyHandle),
+            .dummy
+        )
+        XCTAssertEqual(
+            simulation.world.testGuideBot?.mode,
+            GuideBotScript.inShipMode
+        )
+        XCTAssertTrue(script058.objectSoundLoops.isEmpty)
         XCTAssertEqual(
             script058.trainingGuidebotReturnMarkerLightDistance,
             50
@@ -201,28 +233,10 @@ extension WorldRenderingTests {
             level: simulation.runtimeLevel,
             rendersFaces: false
         )
-        XCTAssertFalse(simulation.runtimeLevel.objectPresentations.contains {
-            $0.objectHandle
-                == level.trainingRobotGuidebotChain?.guidebotObjectHandle
-                && $0.isVisible
-        })
-        let completedRandomState = try XCTUnwrap(
-            (
-                try XCTUnwrap(
-                    testWorldObject(simulation.world)
-                )["authoritativeRandomState"] as? NSNumber
-            )?.uint32Value
-        )
-        XCTAssertEqual(
-            completedRandomState,
-            returnRandomState,
-            "The deferred return-to-ship branch must not consume the authoritative stream."
-        )
         let postReturnFrame = simulation.update(
-            at: Double(script058.gameTime) + 0.1,
+            at: timestamp + 0.1,
             input: .zero
         )
-        XCTAssertNil(postReturnFrame.trainingGuidebot)
         XCTAssertTrue(postReturnFrame.trainingOpeningFeedback.isEmpty)
 
         let continuation = try JSONDecoder().decode(
@@ -236,8 +250,7 @@ extension WorldRenderingTests {
         )
         let afterReload = restored.update(at: 100.1, input: .zero)
         XCTAssertTrue(afterReload.trainingOpeningFeedback.isEmpty)
-        XCTAssertNil(afterReload.trainingGuidebot)
-        XCTAssertFalse(afterReload.trainingGuidebotAmbientEngineIsActive)
+        XCTAssertTrue(afterReload.objectSoundLoops.isEmpty)
         XCTAssertEqual(
             afterReload.trainingGuidebotReturnMarkerLightDistance,
             chain.returnToShip?.openMarkerLightDistance
@@ -246,876 +259,6 @@ extension WorldRenderingTests {
             level: restored.runtimeLevel,
             rendersFaces: false
         )
-    }
-
-    @MainActor
-    func testInShipReleaseGuidebotCommandReusesBirthAfterScript039() throws {
-        let baseLevel = makeTrainingKillbotEntryLevel()
-        let syntheticReleaseSound = CanonicalSoundClip(
-            logicalName: "GBExpulsionA",
-            sourceName: "GBExpulsionA.wav",
-            sourceEntryIndex: 1_246,
-            sampleRate: 22_050,
-            channelCount: 1,
-            frameCount: 1,
-            pcm16LittleEndian: Data(repeating: 0, count: 2),
-            pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
-            sourceArchive: "d3.hog",
-            sourceSHA256: String(repeating: "9", count: 64),
-            importVolume: 0.5
-        )
-        let syntheticAmbientEngineSound = CanonicalSoundClip(
-            logicalName: "GBotEngineB1",
-            sourceName: "GBotEngineB.wav",
-            sourceEntryIndex: 1_262,
-            sampleRate: 22_050,
-            channelCount: 1,
-            frameCount: 1,
-            pcm16LittleEndian: Data(repeating: 0, count: 2),
-            pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
-            sourceArchive: "d3.hog",
-            sourceSHA256: String(repeating: "8", count: 64),
-            importVolume: 0.1
-        )
-        var levelObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(baseLevel)
-            ) as? [String: Any]
-        )
-        var source = try XCTUnwrap(
-            levelObject["source"] as? [String: Any]
-        )
-        source["archiveSHA256"] = String(repeating: "0", count: 64)
-        var profileFiles = try XCTUnwrap(
-            source["profileFiles"] as? [[String: Any]]
-        )
-        if !profileFiles.contains(where: {
-            $0["relativePath"] as? String == "d3.hog"
-        }) {
-            profileFiles.append([
-                "relativePath": "d3.hog",
-                "byteCount": 194_030_423,
-                "sha256":
-                    "a0f1cb2c1a73da828a5fd4e80d6544b63da04e177dc2b894d9e6418296bc24c6",
-            ])
-        }
-        source["profileFiles"] = profileFiles
-        levelObject["source"] = source
-        var releaseChain = try XCTUnwrap(
-            levelObject["trainingRobotGuidebotChain"] as? [String: Any]
-        )
-        releaseChain["releaseSoundSourceName"] = "GBExpulsionA.wav"
-        releaseChain["ambientEngineSoundSourceName"] = "GBotEngineB.wav"
-        levelObject["trainingRobotGuidebotChain"] = releaseChain
-        var soundClips = try XCTUnwrap(
-            levelObject["soundClips"] as? [[String: Any]]
-        )
-        soundClips.append(try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(syntheticReleaseSound)
-            ) as? [String: Any]
-        ))
-        soundClips.append(try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(syntheticAmbientEngineSound)
-            ) as? [String: Any]
-        ))
-        levelObject["soundClips"] = soundClips
-        var dependencyManifest = try XCTUnwrap(
-            levelObject["dependencyManifest"] as? [String: Any]
-        )
-        var currentDependencies = try XCTUnwrap(
-            dependencyManifest["current"] as? [[String: Any]]
-        )
-        currentDependencies.append(try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(DependencyRecord(
-                    category: "sound",
-                    source: .init(
-                        storedIndex: 1_246,
-                        sourceName: "GBExpulsionA.wav"
-                    ),
-                    state: "canonical-pcm-imported",
-                    provenance: "synthetic canonical fixture"
-                ))
-            ) as? [String: Any]
-        ))
-        currentDependencies.append(try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(DependencyRecord(
-                    category: "sound",
-                    source: .init(
-                        storedIndex: 1_262,
-                        sourceName: "GBotEngineB.wav"
-                    ),
-                    state: "canonical-pcm-imported",
-                    provenance: "synthetic canonical fixture"
-                ))
-            ) as? [String: Any]
-        ))
-        dependencyManifest["current"] = currentDependencies
-        levelObject["dependencyManifest"] = dependencyManifest
-        let level = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: levelObject)
-        )
-        let decodedReleaseSound = try XCTUnwrap(level.soundClips.first {
-            $0.sourceName == "GBExpulsionA.wav"
-        })
-        XCTAssertEqual(decodedReleaseSound, syntheticReleaseSound)
-        XCTAssertEqual(
-            level.soundClips.first {
-                $0.sourceName == "GBotEngineB.wav"
-            },
-            syntheticAmbientEngineSound
-        )
-        XCTAssertEqual(
-            decodedReleaseSound.pcmSHA256,
-            canonicalSHA256(decodedReleaseSound.pcm16LittleEndian)
-        )
-        XCTAssertTrue(level.source.profileFiles.contains {
-            $0.relativePath == decodedReleaseSound.sourceArchive
-        })
-        XCTAssertTrue(level.dependencyManifest.current.contains {
-            $0.category == "sound"
-                && $0.source == .init(
-                    storedIndex: decodedReleaseSound.sourceEntryIndex,
-                    sourceName: decodedReleaseSound.sourceName
-                )
-        })
-        XCTAssertEqual(
-            Set(level.soundClips.map { $0.sourceName.lowercased() }).count,
-            level.soundClips.count
-        )
-        try level.validate()
-        let initialSimulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        var initialContinuationObject = try XCTUnwrap(
-            testWorldObject(initialSimulation.world)
-        )
-        var initialGalleryState = try XCTUnwrap(
-            initialContinuationObject["trainingGalleryBarrierState"]
-                as? [String: Any]
-        )
-        initialGalleryState["wasTriggered"] = true
-        initialContinuationObject["trainingGalleryBarrierState"] =
-            initialGalleryState
-        let gallerySimulation = try GameSession(
-            level: level,
-            world: (decodeTestWorld(initialContinuationObject)).rebased(onto: level),
-            resumedAtTimestamp: 0
-        )
-        // Scripts 036 and 029 ran: DestroyBot2 is gone, and Script 029 hid
-        // the enabled-control summary (TrainingMission.cpp:1580).
-        gallerySimulation.applyTrainingScript036Outcome()
-        gallerySimulation.world.hudShowControls = false
-        let readyContinuationObject = try XCTUnwrap(
-            testWorldObject(gallerySimulation.world)
-        )
-        let simulation = try GameSession(
-            level: level,
-            world: (decodeTestWorld(readyContinuationObject)).rebased(onto: level),
-            resumedAtTimestamp: 0
-        )
-
-        var timestamp = 0.1
-        _ = simulation.update(
-            at: timestamp,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-        timestamp += 0.1
-        _ = simulation.update(
-            at: timestamp,
-            input: .init(usesInventory: true)
-        )
-        timestamp += 0.1
-        _ = simulation.update(
-            at: timestamp,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-        for _ in 1...100 {
-            timestamp += 0.1
-            let frame = simulation.update(at: timestamp, input: .zero)
-            if frame.trainingOpeningFeedback.contains(where: {
-                $0.voiceSourceName == "proceed6.osf"
-            }) {
-                break
-            }
-        }
-        timestamp += 0.1
-        let portalEntry = simulation.update(
-            at: timestamp,
-            input: .init(forward: 1)
-        )
-        XCTAssertTrue(portalEntry.trainingOpeningFeedback.contains(where: {
-            $0.voiceSourceName == "intro6.osf"
-        }))
-        var script039: PlayerSimulationFrame?
-        for _ in 1...130 {
-            timestamp += 0.1
-            let frame = simulation.update(at: timestamp, input: .zero)
-            if frame.trainingOpeningFeedback.contains(where: {
-                $0.voiceSourceName == "guidebotf.osf"
-            }) {
-                script039 = frame
-                break
-            }
-        }
-        let script039Frame = try XCTUnwrap(script039)
-        XCTAssertTrue(simulation.trainingGuidebotReleaseCommandIsAvailable)
-
-        let menu = RevivalGameplayView.trainingGuidebotReleaseMenu(
-            target: nil,
-            action: nil
-        )
-        XCTAssertEqual(menu.title, "GB Command Menu")
-        XCTAssertEqual(menu.items.count, 1)
-        XCTAssertEqual(menu.items[0].title, "1. Release Guidebot")
-        XCTAssertEqual(menu.items[0].keyEquivalent, "1")
-        XCTAssertTrue(menu.items[0].keyEquivalentModifierMask.isEmpty)
-        XCTAssertEqual(menu.items[0].tag, 0)
-        XCTAssertTrue(
-            RevivalGameplayView.cancelsTrainingGuidebotReleaseMenu(
-                keyCode: 118
-            )
-        )
-        XCTAssertTrue(
-            RevivalGameplayView.cancelsTrainingGuidebotReleaseMenu(
-                keyCode: 53
-            )
-        )
-        XCTAssertFalse(
-            RevivalGameplayView.cancelsTrainingGuidebotReleaseMenu(
-                keyCode: 18
-            )
-        )
-
-        let canonicalPlayer = try XCTUnwrap(level.objects.first {
-            $0.handle == level.defaultPlayerBinding?.objectHandle
-        })
-        var releaseContinuationObject = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        releaseContinuationObject["playerPosition"] = [
-            "x": canonicalPlayer.position.x,
-            "y": canonicalPlayer.position.y,
-            "z": canonicalPlayer.position.z,
-        ]
-        releaseContinuationObject["playerLocation"] = try JSONSerialization
-            .jsonObject(with: JSONEncoder().encode(canonicalPlayer.location))
-        releaseContinuationObject["playerOrientation"] = [
-            "right": [
-                "x": canonicalPlayer.orientation.right.x,
-                "y": canonicalPlayer.orientation.right.y,
-                "z": canonicalPlayer.orientation.right.z,
-            ],
-            "up": [
-                "x": canonicalPlayer.orientation.up.x,
-                "y": canonicalPlayer.orientation.up.y,
-                "z": canonicalPlayer.orientation.up.z,
-            ],
-            "forward": [
-                "x": canonicalPlayer.orientation.forward.x,
-                "y": canonicalPlayer.orientation.forward.y,
-                "z": canonicalPlayer.orientation.forward.z,
-            ],
-        ]
-        releaseContinuationObject["velocity"] = [
-            "x": Float.zero,
-            "y": Float.zero,
-            "z": Float.zero,
-        ]
-        releaseContinuationObject["frameDuration"] = Float.zero
-        let releaseSimulation = try GameSession(
-            level: level,
-            world: (decodeTestWorld(releaseContinuationObject)).rebased(onto: level),
-            resumedAtTimestamp: 100
-        )
-        XCTAssertTrue(
-            releaseSimulation.trainingGuidebotReleaseCommandIsAvailable
-        )
-        let player = try XCTUnwrap(releaseSimulation.runtimeLevel.objects.first {
-            $0.handle
-                == releaseSimulation.level.defaultPlayerBinding?.objectHandle
-        })
-        let inheritedVelocity = releaseSimulation.world.velocity
-        let feedbackCountBeforeRelease =
-            script039Frame.trainingOpeningFeedback.count
-        let releaseStateBefore = try XCTUnwrap(
-            releaseContinuationObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        let messageSoundTimeBeforeRelease =
-            releaseStateBefore["lastMessageSoundTime"] as? NSNumber
-        let randomStateBeforeRelease = try XCTUnwrap(
-            (releaseContinuationObject["authoritativeRandomState"]
-                as? NSNumber)?.uint32Value
-        )
-        let released = releaseSimulation.update(
-            at: 100.1,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-        XCTAssertFalse(released.trainingGuidebotAmbientEngineIsActive)
-        let guidebot = try XCTUnwrap(released.trainingGuidebot)
-        XCTAssertEqual(guidebot.spawnPosition, player.position)
-        XCTAssertEqual(guidebot.orientation, player.orientation)
-        XCTAssertEqual(
-            guidebot.spawnVelocity,
-            Vector3(
-                x: inheritedVelocity.x
-                    + player.orientation.forward.x * 40,
-                y: inheritedVelocity.y
-                    + player.orientation.forward.y * 40,
-                z: inheritedVelocity.z
-                    + player.orientation.forward.z * 40
-            )
-        )
-        XCTAssertEqual(released.trainingOpeningFeedback, [
-            .init(
-                hudMessages: [],
-                voiceSourceName: "",
-                voicePrecedesHUDMessages: true,
-                soundSourceName: "GBExpulsionA.wav"
-            ),
-        ])
-        var soundAttempts: [String] = []
-        var presentedHUDMessages: [String] = []
-        var hudPresentationCount = 0
-        RevivalGameplayView.presentTrainingFeedbackSequence(
-            released.trainingOpeningFeedback,
-            attemptVoice: { _ in },
-            attemptSound: { sourceName, eventVolume in
-                XCTAssertNil(eventVolume)
-                soundAttempts.append(sourceName)
-            },
-            presentHUDMessages: {
-                hudPresentationCount += 1
-                presentedHUDMessages.append(contentsOf: $0)
-            }
-        )
-        XCTAssertEqual(soundAttempts, ["GBExpulsionA.wav"])
-        XCTAssertEqual(hudPresentationCount, 0)
-        XCTAssertTrue(presentedHUDMessages.isEmpty)
-        XCTAssertFalse(
-            releaseSimulation.trainingGuidebotReleaseCommandIsAvailable
-        )
-        XCTAssertTrue(releaseSimulation.runtimeLevel.objectPresentations.contains {
-            $0.objectHandle
-                == level.trainingRobotGuidebotChain?.guidebotObjectHandle
-                && $0.isVisible
-        })
-        let releasedContinuationObject = try XCTUnwrap(
-            testWorldObject(releaseSimulation.world)
-        )
-        let releasedState = try XCTUnwrap(
-            releasedContinuationObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        let releasedGuidebot = try XCTUnwrap(
-            releasedState["guidebot"] as? [String: Any]
-        )
-        XCTAssertEqual(releasedGuidebot["task"] as? String, "outbound")
-        XCTAssertEqual(
-            releasedState["lastMessageSoundTime"] as? NSNumber,
-            messageSoundTimeBeforeRelease
-        )
-        let randomStateAfterRelease = try XCTUnwrap(
-            (releasedContinuationObject["authoritativeRandomState"]
-                as? NSNumber)?.uint32Value
-        )
-        let firstModeState =
-            randomStateBeforeRelease &* 214_013 &+ 2_531_011
-        let secondModeState = firstModeState &* 214_013 &+ 2_531_011
-        XCTAssertEqual(randomStateAfterRelease, secondModeState)
-        XCTAssertEqual(
-            script039Frame.trainingOpeningFeedback.count,
-            feedbackCountBeforeRelease
-        )
-
-        var ambientTransitionFrame: PlayerSimulationFrame?
-        var ambientTimestamp = 100.1
-        for _ in 1...20 {
-            ambientTimestamp += 0.1
-            let frame = releaseSimulation.update(
-                at: ambientTimestamp,
-                input: .zero
-            )
-            let continuationObject = try XCTUnwrap(
-                testWorldObject(releaseSimulation.world)
-            )
-            let state = try XCTUnwrap(
-                continuationObject["trainingRobotGuidebotState"]
-                    as? [String: Any]
-            )
-            if state["guidebotMode"] as? String == "ambient" {
-                ambientTransitionFrame = frame
-                break
-            }
-            XCTAssertFalse(frame.trainingGuidebotAmbientEngineIsActive)
-        }
-        XCTAssertFalse(
-            try XCTUnwrap(ambientTransitionFrame)
-                .trainingGuidebotAmbientEngineIsActive,
-            "The released GBM_BIRTH branch returns on the transition frame."
-        )
-        ambientTimestamp += 0.1
-        let firstNormalAmbientFrame = releaseSimulation.update(
-            at: ambientTimestamp,
-            input: .zero
-        )
-        XCTAssertTrue(
-            firstNormalAmbientFrame.trainingGuidebotAmbientEngineIsActive
-        )
-        let ambientMix = try XCTUnwrap(
-            RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
-                frame: firstNormalAmbientFrame,
-                rooms: level.rooms
-            )
-        )
-        XCTAssertGreaterThanOrEqual(ambientMix.volumeScale, 0)
-        XCTAssertLessThanOrEqual(ambientMix.volumeScale, 1)
-        XCTAssertGreaterThanOrEqual(ambientMix.pan, -1)
-        XCTAssertLessThanOrEqual(ambientMix.pan, 1)
-        let listener = PlayerView(
-            playerID: 0,
-            objectHandle: 1,
-            roomSourceIndex: 1,
-            camera: .init(
-                position: .zero,
-                target: .init(x: 0, y: 0, z: 1),
-                up: .init(x: 0, y: 1, z: 0),
-                projection: .sourceDefault
-            ),
-            collisionRadius: 1
-        )
-        let sameRoom = LevelRoom(
-            sourceIndex: 1,
-            vertices: [],
-            faces: [],
-            portals: []
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(
-                RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
-                    sourcePosition: .init(x: 0, y: 0, z: 10),
-                    sourceRoomSourceIndex: 1,
-                    listener: listener,
-                    rooms: [sameRoom]
-                )
-            ).volumeScale,
-            1,
-            accuracy: 0.000_001
-        )
-        let rightMix = try XCTUnwrap(
-            RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
-                sourcePosition: .init(x: 55, y: 0, z: 0),
-                sourceRoomSourceIndex: 1,
-                listener: listener,
-                rooms: [sameRoom]
-            )
-        )
-        XCTAssertEqual(rightMix.volumeScale, 0.5, accuracy: 0.000_001)
-        XCTAssertEqual(rightMix.pan, 1, accuracy: 0.000_001)
-        XCTAssertEqual(
-            try XCTUnwrap(
-                RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
-                    sourcePosition: .init(x: -55, y: 0, z: 0),
-                    sourceRoomSourceIndex: 1,
-                    listener: listener,
-                    rooms: [sameRoom]
-                )
-            ).pan,
-            -1,
-            accuracy: 0.000_001
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(
-                RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
-                    sourcePosition: .init(x: 0, y: 0, z: 100),
-                    sourceRoomSourceIndex: 1,
-                    listener: listener,
-                    rooms: [sameRoom]
-                )
-            ).volumeScale,
-            0,
-            accuracy: 0.000_001
-        )
-        let sourcePortal = LevelPortal(
-            faceIndex: 0,
-            connectedRoom: 2,
-            connectedPortal: 0,
-            pathPoint: .init(x: 20, y: 0, z: 0)
-        )
-        let firstReciprocal = LevelPortal(
-            faceIndex: 0,
-            connectedRoom: 1,
-            connectedPortal: 0,
-            pathPoint: .init(x: 20, y: 0, z: 0)
-        )
-        let secondPortal = LevelPortal(
-            faceIndex: 1,
-            connectedRoom: 3,
-            connectedPortal: 0,
-            pathPoint: .init(x: 80, y: 0, z: 0)
-        )
-        let secondReciprocal = LevelPortal(
-            faceIndex: 0,
-            connectedRoom: 2,
-            connectedPortal: 1,
-            pathPoint: .init(x: 80, y: 0, z: 0)
-        )
-        let portalRooms = [
-            LevelRoom(
-                sourceIndex: 1,
-                vertices: [],
-                faces: [],
-                portals: [sourcePortal]
-            ),
-            LevelRoom(
-                sourceIndex: 2,
-                vertices: [],
-                faces: [],
-                portals: [firstReciprocal, secondPortal]
-            ),
-            LevelRoom(
-                sourceIndex: 3,
-                vertices: [],
-                faces: [],
-                portals: [secondReciprocal]
-            ),
-        ]
-        let portalListener = PlayerView(
-            playerID: listener.playerID,
-            objectHandle: listener.objectHandle,
-            roomSourceIndex: 3,
-            camera: listener.camera,
-            collisionRadius: listener.collisionRadius
-        )
-        let routedMix = try XCTUnwrap(
-            RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
-                sourcePosition: .zero,
-                sourceRoomSourceIndex: 1,
-                listener: portalListener,
-                rooms: portalRooms
-            )
-        )
-        XCTAssertEqual(routedMix.volumeScale, 0, accuracy: 0.000_001)
-        XCTAssertEqual(routedMix.pan, 1, accuracy: 0.000_001)
-        let shortSourcePortal = LevelPortal(
-            faceIndex: 0,
-            connectedRoom: 2,
-            connectedPortal: 0,
-            pathPoint: .init(x: 10, y: 0, z: 0)
-        )
-        let shortFirstReciprocal = LevelPortal(
-            faceIndex: 0,
-            connectedRoom: 1,
-            connectedPortal: 0,
-            pathPoint: .init(x: 10, y: 0, z: 0)
-        )
-        let shortSecondPortal = LevelPortal(
-            faceIndex: 1,
-            connectedRoom: 3,
-            connectedPortal: 0,
-            pathPoint: .init(x: 20, y: 0, z: 0)
-        )
-        let shortSecondReciprocal = LevelPortal(
-            faceIndex: 0,
-            connectedRoom: 2,
-            connectedPortal: 1,
-            pathPoint: .init(x: 20, y: 0, z: 0)
-        )
-        let doorMix = try XCTUnwrap(
-            RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
-                sourcePosition: .zero,
-                sourceRoomSourceIndex: 1,
-                listener: portalListener,
-                rooms: [
-                    LevelRoom(
-                        sourceIndex: 1,
-                        vertices: [],
-                        faces: [],
-                        portals: [shortSourcePortal]
-                    ),
-                    LevelRoom(
-                        sourceIndex: 2,
-                        vertices: [],
-                        faces: [],
-                        portals: [
-                            shortFirstReciprocal,
-                            shortSecondPortal,
-                        ],
-                        door: .init(
-                            flags: 0,
-                            keysNeeded: 0,
-                            definition: .init(
-                                storedIndex: 0,
-                                sourceName: "TestDoor"
-                            ),
-                            position: 0
-                        )
-                    ),
-                    LevelRoom(
-                        sourceIndex: 3,
-                        vertices: [],
-                        faces: [],
-                        portals: [shortSecondReciprocal]
-                    ),
-                ]
-            )
-        )
-        XCTAssertEqual(
-            doorMix.volumeScale,
-            Float(2) / 15,
-            accuracy: 0.000_001
-        )
-        XCTAssertEqual(doorMix.pan, 1, accuracy: 0.000_001)
-        let disconnectedListener = PlayerView(
-            playerID: listener.playerID,
-            objectHandle: listener.objectHandle,
-            roomSourceIndex: 4,
-            camera: listener.camera,
-            collisionRadius: listener.collisionRadius
-        )
-        XCTAssertNil(
-            RevivalGameplayView.trainingGuidebotAmbientEngineSpatialMix(
-                sourcePosition: .zero,
-                sourceRoomSourceIndex: 1,
-                listener: disconnectedListener,
-                rooms: [
-                    sameRoom,
-                    LevelRoom(
-                        sourceIndex: 4,
-                        vertices: [],
-                        faces: [],
-                        portals: []
-                    ),
-                ]
-            )
-        )
-        let ambientContinuationObject = try XCTUnwrap(
-            testWorldObject(releaseSimulation.world)
-        )
-        XCTAssertNil(ambientContinuationObject["guidebotAmbientEngineActive"])
-
-        let continuation = try decodeTestWorld(releasedContinuationObject)
-        let restored = try GameSession(
-            level: level,
-            world: continuation.rebased(onto: level),
-            resumedAtTimestamp: 200
-        )
-        let silent = restored.update(at: 200.1, input: .zero)
-        XCTAssertNotNil(silent.trainingGuidebot)
-        XCTAssertTrue(silent.trainingOpeningFeedback.isEmpty)
-
-        let ambientContinuation = try decodeTestWorld(ambientContinuationObject)
-        let restoredAmbient = try GameSession(
-            level: level,
-            world: ambientContinuation.rebased(onto: level),
-            resumedAtTimestamp: 250
-        )
-        let resumedAmbient = restoredAmbient.update(
-            at: 250.1,
-            input: .zero
-        )
-        XCTAssertTrue(
-            resumedAmbient.trainingGuidebotAmbientEngineIsActive
-        )
-        XCTAssertTrue(resumedAmbient.trainingOpeningFeedback.isEmpty)
-
-        var compatibleLevelObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(level)
-            ) as? [String: Any]
-        )
-        var compatibleChain = try XCTUnwrap(
-            compatibleLevelObject["trainingRobotGuidebotChain"]
-                as? [String: Any]
-        )
-        compatibleChain.removeValue(forKey: "releaseSoundSourceName")
-        compatibleChain.removeValue(
-            forKey: "ambientEngineSoundSourceName"
-        )
-        compatibleLevelObject["trainingRobotGuidebotChain"] = compatibleChain
-        compatibleLevelObject["soundClips"] = try XCTUnwrap(
-            compatibleLevelObject["soundClips"] as? [[String: Any]]
-        ).filter {
-            let sourceName = $0["sourceName"] as? String
-            return sourceName != "GBExpulsionA.wav"
-                && sourceName != "GBotEngineB.wav"
-        }
-        var compatibleManifest = try XCTUnwrap(
-            compatibleLevelObject["dependencyManifest"] as? [String: Any]
-        )
-        compatibleManifest["current"] = try XCTUnwrap(
-            compatibleManifest["current"] as? [[String: Any]]
-        ).filter { dependency in
-            guard dependency["category"] as? String == "sound",
-                  let source = dependency["source"] as? [String: Any]
-            else {
-                return true
-            }
-            let sourceName = source["sourceName"] as? String
-            return sourceName != "GBExpulsionA.wav"
-                && sourceName != "GBotEngineB.wav"
-        }
-        compatibleLevelObject["dependencyManifest"] = compatibleManifest
-        let compatibleLevel = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: compatibleLevelObject)
-        )
-        try compatibleLevel.validate()
-        let compatibleSimulation = try GameSession(
-            level: compatibleLevel,
-            world: (decodeTestWorld(releaseContinuationObject)).rebased(onto: compatibleLevel),
-            resumedAtTimestamp: 300
-        )
-        let compatibleRelease = compatibleSimulation.update(
-            at: 300.1,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-        XCTAssertNotNil(compatibleRelease.trainingGuidebot)
-        XCTAssertTrue(compatibleRelease.trainingOpeningFeedback.isEmpty)
-
-        var hostileLevelObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(level)
-            ) as? [String: Any]
-        )
-        hostileLevelObject["soundClips"] = try XCTUnwrap(
-            hostileLevelObject["soundClips"] as? [[String: Any]]
-        ).filter {
-            $0["sourceName"] as? String != "GBotEngineB.wav"
-        }
-        var hostileManifest = try XCTUnwrap(
-            hostileLevelObject["dependencyManifest"] as? [String: Any]
-        )
-        hostileManifest["current"] = try XCTUnwrap(
-            hostileManifest["current"] as? [[String: Any]]
-        ).filter { dependency in
-            guard dependency["category"] as? String == "sound",
-                  let source = dependency["source"] as? [String: Any]
-            else {
-                return true
-            }
-            return source["sourceName"] as? String != "GBotEngineB.wav"
-        }
-        hostileLevelObject["dependencyManifest"] = hostileManifest
-        let hostileLevel = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: hostileLevelObject)
-        )
-        XCTAssertThrowsError(try hostileLevel.validate()) {
-            XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .invalidDependency("Training robot Guidebot chain")
-            )
-        }
-    }
-    func testGuidebotReturnTracksLivePlayerMovementInSameFrame()
-        throws
-    {
-        let level = makeTrainingCameraMonitorLevel()
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        _ = simulation.update(
-            at: 0.1,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-        _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
-        _ = simulation.update(
-            at: 0.3,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-
-        let followingMovedPlayer = simulation.update(
-            at: 0.4,
-            input: .init(forward: 1)
-        )
-
-        XCTAssertEqual(
-            followingMovedPlayer.trainingGuidebot?.destination,
-            followingMovedPlayer.playerView.camera.position
-        )
-    }
-
-    func testGuidebotReturnReallocatesWhenLivePlayerChangesRooms()
-        throws
-    {
-        var level = makeTrainingCameraMonitorLevel()
-        let targetPosition = Vector3(
-            x: 10_000,
-            y: 10_000,
-            z: 10_000
-        )
-        let targetRoom = makeSourceContainmentRoom(
-            center: targetPosition,
-            texture: level.surfacePhysics[0].texture,
-            sourceIndex: 999,
-            halfExtent: 100
-        )
-        level.rooms.append(targetRoom)
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        _ = simulation.update(
-            at: 0.1,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-        _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
-        let requested = simulation.update(
-            at: 0.3,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-        let guidebot = try XCTUnwrap(requested.trainingGuidebot)
-        var continuationObject = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        var playerLocation = try XCTUnwrap(
-            continuationObject["playerLocation"] as? [String: Any]
-        )
-        playerLocation["room"] = ["_0": targetRoom.sourceIndex]
-        continuationObject["playerLocation"] = playerLocation
-        continuationObject["playerPosition"] = [
-            "x": targetPosition.x,
-            "y": targetPosition.y,
-            "z": targetPosition.z,
-        ]
-        let movedPlayerContinuation = try decodeTestWorld(continuationObject)
-        let restored = try GameSession(
-            level: level,
-            world: movedPlayerContinuation.rebased(onto: level),
-            resumedAtTimestamp: 100
-        )
-
-        let reallocated = restored.update(at: 100.1, input: .zero)
-
-        let reallocatedGuidebot = try XCTUnwrap(
-            reallocated.trainingGuidebot
-        )
-        let liveTarget = reallocated.playerView.camera.position
-        XCTAssertEqual(reallocatedGuidebot.destination, liveTarget)
-        if reallocatedGuidebot.routeFailure == nil {
-            XCTAssertEqual(
-                reallocatedGuidebot.route.roomSourceIndices.last,
-                targetRoom.sourceIndex
-            )
-        } else {
-            XCTAssertEqual(reallocatedGuidebot.route.mode, .direct)
-            XCTAssertEqual(
-                reallocatedGuidebot.route.points,
-                [liveTarget]
-            )
-            XCTAssertNotEqual(
-                reallocatedGuidebot.route,
-                guidebot.route
-            )
-        }
     }
 
     func testGuidebotCrossRoomReturnReachesScript058() throws {
@@ -1263,20 +406,7 @@ extension WorldRenderingTests {
                 rooms: []
             )
         )
-        let guidebotDefinition = try XCTUnwrap(
-            level.trainingRobotGuidebotChain?.guidebot
-        )
-        let allocated = try trainingGuidebotRoute(
-            in: level,
-            roomStates: RoomState.canonical(level),
-            startRoomSourceIndex: 3,
-            start: start,
-            startForward: .init(x: 1, y: 0, z: 0),
-            destinationRoomSourceIndex: 1,
-            destination: destination,
-            radius: max(0, guidebotDefinition.collisionRadius - 0.1)
-        ).get()
-        XCTAssertEqual(allocated.mode, .roomPortals)
+        level = withTrainingGuideBot(level)
         let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
@@ -1286,6 +416,15 @@ extension WorldRenderingTests {
             input: .init(deploysTrainingGuidebot: true)
         )
         _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
+        // The birth ends after 1.2 s (AIGame.cpp:5893), and the parent link
+        // that keeps the Guide-Bot from hitting the player ends 3 s after
+        // the birth (:6246).
+        var seedTime = 0.2
+        simulation.runFrames(32, from: &seedTime)
+        XCTAssertEqual(
+            simulation.world.boaRoomRoute(from: 3, to: 1, level: level),
+            [3, 2, 1]
+        )
 
         var continuationObject = try XCTUnwrap(
             testWorldObject(simulation.world)
@@ -1306,7 +445,7 @@ extension WorldRenderingTests {
         )
 
         var completed: PlayerSimulationFrame?
-        for frameIndex in 1...200 {
+        for frameIndex in 1...400 {
             let frame = restored.update(
                 at: 100 + Double(frameIndex) * 0.1,
                 input: frameIndex == 1
@@ -1314,20 +453,16 @@ extension WorldRenderingTests {
                     : .zero
             )
             if frameIndex == 1 {
-                XCTAssertEqual(
-                    frame.trainingGuidebot?.route.mode,
-                    .roomPortals
+                XCTAssertEqual(hudMessages([frame]), ["GB: Returning to ship."])
+            }
+            if frameIndex == 2 {
+                // The return goal paths through the portal rooms
+                // (AIPathAllocPath, aipath.cpp:977).
+                let path = try XCTUnwrap(
+                    restored.world.testGuideBotObject?.ai?.path
                 )
-                XCTAssertEqual(
-                    frame.trainingGuidebot?.route
-                        .roomSourceIndices.last,
-                    1
-                )
-                XCTAssertGreaterThan(
-                    frame.trainingGuidebot?.route
-                        .roomSourceIndices.count ?? 0,
-                    1
-                )
+                XCTAssertEqual(path.dynamicNodes.last?.roomSourceIndex, 1)
+                XCTAssertGreaterThan(path.dynamicNodes.count, 1)
             }
             if frame.trainingOpeningFeedback.contains(where: {
                 $0.voiceSourceName == "proceed6.osf"
@@ -1338,7 +473,10 @@ extension WorldRenderingTests {
         }
 
         let script058 = try XCTUnwrap(completed)
-        XCTAssertNil(script058.trainingGuidebot)
+        XCTAssertEqual(
+            restored.world.objectType(restored.world.buddyHandle),
+            .dummy
+        )
         XCTAssertEqual(
             script058.trainingGuidebotReturnMarkerLightDistance,
             50

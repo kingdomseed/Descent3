@@ -620,7 +620,11 @@ func resolveRetailSurfacePhysics(
         } else {
             behavior = .blocking
         }
-        return SurfacePhysicsEntry(texture: texture, behavior: behavior)
+        return SurfacePhysicsEntry(
+            texture: texture,
+            behavior: behavior,
+            textureFlags: page.flags
+        )
     }
 }
 

@@ -252,11 +252,13 @@ extension GameWorld {
 
     /// AIPathAllocPath (aipath.cpp:977): a dynamic path for goal
     /// `goalIndex` from the object's position to `endPosition` in
-    /// `endRoom`. When BOA finds no room route the path is freed and the
-    /// call fails. A clear straight line (the size probe, fq.rad =
-    /// size - 0.1) makes a path of the end point only; otherwise the route
-    /// of `boaRoute` (BOA.swift) leads to it. Returns whether a path was
-    /// made.
+    /// `endRoom`. When BOA_GetNextRoom finds no route the path is freed
+    /// and the call fails. A clear straight line (the size probe, fq.rad =
+    /// size - 0.1) makes a path of the end point only. Otherwise a route
+    /// too small for a robot, or a possibly blocked one with a locked door
+    /// or a closed portal, takes AIFindAltPath (with its draws); any other
+    /// takes `boaRoute` (BOA.swift), and the alternate path when that fails
+    /// (aipath.cpp:1022-1090). Returns whether a path was made.
     @discardableResult
     mutating func aiPathAllocPath(
         _ handle: ObjectHandle,
@@ -273,30 +275,94 @@ extension GameWorld {
         ai.path.free()
         ai.path.goalIndex = goalIndex
         ai.path.goalUniqueID = ai.goals[goalIndex].uniqueID
-        guard boaRoomRoute(from: startRoom, to: endRoom, level: level) != nil
-        else {
+        func fail() -> Bool {
             ai.path.free()
             object.ai = ai
             objects[handle] = object
             return false
         }
+        // BOA_GetNextRoom finds no route: no path.
+        guard boaGetNextRoom(startRoom, endRoom, level: level)
+                != level.effectiveBOATables.noPath
+        else {
+            return fail()
+        }
         let speed = sqrt(dot(object.velocity, object.velocity))
         let startForward = speed > 0
             ? object.velocity / speed
             : object.orientation.forward
-        guard let route = boaRoute(
-            startRoom: startRoom,
-            start: object.position,
-            startForward: startForward,
-            endRoom: endRoom,
-            end: endPosition,
-            radius: max(0.1, object.size - 0.1),
-            level: level
-        ) else {
-            ai.path.free()
-            object.ai = ai
-            objects[handle] = object
-            return false
+        let radius = max(0.1, object.size - 0.1)
+        var route: [AIPathNode]
+        if boaProbeIsClear(room: startRoom, start: object.position,
+                           end: endPosition, radius: radius, level: level) {
+            route = []
+        } else {
+            // f_make_alt (aipath.cpp:1035-1060): the route is too small
+            // for a robot, or it may be blocked and a door on it is locked
+            // or a portal on it is closed.
+            var makeAlternate =
+                boaTooSmallForRobot(startRoom, endRoom, level: level)
+            if !makeAlternate,
+               boaHasPossibleBlockage(startRoom, endRoom, level: level) {
+                let noPath = level.effectiveBOATables.noPath
+                var next = startRoom
+                var steps = 0
+                repeat {
+                    steps += 1
+                    if steps > level.rooms.count + 1 { break }
+                    if next != startRoom,
+                       boaLockedDoor(handle, room: next, level: level) {
+                        makeAlternate = true
+                        break
+                    }
+                    let last = next
+                    next = boaGetNextRoom(next, endRoom, level: level)
+                    if last != next, next != noPath,
+                       boaDetermineStartRoomPortal(last, next, level: level)
+                        == -1 {
+                        makeAlternate = true
+                        break
+                    }
+                } while next != startRoom && next != endRoom
+                    && next != noPath
+            }
+            var direct: [AIPathNode]? = nil
+            if !makeAlternate {
+                direct = boaRoute(
+                    startRoom: startRoom,
+                    start: object.position,
+                    startForward: startForward,
+                    endRoom: endRoom,
+                    end: endPosition,
+                    radius: radius,
+                    level: level
+                )
+            }
+            if let direct {
+                route = direct
+            } else {
+                // AIFindAltPath, with its draws, and the alternate route's
+                // nodes (architecture.md section 9).
+                objects[handle] = object
+                guard let alternate = aiFindAltPath(
+                    handle, from: startRoom, to: endRoom, level: level
+                ),
+                    let nodes = alternate.rooms.count > 1
+                        ? boaPortalNodes(alternate.rooms, level: level)
+                        : boaRoute(
+                            startRoom: startRoom,
+                            start: object.position,
+                            startForward: startForward,
+                            endRoom: endRoom,
+                            end: endPosition,
+                            radius: radius,
+                            level: level
+                        )
+                else {
+                    return fail()
+                }
+                route = nodes
+            }
         }
         // AIPathAddDPath, then AIPathAddDPathNode for each node and the end
         // point.

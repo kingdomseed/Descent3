@@ -2174,21 +2174,44 @@ func runD3Import(
     level = level.appendingSoundClips(addedSoundClips)
     // Package schema 12 (LevelScriptImport.swift). Archives in cfile search
     // order: the mission, then the base archives in reverse opening order.
+    let scriptArchives: [LevelScriptArchive] = [
+        (trainingFile, training, trainingArchive),
+        (extra13File, extra13, extra13Archive),
+        (mercFile, merc, mercArchive),
+        (extraFile, extra, extraArchive),
+        (d3File, d3, d3Archive),
+    ].map {
+        .init(relativePath: $0.0.relativePath, data: $0.1.data, archive: $0.2)
+    }
     level = level.addingScripting(try importLevelScripting(
         level: level,
         levelFileName: mission.mineSourceName,
-        archives: [
-            (trainingFile, training, trainingArchive),
-            (extra13File, extra13, extra13Archive),
-            (mercFile, merc, mercArchive),
-            (extraFile, extra, extraArchive),
-            (d3File, d3, d3Archive),
-        ].map {
-            .init(relativePath: $0.0.relativePath, data: $0.1.data, archive: $0.2)
-        },
+        archives: scriptArchives,
         table: tableData,
         overlay: overlayData
     ))
+    // The compiled game modules the bindings reach (GameModuleImport.swift):
+    // their string tables, sounds, weapons, and created object pages.
+    level = try level.addingGameModules(
+        archives: scriptArchives,
+        genericPages: genericPages,
+        soundPage: { name in
+            try resolveRetailSoundPage(
+                table: tableData,
+                overlay: overlayData,
+                named: name
+            )
+        },
+        soundClip: { try reachedSoundClip(named: $0) },
+        weapon: { name in
+            try resolveRetailWeaponPresentation(
+                table: tableData,
+                overlay: overlayData,
+                named: name
+            )
+        },
+        weaponModel: { modelSources[$0.lowercased()] }
+    )
     // The first frame renders the world after the level start scripts
     // (Script 000 hides the goal powerups, TrainingMission.cpp:1461-1495).
     let playerView = defaultPlayerView(in: level)

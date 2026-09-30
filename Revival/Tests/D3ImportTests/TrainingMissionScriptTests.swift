@@ -326,7 +326,13 @@ final class TrainingMissionScriptTests: XCTestCase {
         let portalRoom = try XCTUnwrap(
             session.level.rooms.firstIndex { $0.name == "PortalRoom1" }
         )
-        XCTAssertEqual(session.world.rooms[portalRoom].portalFlags, [1, 1])
+        // MakeBOA marks this synthetic level's portals PF_TOO_SMALL_FOR_ROBOT
+        // (find_small_portals, BOA.cpp:1943); the check is on the others.
+        let smallFlag: UInt32 = 4
+        XCTAssertEqual(
+            session.world.rooms[portalRoom].portalFlags.map { $0 & ~smallFlag },
+            [1, 1]
+        )
         var timestamp = 1.1
         for (index, step) in steps.enumerated() {
             timestamp += 0.1
@@ -348,7 +354,10 @@ final class TrainingMissionScriptTests: XCTestCase {
         )
         // aPortalRenderSet(0, 0|1, Room_indexes[0], 1) clears
         // PF_RENDER_FACES on both sides (multisafe.cpp:1447).
-        XCTAssertEqual(session.world.rooms[portalRoom].portalFlags, [0, 0])
+        XCTAssertEqual(
+            session.world.rooms[portalRoom].portalFlags.map { $0 & ~smallFlag },
+            [0, 0]
+        )
         for portal in session.level.rooms[portalRoom].portals {
             let connected = try XCTUnwrap(session.level.rooms.firstIndex {
                 $0.sourceIndex == portal.connectedRoom

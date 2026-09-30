@@ -11,6 +11,10 @@
 		5E6300000000000000000001 /* GenericPageImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E63000000000000000000F0 /* GenericPageImportTests.swift */; };
 		5E6200000000000000000001 /* ObjectFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E62000000000000000000F0 /* ObjectFrameTests.swift */; };
 		4FAADC5C5B9E3D485F7203DB /* AIGoalPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16722C836F6149118106C212 /* AIGoalPathTests.swift */; };
+		C9C9C85F72E6203EFF4D2E29 /* GuideBotEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8A6F8C3DD74DB6C7C1FF5A /* GuideBotEngineTests.swift */; };
+		8E11FDA916308E5D87FDE173 /* StringTableImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */; };
+		C92AD00AAA0B4B237E1B1B17 /* GuideBotScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */; };
+		01D46C5909D21CDAD71F06D4 /* GuideBotFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */; };
 		5E6100000000000000000001 /* TrainingDodgeManeuverScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */; };
 		7A1300000000000000000001 /* OsirisTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A13000000000000000000F0 /* OsirisTests.swift */; };
 		7B1500000000000000000001 /* ObjectTableFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B15000000000000000000F0 /* ObjectTableFixtures.swift */; };
@@ -26,6 +30,11 @@
 		7B0800000000000000000001 /* AIPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B08000000000000000000F0 /* AIPath.swift */; };
 		7B0700000000000000000001 /* AIGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B07000000000000000000F0 /* AIGoal.swift */; };
 		67819DF05E7A6A51C297084A /* BOA.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A835DADEC12872A69375050 /* BOA.swift */; };
+		67A0E3FCE6FD0022DADEFD09 /* BOATables.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368EDB75B735F1E7B14640C2 /* BOATables.swift */; };
+		E96E0C734CC5E618E49A5086 /* FixMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346BF267F8445A942F17C6BC /* FixMath.swift */; };
+		70B84B4DA44BF3C37D3744D7 /* BOATables+Make.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */; };
+		277E4B14EC977227B119FD5B /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
+		BC4086E23B0AF6269CB4646A /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000001 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000001 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
 		5FC0E2061438EFDD3367FF8D /* WeaponFire+Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC2CC211D628E452AD439E8 /* WeaponFire+Player.swift */; };
@@ -45,6 +54,11 @@
 		7B0800000000000000000002 /* AIPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B08000000000000000000F0 /* AIPath.swift */; };
 		7B0700000000000000000002 /* AIGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B07000000000000000000F0 /* AIGoal.swift */; };
 		05219B2765FBB648CDB12AAE /* BOA.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A835DADEC12872A69375050 /* BOA.swift */; };
+		B8F36A835F4176A5E39A7699 /* BOATables.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368EDB75B735F1E7B14640C2 /* BOATables.swift */; };
+		257E390305E26D4D79A6DDF7 /* FixMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346BF267F8445A942F17C6BC /* FixMath.swift */; };
+		3F3E520CEFAE7F982DB81D26 /* BOATables+Make.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */; };
+		F9EDBFA52B0F45AF122669A2 /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
+		1A0686866FB1A49F2173FEA0 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000002 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000002 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
 		BF2A2286057BC408D564081C /* WeaponFire+Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC2CC211D628E452AD439E8 /* WeaponFire+Player.swift */; };
@@ -64,6 +78,11 @@
 		7B0800000000000000000003 /* AIPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B08000000000000000000F0 /* AIPath.swift */; };
 		7B0700000000000000000003 /* AIGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B07000000000000000000F0 /* AIGoal.swift */; };
 		D5EA7B817633298ECACBE32B /* BOA.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A835DADEC12872A69375050 /* BOA.swift */; };
+		541DA0077DEA3EFA86F6F963 /* BOATables.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368EDB75B735F1E7B14640C2 /* BOATables.swift */; };
+		2A6A0D130F2F78848D0712E1 /* FixMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346BF267F8445A942F17C6BC /* FixMath.swift */; };
+		41ED3F9F93D7C709DC8B6B30 /* BOATables+Make.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */; };
+		EE1A006B94A9BEAC16C971EE /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
+		F80F28AAF958FB3C031517B3 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000003 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000003 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
 		C808163606DE017C93E994D3 /* WeaponFire+Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC2CC211D628E452AD439E8 /* WeaponFire+Player.swift */; };
@@ -83,6 +102,11 @@
 		7B0800000000000000000004 /* AIPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B08000000000000000000F0 /* AIPath.swift */; };
 		7B0700000000000000000004 /* AIGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B07000000000000000000F0 /* AIGoal.swift */; };
 		0D261E598B7BA2F286735FC3 /* BOA.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A835DADEC12872A69375050 /* BOA.swift */; };
+		AC6A7E4DFB675E4EE31B0B34 /* BOATables.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368EDB75B735F1E7B14640C2 /* BOATables.swift */; };
+		BDFDB5836D58A3D2D05CF639 /* FixMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346BF267F8445A942F17C6BC /* FixMath.swift */; };
+		DFD918E3CF700354E30FDF18 /* BOATables+Make.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */; };
+		F9F9682215DFE5A1E694FA4D /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
+		24782A6620743FCEDFF1E740 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000004 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000004 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
 		FA06818213395DE0DD48F8C8 /* WeaponFire+Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC2CC211D628E452AD439E8 /* WeaponFire+Player.swift */; };
@@ -102,6 +126,11 @@
 		7B0800000000000000000005 /* AIPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B08000000000000000000F0 /* AIPath.swift */; };
 		7B0700000000000000000005 /* AIGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B07000000000000000000F0 /* AIGoal.swift */; };
 		8285D980204A37EDA3DA6BC6 /* BOA.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A835DADEC12872A69375050 /* BOA.swift */; };
+		A7A233EAA741260A7CDAABDC /* BOATables.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368EDB75B735F1E7B14640C2 /* BOATables.swift */; };
+		A926C151B88A4DF317CC3AD6 /* FixMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346BF267F8445A942F17C6BC /* FixMath.swift */; };
+		2CEAB4848E7E63FFEFB9D296 /* BOATables+Make.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */; };
+		4A337FCE55F9DB14F7C12D40 /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
+		87D8923A66AEB76E9E3B7EA8 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000005 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000005 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
 		8C32180EABE4E532476F43CC /* WeaponFire+Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC2CC211D628E452AD439E8 /* WeaponFire+Player.swift */; };
@@ -170,13 +199,42 @@
 		7A0A00000000000000000002 /* TrainingMission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0A000000000000000000F0 /* TrainingMission.swift */; };
 		7A0A00000000000000000001 /* TrainingMission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0A000000000000000000F0 /* TrainingMission.swift */; };
 		7A0900000000000000000005 /* LevelModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09000000000000000000F0 /* LevelModule.swift */; };
+		412967AFA0961A5D6274986C /* OsirisPredefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE699562117C75CD48C00417 /* OsirisPredefs.swift */; };
+		C46B431E6F962C496D602B85 /* AIGame+GBPowerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A148F643B57957349918A026 /* AIGame+GBPowerup.swift */; };
+		9075A774E3B05096B03C149C /* AIGame+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */; };
+		E222AE502EAA48D7B79C3B36 /* AIGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B79283ACE3056A69CEA5AF0 /* AIGame.swift */; };
+		8B0EF5A72B550E66A7376B72 /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0900000000000000000004 /* LevelModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09000000000000000000F0 /* LevelModule.swift */; };
+		242120FF97188232EF032EE6 /* OsirisPredefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE699562117C75CD48C00417 /* OsirisPredefs.swift */; };
+		CC31395EB7F994D29F9ADED6 /* AIGame+GBPowerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A148F643B57957349918A026 /* AIGame+GBPowerup.swift */; };
+		3B0E7BA306232E2CC1163FB7 /* AIGame+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */; };
+		973C228477D3B96129FA7C7A /* AIGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B79283ACE3056A69CEA5AF0 /* AIGame.swift */; };
+		3F060492A182DCCB6B37F0DF /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0900000000000000000003 /* LevelModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09000000000000000000F0 /* LevelModule.swift */; };
+		976ED317393306E77A51C991 /* OsirisPredefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE699562117C75CD48C00417 /* OsirisPredefs.swift */; };
+		A94BA0A9B9CC632434CC19B2 /* AIGame+GBPowerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A148F643B57957349918A026 /* AIGame+GBPowerup.swift */; };
+		A5440AF8FBE88508F605CD8A /* AIGame+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */; };
+		4F5C2E24454CF82A4DD50987 /* AIGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B79283ACE3056A69CEA5AF0 /* AIGame.swift */; };
+		521934572A000AC6D5DDD818 /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0900000000000000000002 /* LevelModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09000000000000000000F0 /* LevelModule.swift */; };
+		22FC7689741B7B36EFE5B299 /* OsirisPredefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE699562117C75CD48C00417 /* OsirisPredefs.swift */; };
+		B815FE59BD4FEB29E2B9C340 /* AIGame+GBPowerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A148F643B57957349918A026 /* AIGame+GBPowerup.swift */; };
+		179EEB4A4C9FFC5057935DF1 /* AIGame+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */; };
+		59BBC8C098A61FA44B630106 /* AIGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B79283ACE3056A69CEA5AF0 /* AIGame.swift */; };
+		7F12FFB98AC34E3B9E04284E /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0900000000000000000001 /* LevelModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09000000000000000000F0 /* LevelModule.swift */; };
+		89D67506D812C45FDAA22386 /* OsirisPredefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE699562117C75CD48C00417 /* OsirisPredefs.swift */; };
+		3F9D1B2549A1890728544CB6 /* AIGame+GBPowerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A148F643B57957349918A026 /* AIGame+GBPowerup.swift */; };
+		60B21874B03E064AA548758C /* AIGame+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */; };
+		8BD6DFDD8387B4159870AC55 /* AIGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B79283ACE3056A69CEA5AF0 /* AIGame.swift */; };
+		CCB7844466FF45C894A13826 /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0700000000000000000002 /* LevelScriptImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A07000000000000000000F0 /* LevelScriptImport.swift */; };
+		57E59D7F305BF23842DBBFAE /* GameModuleImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */; };
+		178E0A29105B54E9E2F53A02 /* StringTableImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */; };
 		7B1400000000000000000001 /* GenericPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B14000000000000000000F0 /* GenericPage.swift */; };
 		7A0700000000000000000001 /* LevelScriptImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A07000000000000000000F0 /* LevelScriptImport.swift */; };
+		DFE07CD4F288FB838FD3AC2E /* GameModuleImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */; };
+		832676DCE450A4DD63378622 /* StringTableImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */; };
 		7B1400000000000000000002 /* GenericPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B14000000000000000000F0 /* GenericPage.swift */; };
 		7A0600000000000000000005 /* LevelScripting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A06000000000000000000F0 /* LevelScripting.swift */; };
 		7A0600000000000000000004 /* LevelScripting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A06000000000000000000F0 /* LevelScripting.swift */; };
@@ -395,6 +453,10 @@
 		5E63000000000000000000F0 /* GenericPageImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenericPageImportTests.swift; sourceTree = "<group>"; };
 		5E62000000000000000000F0 /* ObjectFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectFrameTests.swift; sourceTree = "<group>"; };
 		16722C836F6149118106C212 /* AIGoalPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIGoalPathTests.swift; sourceTree = "<group>"; };
+		3B8A6F8C3DD74DB6C7C1FF5A /* GuideBotEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotEngineTests.swift; sourceTree = "<group>"; };
+		51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringTableImportTests.swift; sourceTree = "<group>"; };
+		A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotScriptTests.swift; sourceTree = "<group>"; };
+		F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotFixtures.swift; sourceTree = "<group>"; };
 		5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDodgeManeuverScriptTests.swift; sourceTree = "<group>"; };
 		7A13000000000000000000F0 /* OsirisTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsirisTests.swift; sourceTree = "<group>"; };
 		7B15000000000000000000F0 /* ObjectTableFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectTableFixtures.swift; sourceTree = "<group>"; };
@@ -410,6 +472,11 @@
 		7B08000000000000000000F0 /* AIPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIPath.swift; sourceTree = "<group>"; };
 		7B07000000000000000000F0 /* AIGoal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIGoal.swift; sourceTree = "<group>"; };
 		6A835DADEC12872A69375050 /* BOA.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BOA.swift; sourceTree = "<group>"; };
+		368EDB75B735F1E7B14640C2 /* BOATables.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BOATables.swift; sourceTree = "<group>"; };
+		346BF267F8445A942F17C6BC /* FixMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixMath.swift; sourceTree = "<group>"; };
+		C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BOATables+Make.swift"; sourceTree = "<group>"; };
+		655B4F47EF50402AFB79757C /* Inventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Inventory.swift; sourceTree = "<group>"; };
+		EBB55F716A78C2203311F4FA /* SoundSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundSystem.swift; sourceTree = "<group>"; };
 		7B06000000000000000000F0 /* Damage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Damage.swift; sourceTree = "<group>"; };
 		7B05000000000000000000F0 /* WeaponFire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeaponFire.swift; sourceTree = "<group>"; };
 		DFC2CC211D628E452AD439E8 /* WeaponFire+Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeaponFire+Player.swift"; sourceTree = "<group>"; };
@@ -434,7 +501,14 @@
 		7A0B000000000000000000F0 /* OsirisLoadandBind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsirisLoadandBind.swift; sourceTree = "<group>"; };
 		7A0A000000000000000000F0 /* TrainingMission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingMission.swift; sourceTree = "<group>"; };
 		7A09000000000000000000F0 /* LevelModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelModule.swift; sourceTree = "<group>"; };
+		CE699562117C75CD48C00417 /* OsirisPredefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsirisPredefs.swift; sourceTree = "<group>"; };
+		A148F643B57957349918A026 /* AIGame+GBPowerup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIGame+GBPowerup.swift"; sourceTree = "<group>"; };
+		A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIGame+GuideBot.swift"; sourceTree = "<group>"; };
+		6B79283ACE3056A69CEA5AF0 /* AIGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIGame.swift; sourceTree = "<group>"; };
+		3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultScript.swift; sourceTree = "<group>"; };
 		7A07000000000000000000F0 /* LevelScriptImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScriptImport.swift; sourceTree = "<group>"; };
+		6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameModuleImport.swift; sourceTree = "<group>"; };
+		D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringTableImport.swift; sourceTree = "<group>"; };
 		7B14000000000000000000F0 /* GenericPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenericPage.swift; sourceTree = "<group>"; };
 		7A06000000000000000000F0 /* LevelScripting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScripting.swift; sourceTree = "<group>"; };
 		7A05000000000000000000F0 /* LevelScriptImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScriptImportTests.swift; sourceTree = "<group>"; };
@@ -577,6 +651,11 @@
 			isa = PBXGroup;
 			children = (
 				7A09000000000000000000F0 /* LevelModule.swift */,
+				CE699562117C75CD48C00417 /* OsirisPredefs.swift */,
+				A148F643B57957349918A026 /* AIGame+GBPowerup.swift */,
+				A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */,
+				6B79283ACE3056A69CEA5AF0 /* AIGame.swift */,
+				3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */,
 				7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */,
 				7B13000000000000000000F0 /* DallasFuncs+AI.swift */,
 				7B12000000000000000000F0 /* OsirisVector.swift */,
@@ -636,6 +715,8 @@
 			isa = PBXGroup;
 			children = (
 				7A07000000000000000000F0 /* LevelScriptImport.swift */,
+				6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */,
+				D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */,
 				7B14000000000000000000F0 /* GenericPage.swift */,
 				B2000000000000000000000B /* D3ImportOperation.swift */,
 				C20000000000000000000001 /* PresentationImport.swift */,
@@ -680,6 +761,11 @@
 				7B08000000000000000000F0 /* AIPath.swift */,
 				7B07000000000000000000F0 /* AIGoal.swift */,
 				6A835DADEC12872A69375050 /* BOA.swift */,
+				368EDB75B735F1E7B14640C2 /* BOATables.swift */,
+				346BF267F8445A942F17C6BC /* FixMath.swift */,
+				C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */,
+				655B4F47EF50402AFB79757C /* Inventory.swift */,
+				EBB55F716A78C2203311F4FA /* SoundSystem.swift */,
 				7B06000000000000000000F0 /* Damage.swift */,
 				7B05000000000000000000F0 /* WeaponFire.swift */,
 				DFC2CC211D628E452AD439E8 /* WeaponFire+Player.swift */,
@@ -771,6 +857,10 @@
 				5E63000000000000000000F0 /* GenericPageImportTests.swift */,
 				5E62000000000000000000F0 /* ObjectFrameTests.swift */,
 				16722C836F6149118106C212 /* AIGoalPathTests.swift */,
+				3B8A6F8C3DD74DB6C7C1FF5A /* GuideBotEngineTests.swift */,
+				51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */,
+				A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */,
+				F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */,
 				5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */,
 				7A13000000000000000000F0 /* OsirisTests.swift */,
 				7B15000000000000000000F0 /* ObjectTableFixtures.swift */,
@@ -1010,7 +1100,14 @@
 			files = (
 				7A0A00000000000000000001 /* TrainingMission.swift in Sources */,
 				7A0900000000000000000001 /* LevelModule.swift in Sources */,
+				89D67506D812C45FDAA22386 /* OsirisPredefs.swift in Sources */,
+				3F9D1B2549A1890728544CB6 /* AIGame+GBPowerup.swift in Sources */,
+				60B21874B03E064AA548758C /* AIGame+GuideBot.swift in Sources */,
+				8BD6DFDD8387B4159870AC55 /* AIGame.swift in Sources */,
+				CCB7844466FF45C894A13826 /* DefaultScript.swift in Sources */,
 				7A0700000000000000000001 /* LevelScriptImport.swift in Sources */,
+				DFE07CD4F288FB838FD3AC2E /* GameModuleImport.swift in Sources */,
+				832676DCE450A4DD63378622 /* StringTableImport.swift in Sources */,
 				7B1400000000000000000002 /* GenericPage.swift in Sources */,
 				7A0600000000000000000001 /* LevelScripting.swift in Sources */,
 				7A1100000000000000000001 /* AIMain.swift in Sources */,
@@ -1020,6 +1117,11 @@
 				7B0800000000000000000005 /* AIPath.swift in Sources */,
 				7B0700000000000000000005 /* AIGoal.swift in Sources */,
 				8285D980204A37EDA3DA6BC6 /* BOA.swift in Sources */,
+				A7A233EAA741260A7CDAABDC /* BOATables.swift in Sources */,
+				A926C151B88A4DF317CC3AD6 /* FixMath.swift in Sources */,
+				2CEAB4848E7E63FFEFB9D296 /* BOATables+Make.swift in Sources */,
+				4A337FCE55F9DB14F7C12D40 /* Inventory.swift in Sources */,
+				87D8923A66AEB76E9E3B7EA8 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000005 /* Damage.swift in Sources */,
 				7B0500000000000000000005 /* WeaponFire.swift in Sources */,
 				8C32180EABE4E532476F43CC /* WeaponFire+Player.swift in Sources */,
@@ -1084,6 +1186,11 @@
 			files = (
 				7A0A00000000000000000002 /* TrainingMission.swift in Sources */,
 				7A0900000000000000000002 /* LevelModule.swift in Sources */,
+				22FC7689741B7B36EFE5B299 /* OsirisPredefs.swift in Sources */,
+				B815FE59BD4FEB29E2B9C340 /* AIGame+GBPowerup.swift in Sources */,
+				179EEB4A4C9FFC5057935DF1 /* AIGame+GuideBot.swift in Sources */,
+				59BBC8C098A61FA44B630106 /* AIGame.swift in Sources */,
+				7F12FFB98AC34E3B9E04284E /* DefaultScript.swift in Sources */,
 				7A0600000000000000000002 /* LevelScripting.swift in Sources */,
 				7A1100000000000000000002 /* AIMain.swift in Sources */,
 				7B1100000000000000000004 /* Object+Frame.swift in Sources */,
@@ -1092,6 +1199,11 @@
 				7B0800000000000000000004 /* AIPath.swift in Sources */,
 				7B0700000000000000000004 /* AIGoal.swift in Sources */,
 				0D261E598B7BA2F286735FC3 /* BOA.swift in Sources */,
+				AC6A7E4DFB675E4EE31B0B34 /* BOATables.swift in Sources */,
+				BDFDB5836D58A3D2D05CF639 /* FixMath.swift in Sources */,
+				DFD918E3CF700354E30FDF18 /* BOATables+Make.swift in Sources */,
+				F9F9682215DFE5A1E694FA4D /* Inventory.swift in Sources */,
+				24782A6620743FCEDFF1E740 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000004 /* Damage.swift in Sources */,
 				7B0500000000000000000004 /* WeaponFire.swift in Sources */,
 				FA06818213395DE0DD48F8C8 /* WeaponFire+Player.swift in Sources */,
@@ -1154,6 +1266,11 @@
 			files = (
 				7A0A00000000000000000003 /* TrainingMission.swift in Sources */,
 				7A0900000000000000000003 /* LevelModule.swift in Sources */,
+				976ED317393306E77A51C991 /* OsirisPredefs.swift in Sources */,
+				A94BA0A9B9CC632434CC19B2 /* AIGame+GBPowerup.swift in Sources */,
+				A5440AF8FBE88508F605CD8A /* AIGame+GuideBot.swift in Sources */,
+				4F5C2E24454CF82A4DD50987 /* AIGame.swift in Sources */,
+				521934572A000AC6D5DDD818 /* DefaultScript.swift in Sources */,
 				7A0600000000000000000003 /* LevelScripting.swift in Sources */,
 				7A1100000000000000000003 /* AIMain.swift in Sources */,
 				7B1100000000000000000003 /* Object+Frame.swift in Sources */,
@@ -1162,6 +1279,11 @@
 				7B0800000000000000000003 /* AIPath.swift in Sources */,
 				7B0700000000000000000003 /* AIGoal.swift in Sources */,
 				D5EA7B817633298ECACBE32B /* BOA.swift in Sources */,
+				541DA0077DEA3EFA86F6F963 /* BOATables.swift in Sources */,
+				2A6A0D130F2F78848D0712E1 /* FixMath.swift in Sources */,
+				41ED3F9F93D7C709DC8B6B30 /* BOATables+Make.swift in Sources */,
+				EE1A006B94A9BEAC16C971EE /* Inventory.swift in Sources */,
+				F80F28AAF958FB3C031517B3 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000003 /* Damage.swift in Sources */,
 				7B0500000000000000000003 /* WeaponFire.swift in Sources */,
 				C808163606DE017C93E994D3 /* WeaponFire+Player.swift in Sources */,
@@ -1226,7 +1348,14 @@
 			files = (
 				7A0A00000000000000000004 /* TrainingMission.swift in Sources */,
 				7A0900000000000000000004 /* LevelModule.swift in Sources */,
+				242120FF97188232EF032EE6 /* OsirisPredefs.swift in Sources */,
+				CC31395EB7F994D29F9ADED6 /* AIGame+GBPowerup.swift in Sources */,
+				3B0E7BA306232E2CC1163FB7 /* AIGame+GuideBot.swift in Sources */,
+				973C228477D3B96129FA7C7A /* AIGame.swift in Sources */,
+				3F060492A182DCCB6B37F0DF /* DefaultScript.swift in Sources */,
 				7A0700000000000000000002 /* LevelScriptImport.swift in Sources */,
+				57E59D7F305BF23842DBBFAE /* GameModuleImport.swift in Sources */,
+				178E0A29105B54E9E2F53A02 /* StringTableImport.swift in Sources */,
 				7B1400000000000000000001 /* GenericPage.swift in Sources */,
 				7A0600000000000000000004 /* LevelScripting.swift in Sources */,
 				7A1100000000000000000004 /* AIMain.swift in Sources */,
@@ -1236,6 +1365,11 @@
 				7B0800000000000000000002 /* AIPath.swift in Sources */,
 				7B0700000000000000000002 /* AIGoal.swift in Sources */,
 				05219B2765FBB648CDB12AAE /* BOA.swift in Sources */,
+				B8F36A835F4176A5E39A7699 /* BOATables.swift in Sources */,
+				257E390305E26D4D79A6DDF7 /* FixMath.swift in Sources */,
+				3F3E520CEFAE7F982DB81D26 /* BOATables+Make.swift in Sources */,
+				F9EDBFA52B0F45AF122669A2 /* Inventory.swift in Sources */,
+				1A0686866FB1A49F2173FEA0 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000002 /* Damage.swift in Sources */,
 				7B0500000000000000000002 /* WeaponFire.swift in Sources */,
 				BF2A2286057BC408D564081C /* WeaponFire+Player.swift in Sources */,
@@ -1265,6 +1399,10 @@
 				5E6300000000000000000001 /* GenericPageImportTests.swift in Sources */,
 				5E6200000000000000000001 /* ObjectFrameTests.swift in Sources */,
 				4FAADC5C5B9E3D485F7203DB /* AIGoalPathTests.swift in Sources */,
+				C9C9C85F72E6203EFF4D2E29 /* GuideBotEngineTests.swift in Sources */,
+				8E11FDA916308E5D87FDE173 /* StringTableImportTests.swift in Sources */,
+				C92AD00AAA0B4B237E1B1B17 /* GuideBotScriptTests.swift in Sources */,
+				01D46C5909D21CDAD71F06D4 /* GuideBotFixtures.swift in Sources */,
 				5E6100000000000000000001 /* TrainingDodgeManeuverScriptTests.swift in Sources */,
 				7A1300000000000000000001 /* OsirisTests.swift in Sources */,
 				7B1500000000000000000001 /* ObjectTableFixtures.swift in Sources */,
@@ -1355,6 +1493,11 @@
 			files = (
 				7A0A00000000000000000005 /* TrainingMission.swift in Sources */,
 				7A0900000000000000000005 /* LevelModule.swift in Sources */,
+				412967AFA0961A5D6274986C /* OsirisPredefs.swift in Sources */,
+				C46B431E6F962C496D602B85 /* AIGame+GBPowerup.swift in Sources */,
+				9075A774E3B05096B03C149C /* AIGame+GuideBot.swift in Sources */,
+				E222AE502EAA48D7B79C3B36 /* AIGame.swift in Sources */,
+				8B0EF5A72B550E66A7376B72 /* DefaultScript.swift in Sources */,
 				7A0600000000000000000005 /* LevelScripting.swift in Sources */,
 				7A1100000000000000000005 /* AIMain.swift in Sources */,
 				7B1100000000000000000001 /* Object+Frame.swift in Sources */,
@@ -1363,6 +1506,11 @@
 				7B0800000000000000000001 /* AIPath.swift in Sources */,
 				7B0700000000000000000001 /* AIGoal.swift in Sources */,
 				67819DF05E7A6A51C297084A /* BOA.swift in Sources */,
+				67A0E3FCE6FD0022DADEFD09 /* BOATables.swift in Sources */,
+				E96E0C734CC5E618E49A5086 /* FixMath.swift in Sources */,
+				70B84B4DA44BF3C37D3744D7 /* BOATables+Make.swift in Sources */,
+				277E4B14EC977227B119FD5B /* Inventory.swift in Sources */,
+				BC4086E23B0AF6269CB4646A /* SoundSystem.swift in Sources */,
 				7B0600000000000000000001 /* Damage.swift in Sources */,
 				7B0500000000000000000001 /* WeaponFire.swift in Sources */,
 				5FC0E2061438EFDD3367FF8D /* WeaponFire+Player.swift in Sources */,

@@ -41,6 +41,14 @@ func collisionResult(_ a: ObjectType, _ b: ObjectType) -> CollisionCheck {
     switch (a, b) {
     case (.player, .powerup), (.powerup, .player):
         .sphereSphere   // collide.cpp:2624
+    case (.robot, .player):
+        // ENABLE_COLLISION_POLY_SPHERE(OBJ_ROBOT, OBJ_PLAYER),
+        // collide.cpp:2619: a robot's move against the player.
+        .polySphere
+    case (.player, .robot):
+        // Its mirror (the macro sets both, collide.cpp:2549): the player's
+        // move against a robot's model. The bump response arrives in M2.
+        .spherePoly
     case (.player, .weapon), (.robot, .weapon), (.clutter, .weapon),
          (.building, .weapon):
         // ENABLE_COLLISION_POLY_SPHERE(OBJ_PLAYER/OBJ_ROBOT, OBJ_WEAPON),
@@ -222,6 +230,8 @@ extension GameWorld {
         var nearest: (handle: ObjectHandle, distance: Float)?
         for object in objects where object.handle != mover {
             guard !ignored.contains(object.handle),
+                  // fvi skips related objects (findintersection.cpp:3364).
+                  !objectsAreRelated(moving, object),
                   object.flags & GameObject.noObjectCollisionsFlag == 0,
                   object.flags & GameObject.deadFlag == 0,
                   case let .room(room) = object.location,

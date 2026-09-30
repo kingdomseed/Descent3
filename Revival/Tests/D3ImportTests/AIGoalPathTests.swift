@@ -146,18 +146,23 @@ final class AIGoalPathTests: XCTestCase {
         )
     }
 
-    /// BOA_GetNextRoom over the reciprocal portals: a route across rooms
-    /// passes each portal's path point (architecture.md section 9).
+    /// BOA_GetNextRoom over the tables MakeBOA makes for a level without
+    /// stored ones: a route across an open portal (not rendered, or
+    /// rendered fly-through; BOA.cpp:259) passes each portal's path point
+    /// (architecture.md section 9).
     func testBOARouteCrossesPortalPathPoints() throws {
         let level = makeTrainingManeuverFollowLevel()
         let world = GameSession(level: level, presentationReadyTimestamp: 0)
             .world
+        func isOpen(_ portal: LevelPortal) -> Bool {
+            (portal.flags & 1 == 0 || portal.flags & 2 != 0)
+                && portal.flags & 32 == 0
+                && level.rooms.contains { $0.sourceIndex == portal.connectedRoom }
+        }
         let room = try XCTUnwrap(level.rooms.first {
-            $0.portals.contains { portal in
-                level.rooms.contains { $0.sourceIndex == portal.connectedRoom }
-            }
+            $0.portals.contains(where: isOpen)
         })
-        let portal = try XCTUnwrap(room.portals.first)
+        let portal = try XCTUnwrap(room.portals.first(where: isOpen))
         let rooms = try XCTUnwrap(world.boaRoomRoute(
             from: room.sourceIndex, to: portal.connectedRoom, level: level
         ))

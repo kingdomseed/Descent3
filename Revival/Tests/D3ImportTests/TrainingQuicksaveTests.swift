@@ -9,7 +9,7 @@ final class TrainingQuicksaveTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let profileID = UUID()
         let package = makePackageReference()
-        let level = makeTrainingRASBot1DeathLevel()
+        let level = withTrainingGuideBot(makeTrainingRASBot1DeathLevel())
         try level.validate()
         let original = GameSession(
             level: level,

@@ -223,8 +223,10 @@ extension GameWorld {
             try sweep.visit(child.value, label: child.label ?? "")
         }
         try validateStateDefinitions(level: level)
-        try validateScriptState(level: level)
+        // The object_info and weapon indices are checked before the script
+        // bindings resolve pages through them.
         try validateObjectRuntimeState(level: level)
+        try validateScriptState(level: level)
         try validateIndicesAndCapacities(level: level)
         try validateNumericDomains(level: level)
     }
@@ -280,6 +282,10 @@ extension GameWorld {
         }
         try require(presentationRequests.isEmpty, "presentationRequests")
         try require(
+            trainingGuidebotFlareShots.isEmpty,
+            "trainingGuidebotFlareShots"
+        )
+        try require(
             levelModule.isValidSavedState(
                 forLoaded: LevelModule.load(level: level)
             ),
@@ -312,9 +318,19 @@ extension GameWorld {
                     && object.dummyType != .dummy,
                 "object \(object.handle.slot) dummyType"
             )
-            // Bound scripts are exactly the ones the level module gives.
+            // A default script's state is finite and in range.
+            if let defaultScript = object.scripts?.defaultScript {
+                try NestedStateSweep(roomSourceIndices: Set(
+                    level.rooms.map(\.sourceIndex)
+                )).visit(defaultScript, label: "defaultScript")
+            }
+            // Bound scripts are exactly the ones the modules give.
             try require(
-                object.scripts == osirisScripts(for: object, level: level),
+                object.scripts.map {
+                    $0.hasSameBinding(
+                        as: osirisScripts(for: object, level: level)
+                    ) && ($0.defaultScript?.isValidSavedState ?? true)
+                } ?? (osirisScripts(for: object, level: level) == nil),
                 "object \(object.handle.slot) scripts"
             )
             if let lighting = object.localLighting {
@@ -580,27 +596,32 @@ extension GameWorld {
                 trainingGuidebotYellowFlareTimeoutSparkParticlePresentationCapacity,
                 "trainingRobotGuidebotState.yellowFlareTimeoutSparkParticles"
             )
-            if let guidebot = state.guidebot {
-                try require(
-                    guidebot.route.points.indices
-                        .contains(guidebot.routePointIndex),
-                    "guidebot.routePointIndex"
-                )
-                let navigation = Dictionary(
-                    (level.indoorNavigation?.rooms ?? []).map {
-                        ($0.sourceIndex, $0.nodes.count)
-                    },
-                    uniquingKeysWith: { first, _ in first }
-                )
-                try require(
-                    guidebot.route.nodeReferences.allSatisfy {
-                        (0..<(navigation[$0.roomSourceIndex] ?? 0))
-                            .contains($0.nodeIndex)
-                    },
-                    "guidebot.route.nodeReferences"
-                )
-            }
         }
+        // The sound system's loops name a level sound and have distinct
+        // handles.
+        try require(
+            soundSystem.nextHandle >= 0
+                && Set(soundSystem.objectLoops.map(\.handle)).count
+                    == soundSystem.objectLoops.count
+                && soundSystem.objectLoops.allSatisfy {
+                    level.soundClips.indices.contains($0.soundIndex)
+                        && $0.handle >= 0
+                },
+            "soundSystem"
+        )
+        try limit(
+            playerInventory.items.count,
+            PlayerInventory.maximumUniqueItems,
+            "playerInventory"
+        )
+        try require(
+            playerInventory.items.allSatisfy {
+                $0.count > 0
+                    && level.objectInfos?.indices.contains($0.id) == true
+            },
+            "playerInventory"
+        )
+        try require(playerGuideBotName.count <= 7, "playerGuideBotName")
     }
 
     /// The per-object runtime state: object_info and weapon indices name

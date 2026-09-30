@@ -1022,9 +1022,6 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                             frame: frame,
                             voiceClips: simulation.level.voiceClips,
                             soundClips: simulation.level.soundClips,
-                            guidebotAmbientEngineSoundSourceName:
-                                simulation.level.trainingRobotGuidebotChain?
-                                    .ambientEngineSoundSourceName,
                             rooms: simulation.level.rooms
                         )
                         try renderer.update(

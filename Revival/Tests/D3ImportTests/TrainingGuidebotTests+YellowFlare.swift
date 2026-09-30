@@ -4,7 +4,7 @@ extension WorldRenderingTests {
     func testGuidebotYellowFlareResetsBeforeEligibilityThenRetainsCarrierAndFirstParticle()
         throws
     {
-        let level = makeTrainingGuidebotYellowFlareLevel()
+        let level = withTrainingGuideBot(makeTrainingGuidebotYellowFlareLevel())
         let initialRandomState: UInt32 = 0x1357_9BDF
         func nextState(_ state: UInt32) -> UInt32 {
             state &* 214_013 &+ 2_531_011
@@ -91,55 +91,41 @@ extension WorldRenderingTests {
                 .init(x: x.1, y: y.1, z: z.1)
             )
         }
+        /// The continuation as JSON, with the Guide-Bot back in the ship
+        /// (ghosted, GBM_IN_SHIP): the later phases check the flare's own
+        /// draws, so the Guide-Bot's AI frame and ambient draws must not run.
         func continuationObject(
             _ continuation: GameWorld
         ) throws -> [String: Any] {
-            try XCTUnwrap(
-                testWorldObject(continuation)
-            )
+            var world = continuation
+            world.parkTestGuideBotInShip()
+            return try XCTUnwrap(testWorldObject(world))
         }
+        /// The translated Guide-Bot with its flare due.
         func preparedContinuation(
             from continuation: GameWorld,
             helperSlotsAreUsed: Bool,
             randomState: UInt32
         ) throws -> GameWorld {
-            var object = try continuationObject(continuation)
-            object["authoritativeRandomState"] = NSNumber(value: randomState)
-            var state = try XCTUnwrap(
-                object["trainingRobotGuidebotState"] as? [String: Any]
+            var world = continuation
+            world.authoritativeRandomState = randomState
+            world.prepareTestGuideBotFlare(
+                helperSlotsAreUsed: helperSlotsAreUsed,
+                level: level
             )
-            state["guidebotMode"] = "ambient"
-            state["guidebotModeTime"] = 0.1
-            state["nextAmbientTime"] = 100.0
-            state["timeUntilNextFlare"] = 0.05
-            state["nextPowerupCheckTime"] = 100.0
-            state["yellowFlareGoalSlots"] = [
-                "slot1IsUsed": true,
-                "slot2IsUsed": helperSlotsAreUsed,
-                "slot3IsUsed": helperSlotsAreUsed,
-            ]
-            state["yellowFlares"] = []
-            object["trainingRobotGuidebotState"] = state
-            return try decodeTestWorld(object)
+            return world
         }
         func randomState(
             in continuation: GameWorld
         ) throws -> UInt32 {
-            let object = try continuationObject(continuation)
-            return try XCTUnwrap(
-                (object["authoritativeRandomState"] as? NSNumber)?
-                    .uint32Value
-            )
+            continuation.authoritativeRandomState
         }
-
+        // Deploy, then run until the Guide-Bot is in GBM_AMBIENT.
         let seedSimulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
-        _ = seedSimulation.update(
-            at: 0.1,
-            input: .init(deploysTrainingGuidebot: true)
-        )
+        seedSimulation.runToTestGuideBotAmbient()
         _ = try GameSession(
             level: level,
             world: seedSimulation.world.rebased(onto: level),
@@ -150,63 +136,88 @@ extension WorldRenderingTests {
             helperSlotsAreUsed: true,
             randomState: initialRandomState
         )
+        // The script event alone (EVT_AI_FRAME, DoFrame, AIGame.cpp:6106):
+        // the flare timer resets with one draw of the module's rand() and
+        // no ps_rand draw; with goal slots 2 and 3 used, no flare.
+        func scriptFrame(_ start: GameWorld) -> GameWorld {
+            var world = start
+            _ = GuideBotScript.callEvent(.aiFrame, me: world.buddyHandle,
+                                         world: &world, level: level)
+            return world
+        }
+        func moduleDraw(after state: UInt32) -> (Float, UInt32) {
+            let next = nextState(state)
+            return (Float((next >> 16) & 0x7fff) / Float(0x7fff), next)
+        }
+        let blockedScript = scriptFrame(blockedStart)
+        let (blockedFraction, blockedModuleState) =
+            moduleDraw(after: blockedStart.gameModuleRandomState)
+        XCTAssertEqual(blockedScript.authoritativeRandomState,
+                       initialRandomState)
+        XCTAssertEqual(blockedScript.gameModuleRandomState, blockedModuleState)
+        XCTAssertEqual(
+            blockedScript.guideBot(blockedScript.buddyHandle)?
+                .timeUntilNextFlare,
+            3 + blockedFraction
+        )
+        XCTAssertTrue(blockedScript.trainingGuidebotFlareShots.isEmpty)
         let blocked = try GameSession(
             level: level,
             world: blockedStart.rebased(onto: level),
             resumedAtTimestamp: 10
         )
         let blockedFrame = blocked.update(at: 10.1, input: .zero)
-        let stateAfterBlockedReset = nextState(initialRandomState)
-        XCTAssertEqual(
-            try randomState(in: blocked.world),
-            stateAfterBlockedReset
+        // The timer resets to 3 + rand fraction without a flare.
+        let blockedTimer = try XCTUnwrap(
+            blocked.world.guideBot(blocked.world.buddyHandle)?
+                .timeUntilNextFlare
         )
+        XCTAssertTrue((3...4).contains(blockedTimer), "\(blockedTimer)")
         XCTAssertTrue(blockedFrame.trainingGuidebotYellowFlares.isEmpty)
         XCTAssertTrue(blockedFrame.trainingGuidebotYellowFlareParticles.isEmpty)
-        XCTAssertFalse(blockedFrame.trainingOpeningFeedback.contains {
-            $0.soundSourceName == "Flare.wav"
-        })
+        XCTAssertFalse(soundNames([blockedFrame]).contains("Flare"))
 
         let eligibleStart = try preparedContinuation(
             from: blocked.world,
             helperSlotsAreUsed: false,
-            randomState: stateAfterBlockedReset
+            randomState: blocked.world.authoritativeRandomState
         )
+        // With only goal slot 1 used it fires: one module draw, the Flare
+        // sound, and the weapon, still no ps_rand draw.
+        let eligibleScript = scriptFrame(eligibleStart)
+        XCTAssertEqual(eligibleScript.authoritativeRandomState,
+                       eligibleStart.authoritativeRandomState)
+        XCTAssertEqual(
+            eligibleScript.gameModuleRandomState,
+            moduleDraw(after: eligibleStart.gameModuleRandomState).1
+        )
+        XCTAssertEqual(eligibleScript.trainingGuidebotFlareShots.count, 1)
         let eligible = try GameSession(
             level: level,
             world: eligibleStart.rebased(onto: level),
             resumedAtTimestamp: 20
         )
         let fired = eligible.update(at: 20.1, input: .zero)
-        let stateAfterEligibleReset = nextState(stateAfterBlockedReset)
-        XCTAssertEqual(
-            try randomState(in: eligible.world),
-            stateAfterEligibleReset
-        )
-        XCTAssertEqual(
-            fired.trainingOpeningFeedback.filter {
-                $0.soundSourceName == "Flare.wav"
-            }.count,
-            1
-        )
+        XCTAssertEqual(soundNames([fired]).filter { $0 == "Flare" }.count, 1)
         let carrierAtCreation = try XCTUnwrap(
             fired.trainingGuidebotYellowFlares.only
         )
         XCTAssertTrue(fired.trainingGuidebotYellowFlareParticles.isEmpty)
         XCTAssertEqual(carrierAtCreation.lightDistance, 35)
 
+        // With the Guide-Bot back in the ship (no AI frame), the next
+        // frame's only draws are the particle's and the light's seven.
+        eligible.world.parkTestGuideBotInShip()
+        var expectedDrawState = eligible.world.authoritativeRandomState
         let emitted = eligible.update(at: 20.2, input: .zero)
-        var expectedDrawState = stateAfterEligibleReset
         let particleAndLightDraws = (0..<7).map { _ -> UInt32 in
             expectedDrawState = nextState(expectedDrawState)
             return (expectedDrawState >> 16) & 0x7fff
         }
-        XCTAssertEqual(
-            try randomState(in: eligible.world),
-            expectedDrawState
-        )
+        XCTAssertEqual(eligible.world.authoritativeRandomState,
+                       expectedDrawState)
         XCTAssertFalse(emitted.trainingOpeningFeedback.contains {
-            $0.soundSourceName == "Flare.wav"
+            ["Flare", "Flare.wav"].contains($0.soundSourceName)
         })
         let carrier = try XCTUnwrap(
             emitted.trainingGuidebotYellowFlares.only
@@ -360,7 +371,6 @@ extension WorldRenderingTests {
             attachedObject["trainingRobotGuidebotState"]
                 as? [String: Any]
         )
-        attachedState["timeUntilNextFlare"] = 3.5
         attachedState["yellowFlareParticles"] = []
         var attachedFlares = try XCTUnwrap(
             attachedState["yellowFlares"] as? [[String: Any]]
@@ -421,7 +431,7 @@ extension WorldRenderingTests {
         )
         XCTAssertNotEqual(attachedCarrier.position, player.position)
         XCTAssertFalse(attachedFrame.trainingOpeningFeedback.contains {
-            $0.soundSourceName == "Flare.wav"
+            ["Flare", "Flare.wav"].contains($0.soundSourceName)
         })
         let freshBaseRestore = try GameSession(
             level: level,
@@ -437,7 +447,7 @@ extension WorldRenderingTests {
             1
         )
         XCTAssertFalse(freshBaseFrame.trainingOpeningFeedback.contains {
-            $0.soundSourceName == "Flare.wav"
+            ["Flare", "Flare.wav"].contains($0.soundSourceName)
         })
 
         var nearWallObject = try continuationObject(
@@ -448,7 +458,6 @@ extension WorldRenderingTests {
             nearWallObject["trainingRobotGuidebotState"]
                 as? [String: Any]
         )
-        nearWallState["timeUntilNextFlare"] = 3.5
         nearWallState["yellowFlareParticles"] = []
         var nearWallFlares = try XCTUnwrap(
             nearWallState["yellowFlares"] as? [[String: Any]]
@@ -495,7 +504,7 @@ extension WorldRenderingTests {
             stuckFrame.trainingGuidebotYellowFlareParticles.isEmpty
         )
         XCTAssertFalse(stuckFrame.trainingOpeningFeedback.contains {
-            $0.soundSourceName == "Flare.wav"
+            ["Flare", "Flare.wav"].contains($0.soundSourceName)
         })
 
         var exactZeroObject = try continuationObject(nearWall.world)
@@ -504,7 +513,6 @@ extension WorldRenderingTests {
             exactZeroObject["trainingRobotGuidebotState"]
                 as? [String: Any]
         )
-        exactZeroState["timeUntilNextFlare"] = 3.5
         exactZeroState["yellowFlareParticles"] = []
         var exactZeroFlares = try XCTUnwrap(
             exactZeroState["yellowFlares"] as? [[String: Any]]
@@ -533,7 +541,6 @@ extension WorldRenderingTests {
             expiryObject["trainingRobotGuidebotState"]
                 as? [String: Any]
         )
-        expiryState["timeUntilNextFlare"] = 3.5
         expiryState["yellowFlareParticles"] = []
         var expiringFlares = try XCTUnwrap(
             expiryState["yellowFlares"] as? [[String: Any]]
@@ -738,7 +745,7 @@ extension WorldRenderingTests {
             in: expiry.world
         )
         XCTAssertFalse(expiredFrame.trainingOpeningFeedback.contains {
-            $0.soundSourceName == "Flare.wav"
+            ["Flare", "Flare.wav"].contains($0.soundSourceName)
         })
         let expiredRestore = try GameSession(
             level: eligible.level,
@@ -814,7 +821,7 @@ extension WorldRenderingTests {
             restoredCenterExpected.velocity.z
         )
         XCTAssertFalse(expiredRestoreFrame.trainingOpeningFeedback.contains {
-            $0.soundSourceName == "Flare.wav"
+            ["Flare", "Flare.wav"].contains($0.soundSourceName)
         })
         let boundedTimeoutRandomState = try randomState(
             in: expiredRestore.world
@@ -864,7 +871,6 @@ extension WorldRenderingTests {
             finalNegativeObject["trainingRobotGuidebotState"]
                 as? [String: Any]
         )
-        finalNegativeState["timeUntilNextFlare"] = 3.5
         var finalNegativeSparks = try XCTUnwrap(
             finalNegativeState["yellowFlareTimeoutSparks"]
                 as? [[String: Any]]
@@ -1251,17 +1257,21 @@ extension WorldRenderingTests {
                     && handle > UInt32.max - 5_054)
         })
 
-        var laterParentObject = try continuationObject(
-            quiescing.world
+        // The Guide-Bot fires its next flare on the next 0.01 s frame.
+        var laterParentWorld = quiescing.world
+        laterParentWorld.unparkTestGuideBot()
+        laterParentWorld.prepareTestGuideBotFlare(
+            helperSlotsAreUsed: false,
+            clearsFlares: false,
+            level: eligible.level
+        )
+        laterParentWorld.updateGuideBot(laterParentWorld.buddyHandle) {
+            $0.timeUntilNextFlare = 0.005
+        }
+        var laterParentObject = try XCTUnwrap(
+            testWorldObject(laterParentWorld)
         )
         laterParentObject["frameDuration"] = 0.01
-        var laterParentState = try XCTUnwrap(
-            laterParentObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        laterParentState["timeUntilNextFlare"] = 0.005
-        laterParentObject["trainingRobotGuidebotState"] =
-            laterParentState
         let laterParent = try GameSession(
             level: eligible.level,
             world: (decodeTestWorld(laterParentObject)).rebased(onto: eligible.level),
@@ -1650,42 +1660,24 @@ extension WorldRenderingTests {
             level: compatibleLevel,
             presentationReadyTimestamp: 0
         )
-        _ = compatibleSeed.update(
-            at: 0.1,
-            input: .init(deploysTrainingGuidebot: true)
+        compatibleSeed.runToTestGuideBotAmbient()
+        let compatibleStart = try preparedContinuation(
+            from: compatibleSeed.world,
+            helperSlotsAreUsed: false,
+            randomState: initialRandomState
         )
-        var compatibleObject = try continuationObject(
-            compatibleSeed.world
-        )
-        compatibleObject["authoritativeRandomState"] = NSNumber(
-            value: initialRandomState
-        )
-        var compatibleState = try XCTUnwrap(
-            compatibleObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        compatibleState["guidebotMode"] = "ambient"
-        compatibleState["guidebotModeTime"] = 0.1
-        compatibleState["nextAmbientTime"] = 100.0
-        compatibleState["timeUntilNextFlare"] = 0.05
-        compatibleState["nextPowerupCheckTime"] = 100.0
-        compatibleObject["trainingRobotGuidebotState"] = compatibleState
         let compatible = try GameSession(
             level: compatibleLevel,
-            world: (decodeTestWorld(compatibleObject)).rebased(onto: compatibleLevel),
+            world: compatibleStart.rebased(onto: compatibleLevel),
             resumedAtTimestamp: 30
         )
         let compatibleFrame = compatible.update(at: 30.1, input: .zero)
-        XCTAssertEqual(
-            try randomState(in: compatible.world),
-            nextState(initialRandomState)
-        )
         XCTAssertTrue(compatibleFrame.trainingGuidebotYellowFlares.isEmpty)
         XCTAssertTrue(
             compatibleFrame.trainingGuidebotYellowFlareParticles.isEmpty
         )
-        XCTAssertFalse(compatibleFrame.trainingOpeningFeedback.contains {
-            $0.soundSourceName == "Flare.wav"
-        })
+        // The Guide-Bot still plays its "Flare" sound (AIGame.cpp:6114) and
+        // fires the weapon page; only the bespoke flare is absent.
+        XCTAssertEqual(soundNames([compatibleFrame]).filter { $0 == "Flare" }.count, 1)
     }
 }

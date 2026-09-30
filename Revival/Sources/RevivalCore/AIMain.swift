@@ -110,13 +110,57 @@ extension GameWorld {
 
     /// AIInitAll (AImain.cpp:3810), run by StartLevel before the level
     /// script starts (gamesequence.cpp:1482): AIInit for every AI object in
-    /// slot order. The random draws of level load come before the seed.
+    /// slot order, then, in single player, the Guide-Bot: ObjCreate of
+    /// ROBOT_GUIDEBOT at the player with the player as parent, ghosted, as
+    /// Buddy_handle (:3833-3839). Then ResetPlayerObject gives the player
+    /// the Guide-Bot in the inventory while it is not out (Player.cpp:1451).
+    /// The random draws of level load come before the seed.
+    ///
+    /// Until objects are created at level start (M1 step 10), the level's
+    /// imported object with the Guide-Bot page stands in for the one
+    /// ObjCreate makes: it keeps its slot and handle.
     mutating func aiInitAll(level: Level) {
+        buddyHandle = .none
+        let guideBotPage = objectFindID(
+            CanonicalObjectInfo.guideBotPageName, level: level
+        )
+        let buddy = objects.first {
+            guideBotPage >= 0 && $0.info == guideBotPage && $0.ai != nil
+        }?.handle
         for slot in 0..<ObjectTable.capacity {
-            guard let object = objects.slots[slot], object.ai != nil else {
+            guard let object = objects.slots[slot], object.ai != nil,
+                  object.handle != buddy
+            else {
                 continue
             }
             aiInit(object.handle, level: level)
+        }
+        let player = playerObjectHandle(slot: 0, level: level)
+        if let buddy, let playerObject = objects[player],
+           var object = objects[buddy] {
+            // ObjCreate(OBJ_ROBOT, ROBOT_GUIDEBOT, player room, player
+            // position, NULL, player handle): identity orientation, the
+            // polygon render type, the creation time, and ObjInitGeneric's
+            // draw (ObjInit.cpp:728) before its AIInit.
+            object.location = playerObject.location
+            object.position = playerObject.position
+            object.orientation = Self.identityOrientation
+            object.renderType = .polyobj
+            object.parent = player
+            object.creationTime = gameTime
+            object.velocity = .zero
+            objects[buddy] = object
+            _ = psRand()
+            aiInit(buddy, level: level)
+            buddyHandle = buddy
+            ghostObject(buddy)
+        }
+        if objects[player] != nil,
+           !playerInventory.checkItem(type: ObjectType.robot.rawValue,
+                                      id: guideBotPage),
+           objects[buddyHandle].map({ $0.type != .robot }) ?? false {
+            playerInventory.add(type: ObjectType.robot.rawValue,
+                                id: guideBotPage)
         }
     }
 
@@ -141,6 +185,13 @@ extension GameWorld {
         ai.statusRegister = 0
         ai.weaponSpeed = 0
         ai.vecToTargetPerceived = object.orientation.forward
+        // An object a player (or a dead player's ghost) made is on the
+        // rebel team (AImain.cpp:3690-3697).
+        if let parent = objects[object.parent],
+           parent.type == .player || parent.type == .ghost {
+            ai.flags &= ~ObjectAIFrame.teamMask
+            ai.flags |= ObjectAIFrame.teamRebel
+        }
         // The idle or alert animation starts at a random frame. The
         // animation itself arrives with ai_do_animation.
         _ = psRand()
@@ -184,6 +235,14 @@ extension GameWorld {
         // Clear out the goals and give the type's goals
         // (AImain.cpp:3799, GoalInitTypeGoals AIGoal.cpp:1295).
         goalInitTypeGoals(handle, type: ai.aiType, level: level)
+        // IS_GUIDEBOT (objinfo.h:363): the Guide-Bot dodges (:3801).
+        let pages = [
+            CanonicalObjectInfo.guideBotPageName,
+            CanonicalObjectInfo.guideBotRedPageName,
+        ].map { objectFindID($0, level: level) }
+        if pages.contains(where: { $0 >= 0 && $0 == infoIndex }) {
+            objects[handle]?.ai?.flags |= ObjectAIFrame.dodgeFlag
+        }
     }
 
     // MARK: Power and team
@@ -387,11 +446,22 @@ extension GameWorld {
                Float(psRand()) / 1.2 > ai.aggression * Float(Self.randMax) {
                 forgiveFriend = true
             }
-            // The Guide-Bot (Buddy_handle) joins with the AIGame scripts in
-            // M1 step 8.
-            if forgiveFriend || !aiTargetValid(handle, level: level) {
+            // A robot that targets the Guide-Bot goes back to the player
+            // (AImain.cpp:5883-5891).
+            let target = objects[handle]?.ai?.targetHandle ?? .none
+            let targetsBuddy = target != .none && target == buddyHandle
+            if forgiveFriend || !aiTargetValid(handle, level: level)
+                || (targetsBuddy && objects[buddyHandle]?.type != .ghost) {
                 let player = playerObjectHandle(slot: 0, level: level)
-                best = objects[player]?.type == .ghost ? .none : player
+                if objects[player]?.type != .ghost {
+                    best = player
+                } else if buddyHandle != .none,
+                          let buddy = objects[buddyHandle],
+                          buddy.type != .ghost {
+                    best = buddy.handle
+                } else {
+                    best = .none
+                }
             } else {
                 best = objects[handle]?.ai?.targetHandle ?? .none
             }

@@ -1,6 +1,6 @@
 # Sources, content rights, and corrections
 
-Status: core reference. Updated 2026-09-29.
+Status: core reference. Updated 2026-09-30.
 
 This file records what the port translates from, what content it may use, and which fixes from maintained forks it adopts.
 
@@ -20,6 +20,10 @@ This file records what the port translates from, what content it may use, and wh
 - **Descent3** `upstream/main` is at `a3e82bc2` (2026-09-16). The only change after the pin is PR #733: `Descent3/demofile.cpp` `DemoWriteAttachObjRad` now writes `DT_ATTACH_RAD`, not `DT_ATTACH`. This matters only for demo/replay work, and the port must use the corrected record type there. Keep the pin at `156cba8a`. No release was tagged after `v1.5.0`.
 - **PiccuEngine** master is at `4627d77e` (2026-08-27). The 15 commits after the snapshot are portability changes only (64-bit types, include fixes, registry). Nothing to adopt.
 - **DESCENT 3MASTERED** master is at `664aefc7` (2026-08-19). The 134 commits after the snapshot and the tags `0.9-Pre-1` to `0.9.1-Pre` are mostly renderer work: per-pixel lighting, bloom, AO, MSAA, and a new terrain renderer. That work includes self-labeled regression checkpoints and reverts (for example `7fb4f60`, `74d2588`, `a7aeecc`, `0f8eff3`). The port adopts only the semantic corrections in section 2. The renderer features are post-1.0 options (see `plan.md`, milestone P5).
+
+### Released-build behavior the source leaves open
+
+- **Game module `rand()`.** The game module DLLs (for example `AIGame.dll`) call the C library `rand()`, not `ps_rand` (`misc/psrand.cpp:39`). The port uses the generator of the MSVC C library of the released Windows build: `holdrand = holdrand * 214013 + 2531011`, result `(holdrand >> 16) & 0x7fff`, on a state of its own that starts at 1 (the CRT default; the module calls `srand` only in its thief code, `AIGame.cpp:1851`). It is saved in `GameWorld.gameModuleRandomState`.
 
 Recheck all three repos at the start of each milestone. Update this section with the new heads and any new corrections.
 

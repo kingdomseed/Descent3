@@ -209,7 +209,7 @@ struct LevelPortal: Codable, Equatable, Sendable {
     let connectedRoom: Int
     let connectedPortal: Int
     let boundaryNodeIndex: Int
-    let pathPoint: Vector3
+    var pathPoint: Vector3
     let combineMaster: Int
 
     init(
@@ -279,7 +279,7 @@ struct RoomFog: Codable, Equatable, Sendable {
 struct LevelRoom: Codable, Equatable, Sendable {
     let sourceIndex: Int
     var name: String?
-    let pathPoint: Vector3
+    var pathPoint: Vector3
     var vertices: [Vector3]
     var faces: [LevelFace]
     var portals: [LevelPortal]
@@ -593,6 +593,9 @@ enum SurfacePhysicsBehavior: String, Codable, Equatable, Sendable {
 struct SurfacePhysicsEntry: Codable, Equatable, Sendable {
     let texture: SourceResource
     let behavior: SurfacePhysicsBehavior
+    /// The texture page's TF_ flags (gametexture.h), when the page is
+    /// known. MakeBOA reads TF_BREAKABLE and TF_FORCEFIELD (BOA.cpp:261).
+    var textureFlags: UInt32? = nil
 }
 
 struct ModelBounds: Codable, Equatable, Sendable {

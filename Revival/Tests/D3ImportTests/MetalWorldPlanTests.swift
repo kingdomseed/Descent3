@@ -1179,7 +1179,7 @@ final class MetalWorldPlanTests: XCTestCase {
     }
 
     func testF4ActivatesReservedGuidebotDrawInTheRetainedPlan() throws {
-        let level = makeTrainingRobotGuidebotLevel()
+        let level = withTrainingGuideBot(makeTrainingRobotGuidebotLevel())
         let playerView = defaultPlayerView(in: level)
         let initial = try makeMetalWorldPlan(
             level: level,

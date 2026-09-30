@@ -28,6 +28,11 @@ struct CanonicalObjectInfo: Codable, Equatable, Sendable {
     static let noDifficultyScaleDamageFlag: UInt32 = 0x800
     /// OIF_NO_DIFF_SCALE_MOVE (objinfo.h:345).
     static let noDifficultyScaleMoveFlag: UInt32 = 0x1000
+    /// The static pages GENOBJ_GUIDEBOT and GENOBJ_GUIDEBOTRED
+    /// (Descent3/objinfo.cpp:52): ROBOT_GUIDEBOT and ROBOT_GUIDEBOTRED
+    /// (object_external.h:354) name them.
+    static let guideBotPageName = "GuideBot"
+    static let guideBotRedPageName = "GuideBotRed"
 
     /// The page name. A placed object uses it when its definition name
     /// matches (stricmp, as FindObjectIDName does).
@@ -70,6 +75,20 @@ struct CanonicalObjectInfo: Codable, Equatable, Sendable {
     /// `phys_info`: the physics a page with OIF_USES_PHYSICS gives the
     /// objects made from it at run time (ObjInit.cpp:774).
     var physics: ObjectPhysics? = nil
+    /// `module_name` (generic.cpp version 18) as a canonical module name,
+    /// nil when the page names none: the game module of an object's default
+    /// script when the level names none for it (Osiris_BindScriptsToObject,
+    /// OsirisLoadandBind.cpp:1471).
+    var moduleName: String? = nil
+    /// `script_name_override` (version 19), nil when empty: the name
+    /// GetGOScriptID reads instead of the page name.
+    var scriptNameOverride: String? = nil
+
+    /// The page name Osiris_BindScriptsToObject gives GetGOScriptID
+    /// (OsirisLoadandBind.cpp:1476-1482).
+    var defaultScriptName: String {
+        scriptNameOverride ?? name
+    }
 }
 
 /// The death spew of an object page.

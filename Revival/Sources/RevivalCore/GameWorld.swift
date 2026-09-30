@@ -30,6 +30,11 @@ struct GameWorld: Codable, Equatable, Sendable {
     var gameTime: Float = 0
     /// The `ps_rand` LCG state.
     var authoritativeRandomState: UInt32
+    /// The C library `rand()` state of the game module DLL (AIGame.dll):
+    /// separate from `ps_rand` (misc/psrand.cpp:39). The CRT starts it at 1;
+    /// the module seeds it only in its thief code (AIGame.cpp:1851, :6213,
+    /// :7493).
+    var gameModuleRandomState: UInt32 = 1
 
     var objects: ObjectTable
     /// Indexed like `Level.rooms`.
@@ -88,6 +93,15 @@ struct GameWorld: Codable, Equatable, Sendable {
     var playerDeathsLevel: Int16 = 0
     /// Hud_show_controls (hud.cpp:503).
     var hudShowControls = false
+    /// `Players[0].inventory` (Inventory.swift).
+    var playerInventory = PlayerInventory()
+    /// The pilot's Guide-Bot name (pilot::guidebot_name, pilot_class.cpp:202),
+    /// which MSAFE_MISC_GUIDEBOT_NAME reads.
+    var playerGuideBotName = "GB"
+    /// Buddy_handle[0] (AImain.cpp:1628): the Guide-Bot AIInitAll makes.
+    var buddyHandle: ObjectHandle = .none
+    /// The sound handles and the looping object sounds (SoundSystem.swift).
+    var soundSystem = SoundSystemState()
 
     /// AI_unique_goal_id (AImain.cpp:1557): the next goal's `goal_uid`.
     var aiUniqueGoalID: Int32 = 0
@@ -109,6 +123,10 @@ struct GameWorld: Codable, Equatable, Sendable {
     // later M1 steps.
     var trainingGalleryBarrierState: TrainingGalleryBarrierState?
     var trainingRobotGuidebotState: TrainingRobotGuidebotState?
+    /// The flares the Guide-Bot fired this update, for the bespoke flare
+    /// path. The session makes them within the update, so a saved world has
+    /// none.
+    var trainingGuidebotFlareShots: [TrainingGuidebotFlareShot] = []
     var trainingCameraMonitorState: TrainingCameraMonitorState?
     var trainingKillbotEntryState: TrainingKillbotEntryState?
     var trainingInvulnerabilityPickupState:
@@ -144,6 +162,17 @@ struct GameWorld: Codable, Equatable, Sendable {
                 continue
             }
             objects[object.handle]?.flags |= GameObject.bigObjectFlag
+        }
+        // DeleteMultiplayerObjects (Player.cpp:1365), from StartLevel in
+        // single player (gamesequence.cpp:1572): every other player object
+        // is deleted, in slot order, before the level script and AI start.
+        for slot in 0..<ObjectTable.capacity {
+            guard let object = objects.slots[slot], object.type == .player,
+                  object.handle.rawValue != binding.objectHandle
+            else {
+                continue
+            }
+            objects.delete(object.handle)
         }
         initializeTrainingState(level: level)
         // StartLevel runs AIInitAll before the level script starts

@@ -1,420 +1,95 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The bespoke Training code that the Guide-Bot's scripts still leave to
+// Swift: the Guide-Bot's flares (M1 step 8d), the two F4 inputs until the
+// buddy menu (M1 step 8c), and the Camera Monitor presentation (M1 step 9).
+// The Guide-Bot itself is the AIGame GuideBot script
+// (Scripts/AIGame+GuideBot.swift).
 
 import Foundation
 
-func trainingGuidebotRoute(
-    in level: Level,
-    roomStates: [RoomState],
-    startRoomSourceIndex: Int,
-    start: Vector3,
-    startForward: Vector3,
-    destinationRoomSourceIndex: Int,
-    destination: Vector3,
-    radius: Float
-) -> Result<TrainingGuidebotRoute, TrainingGuidebotRouteError> {
-    precondition(
-        radius.isFinite && radius >= 0
-            && startForward.x.isFinite
-            && startForward.y.isFinite
-            && startForward.z.isFinite
-    )
-    let boaRooms = trainingGuidebotBOARoomRoute(
-        in: level,
-        start: startRoomSourceIndex,
-        destination: destinationRoomSourceIndex
-    )
-    guard let boaRooms else { return .failure(.noBOAPath) }
-    if trainingGuidebotProbeIsClear(
-        in: level,
-        roomStates: roomStates,
-        startRoomSourceIndex: startRoomSourceIndex,
-        start: start,
-        destination: destination,
-        radius: radius
-    ) {
-        return .success(.init(
-            mode: .direct,
-            points: [destination],
-            roomSourceIndices: boaRooms,
-            nodeReferences: []
+extension GameWorld {
+    /// The bespoke flare path of MSAFE_OBJECT_FIRE_WEAPON: a weapon the
+    /// level's bespoke flare definition names becomes a flare shot at the
+    /// firing object's place. Returns whether it took the weapon.
+    mutating func fireBespokeFlareFromObject(
+        _ handle: ObjectHandle,
+        weaponName: String,
+        level: Level
+    ) -> Bool {
+        guard let definition = level.trainingRobotGuidebotChain?.yellowFlare,
+              definition.source.sourceName
+                .caseInsensitiveCompare(weaponName) == .orderedSame,
+              trainingRobotGuidebotState?.yellowFlares != nil,
+              let object = objects[handle],
+              case let .room(room) = object.location
+        else {
+            return false
+        }
+        trainingGuidebotFlareShots.append(.init(
+            parent: handle,
+            roomSourceIndex: room,
+            position: object.position,
+            orientation: object.orientation
         ))
-    }
-
-    guard let graph = level.indoorNavigation,
-          graph.sourceWasVerified else {
-        return .failure(.unverifiedBoundaryNodes)
-    }
-    let navigationByRoom = Dictionary(
-        uniqueKeysWithValues: graph.rooms.map { ($0.sourceIndex, $0) }
-    )
-    if startRoomSourceIndex != destinationRoomSourceIndex {
-        let roomBySourceIndex = Dictionary(
-            uniqueKeysWithValues: level.rooms.map {
-                ($0.sourceIndex, $0)
-            }
-        )
-        var portalPoints: [Vector3] = []
-        for (roomSourceIndex, nextRoomSourceIndex) in zip(
-            boaRooms,
-            boaRooms.dropFirst()
-        ) {
-            guard let portal = roomBySourceIndex[roomSourceIndex]?
-                .portals.first(where: {
-                    $0.connectedRoom == nextRoomSourceIndex
-                })
-            else {
-                return .failure(.noRoomPortalPath)
-            }
-            portalPoints.append(portal.pathPoint)
-        }
-        return .success(.init(
-            mode: .roomPortals,
-            points: portalPoints + [destination],
-            roomSourceIndices: boaRooms,
-            nodeReferences: []
-        ))
-    }
-    guard let startNodes = navigationByRoom[startRoomSourceIndex]?.nodes,
-          let destinationNodes =
-            navigationByRoom[destinationRoomSourceIndex]?.nodes
-    else {
-        return .failure(.noVisibleBoundaryNode)
-    }
-    let probeRadius = min(radius / 4, 20)
-    let visibleStartNodes = startNodes.indices.filter {
-        trainingGuidebotDistance(start, startNodes[$0].position) < 800
-            && trainingGuidebotProbeIsClear(
-                in: level,
-                roomStates: roomStates,
-                startRoomSourceIndex: startRoomSourceIndex,
-                start: start,
-                destination: startNodes[$0].position,
-                radius: probeRadius
-            )
-    }
-    let forwardStartNodes = visibleStartNodes.filter {
-        dot(
-            startForward,
-            sourceVectorNormalized(startNodes[$0].position - start)
-        ) > 0
-    }
-    let startReference = (forwardStartNodes.last ?? visibleStartNodes.last)
-        .map {
-            IndoorNavigationNodeReference(
-                roomSourceIndex: startRoomSourceIndex,
-                nodeIndex: $0
-            )
-        }
-    let visibleDestinationNodes = destinationNodes.indices
-        .filter {
-            destinationNodes[$0].edges.contains {
-                $0.maximumRadius >= probeRadius
-            }
-                &&
-            trainingGuidebotProbeIsClear(
-                in: level,
-                roomStates: roomStates,
-                startRoomSourceIndex: destinationRoomSourceIndex,
-                start: destinationNodes[$0].position,
-                destination: destination,
-                radius: probeRadius
-            )
-        }
-    let destinationReference = (
-        visibleDestinationNodes.min {
-            trainingGuidebotQuickDistance(
-                destinationNodes[$0].position,
-                destination
-            ) < trainingGuidebotQuickDistance(
-                destinationNodes[$1].position,
-                destination
-            )
-        }
-            ?? destinationNodes.indices
-                .filter {
-                    trainingGuidebotQuickDistance(
-                        destinationNodes[$0].position,
-                        destination
-                    ) < 800
-                }
-                .min {
-                    trainingGuidebotQuickDistance(
-                        destinationNodes[$0].position,
-                        destination
-                    ) < trainingGuidebotQuickDistance(
-                        destinationNodes[$1].position,
-                        destination
-                    )
-                }
-    )
-        .map {
-            IndoorNavigationNodeReference(
-                roomSourceIndex: destinationRoomSourceIndex,
-                nodeIndex: $0
-            )
-        }
-    guard let startReference, let destinationReference else {
-        return .failure(.noVisibleBoundaryNode)
-    }
-    guard let references = trainingGuidebotBoundaryNodePath(
-        room: navigationByRoom[startRoomSourceIndex]!,
-        start: startReference,
-        destination: destinationReference
-    ) else {
-        return .failure(.noBoundaryNodePath)
-    }
-    let points = references.map {
-        navigationByRoom[$0.roomSourceIndex]!.nodes[$0.nodeIndex].position
-    } + [destination]
-    var orderedRooms: [Int] = []
-    for reference in references
-    where orderedRooms.last != reference.roomSourceIndex {
-        orderedRooms.append(reference.roomSourceIndex)
-    }
-    return .success(.init(
-        mode: .boundaryNodes,
-        points: points,
-        roomSourceIndices: orderedRooms,
-        nodeReferences: references
-    ))
-}
-
-private func trainingGuidebotBOARoomRoute(
-    in level: Level,
-    start: Int,
-    destination: Int
-) -> [Int]? {
-    guard level.rooms.contains(where: { $0.sourceIndex == start }),
-          level.rooms.contains(where: {
-              $0.sourceIndex == destination
-          }) else {
-        return nil
-    }
-    if start == destination { return [start] }
-    let roomBySourceIndex = Dictionary(
-        uniqueKeysWithValues: level.rooms.map { ($0.sourceIndex, $0) }
-    )
-    var queue = [start]
-    var predecessor: [Int: Int] = [:]
-    var visited: Set<Int> = [start]
-    while !queue.isEmpty {
-        let roomSourceIndex = queue.removeFirst()
-        for portal in roomBySourceIndex[roomSourceIndex]!.portals {
-            let next = portal.connectedRoom
-            guard visited.insert(next).inserted else { continue }
-            predecessor[next] = roomSourceIndex
-            if next == destination {
-                var result = [destination]
-                while result.last != start {
-                    result.append(predecessor[result.last!]!)
-                }
-                return Array(result.reversed())
-            }
-            queue.append(next)
-        }
-    }
-    return nil
-}
-
-private func trainingGuidebotBoundaryNodePath(
-    room: IndoorNavigationRoom,
-    start: IndoorNavigationNodeReference,
-    destination: IndoorNavigationNodeReference
-) -> [IndoorNavigationNodeReference]? {
-    guard start.roomSourceIndex == room.sourceIndex,
-          destination.roomSourceIndex == room.sourceIndex else {
-        return nil
-    }
-    var distances = [start.nodeIndex: 0]
-    var predecessor: [Int: Int] = [:]
-    var pending = [start.nodeIndex]
-    var visited: Set<Int> = []
-    while !pending.isEmpty {
-        let current = pending.indices.min {
-            let lhs = pending[$0]
-            let rhs = pending[$1]
-            let lhsDistance = distances[lhs, default: .max]
-            let rhsDistance = distances[rhs, default: .max]
-            return lhsDistance == rhsDistance
-                ? $0 > $1
-                : lhsDistance < rhsDistance
-        }.map { pending.remove(at: $0) }!
-        guard visited.insert(current).inserted else { continue }
-        if current == destination.nodeIndex {
-            var result = [current]
-            while result.last != start.nodeIndex {
-                result.append(predecessor[result.last!]!)
-            }
-            return result.reversed().map {
-                IndoorNavigationNodeReference(
-                    roomSourceIndex: room.sourceIndex,
-                    nodeIndex: $0
-                )
-            }
-        }
-        for edge in room.nodes[current].edges
-        where edge.destinationRoomSourceIndex == room.sourceIndex
-            && room.nodes.indices.contains(edge.destinationNodeIndex) {
-            let next = edge.destinationNodeIndex
-            let candidate = distances[current]! + edge.cost
-            if candidate <= distances[next, default: .max] {
-                distances[next] = candidate
-                predecessor[next] = current
-                pending.append(next)
-            }
-        }
-    }
-    return nil
-}
-
-private func trainingGuidebotProbeIsClear(
-    in level: Level,
-    roomStates: [RoomState],
-    startRoomSourceIndex: Int,
-    start: Vector3,
-    destination: Vector3,
-    radius: Float
-) -> Bool {
-    if case .noHit = traceIndoorMovement(
-        in: level,
-        roomStates: roomStates,
-        startRoom: startRoomSourceIndex,
-        start: start,
-        end: destination,
-        radius: radius
-    ).outcome {
         return true
     }
-    return false
-}
-
-private func trainingGuidebotDistance(
-    _ lhs: Vector3,
-    _ rhs: Vector3
-) -> Float {
-    let delta = lhs - rhs
-    return sqrt(dot(delta, delta))
-}
-
-private func trainingGuidebotQuickDistance(
-    _ lhs: Vector3,
-    _ rhs: Vector3
-) -> Float {
-    abs(lhs.x - rhs.x)
-        + abs(lhs.y - rhs.y)
-        + abs(lhs.z - rhs.z)
-}
-
-func trainingCameraMonitorGoalTarget(
-    in level: Level,
-    world: GameWorld
-) -> GameObject? {
-    guard let cameraChain = level.trainingCameraMonitorChain else {
-        return nil
-    }
-    let activePrimaryIndices = world.goals.indices.filter { index in
-        let status = world.goals[index].status
-        return status & 0x0000_0004 != 0
-            && status
-                & (0x0000_0002 | 0x0000_0008 | 0x0000_0080)
-                == 0
-    }
-    let minimumPriorityByList = Dictionary(
-        activePrimaryIndices.map {
-            (world.goals[$0].list, world.goals[$0].priority)
-        },
-        uniquingKeysWith: min
-    )
-    let firstActivePrimaryIndex = (Int8(0)...Int8(3))
-        .lazy
-        .compactMap { list in
-            activePrimaryIndices.first { index in
-                let goal = world.goals[index]
-                return goal.list == list
-                    && goal.priority == minimumPriorityByList[list]
-            }
-        }
-        .first
-    guard let firstActivePrimaryIndex else { return nil }
-    let goal = world.goals[firstActivePrimaryIndex]
-    guard goal.status & (0x0000_0020 | 0x0000_0040) == 0,
-          goal.name == "Locate the Camera Monitor",
-          goal.itemName == "Camera Monitor",
-          goal.items.count == 1,
-          let item = goal.items.first,
-          item.type == 2,
-          item.sourceHandle == cameraChain.pickupObjectHandle,
-          item.objectHandle == cameraChain.pickupObjectHandle,
-          !item.done,
-          let target = trainingCameraMonitorObjectTarget(
-              in: level,
-              objects: world.objects
-          )
-    else {
-        return nil
-    }
-    return target
-}
-
-func trainingCameraMonitorObjectTarget(
-    in level: Level,
-    objects: ObjectTable
-) -> GameObject? {
-    guard let cameraChain = level.trainingCameraMonitorChain,
-          cameraChain.returnToShip != nil,
-          let target =
-            objects[ObjectHandle(cameraChain.pickupObjectHandle)],
-          target.type == .powerup,
-          target.location == .room(39)
-    else {
-        return nil
-    }
-    return target
 }
 
 extension GameSession {
+    /// The Guide-Bot menu's goal command is offered (MakeCommandList).
     var trainingGuidebotGoalCommandIsAvailable: Bool {
-        trainingCameraMonitorActiveGoalTarget() != nil
+        guideBotMenuOffers(GuideBotScript.findActiveGoal0)
     }
 
+    /// The Guide-Bot menu's return-to-ship command is offered.
     var trainingGuidebotReturnToShipCommandIsAvailable: Bool {
-        guard level.trainingCameraMonitorChain?.returnToShip != nil,
-              let guidebotState = trainingRobotGuidebotState,
-              guidebotState.guidebotContinuationWasPresented,
-              guidebotState.guidebotIsDeployed,
-              !guidebotState.guidebotEnteredShip,
-              guidebotState.guidebotMode == .ambient,
-              guidebotState.guidebot?.task == .escortPlayer,
-              !guidebotState.returnWasRequested,
-              let cameraState = trainingCameraMonitorState,
-              !cameraState.isHeld,
-              cameraState.wasUsed,
-              !cameraState.script058WasPresented
-        else {
-            return false
-        }
-        return true
+        guideBotMenuOffers(GuideBotScript.returnToShipCommand)
     }
 
+    /// The Guide-Bot menu's exit-ship command is offered.
     var trainingGuidebotReleaseCommandIsAvailable: Bool {
-        guard level.trainingRobotGuidebotChain != nil,
-              let state = trainingRobotGuidebotState
+        guideBotMenuOffers(GuideBotScript.exitShipCommand)
+    }
+
+    /// COM_GET_MENU (BuddyBotDownloadData, buddymenu.cpp:370) and whether it
+    /// lists the command.
+    private func guideBotMenuOffers(_ command: Int32) -> Bool {
+        world.guideBotMenu(level: level)?.commands
+            .contains { $0.id == command } ?? false
+    }
+
+    /// The two Guide-Bot inputs until the buddy menu (M1 step 8c): the goal
+    /// input sends the first active goal's command, and the F4 input sends
+    /// the exit-ship command in the ship, or the return-to-ship command
+    /// outside it, whichever the menu offers.
+    func sendTrainingGuidebotMenuCommand(_ input: InputSnapshot) {
+        guard input.deploysTrainingGuidebot
+                || input.requestsTrainingGuidebotActiveGoal,
+              let menu = world.guideBotMenu(level: level)
         else {
-            return false
+            return
         }
-        return state.guidebotEnteredShip
-            && !state.guidebotIsDeployed
-            && state.guidebot == nil
+        let offered = Set(menu.commands.map(\.id))
+        if input.deploysTrainingGuidebot {
+            if offered.contains(GuideBotScript.exitShipCommand) {
+                world.guideBotCommand(GuideBotScript.exitShipCommand,
+                                      level: level)
+            } else if offered.contains(GuideBotScript.returnToShipCommand) {
+                world.guideBotCommand(GuideBotScript.returnToShipCommand,
+                                      level: level)
+            }
+        }
+        if input.requestsTrainingGuidebotActiveGoal,
+           offered.contains(GuideBotScript.findActiveGoal0) {
+            world.guideBotCommand(GuideBotScript.findActiveGoal0, level: level)
+        }
     }
 
     func nextAuthoritativeRandomValue() -> UInt32 {
         authoritativeRandomState =
             authoritativeRandomState &* 214_013 &+ 2_531_011
         return (authoritativeRandomState >> 16) & 0x7fff
-    }
-
-    private func nextAuthoritativeRandomFraction() -> Float {
-        Float(nextAuthoritativeRandomValue()) / 32_767
     }
 
     private func nextYellowFlareCreationOrdinal() -> UInt64? {
@@ -428,670 +103,57 @@ extension GameSession {
         return ordinal
     }
 
-    private func reinitializeTrainingGuidebotAmbient(
-        at gameTime: Float,
-        state: inout TrainingRobotGuidebotState
-    ) {
-        state.nextAmbientTime = gameTime + 1
-        _ = nextAuthoritativeRandomValue() % 6
-    }
-
-    private func setTrainingGuidebotMode(
-        _ mode: TrainingGuidebotMode,
-        at gameTime: Float,
-        state: inout TrainingRobotGuidebotState
-    ) {
-        state.guidebotMode = mode
-        state.guidebotModeTime = 0
-        state.timeUntilNextFlare =
-            3 + nextAuthoritativeRandomFraction()
-        state.timeUntilNextPlayerVisibilityCheck =
-            0.5 + 0.5 * nextAuthoritativeRandomFraction()
-        state.returnTime = gameTime
-        switch mode {
-        case .birth:
-            state.nextAmbientTime = gameTime + 1.2
-        case .ambient:
-            reinitializeTrainingGuidebotAmbient(
-                at: gameTime,
-                state: &state
-            )
-        }
-    }
-
-    func advanceTrainingGuidebotTiming(
-        duration: Float,
-        gameTime: Float
-    ) -> TrainingOpeningFeedback? {
-        guard duration > 0,
-              var state = trainingRobotGuidebotState,
-              let guidebot = state.guidebot,
-              let mode = state.guidebotMode,
-              var modeTime = state.guidebotModeTime
+    /// Makes the bespoke flares the Guide-Bot fired this update, after the
+    /// flares moved, from the Guide-Bot's place at the shot.
+    func createTrainingGuidebotFlareShots(gameTime: Float) {
+        let shots = world.trainingGuidebotFlareShots
+        world.trainingGuidebotFlareShots = []
+        guard let definition = level.trainingRobotGuidebotChain?.yellowFlare
         else {
-            return nil
+            return
         }
-
-        if mode == .ambient,
-           (state.nextPowerupCheckTime ?? 0) <= gameTime {
-            state.nextPowerupCheckTime =
-                gameTime + 2 + nextAuthoritativeRandomFraction()
-        }
-
-        modeTime += duration
-        state.guidebotModeTime = modeTime
-        if mode == .birth {
-            if modeTime > 1.2 {
-                setTrainingGuidebotMode(
-                    .ambient,
-                    at: gameTime,
-                    state: &state
-                )
+        for shot in shots {
+            guard var state = trainingRobotGuidebotState,
+                  state.yellowFlares != nil,
+                  state.yellowFlares!.count
+                    < trainingGuidebotYellowFlarePresentationCapacity
+            else {
+                continue
             }
-            trainingRobotGuidebotState = state
-            return nil
-        }
-
-        if gameTime > (state.nextAmbientTime ?? gameTime + 1) {
-            reinitializeTrainingGuidebotAmbient(
-                at: gameTime,
-                state: &state
-            )
-        }
-
-        var visibility =
-            (state.timeUntilNextPlayerVisibilityCheck ?? 0.5)
-                - duration
-        if visibility <= 0 {
-            visibility =
-                0.5 + 0.5 * nextAuthoritativeRandomFraction()
-        }
-        state.timeUntilNextPlayerVisibilityCheck = visibility
-
-        var flare = (state.timeUntilNextFlare ?? 3) - duration
-        var feedback: TrainingOpeningFeedback?
-        if flare <= 0 {
-            flare = 3 + nextAuthoritativeRandomFraction()
-            if state.yellowFlareGoalSlots?.isEligible == true,
-               let definition =
-                    level.trainingRobotGuidebotChain?.yellowFlare,
-               state.yellowFlares != nil {
-                feedback = .init(
-                    hudMessages: [],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: true,
-                    soundSourceName:
-                        definition.fireSoundSourceName
-                )
-                if state.yellowFlares!.count
-                    < trainingGuidebotYellowFlarePresentationCapacity {
-                    let usesSharedCreationOrdinals =
-                        playerYellowFlareState != nil
-                    let creationOrdinal = usesSharedCreationOrdinals
-                        ? nextYellowFlareCreationOrdinal()
-                        : nil
-                    guard !usesSharedCreationOrdinals
-                        || creationOrdinal != nil else {
-                        state.timeUntilNextFlare = flare
-                        trainingRobotGuidebotState = state
-                        return feedback
-                    }
-                    let orientation = sourceOrientation(
-                        forward: guidebot.orientation.forward,
-                        up: guidebot.orientation.up
-                    )
-                    let receivesTimeout = definition.timeout != nil
-                        && state.yellowFlareTimeoutReachedFollowingFrame == false
-                        && state.yellowFlareTimeoutSparks?.isEmpty == true
-                        && !state.yellowFlares!.contains {
-                            $0.sourceObjectSlot != nil
-                        }
-                    state.yellowFlares!.append(.init(
-                        roomSourceIndex: guidebot.roomSourceIndex,
-                        position: guidebot.position,
-                        orientation: orientation,
-                        velocity:
-                            orientation.forward * definition.speed,
-                        lifeRemaining: definition.lifetime,
-                        lastParticleDropTime: 0,
-                        presentedLightDistance:
-                            definition.lightDistance,
-                        // DestroyBot2's released slot 16 is the top of the
-                        // LIFO free stack when this first retained flare is
-                        // created.
-                        sourceObjectSlot: receivesTimeout ? 16 : nil,
-                        creationOrdinal: creationOrdinal,
-                        parentObjectHandle:
-                            level.trainingRobotGuidebotChain?
-                                .guidebotObjectHandle
-                    ))
-                }
+            let usesSharedCreationOrdinals = playerYellowFlareState != nil
+            let creationOrdinal = usesSharedCreationOrdinals
+                ? nextYellowFlareCreationOrdinal()
+                : nil
+            guard !usesSharedCreationOrdinals || creationOrdinal != nil else {
+                continue
             }
-        }
-        state.timeUntilNextFlare = flare
-        trainingRobotGuidebotState = state
-        return feedback
-    }
-
-    func trainingGuidebotFeedback(
-        _ message: String,
-        requestedSoundSourceName: String?,
-        at gameTime: Float
-    ) -> TrainingOpeningFeedback {
-        var state = trainingRobotGuidebotState!
-        var soundSourceName: String?
-        if (state.lastMessageSoundTime ?? 0) + 2.5 < gameTime {
-            state.lastMessageSoundTime = gameTime
-            soundSourceName = requestedSoundSourceName
-        }
-        trainingRobotGuidebotState = state
-        return .init(
-            hudMessages: [message],
-            voiceSourceName: "",
-            voicePrecedesHUDMessages: true,
-            soundSourceName: soundSourceName
-        )
-    }
-
-    func completeTrainingGuidebotReturn(
-        at gameTime: Float
-    ) -> TrainingOpeningFeedback? {
-        guard var state = trainingRobotGuidebotState,
-              state.guidebot?.task == .escortPlayer,
-              state.returnGreetingWasPresented != true
-        else {
-            return nil
-        }
-        var feedback: TrainingOpeningFeedback?
-        if state.activeGoalWasReached == true {
-            let greeting = nextAuthoritativeRandomValue() % 100 > 50
-                ? "GB: Come on!"
-                : "GB: Let's go!"
-            trainingRobotGuidebotState = state
-            feedback = trainingGuidebotFeedback(
-                greeting,
-                requestedSoundSourceName:
-                    level.trainingCameraMonitorChain?.returnToShip?
-                        .greetingSoundSourceName,
-                at: gameTime
-            )
             state = trainingRobotGuidebotState!
-        }
-        state.timeUntilNextFlare =
-            3 + nextAuthoritativeRandomFraction()
-        state.yellowFlareGoalSlots?.slot2IsUsed = false
-        state.returnTime = gameTime
-        state.returnGreetingWasPresented = true
-        trainingRobotGuidebotState = state
-        return feedback
-    }
-
-    private func trainingCameraMonitorActiveGoalTarget()
-        -> GameObject?
-    {
-        guard let state = trainingRobotGuidebotState,
-              state.guidebotContinuationWasPresented,
-              state.guidebotIsDeployed,
-              !state.guidebotEnteredShip,
-              state.guidebotMode == .ambient,
-              state.guidebot?.task == .outbound,
-              let cameraState = trainingCameraMonitorState,
-              !cameraState.isHeld,
-              !cameraState.wasUsed,
-              !cameraState.script058WasPresented,
-              let target = trainingCameraMonitorGoalTarget(in: level, world: world)
-        else {
-            return nil
-        }
-        return target
-    }
-
-    func requestTrainingGuidebotActiveGoal(
-        at gameTime: Float
-    )
-        -> TrainingOpeningFeedback?
-    {
-        guard let target = trainingCameraMonitorActiveGoalTarget(),
-              case let .room(targetRoomSourceIndex) = target.location,
-              var state = trainingRobotGuidebotState,
-              var guidebot = state.guidebot,
-              let definition = level.trainingRobotGuidebotChain?.guidebot,
-              let soundSourceName =
-                level.trainingCameraMonitorChain?.returnToShip?
-                    .returnSoundSourceName
-        else {
-            return nil
-        }
-        let startForward = sourceVectorNormalized(
-            guidebot.velocity == .zero
-                ? guidebot.orientation.forward
-                : guidebot.velocity
-        )
-        guard case let .success(route) = trainingGuidebotRoute(
-            in: level,
-            roomStates: world.rooms,
-            startRoomSourceIndex: guidebot.roomSourceIndex,
-            start: guidebot.position,
-            startForward: startForward,
-            destinationRoomSourceIndex: targetRoomSourceIndex,
-            destination: target.position,
-            radius: max(0, definition.collisionRadius - 0.1)
-        ) else {
-            return nil
-        }
-        guidebot.destination = target.position
-        guidebot.route = route
-        guidebot.routeFailure = nil
-        guidebot.routePointIndex = 0
-        guidebot.activeSteeringMode = .direct
-        guidebot.task = .activeGoal
-        guidebot.allocationStartPosition = guidebot.position
-        guidebot.allocationStartForward = startForward
-        guidebot.routeDestination = target.position
-        guidebot.routeDestinationRoomSourceIndex =
-            targetRoomSourceIndex
-        state.activeGoalWasReached = false
-        if state.yellowFlares != nil {
-            state.yellowFlareGoalSlots = .init(
-                slot1IsUsed: true,
-                slot2IsUsed: true,
-                slot3IsUsed: true
+            let orientation = sourceOrientation(
+                forward: shot.orientation.forward,
+                up: shot.orientation.up
             )
-        }
-        state.guidebot = guidebot
-        trainingRobotGuidebotState = state
-        return trainingGuidebotFeedback(
-            "GB: On my way!",
-            requestedSoundSourceName: soundSourceName,
-            at: gameTime
-        )
-    }
-
-    func deployTrainingGuidebot(
-        from player: GameObject,
-        playerVelocity: Vector3,
-        gameTime: Float
-    ) {
-        guard var state = trainingRobotGuidebotState,
-              !state.guidebotIsDeployed,
-              !state.guidebotEnteredShip,
-              let definition = level.trainingRobotGuidebotChain?.guidebot,
-              case let .room(roomSourceIndex) = player.location
-        else {
-            return
-        }
-        let spawnVelocity = playerVelocity
-            + player.orientation.forward * definition.birthForwardVelocity
-        let destination = player.position
-            + player.orientation.forward * definition.goalForwardDistance
-        let allocated = trainingGuidebotRoute(
-            in: level,
-            roomStates: world.rooms,
-            startRoomSourceIndex: roomSourceIndex,
-            start: player.position,
-            startForward: player.orientation.forward,
-            destinationRoomSourceIndex: roomSourceIndex,
-            destination: destination,
-            radius: max(0, definition.collisionRadius - 0.1)
-        )
-        let route: TrainingGuidebotRoute
-        let failure: TrainingGuidebotRouteError?
-        switch allocated {
-        case .success(let allocatedRoute):
-            route = allocatedRoute
-            failure = nil
-        case .failure(let error):
-            route = .init(
-                mode: .direct,
-                points: [destination],
-                roomSourceIndices: [roomSourceIndex],
-                nodeReferences: []
-            )
-            failure = error
-        }
-        state.guidebotIsDeployed = true
-        state.guidebot = .init(
-            spawnPosition: player.position,
-            roomSourceIndex: roomSourceIndex,
-            position: player.position,
-            orientation: player.orientation,
-            spawnVelocity: spawnVelocity,
-            velocity: spawnVelocity,
-            destination: destination,
-            route: route,
-            routeFailure: failure,
-            routePointIndex: 0,
-            activeSteeringMode: .direct,
-            task: .outbound,
-            allocationStartPosition: player.position,
-            allocationStartForward: player.orientation.forward,
-            routeDestination: destination,
-            routeDestinationRoomSourceIndex: roomSourceIndex
-        )
-        state.nextPowerupCheckTime =
-            state.nextPowerupCheckTime ?? 0
-        state.lastMessageSoundTime =
-            state.lastMessageSoundTime ?? 0
-        state.returnGreetingWasPresented = false
-        if state.yellowFlares != nil {
-            state.yellowFlareGoalSlots = .init(
-                slot1IsUsed: true,
-                slot2IsUsed: false,
-                slot3IsUsed: false
-            )
-        }
-        setTrainingGuidebotMode(
-            .birth,
-            at: gameTime,
-            state: &state
-        )
-        trainingRobotGuidebotState = state
-        syncTrainingGuidebotObject()
-    }
-
-    func releaseTrainingGuidebot(
-        from player: GameObject,
-        playerVelocity: Vector3,
-        gameTime: Float
-    ) -> TrainingOpeningFeedback? {
-        guard trainingGuidebotReleaseCommandIsAvailable,
-              var state = trainingRobotGuidebotState
-        else {
-            return nil
-        }
-        state.activeGoalWasReached = nil
-        state.returnWasRequested = false
-        state.guidebotEnteredShip = false
-        state.arrivalFeedbackWasPresented = false
-        trainingRobotGuidebotState = state
-        deployTrainingGuidebot(
-            from: player,
-            playerVelocity: playerVelocity,
-            gameTime: gameTime
-        )
-        guard trainingRobotGuidebotState?.guidebotIsDeployed == true,
-              trainingRobotGuidebotState?.guidebot?.task == .outbound,
-              trainingRobotGuidebotState?.guidebotMode == .birth,
-              let soundSourceName =
-                level.trainingRobotGuidebotChain?.releaseSoundSourceName
-        else {
-            return nil
-        }
-        return .init(
-            hudMessages: [],
-            voiceSourceName: "",
-            voicePrecedesHUDMessages: true,
-            soundSourceName: soundSourceName
-        )
-    }
-
-    func syncTrainingGuidebotObject() {
-        guard let guidebot =
-                trainingRobotGuidebotState?.guidebot,
-              let chain = level.trainingRobotGuidebotChain,
-              var object =
-                world.objects[ObjectHandle(chain.guidebotObjectHandle)],
-              level.objectPresentations.contains(where: {
-                  $0.objectHandle == chain.guidebotObjectHandle
-              })
-        else {
-            return
-        }
-        object.location = .room(guidebot.roomSourceIndex)
-        object.position = guidebot.position
-        object.orientation = guidebot.orientation
-        object.renderType = .polyobj
-        world.objects[object.handle] = object
-    }
-
-    func advanceTrainingGuidebot(
-        duration: Float,
-        player: GameObject,
-        playerRadius: Float
-    ) -> TrainingGuidebotAdvanceEvent? {
-        guard duration > 0,
-              var state = trainingRobotGuidebotState,
-              var guidebot = state.guidebot,
-              let definition = level.trainingRobotGuidebotChain?.guidebot
-        else {
-            return nil
-        }
-        if guidebot.task == .escortPlayer {
-            guidebot.velocity = .zero
-            guidebot.destination = player.position
-            guidebot.activeSteeringMode = .stopped
-            state.guidebot = guidebot
-            trainingRobotGuidebotState = state
-            syncTrainingGuidebotObject()
-            return nil
-        }
-        if guidebot.task == .returnToPlayer
-            || guidebot.task == .returnToShip
-        {
-            if case let .room(playerRoomSourceIndex) = player.location,
-               playerRoomSourceIndex
-                    != guidebot.routeDestinationRoomSourceIndex {
-                let startForward = sourceVectorNormalized(
-                    guidebot.velocity == .zero
-                        ? guidebot.orientation.forward
-                        : guidebot.velocity
-                )
-                let allocated = trainingGuidebotRoute(
-                    in: level,
-                    roomStates: world.rooms,
-                    startRoomSourceIndex: guidebot.roomSourceIndex,
-                    start: guidebot.position,
-                    startForward: startForward,
-                    destinationRoomSourceIndex: playerRoomSourceIndex,
-                    destination: player.position,
-                    radius: max(
-                        0,
-                        definition.collisionRadius - 0.1
-                    )
-                )
-                switch allocated {
-                case .success(let route):
-                    guidebot.route = route
-                    guidebot.routeFailure = nil
-                case .failure(let failure):
-                    guidebot.route = .init(
-                        mode: .direct,
-                        points: [player.position],
-                        roomSourceIndices: [
-                            guidebot.roomSourceIndex
-                        ],
-                        nodeReferences: []
-                    )
-                    guidebot.routeFailure = failure
+            let receivesTimeout = definition.timeout != nil
+                && state.yellowFlareTimeoutReachedFollowingFrame == false
+                && state.yellowFlareTimeoutSparks?.isEmpty == true
+                && !state.yellowFlares!.contains {
+                    $0.sourceObjectSlot != nil
                 }
-                guidebot.routePointIndex = 0
-                guidebot.activeSteeringMode = .direct
-                guidebot.allocationStartPosition = guidebot.position
-                guidebot.allocationStartForward = startForward
-                guidebot.routeDestination = player.position
-                guidebot.routeDestinationRoomSourceIndex =
-                    playerRoomSourceIndex
-            }
-            guidebot.destination = player.position
-        }
-        let followsAllocatedRoute =
-            guidebot.routeFailure == nil && guidebot.route.mode != .direct
-        func passedRoutePoint(at position: Vector3) -> Bool {
-            let index = guidebot.routePointIndex
-            guard followsAllocatedRoute,
-                  index < guidebot.route.points.count - 1 else {
-                return false
-            }
-            let point = guidebot.route.points[index]
-            let pathDirection = index == 0
-                ? guidebot.route.points[index + 1] - point
-                : point - guidebot.route.points[index - 1]
-            return dot(position - point, pathDirection) >= 0
-        }
-        while passedRoutePoint(at: guidebot.position) {
-            guidebot.routePointIndex += 1
-        }
-        let isFinalRoutePoint =
-            guidebot.routePointIndex == guidebot.route.points.count - 1
-        let target = followsAllocatedRoute
-            ? ((guidebot.task == .returnToPlayer
-                || guidebot.task == .returnToShip) && isFinalRoutePoint
-                ? guidebot.destination
-                : guidebot.route.points[guidebot.routePointIndex])
-            : guidebot.destination
-        let remaining = target - guidebot.position
-        let distance = sqrt(dot(remaining, remaining))
-        let goalCircleDistance: Float
-        switch guidebot.task {
-        case .outbound, .returnToShip:
-            goalCircleDistance = definition.goalCircleDistance
-        case .activeGoal:
-            goalCircleDistance =
-                20
-                + definition.collisionRadius
-                + (level.trainingCameraMonitorChain?
-                    .pickupCollisionRadius ?? 0)
-                + 0.1
-        case .returnToPlayer:
-            goalCircleDistance =
-                30 + definition.collisionRadius + playerRadius + 0.1
-        case .escortPlayer:
-            goalCircleDistance = definition.goalCircleDistance
-        }
-        let reachedGoal =
-            isFinalRoutePoint
-                && distance <= goalCircleDistance
-        let desiredVelocity = reachedGoal
-            ? Vector3.zero
-            : sourceVectorNormalized(remaining) * definition.maximumVelocity
-        let velocityDelta = desiredVelocity - guidebot.velocity
-        let deltaMagnitude = sqrt(dot(velocityDelta, velocityDelta))
-        let maximumDelta = definition.maximumDeltaVelocity * duration
-        if deltaMagnitude > maximumDelta, deltaMagnitude > 0 {
-            guidebot.velocity = guidebot.velocity
-                + velocityDelta / deltaMagnitude * maximumDelta
-        } else {
-            guidebot.velocity = desiredVelocity
-        }
-        let movementStart = guidebot.position
-        let trace = traceIndoorMovement(
-            in: level,
-            roomStates: world.rooms,
-            startRoom: guidebot.roomSourceIndex,
-            start: guidebot.position,
-            end: guidebot.position + guidebot.velocity * duration,
-            radius: definition.collisionRadius
-        )
-        guidebot.position = trace.finalPosition
-        guidebot.roomSourceIndex = trace.containingRoomSourceIndex
-        if case .wallHit = trace.outcome {
-            guidebot.velocity = .zero
-        }
-        while passedRoutePoint(at: guidebot.position) {
-            guidebot.routePointIndex += 1
-        }
-        guidebot.activeSteeringMode = reachedGoal
-            ? .stopped
-            : followsAllocatedRoute ? .allocatedRoute : .direct
-        if guidebot.task == .activeGoal, reachedGoal,
-           case let .room(playerRoomSourceIndex) = player.location {
-            let startForward = sourceVectorNormalized(
-                guidebot.velocity == .zero
-                    ? guidebot.orientation.forward
-                    : guidebot.velocity
-            )
-            let allocated = trainingGuidebotRoute(
-                in: level,
-                roomStates: world.rooms,
-                startRoomSourceIndex: guidebot.roomSourceIndex,
-                start: guidebot.position,
-                startForward: startForward,
-                destinationRoomSourceIndex: playerRoomSourceIndex,
-                destination: player.position,
-                radius: max(
-                    0,
-                    definition.collisionRadius - 0.1
-                )
-            )
-            switch allocated {
-            case .success(let route):
-                guidebot.route = route
-                guidebot.routeFailure = nil
-            case .failure(let failure):
-                guidebot.route = .init(
-                    mode: .direct,
-                    points: [player.position],
-                    roomSourceIndices: [
-                        guidebot.roomSourceIndex
-                    ],
-                    nodeReferences: []
-                )
-                guidebot.routeFailure = failure
-            }
-            guidebot.destination = player.position
-            guidebot.routePointIndex = 0
-            guidebot.activeSteeringMode = .direct
-            guidebot.task = .returnToPlayer
-            guidebot.allocationStartPosition = guidebot.position
-            guidebot.allocationStartForward = startForward
-            guidebot.routeDestination = player.position
-            guidebot.routeDestinationRoomSourceIndex =
-                playerRoomSourceIndex
-            state.activeGoalWasReached = true
-            if state.yellowFlares != nil {
-                state.yellowFlareGoalSlots = .init(
-                    slot1IsUsed: true,
-                    slot2IsUsed: true,
-                    slot3IsUsed: false
-                )
-            }
-            state.guidebot = guidebot
+            state.yellowFlares!.append(.init(
+                roomSourceIndex: shot.roomSourceIndex,
+                position: shot.position,
+                orientation: orientation,
+                velocity: orientation.forward * definition.speed,
+                lifeRemaining: definition.lifetime,
+                lastParticleDropTime: 0,
+                presentedLightDistance: definition.lightDistance,
+                // DestroyBot2's released slot 16 is the top of the LIFO
+                // free stack when this first retained flare is created.
+                sourceObjectSlot: receivesTimeout ? 16 : nil,
+                creationOrdinal: creationOrdinal,
+                parentObjectHandle: shot.parent.rawValue
+            ))
             trainingRobotGuidebotState = state
-            syncTrainingGuidebotObject()
-            return .reachedActiveGoal
         }
-        if guidebot.task == .returnToPlayer, reachedGoal {
-            guidebot.velocity = .zero
-            guidebot.destination = player.position
-            guidebot.activeSteeringMode = .stopped
-            guidebot.task = .escortPlayer
-            state.guidebot = guidebot
-            trainingRobotGuidebotState = state
-            syncTrainingGuidebotObject()
-            return .returnedToPlayer
-        }
-        if guidebot.task == .returnToShip,
-           case let .room(playerRoomSourceIndex) = player.location,
-           guidebot.roomSourceIndex == playerRoomSourceIndex,
-           segmentSphereHitFraction(
-               start: movementStart,
-               end: guidebot.position,
-               center: player.position,
-               radius: definition.collisionRadius + playerRadius
-           ) != nil {
-            state.guidebot = nil
-            state.guidebotIsDeployed = false
-            state.guidebotEnteredShip = true
-            state.yellowFlareGoalSlots = nil
-            trainingRobotGuidebotState = state
-            let handle =
-                level.trainingRobotGuidebotChain!.guidebotObjectHandle
-            world.setObjectRendered(handle, false)
-            return .enteredShip
-        }
-        if guidebot.task == .activeGoal {
-            if state.yellowFlareGoalSlots?.slot3IsUsed == true {
-                state.yellowFlareGoalSlots?.slot3IsUsed = false
-            } else if state.yellowFlareGoalSlots?.slot2IsUsed == true {
-                state.yellowFlareGoalSlots?.slot2IsUsed = false
-            }
-        } else if guidebot.task == .outbound, reachedGoal {
-            state.yellowFlareGoalSlots?.slot1IsUsed = false
-        }
-        state.guidebot = guidebot
-        trainingRobotGuidebotState = state
-        syncTrainingGuidebotObject()
-        return nil
     }
 
     private func trainingGuidebotYellowFlareNormalizedVisualAge(
@@ -1477,6 +539,14 @@ extension GameSession {
                           objectRoomSourceIndex
                       ),
                       age >= 3 || object.handle.rawValue != parentHandle,
+                      // A weapon does not collide with OBJ_DUMMY (a ghosted
+                      // object, such as the Guide-Bot in the ship) or a
+                      // powerup (CollideInit, collide.cpp:2585-2640).
+                      object.type != .dummy, object.type != .powerup,
+                      // fvi skips an object with the same parent
+                      // (ObjectsAreRelated, findintersection.cpp:3364).
+                      object.parent.rawValue != parentHandle
+                        || object.parent == .none,
                       let presentation =
                         level.objectPresentations.first(where: {
                             $0.objectHandle == object.handle.rawValue
@@ -1568,67 +638,6 @@ extension GameSession {
         state.yellowFlareTimeoutSparks = timeoutSparks
         state.yellowFlareTimeoutSparkParticles = timeoutSparkParticles
         trainingRobotGuidebotState = state
-    }
-    func requestTrainingGuidebotReturn(
-        to player: GameObject
-    ) -> Bool {
-        guard var state = trainingRobotGuidebotState,
-              !state.returnWasRequested,
-              !state.guidebotEnteredShip,
-              var guidebot = state.guidebot,
-              let definition = level.trainingRobotGuidebotChain?.guidebot,
-              case let .room(playerRoomSourceIndex) = player.location
-        else {
-            return false
-        }
-        let startForward = sourceVectorNormalized(
-            guidebot.velocity == .zero
-                ? guidebot.orientation.forward
-                : guidebot.velocity
-        )
-        let allocated = trainingGuidebotRoute(
-            in: level,
-            roomStates: world.rooms,
-            startRoomSourceIndex: guidebot.roomSourceIndex,
-            start: guidebot.position,
-            startForward: startForward,
-            destinationRoomSourceIndex: playerRoomSourceIndex,
-            destination: player.position,
-            radius: max(0, definition.collisionRadius - 0.1)
-        )
-        switch allocated {
-        case .success(let route):
-            guidebot.route = route
-            guidebot.routeFailure = nil
-        case .failure(let failure):
-            guidebot.route = .init(
-                mode: .direct,
-                points: [player.position],
-                roomSourceIndices: [guidebot.roomSourceIndex],
-                nodeReferences: []
-            )
-            guidebot.routeFailure = failure
-        }
-        guidebot.destination = player.position
-        guidebot.routePointIndex = 0
-        guidebot.activeSteeringMode = .direct
-        guidebot.task = .returnToShip
-        guidebot.allocationStartPosition = guidebot.position
-        guidebot.allocationStartForward = startForward
-        guidebot.routeDestination = player.position
-        guidebot.routeDestinationRoomSourceIndex =
-            playerRoomSourceIndex
-        state.guidebot = guidebot
-        state.returnWasRequested = true
-        if state.yellowFlares != nil {
-            state.yellowFlareGoalSlots = .init(
-                slot1IsUsed: true,
-                slot2IsUsed: false,
-                slot3IsUsed: false
-            )
-        }
-        trainingRobotGuidebotState = state
-        return true
     }
 }
 

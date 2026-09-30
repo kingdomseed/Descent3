@@ -15,8 +15,8 @@
 // DoDyingFrame, DoDebrisFrame, DoSplinterFrame, DoExplosionFrame;
 // WeaponDoFrame's parent-collision timer is read where a weapon moves), the
 // lifeleft timeout, and the movement (AI, weapon, shockwave, and generic
-// physics). The object EVT_INTERVAL, animation, and effects arrive
-// with the general object frame (M2). ObjDeleteDead keeps the order of the
+// physics), and the object's EVT_INTERVAL. The animation and effects
+// arrive with the general object frame (M2). ObjDeleteDead keeps the order of the
 // original; the level goal inform and the inventory removal arrive with
 // level goals and inventory (M1 step 9), and no imported object sets their
 // flags before then.
@@ -27,9 +27,10 @@ extension GameWorld {
     /// ObjDoFrameAll's loop (object.cpp:2969) for the live objects in
     /// `slots`, in ascending order. An object made during the loop in a
     /// later slot is processed in the same pass, as the C++ loop reads
-    /// Highest_object_index each time. A player object is skipped: the
-    /// bound player moves in the session, and an unused player start does
-    /// nothing in single player.
+    /// Highest_object_index each time. The player object is skipped: it
+    /// moves (and gets its EVT_INTERVAL) in the session. It is the only
+    /// player object: GameWorld's init deletes the others, as
+    /// DeleteMultiplayerObjects does in single player (Player.cpp:1365).
     mutating func objDoFrameSlots(_ slots: Range<Int>, level: Level) {
         for slot in slots {
             guard let object = objects.slots[slot],
@@ -77,23 +78,40 @@ extension GameWorld {
             timeoutObject(handle, level: level)
             objects[handle]?.flags |= GameObject.deadFlag
         }
+        // A dead object stops here (object.cpp:2777).
         guard let moving = objects[handle],
               moving.flags & GameObject.deadFlag == 0
         else {
             return
         }
-        switch moving.type {
-        case .weapon:
-            moveWeapon(handle, level: level)
-        case .shockwave:
-            shockwaveConcussiveForce(handle, level: level)
-        default:
-            if moving.physics != nil, moving.ai == nil || moving.dying != nil {
-                movePhysicsObject(handle, level: level)
-            } else if moving.ai != nil, moving.usesPhysics {
-                moveAIObject(handle, level: level)
+        // do_physics_sim does not move a ghosted object (physics.cpp:751).
+        if moving.type != .dummy {
+            switch moving.type {
+            case .weapon:
+                moveWeapon(handle, level: level)
+            case .shockwave:
+                shockwaveConcussiveForce(handle, level: level)
+            default:
+                if moving.physics != nil,
+                   moving.ai == nil || moving.dying != nil {
+                    movePhysicsObject(handle, level: level)
+                } else if moving.ai != nil, moving.usesPhysics {
+                    moveAIObject(handle, level: level)
+                }
             }
         }
+        objectIntervalEvent(handle, level: level)
+    }
+
+    /// The object's EVT_INTERVAL after its movement (object.cpp:2868-2876),
+    /// with this frame's Frametime and Gametime.
+    mutating func objectIntervalEvent(_ handle: ObjectHandle, level: Level) {
+        guard objects[handle] != nil else { return }
+        osirisCallEvent(
+            handle,
+            .interval(frameTime: frameDuration, gameTime: gameTime),
+            level: level
+        )
     }
 
     /// TimeoutObject (object.cpp:2156).

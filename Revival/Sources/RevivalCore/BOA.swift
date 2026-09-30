@@ -6,13 +6,12 @@
 // AIGenerateBOAPath and AIGenerateBNodePath (aipath.cpp:791, :906) add to a
 // dynamic path.
 //
-// Accepted difference (architecture.md section 9): the original reads the
-// CBOA tables that the level editor computed (BOA_Array, the BNode lists).
-// Revival derives the room route from the level's reciprocal portals, with
-// the fewest rooms first. A route that stays in one room and whose straight
-// line is blocked follows the room's verified boundary nodes; a route that
-// crosses rooms goes through each portal's path point. The straight-line
-// probe traces the walls only.
+// The room route follows BOA_GetNextRoom (BOATables.swift). Accepted
+// difference (architecture.md section 9): a route that stays in one room
+// and whose straight line is blocked follows the room's verified boundary
+// nodes; a route that crosses rooms goes through each portal's path point
+// instead of the BNode path. The straight-line probe traces the walls
+// only.
 
 import Foundation
 
@@ -32,46 +31,42 @@ extension GameWorld {
             ).contains(toRoom)
     }
 
-    /// The BOA_GetNextRoom chain from `start` to `destination`: the rooms
-    /// in order, `start` first, or `nil` for BOA_NO_PATH. Breadth first
-    /// over the portals in room and portal order.
+    /// The BOA_GetNextRoom chain from `start` to `destination`
+    /// (BOATables.swift): the rooms in order, `start` first, or `nil` for
+    /// BOA_NO_PATH.
     func boaRoomRoute(from start: Int, to destination: Int,
                       level: Level) -> [Int]? {
-        let roomBySourceIndex = Dictionary(
-            uniqueKeysWithValues: level.rooms.map { ($0.sourceIndex, $0) }
-        )
-        guard roomBySourceIndex[start] != nil,
-              roomBySourceIndex[destination] != nil
+        guard level.boaRoom(start) != nil, level.boaRoom(destination) != nil
         else {
             return nil
         }
-        if start == destination { return [start] }
-        var queue = [start]
-        var head = 0
-        var predecessor: [Int: Int] = [:]
-        var visited: Set<Int> = [start]
-        while head < queue.count {
-            let room = queue[head]
-            head += 1
-            for portal in roomBySourceIndex[room]!.portals {
-                let next = portal.connectedRoom
-                guard roomBySourceIndex[next] != nil,
-                      visited.insert(next).inserted
-                else {
-                    continue
-                }
-                predecessor[next] = room
-                if next == destination {
-                    var result = [destination]
-                    while result.last != start {
-                        result.append(predecessor[result.last!]!)
-                    }
-                    return Array(result.reversed())
-                }
-                queue.append(next)
-            }
+        let noPath = level.effectiveBOATables.noPath
+        var route = [start]
+        while route.last! != destination {
+            let next = boaGetNextRoom(route.last!, destination, level: level)
+            guard next != noPath, !route.contains(next) else { return nil }
+            route.append(next)
         }
-        return nil
+        return route
+    }
+
+    /// The nodes of a room route that crosses rooms: the path point of the
+    /// portal BOA_DetermineStartRoomPortal picks between each pair (as
+    /// AIGenerateAltBNodePath does, aipath.cpp:654), in the room it leads
+    /// into.
+    func boaPortalNodes(_ rooms: [Int], level: Level) -> [AIPathNode]? {
+        var nodes: [AIPathNode] = []
+        for (room, next) in zip(rooms, rooms.dropFirst()) {
+            let index = boaDetermineStartRoomPortal(room, next, level: level)
+            guard index >= 0,
+                  let portal = level.boaRoom(room)?.portals[index]
+            else {
+                return nil
+            }
+            nodes.append(AIPathNode(position: portal.pathPoint,
+                                    roomSourceIndex: next))
+        }
+        return nodes
     }
 
     /// The nodes a dynamic path takes before its end point (the node
@@ -96,20 +91,7 @@ extension GameWorld {
             return []
         }
         if startRoom != endRoom {
-            let roomBySourceIndex = Dictionary(
-                uniqueKeysWithValues: level.rooms.map { ($0.sourceIndex, $0) }
-            )
-            var nodes: [AIPathNode] = []
-            for (room, next) in zip(rooms, rooms.dropFirst()) {
-                guard let portal = roomBySourceIndex[room]?.portals.first(
-                    where: { $0.connectedRoom == next }
-                ) else {
-                    return nil
-                }
-                nodes.append(AIPathNode(position: portal.pathPoint,
-                                        roomSourceIndex: next))
-            }
-            return nodes
+            return boaPortalNodes(rooms, level: level)
         }
         return boaBoundaryNodeRoute(
             room: startRoom,

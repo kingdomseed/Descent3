@@ -40,8 +40,11 @@ final class GameSaveTests: XCTestCase {
         )
     }
 
+    /// The GuideBot script state (the default script on its object) saves
+    /// and continues: the birth at the save and the ambient mode, flares,
+    /// and visibility checks after it.
     func testSavedWorldAdvancesIdenticallyAfterGuidebotRelease() throws {
-        let level = makeTrainingCameraMonitorLevel()
+        let level = withTrainingGuideBot(makeTrainingCameraMonitorLevel())
         let chain = try XCTUnwrap(level.trainingRobotGuidebotChain)
         try assertSaveContinuation(
             level: level,
@@ -49,18 +52,20 @@ final class GameSaveTests: XCTestCase {
                 session.applyTrainingScript036Outcome()
             },
             firstInput: .init(deploysTrainingGuidebot: true),
-            warmupFrames: 12,
+            warmupFrames: 8,
             followFrames: 60,
             atSave: { session in
                 XCTAssertEqual(
-                    session.world.trainingRobotGuidebotState?
-                        .guidebotIsDeployed,
-                    true
+                    session.world.objectType(session.world.buddyHandle),
+                    .robot
                 )
-                XCTAssertNotNil(
-                    session.world.objects[
-                        ObjectHandle(chain.guidebotObjectHandle)
-                    ]
+                XCTAssertEqual(
+                    session.world.buddyHandle,
+                    ObjectHandle(chain.guidebotObjectHandle)
+                )
+                XCTAssertEqual(
+                    session.world.testGuideBot?.mode,
+                    GuideBotScript.birthMode
                 )
             }
         )
@@ -69,7 +74,12 @@ final class GameSaveTests: XCTestCase {
     func testSavedWorldAdvancesIdenticallyAfterRobotDeath() throws {
         let level = makeTrainingRASBot1DeathLevel()
         let rasBot1 = ObjectHandle(2_074)
-        let placedCount = ObjectTable(level: level).count
+        // The placed objects the world keeps: DeleteMultiplayerObjects
+        // removes the other player starts (Player.cpp:1365).
+        let placedHandles = Set(level.objects.map(\.handle))
+        let placedCount = GameWorld(level: level).objects.filter {
+            placedHandles.contains($0.handle.rawValue)
+        }.count
         try assertSaveContinuation(
             level: level,
             prepare: { session in
@@ -473,7 +483,9 @@ final class GameSaveTests: XCTestCase {
             level: concussionLevel
         )
 
-        let guidebotLevel = makeTrainingCameraMonitorLevel()
+        let guidebotLevel = withTrainingGuideBot(
+            makeTrainingCameraMonitorLevel()
+        )
         let guidebotSession = GameSession(
             level: guidebotLevel,
             presentationReadyTimestamp: 0
@@ -483,14 +495,33 @@ final class GameSaveTests: XCTestCase {
             input: .init(deploysTrainingGuidebot: true)
         )
         let deployed = guidebotSession.world
-        XCTAssertNotNil(deployed.trainingRobotGuidebotState?.guidebot)
+        XCTAssertNotNil(deployed.testGuideBot)
         XCTAssertNoThrow(try deployed.validate(against: guidebotLevel))
-        var routeIndex = deployed
-        routeIndex.trainingRobotGuidebotState?.guidebot?.routePointIndex =
-            deployed.trainingRobotGuidebotState!.guidebot!.route.points.count
+        var badPowerups = deployed
+        badPowerups.updateGuideBot(deployed.buddyHandle) {
+            $0.powerups = [3]
+        }
         assertRejected(
-            .indexOutOfRange("guidebot.routePointIndex"),
-            routeIndex,
+            .unexpectedState("object \(deployed.buddyHandle.slot) scripts"),
+            badPowerups,
+            level: guidebotLevel
+        )
+        var badTime = deployed
+        badTime.updateGuideBot(deployed.buddyHandle) {
+            $0.modeTime = .nan
+        }
+        assertRejected(
+            .nonFiniteValue("modeTime"),
+            badTime,
+            level: guidebotLevel
+        )
+        var badLoop = deployed
+        badLoop.soundSystem.objectLoops = [
+            .init(handle: 0, soundIndex: 10_000, object: deployed.buddyHandle),
+        ]
+        assertRejected(
+            .indexOutOfRange("soundSystem"),
+            badLoop,
             level: guidebotLevel
         )
         let dodgeLevel = makeTrainingMovingTargetHandoffLevel()

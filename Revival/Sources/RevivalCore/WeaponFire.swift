@@ -111,6 +111,7 @@ extension GameWorld {
     /// FireWeaponFromObject (WeaponFire.cpp:1809). Only a CT_AI object
     /// spreads its fire. Returns the new weapon, or `nil` when none was
     /// made.
+    @discardableResult
     mutating func fireWeaponFromObject(
         _ handle: ObjectHandle,
         weaponName: String,
@@ -122,29 +123,41 @@ extension GameWorld {
         guard let object = objects[handle],
               let weaponIndex = level.weapons?.firstIndex(where: {
                   $0.name.caseInsensitiveCompare(weaponName) == .orderedSame
-              }),
-              let model = level.polygonModel(of: object)
+              })
         else {
             return nil
         }
         var position: Vector3
         var direction: Vector3
-        if gunpoint >= (model.gunpoints?.count ?? 0) {
+        let model = level.polygonModel(of: object)
+        if gunpoint == -1 {
+            // Gun -1 fires from the object's center (WeaponFire.cpp:1826).
             position = object.position
             direction = object.orientation.forward
-        } else if forceForward {
-            position = weaponCalcGun(object, gunpoint: gunpoint, model: model)
-                .point
-            direction = object.orientation.forward
-        } else if forceTarget, let ai = object.ai,
-                  ai.vecToTargetPerceived != .zero {
-            position = weaponCalcGun(object, gunpoint: gunpoint, model: model)
-                .point
-            direction = ai.vecToTargetPerceived
+        } else if let model {
+            if gunpoint >= (model.gunpoints?.count ?? 0) {
+                position = object.position
+                direction = object.orientation.forward
+            } else if forceForward {
+                position = weaponCalcGun(
+                    object, gunpoint: gunpoint, model: model
+                ).point
+                direction = object.orientation.forward
+            } else if forceTarget, let ai = object.ai,
+                      ai.vecToTargetPerceived != .zero {
+                position = weaponCalcGun(
+                    object, gunpoint: gunpoint, model: model
+                ).point
+                direction = ai.vecToTargetPerceived
+            } else {
+                let gun = weaponCalcGun(
+                    object, gunpoint: gunpoint, model: model
+                )
+                position = gun.point
+                direction = gun.normal
+            }
         } else {
-            let gun = weaponCalcGun(object, gunpoint: gunpoint, model: model)
-            position = gun.point
-            direction = gun.normal
+            return nil
         }
 
         if let ai = object.ai {

@@ -667,7 +667,9 @@ extension WorldRenderingTests {
             "capacity failure adds no sound, carrier, or random draw"
         )
 
-        let oldPackage = makeTrainingGuidebotYellowFlareLevel()
+        let oldPackage = withTrainingGuideBot(
+            makeTrainingGuidebotYellowFlareLevel()
+        )
         let silent = GameSession(
             level: oldPackage,
             presentationReadyTimestamp: 0,
@@ -683,31 +685,15 @@ extension WorldRenderingTests {
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: seed
         )
-        _ = legacyGuidebot.update(
-            at: 0.1,
-            input: .init(deploysTrainingGuidebot: true)
+        legacyGuidebot.runToTestGuideBotAmbient()
+        var legacyWorld = legacyGuidebot.world
+        legacyWorld.prepareTestGuideBotFlare(
+            helperSlotsAreUsed: false,
+            level: oldPackage
         )
-        var legacyObject = try XCTUnwrap(
-            testWorldObject(legacyGuidebot.world)
-        )
-        var legacyGuidebotState = try XCTUnwrap(
-            legacyObject["trainingRobotGuidebotState"] as? [String: Any]
-        )
-        legacyGuidebotState["guidebotMode"] = "ambient"
-        legacyGuidebotState["guidebotModeTime"] = 0.1
-        legacyGuidebotState["nextAmbientTime"] = 100.0
-        legacyGuidebotState["timeUntilNextFlare"] = 0.05
-        legacyGuidebotState["nextPowerupCheckTime"] = 100.0
-        legacyGuidebotState["yellowFlareGoalSlots"] = [
-            "slot1IsUsed": true,
-            "slot2IsUsed": false,
-            "slot3IsUsed": false,
-        ]
-        legacyGuidebotState["yellowFlares"] = []
-        legacyObject["trainingRobotGuidebotState"] = legacyGuidebotState
         let restoredLegacyGuidebot = try GameSession(
             level: oldPackage,
-            world: (decodeTestWorld(legacyObject)).rebased(onto: oldPackage),
+            world: legacyWorld.rebased(onto: oldPackage),
             resumedAtTimestamp: 1
         )
         let legacyGuidebotFrame = restoredLegacyGuidebot.update(
@@ -724,38 +710,22 @@ extension WorldRenderingTests {
     func testPlayerAndGuidebotYellowFamiliesAdvanceBySharedCreationOrdinal()
         throws
     {
-        let level = try makePlayerYellowFlareLevel()
+        let level = withTrainingGuideBot(try makePlayerYellowFlareLevel())
         let seed: UInt32 = 0x3141_5926
         let initial = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: seed
         )
-        _ = initial.update(
-            at: 0.1,
-            input: .init(deploysTrainingGuidebot: true)
+        initial.runToTestGuideBotAmbient()
+        var dueWorld = initial.world
+        dueWorld.prepareTestGuideBotFlare(
+            helperSlotsAreUsed: false,
+            level: level
         )
-        var dueObject = try XCTUnwrap(
-            testWorldObject(initial.world)
-        )
-        var dueGuidebot = try XCTUnwrap(
-            dueObject["trainingRobotGuidebotState"] as? [String: Any]
-        )
-        dueGuidebot["guidebotMode"] = "ambient"
-        dueGuidebot["guidebotModeTime"] = 0.1
-        dueGuidebot["nextAmbientTime"] = 100.0
-        dueGuidebot["timeUntilNextFlare"] = 0.05
-        dueGuidebot["nextPowerupCheckTime"] = 100.0
-        dueGuidebot["yellowFlareGoalSlots"] = [
-            "slot1IsUsed": true,
-            "slot2IsUsed": false,
-            "slot3IsUsed": false,
-        ]
-        dueGuidebot["yellowFlares"] = []
-        dueObject["trainingRobotGuidebotState"] = dueGuidebot
         let due = try GameSession(
             level: level,
-            world: (decodeTestWorld(dueObject)).rebased(onto: level),
+            world: dueWorld.rebased(onto: level),
             resumedAtTimestamp: 1
         )
         _ = due.update(at: 1.1, input: .zero)
@@ -790,8 +760,12 @@ extension WorldRenderingTests {
             (playerPrototypeState["parents"] as? [[String: Any]])?.only
         )
 
+        // With the Guide-Bot in the ship, the frame's only draws are the
+        // three flares' (7 each).
+        var dueFlaresOnly = due.world
+        dueFlaresOnly.parkTestGuideBotInShip()
         var mixedObject = try XCTUnwrap(
-            testWorldObject(due.world)
+            testWorldObject(dueFlaresOnly)
         )
         mixedObject["authoritativeRandomState"] = NSNumber(value: seed)
         mixedObject["frameDuration"] = 0.1

@@ -756,27 +756,68 @@ extension GameWorld {
     }
 
     /// The physics move of an AI object (do_physics_sim for MT_PHYSICS):
-    /// its velocity carried through the rooms. A wall stops it.
+    /// its velocity carried through the rooms. A wall stops it. A ghosted
+    /// object does not move (physics.cpp:751). A robot that meets the
+    /// player on the way stops there, the pair's EVT_COLLIDE goes out
+    /// (collide_two_objects), and the rest of the move goes on past the
+    /// player (the ignore list, physics.cpp:1535); the bump response of the
+    /// pair arrives with the general physics (M2).
     mutating func moveAIObject(_ handle: ObjectHandle, level: Level) {
-        guard var object = objects[handle], object.usesPhysics,
-              object.velocity != .zero,
-              case let .room(room) = object.location
+        guard let start = objects[handle], start.usesPhysics,
+              start.type != .dummy,
+              start.velocity != .zero,
+              case .room = start.location
         else {
             return
         }
-        let trace = traceIndoorMovement(
-            in: level,
-            roomStates: rooms,
-            startRoom: room,
-            start: object.position,
-            end: object.position + object.velocity * frameDuration,
-            radius: object.size
-        )
-        object.position = trace.finalPosition
-        object.location = .room(trace.containingRoomSourceIndex)
-        if case .wallHit = trace.outcome {
-            object.velocity = .zero
+        let end = start.position + start.velocity * frameDuration
+        var ignored: [ObjectHandle] = []
+        while var object = objects[handle], object.type != .dummy,
+              case let .room(room) = object.location {
+            let trace = traceIndoorMovement(
+                in: level,
+                roomStates: rooms,
+                startRoom: room,
+                start: object.position,
+                end: end,
+                radius: object.size
+            )
+            if object.type == .robot,
+               let hit = nearestMoveObjectHit(
+                   handle,
+                   start: object.position,
+                   end: trace.finalPosition,
+                   radius: object.size,
+                   visitedRoomSourceIndices: trace.visitedRoomSourceIndices,
+                   ignored: ignored,
+                   level: level
+               ) {
+                let move = trace.finalPosition - object.position
+                let length = sqrt(dot(move, move))
+                let reached = traceIndoorMovement(
+                    in: level,
+                    roomStates: rooms,
+                    startRoom: room,
+                    start: object.position,
+                    end: length > 0
+                        ? object.position + move * (hit.distance / length)
+                        : object.position,
+                    radius: object.size
+                )
+                object.position = reached.finalPosition
+                object.location = .room(reached.containingRoomSourceIndex)
+                objects[handle] = object
+                ignored.append(hit.handle)
+                collideTwoObjects(handle, hit.handle, level: level)
+                continue
+            }
+            object.position = trace.finalPosition
+            object.location = .room(trace.containingRoomSourceIndex)
+            if case .wallHit = trace.outcome {
+                object.velocity = .zero
+            }
+            objects[handle] = object
+            break
         }
-        objects[handle] = object
     }
 }

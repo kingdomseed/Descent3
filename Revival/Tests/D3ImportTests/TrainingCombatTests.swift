@@ -42,17 +42,22 @@ extension WorldRenderingTests {
             input: .init(deploysTrainingGuidebot: true)
         )
         timestamp += 0.1
-        _ = simulation.update(
+        let used = simulation.update(
             at: timestamp,
             input: .init(usesInventory: true)
         )
+        // This level has no Guide-Bot, so qGetBuddyObj is not a robot and
+        // Script 058 (TrainingMission.cpp:1444) runs in the use frame.
+        var script058: PlayerSimulationFrame? =
+            used.trainingOpeningFeedback.contains(where: {
+                $0.voiceSourceName == "proceed6.osf"
+            }) ? used : nil
         timestamp += 0.1
         _ = simulation.update(
             at: timestamp,
             input: .init(deploysTrainingGuidebot: true)
         )
-        var script058: PlayerSimulationFrame?
-        for _ in 1...100 {
+        for _ in 1...100 where script058 == nil {
             timestamp += 0.1
             let frame = simulation.update(
                 at: timestamp,
@@ -66,7 +71,7 @@ extension WorldRenderingTests {
             }
         }
         let returned = try XCTUnwrap(script058)
-        timestamp = Double(returned.gameTime) + 0.1
+        timestamp = max(timestamp, Double(returned.gameTime)) + 0.1
         XCTAssertTrue(
             simulation.update(at: timestamp, input: .zero)
                 .trainingOpeningFeedback.isEmpty
@@ -81,7 +86,9 @@ extension WorldRenderingTests {
             if frame.trainingOpeningFeedback.contains(where: {
                 $0.voiceSourceName == "intro6.osf"
             }) {
-                XCTAssertEqual(frameIndex, 1)
+                // The player flies from where Script 058 found it to the
+                // Portal3 trigger.
+                XCTAssertLessThan(frameIndex, 40)
                 entered = frame
                 break
             }
@@ -127,11 +134,11 @@ extension WorldRenderingTests {
         // Script 036's FlashLight-2 light and DestroyBot2's deletion.
         XCTAssertEqual(simulation.galleryMarkerLightDistance, 50)
         XCTAssertNil(simulation.world.objects[ObjectHandle(4_112)])
-        let robotState = try XCTUnwrap(
-            continuationObject["trainingRobotGuidebotState"]
-                as? [String: Any]
+        // qGetBuddyObj is not a robot (TrainingMission.cpp:1445).
+        XCTAssertNotEqual(
+            simulation.world.objectType(simulation.world.buddyHandle),
+            .robot
         )
-        XCTAssertEqual(robotState["guidebotEnteredShip"] as? Bool, true)
         let cameraState = try XCTUnwrap(
             continuationObject["trainingCameraMonitorState"]
                 as? [String: Any]
