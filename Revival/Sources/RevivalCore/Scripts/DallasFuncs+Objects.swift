@@ -5,7 +5,7 @@
 // aObjSetLightingDist (:2035), aObjSetLightingColor (:2057),
 // aObjSetShields (:1849), aSetObjectTimer (:2451), aObjGhostSet (:2896),
 // aObjHide (:2916), aObjMakeInvuln (:2937), aAISetState (:3330), and the
-// query qObjShields (:5593).
+// queries qObjIsType (:5292) and qObjShields (:5593).
 
 extension GameWorld {
     /// aObjSetLightingDist (DallasFuncs.cpp:2035).
@@ -51,6 +51,12 @@ extension GameWorld {
     /// aObjSetShields (DallasFuncs.cpp:1849): MSAFE_OBJECT_SHIELDS.
     mutating func aObjSetShields(_ objref: ObjectHandle, _ shields: Float) {
         setObjectShields(objref, shields)
+    }
+
+    /// qObjIsType (DallasFuncs.cpp:5292): MSAFE_OBJECT_TYPE, which is -1
+    /// for a stale handle (multisafe.cpp:902), equals `type`.
+    func qObjIsType(_ objhandle: ObjectHandle, _ type: Int32) -> Bool {
+        (objectType(objhandle).map { Int32($0.rawValue) } ?? -1) == type
     }
 
     /// qObjShields (DallasFuncs.cpp:5593): MSAFE_OBJECT_SHIELDS, or -1 for

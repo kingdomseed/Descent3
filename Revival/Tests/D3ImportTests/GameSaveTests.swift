@@ -50,8 +50,8 @@ final class GameSaveTests: XCTestCase {
             level: level,
             prepare: { session in
                 session.applyTrainingScript036Outcome()
+                session.releaseOrRecallTestGuideBot()
             },
-            firstInput: .init(deploysTrainingGuidebot: true),
             warmupFrames: 8,
             followFrames: 60,
             atSave: { session in
@@ -490,9 +490,10 @@ final class GameSaveTests: XCTestCase {
             level: guidebotLevel,
             presentationReadyTimestamp: 0
         )
+        guidebotSession.releaseOrRecallTestGuideBot()
         _ = guidebotSession.update(
             at: 0.1,
-            input: .init(deploysTrainingGuidebot: true)
+            input: .zero
         )
         let deployed = guidebotSession.world
         XCTAssertNotNil(deployed.testGuideBot)

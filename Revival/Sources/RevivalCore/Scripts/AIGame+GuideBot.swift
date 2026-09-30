@@ -1838,10 +1838,19 @@ extension GameWorld {
 
     /// The Guide-Bot's command menu (COM_GET_MENU through AINotify, as
     /// BuddyBotDownloadData asks it, Descent3/buddymenu.cpp:370), or nil
-    /// when the level has no Guide-Bot.
+    /// when the level has no Guide-Bot or AINotify's gate stops the notify
+    /// (a disabled AI, AImain.cpp:2905). No custom or level script handles
+    /// AIN_USER_DEFINED, so the default script's DoExternalCommands answers
+    /// (AIGame.cpp:5409).
     mutating func guideBotMenu(level: Level) -> GuideBotMenu? {
         let buddy = buddyHandle
-        guard guideBot(buddy) != nil else { return nil }
+        guard guideBot(buddy) != nil,
+              objects[buddy]?.ai.map({
+                  $0.flags & ObjectAIFrame.disabledFlag == 0
+              }) ?? true
+        else {
+            return nil
+        }
         aiSetFlags(buddy, ObjectAIFrame.autoAvoidFriendsFlag)
         return GuideBotScript.menu(buddy, &self, level)
     }

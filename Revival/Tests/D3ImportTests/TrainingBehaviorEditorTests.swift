@@ -391,7 +391,8 @@ extension EditorProjectTests {
             at: root,
             withIntermediateDirectories: false
         )
-        let trainingLevel = makeTrainingRobotGuidebotLevel()
+        // Script 032 comes from the Training module (Portal2's trigger).
+        let trainingLevel = makeScriptedTrainingGalleryLevel()
         let unverifiedNavigationLevel = replacing(
             trainingLevel,
             indoorNavigation: .init(

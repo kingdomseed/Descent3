@@ -16,9 +16,10 @@ final class TrainingQuicksaveTests: XCTestCase {
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1234_5678
         )
+        original.releaseOrRecallTestGuideBot()
         _ = original.update(
             at: 0.1,
-            input: .init(deploysTrainingGuidebot: true)
+            input: .zero
         )
         let saved = original.world
         let saveFile = GameSaveFile(rootURL: root)

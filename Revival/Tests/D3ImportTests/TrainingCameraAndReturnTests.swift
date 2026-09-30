@@ -2,7 +2,10 @@ import XCTest
 
 extension WorldRenderingTests {
     func testCameraMonitorPickupUseAndTimedViewContinueOnceAcrossReload() throws {
-        let level = makeTrainingCameraMonitorLevel()
+        let level = scriptingTrainingCameraMonitorLevel(
+            makeTrainingCameraMonitorLevel(),
+            guideBot: false
+        )
         try level.validate()
         let chain = try XCTUnwrap(level.trainingCameraMonitorChain)
         let securityCamera = try XCTUnwrap(level.objects.first {
@@ -66,22 +69,19 @@ extension WorldRenderingTests {
             input: .init(usesInventory: true)
         )
         // This level has no Guide-Bot (qGetBuddyObj is not a robot), so
-        // Script 058 (TrainingMission.cpp:1444) follows the use in the
-        // same frame's level EVT_INTERVAL.
+        // Script 058 (TrainingMission.cpp:1444) follows the use (Script
+        // 059's counter) in the same frame's level EVT_INTERVAL.
         XCTAssertEqual(
-            used.trainingOpeningFeedback,
-            [.init(
-                hudMessages: [
-                    "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
-                ],
-                voiceSourceName: "guidebotd.osf",
-                voicePrecedesHUDMessages: true
-            ), .init(
-                hudMessages: ["Excellent!"],
-                voiceSourceName: "proceed6.osf",
-                voicePrecedesHUDMessages: true
-            )]
+            presentationLog(used),
+            [
+                "voice:guidebotd.osf",
+                "hud:Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
+                "voice:proceed6.osf",
+                "hud:Excellent!",
+            ]
         )
+        XCTAssertEqual(restored.world.testTrainingMission?.script059Count, 1)
+        XCTAssertEqual(restored.world.testTrainingMission?.script058Count, 1)
         let popup = try XCTUnwrap(used.trainingCameraMonitor)
         XCTAssertEqual(popup.remainingDuration, 10, accuracy: 0.000_1)
         XCTAssertEqual(popup.roomSourceIndex, securityCameraRoom)
@@ -142,10 +142,14 @@ extension WorldRenderingTests {
 
     /// The return command (GBC_RETURN_TO_SHIP, AIGame.cpp:5143) sends the
     /// Guide-Bot into the player; the collision enters the ship
-    /// (DoCollide :5510, SetMode(GBM_ENTER_SHIP) :4628), and the bespoke
-    /// Script 058 bridge sees it back in the ship once (TrainingMission.cpp:1443).
+    /// (DoCollide :5510, SetMode(GBM_ENTER_SHIP) :4628). Script 058
+    /// (TrainingMission.cpp:1443-1455) waits while the Guide-Bot is a robot
+    /// and then, in the level EVT_INTERVAL, lights FlashLight-3, opens
+    /// PortalRoom5, plays proceed6.osf, and shows GoodJob, once.
     func testGuidebotReturnCollisionRunsScript058OnceAcrossReload() throws {
-        let level = withTrainingGuideBot(makeTrainingCameraMonitorLevel())
+        let level = scriptingTrainingCameraMonitorLevel(
+            makeTrainingCameraMonitorLevel()
+        )
         try level.validate()
         let chain = try XCTUnwrap(level.trainingCameraMonitorChain)
         let simulation = GameSession(
@@ -153,9 +157,10 @@ extension WorldRenderingTests {
             presentationReadyTimestamp: 0
         )
         var timestamp = 0.1
+        simulation.releaseOrRecallTestGuideBot()
         _ = simulation.update(
             at: timestamp,
-            input: .init(deploysTrainingGuidebot: true)
+            input: .zero
         )
         timestamp += 0.1
         _ = simulation.update(at: timestamp, input: .init(usesInventory: true))
@@ -166,10 +171,15 @@ extension WorldRenderingTests {
             simulation.world.testGuideBot?.mode,
             GuideBotScript.ambientMode
         )
+        // The Guide-Bot is a robot, so Script 058 waits after the use.
+        XCTAssertEqual(simulation.world.testTrainingMission?.script059Count, 1)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script058Count, 0)
+        XCTAssertEqual(simulation.returnMarkerLightDistance, 0)
         timestamp += 0.1
+        simulation.releaseOrRecallTestGuideBot()
         let requested = simulation.update(
             at: timestamp,
-            input: .init(deploysTrainingGuidebot: true)
+            input: .zero
         )
         XCTAssertEqual(hudMessages([requested]), ["GB: Returning to ship."])
         // DoInit set last_sound_time at level start (AIGame.cpp:5683), so
@@ -226,7 +236,7 @@ extension WorldRenderingTests {
         )
         XCTAssertTrue(script058.objectSoundLoops.isEmpty)
         XCTAssertEqual(
-            script058.trainingGuidebotReturnMarkerLightDistance,
+            simulation.returnMarkerLightDistance,
             50
         )
         assertTrainingGuidebotReturnBarrier(
@@ -252,7 +262,7 @@ extension WorldRenderingTests {
         XCTAssertTrue(afterReload.trainingOpeningFeedback.isEmpty)
         XCTAssertTrue(afterReload.objectSoundLoops.isEmpty)
         XCTAssertEqual(
-            afterReload.trainingGuidebotReturnMarkerLightDistance,
+            restored.returnMarkerLightDistance,
             chain.returnToShip?.openMarkerLightDistance
         )
         assertTrainingGuidebotReturnBarrier(
@@ -406,14 +416,15 @@ extension WorldRenderingTests {
                 rooms: []
             )
         )
-        level = withTrainingGuideBot(level)
+        level = scriptingTrainingCameraMonitorLevel(level)
         let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
+        simulation.releaseOrRecallTestGuideBot()
         _ = simulation.update(
             at: 0.1,
-            input: .init(deploysTrainingGuidebot: true)
+            input: .zero
         )
         _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
         // The birth ends after 1.2 s (AIGame.cpp:5893), and the parent link
@@ -446,11 +457,12 @@ extension WorldRenderingTests {
 
         var completed: PlayerSimulationFrame?
         for frameIndex in 1...400 {
+            if frameIndex == 1 {
+                restored.releaseOrRecallTestGuideBot()
+            }
             let frame = restored.update(
                 at: 100 + Double(frameIndex) * 0.1,
-                input: frameIndex == 1
-                    ? .init(deploysTrainingGuidebot: true)
-                    : .zero
+                input: .zero
             )
             if frameIndex == 1 {
                 XCTAssertEqual(hudMessages([frame]), ["GB: Returning to ship."])
@@ -478,7 +490,7 @@ extension WorldRenderingTests {
             .dummy
         )
         XCTAssertEqual(
-            script058.trainingGuidebotReturnMarkerLightDistance,
+            restored.returnMarkerLightDistance,
             50
         )
         assertTrainingGuidebotReturnBarrier(

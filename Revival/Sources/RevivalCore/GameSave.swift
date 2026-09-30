@@ -240,9 +240,6 @@ extension GameWorld {
         let pairs: [(String, Bool, Bool)] = [
             ("playerYellowFlareState", playerYellowFlareState != nil,
              level.shipDefinitions.first?.playerYellowFlare != nil),
-            ("trainingGalleryBarrierState",
-             trainingGalleryBarrierState != nil,
-             level.trainingGalleryBarrier != nil),
             ("trainingRobotGuidebotState",
              trainingRobotGuidebotState != nil,
              level.trainingRobotGuidebotChain != nil),
@@ -281,6 +278,12 @@ extension GameWorld {
             if !condition { throw .unexpectedState(name) }
         }
         try require(presentationRequests.isEmpty, "presentationRequests")
+        // SGSTriggers saves one flags value per level trigger
+        // (gamesave.cpp:951).
+        try require(
+            triggerFlags.count == level.triggers.count,
+            "triggerFlags"
+        )
         try require(
             trainingGuidebotFlareShots.isEmpty,
             "trainingGuidebotFlareShots"

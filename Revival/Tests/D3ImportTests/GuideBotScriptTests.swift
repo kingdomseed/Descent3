@@ -41,10 +41,10 @@ final class GuideBotScriptTests: XCTestCase {
     /// GBM_AMBIENT and its parent link is gone (3 s after its birth).
     private func releasedAmbient(_ session: GameSession,
                                  timestamp: inout Double) {
+        session.releaseOrRecallTestGuideBot()
         session.runFrames(
             35,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
+            from: &timestamp
         )
     }
 
@@ -113,14 +113,14 @@ final class GuideBotScriptTests: XCTestCase {
         XCTAssertEqual(inShip.commands.map(\.text),
                        ["Exit ship", "Rename GB Unit"])
         XCTAssertEqual(inShip.commands[1].dialogText, "Enter GuideBot name:")
-        XCTAssertTrue(simulation.trainingGuidebotReleaseCommandIsAvailable)
-        XCTAssertFalse(simulation.trainingGuidebotGoalCommandIsAvailable)
+        XCTAssertTrue(simulation.testBuddyMenuOffers(GuideBotScript.exitShipCommand))
+        XCTAssertFalse(simulation.testBuddyMenuOffers(GuideBotScript.findActiveGoal0))
 
         var timestamp = 0.0
+        simulation.releaseOrRecallTestGuideBot()
         simulation.runFrames(
             1,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
+            from: &timestamp
         )
         XCTAssertEqual(
             simulation.world.testGuideBot?.mode,
@@ -130,8 +130,8 @@ final class GuideBotScriptTests: XCTestCase {
             simulation.world.guideBotMenu(level: simulation.level)?.commands,
             []
         )
-        XCTAssertFalse(simulation.trainingGuidebotGoalCommandIsAvailable)
-        XCTAssertFalse(simulation.trainingGuidebotReleaseCommandIsAvailable)
+        XCTAssertFalse(simulation.testBuddyMenuOffers(GuideBotScript.findActiveGoal0))
+        XCTAssertFalse(simulation.testBuddyMenuOffers(GuideBotScript.exitShipCommand))
 
         simulation.runFrames(14, from: &timestamp)
         XCTAssertEqual(
@@ -154,8 +154,8 @@ final class GuideBotScriptTests: XCTestCase {
         XCTAssertFalse(ids.contains(GuideBotScript.exitShipCommand))
         XCTAssertFalse(ids.contains(GuideBotScript.findOutsideCommand))
         XCTAssertEqual(simulation.world.testGuideBot?.numberOfPrimaryGoals, 1)
-        XCTAssertTrue(simulation.trainingGuidebotGoalCommandIsAvailable)
-        XCTAssertTrue(simulation.trainingGuidebotReturnToShipCommandIsAvailable)
+        XCTAssertTrue(simulation.testBuddyMenuOffers(GuideBotScript.findActiveGoal0))
+        XCTAssertTrue(simulation.testBuddyMenuOffers(GuideBotScript.returnToShipCommand))
     }
 
     /// GBC_EXIT_SHIP sends EVT_USE to the Guide-Bot (AIGame.cpp:5243);
@@ -170,10 +170,10 @@ final class GuideBotScriptTests: XCTestCase {
         simulation.world.velocity = .init(x: 3, y: 0, z: 0)
         let playerBefore = simulation.world.testPlayerObject
         var timestamp = 0.0
+        simulation.releaseOrRecallTestGuideBot()
         let released = simulation.runFrames(
             1,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
+            from: &timestamp
         )
         XCTAssertEqual(soundNames(released), ["GBExpulsionA"])
         XCTAssertTrue(hudMessages(released).isEmpty)
@@ -218,11 +218,11 @@ final class GuideBotScriptTests: XCTestCase {
         for frame in 1...20 {
             let frameTime = simulation.world.frameDuration
             timestamp += 0.1
+            if frame == 1 {
+                simulation.releaseOrRecallTestGuideBot()
+            }
             let before = simulation.world
-            _ = simulation.update(
-                at: timestamp,
-                input: frame == 1 ? .init(deploysTrainingGuidebot: true) : .zero
-            )
+            _ = simulation.update(at: timestamp, input: .zero)
             // SetMode(GBM_BIRTH) runs at the frame's start (the menu
             // command), and that frame's DoFrame already adds its Frametime.
             modeTime += frameTime
@@ -280,10 +280,10 @@ final class GuideBotScriptTests: XCTestCase {
     func testTheEngineSoundLoopsWithTheGuideBotAndStopsInTheShip() throws {
         let simulation = session()
         var timestamp = 0.0
+        simulation.releaseOrRecallTestGuideBot()
         let birth = simulation.runFrames(
             12,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
+            from: &timestamp
         )
         XCTAssertTrue(birth.allSatisfy { $0.objectSoundLoops.isEmpty })
         let ambient = simulation.runFrames(4, from: &timestamp)
@@ -324,19 +324,19 @@ final class GuideBotScriptTests: XCTestCase {
         var timestamp = 0.0
         releasedAmbient(simulation, timestamp: &timestamp)
         XCTAssertGreaterThan(simulation.world.gameTime, 2.5)
+        simulation.selectTestBuddyCommand(GuideBotScript.findActiveGoal0)
         let accepted = simulation.runFrames(
             1,
-            from: &timestamp,
-            firstInput: .init(requestsTrainingGuidebotActiveGoal: true)
+            from: &timestamp
         )
         XCTAssertEqual(hudMessages(accepted), ["GB: On my way!"])
         XCTAssertEqual(soundNames(accepted), ["GBotAcceptOrder1"])
         let soundTime = try XCTUnwrap(simulation.world.testGuideBot)
             .lastSoundTime
+        simulation.releaseOrRecallTestGuideBot()
         let gated = simulation.runFrames(
             1,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
+            from: &timestamp
         )
         XCTAssertEqual(hudMessages(gated), ["GB: Returning to ship."])
         XCTAssertFalse(soundNames(gated).contains("GBotAcceptOrder1"))
@@ -354,10 +354,10 @@ final class GuideBotScriptTests: XCTestCase {
         let simulation = session(level)
         var timestamp = 0.0
         releasedAmbient(simulation, timestamp: &timestamp)
+        simulation.selectTestBuddyCommand(GuideBotScript.findActiveGoal0)
         let accepted = simulation.runFrames(
             1,
-            from: &timestamp,
-            firstInput: .init(requestsTrainingGuidebotActiveGoal: true)
+            from: &timestamp
         )
         XCTAssertEqual(hudMessages(accepted), ["GB: On my way!"])
         let goals = try XCTUnwrap(simulation.world.testGuideBotObject?.ai?.goals)
@@ -440,11 +440,11 @@ final class GuideBotScriptTests: XCTestCase {
         let simulation = session(level)
         var timestamp = 0.0
         releasedAmbient(simulation, timestamp: &timestamp)
-        XCTAssertTrue(simulation.trainingGuidebotGoalCommandIsAvailable)
+        XCTAssertTrue(simulation.testBuddyMenuOffers(GuideBotScript.findActiveGoal0))
+        simulation.selectTestBuddyCommand(GuideBotScript.findActiveGoal0)
         let refused = simulation.runFrames(
             1,
-            from: &timestamp,
-            firstInput: .init(requestsTrainingGuidebotActiveGoal: true)
+            from: &timestamp
         )
         XCTAssertEqual(
             hudMessages(refused),
@@ -468,10 +468,10 @@ final class GuideBotScriptTests: XCTestCase {
         let simulation = session(level)
         var timestamp = 0.0
         releasedAmbient(simulation, timestamp: &timestamp)
+        simulation.releaseOrRecallTestGuideBot()
         let requested = simulation.runFrames(
             1,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
+            from: &timestamp
         )
         XCTAssertEqual(hudMessages(requested), ["GB: Returning to ship."])
         let returning = try XCTUnwrap(
@@ -498,12 +498,12 @@ final class GuideBotScriptTests: XCTestCase {
         XCTAssertEqual(simulation.world.testGuideBot?.mode,
                        GuideBotScript.inShipMode)
         XCTAssertEqual(simulation.world.playerInventory.items.count, 1)
-        XCTAssertTrue(simulation.trainingGuidebotReleaseCommandIsAvailable)
+        XCTAssertTrue(simulation.testBuddyMenuOffers(GuideBotScript.exitShipCommand))
 
+        simulation.releaseOrRecallTestGuideBot()
         let again = simulation.runFrames(
             1,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
+            from: &timestamp
         )
         XCTAssertTrue(soundNames(again).contains("GBExpulsionA"))
         XCTAssertEqual(simulation.world.testGuideBot?.mode,
@@ -518,10 +518,10 @@ final class GuideBotScriptTests: XCTestCase {
         let simulation = session(level, seed: 0x1357_9BDF)
         var timestamp = 0.0
         releasedAmbient(simulation, timestamp: &timestamp)
+        simulation.selectTestBuddyCommand(GuideBotScript.findActiveGoal0)
         simulation.runFrames(
             20,
-            from: &timestamp,
-            firstInput: .init(requestsTrainingGuidebotActiveGoal: true)
+            from: &timestamp
         )
         XCTAssertTrue(
             try XCTUnwrap(simulation.world.testGuideBotObject?.ai?.goals[1])
@@ -609,10 +609,10 @@ final class GuideBotScriptTests: XCTestCase {
         let simulation = session(level)
         XCTAssertEqual(simulation.world.gbPowerup(ObjectHandle(4_136))?.type, 4)
         var timestamp = 0.0
+        simulation.releaseOrRecallTestGuideBot()
         let frames = simulation.runFrames(
             200,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
+            from: &timestamp
         )
         let messages = hudMessages(frames)
         XCTAssertTrue(messages.contains("GB: TXT_GB_I_FOUND_A_GB_POWERUP"))
@@ -667,10 +667,10 @@ final class GuideBotScriptTests: XCTestCase {
         XCTAssertEqual(menu.commands.first?.text, "Exit ship")
 
         var timestamp = 0.0
+        simulation.releaseOrRecallTestGuideBot()
         let released = simulation.runFrames(
             1,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
+            from: &timestamp
         )
         XCTAssertEqual(soundNames(released), ["GBExpulsionA"])
         XCTAssertEqual(simulation.world.objectType(buddy), .robot)

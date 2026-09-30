@@ -91,7 +91,6 @@ struct PlayerSimulationFrame: Equatable, Sendable {
         [TrainingGuidebotYellowFlareTimeoutSparkFrame]
     let trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame]
-    let trainingGuidebotReturnMarkerLightDistance: Float?
     /// The playing looping sounds linked to an object (SoundSystem.swift),
     /// at the object's place this frame.
     let objectSoundLoops: [ObjectSoundLoopFrame]

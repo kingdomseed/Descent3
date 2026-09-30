@@ -364,11 +364,48 @@ extension GameSession {
     /// frames of 0.1 s).
     func runToTestGuideBotAmbient() {
         var timestamp = 0.0
-        runFrames(
-            35,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
-        )
+        releaseOrRecallTestGuideBot()
+        runFrames(35, from: &timestamp)
+    }
+
+    /// F4 between frames, then the buddy menu item that sends `command`
+    /// (BuddyDisplay and BuddyProcessCommand, buddymenu.cpp:95, :437), or
+    /// ESC when the menu does not offer it. Returns whether it was sent.
+    @discardableResult
+    func selectTestBuddyCommand(_ command: Int32, text: String? = nil)
+        -> Bool
+    {
+        guard let menu = openBuddyMenu(at: lastTimestamp) else {
+            return false
+        }
+        guard let index = menu.commands.firstIndex(where: {
+            $0.id == command
+        }) else {
+            closeBuddyMenu(at: lastTimestamp)
+            return false
+        }
+        selectBuddyMenuItem(index, text: text, at: lastTimestamp)
+        return true
+    }
+
+    /// F4 and the first of "Exit ship" and "Return to ship" the menu
+    /// offers, as a player releases or recalls the Guide-Bot.
+    func releaseOrRecallTestGuideBot() {
+        guard let menu = openBuddyMenu(at: lastTimestamp) else { return }
+        guard let index = menu.commands.firstIndex(where: {
+            $0.id == GuideBotScript.exitShipCommand
+                || $0.id == GuideBotScript.returnToShipCommand
+        }) else {
+            closeBuddyMenu(at: lastTimestamp)
+            return
+        }
+        selectBuddyMenuItem(index, at: lastTimestamp)
+    }
+
+    /// Whether the buddy menu would offer `command` now (COM_GET_MENU).
+    func testBuddyMenuOffers(_ command: Int32) -> Bool {
+        world.guideBotMenu(level: level)?.commands
+            .contains { $0.id == command } ?? false
     }
 
     /// Runs `frames` updates of 0.1 s with `input` on the first, and returns

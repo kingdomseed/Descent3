@@ -17,6 +17,15 @@ final class GameSession {
     var lastTimestamp: Double
     var pauseDepth = 0
     private var pauseTimestamp: Double?
+    /// Game_interface_mode == GAME_BUDDY_INTERFACE: F4 asked for the buddy
+    /// menu this frame (GameLoop.cpp:1493). The app opens it after the frame
+    /// (BuddyMenu.swift).
+    var buddyMenuIsRequested = false
+    /// The open buddy menu, while the game is paused for it.
+    var buddyMenu: BuddyMenu?
+    /// Presentation the Guide-Bot asked for while the game was paused for
+    /// the buddy menu. The next frame presents it first.
+    var pendingMenuPresentation: [ScriptPresentationRequest] = []
 
     init(
         level: Level,
@@ -123,10 +132,6 @@ final class GameSession {
     var playerYellowFlareState: PlayerYellowFlareState? {
         get { world.playerYellowFlareState }
         set { world.playerYellowFlareState = newValue }
-    }
-    var trainingGalleryBarrierState: TrainingGalleryBarrierState? {
-        get { world.trainingGalleryBarrierState }
-        set { world.trainingGalleryBarrierState = newValue }
     }
     var trainingRobotGuidebotState: TrainingRobotGuidebotState? {
         get { world.trainingRobotGuidebotState }
@@ -285,13 +290,15 @@ final class GameSession {
     }
 
     /// Moves the script presentation requests of this update into the
-    /// frame's presentation list, in request order. A streamed file name
+    /// frame's presentation list, in request order, after those the
+    /// Guide-Bot made while the buddy menu paused the game. A streamed file name
     /// becomes the level's canonical voice key (package schema 12). The
     /// voice path plays each clip at its imported volume, and every
     /// translated call passes volume 1. A 2D sound plays its sound clip at
     /// the clip's import volume times the requested volume.
     func takeScriptPresentation() -> [TrainingOpeningFeedback] {
-        let requests = world.presentationRequests
+        let requests = pendingMenuPresentation + world.presentationRequests
+        pendingMenuPresentation = []
         world.presentationRequests = []
         return requests.map { request in
             switch request {

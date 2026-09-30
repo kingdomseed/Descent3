@@ -361,8 +361,8 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         metalView.controllerInputChanged = {
             [weak self] in self?.playerInput.setController($0)
         }
-        metalView.guidebotDeployRequested = {
-            [weak self] in self?.requestGuidebotAction()
+        metalView.buddyMenuRequested = {
+            [weak self] in self?.playerInput.requestBuddyMenu()
         }
         metalView.primaryFireHeldChanged = {
             [weak self] in self?.playerInput.setPrimaryFireHeld($0)
@@ -614,95 +614,17 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         window?.makeFirstResponder(gameplayView)
     }
 
-    private func requestGuidebotAction() {
-        guard let simulation = playSimulation,
-              simulation.trainingGuidebotGoalCommandIsAvailable
-        else {
-            requestTrainingGuidebotReturnToShipOrDeployment()
-            return
+    /// After the F4 frame the view runs the buddy menu as a solo pause
+    /// (RevivalGameplayView.runBuddyMenu, setSoloPause). No frame runs
+    /// until it closes.
+    private func runBuddyMenu(_ simulation: GameSession) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.playSimulation === simulation else {
+                simulation.buddyMenuIsRequested = false
+                return
+            }
+            self.gameplayView.runBuddyMenu(simulation)
         }
-        playerInput.setGameplayActive(
-            false,
-            simulation: simulation,
-            at: ProcessInfo.processInfo.systemUptime
-        )
-        gameplayView.clearInput()
-        let selected = gameplayView.presentTrainingGuidebotGoalMenu()
-        let active =
-            playSimulation === simulation
-            && window?.isKeyWindow == true
-        playerInput.setGameplayActive(
-            active,
-            simulation: simulation,
-            at: ProcessInfo.processInfo.systemUptime
-        )
-        gameplayView.setGameplayActive(active)
-        if active {
-            window?.makeFirstResponder(gameplayView)
-        }
-        guard selected, active else { return }
-        playerInput.requestTrainingGuidebotActiveGoal()
-    }
-
-    private func requestTrainingGuidebotReturnToShipOrDeployment() {
-        guard let simulation = playSimulation,
-              simulation.trainingGuidebotReturnToShipCommandIsAvailable
-        else {
-            requestTrainingGuidebotReleaseOrDeployment()
-            return
-        }
-        playerInput.setGameplayActive(
-            false,
-            simulation: simulation,
-            at: ProcessInfo.processInfo.systemUptime
-        )
-        gameplayView.clearInput()
-        let selected =
-            gameplayView.presentTrainingGuidebotReturnToShipMenu()
-        let active =
-            playSimulation === simulation
-            && window?.isKeyWindow == true
-        playerInput.setGameplayActive(
-            active,
-            simulation: simulation,
-            at: ProcessInfo.processInfo.systemUptime
-        )
-        gameplayView.setGameplayActive(active)
-        if active {
-            window?.makeFirstResponder(gameplayView)
-        }
-        guard selected, active else { return }
-        playerInput.requestGuidebotDeployment()
-    }
-
-    private func requestTrainingGuidebotReleaseOrDeployment() {
-        guard let simulation = playSimulation,
-              simulation.trainingGuidebotReleaseCommandIsAvailable
-        else {
-            playerInput.requestGuidebotDeployment()
-            return
-        }
-        playerInput.setGameplayActive(
-            false,
-            simulation: simulation,
-            at: ProcessInfo.processInfo.systemUptime
-        )
-        gameplayView.clearInput()
-        let selected = gameplayView.presentTrainingGuidebotReleaseMenu()
-        let active =
-            playSimulation === simulation
-            && window?.isKeyWindow == true
-        playerInput.setGameplayActive(
-            active,
-            simulation: simulation,
-            at: ProcessInfo.processInfo.systemUptime
-        )
-        gameplayView.setGameplayActive(active)
-        if active {
-            window?.makeFirstResponder(gameplayView)
-        }
-        guard selected, active else { return }
-        playerInput.requestGuidebotDeployment()
     }
 
     @objc private func commitRoomName(_ sender: Any?) {
@@ -987,7 +909,10 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                 renderer?.setFrameUpdate { [weak self, weak renderer] timestamp in
                     guard let self, let renderer,
                           self.playSimulation === simulation,
-                          self.playerInput.gameplayIsActive else {
+                          self.playerInput.gameplayIsActive,
+                          // The buddy menu request or open menu holds it.
+                          !simulation.buddyMenuIsRequested,
+                          simulation.buddyMenu == nil else {
                         return
                     }
                     let mouse = self.gameplayView.drainMouseDelta()
@@ -1040,6 +965,9 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                     } catch {
                         renderer.setFrameUpdate(nil)
                         self.setStatus(error.localizedDescription, isError: true)
+                    }
+                    if simulation.buddyMenuIsRequested {
+                        self.runBuddyMenu(simulation)
                     }
                 }
                 projectDocument.commitPlaySession(candidate, renderingWorld: false)

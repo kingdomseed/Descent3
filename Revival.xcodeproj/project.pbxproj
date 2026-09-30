@@ -14,6 +14,8 @@
 		C9C9C85F72E6203EFF4D2E29 /* GuideBotEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8A6F8C3DD74DB6C7C1FF5A /* GuideBotEngineTests.swift */; };
 		8E11FDA916308E5D87FDE173 /* StringTableImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */; };
 		C92AD00AAA0B4B237E1B1B17 /* GuideBotScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */; };
+		75501B9C341D45FBD07768EC /* TriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB2B52F636938E83E7CDA8 /* TriggerTests.swift */; };
+		7A0E47CDEFFE44C430D1F008 /* BuddyMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC90A27E30D55B716BD00FD /* BuddyMenuTests.swift */; };
 		01D46C5909D21CDAD71F06D4 /* GuideBotFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */; };
 		5E6100000000000000000001 /* TrainingDodgeManeuverScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */; };
 		7A1300000000000000000001 /* OsirisTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A13000000000000000000F0 /* OsirisTests.swift */; };
@@ -34,6 +36,8 @@
 		E96E0C734CC5E618E49A5086 /* FixMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346BF267F8445A942F17C6BC /* FixMath.swift */; };
 		70B84B4DA44BF3C37D3744D7 /* BOATables+Make.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */; };
 		277E4B14EC977227B119FD5B /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
+		0BC1F1B72D7F98FF481FE1FD /* BuddyMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */; };
+		B4BE9BD4A06A458CE78008BE /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCA77662893599B5A18A34 /* Trigger.swift */; };
 		BC4086E23B0AF6269CB4646A /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000001 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000001 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
@@ -58,6 +62,8 @@
 		257E390305E26D4D79A6DDF7 /* FixMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346BF267F8445A942F17C6BC /* FixMath.swift */; };
 		3F3E520CEFAE7F982DB81D26 /* BOATables+Make.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */; };
 		F9EDBFA52B0F45AF122669A2 /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
+		9FE6D9DAB0B2A5304DB12BE6 /* BuddyMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */; };
+		131AF633C283823F3C33502B /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCA77662893599B5A18A34 /* Trigger.swift */; };
 		1A0686866FB1A49F2173FEA0 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000002 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000002 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
@@ -82,6 +88,8 @@
 		2A6A0D130F2F78848D0712E1 /* FixMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346BF267F8445A942F17C6BC /* FixMath.swift */; };
 		41ED3F9F93D7C709DC8B6B30 /* BOATables+Make.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */; };
 		EE1A006B94A9BEAC16C971EE /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
+		67FE0E824A3AB386EDCC4766 /* BuddyMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */; };
+		E376FA2B0EB852E19D1FCD55 /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCA77662893599B5A18A34 /* Trigger.swift */; };
 		F80F28AAF958FB3C031517B3 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000003 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000003 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
@@ -106,6 +114,8 @@
 		BDFDB5836D58A3D2D05CF639 /* FixMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346BF267F8445A942F17C6BC /* FixMath.swift */; };
 		DFD918E3CF700354E30FDF18 /* BOATables+Make.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */; };
 		F9F9682215DFE5A1E694FA4D /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
+		3F09FAC5E3071C44E3E99E8A /* BuddyMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */; };
+		6316562FA5E34EE550A6ED9D /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCA77662893599B5A18A34 /* Trigger.swift */; };
 		24782A6620743FCEDFF1E740 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000004 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000004 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
@@ -130,6 +140,8 @@
 		A926C151B88A4DF317CC3AD6 /* FixMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346BF267F8445A942F17C6BC /* FixMath.swift */; };
 		2CEAB4848E7E63FFEFB9D296 /* BOATables+Make.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */; };
 		4A337FCE55F9DB14F7C12D40 /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
+		B69276682B25338200C98632 /* BuddyMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */; };
+		4F06729EC83600415B8707AE /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCA77662893599B5A18A34 /* Trigger.swift */; };
 		87D8923A66AEB76E9E3B7EA8 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000005 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000005 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
@@ -456,6 +468,8 @@
 		3B8A6F8C3DD74DB6C7C1FF5A /* GuideBotEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotEngineTests.swift; sourceTree = "<group>"; };
 		51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringTableImportTests.swift; sourceTree = "<group>"; };
 		A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotScriptTests.swift; sourceTree = "<group>"; };
+		7ACB2B52F636938E83E7CDA8 /* TriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerTests.swift; sourceTree = "<group>"; };
+		2DC90A27E30D55B716BD00FD /* BuddyMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyMenuTests.swift; sourceTree = "<group>"; };
 		F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotFixtures.swift; sourceTree = "<group>"; };
 		5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDodgeManeuverScriptTests.swift; sourceTree = "<group>"; };
 		7A13000000000000000000F0 /* OsirisTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsirisTests.swift; sourceTree = "<group>"; };
@@ -476,6 +490,8 @@
 		346BF267F8445A942F17C6BC /* FixMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixMath.swift; sourceTree = "<group>"; };
 		C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BOATables+Make.swift"; sourceTree = "<group>"; };
 		655B4F47EF50402AFB79757C /* Inventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Inventory.swift; sourceTree = "<group>"; };
+		EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyMenu.swift; sourceTree = "<group>"; };
+		80DCA77662893599B5A18A34 /* Trigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trigger.swift; sourceTree = "<group>"; };
 		EBB55F716A78C2203311F4FA /* SoundSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundSystem.swift; sourceTree = "<group>"; };
 		7B06000000000000000000F0 /* Damage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Damage.swift; sourceTree = "<group>"; };
 		7B05000000000000000000F0 /* WeaponFire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeaponFire.swift; sourceTree = "<group>"; };
@@ -765,6 +781,8 @@
 				346BF267F8445A942F17C6BC /* FixMath.swift */,
 				C92CB8E2609A2BF7F87ED0BA /* BOATables+Make.swift */,
 				655B4F47EF50402AFB79757C /* Inventory.swift */,
+				EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */,
+				80DCA77662893599B5A18A34 /* Trigger.swift */,
 				EBB55F716A78C2203311F4FA /* SoundSystem.swift */,
 				7B06000000000000000000F0 /* Damage.swift */,
 				7B05000000000000000000F0 /* WeaponFire.swift */,
@@ -860,6 +878,8 @@
 				3B8A6F8C3DD74DB6C7C1FF5A /* GuideBotEngineTests.swift */,
 				51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */,
 				A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */,
+				7ACB2B52F636938E83E7CDA8 /* TriggerTests.swift */,
+				2DC90A27E30D55B716BD00FD /* BuddyMenuTests.swift */,
 				F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */,
 				5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */,
 				7A13000000000000000000F0 /* OsirisTests.swift */,
@@ -1121,6 +1141,8 @@
 				A926C151B88A4DF317CC3AD6 /* FixMath.swift in Sources */,
 				2CEAB4848E7E63FFEFB9D296 /* BOATables+Make.swift in Sources */,
 				4A337FCE55F9DB14F7C12D40 /* Inventory.swift in Sources */,
+				B69276682B25338200C98632 /* BuddyMenu.swift in Sources */,
+				4F06729EC83600415B8707AE /* Trigger.swift in Sources */,
 				87D8923A66AEB76E9E3B7EA8 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000005 /* Damage.swift in Sources */,
 				7B0500000000000000000005 /* WeaponFire.swift in Sources */,
@@ -1203,6 +1225,8 @@
 				BDFDB5836D58A3D2D05CF639 /* FixMath.swift in Sources */,
 				DFD918E3CF700354E30FDF18 /* BOATables+Make.swift in Sources */,
 				F9F9682215DFE5A1E694FA4D /* Inventory.swift in Sources */,
+				3F09FAC5E3071C44E3E99E8A /* BuddyMenu.swift in Sources */,
+				6316562FA5E34EE550A6ED9D /* Trigger.swift in Sources */,
 				24782A6620743FCEDFF1E740 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000004 /* Damage.swift in Sources */,
 				7B0500000000000000000004 /* WeaponFire.swift in Sources */,
@@ -1283,6 +1307,8 @@
 				2A6A0D130F2F78848D0712E1 /* FixMath.swift in Sources */,
 				41ED3F9F93D7C709DC8B6B30 /* BOATables+Make.swift in Sources */,
 				EE1A006B94A9BEAC16C971EE /* Inventory.swift in Sources */,
+				67FE0E824A3AB386EDCC4766 /* BuddyMenu.swift in Sources */,
+				E376FA2B0EB852E19D1FCD55 /* Trigger.swift in Sources */,
 				F80F28AAF958FB3C031517B3 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000003 /* Damage.swift in Sources */,
 				7B0500000000000000000003 /* WeaponFire.swift in Sources */,
@@ -1369,6 +1395,8 @@
 				257E390305E26D4D79A6DDF7 /* FixMath.swift in Sources */,
 				3F3E520CEFAE7F982DB81D26 /* BOATables+Make.swift in Sources */,
 				F9EDBFA52B0F45AF122669A2 /* Inventory.swift in Sources */,
+				9FE6D9DAB0B2A5304DB12BE6 /* BuddyMenu.swift in Sources */,
+				131AF633C283823F3C33502B /* Trigger.swift in Sources */,
 				1A0686866FB1A49F2173FEA0 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000002 /* Damage.swift in Sources */,
 				7B0500000000000000000002 /* WeaponFire.swift in Sources */,
@@ -1402,6 +1430,8 @@
 				C9C9C85F72E6203EFF4D2E29 /* GuideBotEngineTests.swift in Sources */,
 				8E11FDA916308E5D87FDE173 /* StringTableImportTests.swift in Sources */,
 				C92AD00AAA0B4B237E1B1B17 /* GuideBotScriptTests.swift in Sources */,
+				75501B9C341D45FBD07768EC /* TriggerTests.swift in Sources */,
+				7A0E47CDEFFE44C430D1F008 /* BuddyMenuTests.swift in Sources */,
 				01D46C5909D21CDAD71F06D4 /* GuideBotFixtures.swift in Sources */,
 				5E6100000000000000000001 /* TrainingDodgeManeuverScriptTests.swift in Sources */,
 				7A1300000000000000000001 /* OsirisTests.swift in Sources */,
@@ -1510,6 +1540,8 @@
 				E96E0C734CC5E618E49A5086 /* FixMath.swift in Sources */,
 				70B84B4DA44BF3C37D3744D7 /* BOATables+Make.swift in Sources */,
 				277E4B14EC977227B119FD5B /* Inventory.swift in Sources */,
+				0BC1F1B72D7F98FF481FE1FD /* BuddyMenu.swift in Sources */,
+				B4BE9BD4A06A458CE78008BE /* Trigger.swift in Sources */,
 				BC4086E23B0AF6269CB4646A /* SoundSystem.swift in Sources */,
 				7B0600000000000000000001 /* Damage.swift in Sources */,
 				7B0500000000000000000001 /* WeaponFire.swift in Sources */,

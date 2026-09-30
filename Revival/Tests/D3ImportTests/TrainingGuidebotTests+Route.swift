@@ -2,7 +2,7 @@ import XCTest
 
 extension WorldRenderingTests {
     func testDeployedGuidebotContinuationRestoresPresentationWithoutRepeatingScript060() throws {
-        let level = withTrainingGuideBot(makeTrainingRobotGuidebotLevel())
+        let level = makeScriptedTrainingGalleryLevel()
         let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
@@ -20,9 +20,10 @@ extension WorldRenderingTests {
                 break
             }
         }
+        simulation.releaseOrRecallTestGuideBot()
         let deployed = simulation.update(
             at: galleryTimestamp + 0.1,
-            input: .init(deploysTrainingGuidebot: true)
+            input: .zero
         )
         // Script 060 runs once the Guide-Bot is out (TrainingMission.cpp:1431).
         XCTAssertTrue(deployed.trainingOpeningFeedback.contains {

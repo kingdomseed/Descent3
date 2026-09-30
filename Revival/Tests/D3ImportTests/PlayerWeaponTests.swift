@@ -359,12 +359,13 @@ extension WorldRenderingTests {
             [true, false, true, false, true, false]
         )
 
-        XCTAssertFalse(
-            trainingPlayerControlMask(
-                galleryWasTriggered: true,
-                controlsWereRestored: false,
-                controllerBitflags: .all
-            ).contains(.primaryWeapon)
+        // Script 032's aToggleAllPlayerControls(0, 0) clears every control
+        // bit, the primary weapon's too (TrainingMission.cpp:2336).
+        XCTAssertEqual(
+            InputSnapshot(firesPrimaryWeapon: true)
+                .applying(PlayerControlMask(rawValue: 0))
+                .firesPrimaryWeapon,
+            false
         )
     }
 

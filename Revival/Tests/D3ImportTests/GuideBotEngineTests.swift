@@ -98,10 +98,10 @@ final class GuideBotEngineTests: XCTestCase {
             let simulation = session(seed: seed)
             XCTAssertEqual(simulation.world.gameModuleRandomState, 1)
             var timestamp = 0.0
+            simulation.releaseOrRecallTestGuideBot()
             simulation.runFrames(
                 1,
-                from: &timestamp,
-                firstInput: .init(deploysTrainingGuidebot: true)
+                from: &timestamp
             )
             return simulation
         }
@@ -198,10 +198,10 @@ final class GuideBotEngineTests: XCTestCase {
         var timestamp = 0.0
         simulation.runToTestGuideBotAmbient()
         timestamp = 3.5
+        simulation.releaseOrRecallTestGuideBot()
         simulation.runFrames(
             1,
-            from: &timestamp,
-            firstInput: .init(deploysTrainingGuidebot: true)
+            from: &timestamp
         )
         XCTAssertEqual(simulation.world.testGuideBot?.isMarkedForPickup, true)
         // Park it ahead of the player, unable to move.

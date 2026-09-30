@@ -1,419 +1,261 @@
 import XCTest
 
-extension WorldRenderingTests {
-    func testTrainingGalleryTriggerClosesAnimatedBarrierOnceAndRestores() throws {
-        let level = makeTrainingGalleryBarrierLevel()
-        try level.validate()
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
+/// The retail text of the Training messages the Guide-Bot scripts show
+/// (TrainingMission.msg).
+let fixtureGuideBotScriptMessages = [
+    LevelScriptMessage(
+        name: "GBIntro",
+        text: "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4."
+    ),
+    LevelScriptMessage(
+        name: "GetCameraMonitor",
+        text: "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to."
+    ),
+]
 
-        var triggerFrame: PlayerSimulationFrame?
-        for frameIndex in 1...20 {
-            let frame = simulation.update(
-                at: Double(frameIndex) * 0.1,
-                input: .init(forward: 1)
-            )
-            if frame.trainingOpeningFeedback.contains(where: {
-                $0.voiceSourceName == "guidebota.osf"
-            }) {
-                triggerFrame = frame
-                break
+/// `level` with the Training module and the Guide-Bot script messages,
+/// and the room with this source index named as the scripts look it up.
+func addingGuideBotLessonScripting(
+    _ level: Level,
+    roomSourceIndex: Int,
+    roomName: String
+) -> Level {
+    var level = level
+    let room = level.rooms.firstIndex { $0.sourceIndex == roomSourceIndex }!
+    level.rooms[room].name = roomName
+    return addingTrainingMissionScripting(
+        level,
+        messages: fixtureTrainingMessages + fixtureGuideBotScriptMessages
+    )
+}
+
+/// The gallery level with the Training module and the translated
+/// Guide-Bot: the barrier room is PortalRoom4 (Room_indexes[3]) and
+/// FlashLight-2 is Object_handles[1], as in the retail level.
+func makeScriptedTrainingGalleryLevel() -> Level {
+    let level = makeTrainingRobotGuidebotLevel()
+    return withTrainingGuideBot(addingGuideBotLessonScripting(
+        level,
+        roomSourceIndex: level.trainingGalleryBarrier!.barrierRoomSourceIndex,
+        roomName: "PortalRoom4"
+    ))
+}
+
+/// `level` (a Camera Monitor level) with the Training module: the return
+/// barrier room is PortalRoom5 (Room_indexes[4]) and FlashLight-3 is
+/// Object_handles[2]. With `guideBot`, the Guide-Bot is the translated one.
+func scriptingTrainingCameraMonitorLevel(
+    _ level: Level,
+    guideBot: Bool = true
+) -> Level {
+    let scripted = addingGuideBotLessonScripting(
+        level,
+        roomSourceIndex: level.trainingCameraMonitorChain!.returnToShip!
+            .barrierRoomSourceIndex,
+        roomName: "PortalRoom5"
+    )
+    return guideBot ? withTrainingGuideBot(scripted) : scripted
+}
+
+/// Scripts 032 and 060 of TrainingMission.cpp as the translated level
+/// module runs them: Portal2's trigger EVT_COLLIDE, and the level
+/// EVT_INTERVAL check of the Guide-Bot (qGetBuddyObj). Script 058 is in
+/// TrainingCameraAndReturnTests.
+final class TrainingGuideBotScriptTests: XCTestCase {
+    private func session(_ level: Level) throws -> GameSession {
+        try level.validate()
+        let session = GameSession(level: level, presentationReadyTimestamp: 0)
+        // Script 002's first HUD message has run.
+        session.world.trainingMission.script002Count = 1
+        return session
+    }
+
+    /// Flies forward until Script 032 runs, and returns that frame.
+    private func flyThroughPortal2(
+        _ session: GameSession,
+        timestamp: inout Double
+    ) throws -> PlayerSimulationFrame {
+        session.parkTrainingGoals()
+        for _ in 1...40 {
+            timestamp += 0.1
+            let frame = session.update(at: timestamp, input: .init(forward: 1))
+            if session.world.testTrainingMission?.script032Count == 1 {
+                return frame
             }
         }
+        XCTFail("The player did not cross Portal2")
+        return session.update(at: timestamp + 0.1, input: .zero)
+    }
 
-        let triggered = try XCTUnwrap(triggerFrame)
-        XCTAssertEqual(
-            triggered.trainingOpeningFeedback,
-            [.init(
-                hudMessages: [
-                    "Excellent!",
-                    "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
-                ],
-                voiceSourceName: "guidebota.osf",
-                voicePrecedesHUDMessages: true
-            )]
-        )
-        XCTAssertEqual(
-            triggered.enabledPlayerControls,
-            PlayerControlMask(rawValue: 0)
-        )
+    /// Script 032 (TrainingMission.cpp:2328-2341): Portal2's trigger hears
+    /// EVT_COLLIDE when the player crosses it, and the script plays
+    /// GuideBotA.osf, turns FlashLight-2 off, closes PortalRoom4's portals
+    /// 1 and 0, shows GoodJob and GBIntro, and turns every control off,
+    /// once. The one-shot trigger dies (trigger.cpp:250).
+    func testPortal2TriggerRunsScript032Once() throws {
+        let level = makeScriptedTrainingGalleryLevel()
+        let simulation = try session(level)
+        simulation.applyTrainingScript036Outcome()
+        XCTAssertEqual(simulation.galleryMarkerLightDistance, 50)
+        var timestamp = 0.0
+        let crossed = try flyThroughPortal2(simulation, timestamp: &timestamp)
+        XCTAssertEqual(presentationLog(crossed), [
+            "voice:guidebota.osf",
+            "hud:Excellent!",
+            "hud:\(fixtureGuideBotScriptMessages[0].text)",
+        ])
         XCTAssertEqual(simulation.galleryMarkerLightDistance, 0)
-        XCTAssertEqual(triggered.playerView.roomSourceIndex, 3)
-        assertTrainingGalleryBarrier(level: simulation.runtimeLevel, rendersFaces: true)
-        let playerStart = level.objects.first { $0.handle == 2_048 }!
-        let blockedReturn = traceIndoorMovement(
-            in: simulation.runtimeLevel,
-            startRoom: triggered.playerView.roomSourceIndex,
-            start: triggered.playerView.camera.position,
-            end: playerStart.position,
-            radius: triggered.playerView.collisionRadius
+        assertTrainingGalleryBarrier(
+            level: simulation.runtimeLevel,
+            rendersFaces: true
         )
-        guard case .wallHit = blockedReturn.outcome else {
-            return XCTFail("The closed force-field barrier must block the player")
-        }
+        XCTAssertEqual(simulation.world.playerControllerBitflags.rawValue, 0)
+        let portal2 = try XCTUnwrap(level.triggers.firstIndex {
+            $0.name == "Portal2"
+        })
+        XCTAssertNotEqual(
+            simulation.world.triggerFlags[portal2] & TriggerFlag.dead,
+            0
+        )
 
-        let continuation = try JSONDecoder().decode(
+        // The saved world keeps the dead trigger and the counter.
+        let saved = try JSONDecoder().decode(
             GameWorld.self,
             from: JSONEncoder().encode(simulation.world)
         )
-        let repeated = simulation.update(
-            at: Double(triggered.gameTime) + 0.1,
-            input: .init(forward: -1)
-        )
-        XCTAssertTrue(repeated.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(
-            repeated.enabledPlayerControls,
-            PlayerControlMask(rawValue: 0)
-        )
-
         let restored = try GameSession(
             level: level,
-            world: continuation.rebased(onto: level),
+            world: saved,
             resumedAtTimestamp: 100
         )
-        assertTrainingGalleryBarrier(level: restored.runtimeLevel, rendersFaces: true)
-        let afterRestore = restored.update(at: 100.1, input: .zero)
-        XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(
-            afterRestore.enabledPlayerControls,
-            PlayerControlMask(rawValue: 0)
-        )
-        XCTAssertEqual(restored.galleryMarkerLightDistance, 0)
+        XCTAssertEqual(restored.world.triggerFlags, simulation.world.triggerFlags)
+        XCTAssertEqual(restored.world.testTrainingMission?.script032Count, 1)
+        let later = simulation.update(at: timestamp + 0.1, input: .zero)
+        XCTAssertTrue(presentationLog(later).isEmpty)
+        XCTAssertEqual(later.enabledPlayerControls.rawValue, 0)
     }
 
-    /// After Script 036 opened the gallery (TrainingRobotScriptTests covers
-    /// Scripts 036 and 029), Portal2 runs the bespoke Script 032 once.
-    func testPortal2AfterScript036RunsScript032OnceAndRestoresLaterState() throws {
-        let level = makeTrainingRobotGuidebotLevel()
-        try level.validate()
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-
+    /// Script 060 (TrainingMission.cpp:1431-1441): in the level
+    /// EVT_INTERVAL of the frame after the buddy menu's "Exit ship", the
+    /// Guide-Bot is a robot after Script 032, so the script plays
+    /// GuideBotB.osf, turns every control on, and shows GetCameraMonitor,
+    /// once.
+    func testScript060RunsOnceTheGuideBotIsOutAfterScript032() throws {
+        let simulation = try session(makeScriptedTrainingGalleryLevel())
         simulation.applyTrainingScript036Outcome()
-        assertTrainingGalleryBarrier(
-            level: simulation.runtimeLevel,
-            rendersFaces: false
-        )
-        var timestamp = 0.1
-        let opened = simulation.update(at: timestamp, input: .zero)
-        XCTAssertEqual(opened.enabledPlayerControls, .all)
-        XCTAssertEqual(simulation.galleryMarkerLightDistance, 50)
+        var timestamp = 0.0
+        _ = try flyThroughPortal2(simulation, timestamp: &timestamp)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script060Count, 0)
 
-        var script032Frame: PlayerSimulationFrame?
-        for _ in 1...20 {
+        // F4, then "Exit ship" (buddymenu.cpp:437).
+        timestamp += 0.1
+        _ = simulation.update(at: timestamp, input: .init(opensBuddyMenu: true))
+        XCTAssertTrue(simulation.buddyMenuIsRequested)
+        let menu = try XCTUnwrap(simulation.openBuddyMenu(at: timestamp))
+        XCTAssertEqual(menu.commands.first?.id, GuideBotScript.exitShipCommand)
+        simulation.selectBuddyMenuItem(0, at: timestamp)
+        timestamp += 0.1
+        let released = simulation.update(at: timestamp, input: .zero)
+        XCTAssertEqual(soundNames([released]), ["GBExpulsionA"])
+        XCTAssertEqual(
+            presentationLog(released).filter { !$0.hasPrefix("sound:") },
+            [
+                "voice:guidebotb.osf",
+                "hud:\(fixtureGuideBotScriptMessages[1].text)",
+            ]
+        )
+        XCTAssertEqual(released.enabledPlayerControls, .all)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script060Count, 1)
+        timestamp += 0.1
+        let later = simulation.update(at: timestamp, input: .zero)
+        XCTAssertTrue(presentationLog(later).isEmpty)
+    }
+
+    /// Script 060 needs Script 032 (TrainingMission.cpp:1433): a Guide-Bot
+    /// released before the gallery changes no control.
+    func testScript060WaitsForScript032() throws {
+        let simulation = try session(makeScriptedTrainingGalleryLevel())
+        XCTAssertTrue(simulation.selectTestBuddyCommand(
+            GuideBotScript.exitShipCommand
+        ))
+        var timestamp = 0.0
+        let frames = simulation.runFrames(3, from: &timestamp)
+        XCTAssertEqual(
+            simulation.world.objectType(simulation.world.buddyHandle),
+            .robot
+        )
+        XCTAssertFalse(presentationLog(frames[0]).contains("voice:guidebotb.osf"))
+        XCTAssertEqual(simulation.world.testTrainingMission?.script060Count, 0)
+    }
+
+    /// Real content, opt-in (REVIVAL_TRAINING_PACKAGE, engineering.md
+    /// section 2): after Script 036 opens PortalRoom4, the player flies
+    /// through the retail Portal2 trigger face (PortalRoom4's portal 1),
+    /// Script 032 runs from its EVT_COLLIDE, and the buddy menu's "Exit
+    /// ship" then releases the Guide-Bot, so Script 060 turns every
+    /// control on.
+    func testImportedTrainingPackagePortal2AndBuddyMenuRelease() throws {
+        guard let path = ProcessInfo.processInfo.environment[
+            "REVIVAL_TRAINING_PACKAGE"
+        ] else {
+            throw XCTSkip("set REVIVAL_TRAINING_PACKAGE to a training.revival")
+        }
+        let level = try loadCanonicalLevel(from: URL(fileURLWithPath: path))
+        let simulation = GameSession(level: level, presentationReadyTimestamp: 0)
+        simulation.world.trainingMission.script002Count = 1
+        // DestroyBot2's death runs Script 036 (TrainingMission.cpp:2040),
+        // which opens PortalRoom4, where Portal2 is.
+        simulation.world.osirisCallEvent(
+            level.findObjectName("DestroyBot2"),
+            .destroy(isDying: true),
+            level: level
+        )
+        XCTAssertEqual(simulation.world.testTrainingMission?.script036Count, 1)
+        let portal2 = try XCTUnwrap(level.triggers.firstIndex {
+            $0.name.caseInsensitiveCompare("Portal2") == .orderedSame
+        })
+        let trigger = level.triggers[portal2]
+        let center = simulation.world.roomFaceCenter(
+            trigger.roomIndex, face: trigger.faceIndex, level: level
+        )
+        let normal = simulation.world.roomFaceNormal(
+            trigger.roomIndex, face: trigger.faceIndex, level: level
+        )
+        // The player waits inside the trigger's room, 10 units in front of
+        // the face (face normals point into the room), and moves out
+        // through it.
+        let player = simulation.world.testPlayerObject.handle
+        simulation.world.objects[player]?.location = .room(trigger.roomIndex)
+        simulation.world.objects[player]?.position = center + normal * 10
+        var timestamp = 0.0
+        var log: [String] = []
+        for _ in 1...10
+        where simulation.world.testTrainingMission?.script032Count == 0 {
+            simulation.world.velocity = normal * -100
             timestamp += 0.1
-            let frame = simulation.update(
-                at: timestamp,
-                input: .init(forward: 1)
-            )
-            if frame.trainingOpeningFeedback.contains(where: {
-                $0.voiceSourceName == "guidebota.osf"
-            }) {
-                script032Frame = frame
-                break
-            }
+            log = presentationLog(simulation.update(at: timestamp, input: .zero))
         }
-        let script032 = try XCTUnwrap(script032Frame)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script032Count, 1)
+        let voice = try XCTUnwrap(level.scripting?.streamedAudio.first {
+            $0.name == "GuideBotA.osf"
+        }?.key)
+        XCTAssertEqual(log.first, "voice:\(voice)")
+        XCTAssertEqual(log.filter { $0.hasPrefix("hud:") }, [
+            "hud:\(TrainingMissionScript.message(0, level: level))",
+            "hud:\(TrainingMissionScript.message(27, level: level))",
+        ])
+        XCTAssertEqual(simulation.world.playerControllerBitflags.rawValue, 0)
+
+        let menu = try XCTUnwrap(simulation.openBuddyMenu(at: timestamp))
+        XCTAssertEqual(menu.itemText(0), "1. Exit ship")
+        simulation.selectBuddyMenuItem(0, at: timestamp)
+        timestamp += 0.1
+        _ = simulation.update(at: timestamp, input: .zero)
         XCTAssertEqual(
-            script032.trainingOpeningFeedback,
-            [.init(
-                hudMessages: [
-                    "Excellent!",
-                    "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
-                ],
-                voiceSourceName: "guidebota.osf",
-                voicePrecedesHUDMessages: true
-            )]
-        )
-        XCTAssertEqual(
-            level.trainingGalleryBarrier?.orderedPortalIndices,
-            [1, 0]
-        )
-        XCTAssertEqual(
-            script032.enabledPlayerControls,
-            PlayerControlMask(rawValue: 0)
-        )
-        XCTAssertEqual(simulation.galleryMarkerLightDistance, 0)
-        XCTAssertNotEqual(
             simulation.world.objectType(simulation.world.buddyHandle),
             .robot
         )
-        XCTAssertFalse(simulation.runtimeLevel.objectPresentations.contains {
-            $0.objectHandle
-                == level.trainingRobotGuidebotChain?.guidebotObjectHandle
-                && $0.isVisible
-        })
-        assertTrainingGalleryBarrier(
-            level: simulation.runtimeLevel,
-            rendersFaces: true
-        )
-
-        let continuationData = try JSONEncoder().encode(
-            simulation.world
-        )
-        let continuation = try JSONDecoder().decode(
-            GameWorld.self,
-            from: continuationData
-        )
-        let repeated = simulation.update(
-            at: timestamp + 0.1,
-            input: .init(forward: 1)
-        )
-        XCTAssertTrue(repeated.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(
-            repeated.enabledPlayerControls,
-            PlayerControlMask(rawValue: 0)
-        )
-        XCTAssertNotEqual(
-            simulation.world.objectType(simulation.world.buddyHandle),
-            .robot
-        )
-
-        let restored = try GameSession(
-            level: level,
-            world: continuation.rebased(onto: level),
-            resumedAtTimestamp: 100
-        )
-        assertTrainingGalleryBarrier(
-            level: restored.runtimeLevel,
-            rendersFaces: true
-        )
-        let afterRestore = restored.update(
-            at: 100.1,
-            input: .init(forward: 1)
-        )
-        XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(
-            afterRestore.enabledPlayerControls,
-            PlayerControlMask(rawValue: 0)
-        )
-        XCTAssertEqual(restored.galleryMarkerLightDistance, 0)
-        XCTAssertNotEqual(
-            restored.world.objectType(restored.world.buddyHandle),
-            .robot
-        )
-
-    }
-
-    func testScript036AfterScript060RestoresItsLaterBarrierState() throws {
-        let level = withTrainingGuideBot(makeTrainingRobotGuidebotLevel())
-        try level.validate()
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-
-        var timestamp = 0.0
-        for frameIndex in 1...20 {
-            timestamp = Double(frameIndex) * 0.1
-            let frame = simulation.update(
-                at: timestamp,
-                input: .init(forward: 1)
-            )
-            if frame.trainingOpeningFeedback.contains(where: {
-                $0.voiceSourceName == "guidebota.osf"
-            }) {
-                break
-            }
-        }
-        let script060 = simulation.update(
-            at: timestamp + 0.1,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-        XCTAssertTrue(script060.trainingOpeningFeedback.contains {
-            $0.voiceSourceName == "guidebotb.osf"
-        })
-        XCTAssertEqual(simulation.galleryMarkerLightDistance, 0)
-        assertTrainingGalleryBarrier(
-            level: simulation.runtimeLevel,
-            rendersFaces: true
-        )
-
-        simulation.applyTrainingScript036Outcome()
-        let continuationData = try JSONEncoder().encode(
-            simulation.world
-        )
-        XCTAssertEqual(simulation.galleryMarkerLightDistance, 50)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script060Count, 1)
         XCTAssertEqual(simulation.world.playerControllerBitflags, .all)
-        assertTrainingGalleryBarrier(
-            level: simulation.runtimeLevel,
-            rendersFaces: false
-        )
-        let continuation = try JSONDecoder().decode(
-            GameWorld.self,
-            from: continuationData
-        )
-        var restorationLevel = level
-        let restoredRoomIndex = try XCTUnwrap(
-            restorationLevel.rooms.firstIndex {
-                $0.sourceIndex == script060.playerView.roomSourceIndex
-            }
-        )
-        restorationLevel.rooms[restoredRoomIndex] =
-            addingSourceContainmentShell(
-                to: restorationLevel.rooms[restoredRoomIndex],
-                center: script060.playerView.camera.position,
-                texture: restorationLevel.surfacePhysics[0].texture,
-                halfExtent: 500
-            )
-        let restored = try GameSession(
-            level: restorationLevel,
-            world: continuation.rebased(onto: restorationLevel),
-            resumedAtTimestamp: 100
-        )
-        assertTrainingGalleryBarrier(
-            level: restored.runtimeLevel,
-            rendersFaces: false
-        )
-        let afterRestore = restored.update(
-            at: 100.1,
-            input: .zero
-        )
-        XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(afterRestore.enabledPlayerControls, .all)
-        XCTAssertEqual(restored.galleryMarkerLightDistance, 50)
-    }
-
-    func testTrainingGuidebotDeploymentContinuesGalleryOnce() throws {
-        let level = withTrainingGuideBot(makeTrainingRobotGuidebotLevel())
-        try level.validate()
-        XCTAssertEqual(
-            trainingPlayerControlMask(
-                galleryWasTriggered: true,
-                controlsWereRestored: true,
-                controllerBitflags: [.reverse]
-            ),
-            .all
-        )
-        let guidebotSimulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        // Scripts 000 and 021 showed the enabled controls
-        // (TrainingMission.cpp:1494, :1949); Script 029 hides them.
-        guidebotSimulation.world.hudShowControls = true
-
-        var triggerFrame: PlayerSimulationFrame?
-        var triggerTimestamp = 0.0
-        for frameIndex in 1...20 {
-            triggerTimestamp = Double(frameIndex) * 0.1
-            let frame = guidebotSimulation.update(
-                at: triggerTimestamp,
-                input: .init(forward: 1)
-            )
-            if frame.trainingOpeningFeedback.contains(where: {
-                $0.voiceSourceName == "guidebota.osf"
-            }) {
-                triggerFrame = frame
-                break
-            }
-        }
-        let triggered = try XCTUnwrap(triggerFrame)
-        XCTAssertEqual(triggered.enabledPlayerControls.rawValue, 0)
-        XCTAssertTrue(triggered.showsEnabledPlayerControls)
-
-        let deployed = guidebotSimulation.update(
-            at: triggerTimestamp + 0.1,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-        // The exit command's birth plays GBExpulsionA at the player
-        // (AIGame.cpp:4722), and Script 060 sees the Guide-Bot out.
-        XCTAssertEqual(
-            deployed.trainingOpeningFeedback.filter {
-                $0.soundSourceName == nil
-            },
-            [.init(
-                hudMessages: [
-                    "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
-                ],
-                voiceSourceName: "guidebotb.osf",
-                voicePrecedesHUDMessages: true
-            )]
-        )
-        XCTAssertEqual(soundNames([deployed]), ["GBExpulsionA"])
-        XCTAssertEqual(deployed.enabledPlayerControls, .all)
-        XCTAssertTrue(deployed.showsEnabledPlayerControls)
-        XCTAssertEqual(guidebotSimulation.galleryMarkerLightDistance, 0)
-        assertTrainingGalleryBarrier(
-            level: guidebotSimulation.runtimeLevel,
-            rendersFaces: true
-        )
-        let deployedContinuation = try JSONDecoder().decode(
-            GameWorld.self,
-            from: JSONEncoder().encode(guidebotSimulation.world)
-        )
-        var deployedRestorationLevel = level
-        let deployedRoomIndex = try XCTUnwrap(
-            deployedRestorationLevel.rooms.firstIndex {
-                $0.sourceIndex == deployed.playerView.roomSourceIndex
-            }
-        )
-        deployedRestorationLevel.rooms[deployedRoomIndex] =
-            addingSourceContainmentShell(
-                to: deployedRestorationLevel.rooms[deployedRoomIndex],
-                center: deployed.playerView.camera.position,
-                texture: deployedRestorationLevel.surfacePhysics[0].texture,
-                halfExtent: 500
-            )
-        XCTAssertNoThrow(
-            try GameSession(
-                level: deployedRestorationLevel,
-                world: deployedContinuation.rebased(onto: deployedRestorationLevel),
-                resumedAtTimestamp: 100
-            )
-        )
-        let repeatedGuidebot = guidebotSimulation.update(
-            at: triggerTimestamp + 0.2,
-            input: .zero
-        )
-        XCTAssertTrue(repeatedGuidebot.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(repeatedGuidebot.enabledPlayerControls, .all)
-
-    }
-
-    func testTrainingGuidebotDeploymentReachesScript060InSameUpdate() throws {
-        let simulation = GameSession(
-            level: withTrainingGuideBot(makeTrainingRobotGuidebotLevel()),
-            presentationReadyTimestamp: 0
-        )
-        var timestamp = 0.0
-        for frameIndex in 1...20 {
-            timestamp = Double(frameIndex) * 0.1
-            let frame = simulation.update(
-                at: timestamp,
-                input: .init(forward: 1)
-            )
-            if frame.trainingOpeningFeedback.contains(where: {
-                $0.voiceSourceName == "guidebota.osf"
-            }) {
-                break
-            }
-        }
-
-        let deployed = simulation.update(
-            at: timestamp + 0.1,
-            input: .init(deploysTrainingGuidebot: true)
-        )
-
-        // The exit command's birth plays GBExpulsionA at the player
-        // (AIGame.cpp:4722), and Script 060 sees the Guide-Bot out.
-        XCTAssertEqual(
-            deployed.trainingOpeningFeedback.filter {
-                $0.soundSourceName == nil
-            },
-            [.init(
-                hudMessages: [
-                    "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
-                ],
-                voiceSourceName: "guidebotb.osf",
-                voicePrecedesHUDMessages: true
-            )]
-        )
-        XCTAssertEqual(soundNames([deployed]), ["GBExpulsionA"])
-        XCTAssertEqual(deployed.enabledPlayerControls, .all)
     }
 }

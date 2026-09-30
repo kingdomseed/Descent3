@@ -220,7 +220,6 @@ func updateMetalWorldPlan(
         [TrainingGuidebotYellowFlareTimeoutSparkFrame] = [],
     trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame] = [],
-    trainingGuidebotReturnMarkerLightDistance: Float? = nil,
     playerFastHeadlight: PlayerFastHeadlightFrame? = nil
 ) throws -> MetalWorldPlan {
     try updateMetalWorldPlan(
@@ -246,8 +245,6 @@ func updateMetalWorldPlan(
             trainingGuidebotYellowFlareTimeoutSparks,
         trainingGuidebotYellowFlareTimeoutSparkParticles:
             trainingGuidebotYellowFlareTimeoutSparkParticles,
-        trainingGuidebotReturnMarkerLightDistance:
-            trainingGuidebotReturnMarkerLightDistance,
         playerFastHeadlight: playerFastHeadlight
     )
 }
@@ -298,8 +295,6 @@ func updateMetalWorldPlan(
             frame.trainingGuidebotYellowFlareTimeoutSparks,
         trainingGuidebotYellowFlareTimeoutSparkParticles:
             frame.trainingGuidebotYellowFlareTimeoutSparkParticles,
-        trainingGuidebotReturnMarkerLightDistance:
-            frame.trainingGuidebotReturnMarkerLightDistance,
         playerFastHeadlight: frame.playerFastHeadlight
     )
 }
@@ -327,7 +322,6 @@ func updateMetalWorldPlan(
         trainingGuidebotYellowFlareTimeoutExplosions: [],
         trainingGuidebotYellowFlareTimeoutSparks: [],
         trainingGuidebotYellowFlareTimeoutSparkParticles: [],
-        trainingGuidebotReturnMarkerLightDistance: nil,
         playerFastHeadlight: nil
     )
 }
@@ -355,7 +349,6 @@ private func updateMetalWorldPlan(
         [TrainingGuidebotYellowFlareTimeoutSparkFrame],
     trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame],
-    trainingGuidebotReturnMarkerLightDistance: Float?,
     playerFastHeadlight: PlayerFastHeadlightFrame?
 ) throws -> MetalWorldPlan {
     let extraction = try extractWorldForRendering(
@@ -663,31 +656,6 @@ private func updateMetalWorldPlan(
                     applyingObjectLight(
                         to: updatedPreparedDraws[index],
                         position: object.position,
-                        distance: distance * light.distanceScale,
-                        color: light.color
-                    )
-            }
-        }
-    }
-    if let distance = trainingGuidebotReturnMarkerLightDistance,
-       distance > 0,
-       let returnChain =
-            level.trainingCameraMonitorChain?.returnToShip,
-       let presentation = returnChain.markerLightPresentation,
-       let marker = objects[ObjectHandle(returnChain.markerLightObjectHandle)],
-       let gameTime = presentationFrame?.systemsGameTime {
-        let light = sourceObjectLight(
-            presentation,
-            gameTime: gameTime
-        )
-        if light.distanceScale > 0 {
-            for index in Set(
-                activeDrawIndices + auxiliaryActiveDrawIndices
-            ) {
-                updatedPreparedDraws[index] =
-                    applyingObjectLight(
-                        to: updatedPreparedDraws[index],
-                        position: marker.position,
                         distance: distance * light.distanceScale,
                         color: light.color
                     )

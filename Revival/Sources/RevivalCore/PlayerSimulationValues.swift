@@ -2,16 +2,10 @@
 
 import Foundation
 
-struct TrainingGalleryBarrierState: Codable, Equatable, Sendable {
-    var wasTriggered = false
-}
-
 /// The bespoke Training state that the translated scripts still leave to
-/// Swift: the Script 060 presentation and its control restore (M1 step 8c)
-/// and the Guide-Bot's flares (M1 step 8d). The Guide-Bot itself is the
+/// Swift: the Guide-Bot's flares (M1 step 8d). The Guide-Bot itself is the
 /// AIGame GuideBot script (AIGame+GuideBot.swift).
 struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
-    var guidebotContinuationWasPresented = false
     var yellowFlares:
         [TrainingGuidebotYellowFlareState]? = nil
     var yellowFlareParticles:
@@ -23,7 +17,6 @@ struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
     var yellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleState]? = nil
     var yellowFlareTimeoutReachedFollowingFrame: Bool? = nil
-    var controlsWereRestored = false
 }
 
 /// A flare the Guide-Bot fired this frame (MSAFE_OBJECT_FIRE_WEAPON), at
@@ -149,8 +142,6 @@ struct TrainingCameraMonitorState:
     var popupRemaining: Float?
     var completionTimerRemaining: Float?
     var completionTimerWasConsumed = false
-    var returnMarkerLightDistance: Float = 0
-    var script058WasPresented = false
 }
 
 struct TrainingKillbotEntryState:
@@ -207,9 +198,6 @@ extension GameWorld {
     /// The level-start state of the bespoke Training script types. Later M1
     /// steps replace these with the Training level module.
     mutating func initializeTrainingState(level: Level) {
-        trainingGalleryBarrierState = level.trainingGalleryBarrier.map {
-            _ in TrainingGalleryBarrierState()
-        }
         trainingRobotGuidebotState = level.trainingRobotGuidebotChain.map {
             TrainingRobotGuidebotState(
                 yellowFlares: $0.yellowFlare == nil ? nil : [],

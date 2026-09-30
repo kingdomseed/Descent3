@@ -4,29 +4,27 @@ extension WorldRenderingTests {
     func testKillbotEntryClosesPortalRoom5AndRunsTimedInstructionAcrossReload()
         throws
     {
-        let level = makeTrainingKillbotEntryLevel()
+        let level = scriptingTrainingCameraMonitorLevel(
+            makeTrainingKillbotEntryLevel(),
+            guideBot: false
+        )
         try level.validate()
         let initialSimulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
-        var initialContinuationObject = try XCTUnwrap(
+        let initialContinuationObject = try XCTUnwrap(
             testWorldObject(initialSimulation.world)
         )
-        var initialGalleryState = try XCTUnwrap(
-            initialContinuationObject["trainingGalleryBarrierState"]
-                as? [String: Any]
-        )
-        initialGalleryState["wasTriggered"] = true
-        initialContinuationObject["trainingGalleryBarrierState"] =
-            initialGalleryState
         let gallerySimulation = try GameSession(
             level: level,
             world: (decodeTestWorld(initialContinuationObject)).rebased(onto: level),
             resumedAtTimestamp: 0
         )
-        // Scripts 036 and 029 ran (TrainingRobotScriptTests).
+        // Scripts 036 and 029 ran (TrainingRobotScriptTests), and Script
+        // 032 (TrainingGuideBotScriptTests).
         gallerySimulation.applyTrainingScript036Outcome()
+        gallerySimulation.world.trainingMission.script032Count = 1
         gallerySimulation.world.hudShowControls = false
         let destroyedContinuationObject = try XCTUnwrap(
             testWorldObject(gallerySimulation.world)
@@ -39,7 +37,7 @@ extension WorldRenderingTests {
         var timestamp = 0.1
         _ = simulation.update(
             at: timestamp,
-            input: .init(deploysTrainingGuidebot: true)
+            input: .zero
         )
         timestamp += 0.1
         let used = simulation.update(
@@ -55,7 +53,7 @@ extension WorldRenderingTests {
         timestamp += 0.1
         _ = simulation.update(
             at: timestamp,
-            input: .init(deploysTrainingGuidebot: true)
+            input: .zero
         )
         for _ in 1...100 where script058 == nil {
             timestamp += 0.1
@@ -76,6 +74,8 @@ extension WorldRenderingTests {
             simulation.update(at: timestamp, input: .zero)
                 .trainingOpeningFeedback.isEmpty
         )
+        // The opening goals stay out of the flight (Script 014 would run).
+        simulation.parkTrainingGoals()
         var entered: PlayerSimulationFrame?
         for frameIndex in 1...40 {
             timestamp += 0.1
@@ -102,7 +102,7 @@ extension WorldRenderingTests {
             voicePrecedesHUDMessages: false
         ))
         XCTAssertEqual(
-            entry.trainingGuidebotReturnMarkerLightDistance,
+            simulation.returnMarkerLightDistance,
             0
         )
         assertTrainingGuidebotReturnBarrier(
@@ -126,11 +126,6 @@ extension WorldRenderingTests {
             ),
             entry.playerView.roomSourceIndex
         )
-        let galleryState = try XCTUnwrap(
-            continuationObject["trainingGalleryBarrierState"]
-                as? [String: Any]
-        )
-        XCTAssertEqual(galleryState["wasTriggered"] as? Bool, true)
         // Script 036's FlashLight-2 light and DestroyBot2's deletion.
         XCTAssertEqual(simulation.galleryMarkerLightDistance, 50)
         XCTAssertNil(simulation.world.objects[ObjectHandle(4_112)])
@@ -142,11 +137,6 @@ extension WorldRenderingTests {
         let cameraState = try XCTUnwrap(
             continuationObject["trainingCameraMonitorState"]
                 as? [String: Any]
-        )
-        XCTAssertEqual(cameraState["script058WasPresented"] as? Bool, true)
-        XCTAssertEqual(
-            cameraState["returnMarkerLightDistance"] as? Double,
-            50
         )
         let killbotEntryState = try XCTUnwrap(
             continuationObject["trainingKillbotEntryState"]

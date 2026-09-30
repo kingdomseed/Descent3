@@ -36,7 +36,8 @@ private final class NoninteractiveTrainingOverlay: NSView {
 final class RevivalGameplayView: MTKView {
     var heldInputChanged: ((InputSnapshot) -> Void)?
     var controllerInputChanged: ((InputSnapshot) -> Void)?
-    var guidebotDeployRequested: (() -> Void)?
+    /// F4 (GameLoop.cpp:1493).
+    var buddyMenuRequested: (() -> Void)?
     var primaryFireHeldChanged: ((Bool) -> Void)?
     var secondaryFireHeldChanged: ((Bool) -> Void)?
     var playerFlareRequested: (() -> Void)?
@@ -114,9 +115,7 @@ final class RevivalGameplayView: MTKView {
     private var trainingResultIsPresented = false
     private var trainingResultPresentedAt: TimeInterval?
     private var pendingTrainingResultKeyAcknowledgement = false
-    private var trainingGuidebotGoalWasSelected = false
-    private var trainingGuidebotReturnToShipWasSelected = false
-    private var trainingGuidebotReleaseWasSelected = false
+    private var selectedBuddyMenuItem: Int?
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -336,11 +335,12 @@ final class RevivalGameplayView: MTKView {
             setSecondaryFireHeld(true)
             return
         }
-        if Self.requestsGuidebotDeployment(
+        if Self.requestsBuddyMenu(
             keyCode: event.keyCode,
+            isRepeat: event.isARepeat,
             gameplayIsActive: gameplayIsActive
         ) {
-            guidebotDeployRequested?()
+            buddyMenuRequested?()
             return
         }
         if Self.requestsInventoryUse(
@@ -1213,113 +1213,92 @@ final class RevivalGameplayView: MTKView {
         pausedTrainingGuidebotAmbientEnginePlayer = nil
     }
 
-    func presentTrainingGuidebotGoalMenu() -> Bool {
-        trainingGuidebotGoalWasSelected = false
-        let menu = Self.trainingGuidebotGoalMenu(
+    /// RunGameMenu's GAME_BUDDY_INTERFACE case (gamesequence.cpp:1972)
+    /// after the F4 frame, as a solo pause like F1 and P: the sounds pause
+    /// and the shell withholds input and frames (PauseGame,
+    /// GameLoop.cpp:2770); the Core menu opens (GameSession.openBuddyMenu),
+    /// the chosen command goes to the Guide-Bot, and then the shell resumes
+    /// and the sounds play on (ResumeGame, :2780). Gameplay stays active in
+    /// the view, so the HUD and the paused sounds survive the modal.
+    func runBuddyMenu(_ simulation: GameSession) {
+        clearInput()
+        pauseCurrentTrainingAudio()
+        soloPauseChanged?(true)
+        let opened = max(
+            ProcessInfo.processInfo.systemUptime,
+            simulation.lastTimestamp
+        )
+        if let menu = simulation.openBuddyMenu(at: opened) {
+            let choice = presentBuddyMenu(menu)
+            let closed = max(ProcessInfo.processInfo.systemUptime, opened)
+            if let choice {
+                simulation.selectBuddyMenuItem(
+                    choice.index,
+                    text: choice.text,
+                    at: closed
+                )
+            } else {
+                simulation.closeBuddyMenu(at: closed)
+            }
+        }
+        soloPauseChanged?(false)
+    }
+
+    /// BuddyDisplay's window (buddymenu.cpp:95-172) as a native pop-up
+    /// menu: one item per command, with its "1." to "9." or "A." text and
+    /// its accelerator key; the arrow keys and Return also select. F4 and
+    /// Escape close it with no command (:98, :143). An item with a dialog
+    /// then asks for its text (DoEditDialog, :445). Returns the chosen item
+    /// and its text, or nil.
+    func presentBuddyMenu(_ buddyMenu: BuddyMenu) -> (index: Int, text: String?)? {
+        selectedBuddyMenuItem = nil
+        let menu = Self.buddyMenu(
+            buddyMenu,
             target: self,
-            action: #selector(selectTrainingGuidebotGoal)
+            action: #selector(selectBuddyMenuItem)
         )
         let eventMonitor = NSEvent.addLocalMonitorForEvents(
             matching: .keyDown
         ) { event in
-            guard Self.cancelsTrainingGuidebotGoalMenu(
-                keyCode: event.keyCode
-            ) else {
+            guard Self.closesBuddyMenu(keyCode: event.keyCode) else {
                 return event
             }
             menu.cancelTracking()
             return nil
-        }
-        defer {
-            if let eventMonitor {
-                NSEvent.removeMonitor(eventMonitor)
-            }
         }
         menu.popUp(
             positioning: nil,
             at: NSPoint(x: bounds.midX, y: bounds.midY),
             in: self
         )
-        return trainingGuidebotGoalWasSelected
-    }
-
-    @objc private func selectTrainingGuidebotGoal(_ sender: NSMenuItem) {
-        guard sender.tag == 3 else { return }
-        trainingGuidebotGoalWasSelected = true
-    }
-
-    func presentTrainingGuidebotReturnToShipMenu() -> Bool {
-        trainingGuidebotReturnToShipWasSelected = false
-        let menu = Self.trainingGuidebotReturnToShipMenu(
-            target: self,
-            action: #selector(selectTrainingGuidebotReturnToShip)
-        )
-        let eventMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: .keyDown
-        ) { event in
-            guard Self.cancelsTrainingGuidebotReturnToShipMenu(
-                keyCode: event.keyCode
-            ) else {
-                return event
-            }
-            menu.cancelTracking()
-            return nil
+        if let eventMonitor {
+            NSEvent.removeMonitor(eventMonitor)
         }
-        defer {
-            if let eventMonitor {
-                NSEvent.removeMonitor(eventMonitor)
-            }
+        guard let index = selectedBuddyMenuItem else { return nil }
+        guard let prompt = buddyMenu.commands[index].dialogText else {
+            return (index, nil)
         }
-        menu.popUp(
-            positioning: nil,
-            at: NSPoint(x: bounds.midX, y: bounds.midY),
-            in: self
-        )
-        return trainingGuidebotReturnToShipWasSelected
+        return (index, presentBuddyTextDialog(prompt: prompt))
     }
 
-    @objc private func selectTrainingGuidebotReturnToShip(
-        _ sender: NSMenuItem
-    ) {
-        guard sender.tag == 43 else { return }
-        trainingGuidebotReturnToShipWasSelected = true
+    @objc private func selectBuddyMenuItem(_ sender: NSMenuItem) {
+        selectedBuddyMenuItem = sender.tag
     }
 
-    func presentTrainingGuidebotReleaseMenu() -> Bool {
-        trainingGuidebotReleaseWasSelected = false
-        let menu = Self.trainingGuidebotReleaseMenu(
-            target: self,
-            action: #selector(selectTrainingGuidebotRelease)
-        )
-        let eventMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: .keyDown
-        ) { event in
-            guard Self.cancelsTrainingGuidebotReleaseMenu(
-                keyCode: event.keyCode
-            ) else {
-                return event
-            }
-            menu.cancelTracking()
-            return nil
-        }
-        defer {
-            if let eventMonitor {
-                NSEvent.removeMonitor(eventMonitor)
-            }
-        }
-        menu.popUp(
-            positioning: nil,
-            at: NSPoint(x: bounds.midX, y: bounds.midY),
-            in: self
-        )
-        return trainingGuidebotReleaseWasSelected
-    }
-
-    @objc private func selectTrainingGuidebotRelease(
-        _ sender: NSMenuItem
-    ) {
-        guard sender.tag == 0 else { return }
-        trainingGuidebotReleaseWasSelected = true
+    /// DoEditDialog (buddymenu.cpp:445): a text field of at most
+    /// BuddyMenu.maximumAnswerLength characters. Cancel leaves the answer
+    /// empty, as the dialog leaves `answer`.
+    private func presentBuddyTextDialog(prompt: String) -> String {
+        let alert = NSAlert()
+        alert.messageText = prompt
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        field.placeholderString = "Name"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return "" }
+        return String(field.stringValue.prefix(BuddyMenu.maximumAnswerLength))
     }
 
     func presentTrainingContentReadyState(completedLevelName: String) {
@@ -1420,79 +1399,50 @@ final class RevivalGameplayView: MTKView {
         )
     }
 
-    nonisolated static func requestsGuidebotDeployment(
+    /// F4 opens the buddy menu (GameLoop.cpp:1493).
+    nonisolated static func requestsBuddyMenu(
         keyCode: UInt16,
+        isRepeat: Bool,
         gameplayIsActive: Bool
     ) -> Bool {
-        gameplayIsActive && keyCode == 118
+        gameplayIsActive && !isRepeat && keyCode == 118
     }
 
-    static func trainingGuidebotGoalMenu(
+    /// The native menu of BuddyDisplay's window: the title as a disabled
+    /// first item (the window caption), then one item per hotspot with its
+    /// text, its accelerator key with no modifier, and its index as the
+    /// tag.
+    static func buddyMenu(
+        _ buddyMenu: BuddyMenu,
         target: AnyObject?,
         action: Selector?
     ) -> NSMenu {
-        let menu = NSMenu(title: "GB Command Menu")
-        let item = NSMenuItem(
-            title: "1. Get to Camera Monitor",
-            action: action,
-            keyEquivalent: "1"
-        )
-        item.target = target
-        item.tag = 3
-        item.keyEquivalentModifierMask = []
-        menu.addItem(item)
+        let menu = NSMenu(title: buddyMenu.title)
+        menu.autoenablesItems = false
+        let title = NSMenuItem(title: buddyMenu.title, action: nil,
+                               keyEquivalent: "")
+        title.isEnabled = false
+        title.tag = -1
+        menu.addItem(title)
+        menu.addItem(.separator())
+        for index in buddyMenu.commands.indices {
+            let item = NSMenuItem(
+                title: buddyMenu.itemText(index),
+                action: action,
+                keyEquivalent: buddyMenu.acceleratorCharacter(index)
+                    .map(String.init) ?? ""
+            )
+            item.target = target
+            item.tag = index
+            item.keyEquivalentModifierMask = []
+            menu.addItem(item)
+        }
         return menu
     }
 
-    static func trainingGuidebotReturnToShipMenu(
-        target: AnyObject?,
-        action: Selector?
-    ) -> NSMenu {
-        let menu = NSMenu(title: "GB Command Menu")
-        let item = NSMenuItem(
-            title: "1. Return to ship",
-            action: action,
-            keyEquivalent: "1"
-        )
-        item.target = target
-        item.tag = 43
-        item.keyEquivalentModifierMask = []
-        menu.addItem(item)
-        return menu
-    }
-
-    static func trainingGuidebotReleaseMenu(
-        target: AnyObject?,
-        action: Selector?
-    ) -> NSMenu {
-        let menu = NSMenu(title: "GB Command Menu")
-        let item = NSMenuItem(
-            title: "1. Release Guidebot",
-            action: action,
-            keyEquivalent: "1"
-        )
-        item.target = target
-        item.tag = 0
-        item.keyEquivalentModifierMask = []
-        menu.addItem(item)
-        return menu
-    }
-
-    nonisolated static func cancelsTrainingGuidebotGoalMenu(
-        keyCode: UInt16
-    ) -> Bool {
-        keyCode == 118 || keyCode == 53
-    }
-
-    nonisolated static func cancelsTrainingGuidebotReturnToShipMenu(
-        keyCode: UInt16
-    ) -> Bool {
-        keyCode == 118 || keyCode == 53
-    }
-
-    nonisolated static func cancelsTrainingGuidebotReleaseMenu(
-        keyCode: UInt16
-    ) -> Bool {
+    /// F4 (UID_CANCEL) and Escape (UID_OK) close the buddy menu with no
+    /// command (buddymenu.cpp:98, :143).
+    nonisolated static func closesBuddyMenu(keyCode: UInt16) -> Bool {
         keyCode == 118 || keyCode == 53
     }
 

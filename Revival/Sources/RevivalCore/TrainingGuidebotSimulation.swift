@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The bespoke Training code that the Guide-Bot's scripts still leave to
-// Swift: the Guide-Bot's flares (M1 step 8d), the two F4 inputs until the
-// buddy menu (M1 step 8c), and the Camera Monitor presentation (M1 step 9).
+// Swift: the Guide-Bot's flares (M1 step 8d) and the Camera Monitor
+// presentation (M1 step 9).
 // The Guide-Bot itself is the AIGame GuideBot script
 // (Scripts/AIGame+GuideBot.swift).
 
@@ -37,55 +37,6 @@ extension GameWorld {
 }
 
 extension GameSession {
-    /// The Guide-Bot menu's goal command is offered (MakeCommandList).
-    var trainingGuidebotGoalCommandIsAvailable: Bool {
-        guideBotMenuOffers(GuideBotScript.findActiveGoal0)
-    }
-
-    /// The Guide-Bot menu's return-to-ship command is offered.
-    var trainingGuidebotReturnToShipCommandIsAvailable: Bool {
-        guideBotMenuOffers(GuideBotScript.returnToShipCommand)
-    }
-
-    /// The Guide-Bot menu's exit-ship command is offered.
-    var trainingGuidebotReleaseCommandIsAvailable: Bool {
-        guideBotMenuOffers(GuideBotScript.exitShipCommand)
-    }
-
-    /// COM_GET_MENU (BuddyBotDownloadData, buddymenu.cpp:370) and whether it
-    /// lists the command.
-    private func guideBotMenuOffers(_ command: Int32) -> Bool {
-        world.guideBotMenu(level: level)?.commands
-            .contains { $0.id == command } ?? false
-    }
-
-    /// The two Guide-Bot inputs until the buddy menu (M1 step 8c): the goal
-    /// input sends the first active goal's command, and the F4 input sends
-    /// the exit-ship command in the ship, or the return-to-ship command
-    /// outside it, whichever the menu offers.
-    func sendTrainingGuidebotMenuCommand(_ input: InputSnapshot) {
-        guard input.deploysTrainingGuidebot
-                || input.requestsTrainingGuidebotActiveGoal,
-              let menu = world.guideBotMenu(level: level)
-        else {
-            return
-        }
-        let offered = Set(menu.commands.map(\.id))
-        if input.deploysTrainingGuidebot {
-            if offered.contains(GuideBotScript.exitShipCommand) {
-                world.guideBotCommand(GuideBotScript.exitShipCommand,
-                                      level: level)
-            } else if offered.contains(GuideBotScript.returnToShipCommand) {
-                world.guideBotCommand(GuideBotScript.returnToShipCommand,
-                                      level: level)
-            }
-        }
-        if input.requestsTrainingGuidebotActiveGoal,
-           offered.contains(GuideBotScript.findActiveGoal0) {
-            world.guideBotCommand(GuideBotScript.findActiveGoal0, level: level)
-        }
-    }
-
     func nextAuthoritativeRandomValue() -> UInt32 {
         authoritativeRandomState =
             authoritativeRandomState &* 214_013 &+ 2_531_011

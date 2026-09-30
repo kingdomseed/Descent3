@@ -41,6 +41,9 @@ struct GameWorld: Codable, Equatable, Sendable {
     var rooms: [RoomState]
     /// Level_goals, indexed like `Level.goals`.
     var goals: [LevelGoal]
+    /// `Triggers[].flags` (trigger.h:113), indexed like `Level.triggers`
+    /// (Trigger.swift).
+    var triggerFlags: [UInt16]
 
     // Player ship.
     var velocity = Vector3.zero
@@ -121,7 +124,6 @@ struct GameWorld: Codable, Equatable, Sendable {
 
     // Training script state. These move into the Training level module in
     // later M1 steps.
-    var trainingGalleryBarrierState: TrainingGalleryBarrierState?
     var trainingRobotGuidebotState: TrainingRobotGuidebotState?
     /// The flares the Guide-Bot fired this update, for the bespoke flare
     /// path. The session makes them within the update, so a saved world has
@@ -148,6 +150,7 @@ struct GameWorld: Codable, Equatable, Sendable {
         objects = ObjectTable(level: level)
         rooms = RoomState.canonical(level)
         goals = level.goals
+        triggerFlags = Self.initialTriggerFlags(level)
         angularVelocity = ship.physics.initialAngularVelocity
         playerYellowFlareState = level.shipDefinitions.first?
             .playerYellowFlare == nil ? nil : .init()

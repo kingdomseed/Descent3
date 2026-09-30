@@ -67,14 +67,7 @@ extension GameSession {
                 || world.playerDeath != nil
         let currentEnabledControls = controlsAreSuspended
             ? PlayerControlMask(rawValue: 0)
-            : trainingPlayerControlMask(
-                galleryWasTriggered:
-                    trainingGalleryBarrierState?.wasTriggered == true,
-                controlsWereRestored:
-                    trainingRobotGuidebotState?
-                        .controlsWereRestored == true,
-                controllerBitflags: world.playerControllerBitflags
-            )
+            : world.playerControllerBitflags
         let input = controlsAreSuspended
             ? InputSnapshot.zero
             : input.applying(currentEnabledControls)
@@ -108,12 +101,22 @@ extension GameSession {
                 chain.completionTimerDuration
             trainingCameraMonitorState = state
             cameraMonitorWasUsedThisFrame = true
+            // InventoryUseItem sends EVT_USE to the item before it removes
+            // it (Inventory.cpp:819); the level module counts Script 059.
+            world.osirisCallEvent(
+                ObjectHandle(chain.pickupObjectHandle),
+                .use(it: playerHandle),
+                level: level
+            )
             world.objects.delete(ObjectHandle(chain.pickupObjectHandle))
         }
-        // ProcessKeys (GameLoop.cpp:1493): a buddy menu command goes to the
-        // Guide-Bot (BuddyProcessCommand, buddymenu.cpp:452). Until the buddy
-        // menu (M1 step 8c), the two Guide-Bot inputs pick the command.
-        sendTrainingGuidebotMenuCommand(input)
+        // ProcessNormalKey (GameLoop.cpp:1493): F4 asks for the buddy menu
+        // (Game_interface_mode = GAME_BUDDY_INTERFACE), which RunGameMenu
+        // opens after this frame (BuddyMenu.swift). A dying or dead player's
+        // keys stop before it (:1433-1440); its input is zero here.
+        if input.opensBuddyMenu {
+            buddyMenuIsRequested = true
+        }
         let ship = level.shipDefinitions.first { $0.source == binding.ship }!
         guard case let .room(startRoom) = object.location else {
             preconditionFailure("The Slice 10 player simulation is indoor.")
@@ -216,7 +219,10 @@ extension GameSession {
         var roomSourceIndex = startRoom
         // The objects hit this frame (ignore_obj_list, physics.cpp:1535).
         var collidedObjects: [ObjectHandle] = []
-        var trainingGalleryWasCrossedThisFrame = false
+        // Fvi_recorded_faces: do_physics_sim clears the list (physics.cpp:685),
+        // and each move of the sim records the trigger faces it passes
+        // (FQ_RECORD, :796, :986) for ObjCheckTriggers.
+        var recordedFaces: [IndoorPortalCrossing] = []
         var trainingKillbotEntryWasCrossedThisFrame = false
         var trainingFinalRoomEntryWasCrossedThisFrame = false
         var trainingCameraMonitorWasHitThisFrame = false
@@ -299,12 +305,6 @@ extension GameSession {
                     visitedRoomSourceIndices:
                         trace.visitedRoomSourceIndices
                 )
-            trainingGalleryWasCrossedThisFrame =
-                trainingGalleryWasCrossedThisFrame
-                || trainingGalleryTriggerWasCrossed(
-                    in: level,
-                    passedPortalFaces: trace.passedPortalFaces
-                )
             trainingKillbotEntryWasCrossedThisFrame =
                 trainingKillbotEntryWasCrossedThisFrame
                 || trainingKillbotEntryTriggerWasCrossed(
@@ -317,9 +317,13 @@ extension GameSession {
                     in: level,
                     passedPortalFaces: trace.passedPortalFaces
                 )
+            // Only a wiggle that hits nothing moves the ship and keeps its
+            // recorded faces (physics.cpp:809); otherwise the main move
+            // starts a new record list (FQ_NEW_RECORD_LIST, :986).
             if case .noHit = trace.outcome {
                 position = trace.finalPosition
                 roomSourceIndex = trace.containingRoomSourceIndex
+                recordedFaces += trace.passedPortalFaces
             }
         }
         advanceIndoorPlayerRotation(
@@ -428,12 +432,7 @@ extension GameSession {
                     visitedRoomSourceIndices:
                         trace.visitedRoomSourceIndices
                 )
-            trainingGalleryWasCrossedThisFrame =
-                trainingGalleryWasCrossedThisFrame
-                || trainingGalleryTriggerWasCrossed(
-                    in: level,
-                    passedPortalFaces: trace.passedPortalFaces
-                )
+            recordedFaces += trace.passedPortalFaces
             trainingKillbotEntryWasCrossedThisFrame =
                 trainingKillbotEntryWasCrossedThisFrame
                 || trainingKillbotEntryTriggerWasCrossed(
@@ -486,6 +485,18 @@ extension GameSession {
             }
 
             wallContact = wallContact ?? contact
+            // collide_player_and_wall checks a trigger on the wall it hit
+            // (collide.cpp:1295).
+            world.objects[playerHandle]!.position = trace.finalPosition
+            world.objects[playerHandle]!.location =
+                .room(trace.containingRoomSourceIndex)
+            world.checkTrigger(
+                room: contact.roomSourceIndex,
+                face: contact.faceIndex,
+                object: playerHandle,
+                eventType: .collide,
+                level: level
+            )
             let attemptedDistance = vectorDistance(position, integrated.position)
             let priorRemainingDuration = remainingDuration
             remainingDuration = attemptedDistance > 0
@@ -529,6 +540,12 @@ extension GameSession {
         }
         world.objects[playerHandle]!.position = position
         world.objects[playerHandle]!.location = .room(roomSourceIndex)
+        // ObjCheckTriggers follows do_physics_sim (object.cpp:2807).
+        world.objCheckTriggers(
+            playerHandle,
+            recordedFaces: recordedFaces,
+            level: level
+        )
         // The player's EVT_INTERVAL ends its ObjDoFrame (object.cpp:2868).
         world.objectIntervalEvent(playerHandle, level: level)
         // The rest of ObjDoFrameAll's loop, then ObjDeleteDead
@@ -650,53 +667,6 @@ extension GameSession {
                 voicePrecedesHUDMessages: true
             ))
         }
-        // Script 058 (TrainingMission.cpp:1443, the level EVT_INTERVAL): the
-        // Guide-Bot is not a robot (in the ship, or none) after the Camera
-        // Monitor was used. EVT_USE (Script 059) comes first in the frame,
-        // from the keys.
-        // It moves to TrainingMission.swift in M1 step 8c.
-        if let chain = level.trainingCameraMonitorChain?.returnToShip,
-           var cameraState = trainingCameraMonitorState,
-           cameraState.wasUsed,
-           !cameraState.script058WasPresented,
-           world.objectType(world.buddyHandle) != .robot {
-            cameraState.returnMarkerLightDistance =
-                chain.openMarkerLightDistance
-            cameraState.script058WasPresented = true
-            trainingCameraMonitorState = cameraState
-            openTrainingGuidebotReturnBarrier(in: &world, level: level)
-            trainingOpeningFeedback.append(.init(
-                hudMessages: [chain.successMessage],
-                voiceSourceName: chain.successVoiceSourceName,
-                voicePrecedesHUDMessages: true
-            ))
-        }
-        if var galleryState = trainingGalleryBarrierState,
-           !galleryState.wasTriggered,
-           trainingGalleryWasCrossedThisFrame,
-           let barrier = level.trainingGalleryBarrier {
-            trainingOpeningFeedback.append(.init(
-                hudMessages: [
-                    barrier.successMessage,
-                    barrier.guidebotInstruction,
-                ],
-                voiceSourceName: barrier.voiceSourceName,
-                voicePrecedesHUDMessages: true
-            ))
-            // Script 032's aObjSetLightingDist(Object_handles[1], 0)
-            // (TrainingMission.cpp:2331).
-            world.setObjectLightDistance(
-                ObjectHandle(barrier.markerLightObjectHandle),
-                0
-            )
-            closeTrainingGalleryBarrier(in: &world, level: level)
-            if var robotState = trainingRobotGuidebotState {
-                robotState.controlsWereRestored = false
-                trainingRobotGuidebotState = robotState
-            }
-            galleryState.wasTriggered = true
-            trainingGalleryBarrierState = galleryState
-        }
         if var state = trainingKillbotEntryState,
            !state.wasTriggered,
            trainingKillbotEntryWasCrossedThisFrame,
@@ -710,6 +680,12 @@ extension GameSession {
                 voiceSourceName: chain.entryVoiceSourceName,
                 voicePrecedesHUDMessages: false
             ))
+            // The bespoke Script 042 (TrainingMission.cpp:2351-2366) until
+            // M1 step 9: aObjSetLightingDist(Object_handles[2], 0).
+            world.setObjectLightDistance(
+                ObjectHandle(returnChain.markerLightObjectHandle),
+                chain.closedMarkerLightDistance
+            )
             closeTrainingKillbotEntryBarrier(in: &world, level: level)
             trainingKillbotEntryState = state
         }
@@ -792,28 +768,6 @@ extension GameSession {
                 state.phaseRemaining = remaining
             }
             trainingCloakPickupState = state
-        }
-        if var state = trainingRobotGuidebotState,
-            let chain = level.trainingRobotGuidebotChain
-        {
-            // Script 060 (TrainingMission.cpp:1431): the Guide-Bot is out
-            // (qObjIsType(qGetBuddyObj(0), OBJ_ROBOT)) after Script 032. It
-            // moves to TrainingMission.swift in M1 step 8c.
-            if !state.guidebotContinuationWasPresented,
-               world.objectType(world.buddyHandle) == .robot,
-                trainingGalleryBarrierState?.wasTriggered == true
-            {
-                trainingOpeningFeedback.append(
-                    .init(
-                        hudMessages: [chain.deployedGuidebotMessage],
-                    voiceSourceName:
-                        chain.deployedGuidebotVoiceSourceName,
-                    voicePrecedesHUDMessages: true
-                ))
-                state.guidebotContinuationWasPresented = true
-                state.controlsWereRestored = true
-            }
-            trainingRobotGuidebotState = state
         }
         // DoPlayerFrame, the level EVT_INTERVAL, then Osiris_ProcessTimers
         // (GameLoop.cpp:2992, :3013-3014), with the previous Frametime and
@@ -1137,16 +1091,7 @@ extension GameSession {
             wallContact: wallContact,
             enabledPlayerControls:
                 finalGoalFrame == nil
-                    ? trainingPlayerControlMask(
-                        galleryWasTriggered:
-                            trainingGalleryBarrierState?
-                                .wasTriggered == true,
-                        controlsWereRestored:
-                            trainingRobotGuidebotState?
-                                .controlsWereRestored == true,
-                        controllerBitflags:
-                            world.playerControllerBitflags
-                    )
+                    ? world.playerControllerBitflags
                     : PlayerControlMask(rawValue: 0),
             showsEnabledPlayerControls:
                 finalGoalFrame == nil
@@ -1303,12 +1248,6 @@ extension GameSession {
                             )
                         }
                 } ?? [],
-            trainingGuidebotReturnMarkerLightDistance:
-                trainingKillbotEntryState?.wasTriggered == true
-                    ? level.trainingCameraMonitorChain?.returnToShip?
-                        .killbotEntry?.closedMarkerLightDistance
-                    : trainingCameraMonitorState?
-                        .returnMarkerLightDistance,
             objectSoundLoops: world.soundSystem.objectLoops.compactMap { loop in
                 guard let object = world.objects[loop.object],
                       case let .room(room) = object.location
@@ -1333,19 +1272,6 @@ extension GameSession {
         )
     }
 
-}
-
-private func trainingGalleryTriggerWasCrossed(
-    in level: Level,
-    passedPortalFaces: [IndoorPortalCrossing]
-) -> Bool {
-    guard let barrier = level.trainingGalleryBarrier else {
-        return false
-    }
-    return passedPortalFaces.contains {
-        $0.roomSourceIndex == barrier.triggerRoomSourceIndex
-            && $0.faceIndex == barrier.triggerFaceIndex
-    }
 }
 
 private func trainingKillbotEntryTriggerWasCrossed(
@@ -1509,18 +1435,6 @@ private func trainingCloakFrame(
             phase == .cloaked ? chain.cloakDuration : chain.fadeDuration
     )
 }
-func closeTrainingGalleryBarrier(in world: inout GameWorld, level: Level) {
-    guard let barrier = level.trainingGalleryBarrier else { return }
-    for portalIndex in barrier.orderedPortalIndices {
-        world.setPortalRenderFaces(
-            true,
-            roomSourceIndex: barrier.barrierRoomSourceIndex,
-            portalIndex: portalIndex,
-            level: level
-        )
-    }
-}
-
 /// Whether every listed portal of the room has PF_RENDER_FACES clear.
 func trainingBarrierIsOpen(
     _ world: GameWorld,
@@ -1557,22 +1471,6 @@ func setTrainingPortalRenderState(
 
 func openTrainingGalleryBarrier(in world: inout GameWorld, level: Level) {
     guard let barrier = level.trainingGalleryBarrier else { return }
-    setTrainingPortalRenderState(
-        in: &world,
-        level: level,
-        roomSourceIndex: barrier.barrierRoomSourceIndex,
-        portalIndices: barrier.orderedPortalIndices,
-        rendersFaces: false
-    )
-}
-
-func openTrainingGuidebotReturnBarrier(
-    in world: inout GameWorld,
-    level: Level
-) {
-    guard let barrier = level.trainingCameraMonitorChain?.returnToShip else {
-        return
-    }
     setTrainingPortalRenderState(
         in: &world,
         level: level,

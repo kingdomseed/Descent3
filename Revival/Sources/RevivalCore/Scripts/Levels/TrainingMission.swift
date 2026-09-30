@@ -9,8 +9,9 @@
 // GetCOScriptList (:1280), the custom block's player functions (:519-640),
 // the level script's EVT_INTERVAL (Scripts 018, 025, 031, 030, 034, and
 // 035, :1347-1429), EVT_LEVELSTART (Script 000, :1457), and EVT_TIMER
-// (Scripts 002, 023, 024, 022, 027, 029, 049, and 056, :1501-1622), and
-// the object scripts of
+// (Scripts 002, 023, 024, 022, 027, 029, 049, and 056, :1501-1622), the
+// EVT_INTERVAL Scripts 060 and 058 (:1431-1456), TriggerScript_0000
+// (Script 032, :2325), and the object scripts of
 // the opening, return, dodge, maneuver, and robot lessons:
 // CustomObjectScript_300D (Scripts 001 and 008, :1633), _300C (003, 005,
 // 007, 009, 011, 013, :1662), _300B (004 and 010, :1745), _4809 (006 and
@@ -88,6 +89,13 @@ struct TrainingMissionState: Codable, Equatable, Sendable {
     var script049Count: Int = 0
     var script035Count: Int = 0
     var script056Count: Int = 0
+    /// ScriptActionCtr_032: Portal2 entered (the gallery); _060: the
+    /// Guide-Bot is out; _059: the Camera Monitor was used; _058: the
+    /// Guide-Bot has returned.
+    var script032Count: Int = 0
+    var script059Count: Int = 0
+    var script060Count: Int = 0
+    var script058Count: Int = 0
     var dallas = DallasState.dfInit()
 
     /// Every action counter, for save validation.
@@ -107,7 +115,8 @@ struct TrainingMissionState: Codable, Equatable, Sendable {
             script051Count, script052Count, script053Count,
             script054Count, script055Count,
             script047Count, script048Count, script034Count, script049Count,
-            script035Count, script056Count,
+            script035Count, script056Count, script032Count, script059Count,
+            script060Count, script058Count,
         ]
     }
 }
@@ -317,6 +326,12 @@ enum TrainingMissionScript {
             increment(\.script045Count, world: &world)
         case (0x012, .destroy(isDying: true)):
             increment(\.script046Count, world: &world)
+        // Script 059: Player used camera monitor (:2074-2084). Until M1
+        // step 9 the bespoke Camera Monitor use plays GuideBotD.osf, shows
+        // UseCameraMonitor, and opens the popup view; the handler counts
+        // ScriptActionCtr_059, which Scripts 038 and 058 read.
+        case (0x00e, .use):
+            increment(\.script059Count, world: &world)
         // Script 047: InvulnPowerup2 Picked up (:2174-2186).
         case (0x013, .collide):
             if world.trainingMission.script047Count < 1 {
@@ -343,13 +358,21 @@ enum TrainingMissionScript {
         return .all
     }
 
+    /// The trigger scripts' CallEvent. Each returns CONTINUE_CHAIN |
+    /// CONTINUE_DEFAULT (for example TrainingMission.cpp:2345).
+    /// TriggerScript_0001 and _0002 (Scripts 042 and 050) are still the
+    /// bespoke Training code (M1 step 9).
     static func callTriggerEvent(
         id: Int32,
         event: ScriptEvent,
         world: inout GameWorld,
         level: Level
     ) -> ChainFlags {
-        .all
+        switch (id, event) {
+        case (0x01b, .collide): collidePortal2(world: &world, level: level)
+        default: break
+        }
+        return .all
     }
 
     /// LevelScript_0000::CallEvent (TrainingMission.cpp:1333).
@@ -372,8 +395,8 @@ enum TrainingMissionScript {
     }
 
     /// EVT_INTERVAL (TrainingMission.cpp:1347-1456). Scripts 018, 025, 031,
-    /// 030, 034, and 035 are translated; Scripts 038 and 060 are still
-    /// bespoke.
+    /// 030, 034, 035, 060, and 058 are translated; Script 038 is still
+    /// bespoke (M1 step 9).
     private static func levelInterval(world: inout GameWorld, level: Level) {
         func object(_ index: Int) -> ObjectHandle {
             objectHandle(index, level: level)
@@ -464,6 +487,32 @@ enum TrainingMissionScript {
 
             // Increment the script action counter
             increment(\.script035Count, world: &world)
+        }
+
+        // Script 060: Is Buddy Out?
+        if world.trainingMission.script060Count < 1,
+           world.qObjIsType(world.qGetBuddyObj(0, level: level), 2) == true,
+           (world.trainingMission.script032Count > 0) == true {
+            world.aSoundPlaySteamingText("GuideBotB.osf", 1)
+            world.aToggleAllPlayerControls(1, 0, level: level)
+            world.aShowHUDMessage(message(35, level: level))
+
+            // Increment the script action counter
+            increment(\.script060Count, world: &world)
+        }
+
+        // Script 058: Buddy Has Returned
+        if world.trainingMission.script058Count < 1,
+           world.qObjIsType(world.qGetBuddyObj(0, level: level), 2) == false,
+           (world.trainingMission.script059Count > 0) == true {
+            world.aObjSetLightingDist(object(2), 50)
+            world.aPortalRenderSet(0, 0, roomIndex(4, level: level), true, level: level)
+            world.aPortalRenderSet(0, 1, roomIndex(4, level: level), true, level: level)
+            world.aSoundPlaySteamingText("proceed6.osf", 1)
+            world.aShowHUDMessage(message(0, level: level))
+
+            // Increment the script action counter
+            increment(\.script058Count, world: &world)
         }
     }
 
@@ -651,6 +700,24 @@ extension TrainingMissionScript {
     ) {
         if world.trainingMission[keyPath: counter] < maximumActionCounter {
             world.trainingMission[keyPath: counter] += 1
+        }
+    }
+
+    /// TriggerScript_0000 EVT_COLLIDE, Portal2
+    /// (TrainingMission.cpp:2325-2345).
+    static func collidePortal2(world: inout GameWorld, level: Level) {
+        // Script 032: Entered Gallery
+        if world.trainingMission.script032Count < 1 {
+            world.aSoundPlaySteamingText("GuideBotA.osf", 1)
+            world.aObjSetLightingDist(objectHandle(1, level: level), 0)
+            world.aPortalRenderSet(1, 1, roomIndex(3, level: level), true, level: level)
+            world.aPortalRenderSet(1, 0, roomIndex(3, level: level), true, level: level)
+            world.aShowHUDMessage(message(0, level: level))
+            world.aShowHUDMessage(message(27, level: level))
+            world.aToggleAllPlayerControls(0, 0, level: level)
+
+            // Increment the script action counter
+            increment(\.script032Count, world: &world)
         }
     }
 
@@ -1024,6 +1091,12 @@ extension GameWorld {
     }
 
     // The custom block's player functions (TrainingMission.cpp:519-640).
+
+    /// qGetBuddyObj (TrainingMission.cpp:535): the player's Guide-Bot
+    /// (PLYV_I_BUDDY_HANDLE).
+    func qGetBuddyObj(_ playerNum: Int, level: Level) -> ObjectHandle {
+        playerBuddyHandle(playerObjectHandle(slot: playerNum, level: level))
+    }
 
     /// qGetPlayerObj (TrainingMission.cpp:558).
     func qGetPlayerObj(_ playerNum: Int, level: Level) -> ObjectHandle {

@@ -15,8 +15,8 @@ struct InputSnapshot: Equatable, Sendable {
     let firesPrimaryWeapon: Bool
     let firesSecondaryWeapon: Bool
     let firesPlayerFlare: Bool
-    let deploysTrainingGuidebot: Bool
-    let requestsTrainingGuidebotActiveGoal: Bool
+    /// KEY_F4 (GameLoop.cpp:1493): the buddy menu.
+    let opensBuddyMenu: Bool
     let usesInventory: Bool
     let togglesHeadlight: Bool
     let rearViewPressed: Bool
@@ -37,8 +37,7 @@ struct InputSnapshot: Equatable, Sendable {
         firesPrimaryWeapon: Bool = false,
         firesSecondaryWeapon: Bool = false,
         firesPlayerFlare: Bool = false,
-        deploysTrainingGuidebot: Bool = false,
-        requestsTrainingGuidebotActiveGoal: Bool = false,
+        opensBuddyMenu: Bool = false,
         usesInventory: Bool = false,
         togglesHeadlight: Bool = false,
         rearViewPressed: Bool = false,
@@ -59,9 +58,7 @@ struct InputSnapshot: Equatable, Sendable {
         self.firesPrimaryWeapon = firesPrimaryWeapon
         self.firesSecondaryWeapon = firesSecondaryWeapon
         self.firesPlayerFlare = firesPlayerFlare
-        self.deploysTrainingGuidebot = deploysTrainingGuidebot
-        self.requestsTrainingGuidebotActiveGoal =
-            requestsTrainingGuidebotActiveGoal
+        self.opensBuddyMenu = opensBuddyMenu
         self.usesInventory = usesInventory
         self.togglesHeadlight = togglesHeadlight
         self.rearViewPressed = rearViewPressed
@@ -88,20 +85,6 @@ struct PlayerControlMask: OptionSet, Codable, Equatable, Sendable {
     static let secondaryWeapon = Self(rawValue: 1 << 13)
     static let afterburner = Self(rawValue: 1 << 14)
     static let all = Self(rawValue: .max)
-}
-
-func trainingPlayerControlMask(
-    galleryWasTriggered: Bool,
-    controlsWereRestored: Bool,
-    controllerBitflags: PlayerControlMask
-) -> PlayerControlMask {
-    if controlsWereRestored {
-        return .all
-    }
-    if galleryWasTriggered {
-        return PlayerControlMask(rawValue: 0)
-    }
-    return controllerBitflags
 }
 
 extension InputSnapshot {
@@ -139,9 +122,7 @@ extension InputSnapshot {
             firesSecondaryWeapon:
                 controls.contains(.secondaryWeapon) && firesSecondaryWeapon,
             firesPlayerFlare: firesPlayerFlare,
-            deploysTrainingGuidebot: deploysTrainingGuidebot,
-            requestsTrainingGuidebotActiveGoal:
-                requestsTrainingGuidebotActiveGoal,
+            opensBuddyMenu: opensBuddyMenu,
             usesInventory: usesInventory,
             togglesHeadlight: togglesHeadlight,
             rearViewPressed: rearViewPressed,
@@ -229,8 +210,7 @@ struct PlayerInputState: Sendable {
     private var controller = InputSnapshot.zero
     private var mouseDeltaX: Float = 0
     private var mouseDeltaY: Float = 0
-    private var guidebotDeploymentIsPending = false
-    private var guidebotActiveGoalRequestIsPending = false
+    private var buddyMenuRequestIsPending = false
     private var primaryFireIsHeld = false
     private var secondaryFireIsHeld = false
     private var playerFlareIsPending = false
@@ -260,14 +240,10 @@ struct PlayerInputState: Sendable {
         mouseDeltaY += y
     }
 
-    mutating func requestGuidebotDeployment() {
+    /// The F4 key.
+    mutating func requestBuddyMenu() {
         guard gameplayIsActive else { return }
-        guidebotDeploymentIsPending = true
-    }
-
-    mutating func requestTrainingGuidebotActiveGoal() {
-        guard gameplayIsActive else { return }
-        guidebotActiveGoalRequestIsPending = true
+        buddyMenuRequestIsPending = true
     }
 
     mutating func setPrimaryFireHeld(_ isHeld: Bool) {
@@ -325,9 +301,7 @@ struct PlayerInputState: Sendable {
         }
         let deltaX = mouseDeltaX
         let deltaY = mouseDeltaY
-        let deploysTrainingGuidebot = guidebotDeploymentIsPending
-        let requestsTrainingGuidebotActiveGoal =
-            guidebotActiveGoalRequestIsPending
+        let opensBuddyMenu = buddyMenuRequestIsPending
         let firesPrimaryWeapon = primaryFireIsHeld
         let firesSecondaryWeapon = secondaryFireIsHeld
         let firesPlayerFlare = playerFlareIsPending
@@ -337,8 +311,7 @@ struct PlayerInputState: Sendable {
         let rearViewHeld = rearViewIsHeld
         mouseDeltaX = 0
         mouseDeltaY = 0
-        guidebotDeploymentIsPending = false
-        guidebotActiveGoalRequestIsPending = false
+        buddyMenuRequestIsPending = false
         inventoryUseIsPending = false
         headlightToggleIsPending = false
         playerFlareIsPending = false
@@ -363,9 +336,7 @@ struct PlayerInputState: Sendable {
             firesPrimaryWeapon: firesPrimaryWeapon,
             firesSecondaryWeapon: firesSecondaryWeapon,
             firesPlayerFlare: firesPlayerFlare,
-            deploysTrainingGuidebot: deploysTrainingGuidebot,
-            requestsTrainingGuidebotActiveGoal:
-                requestsTrainingGuidebotActiveGoal,
+            opensBuddyMenu: opensBuddyMenu,
             usesInventory: usesInventory,
             togglesHeadlight: togglesHeadlight,
             rearViewPressed: rearViewPressed,
@@ -384,8 +355,7 @@ struct PlayerInputState: Sendable {
             controller = .zero
             mouseDeltaX = 0
             mouseDeltaY = 0
-            guidebotDeploymentIsPending = false
-            guidebotActiveGoalRequestIsPending = false
+            buddyMenuRequestIsPending = false
             primaryFireIsHeld = false
             secondaryFireIsHeld = false
             playerFlareIsPending = false

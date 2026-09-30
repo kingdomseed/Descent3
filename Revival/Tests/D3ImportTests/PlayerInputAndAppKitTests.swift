@@ -563,126 +563,80 @@ extension WorldRenderingTests {
 
     }
 
-    func testF4RequestsGuidebotDeploymentOnlyDuringGameplay() {
-        XCTAssertTrue(
-            RevivalGameplayView.requestsGuidebotDeployment(
-                keyCode: 118,
-                gameplayIsActive: true
-            )
-        )
-        XCTAssertFalse(
-            RevivalGameplayView.requestsGuidebotDeployment(
-                keyCode: 118,
-                gameplayIsActive: false
-            )
-        )
-        XCTAssertFalse(
-            RevivalGameplayView.requestsGuidebotDeployment(
-                keyCode: 117,
-                gameplayIsActive: true
-            )
-        )
-        var playerInput = PlayerInputState(rampDuration: 0)
-        playerInput.requestGuidebotDeployment()
-        XCTAssertTrue(
-            playerInput.snapshot(frameDuration: 0.1)
-                .deploysTrainingGuidebot
-        )
-        XCTAssertFalse(
-            playerInput.snapshot(frameDuration: 0.1)
-                .deploysTrainingGuidebot
-        )
+    /// F4 (GameLoop.cpp:1493) is a one-shot buddy menu request during
+    /// gameplay only; a repeat does not ask again.
+    func testF4RequestsTheBuddyMenuOnlyDuringGameplay() {
+        XCTAssertTrue(RevivalGameplayView.requestsBuddyMenu(
+            keyCode: 118, isRepeat: false, gameplayIsActive: true
+        ))
+        XCTAssertFalse(RevivalGameplayView.requestsBuddyMenu(
+            keyCode: 118, isRepeat: false, gameplayIsActive: false
+        ))
+        XCTAssertFalse(RevivalGameplayView.requestsBuddyMenu(
+            keyCode: 118, isRepeat: true, gameplayIsActive: true
+        ))
+        XCTAssertFalse(RevivalGameplayView.requestsBuddyMenu(
+            keyCode: 117, isRepeat: false, gameplayIsActive: true
+        ))
+        var input = PlayerInputState(rampDuration: 0)
+        input.requestBuddyMenu()
+        XCTAssertTrue(input.snapshot(frameDuration: 0.1).opensBuddyMenu)
+        XCTAssertFalse(input.snapshot(frameDuration: 0.1).opensBuddyMenu)
+        input.setGameplayActive(false, simulation: nil, at: 1)
+        input.requestBuddyMenu()
+        XCTAssertEqual(input.snapshot(frameDuration: 0.1), .zero)
+        input.setGameplayActive(true, simulation: nil, at: 2)
+        XCTAssertFalse(input.snapshot(frameDuration: 0.1).opensBuddyMenu)
     }
 
+    /// BuddyDisplay's window as a native menu (buddymenu.cpp:95-172): the
+    /// title, then "1." to "9." and "A." items with the '1'-'9' and 'a'
+    /// accelerators and no modifier; F4 and Escape close it.
     @MainActor
-    func testScript060UsesOneNativeGuidebotGoalMenuAndPausedOneShotCommand() {
-        let menu = RevivalGameplayView.trainingGuidebotGoalMenu(
+    func testBuddyMenuListsTheGuideBotCommandsWithTheirKeys() {
+        let commands = (0..<11).map {
+            GuideBotMenu.Command(
+                id: Int32($0),
+                text: "Command \($0)",
+                dialogText: $0 == 2 ? "Enter GuideBot name:" : nil
+            )
+        }
+        let buddyMenu = BuddyMenu(title: "GB Command Menu", commands: commands)
+        let menu = RevivalGameplayView.buddyMenu(
+            buddyMenu,
             target: nil,
             action: nil
         )
-        XCTAssertEqual(menu.title, "GB Command Menu")
-        XCTAssertEqual(menu.items.count, 1)
-        XCTAssertEqual(menu.items[0].title, "1. Get to Camera Monitor")
-        XCTAssertEqual(menu.items[0].keyEquivalent, "1")
-        XCTAssertTrue(menu.items[0].keyEquivalentModifierMask.isEmpty)
-        XCTAssertEqual(menu.items[0].tag, 3)
-        XCTAssertTrue(
-            RevivalGameplayView.cancelsTrainingGuidebotGoalMenu(
-                keyCode: 118
-            )
+        XCTAssertEqual(menu.items.count, 13)
+        XCTAssertEqual(menu.items[0].title, "GB Command Menu")
+        XCTAssertFalse(menu.items[0].isEnabled)
+        XCTAssertTrue(menu.items[1].isSeparatorItem)
+        let items = Array(menu.items.dropFirst(2))
+        XCTAssertEqual(items.map(\.tag), Array(0..<11))
+        XCTAssertEqual(items[0].title, "1. Command 0")
+        XCTAssertEqual(items[8].title, "9. Command 8")
+        XCTAssertEqual(items[9].title, "A. Command 9")
+        XCTAssertEqual(items[10].title, "B. Command 10")
+        XCTAssertEqual(
+            items.map(\.keyEquivalent),
+            ["1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b"]
         )
-        XCTAssertTrue(
-            RevivalGameplayView.cancelsTrainingGuidebotGoalMenu(
-                keyCode: 53
-            )
+        XCTAssertTrue(items.allSatisfy {
+            $0.keyEquivalentModifierMask.isEmpty
+        })
+        XCTAssertTrue(RevivalGameplayView.closesBuddyMenu(keyCode: 118))
+        XCTAssertTrue(RevivalGameplayView.closesBuddyMenu(keyCode: 53))
+        XCTAssertFalse(RevivalGameplayView.closesBuddyMenu(keyCode: 18))
+        // Items past 'z' and the last N_WINDOW_ACCELS entry get no key.
+        let long = BuddyMenu(
+            title: "",
+            commands: (0..<48).map {
+                .init(id: 0, text: "\($0)", dialogText: nil)
+            }
         )
-        XCTAssertFalse(
-            RevivalGameplayView.cancelsTrainingGuidebotGoalMenu(
-                keyCode: 18
-            )
-        )
-
-        var input = PlayerInputState(rampDuration: 0)
-        input.setHeld(.init(forward: 1))
-        input.setGameplayActive(false, simulation: nil, at: 1)
-        input.requestTrainingGuidebotActiveGoal()
-        XCTAssertEqual(input.snapshot(frameDuration: 0.1), .zero)
-        input.setGameplayActive(true, simulation: nil, at: 2)
-        input.requestTrainingGuidebotActiveGoal()
-        XCTAssertTrue(
-            input.snapshot(frameDuration: 0.1)
-                .requestsTrainingGuidebotActiveGoal
-        )
-        XCTAssertFalse(
-            input.snapshot(frameDuration: 0.1)
-                .requestsTrainingGuidebotActiveGoal
-        )
-    }
-
-    @MainActor
-    func testScript059UsesOneNativeGuidebotReturnMenuAndPausedContextualCommand()
-    {
-        let menu = RevivalGameplayView.trainingGuidebotReturnToShipMenu(
-            target: nil,
-            action: nil
-        )
-        XCTAssertEqual(menu.title, "GB Command Menu")
-        XCTAssertEqual(menu.items.count, 1)
-        XCTAssertEqual(menu.items[0].title, "1. Return to ship")
-        XCTAssertEqual(menu.items[0].keyEquivalent, "1")
-        XCTAssertTrue(menu.items[0].keyEquivalentModifierMask.isEmpty)
-        XCTAssertEqual(menu.items[0].tag, 43)
-        XCTAssertTrue(
-            RevivalGameplayView.cancelsTrainingGuidebotReturnToShipMenu(
-                keyCode: 118
-            )
-        )
-        XCTAssertTrue(
-            RevivalGameplayView.cancelsTrainingGuidebotReturnToShipMenu(
-                keyCode: 53
-            )
-        )
-        XCTAssertFalse(
-            RevivalGameplayView.cancelsTrainingGuidebotReturnToShipMenu(
-                keyCode: 18
-            )
-        )
-
-        var input = PlayerInputState(rampDuration: 0)
-        input.setHeld(.init(forward: 1))
-        input.setGameplayActive(false, simulation: nil, at: 1)
-        input.requestGuidebotDeployment()
-        XCTAssertEqual(input.snapshot(frameDuration: 0.1), .zero)
-        input.setGameplayActive(true, simulation: nil, at: 2)
-        input.requestGuidebotDeployment()
-        XCTAssertTrue(
-            input.snapshot(frameDuration: 0.1)
-                .deploysTrainingGuidebot
-        )
-        XCTAssertFalse(
-            input.snapshot(frameDuration: 0.1)
-                .deploysTrainingGuidebot
-        )
+        XCTAssertEqual(long.acceleratorCharacter(34), "z")
+        XCTAssertNil(long.acceleratorCharacter(35))
+        XCTAssertNil(long.acceleratorCharacter(47))
     }
 
     func testBackslashRequestsOneInventoryUseOnlyDuringGameplay() {

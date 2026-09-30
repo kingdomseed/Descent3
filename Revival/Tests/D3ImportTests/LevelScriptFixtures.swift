@@ -397,6 +397,15 @@ extension GameSession {
         world.aToggleAllPlayerControls(1, 0, level: level)
     }
 
+    /// FlashLight-3's script light distance (the Guide-Bot return marker,
+    /// Object_handles[2]), or 0.
+    var returnMarkerLightDistance: Float {
+        level.trainingCameraMonitorChain?.returnToShip.flatMap {
+            world.objects[ObjectHandle($0.markerLightObjectHandle)]?
+                .localLighting?.lightDistance
+        } ?? 0
+    }
+
     /// FlashLight-2's script light distance (the gallery marker), or 0.
     var galleryMarkerLightDistance: Float {
         level.trainingGalleryBarrier.flatMap {
