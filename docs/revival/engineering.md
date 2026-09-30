@@ -34,7 +34,7 @@ rtk xcodebuild -quiet build -project Revival.xcodeproj -scheme RevivalMac \
 
 # Mobile compile check
 rtk xcodebuild -quiet build -project Revival.xcodeproj -scheme RevivalMobile \
-  -configuration Release -destination 'generic/platform=iOS Simulator' \
+  -configuration Release -destination 'generic/platform=iOS' \
   -derivedDataPath /private/tmp/revival-dd-<task> CODE_SIGNING_ALLOWED=NO
 ```
 
@@ -57,6 +57,8 @@ D3Import --contract 1 --source retail-data/descent3 --staging <dir> \
 - Build success does not prove launch. Launch does not prove behavior. A simulator build does not prove device behavior.
 
 ## 3. Process hygiene (mandatory)
+
+**Shared machine.** Several projects use this Mac. Descent3 runs on **macOS only**: never boot an iOS simulator or Android emulator, and never target a device. The RevivalMobile check is an unsigned `generic/platform=iOS` compile, which boots nothing. Never kill or touch processes from other projects' worktrees or SDKs. Only stop processes whose command line contains `open-source-90s-games` or `/private/tmp/revival-`. Pass these rules on in every subagent brief.
 
 The last project left stray apps, test runners, and debuggers running. Do not repeat that.
 
