@@ -118,18 +118,9 @@ final class GameSession {
         get { world.playerRearViewState }
         set { world.playerRearViewState = newValue }
     }
-    var playerConcussionState: PlayerConcussionState? {
-        get { world.playerConcussionState }
-        set { world.playerConcussionState = newValue }
-    }
     var playerYellowFlareState: PlayerYellowFlareState? {
         get { world.playerYellowFlareState }
         set { world.playerYellowFlareState = newValue }
-    }
-    var trainingFollowBotDestructionState:
-        TrainingFollowBotDestructionState? {
-        get { world.trainingFollowBotDestructionState }
-        set { world.trainingFollowBotDestructionState = newValue }
     }
     var trainingGalleryBarrierState: TrainingGalleryBarrierState? {
         get { world.trainingGalleryBarrierState }
@@ -147,42 +138,6 @@ final class GameSession {
         get { world.trainingKillbotEntryState }
         set { world.trainingKillbotEntryState = newValue }
     }
-    var trainingRASBot1DeathState: TrainingRASBot1DeathState? {
-        get { world.trainingRASBot1DeathState }
-        set { world.trainingRASBot1DeathState = newValue }
-    }
-    var trainingRASBot2DeathState: TrainingRASBot2DeathState? {
-        get { world.trainingRASBot2DeathState }
-        set { world.trainingRASBot2DeathState = newValue }
-    }
-    var trainingRASBot3DeathState: TrainingRASBot3DeathState? {
-        get { world.trainingRASBot3DeathState }
-        set { world.trainingRASBot3DeathState = newValue }
-    }
-    var trainingRASBot4DeathState: TrainingRASBot4DeathState? {
-        get { world.trainingRASBot4DeathState }
-        set { world.trainingRASBot4DeathState = newValue }
-    }
-    var trainingLastBot1DeathState: TrainingLastBot1DeathState? {
-        get { world.trainingLastBot1DeathState }
-        set { world.trainingLastBot1DeathState = newValue }
-    }
-    var trainingLastBot2DeathState: TrainingLastBot2DeathState? {
-        get { world.trainingLastBot2DeathState }
-        set { world.trainingLastBot2DeathState = newValue }
-    }
-    var trainingLastBot3DeathState: TrainingLastBot3DeathState? {
-        get { world.trainingLastBot3DeathState }
-        set { world.trainingLastBot3DeathState = newValue }
-    }
-    var trainingLastBot4DeathState: TrainingLastBot4DeathState? {
-        get { world.trainingLastBot4DeathState }
-        set { world.trainingLastBot4DeathState = newValue }
-    }
-    var trainingLastBot5DeathState: TrainingLastBot5DeathState? {
-        get { world.trainingLastBot5DeathState }
-        set { world.trainingLastBot5DeathState = newValue }
-    }
     var trainingInvulnerabilityPickupState: TrainingInvulnerabilityPickupState? {
         get { world.trainingInvulnerabilityPickupState }
         set { world.trainingInvulnerabilityPickupState = newValue }
@@ -191,17 +146,9 @@ final class GameSession {
         get { world.trainingCloakPickupState }
         set { world.trainingCloakPickupState = newValue }
     }
-    var trainingLastRoomState: TrainingLastRoomState? {
-        get { world.trainingLastRoomState }
-        set { world.trainingLastRoomState = newValue }
-    }
     var trainingFinalRoomEntryState: TrainingFinalRoomEntryState? {
         get { world.trainingFinalRoomEntryState }
         set { world.trainingFinalRoomEntryState = newValue }
-    }
-    var trainingFinalBotsCompletionState: TrainingFinalBotsCompletionState? {
-        get { world.trainingFinalBotsCompletionState }
-        set { world.trainingFinalBotsCompletionState = newValue }
     }
     var trainingFinalGoalState: TrainingFinalGoalState? {
         get { world.trainingFinalGoalState }
@@ -214,236 +161,6 @@ final class GameSession {
     var trainingSessionOutcome: TrainingSessionOutcome? {
         get { world.trainingSessionOutcome }
         set { world.trainingSessionOutcome = newValue }
-    }
-
-    func destroyTrainingRobot(handle: UInt32) {
-        guard let chain = level.trainingRobotGuidebotChain,
-              handle == chain.destroyRobotObjectHandle,
-              var state = trainingRobotGuidebotState,
-              !state.robotWasDestroyed,
-              world.objects[ObjectHandle(handle)] != nil
-        else {
-            return
-        }
-        state.destructionTimerRemaining = chain.destructionDelay
-        if var galleryState = trainingGalleryBarrierState {
-            galleryState.markerLightDistance =
-                level.trainingGalleryBarrier!.openMarkerLightDistance
-            trainingGalleryBarrierState = galleryState
-        }
-        openTrainingGalleryBarrier(in: &world, level: level)
-        state.controlsWereRestored = true
-        state.robotShields = min(state.robotShields, -0.000_001)
-        state.robotWasDestroyed = true
-        trainingRobotGuidebotState = state
-
-        if let handoff = level.trainingFollowBotDestruction,
-           handle == handoff.destroyBot2ObjectHandle {
-            trainingFollowBotDestructionState?.destroyBot2IsVisible = false
-        }
-        world.objects.delete(ObjectHandle(handle))
-    }
-
-    func destroyTrainingRASBot1(handle: UInt32) {
-        guard let chain = level.trainingRASBot1DeathChain,
-              handle == chain.robotObjectHandle,
-              var state = trainingRASBot1DeathState,
-              !state.wasDestroyed,
-              world.objects[ObjectHandle(handle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handle))
-        state.wasDestroyed = true
-        state.shields = min(state.shields, -0.000_001)
-        trainingRASBot1DeathState = state
-    }
-
-    func destroyTrainingRASBot2(handle: UInt32) {
-        guard let chain = level.trainingRASBot2DeathChain,
-              handle == chain.robotObjectHandle,
-              var state = trainingRASBot2DeathState,
-              !state.wasDestroyed,
-              world.objects[ObjectHandle(handle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handle))
-        state.wasDestroyed = true
-        state.shields = min(state.shields, -0.000_001)
-        trainingRASBot2DeathState = state
-    }
-
-    func destroyTrainingRASBot3(handle: UInt32) {
-        guard let chain = level.trainingRASBot3DeathChain,
-              handle == chain.robotObjectHandle,
-              var state = trainingRASBot3DeathState,
-              !state.wasDestroyed,
-              world.objects[ObjectHandle(handle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handle))
-        state.wasDestroyed = true
-        state.shields = min(state.shields, -0.000_001)
-        trainingRASBot3DeathState = state
-    }
-
-    func destroyTrainingRASBot4(handle: UInt32) {
-        guard let chain = level.trainingRASBot4DeathChain,
-              handle == chain.robotObjectHandle,
-              var state = trainingRASBot4DeathState,
-              !state.wasDestroyed,
-              world.objects[ObjectHandle(handle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handle))
-        state.wasDestroyed = true
-        state.shields = min(state.shields, -0.000_001)
-        trainingRASBot4DeathState = state
-    }
-
-    func destroyTrainingLastBot1(handle: UInt32) {
-        guard let chain = level.trainingLastBot1DeathChain,
-              handle == chain.robotObjectHandle,
-              var state = trainingLastBot1DeathState,
-              !state.wasDestroyed,
-              world.objects[ObjectHandle(handle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handle))
-        state.wasDestroyed = true
-        state.shields = min(state.shields, -0.000_001)
-        trainingLastBot1DeathState = state
-    }
-
-    func destroyTrainingLastBot2(handle: UInt32) {
-        guard let chain = level.trainingLastBot2DeathChain,
-              handle == chain.robotObjectHandle,
-              var state = trainingLastBot2DeathState,
-              !state.wasDestroyed,
-              world.objects[ObjectHandle(handle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handle))
-        state.wasDestroyed = true
-        state.shields = min(state.shields, -0.000_001)
-        trainingLastBot2DeathState = state
-    }
-
-    func destroyTrainingLastBot3(handle: UInt32) {
-        guard let chain = level.trainingLastBot3DeathChain,
-              handle == chain.robotObjectHandle,
-              var state = trainingLastBot3DeathState,
-              !state.wasDestroyed,
-              world.objects[ObjectHandle(handle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handle))
-        state.wasDestroyed = true
-        state.shields = min(state.shields, -0.000_001)
-        trainingLastBot3DeathState = state
-    }
-
-    func destroyTrainingLastBot4(handle: UInt32) {
-        guard let chain = level.trainingLastBot4DeathChain,
-              handle == chain.robotObjectHandle,
-              var state = trainingLastBot4DeathState,
-              !state.wasDestroyed,
-              world.objects[ObjectHandle(handle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handle))
-        state.wasDestroyed = true
-        state.shields = min(state.shields, -0.000_001)
-        trainingLastBot4DeathState = state
-    }
-
-    func destroyTrainingLastBot5(handle: UInt32) {
-        guard let chain = level.trainingLastBot5DeathChain,
-              handle == chain.robotObjectHandle,
-              var state = trainingLastBot5DeathState,
-              !state.wasDestroyed,
-              world.objects[ObjectHandle(handle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handle))
-        state.wasDestroyed = true
-        state.shields = min(state.shields, -0.000_001)
-        trainingLastBot5DeathState = state
-    }
-
-    /// CustomObjectScript_2008 EVT_DESTROY, FollowBot1 (Script 037,
-    /// TrainingMission.cpp:1972-1983), still bespoke until M1 step 7.
-    func destroyTrainingFollowBot(isDying: Bool) {
-        guard isDying,
-              let handoff = level.trainingFollowBotDestruction,
-              var destruction = trainingFollowBotDestructionState,
-              !destruction.followBotWasDestroyed,
-              world.objects[ObjectHandle(handoff.followBotObjectHandle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handoff.followBotObjectHandle))
-        destruction.followBotWasDestroyed = true
-        destruction.followBotShields = min(
-            destruction.followBotShields,
-            -0.000_001
-        )
-        if destruction.script037Count < 1,
-           (world.trainingMission.script026Count > 0) == true {
-            destruction.levelTimer11Remaining =
-                handoff.destructionDelay
-            destruction.script037Count = min(
-                destruction.script037Count + 1,
-                trainingScriptActionCounterMaximum
-            )
-        }
-        trainingFollowBotDestructionState = destruction
-    }
-
-    /// CustomObjectScript_1011 EVT_DESTROY, DestroyBot1 (Script 028,
-    /// TrainingMission.cpp:2007-2023), still bespoke until M1 step 7. Its
-    /// path goal is `startTrainingDestroyBot2Path`, given after the frame's
-    /// object loop.
-    func destroyTrainingDestroyBot1(isDying: Bool) {
-        guard isDying,
-              let handoff = level.trainingFollowBotDestruction,
-              var destruction = trainingFollowBotDestructionState,
-              destruction.script027Count > 0,
-              var destroyBot1Destruction =
-                destruction.destroyBot1Destruction,
-              !destroyBot1Destruction.destroyBot1WasDestroyed,
-              world.objects[ObjectHandle(handoff.destroyBot1ObjectHandle)] != nil
-        else {
-            return
-        }
-        world.objects.delete(ObjectHandle(handoff.destroyBot1ObjectHandle))
-        destroyBot1Destruction.destroyBot1WasDestroyed = true
-        destroyBot1Destruction.destroyBot1Shields = min(
-            destroyBot1Destruction.destroyBot1Shields,
-            -0.000_001
-        )
-        if destroyBot1Destruction.script028Count < 1 {
-            destruction.destroyBot1IsVisible = false
-            destruction.destroyBot2IsVisible = true
-            // Script 028 unghosts DestroyBot2, which Script 000 ghosted
-            // (TrainingMission.cpp:2019).
-            world.aObjGhostSet(0, ObjectHandle(handoff.destroyBot2ObjectHandle))
-            world.setObjectRendered(handoff.destroyBot2ObjectHandle, true)
-            destroyBot1Destruction.script028Count = min(
-                destroyBot1Destruction.script028Count + 1,
-                trainingScriptActionCounterMaximum
-            )
-        }
-        destruction.destroyBot1Destruction = destroyBot1Destruction
-        trainingFollowBotDestructionState = destruction
     }
 
     func fastPlayerHeadlight(
@@ -543,27 +260,15 @@ final class GameSession {
     func makeTrainingPostLevelResult(
         elapsedTime: Float
     ) -> TrainingPostLevelResult {
-        let enemyKills = [
-            trainingRobotGuidebotState?.robotWasDestroyed == true,
-            trainingRASBot1DeathState?.wasDestroyed == true,
-            trainingRASBot2DeathState?.wasDestroyed == true,
-            trainingRASBot3DeathState?.wasDestroyed == true,
-            trainingRASBot4DeathState?.wasDestroyed == true,
-            trainingLastBot1DeathState?.wasDestroyed == true,
-            trainingLastBot2DeathState?.wasDestroyed == true,
-            trainingLastBot3DeathState?.wasDestroyed == true,
-            trainingLastBot4DeathState?.wasDestroyed == true,
-            trainingLastBot5DeathState?.wasDestroyed == true,
-        ].count(where: { $0 })
-        return TrainingPostLevelResult(
+        TrainingPostLevelResult(
             title: "Mission Successful",
             levelName: level.metadata.name,
             difficulty: .rookie,
-            score:
-                enemyKills
-                * TrainingRobotCombatDefinition.stockTrainingScore,
+            // Players[0].score and num_kills_level (PlayerScoreAdd,
+            // Player.cpp:3853).
+            score: Int(world.playerScore),
             elapsedTime: elapsedTime,
-            enemyKills: enemyKills,
+            enemyKills: Int(world.playerKillsLevel),
             // Player damage, death, and restore ownership are later Phase 5
             // islands. The current normal Training path retains its source
             // initial ratings and has no admitted death or restore transition.

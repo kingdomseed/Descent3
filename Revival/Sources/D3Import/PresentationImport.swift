@@ -543,6 +543,50 @@ func resolveRetailTextureDefinitions(
     }
 }
 
+/// The order of retail names: stricmp (lowercase ASCII fold, as the
+/// legacy table and HOG lookups compare names), then the exact bytes. It
+/// does not depend on the user's locale.
+func legacyNameOrder(_ lhs: String, _ rhs: String) -> Bool {
+    let fold = { (byte: UInt8) -> UInt8 in
+        (0x41...0x5a).contains(byte) ? byte + 0x20 : byte
+    }
+    let lhsFolded = lhs.utf8.map(fold)
+    let rhsFolded = rhs.utf8.map(fold)
+    guard lhsFolded == rhsFolded else {
+        return lhsFolded.lexicographicallyPrecedes(rhsFolded)
+    }
+    return lhs.utf8.lexicographicallyPrecedes(rhs.utf8)
+}
+
+/// The texture of each model texture slot name, as ReadModelTexture
+/// (model/polymodel.cpp:949) finds it: first a page that shows the slot's
+/// bitmap (FindTextureBitmapName, Descent3/gametexture.cpp:372, the lowest
+/// index wins), then a page with the slot's name (FindTextureName). The
+/// definitions are unique and in ascending stored-index order. Keys are
+/// lowercased.
+func modelTextureSlotTable(
+    _ definitions: [RetailTextureDefinition]
+) -> [String: SourceResource] {
+    var table: [String: SourceResource] = [:]
+    for definition in definitions {
+        table[definition.name.lowercased()] = SourceResource(
+            storedIndex: definition.storedIndex,
+            sourceName: definition.name
+        )
+    }
+    var bitmapTable: [String: SourceResource] = [:]
+    for definition in definitions {
+        let bitmapKey = URL(fileURLWithPath: definition.bitmapSourceName)
+            .deletingPathExtension().lastPathComponent.lowercased()
+        guard bitmapTable[bitmapKey] == nil else { continue }
+        bitmapTable[bitmapKey] = SourceResource(
+            storedIndex: definition.storedIndex,
+            sourceName: definition.name
+        )
+    }
+    return table.merging(bitmapTable) { _, bitmapMatch in bitmapMatch }
+}
+
 func resolveRetailSurfacePhysics(
     table: Data,
     overlay: Data,
@@ -618,8 +662,12 @@ private func mergedRetailTexturePages(
             nextStoredIndex += 1
         }
     }
+    // FindTextureBitmapName (Descent3/gametexture.cpp:372) scans the texture
+    // slots in index order, so the lowest-indexed page that shows a bitmap
+    // wins. Scan in stored-index order, never in Dictionary order.
     var pageByBitmapBase: [String: RetailTexturePage] = [:]
-    for page in pageByName.values where !page.bitmapSourceName.isEmpty {
+    for page in pageByName.values.sorted(by: { $0.storedIndex < $1.storedIndex })
+    where !page.bitmapSourceName.isEmpty {
         let base = URL(fileURLWithPath: page.bitmapSourceName)
             .deletingPathExtension().lastPathComponent.lowercased()
         if pageByBitmapBase[base] == nil { pageByBitmapBase[base] = page }
@@ -1316,42 +1364,24 @@ struct RetailShipDefinition: Equatable, Sendable {
     let name: String
     let presentationSize: Float
     let physics: CanonicalShipPhysics
-    let playerConcussion: RetailPlayerConcussionBinding?
+    /// `static_wb`, all MAX_WBS_PER_OBJ (21), with their fire flags.
+    let weaponBatteries: [RetailShipWeaponBattery]?
     let playerYellowFlare: RetailPlayerYellowFlareBinding?
 }
 
-struct RetailPlayerConcussionBinding: Equatable, Sendable {
-    let batteryIndex: Int
-    let firingMasks: [UInt8]
-    let weaponName: String
-    let fireSoundLogicalNames: [String]
-    let fireWaits: [Float]
+/// One ship page battery (mng_ReadNewShipPage, manage/shippage.cpp): the
+/// fire flags, energy and ammo use, masks and waits (the first `num_masks`),
+/// weapon battery flags, firing mask sounds, and gun point weapons.
+struct RetailShipWeaponBattery: Equatable, Sendable {
+    let index: Int
+    let fireFlags: UInt8
     let energyUsage: Float
     let ammoUsage: Float
-    let fireFlags: UInt8
-    let weaponFlags: UInt16
-}
-
-func canonicalPlayerConcussionBinding(
-    _ retail: RetailPlayerConcussionBinding
-) -> RetailPlayerConcussionBinding {
-    .init(
-        batteryIndex: retail.batteryIndex,
-        firingMasks:
-            retail.batteryIndex == 10 && retail.firingMasks == [2, 4]
-                ? [1, 2]
-                : retail.firingMasks,
-        weaponName:
-            retail.batteryIndex == 10
-                ? "Concussion"
-                : retail.weaponName,
-        fireSoundLogicalNames: retail.fireSoundLogicalNames,
-        fireWaits: retail.fireWaits,
-        energyUsage: retail.energyUsage,
-        ammoUsage: retail.ammoUsage,
-        fireFlags: retail.fireFlags,
-        weaponFlags: retail.weaponFlags
-    )
+    let fireMasks: [UInt8]
+    let fireWaits: [Float]
+    let flags: UInt16
+    let fireSoundNames: [String]
+    let weaponNames: [String]
 }
 
 struct RetailPlayerYellowFlareBinding: Equatable, Sendable {
@@ -1489,7 +1519,7 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                             name: name,
                             presentationSize: presentationSize,
                             physics: physics,
-                            playerConcussion: playerWeaponBindings?.concussion,
+                            weaponBatteries: playerWeaponBindings?.batteries,
                             playerYellowFlare: playerWeaponBindings?.yellowFlare
                         ),
                         genericLight: nil,
@@ -1619,13 +1649,13 @@ private extension RetailPageCursor {
     mutating func readPlayerWeaponBindings(
         shipPageVersion: Int
     ) throws -> (
-        concussion: RetailPlayerConcussionBinding,
+        batteries: [RetailShipWeaponBattery],
         yellowFlare: RetailPlayerYellowFlareBinding
     ) {
         guard shipPageVersion >= 6 else {
             throw RetailTextureTableError.invalidPageLength
         }
-        var concussion: RetailPlayerConcussionBinding?
+        var batteries: [RetailShipWeaponBattery] = []
         var yellowFlare: RetailPlayerYellowFlareBinding?
         for batteryIndex in 0..<21 {
             let fireFlags = try readUInt8()
@@ -1660,20 +1690,19 @@ private extension RetailPageCursor {
             let weaponNames = try (0..<8).map { _ in
                 try readCString(allowEmpty: true)
             }
-            if batteryIndex == 10 {
-                let count = Int(maskCount)
-                concussion = canonicalPlayerConcussionBinding(.init(
-                    batteryIndex: batteryIndex,
-                    firingMasks: Array(firingMasks.prefix(count)),
-                    weaponName: weaponNames[0],
-                    fireSoundLogicalNames: Array(maskSoundNames.prefix(count)),
-                    fireWaits: Array(firingWaits.prefix(count)),
-                    energyUsage: energyUsage,
-                    ammoUsage: ammoUsage,
-                    fireFlags: fireFlags,
-                    weaponFlags: weaponFlags
-                ))
-            } else if batteryIndex == 20 {
+            let count = max(1, min(8, Int(maskCount)))
+            batteries.append(.init(
+                index: batteryIndex,
+                fireFlags: fireFlags,
+                energyUsage: energyUsage,
+                ammoUsage: ammoUsage,
+                fireMasks: Array(firingMasks.prefix(count)),
+                fireWaits: Array(firingWaits.prefix(count)),
+                flags: weaponFlags,
+                fireSoundNames: Array(maskSoundNames.prefix(count)),
+                weaponNames: weaponNames
+            ))
+            if batteryIndex == 20 {
                 yellowFlare = .init(
                     batteryIndex: batteryIndex,
                     firingMask: maskCount == 1 ? firingMasks[0] : 0,
@@ -1688,10 +1717,10 @@ private extension RetailPageCursor {
             }
         }
         try requireEnd()
-        guard let concussion, let yellowFlare else {
+        guard let yellowFlare else {
             throw RetailTextureTableError.invalidPageLength
         }
-        return (concussion, yellowFlare)
+        return (batteries, yellowFlare)
     }
 
     mutating func readCanonicalShipPhysics() throws -> CanonicalShipPhysics {
@@ -2066,7 +2095,7 @@ func parseReachedOutrageModel(
         } else {
             presentation = submodel.presentation
         }
-        return ModelSubmodel(
+        var sorted = ModelSubmodel(
             sourceIndex: submodel.sourceIndex,
             parentIndex: submodel.parentIndex,
             offset: submodel.offset,
@@ -2074,6 +2103,8 @@ func parseReachedOutrageModel(
             faces: submodel.faces,
             presentation: presentation
         )
+        sorted.radius = submodel.radius
+        return sorted
     }
     var accumulatedOffsets = [Vector3?](repeating: nil, count: sortedSubmodels.count)
     func resolvedOffset(_ index: Int, visiting: inout Set<Int>) throws -> Vector3 {
@@ -2126,7 +2157,7 @@ private func parseReachedSubmodel(
     _ = try cursor.readFloat()
     _ = try cursor.readVector()
     let offset = try cursor.readVector()
-    _ = try cursor.readFloat()
+    var radius = try cursor.readFloat()
     _ = try cursor.readInt32()
     _ = try cursor.readInt32()
     if version > 1_805 { _ = try cursor.readVector() }
@@ -2186,14 +2217,37 @@ private func parseReachedSubmodel(
         }
         faces.append(.init(normal: normal, corners: corners, material: material))
     }
-    return .init(
+    let presentation = try parseSubmodelPresentation(properties)
+    // A facing submodel's radius is half the square root of its one face's
+    // area (vm_GetCentroid, model/polymodel.cpp:1963-1972).
+    if case .facing = presentation, let face = faces.first,
+       face.corners.count >= 3 {
+        let points = face.corners.map { vertices[$0.vertexIndex].position }
+        func area(_ a: Vector3, _ b: Vector3, _ c: Vector3) -> Float {
+            let n = sourceVectorCross(b - a, c - b)
+            return sqrt(dot(n, n)) / 2
+        }
+        var total = area(points[0], points[1], points[2])
+        if points.count > 3 {
+            for index in 2..<(points.count - 1) {
+                total += area(points[0], points[index], points[index + 1])
+            }
+        }
+        radius = sqrt(total) / 2
+    }
+    guard radius.isFinite, radius >= 0 else {
+        throw OutrageModelImportError.invalidChunk("SOBJ radius")
+    }
+    var submodel = ModelSubmodel(
         sourceIndex: sourceIndex,
         parentIndex: rawParent < 0 ? nil : rawParent,
         offset: offset,
         vertices: vertices,
         faces: faces,
-        presentation: try parseSubmodelPresentation(properties)
+        presentation: presentation
     )
+    submodel.radius = radius
+    return submodel
 }
 
 private func parseSubmodelPresentation(_ properties: String) throws -> ModelSubmodelPresentation {

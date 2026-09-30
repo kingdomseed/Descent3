@@ -32,22 +32,12 @@ struct Level: Codable, Equatable, Sendable {
     let presentationMaterials: [PresentationMaterial]
     let presentationCoronaAssets: [PresentationCoronaAsset]
     var models: [CanonicalModel]
-    let shipDefinitions: [CanonicalShipDefinition]
+    var shipDefinitions: [CanonicalShipDefinition]
     let defaultPlayerBinding: DefaultPlayerBinding?
     var objectPresentations: [ObjectPresentationReference]
-    var trainingFollowBotDestruction: TrainingFollowBotDestructionHandoff? = nil
     let trainingGalleryBarrier: TrainingGalleryBarrier?
     let trainingRobotGuidebotChain: TrainingRobotGuidebotChain?
     let trainingCameraMonitorChain: TrainingCameraMonitorChain?
-    let trainingRASBot1DeathChain: TrainingRASBot1DeathChain?
-    let trainingRASBot2DeathChain: TrainingRASBot2DeathChain?
-    let trainingRASBot3DeathChain: TrainingRASBot3DeathChain?
-    let trainingRASBot4DeathChain: TrainingRASBot4DeathChain?
-    let trainingLastBot1DeathChain: TrainingLastBot1DeathChain?
-    var trainingLastBot2DeathChain: TrainingLastBot2DeathChain? = nil
-    var trainingLastBot3DeathChain: TrainingLastBot3DeathChain? = nil
-    var trainingLastBot4DeathChain: TrainingLastBot4DeathChain? = nil
-    var trainingLastBot5DeathChain: TrainingLastBot5DeathChain? = nil
     var trainingFinalBotsCompletionChain:
         TrainingFinalBotsCompletionChain? = nil
     var trainingFinalGoalChain: TrainingFinalGoalChain? = nil
@@ -93,15 +83,9 @@ struct Level: Codable, Equatable, Sendable {
         shipDefinitions: [CanonicalShipDefinition] = [],
         defaultPlayerBinding: DefaultPlayerBinding? = nil,
         objectPresentations: [ObjectPresentationReference] = [],
-        trainingFollowBotDestruction: TrainingFollowBotDestructionHandoff? = nil,
         trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
         trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
         trainingCameraMonitorChain: TrainingCameraMonitorChain? = nil,
-        trainingRASBot1DeathChain: TrainingRASBot1DeathChain? = nil,
-        trainingRASBot2DeathChain: TrainingRASBot2DeathChain? = nil,
-        trainingRASBot3DeathChain: TrainingRASBot3DeathChain? = nil,
-        trainingRASBot4DeathChain: TrainingRASBot4DeathChain? = nil,
-        trainingLastBot1DeathChain: TrainingLastBot1DeathChain? = nil,
         trainingInvulnerabilityPickupChain:
             TrainingInvulnerabilityPickupChain? = nil,
         trainingCloakPickupChain: TrainingCloakPickupChain? = nil,
@@ -138,15 +122,9 @@ struct Level: Codable, Equatable, Sendable {
         self.shipDefinitions = shipDefinitions
         self.defaultPlayerBinding = defaultPlayerBinding
         self.objectPresentations = objectPresentations
-        self.trainingFollowBotDestruction = trainingFollowBotDestruction
         self.trainingGalleryBarrier = trainingGalleryBarrier
         self.trainingRobotGuidebotChain = trainingRobotGuidebotChain
         self.trainingCameraMonitorChain = trainingCameraMonitorChain
-        self.trainingRASBot1DeathChain = trainingRASBot1DeathChain
-        self.trainingRASBot2DeathChain = trainingRASBot2DeathChain
-        self.trainingRASBot3DeathChain = trainingRASBot3DeathChain
-        self.trainingRASBot4DeathChain = trainingRASBot4DeathChain
-        self.trainingLastBot1DeathChain = trainingLastBot1DeathChain
         self.trainingInvulnerabilityPickupChain =
             trainingInvulnerabilityPickupChain
         self.trainingCloakPickupChain = trainingCloakPickupChain
@@ -197,32 +175,13 @@ struct Level: Codable, Equatable, Sendable {
         guard (
             schemaVersion == 9
                 && trainingCameraMonitorChain == nil
-                && trainingRASBot1DeathChain == nil
-                && trainingRASBot2DeathChain == nil
-                && trainingRASBot3DeathChain == nil
-                && trainingRASBot4DeathChain == nil
-                && trainingLastBot1DeathChain == nil
-                && trainingLastBot2DeathChain == nil
-                && trainingLastBot3DeathChain == nil
-                && trainingLastBot4DeathChain == nil
-                && trainingLastBot5DeathChain == nil
                 && trainingFinalBotsCompletionChain == nil
             || schemaVersion == 10
                 && trainingCameraMonitorChain != nil
-                && trainingRASBot1DeathChain == nil
-                && trainingRASBot2DeathChain == nil
-                && trainingRASBot3DeathChain == nil
-                && trainingRASBot4DeathChain == nil
-                && trainingLastBot1DeathChain == nil
-                && trainingLastBot2DeathChain == nil
-                && trainingLastBot3DeathChain == nil
-                && trainingLastBot4DeathChain == nil
-                && trainingLastBot5DeathChain == nil
                 && trainingFinalBotsCompletionChain == nil
                 && _soundClips.wasPresent
             || schemaVersion == 11
                 && trainingCameraMonitorChain != nil
-                && trainingRASBot1DeathChain != nil
                 && _soundClips.wasPresent
             || schemaVersion == 12 && _soundClips.wasPresent
         ),
@@ -249,13 +208,7 @@ struct Level: Codable, Equatable, Sendable {
                     ? []
                     : ["Buddybot.oof"])
                 + (weapons ?? []).compactMap(\.model?.sourceName)
-                + (trainingFollowBotDestruction.map {
-                    [$0.projectileModel.sourceName]
-                } ?? [])
                 + (trainingRobotGuidebotChain?.yellowFlare.map {
-                    [$0.model.sourceName]
-                } ?? [])
-                + (shipDefinitions.first?.playerConcussion.map {
                     [$0.model.sourceName]
                 } ?? [])
         )
@@ -489,12 +442,6 @@ struct Level: Codable, Equatable, Sendable {
                 }
             }
         }
-        if let handoff = trainingFollowBotDestruction {
-            try validateTrainingFollowBotDestructionHandoff(
-                handoff,
-                level: self
-            )
-        }
         if let barrier = trainingGalleryBarrier {
             let oneShotFlag: UInt16 = 8
             let playerActivator: UInt16 = 1
@@ -627,30 +574,10 @@ struct Level: Codable, Equatable, Sendable {
                     soundNames.contains($0.lowercased())
                 } ?? true
             guard trainingGalleryBarrier != nil,
-                  chain.destructionDelay.isFinite,
-                  chain.destructionDelay > 0,
-                  isNonempty(chain.destructionMessage),
-                  isNonempty(chain.exitInstruction),
-                  isNonempty(chain.destructionVoiceSourceName),
                   isNonempty(chain.deployedGuidebotMessage),
                   isNonempty(chain.deployedGuidebotVoiceSourceName),
                   chain.deployedGuidebotObjectType == 2,
-                  chain.combat == .stockTraining,
                   chain.guidebot == .stockTraining,
-                  let robot = objects.first(where: {
-                      $0.handle == chain.destroyRobotObjectHandle
-                  }),
-                  robot.type == 2,
-                  robot.storedID == 106,
-                  robot.definition?.sourceName
-                    == "RAS1 Light Security Flyer",
-                  robot.instanceName == "DestroyBot2",
-                  robot.location
-                    == .room(chain.destroyRobotRoomSourceIndex),
-                  robot.flags == chain.destroyRobotFlags,
-                  clipNames.contains(
-                    chain.destructionVoiceSourceName.lowercased()
-                  ),
                   clipNames.contains(
                     chain.deployedGuidebotVoiceSourceName.lowercased()
                   ),
@@ -800,205 +727,6 @@ struct Level: Codable, Equatable, Sendable {
                 )
             }
         }
-        if let chain = trainingRASBot1DeathChain {
-            guard trainingCameraMonitorChain?.returnToShip?
-                    .killbotEntry != nil,
-                  chain.combat == .stockTraining,
-                  let robot = objects.first(where: {
-                      $0.handle == chain.robotObjectHandle
-                  }),
-                  robot.type == 2,
-                  robot.storedID == 106,
-                  robot.definition?.sourceName
-                    == "RAS1 Light Security Flyer",
-                  robot.instanceName == "RASBot1",
-                  robot.location == .room(chain.robotRoomSourceIndex),
-                  robot.flags == chain.robotFlags,
-                  objectPresentations.contains(where: {
-                      $0.objectHandle == chain.robotObjectHandle
-                          && $0.isVisible
-                  }) else {
-                throw LevelValidationError.invalidDependency(
-                    "Training RASBot1 death chain"
-                )
-            }
-        }
-        if let chain = trainingRASBot2DeathChain {
-            guard trainingRASBot1DeathChain != nil,
-                  chain.combat == .stockTraining,
-                  let robot = objects.first(where: {
-                      $0.handle == chain.robotObjectHandle
-                  }),
-                  robot.type == 2,
-                  robot.storedID == 106,
-                  robot.definition?.sourceName
-                    == "RAS1 Light Security Flyer",
-                  robot.instanceName == "RASBot2",
-                  robot.location == .room(chain.robotRoomSourceIndex),
-                  robot.flags == chain.robotFlags,
-                  objectPresentations.contains(where: {
-                      $0.objectHandle == chain.robotObjectHandle
-                          && $0.isVisible
-                  }) else {
-                throw LevelValidationError.invalidDependency(
-                    "Training RASBot2 death chain"
-                )
-            }
-        }
-        if let chain = trainingRASBot3DeathChain {
-            guard trainingRASBot2DeathChain != nil,
-                  chain.combat == .stockTraining,
-                  let robot = objects.first(where: {
-                      $0.handle == chain.robotObjectHandle
-                  }),
-                  robot.type == 2,
-                  robot.storedID == 106,
-                  robot.definition?.sourceName
-                    == "RAS1 Light Security Flyer",
-                  robot.instanceName == "RASBot3",
-                  robot.location == .room(chain.robotRoomSourceIndex),
-                  robot.flags == chain.robotFlags,
-                  objectPresentations.contains(where: {
-                      $0.objectHandle == chain.robotObjectHandle
-                          && $0.isVisible
-                  }) else {
-                throw LevelValidationError.invalidDependency(
-                    "Training RASBot3 death chain"
-                )
-            }
-        }
-        if let chain = trainingRASBot4DeathChain {
-            guard trainingRASBot3DeathChain != nil,
-                  chain.combat == .stockTraining,
-                  let robot = objects.first(where: {
-                      $0.handle == chain.robotObjectHandle
-                  }),
-                  robot.type == 2,
-                  robot.storedID == 106,
-                  robot.definition?.sourceName
-                    == "RAS1 Light Security Flyer",
-                  robot.instanceName == "RASBot4",
-                  robot.location == .room(chain.robotRoomSourceIndex),
-                  robot.flags == chain.robotFlags,
-                  objectPresentations.contains(where: {
-                      $0.objectHandle == chain.robotObjectHandle
-                          && $0.isVisible
-                  }) else {
-                throw LevelValidationError.invalidDependency(
-                    "Training RASBot4 death chain"
-                )
-            }
-        }
-        if let chain = trainingLastBot1DeathChain {
-            guard trainingFinalRoomEntryChain != nil,
-                  chain.combat == .stockTraining,
-                  let robot = objects.first(where: {
-                      $0.handle == chain.robotObjectHandle
-                  }),
-                  robot.type == 2,
-                  robot.storedID == 106,
-                  robot.definition?.sourceName
-                    == "RAS1 Light Security Flyer",
-                  robot.instanceName == "LastBot1",
-                  robot.location == .room(chain.robotRoomSourceIndex),
-                  robot.flags == chain.robotFlags,
-                  objectPresentations.contains(where: {
-                      $0.objectHandle == chain.robotObjectHandle
-                          && $0.isVisible
-                  }) else {
-                throw LevelValidationError.invalidDependency(
-                    "Training LastBot1 death chain"
-                )
-            }
-        }
-        if let chain = trainingLastBot2DeathChain {
-            guard trainingLastBot1DeathChain != nil,
-                  chain.combat == .stockTraining,
-                  let robot = objects.first(where: {
-                      $0.handle == chain.robotObjectHandle
-                  }),
-                  robot.type == 2,
-                  robot.storedID == 106,
-                  robot.definition?.sourceName
-                    == "RAS1 Light Security Flyer",
-                  robot.instanceName == "LastBot2",
-                  robot.location == .room(chain.robotRoomSourceIndex),
-                  robot.flags == chain.robotFlags,
-                  objectPresentations.contains(where: {
-                      $0.objectHandle == chain.robotObjectHandle
-                          && $0.isVisible
-                  }) else {
-                throw LevelValidationError.invalidDependency(
-                    "Training LastBot2 death chain"
-                )
-            }
-        }
-        if let chain = trainingLastBot3DeathChain {
-            guard trainingLastBot2DeathChain != nil,
-                  chain.combat == .stockTraining,
-                  let robot = objects.first(where: {
-                      $0.handle == chain.robotObjectHandle
-                  }),
-                  robot.type == 2,
-                  robot.storedID == 106,
-                  robot.definition?.sourceName
-                    == "RAS1 Light Security Flyer",
-                  robot.instanceName == "LastBot3",
-                  robot.location == .room(chain.robotRoomSourceIndex),
-                  robot.flags == chain.robotFlags,
-                  objectPresentations.contains(where: {
-                      $0.objectHandle == chain.robotObjectHandle
-                          && $0.isVisible
-                  }) else {
-                throw LevelValidationError.invalidDependency(
-                    "Training LastBot3 death chain"
-                )
-            }
-        }
-        if let chain = trainingLastBot4DeathChain {
-            guard trainingLastBot3DeathChain != nil,
-                  chain.combat == .stockTraining,
-                  let robot = objects.first(where: {
-                      $0.handle == chain.robotObjectHandle
-                  }),
-                  robot.type == 2,
-                  robot.storedID == 106,
-                  robot.definition?.sourceName
-                    == "RAS1 Light Security Flyer",
-                  robot.instanceName == "LastBot4",
-                  robot.location == .room(chain.robotRoomSourceIndex),
-                  robot.flags == chain.robotFlags,
-                  objectPresentations.contains(where: {
-                      $0.objectHandle == chain.robotObjectHandle
-                          && $0.isVisible
-                  }) else {
-                throw LevelValidationError.invalidDependency(
-                    "Training LastBot4 death chain"
-                )
-            }
-        }
-        if let chain = trainingLastBot5DeathChain {
-            guard trainingLastBot4DeathChain != nil,
-                  chain.combat == .stockTraining,
-                  let robot = objects.first(where: {
-                      $0.handle == chain.robotObjectHandle
-                  }),
-                  robot.type == 2,
-                  robot.storedID == 106,
-                  robot.definition?.sourceName
-                    == "RAS1 Light Security Flyer",
-                  robot.instanceName == "LastBot5",
-                  robot.location == .room(chain.robotRoomSourceIndex),
-                  robot.flags == chain.robotFlags,
-                  objectPresentations.contains(where: {
-                      $0.objectHandle == chain.robotObjectHandle
-                          && $0.isVisible
-                  }) else {
-                throw LevelValidationError.invalidDependency(
-                    "Training LastBot5 death chain"
-                )
-            }
-        }
         if let chain = trainingInvulnerabilityPickupChain {
             let presentation = objectPresentations.first {
                 $0.objectHandle == chain.pickupObjectHandle
@@ -1010,8 +738,7 @@ struct Level: Codable, Equatable, Sendable {
                 }
             }
             let reachedSoundNames = Set(soundClips.map(\.sourceName))
-            guard trainingRASBot4DeathChain != nil,
-                chain.pickupObjectHandle == 2_076,
+            guard chain.pickupObjectHandle == 2_076,
                 chain.pickupRoomSourceIndex == 12,
                 chain.pickupObjectFlags == 5_120,
                 chain.pickupCollisionRadius.isFinite,
@@ -1506,9 +1233,7 @@ struct Level: Codable, Equatable, Sendable {
                 chain: trainingRobotGuidebotChain!,
                 modelSources: models.map(\.source),
                 objects: objects,
-                objectPresentations: objectPresentations,
-                destroyRobotIsInitiallyVisible:
-                    trainingFollowBotDestruction == nil
+                objectPresentations: objectPresentations
             )
             if trainingCameraMonitorChain != nil {
                 try validateStockTrainingCameraMonitorPackage(
@@ -1531,73 +1256,10 @@ struct Level: Codable, Equatable, Sendable {
                     objectPresentations: objectPresentations
                 )
             }
-            if trainingRASBot1DeathChain != nil {
-                try validateStockTrainingRASBot1DeathPackage(
-                    chain: trainingRASBot1DeathChain,
-                    objects: objects,
-                    objectPresentations: objectPresentations
-                )
-            }
             if trainingFinalRoomEntryChain != nil {
                 try validateStockTrainingFinalRoomEntryPackage(
                     chain: trainingFinalRoomEntryChain,
                     intro7: intro7
-                )
-            }
-            if trainingRASBot2DeathChain != nil {
-                try validateStockTrainingRASBot2DeathPackage(
-                    chain: trainingRASBot2DeathChain,
-                    objects: objects,
-                    objectPresentations: objectPresentations
-                )
-            }
-            if trainingRASBot3DeathChain != nil {
-                try validateStockTrainingRASBot3DeathPackage(
-                    chain: trainingRASBot3DeathChain,
-                    objects: objects,
-                    objectPresentations: objectPresentations
-                )
-            }
-            if trainingRASBot4DeathChain != nil {
-                try validateStockTrainingRASBot4DeathPackage(
-                    chain: trainingRASBot4DeathChain,
-                    objects: objects,
-                    objectPresentations: objectPresentations
-                )
-            }
-            if trainingLastBot1DeathChain != nil {
-                try validateStockTrainingLastBot1DeathPackage(
-                    chain: trainingLastBot1DeathChain,
-                    objects: objects,
-                    objectPresentations: objectPresentations
-                )
-            }
-            if trainingLastBot2DeathChain != nil {
-                try validateStockTrainingLastBot2DeathPackage(
-                    chain: trainingLastBot2DeathChain,
-                    objects: objects,
-                    objectPresentations: objectPresentations
-                )
-            }
-            if trainingLastBot3DeathChain != nil {
-                try validateStockTrainingLastBot3DeathPackage(
-                    chain: trainingLastBot3DeathChain,
-                    objects: objects,
-                    objectPresentations: objectPresentations
-                )
-            }
-            if trainingLastBot4DeathChain != nil {
-                try validateStockTrainingLastBot4DeathPackage(
-                    chain: trainingLastBot4DeathChain,
-                    objects: objects,
-                    objectPresentations: objectPresentations
-                )
-            }
-            if trainingLastBot5DeathChain != nil {
-                try validateStockTrainingLastBot5DeathPackage(
-                    chain: trainingLastBot5DeathChain,
-                    objects: objects,
-                    objectPresentations: objectPresentations
                 )
             }
             if trainingFinalBotsCompletionChain != nil {
@@ -2112,6 +1774,32 @@ extension Level {
     /// This level with more sound clips and their dependency records. Every
     /// other field is kept, which the assembly steps that rebuild a level
     /// from its fields do not do.
+    /// This level with an imported-texture dependency record for each
+    /// texture that has none yet: the explosion frames of its weapons
+    /// (manage/weaponpage.cpp, WeaponFire.cpp:3058).
+    func appendingTextureDependencies(
+        _ textures: [SourceResource],
+        provenance: String
+    ) -> Level {
+        var level = self
+        var current = dependencyManifest.current
+        for texture in textures where !current.contains(where: {
+            $0.category == "texture" && $0.source == texture
+        }) {
+            current.append(.init(
+                category: "texture",
+                source: texture,
+                state: "presentation-payload-imported",
+                provenance: provenance
+            ))
+        }
+        level.dependencyManifest = .init(
+            current: current,
+            historicalEagerBaseline: dependencyManifest.historicalEagerBaseline
+        )
+        return level
+    }
+
     func appendingSoundClips(_ added: [CanonicalSoundClip]) -> Level {
         var level = self
         level.soundClips += added
@@ -2225,7 +1913,11 @@ private func validateModels(
             }
         }
         let indices = Set(model.submodels.map(\.sourceIndex))
-        guard indices == Set(model.submodels.indices) else {
+        guard indices == Set(model.submodels.indices),
+              model.submodels.allSatisfy({ submodel in
+                  submodel.radius.map { $0.isFinite && $0 >= 0 } ?? true
+              })
+        else {
             throw LevelValidationError.invalidModel("\(model.source.sourceName): submodel indices")
         }
         var transformedBounds: ModelBounds?

@@ -491,14 +491,11 @@ struct RevivalProject: Equatable, Sendable {
     }
     var trainingRobotGuidebotSourceDiagnostic: String? {
         level.trainingRobotGuidebotChain.map { chain in
-            let robotName = level.objects.first {
-                $0.handle == chain.destroyRobotObjectHandle
-            }?.instanceName ?? "DestroyBot2"
             let navigation = level.indoorNavigation.map {
                 "\($0.sourceWasVerified ? "verified" : "unverified") \($0.rooms.count) room records"
             } ?? "navigation unavailable"
             let radius = chain.guidebot.collisionRadius - 0.1
-            return "TrainingMission.cpp Scripts 036 + 060 / \(robotName) + Guidebot / NODE/BOA route radius \(radius), \(navigation)"
+            return "TrainingMission.cpp Script 060 / Guidebot / NODE/BOA route radius \(radius), \(navigation)"
         }
     }
     var trainingGuidebotReturnSourceDiagnostic: String? {
@@ -524,91 +521,6 @@ struct RevivalProject: Equatable, Sendable {
         }
         return "TrainingMission.cpp Scripts 042 + 039 / \(entry.triggerName) + \(room.name ?? "PortalRoom5")"
     }
-    var trainingRASBot1DeathSourceDiagnostic: String? {
-        guard let chain = level.trainingRASBot1DeathChain,
-              let robot = level.objects.first(where: {
-                  $0.handle == chain.robotObjectHandle
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 043 / \(robot.instanceName ?? "RASBot1") death"
-    }
-    var trainingRASBot2DeathSourceDiagnostic: String? {
-        guard let chain = level.trainingRASBot2DeathChain,
-              let robot = level.objects.first(where: {
-                  $0.handle == chain.robotObjectHandle
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 044 / \(robot.instanceName ?? "RASBot2") death"
-    }
-    var trainingRASBot3DeathSourceDiagnostic: String? {
-        guard let chain = level.trainingRASBot3DeathChain,
-              let robot = level.objects.first(where: {
-                  $0.handle == chain.robotObjectHandle
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 045 / \(robot.instanceName ?? "RASBot3") death"
-    }
-    var trainingRASBot4DeathSourceDiagnostic: String? {
-        guard let chain = level.trainingRASBot4DeathChain,
-              let robot = level.objects.first(where: {
-                  $0.handle == chain.robotObjectHandle
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 046 / \(robot.instanceName ?? "RASBot4") death"
-    }
-    var trainingLastBot1DeathSourceDiagnostic: String? {
-        guard let chain = level.trainingLastBot1DeathChain,
-              let robot = level.objects.first(where: {
-                  $0.handle == chain.robotObjectHandle
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 051 / \(robot.instanceName ?? "LastBot1") death"
-    }
-    var trainingLastBot2DeathSourceDiagnostic: String? {
-        guard let chain = level.trainingLastBot2DeathChain,
-              let robot = level.objects.first(where: {
-                  $0.handle == chain.robotObjectHandle
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 052 / \(robot.instanceName ?? "LastBot2") death"
-    }
-
-    var trainingLastBot3DeathSourceDiagnostic: String? {
-        guard let chain = level.trainingLastBot3DeathChain,
-              let robot = level.objects.first(where: {
-                  $0.handle == chain.robotObjectHandle
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 053 / \(robot.instanceName ?? "LastBot3") death"
-    }
-
-    var trainingLastBot4DeathSourceDiagnostic: String? {
-        guard let chain = level.trainingLastBot4DeathChain,
-              let robot = level.objects.first(where: {
-                  $0.handle == chain.robotObjectHandle
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 054 / \(robot.instanceName ?? "LastBot4") death"
-    }
-
-    var trainingLastBot5DeathSourceDiagnostic: String? {
-        guard let chain = level.trainingLastBot5DeathChain,
-              let robot = level.objects.first(where: {
-                  $0.handle == chain.robotObjectHandle
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 055 / \(robot.instanceName ?? "LastBot5") death"
-    }
-
     var trainingInvulnerabilityPickupSourceDiagnostic: String? {
         guard let chain = level.trainingInvulnerabilityPickupChain,
             let pickup = level.objects.first(where: {

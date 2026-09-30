@@ -37,6 +37,7 @@ struct ObjectAIFrame: Codable, Equatable, Sendable {
     static let seesGoalStatus: UInt32 = 0x40
 
     // AWARE_ levels (aistruct_external.h:323-327).
+    static let awareFully: Float = 100
     static let awareMostly: Float = 60
     static let awareBarely: Float = 15
     static let awareNone: Float = 0
@@ -88,6 +89,12 @@ struct ObjectAIFrame: Codable, Equatable, Sendable {
     var attackVelocityPercent: Float
     var dodgeVelocityPercent: Float
     var fleeVelocityPercent: Float
+    /// `fight_team` and `fight_same`: the chance a hit by a friend turns
+    /// the object on it.
+    var fightTeam: Float
+    var fightSame: Float
+    /// `next_flinch_time`: AIInit sets it to the Gametime of level start.
+    var nextFlinchTime: Float = 0
     /// `movement_dir`: ai_move's blended movement direction.
     var movementDirection = Vector3.zero
     var awareness: Float = 0
@@ -114,6 +121,8 @@ struct ObjectAIFrame: Codable, Equatable, Sendable {
         attackVelocityPercent = info.attackVelocityPercent
         dodgeVelocityPercent = info.dodgeVelocityPercent
         fleeVelocityPercent = info.fleeVelocityPercent
+        fightTeam = info.fightTeam
+        fightSame = info.fightSame
     }
 
     /// `ai_info->notify_flags & (1 << type)`.

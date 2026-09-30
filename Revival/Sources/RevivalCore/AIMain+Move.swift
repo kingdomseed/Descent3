@@ -345,16 +345,7 @@ extension GameWorld {
     /// normalized, or, when the up vector is zero or parallel to forward,
     /// the right vector the forward vector alone gives (bad_vector2).
     private func vectorToMatrixRight(forward: Vector3, up: Vector3) -> Vector3 {
-        let z = normalizedOrZero(forward)
-        let y = normalizedOrZero(up)
-        if y != .zero {
-            let x = normalizedOrZero(sourceVectorCross(y, z))
-            if x != .zero { return x }
-        }
-        if z.x == 0, z.z == 0 {
-            return Vector3(x: 1, y: 0, z: 0)
-        }
-        return normalizedOrZero(Vector3(x: z.z, y: 0, z: -z.x))
+        sourceVectorToMatrix(forward: forward, up: up).right
     }
 
     private func normalizedOrZero(_ vector: Vector3) -> Vector3 {

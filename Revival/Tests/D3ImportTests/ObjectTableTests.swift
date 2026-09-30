@@ -101,6 +101,43 @@ final class ObjectTableTests: XCTestCase {
         XCTAssertEqual(table.map(\.handle.slot), [0, 1, 2, 3, 4])
     }
 
+    /// ReadObject keeps only OBJECT_SAVE_LOAD_FLAGS (OF_OUTSIDE_MINE) of the
+    /// stored flags (LoadLevel.cpp:1660); ObjInit makes the rest:
+    /// ObjSetRenderPolyobj's OF_POLYGON_OBJECT (ObjInit.cpp:633) and the
+    /// page's OF_DESTROYABLE, OF_AI_DO_DEATH, and OF_FORCE_CEILING_CHECK
+    /// (ObjInit.cpp:766-771); ResetPlayerObject assigns the player's
+    /// (Player.cpp:2507).
+    func testLoadedObjectsTakeTheirFlagsFromObjInitNotTheLevelFile() throws {
+        var level = makeTrainingRobotGuidebotLevel()
+        let robot = try XCTUnwrap(level.objects.firstIndex { $0.handle == 4_112 })
+        // OF_DEAD, OF_ATTACHED, OF_AI_DO_DEATH, OF_USE_DESTROYED_POLYMODEL,
+        // and OF_NO_OBJECT_COLLISIONS.
+        level.objects[robot] = placed(
+            level.objects[robot], flags: 0x2 | 0x10 | 0x40 | 0x4000 | 0x1_0000
+        )
+        let player = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == level.defaultPlayerBinding?.objectHandle
+        })
+        level.objects[player] = placed(
+            level.objects[player], flags: 0x2 | 0x1_0000
+        )
+        let world = GameWorld(level: level)
+        // The RAS1 page has OIF_DESTROYABLE and OIF_DO_CEILING_CHECK.
+        XCTAssertEqual(
+            world.objects[ObjectHandle(4_112)]?.flags,
+            GameObject.polygonObjectFlag | GameObject.destroyableFlag
+                | GameObject.forceCeilingCheckFlag
+        )
+        XCTAssertEqual(
+            world.testPlayerObject.flags,
+            GameObject.polygonObjectFlag | GameObject.destroyableFlag
+        )
+        // The Guide-Bot stand-in's stored 0x110f carries OF_DEAD; it lives.
+        let guidebot = try XCTUnwrap(world.objects[ObjectHandle(6_164)])
+        XCTAssertEqual(guidebot.flags & GameObject.deadFlag, 0)
+        XCTAssertEqual(guidebot.flags & 0x10c, 0)
+    }
+
     func testStaleHandleIsRejectedAfterFreeAndReuse() throws {
         var table = ObjectTable()
         let original = try create(&table)
@@ -150,4 +187,28 @@ final class ObjectTableTests: XCTestCase {
             )
         ))
     }
+}
+
+/// The placed object with other stored flags.
+private func placed(_ object: PlacedObject, flags: UInt32) -> PlacedObject {
+    PlacedObject(
+        handle: object.handle,
+        type: object.type,
+        storedID: object.storedID,
+        definition: object.definition,
+        instanceName: object.instanceName,
+        flags: flags,
+        doorShields: object.doorShields,
+        location: object.location,
+        position: object.position,
+        orientation: object.orientation,
+        containsType: object.containsType,
+        containsID: object.containsID,
+        containsCount: object.containsCount,
+        lifeLeft: object.lifeLeft,
+        soundSource: object.soundSource,
+        inertScriptName: object.inertScriptName,
+        inertModuleName: object.inertModuleName,
+        lightmapSubmodels: object.lightmapSubmodels
+    )
 }

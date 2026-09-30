@@ -223,14 +223,13 @@ extension Level {
         } ?? -1
     }
 
-    /// This level with the script data, object tables, and follow-bot
-    /// destruction handoff of `source`, if it has any. The assembly steps
-    /// rebuild a level from its fields, which would drop them.
+    /// This level with the script data and object tables of `source`, if
+    /// it has any. The assembly steps rebuild a level from its fields, which
+    /// would drop them.
     func preservingScripting(of source: Level) -> Level {
         var level = source.scripting.map(addingScripting) ?? self
         level.objectInfos = source.objectInfos
         level.weapons = source.weapons
-        level.trainingFollowBotDestruction = source.trainingFollowBotDestruction
         return level
     }
 }

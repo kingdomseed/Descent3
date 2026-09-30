@@ -997,16 +997,12 @@ func script050ReadyContinuation(
     var object = try XCTUnwrap(
         testWorldObject(initial.world)
     )
-    for key in [
-        "trainingRASBot1DeathState",
-        "trainingRASBot2DeathState",
-        "trainingRASBot3DeathState",
-        "trainingRASBot4DeathState",
-    ] {
-        object[key] = [
-            "wasDestroyed": true,
-            "shields": -5,
-        ]
+    // Scripts 043-046 ran as the four RAS bots died.
+    if (object["levelModule"] as? [String: Any])?["trainingMission"] != nil {
+        for name in ["script043Count", "script044Count", "script045Count",
+                     "script046Count"] {
+            try setTrainingCounter(&object, name, 1)
+        }
     }
     object["trainingInvulnerabilityPickupState"] = [
         "scriptWasTriggered": true,
@@ -1016,12 +1012,12 @@ func script050ReadyContinuation(
         "scriptWasTriggered": true,
         "wasConsumed": true,
     ]
-    object["trainingLastRoomState"] = [
-        "wasTriggered": true,
-        "markerLightDistance": 50,
-        "timerRemaining": timerRemaining,
-        "wasPresented": false,
-    ]
+    // Scripts 047 and 048 counted the pickups.
+    if (object["levelModule"] as? [String: Any])?["trainingMission"] != nil {
+        for name in ["script047Count", "script048Count", "script034Count"] {
+            try setTrainingCounter(&object, name, 1)
+        }
+    }
     object["playerLocation"] = [
         "room": ["_0": chain.triggerRoomSourceIndex]
     ]
@@ -1039,17 +1035,25 @@ func script050ReadyContinuation(
     // pickups are gone, and Script 048 opened the last-room barrier.
     var world = try decodeTestWorld(object)
     for handle in [
-        level.trainingRASBot1DeathChain?.robotObjectHandle,
-        level.trainingRASBot2DeathChain?.robotObjectHandle,
-        level.trainingRASBot3DeathChain?.robotObjectHandle,
-        level.trainingRASBot4DeathChain?.robotObjectHandle,
+        2_074, 2_075, 2_077, 2_078,
         level.trainingInvulnerabilityPickupChain?.pickupObjectHandle,
         level.trainingCloakPickupChain?.pickupObjectHandle,
     ] {
         world.objects.delete(ObjectHandle(try XCTUnwrap(handle)))
     }
+    // Script 034 opened the last-room barrier, lit FlashLight-4, and set
+    // level timer 9 (TrainingMission.cpp:1403-1415).
     openTrainingLastRoomBarrier(in: &world, level: level)
+    world.setObjectLightDistance(ObjectHandle(chain034Marker(level)), 50)
+    if world.levelModule != .none {
+        world.aSetLevelTimer(timerRemaining, 9)
+    }
     return world
+}
+
+/// FlashLight-4, the last-room marker.
+private func chain034Marker(_ level: Level) -> UInt32 {
+    level.trainingLastRoomChain!.markerLightObjectHandle
 }
 
 func assertTrainingGuidebotReturnBarrier(
@@ -1080,22 +1084,12 @@ func makeTrainingGuidebotBlockedMovementLevel() -> Level {
     level = replacing(
         level,
         trainingRobotGuidebotChain: .init(
-            destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
             guidebotObjectHandle: chain.guidebotObjectHandle,
-            destroyRobotRoomSourceIndex:
-                chain.destroyRobotRoomSourceIndex,
-            destroyRobotFlags: chain.destroyRobotFlags,
-            destructionDelay: chain.destructionDelay,
-            destructionMessage: chain.destructionMessage,
-            exitInstruction: chain.exitInstruction,
-            destructionVoiceSourceName:
-                chain.destructionVoiceSourceName,
             deployedGuidebotObjectType:
                 chain.deployedGuidebotObjectType,
             deployedGuidebotMessage: chain.deployedGuidebotMessage,
             deployedGuidebotVoiceSourceName:
                 chain.deployedGuidebotVoiceSourceName,
-            combat: chain.combat,
             guidebot: .init(
                 collisionRadius: chain.guidebot.collisionRadius,
                 maximumVelocity: chain.guidebot.maximumVelocity,

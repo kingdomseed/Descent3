@@ -39,7 +39,7 @@ extension WorldRenderingTests {
             triggered.enabledPlayerControls,
             PlayerControlMask(rawValue: 0)
         )
-        XCTAssertEqual(triggered.trainingGalleryMarkerLightDistance, 0)
+        XCTAssertEqual(simulation.galleryMarkerLightDistance, 0)
         XCTAssertEqual(triggered.playerView.roomSourceIndex, 3)
         assertTrainingGalleryBarrier(level: simulation.runtimeLevel, rendersFaces: true)
         let playerStart = level.objects.first { $0.handle == 2_048 }!
@@ -80,52 +80,28 @@ extension WorldRenderingTests {
             afterRestore.enabledPlayerControls,
             PlayerControlMask(rawValue: 0)
         )
-        XCTAssertEqual(afterRestore.trainingGalleryMarkerLightDistance, 0)
+        XCTAssertEqual(restored.galleryMarkerLightDistance, 0)
     }
 
-    func testScript029ThenPortal2RunsScript032OnceAndRestoresLaterState() throws {
+    /// After Script 036 opened the gallery (TrainingRobotScriptTests covers
+    /// Scripts 036 and 029), Portal2 runs the bespoke Script 032 once.
+    func testPortal2AfterScript036RunsScript032OnceAndRestoresLaterState() throws {
         let level = makeTrainingRobotGuidebotLevel()
         try level.validate()
-        XCTAssertNil(level.trainingFollowBotDestruction)
         let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
 
-        simulation.destroyTrainingRobot(handle: 4_112)
+        simulation.applyTrainingScript036Outcome()
         assertTrainingGalleryBarrier(
             level: simulation.runtimeLevel,
             rendersFaces: false
         )
-        var timestamp = 0.0
-        var script029Frame: PlayerSimulationFrame?
-        for frameIndex in 1...30 {
-            timestamp = Double(frameIndex) * 0.1
-            let frame = simulation.update(
-                at: timestamp,
-                input: .zero
-            )
-            if frame.trainingOpeningFeedback.contains(where: {
-                $0.voiceSourceName == "proceed5.osf"
-            }) {
-                script029Frame = frame
-                break
-            }
-        }
-        let script029 = try XCTUnwrap(script029Frame)
-        XCTAssertEqual(
-            script029.trainingOpeningFeedback,
-            [.init(
-                hudMessages: [
-                    "Excellent!",
-                    "Now go through the open doorway, and into the next room.",
-                ],
-                voiceSourceName: "proceed5.osf",
-                voicePrecedesHUDMessages: false
-            )]
-        )
-        XCTAssertEqual(script029.enabledPlayerControls, .all)
-        XCTAssertEqual(script029.trainingGalleryMarkerLightDistance, 50)
+        var timestamp = 0.1
+        let opened = simulation.update(at: timestamp, input: .zero)
+        XCTAssertEqual(opened.enabledPlayerControls, .all)
+        XCTAssertEqual(simulation.galleryMarkerLightDistance, 50)
 
         var script032Frame: PlayerSimulationFrame?
         for _ in 1...20 {
@@ -161,7 +137,7 @@ extension WorldRenderingTests {
             script032.enabledPlayerControls,
             PlayerControlMask(rawValue: 0)
         )
-        XCTAssertEqual(script032.trainingGalleryMarkerLightDistance, 0)
+        XCTAssertEqual(simulation.galleryMarkerLightDistance, 0)
         XCTAssertNil(script032.trainingGuidebot)
         XCTAssertFalse(simulation.runtimeLevel.objectPresentations.contains {
             $0.objectHandle
@@ -209,7 +185,7 @@ extension WorldRenderingTests {
             afterRestore.enabledPlayerControls,
             PlayerControlMask(rawValue: 0)
         )
-        XCTAssertEqual(afterRestore.trainingGalleryMarkerLightDistance, 0)
+        XCTAssertEqual(restored.galleryMarkerLightDistance, 0)
         XCTAssertNil(afterRestore.trainingGuidebot)
 
     }
@@ -242,30 +218,18 @@ extension WorldRenderingTests {
         XCTAssertTrue(script060.trainingOpeningFeedback.contains {
             $0.voiceSourceName == "guidebotb.osf"
         })
-        XCTAssertEqual(script060.trainingGalleryMarkerLightDistance, 0)
+        XCTAssertEqual(simulation.galleryMarkerLightDistance, 0)
         assertTrainingGalleryBarrier(
             level: simulation.runtimeLevel,
             rendersFaces: true
         )
 
-        simulation.destroyTrainingRobot(handle: 4_112)
+        simulation.applyTrainingScript036Outcome()
         let continuationData = try JSONEncoder().encode(
             simulation.world
         )
-        let continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: continuationData)
-                as? [String: Any]
-        )
-        let galleryState = try XCTUnwrap(
-            continuationObject["trainingGalleryBarrierState"]
-                as? [String: Any]
-        )
-        XCTAssertEqual(galleryState["markerLightDistance"] as? Double, 50)
-        let robotState = try XCTUnwrap(
-            continuationObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        XCTAssertEqual(robotState["controlsWereRestored"] as? Bool, true)
+        XCTAssertEqual(simulation.galleryMarkerLightDistance, 50)
+        XCTAssertEqual(simulation.world.playerControllerBitflags, .all)
         assertTrainingGalleryBarrier(
             level: simulation.runtimeLevel,
             rendersFaces: false
@@ -302,55 +266,12 @@ extension WorldRenderingTests {
         )
         XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(afterRestore.enabledPlayerControls, .all)
-        XCTAssertEqual(afterRestore.trainingGalleryMarkerLightDistance, 50)
+        XCTAssertEqual(restored.galleryMarkerLightDistance, 50)
     }
 
-    func testTrainingRobotDestructionAndGuidebotDeploymentContinueGalleryOnce() throws {
+    func testTrainingGuidebotDeploymentContinuesGalleryOnce() throws {
         let level = makeTrainingRobotGuidebotLevel()
         try level.validate()
-        var relocatedRobotLevel = level
-        let relocatedRobotIndex = try XCTUnwrap(
-            relocatedRobotLevel.objects.firstIndex {
-                $0.handle == 4_112
-            }
-        )
-        relocatedRobotLevel.objects[relocatedRobotIndex].location = .room(1)
-        XCTAssertThrowsError(try relocatedRobotLevel.validate()) {
-            XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .invalidDependency("Training robot Guidebot chain")
-            )
-        }
-        let chain = try XCTUnwrap(level.trainingRobotGuidebotChain)
-        let wrongRobotFlagsLevel = replacing(
-            level,
-            trainingRobotGuidebotChain: .init(
-                destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
-                guidebotObjectHandle: chain.guidebotObjectHandle,
-                destroyRobotRoomSourceIndex:
-                    chain.destroyRobotRoomSourceIndex,
-                destroyRobotFlags: 0,
-                destructionDelay: chain.destructionDelay,
-                destructionMessage: chain.destructionMessage,
-                exitInstruction: chain.exitInstruction,
-                destructionVoiceSourceName:
-                    chain.destructionVoiceSourceName,
-                deployedGuidebotObjectType:
-                    chain.deployedGuidebotObjectType,
-                deployedGuidebotMessage:
-                    chain.deployedGuidebotMessage,
-                deployedGuidebotVoiceSourceName:
-                    chain.deployedGuidebotVoiceSourceName,
-                combat: chain.combat,
-                guidebot: chain.guidebot
-            )
-        )
-        XCTAssertThrowsError(try wrongRobotFlagsLevel.validate()) {
-            XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .invalidDependency("Training robot Guidebot chain")
-            )
-        }
         XCTAssertEqual(
             trainingPlayerControlMask(
                 galleryWasTriggered: true,
@@ -363,6 +284,9 @@ extension WorldRenderingTests {
             level: level,
             presentationReadyTimestamp: 0
         )
+        // Scripts 000 and 021 showed the enabled controls
+        // (TrainingMission.cpp:1494, :1949); Script 029 hides them.
+        guidebotSimulation.world.hudShowControls = true
 
         var triggerFrame: PlayerSimulationFrame?
         var triggerTimestamp = 0.0
@@ -399,7 +323,7 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(deployed.enabledPlayerControls, .all)
         XCTAssertTrue(deployed.showsEnabledPlayerControls)
-        XCTAssertEqual(deployed.trainingGalleryMarkerLightDistance, 0)
+        XCTAssertEqual(guidebotSimulation.galleryMarkerLightDistance, 0)
         assertTrainingGalleryBarrier(
             level: guidebotSimulation.runtimeLevel,
             rendersFaces: true
@@ -435,138 +359,6 @@ extension WorldRenderingTests {
         XCTAssertTrue(repeatedGuidebot.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(repeatedGuidebot.enabledPlayerControls, .all)
 
-        let destructionSimulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        for frameIndex in 1...20 {
-            let frame = destructionSimulation.update(
-                at: Double(frameIndex) * 0.1,
-                input: .init(forward: 1)
-            )
-            if frame.trainingOpeningFeedback.contains(where: {
-                $0.voiceSourceName == "guidebota.osf"
-            }) {
-                break
-            }
-        }
-        destructionSimulation.destroyTrainingRobot(handle: 4_112)
-        XCTAssertFalse(destructionSimulation.runtimeLevel.objects.contains {
-            $0.handle == 4_112
-        })
-        assertTrainingGalleryBarrier(
-            level: destructionSimulation.runtimeLevel,
-            rendersFaces: false
-        )
-
-        let continuation = try JSONDecoder().decode(
-            GameWorld.self,
-            from: JSONEncoder().encode(destructionSimulation.world)
-        )
-        var consumedDestructionObject = try XCTUnwrap(
-            testWorldObject(continuation)
-        )
-        var consumedDestructionState = try XCTUnwrap(
-            consumedDestructionObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        consumedDestructionState.removeValue(
-            forKey: "destructionTimerRemaining"
-        )
-        consumedDestructionState["destructionFeedbackWasPresented"] = true
-        consumedDestructionState["enabledControlHUDIsVisible"] = false
-        consumedDestructionObject["trainingRobotGuidebotState"] =
-            consumedDestructionState
-        let consumedDestruction = try decodeTestWorld(consumedDestructionObject)
-        let consumedDestructionSimulation = try GameSession(
-            level: level,
-            world: consumedDestruction.rebased(onto: level),
-            resumedAtTimestamp: 300
-        )
-        let afterDestructionReload = consumedDestructionSimulation.update(
-            at: 300.1,
-            input: .zero
-        )
-        XCTAssertTrue(afterDestructionReload.trainingOpeningFeedback.isEmpty)
-        XCTAssertFalse(afterDestructionReload.showsEnabledPlayerControls)
-        XCTAssertEqual(
-            afterDestructionReload.trainingGalleryMarkerLightDistance,
-            50
-        )
-        XCTAssertFalse(consumedDestructionSimulation.runtimeLevel.objects.contains {
-            $0.handle == 4_112
-        })
-        let restored = try GameSession(
-            level: level,
-            world: continuation.rebased(onto: level),
-            resumedAtTimestamp: 100
-        )
-        XCTAssertFalse(restored.runtimeLevel.objects.contains {
-            $0.handle == 4_112
-        })
-        let restoredForwardControls = try GameSession(
-            level: level,
-            world: continuation.rebased(onto: level),
-            resumedAtTimestamp: 150
-        )
-        let restoredNeutralControls = try GameSession(
-            level: level,
-            world: continuation.rebased(onto: level),
-            resumedAtTimestamp: 150
-        )
-        let restoredForwardFrame = restoredForwardControls.update(
-            at: 150.1,
-            input: .init(forward: 1)
-        )
-        let restoredNeutralFrame = restoredNeutralControls.update(
-            at: 150.1,
-            input: .zero
-        )
-        XCTAssertNotEqual(
-            restoredForwardFrame.velocity,
-            restoredNeutralFrame.velocity
-        )
-        let destruction = restored.update(at: 100.1, input: .zero)
-        XCTAssertTrue(destruction.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(destruction.enabledPlayerControls, .all)
-        XCTAssertTrue(destruction.showsEnabledPlayerControls)
-        XCTAssertEqual(destruction.trainingGalleryMarkerLightDistance, 50)
-        var delayedFrame: PlayerSimulationFrame?
-        for frameIndex in 2...21 {
-            let frame = restored.update(
-                at: 100 + Double(frameIndex) * 0.1,
-                input: .zero
-            )
-            if !frame.trainingOpeningFeedback.isEmpty {
-                delayedFrame = frame
-                break
-            }
-        }
-        let delayed = try XCTUnwrap(delayedFrame)
-        XCTAssertEqual(
-            delayed.trainingOpeningFeedback,
-            [.init(
-                hudMessages: [
-                    "Excellent!",
-                    "Now go through the open doorway, and into the next room.",
-                ],
-                voiceSourceName: "proceed5.osf",
-                voicePrecedesHUDMessages: false
-            )]
-        )
-        XCTAssertFalse(delayed.showsEnabledPlayerControls)
-        let afterRestore = restored.update(
-            at: Double(delayed.gameTime) + 100,
-            input: .zero
-        )
-        XCTAssertTrue(afterRestore.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(afterRestore.enabledPlayerControls, .all)
-        XCTAssertFalse(afterRestore.showsEnabledPlayerControls)
-        XCTAssertEqual(afterRestore.trainingGalleryMarkerLightDistance, 50)
-        assertTrainingGalleryBarrier(
-            level: consumedDestructionSimulation.runtimeLevel,
-            rendersFaces: false
-        )
     }
 
     func testTrainingGuidebotDeploymentReachesScript060InSameUpdate() throws {

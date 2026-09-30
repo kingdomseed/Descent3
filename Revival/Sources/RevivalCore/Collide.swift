@@ -2,8 +2,9 @@
 //
 // Translated from physics/collide.cpp (Descent 3, Copyright (C) 2024
 // Parallax Software, GPL-3.0-or-later): the CollisionResult table that
-// CollideInit (:2585) fills, and collide_two_objects (:2393) with its
-// script hook (:2474-2497); from physics/findintersection.cpp, the
+// CollideInit (:2585) fills, collide_two_objects (:2393) with its script
+// hook (:2474-2497), collide_generic_and_weapon (:2155), and
+// collide_player_and_weapon (:2280); from physics/findintersection.cpp, the
 // object check of fvi_rooms_objs (:3325-3590): sphere against sphere
 // (check_vector_to_object :1747, check_vector_to_sphere_1 :1174) and sphere
 // against a polygon model (PolyCollide.swift). The physics loop that calls
@@ -12,10 +13,11 @@
 // The translated pairs are the ones whose collision response exists: the
 // player and a powerup (ENABLE_COLLISION_SPHERE_SPHERE, :2624), whose
 // response is the script alone (NO_COLLISION(OBJ_PLAYER, OBJ_POWERUP),
-// :2519), and the player and a weapon (:2623), whose response is
-// collide_player_and_weapon (WeaponFire.swift). The other pairs (robots,
-// clutter, doors) bump or damage; they join this table with Damage and the
-// general object frame (M1 step 7, M2).
+// :2519); the player and a weapon (:2623); and a robot, clutter, or
+// building and a weapon (:2621, :2626, :2632). The other pairs (the player
+// and robots, weapons and weapons, doors) bump, and they arrive with the
+// general physics and doors (M2). bump_two_objects, the weapon's impact
+// spawns, sticking, and the building surface effects arrive with them.
 
 import Foundation
 
@@ -39,10 +41,15 @@ func collisionResult(_ a: ObjectType, _ b: ObjectType) -> CollisionCheck {
     switch (a, b) {
     case (.player, .powerup), (.powerup, .player):
         .sphereSphere   // collide.cpp:2624
-    case (.player, .weapon):
-        .polySphere     // ENABLE_COLLISION_POLY_SPHERE, collide.cpp:2623
-    case (.weapon, .player):
-        .spherePoly     // collide.cpp:2623 (ENABLE_COLLISION_POLY_SPHERE)
+    case (.player, .weapon), (.robot, .weapon), (.clutter, .weapon),
+         (.building, .weapon):
+        // ENABLE_COLLISION_POLY_SPHERE(OBJ_PLAYER/OBJ_ROBOT, OBJ_WEAPON),
+        // collide.cpp:2621-2623; ENABLE_COLLISION_SPHERE_POLY(OBJ_WEAPON,
+        // OBJ_CLUTTER/OBJ_BUILDING), :2626, :2632.
+        .polySphere
+    case (.weapon, .player), (.weapon, .robot), (.weapon, .clutter),
+         (.weapon, .building):
+        .spherePoly
     default:
         .nothing
     }
@@ -62,10 +69,8 @@ extension GameWorld {
     /// collide_two_objects (collide.cpp:2393) in single player. The level
     /// goal informs (check_lg_inform, :2410) need object flags that no
     /// imported object sets yet. The dying or dead player check (:2476)
-    /// arrives with player death (M1 step 7). Each object's script chain
-    /// gets EVT_COLLIDE, and then the pair's response runs: for the player
-    /// and a powerup there is none (:2519); for the player and a weapon it
-    /// is collide_player_and_weapon (:2500).
+    /// arrives with player death (M2). Each object's script chain gets
+    /// EVT_COLLIDE, and then the pair's response runs.
     mutating func collideTwoObjects(
         _ a: ObjectHandle,
         _ b: ObjectHandle,
@@ -79,8 +84,117 @@ extension GameWorld {
             collidePlayerAndWeapon(player: a, weapon: b, level: level)
         case (.weapon, .player):
             collidePlayerAndWeapon(player: b, weapon: a, level: level)
+        case (.robot, .weapon), (.clutter, .weapon), (.building, .weapon):
+            collideGenericAndWeapon(a, weapon: b, level: level)
+        case (.weapon, .robot), (.weapon, .clutter), (.weapon, .building):
+            collideGenericAndWeapon(b, weapon: a, level: level)
         default:
             break
+        }
+    }
+
+    /// collide_player_and_weapon (collide.cpp:2280): the firing AI object
+    /// learns it hit, the weapon explodes, the player takes the weapon's
+    /// damage, and the weapon dies.
+    mutating func collidePlayerAndWeapon(
+        player: ObjectHandle,
+        weapon handle: ObjectHandle,
+        level: Level
+    ) {
+        guard let weapon = objects[handle],
+              let weaponIndex = weapon.weapon
+        else {
+            return
+        }
+        let definition = level.weapons![weaponIndex]
+        if objects[weapon.parent]?.ai != nil {
+            aiNotifyWeaponHitObject(weapon.parent, target: player,
+                                    level: level)
+        }
+        doWeaponExploded(handle, hitObject: player, level: level)
+        let electrical =
+            definition.flags & CanonicalWeapon.electricalFlag != 0
+        let damage = electrical
+            ? definition.playerDamage * frameDuration
+            : definition.playerDamage
+        if applyDamageToPlayer(
+            player,
+            killer: handle,
+            damage: damage,
+            level: level
+        ) {
+            play3DSound(definition.sounds[CanonicalWeapon.impactRobotSound])
+        }
+        if !electrical {
+            objects[handle]?.flags |= GameObject.deadFlag
+        }
+    }
+
+    /// collide_generic_and_weapon (collide.cpp:2155): a dying object dies a
+    /// little sooner, the weapon's wall impact sound plays and it explodes,
+    /// the firer and the hit AI object hear of it, and the object takes the
+    /// weapon's generic damage. A damaging energy or matter hit throws 3 to
+    /// 8 sparks in the weapon's secondary light color. The weapon dies.
+    mutating func collideGenericAndWeapon(
+        _ hit: ObjectHandle,
+        weapon handle: ObjectHandle,
+        level: Level
+    ) {
+        guard let weapon = objects[handle],
+              let weaponIndex = weapon.weapon
+        else {
+            return
+        }
+        let definition = level.weapons![weaponIndex]
+        let electrical =
+            definition.flags & CanonicalWeapon.electricalFlag != 0
+        let damageType: GenericDamageType =
+            definition.flags & CanonicalWeapon.napalmFlag != 0 ? .fire
+            : definition.flags & CanonicalWeapon.matterWeaponFlag != 0
+                ? .matter
+            : electrical ? .electric : .energy
+        if (objects[hit]?.flags ?? 0) & GameObject.dyingFlag != 0 {
+            objects[hit]?.dying?.delayTime *= 0.975
+        }
+        // The AIN_HEAR_NOISE of the impact sound arrives with AI hearing
+        // (M2).
+        play3DSound(definition.sounds[CanonicalWeapon.impactWallSound])
+        doWeaponExploded(handle, hitObject: hit, level: level)
+        if objects[weapon.parent]?.ai != nil {
+            aiNotifyWeaponHitObject(weapon.parent, target: hit, level: level)
+        }
+        if objects[hit]?.ai != nil {
+            aiNotifyHitByWeapon(hit, weapon: handle, level: level)
+        }
+        let damage = electrical
+            ? definition.genericDamage * frameDuration
+            : definition.genericDamage
+        if applyDamageToGeneric(
+            hit,
+            killer: handle,
+            damageType: damageType,
+            damage: damage,
+            level: level
+        ) {
+            play3DSound(definition.sounds[CanonicalWeapon.impactRobotSound])
+            if !electrical, let weapon = objects[handle],
+               case let .room(room) = weapon.location {
+                let light = definition.lighting?.secondaryColor ?? .zero
+                let color = sourceRGB16(
+                    light.x * 255, light.y * 255, light.z * 255
+                )
+                let count = 3 + Int(psRand() % 6)
+                createRandomLineSparks(
+                    count,
+                    position: weapon.position,
+                    roomSourceIndex: room,
+                    color: color,
+                    level: level
+                )
+            }
+        }
+        if !electrical {
+            objects[handle]?.flags |= GameObject.deadFlag
         }
     }
 

@@ -80,679 +80,215 @@ extension WorldRenderingTests {
         )
     }
 
-    func testRookieConcussionUsesExactCanonicalGunpointsAndOldOmission()
-        throws
-    {
-        let level = try makePlayerConcussionLevel()
-        let binding = try XCTUnwrap(
-            level.shipDefinitions[0].playerConcussion
-        )
-        XCTAssertEqual(binding.gunpoints[0].localPosition, .init(
-            x: 2.792_412_5,
-            y: -1.186_958_9,
-            z: 2.687_090_9
-        ))
-        XCTAssertEqual(binding.gunpoints[0].localForward, .init(
-            x: 0.000_007_629_434_5,
-            y: 0.000_003_337_758_7,
-            z: 1
-        ))
-        XCTAssertEqual(binding.gunpoints[1].localPosition, .init(
-            x: -2.804_046_4,
-            y: -1.186_885_0,
-            z: 2.687_135_2
-        ))
-        XCTAssertEqual(binding.gunpoints[1].localForward, .init(
-            x: 0.000_008_106_278,
-            y: 0.000_003_814_590_4,
-            z: 1
-        ))
-
-        var oldObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: JSONEncoder().encode(level))
-                as? [String: Any]
-        )
-        var oldShips = try XCTUnwrap(
-            oldObject["shipDefinitions"] as? [[String: Any]]
-        )
-        oldShips[0].removeValue(forKey: "playerConcussion")
-        oldObject["shipDefinitions"] = oldShips
-        let oldLevel = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: oldObject)
-        )
-        XCTAssertNil(oldLevel.shipDefinitions[0].playerConcussion)
-
-        var hostileShip = level.shipDefinitions[0]
-        var hostile = try XCTUnwrap(hostileShip.playerConcussion)
-        var gunpoints = hostile.gunpoints
-        gunpoints[0] = .init(
-            index: gunpoints[0].index,
-            parentSubmodelIndex: gunpoints[0].parentSubmodelIndex,
-            localPosition: gunpoints[0].localPosition,
-            localForward: .init(x: 0, y: 0, z: 1)
-        )
-        hostile = replacing(hostile, gunpoints: gunpoints)
-        hostileShip.playerConcussion = hostile
-        XCTAssertThrowsError(try replacing(
-            level,
-            shipDefinitions: [hostileShip]
-        ).validate()) {
-            XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .invalidDependency("default player Concussion binding")
-            )
-        }
-    }
-
-    func testRookieConcussionInclusiveAlternatingAndScheduledCadence()
-        throws
-    {
-        var level = try makePlayerConcussionLevel()
-        let player = try XCTUnwrap(level.objects.first {
-            $0.handle == level.defaultPlayerBinding?.objectHandle
-        })
-        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
-            $0.handle == 4_112
-        })
-        level.objects[robotIndex].position = .init(
-            x: player.position.x,
-            y: player.position.y,
-            z: player.position.z - 100
-        )
+    /// FireWeaponFromPlayer through GameSession.update (WeaponFire.cpp:2830
+    /// with 3MASTERED dbd611e4, bd896ac, c47df2d; sources.md section 2).
+    /// Frames of 0.01, 0.247, and 0.01 s: the first shot fires at Gametime
+    /// 0; the held button's next shot is due at 0.25 and fires in the frame
+    /// whose Gametime is 0.257, keeping the 0.007 s overshoot
+    /// (last_fire_time 0.25). A release and a new press start a new burst
+    /// anchored at that frame's Gametime.
+    func testHeldPrimaryFireKeepsItsScheduledCadenceAcrossFrames() throws {
+        let level = makeTrainingRobotGuidebotLevel()
         let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        let first = simulation.update(
-            at: 0.1,
-            input: .init(firesSecondaryWeapon: true)
-        )
-        XCTAssertEqual(first.playerConcussionMissiles.count, 1)
-        let firstForward = try XCTUnwrap(
-            level.shipDefinitions[0].playerConcussion?.gunpoints[0]
-        ).localForward
-        XCTAssertEqual(
-            first.playerConcussionMissiles[0].position.x,
-            player.position.x + 2.792_412_5
-                + firstForward.x * 175 * first.systemsFrameDuration,
-            accuracy: 0.000_01
-        )
-        _ = simulation.update(at: 0.5, input: .zero)
-        let exactDue = simulation.update(
-            at: 0.5,
-            input: .init(firesSecondaryWeapon: true)
-        )
-        XCTAssertEqual(exactDue.systemsGameTime, 0.5, accuracy: 0.000_1)
-        var object = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        var state = try XCTUnwrap(
-            object["playerConcussionState"] as? [String: Any]
-        )
-        XCTAssertEqual(state["ammo"] as? Int, 4)
-        XCTAssertEqual(
-            try XCTUnwrap(state["nextFireTime"] as? Double),
-            1,
-            accuracy: 0.000_1
-        )
-
-        _ = simulation.update(at: 1.6, input: .zero)
-        let carried = simulation.update(
-            at: 1.6,
-            input: .init(firesSecondaryWeapon: true)
-        )
-        object = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        state = try XCTUnwrap(
-            object["playerConcussionState"] as? [String: Any]
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(state["nextFireTime"] as? Double),
-            1.5,
-            accuracy: 0.000_1
-        )
-        XCTAssertEqual(state["ammo"] as? Int, 3)
-        XCTAssertEqual(state["nextFiringMaskIndex"] as? Int, 1)
-
-        _ = simulation.update(at: 10, input: .zero)
-        _ = simulation.update(at: 10.01, input: .zero)
-        let rebased = simulation.update(
-            at: 10.01,
-            input: .init(firesSecondaryWeapon: true)
-        )
-        object = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        state = try XCTUnwrap(
-            object["playerConcussionState"] as? [String: Any]
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(state["nextFireTime"] as? Double),
-            Double(rebased.systemsGameTime + 0.5),
-            accuracy: 0.000_1
-        )
-        XCTAssertEqual(state["ammo"] as? Int, 2)
-        XCTAssertEqual(state["nextFiringMaskIndex"] as? Int, 0)
-        XCTAssertEqual(carried.systemsGameTime, 1.6, accuracy: 0.000_1)
-    }
-
-    func testFullExplosionListDropsOnlyTheVisualAndKeepsTheShockwave()
-        throws
-    {
-        // DoWeaponExploded makes the shockwave first (WeaponFire.cpp:3066),
-        // then asks VisEffectCreate for the visual, which returns -1 when the
-        // list is full (viseffect.cpp:522). The shockwave still acts.
-        let level = try makePlayerConcussionLevel()
-        let binding = try XCTUnwrap(
-            level.shipDefinitions.first?.playerConcussion
-        )
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        let player = simulation.world.testPlayerObject
-        guard case let .room(playerRoom) = player.location else {
-            return XCTFail("indoor player")
-        }
-        simulation.world.playerConcussionState?.missiles = [
-            .init(
-                creationOrdinal: 0,
-                roomSourceIndex: playerRoom,
-                position: player.position,
-                orientation: player.orientation,
-                velocity: player.orientation.forward * 0.001,
-                lifeRemaining: 0.001
-            ),
-        ]
-        simulation.world.playerConcussionState?.explosions = (1...6).map {
-            .init(
-                creationOrdinal: UInt64($0),
-                roomSourceIndex: playerRoom,
-                position: player.position,
-                lifeRemaining: binding.explosionLifetime,
-                shockwaveLifeRemaining: 0,
-                damagedPlayer: true
-            )
-        }
-        simulation.world.playerConcussionState?.nextCreationOrdinal = 7
-        XCTAssertNoThrow(try simulation.world.validate(against: level))
-        let shieldsBefore = simulation.world.shields
-
-        let frame = simulation.update(at: 0.1, input: .zero)
-        let state = try XCTUnwrap(simulation.world.playerConcussionState)
-        XCTAssertEqual(state.missiles.count, 0, "the missile expired")
-        XCTAssertEqual(
-            state.explosions.filter(\.isPresented).map(\.creationOrdinal),
-            Array(1...6),
-            "the new visual was dropped, not swapped in"
-        )
-        let shockwave = try XCTUnwrap(state.explosions.last)
-        XCTAssertEqual(shockwave.creationOrdinal, 7)
-        XCTAssertFalse(shockwave.isPresented)
-        XCTAssertTrue(shockwave.damagedPlayer)
-        XCTAssertEqual(
-            simulation.world.shields,
-            shieldsBefore - binding.shockwaveDamage,
-            accuracy: 0.001,
-            "the new shockwave damages the player at its center"
-        )
-        XCTAssertEqual(frame.playerConcussionExplosions.count, 6)
-        XCTAssertNoThrow(try simulation.world.validate(against: level))
-        XCTAssertNoThrow(try updateMetalWorldPlan(
-            try makeMetalWorldPlan(
-                level: simulation.runtimeLevel,
-                playerView: frame.playerView
-            ),
-            level: simulation.level,
-            world: simulation.world,
-            frame: frame,
-            drawableAspect: 1
-        ))
-    }
-
-    func testFullSparkListTakesNoRandomDrawsForDroppedSparks() throws {
-        // CreateRandomLineSparks (viseffect.cpp:822) calls VisEffectCreate
-        // first and draws ps_rand only for a spark it allocated.
-        var level = try makePlayerConcussionLevel()
-        let player = try XCTUnwrap(level.objects.first {
-            $0.handle == level.defaultPlayerBinding?.objectHandle
-        })
-        guard case let .room(playerRoom) = player.location else {
-            return XCTFail("indoor player")
-        }
-        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
-            $0.handle == 4_112
-        })
-        level.objects[robotIndex].position = .init(
-            x: player.position.x + player.orientation.forward.x * 15,
-            y: player.position.y + player.orientation.forward.y * 15,
-            z: player.position.z + player.orientation.forward.z * 15
-        )
-        level.objects[robotIndex].location = player.location
-        func run(sparks: Int) throws -> (UInt32, Int) {
-            let simulation = GameSession(
-                level: level,
-                presentationReadyTimestamp: 0,
-                authoritativeRandomSeed: 0x1234_5678
-            )
-            simulation.world.playerConcussionState?.sparks =
-                (0..<sparks).map {
-                    .init(
-                        creationOrdinal: UInt64($0),
-                        roomSourceIndex: playerRoom,
-                        position: player.position,
-                        velocity: player.orientation.up,
-                        size: 1,
-                        lifetime: 2,
-                        lifeRemaining: 2
-                    )
-                }
-            simulation.world.playerConcussionState?.nextCreationOrdinal =
-                UInt64(sparks)
-            _ = simulation.update(
-                at: 0.1,
-                input: .init(firesSecondaryWeapon: true)
-            )
-            let state = try XCTUnwrap(simulation.world.playerConcussionState)
-            return (
-                simulation.world.authoritativeRandomState,
-                state.sparks.count - sparks
-            )
-        }
-        let (openState, created) = try run(sparks: 0)
-        XCTAssertTrue((3...8).contains(created))
-        let (fullState, dropped) = try run(sparks: 48)
-        XCTAssertEqual(dropped, 0)
-        var advanced = fullState
-        for _ in 0..<(created * 6) {
-            advanced = advanced &* 214_013 &+ 2_531_011
-        }
-        XCTAssertEqual(
-            advanced,
-            openState,
-            "only the allocated sparks take their six draws"
-        )
-    }
-
-    func testRookieConcussionLaunchImpactShockwaveAndContinuationAreDeterministic()
-        throws
-    {
-        var level = try makePlayerConcussionLevel()
-        let player = try XCTUnwrap(level.objects.first {
-            $0.handle == level.defaultPlayerBinding?.objectHandle
-        })
-        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
-            $0.handle == 4_112
-        })
-        level.objects[robotIndex].position = .init(
-            x: player.position.x + player.orientation.forward.x * 15,
-            y: player.position.y + player.orientation.forward.y * 15,
-            z: player.position.z + player.orientation.forward.z * 15
-        )
-        level.objects[robotIndex].location = player.location
-
-        let seed = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x1234_5678
         )
-        let continuationObject = try XCTUnwrap(
-            testWorldObject(seed.world)
-        )
-        let reached = try decodeTestWorld(continuationObject)
-        let simulation = try GameSession(
-            level: level,
-            world: reached.rebased(onto: level),
-            resumedAtTimestamp: 100
-        )
-        let randomStateBefore = try XCTUnwrap(
-            continuationObject["authoritativeRandomState"] as? NSNumber
-        ).uint32Value
-
-        let impact = simulation.update(
-            at: 100.1,
-            input: .init(firesSecondaryWeapon: true)
-        )
-        XCTAssertEqual(impact.playerConcussionMissiles.count, 0)
-        XCTAssertEqual(impact.playerConcussionExplosions.count, 1)
-        XCTAssertEqual(
-            impact.playerConcussionExplosions[0].texture.sourceName,
-            "ExplosionE"
-        )
-        XCTAssertEqual(
-            impact.trainingOpeningFeedback.compactMap(\.soundSourceName),
-            ["concmissilefire7.wav", "Explode1.wav"]
-        )
-        XCTAssertTrue((3...8).contains(impact.playerConcussionSparks.count))
-
-        var impactContinuation = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        let concussionState = try XCTUnwrap(
-            impactContinuation["playerConcussionState"] as? [String: Any]
-        )
-        XCTAssertEqual(concussionState["ammo"] as? Int, 5)
-        XCTAssertEqual(concussionState["nextFiringMaskIndex"] as? Int, 1)
-        let robotAfterDirect = try XCTUnwrap(
-            impactContinuation["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        XCTAssertEqual(robotAfterDirect["robotShields"] as? Double, 46)
-        let sparkStates = try XCTUnwrap(
-            concussionState["sparks"] as? [[String: Any]]
-        )
-        let firstSpark = try XCTUnwrap(sparkStates.first)
-        XCTAssertNotNil(firstSpark["position"] as? [String: Any])
-        XCTAssertNotNil(firstSpark["velocity"] as? [String: Any])
-        XCTAssertTrue((0.7...1.06).contains(
-            try XCTUnwrap(firstSpark["size"] as? Double)
-        ))
-        XCTAssertTrue((1...2.35).contains(
-            try XCTUnwrap(firstSpark["lifetime"] as? Double)
-        ))
-
-        var expectedRandomState = randomStateBefore
-        for _ in 0..<(1 + impact.playerConcussionSparks.count * 6) {
-            expectedRandomState = expectedRandomState &* 214_013 &+ 2_531_011
+        func battery() -> DynamicWeaponBattery {
+            simulation.world.testPlayerObject.weaponBatteries[0]
         }
+        func bolts() -> Int {
+            simulation.world.objects.filter { $0.type == .weapon }.count
+        }
+        _ = simulation.update(at: 0.01, input: .init(firesPrimaryWeapon: true))
+        XCTAssertEqual(simulation.energy, 99.85, accuracy: 0.000_01)
+        XCTAssertEqual(bolts(), 2)
+        XCTAssertEqual(battery().lastFireTime, 0, accuracy: 0.000_01)
+
+        _ = simulation.update(at: 0.257, input: .init(firesPrimaryWeapon: true))
+        XCTAssertEqual(simulation.energy, 99.85, accuracy: 0.000_01)
+        XCTAssertEqual(bolts(), 2)
+        _ = simulation.update(at: 0.267, input: .init(firesPrimaryWeapon: true))
+        XCTAssertEqual(simulation.energy, 99.7, accuracy: 0.000_01)
+        XCTAssertEqual(bolts(), 4)
+        XCTAssertEqual(battery().lastFireTime, 0.25, accuracy: 0.000_01)
+        // Firing draws no random numbers.
         XCTAssertEqual(
-            (impactContinuation["authoritativeRandomState"] as? NSNumber)?
-                .uint32Value,
-            expectedRandomState
+            simulation.world.authoritativeRandomState,
+            0x1234_5678
         )
 
-        let premature = simulation.update(
-            at: 100.2,
-            input: .init(firesSecondaryWeapon: true)
-        )
-        XCTAssertEqual(premature.playerConcussionMissiles.count, 0)
-        impactContinuation = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        let prematureState = try XCTUnwrap(
-            impactContinuation["playerConcussionState"] as? [String: Any]
-        )
-        XCTAssertEqual(prematureState["ammo"] as? Int, 5)
-        let robotAfterShockwave = try XCTUnwrap(
-            impactContinuation["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        let explosion = impact.playerConcussionExplosions[0]
-        let robotPosition = level.objects[robotIndex].position
-        let robotRadius = try XCTUnwrap(
-            level.trainingRobotGuidebotChain?.combat.robotCollisionRadius
-        )
-        let surfaceDistance = max(
-            0,
-            sqrt(
-                pow(robotPosition.x - explosion.position.x, 2)
-                    + pow(robotPosition.y - explosion.position.y, 2)
-                    + pow(robotPosition.z - explosion.position.z, 2)
-            ) - robotRadius
-        )
-        let expectedShockwaveDamage = 19 * (1 - surfaceDistance / 32) * 1.5
+        _ = simulation.update(at: 9, input: .zero)
         XCTAssertEqual(
-            try XCTUnwrap(robotAfterShockwave["robotShields"] as? Double),
-            Double(46 - expectedShockwaveDamage),
-            accuracy: 0.000_1
+            simulation.world.playerWeapons[PlayerWeaponState.primary]
+                .firingTime,
+            0
         )
-        let movedState = try XCTUnwrap(
-            prematureState["sparks"] as? [[String: Any]]
-        )
-        XCTAssertNotEqual(
-            movedState.first?["position"] as? [String: Double],
-            firstSpark["position"] as? [String: Double]
-        )
-
-        let savedContinuation = simulation.world
-        let expectedRestoredFrame = simulation.update(
-            at: 100.3,
-            input: .zero
-        )
-        let restored = try GameSession(
-            level: level,
-            world: savedContinuation.rebased(onto: level),
-            resumedAtTimestamp: 200
-        )
-        let restoredFrame = restored.update(at: 200, input: .zero)
-        XCTAssertEqual(
-            restoredFrame.playerConcussionExplosions,
-            expectedRestoredFrame.playerConcussionExplosions
-        )
-        XCTAssertFalse(
-            restored.update(at: 200.1, input: .zero)
-                .trainingOpeningFeedback.contains {
-                    $0.soundSourceName == "concmissilefire7.wav"
-                }
-        )
+        _ = simulation.update(at: 9.016, input: .zero)
+        _ = simulation.update(at: 9.032, input: .init(firesPrimaryWeapon: true))
+        XCTAssertEqual(simulation.energy, 99.55, accuracy: 0.000_01)
+        XCTAssertEqual(battery().lastFireTime, 9.016, accuracy: 0.000_01)
     }
 
-    func testRookieConcussionBlockedAndExhaustedAttemptsAreSideEffectFree()
-        throws
-    {
-        var level = try makePlayerConcussionLevel()
-        let player = try XCTUnwrap(level.objects.first {
-            $0.handle == level.defaultPlayerBinding?.objectHandle
-        })
-        let gunpoint = try XCTUnwrap(
-            level.shipDefinitions.first?.playerConcussion?.gunpoints.first
-        )
-        let blockerIndex = try XCTUnwrap(level.objects.firstIndex {
-            $0.handle == 4_112
-        })
-        let local = gunpoint.localPosition
-        let offset = Vector3(
-            x: player.orientation.right.x * local.x
-                + player.orientation.up.x * local.y
-                + player.orientation.forward.x * local.z,
-            y: player.orientation.right.y * local.x
-                + player.orientation.up.y * local.y
-                + player.orientation.forward.y * local.z,
-            z: player.orientation.right.z * local.x
-                + player.orientation.up.z * local.y
-                + player.orientation.forward.z * local.z
-        )
-        level.objects[blockerIndex].position = .init(
-            x: player.position.x + offset.x * 0.5,
-            y: player.position.y + offset.y * 0.5,
-            z: player.position.z + offset.z * 0.5
-        )
-        level.objects[blockerIndex].location = player.location
-
-        let blockedSimulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0,
-            authoritativeRandomSeed: 0x8765_4321
-        )
-        let before = try XCTUnwrap(
-            testWorldObject(blockedSimulation.world)
-        )
-        let blocked = blockedSimulation.update(
-            at: 0.1,
-            input: .init(firesSecondaryWeapon: true)
-        )
-        XCTAssertTrue(blocked.playerConcussionMissiles.isEmpty)
-        XCTAssertTrue(blocked.playerConcussionExplosions.isEmpty)
-        XCTAssertFalse(blocked.trainingOpeningFeedback.contains {
-            $0.soundSourceName == "concmissilefire7.wav"
-        })
-        var after = try XCTUnwrap(
-            testWorldObject(blockedSimulation.world)
-        )
-        let blockedState = try XCTUnwrap(
-            after["playerConcussionState"] as? [String: Any]
-        )
-        XCTAssertEqual(blockedState["ammo"] as? Int, 6)
-        XCTAssertEqual(blockedState["nextFiringMaskIndex"] as? Int, 0)
-        XCTAssertEqual(
-            (after["authoritativeRandomState"] as? NSNumber)?.uint32Value,
-            (before["authoritativeRandomState"] as? NSNumber)?.uint32Value
-        )
-
-        var exhaustedState = blockedState
-        exhaustedState["ammo"] = 0
-        exhaustedState["nextFireTime"] = 0
-        after["playerConcussionState"] = exhaustedState
-        let exhaustedSimulation = try GameSession(
-            level: level,
-            world: (decodeTestWorld(after)).rebased(onto: level),
-            resumedAtTimestamp: 10
-        )
-        let exhausted = exhaustedSimulation.update(
-            at: 10.1,
-            input: .init(firesSecondaryWeapon: true)
-        )
-        XCTAssertEqual(
-            exhausted.trainingOpeningFeedback.flatMap(\.hudMessages),
-            ["Not enough projectiles available!"]
-        )
-        XCTAssertTrue(exhausted.playerConcussionMissiles.isEmpty)
-        let exhaustedAfter = try XCTUnwrap(
-            testWorldObject(exhaustedSimulation.world)
-        )
-        XCTAssertEqual(
-            (exhaustedAfter["authoritativeRandomState"] as? NSNumber)?
-                .uint32Value,
-            (after["authoritativeRandomState"] as? NSNumber)?.uint32Value
-        )
-    }
-
-    func testRookieConcussionTimeoutAndHostileContinuationAreBounded()
-        throws
-    {
+    /// The Concussion battery alternates gun points 1 and 2 (fire masks 2
+    /// and 4), each shot taking one missile and waiting 0.5 s.
+    func testConcussionAlternatesItsGunpointsThroughTheFrame() throws {
         let level = try makePlayerConcussionLevel()
-        let player = try XCTUnwrap(level.objects.first {
-            $0.handle == level.defaultPlayerBinding?.objectHandle
-        })
-        let playerRoom = try XCTUnwrap({ () -> Int? in
-            guard case let .room(sourceIndex) = player.location else {
-                return nil
-            }
-            return sourceIndex
-        }())
-        let seed = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0,
-            authoritativeRandomSeed: 0x1111_2222
-        )
-        var continuationObject = try XCTUnwrap(
-            testWorldObject(seed.world)
-        )
-        var concussionState = try XCTUnwrap(
-            continuationObject["playerConcussionState"] as? [String: Any]
-        )
-        let missile: [String: Any] = [
-            "creationOrdinal": 0,
-            "roomSourceIndex": playerRoom,
-            "position": try XCTUnwrap(
-                continuationObject["playerPosition"] as? [String: Any]
-            ),
-            "orientation": try XCTUnwrap(
-                continuationObject["playerOrientation"] as? [String: Any]
-            ),
-            "velocity": ["x": 0, "y": 0, "z": 0],
-            "lifeRemaining": 0.05,
-        ]
-        concussionState["missiles"] = [missile]
-        concussionState["ammo"] = 5
-        concussionState["nextCreationOrdinal"] = 1
-        continuationObject["playerConcussionState"] = concussionState
-        let timeoutContinuation = try decodeTestWorld(continuationObject)
-        let timeoutSimulation = try GameSession(
-            level: level,
-            world: timeoutContinuation.rebased(onto: level),
-            resumedAtTimestamp: 10
-        )
-        let timeout = timeoutSimulation.update(at: 10.1, input: .zero)
-        XCTAssertTrue(timeout.playerConcussionMissiles.isEmpty)
-        XCTAssertEqual(timeout.playerConcussionExplosions.count, 1)
-        XCTAssertTrue(timeout.trainingOpeningFeedback.contains {
-            $0.soundSourceName == "Explode1.wav"
-        })
-
-        concussionState["missiles"] = [missile, missile]
-        concussionState["ammo"] = 4
-        continuationObject["playerConcussionState"] = concussionState
-
-        var impossibleConservation = concussionState
-        impossibleConservation["missiles"] = (0..<6).map { ordinal in
-            var distinct = missile
-            distinct["creationOrdinal"] = ordinal
-            return distinct
+        let simulation = GameSession(level: level, presentationReadyTimestamp: 0)
+        simulation.world.playerWeapons[PlayerWeaponState.secondary].index =
+            PlayerWeaponState.concussionIndex
+        let player = simulation.world.testPlayerObject
+        func rightOffsets() -> [Float] {
+            simulation.world.objects.filter { $0.type == .weapon }
+                .sorted { $0.creationTime < $1.creationTime }
+                .map { dot($0.position - player.position,
+                           player.orientation.right) }
         }
-        impossibleConservation["ammo"] = 6
-        impossibleConservation["nextCreationOrdinal"] = 6
-        continuationObject["playerConcussionState"] = impossibleConservation
-
+        _ = simulation.update(at: 0.1, input: .init(firesSecondaryWeapon: true))
+        XCTAssertEqual(
+            simulation.world.playerWeaponAmmo[PlayerWeaponState.concussionIndex],
+            5
+        )
+        XCTAssertEqual(rightOffsets().count, 1)
+        let first = rightOffsets()[0]
+        _ = simulation.update(at: 0.4, input: .init(firesSecondaryWeapon: true))
+        XCTAssertEqual(rightOffsets().count, 1)
+        _ = simulation.update(at: 0.6, input: .init(firesSecondaryWeapon: true))
+        XCTAssertEqual(rightOffsets().count, 1)
+        _ = simulation.update(at: 0.7, input: .init(firesSecondaryWeapon: true))
+        XCTAssertEqual(
+            simulation.world.playerWeaponAmmo[PlayerWeaponState.concussionIndex],
+            4
+        )
+        let offsets = rightOffsets()
+        XCTAssertEqual(offsets.count, 2)
+        // Gun point 1 is 2.792 right of the model's center, gun point 2
+        // 2.804 left of it.
+        XCTAssertEqual(first - (offsets.last ?? 0), 5.596_459, accuracy: 0.05)
     }
 
-    func testScript030RestoresAfterSameFrameConcussionImpact() throws {
-        // The concussion level with the Training level module.
+    /// A shockwave that reaches the pilot during the object frames lowers
+    /// the shields; Script 030 runs later in the same frame's level
+    /// EVT_INTERVAL (GameLoop.cpp:3013, TrainingMission.cpp:1385-1392) and
+    /// restores 50.
+    func testScript030RestoresShieldsAfterASameFrameShockwave() throws {
         let level = addingTrainingMissionScripting(
             try makePlayerConcussionLevel()
         )
-        let player = try XCTUnwrap(level.objects.first {
-            $0.handle == level.defaultPlayerBinding?.objectHandle
-        })
-        let playerRoom = try XCTUnwrap({ () -> Int? in
-            guard case let .room(sourceIndex) = player.location else {
-                return nil
-            }
-            return sourceIndex
-        }())
-        let seed = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+        let simulation = GameSession(level: level, presentationReadyTimestamp: 0)
+        simulation.world.trainingMission.script014Count = 1
+        simulation.world.shields = 30
+        simulation.world.playerWeapons[PlayerWeaponState.secondary].index =
+            PlayerWeaponState.concussionIndex
+        let player = simulation.world.testPlayerObject
+        simulation.world.fireWeaponFromPlayer(
+            player.handle,
+            weaponType: PlayerWeaponState.secondary,
+            isDown: true,
+            downTime: 0.1,
+            level: level
         )
-        var continuationObject = try XCTUnwrap(
-            testWorldObject(seed.world)
+        let missile = try XCTUnwrap(
+            simulation.world.objects.first { $0.type == .weapon }
         )
-        continuationObject["shields"] = 1
-        // After Script 014 (TrainingMission.cpp:1814-1817).
-        continuationObject["playerControllerBitflags"] = 63
-        var concussionState = try XCTUnwrap(
-            continuationObject["playerConcussionState"] as? [String: Any]
-        )
-        concussionState["explosions"] = [[
-            "creationOrdinal": 0,
-            "roomSourceIndex": playerRoom,
-            "position": try XCTUnwrap(
-                continuationObject["playerPosition"] as? [String: Any]
-            ),
-            "lifeRemaining": 0.5,
-            "shockwaveLifeRemaining": 0.1,
-            "damagedObjectHandles": [],
-            "damagedPlayer": false,
-            "isPresented": true,
-        ]]
-        concussionState["ammo"] = 5
-        concussionState["nextCreationOrdinal"] = 1
-        continuationObject["playerConcussionState"] = concussionState
-        var continuation = try decodeTestWorld(continuationObject)
-            .rebased(onto: level)
-        var counters = try XCTUnwrap(continuation.testTrainingMission)
-        counters.script014Count = 1
-        continuation.levelModule = .trainingMission(counters)
-        let simulation = try GameSession(
-            level: level,
-            world: continuation,
-            resumedAtTimestamp: 10
-        )
-        // The impact lands during the object frames (1 - 19). Script 030
-        // runs later in the level EVT_INTERVAL (GameLoop.cpp:3013,
-        // TrainingMission.cpp:1386-1388) and restores 50 in the same frame.
-        let frame = simulation.update(at: 10.1, input: .zero)
-        XCTAssertEqual(frame.shields, 50)
+        simulation.world.objects[missile.handle]?.position = player.position
+        simulation.world.objects[missile.handle]?.location = player.location
+        simulation.world.doWeaponExploded(missile.handle, level: level)
+        simulation.world.objects[missile.handle]?.flags |= GameObject.deadFlag
+        XCTAssertNotNil(simulation.world.objects.first { $0.type == .shockwave })
+
+        _ = simulation.update(at: 0.1, input: .zero)
+        XCTAssertEqual(simulation.world.shields, 50)
         XCTAssertEqual(simulation.world.testTrainingMission?.script030Count, 1)
-        // The next frame's shields are 50, so Script 030 does not run again.
-        _ = simulation.update(at: 10.2, input: .zero)
+        XCTAssertNil(simulation.world.playerDeath)
+        _ = simulation.update(at: 0.2, input: .zero)
         XCTAssertEqual(simulation.world.testTrainingMission?.script030Count, 1)
     }
 
+    /// A real Concussion missile kills DestroyBot2 through the generic
+    /// weapon, damage, and death path; its EVT_DESTROY runs Script 036
+    /// (TrainingMission.cpp:2039-2050), which opens the gallery portals and
+    /// their reciprocals (aPortalRenderSet, DallasFuncs.cpp:1098) and lights
+    /// FlashLight-2, and level timer 12 then runs Script 029.
+    func testConcussionKillOfDestroyBot2RunsItsScriptChain() throws {
+        var base = try makePlayerConcussionLevel()
+        let barrier = try XCTUnwrap(base.trainingGalleryBarrier)
+        let barrierRoom = try XCTUnwrap(base.rooms.firstIndex {
+            $0.sourceIndex == barrier.barrierRoomSourceIndex
+        })
+        base.rooms[barrierRoom].name = "PortalRoom4"
+        let player = try XCTUnwrap(base.objects.first {
+            $0.handle == base.defaultPlayerBinding?.objectHandle
+        })
+        let robotIndex = try XCTUnwrap(base.objects.firstIndex {
+            $0.handle == 4_112
+        })
+        base.objects[robotIndex].position = player.position
+            + player.orientation.forward * 15
+        base.objects[robotIndex].location = player.location
+        let level = addingTrainingMissionScripting(
+            base,
+            messages: fixtureTrainingMessages + [
+                .init(
+                    name: "ExitManuveur",
+                    text:
+                        "Now go through the open doorway, and into the next room."
+                ),
+            ]
+        )
+        let simulation = GameSession(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x1234_5678
+        )
+        simulation.world.playerWeapons[PlayerWeaponState.secondary].index =
+            PlayerWeaponState.concussionIndex
+        // Script 000 turned the controls off; the lessons turned them all
+        // back on. Script 028 unghosted DestroyBot2; one direct hit
+        // (6 x 1.5) kills it.
+        simulation.world.playerControllerBitflags = .all
+        simulation.world.unghostObject(ObjectHandle(4_112))
+        simulation.world.objects[ObjectHandle(4_112)]?.shields = 5
+
+        var time: Double = 0
+        while simulation.world.objects[ObjectHandle(4_112)] != nil, time < 10 {
+            time += 0.1
+            _ = simulation.update(
+                at: time,
+                input: .init(firesSecondaryWeapon: true)
+            )
+        }
+        XCTAssertNil(simulation.world.objects[ObjectHandle(4_112)])
+        XCTAssertEqual(simulation.world.playerScore, 200)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script036Count, 1)
+        XCTAssertEqual(simulation.galleryMarkerLightDistance, 50)
+        for portalIndex in barrier.orderedPortalIndices {
+            XCTAssertEqual(
+                simulation.world.rooms[barrierRoom].portalFlags[portalIndex]
+                    & LevelPortal.renderFacesFlag,
+                0
+            )
+            let portal = level.rooms[barrierRoom].portals[portalIndex]
+            let connected = try XCTUnwrap(level.rooms.firstIndex {
+                $0.sourceIndex == portal.connectedRoom
+            })
+            XCTAssertEqual(
+                simulation.world.rooms[connected]
+                    .portalFlags[portal.connectedPortal]
+                    & LevelPortal.renderFacesFlag,
+                0
+            )
+        }
+        for _ in 0..<30 {
+            time += 0.1
+            _ = simulation.update(at: time, input: .zero)
+        }
+        XCTAssertEqual(simulation.world.testTrainingMission?.script029Count, 1)
+        XCTAssertNoThrow(try simulation.world.validate(against: level))
+    }
+
     @MainActor
-    func testHeldPrimaryFirePublishesUntilReleaseAndKeepsScheduledCadence()
+    func testHeldPrimaryFirePublishesUntilRelease()
         throws
     {
         var playerInput = PlayerInputState(rampDuration: 0)
@@ -821,151 +357,6 @@ extension WorldRenderingTests {
         XCTAssertEqual(
             heldChanges,
             [true, false, true, false, true, false]
-        )
-
-        var level = makeTrainingRobotGuidebotLevel()
-        let player = try XCTUnwrap(
-            level.objects.first {
-                $0.handle == level.defaultPlayerBinding?.objectHandle
-            }
-        )
-        let robotIndex = try XCTUnwrap(
-            level.objects.firstIndex { $0.handle == 4_112 }
-        )
-        level.objects[robotIndex].position = .init(
-            x: player.position.x - player.orientation.forward.x * 100,
-            y: player.position.y - player.orientation.forward.y * 100,
-            z: player.position.z - player.orientation.forward.z * 100
-        )
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0,
-            authoritativeRandomSeed: 0x1234_5678
-        )
-
-        var frame = simulation.update(
-            at: 0.01,
-            input: .init(yaw: 1, firesPrimaryWeapon: true)
-        )
-        let initialPosition = player.position
-        XCTAssertNotEqual(
-            frame.playerView.camera.target,
-            Vector3(
-                x: initialPosition.x + player.orientation.forward.x,
-                y: initialPosition.y + player.orientation.forward.y,
-                z: initialPosition.z + player.orientation.forward.z
-            )
-        )
-        XCTAssertEqual(simulation.energy, 99.85, accuracy: 0.000_01)
-        var continuationObject = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        var guidebotState = try XCTUnwrap(
-            continuationObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        let firstProjectiles = try XCTUnwrap(
-            guidebotState["projectiles"] as? [[String: Any]]
-        )
-        XCTAssertEqual(firstProjectiles.count, 2)
-        let firstVolleyPositions = try firstProjectiles.map { projectile in
-            let position = try XCTUnwrap(
-                projectile["position"] as? [String: Any]
-            )
-            return Vector3(
-                x: Float(try XCTUnwrap(position["x"] as? Double)),
-                y: Float(try XCTUnwrap(position["y"] as? Double)),
-                z: Float(try XCTUnwrap(position["z"] as? Double))
-            )
-        }
-        let gunpoints = try XCTUnwrap(
-            level.trainingRobotGuidebotChain?.combat.gunpoints
-        )
-        let projectileAdvance = try XCTUnwrap(
-            level.trainingRobotGuidebotChain?.combat.projectileSpeed
-        ) * 0.1
-        let expectedPositions = gunpoints.map { gunpoint in
-            Vector3(
-                x: initialPosition.x
-                    + player.orientation.right.x * gunpoint.x
-                    + player.orientation.up.x * gunpoint.y
-                    + player.orientation.forward.x
-                        * (
-                            gunpoint.z + projectileAdvance
-                        ),
-                y: initialPosition.y
-                    + player.orientation.right.y * gunpoint.x
-                    + player.orientation.up.y * gunpoint.y
-                    + player.orientation.forward.y
-                        * (
-                            gunpoint.z + projectileAdvance
-                        ),
-                z: initialPosition.z
-                    + player.orientation.right.z * gunpoint.x
-                    + player.orientation.up.z * gunpoint.y
-                    + player.orientation.forward.z
-                        * (
-                            gunpoint.z + projectileAdvance
-                        )
-            )
-        }
-        XCTAssertEqual(firstVolleyPositions, expectedPositions)
-
-        frame = simulation.update(
-            at: 0.257,
-            input: .init(firesPrimaryWeapon: true)
-        )
-        XCTAssertEqual(simulation.energy, 99.85, accuracy: 0.000_01)
-        frame = simulation.update(
-            at: 0.267,
-            input: .init(firesPrimaryWeapon: true)
-        )
-        XCTAssertEqual(simulation.energy, 99.7, accuracy: 0.000_01)
-
-        continuationObject = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        guidebotState = try XCTUnwrap(
-            continuationObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(
-                guidebotState["projectiles"] as? [[String: Any]]
-            ).count,
-            4
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(
-                guidebotState["nextPrimaryFireTime"] as? Double
-            ),
-            0.5,
-            accuracy: 0.000_000_1
-        )
-        XCTAssertEqual(
-            continuationObject["authoritativeRandomState"] as? Int,
-            Int(0x1234_5678)
-        )
-
-        _ = simulation.update(at: 9, input: .zero)
-        _ = simulation.update(at: 9.016, input: .zero)
-        frame = simulation.update(
-            at: 9.032,
-            input: .init(firesPrimaryWeapon: true)
-        )
-        XCTAssertEqual(simulation.energy, 99.55, accuracy: 0.000_01)
-        let rebasedObject = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        let rebasedGuidebot = try XCTUnwrap(
-            rebasedObject["trainingRobotGuidebotState"] as? [String: Any]
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(
-                rebasedGuidebot["nextPrimaryFireTime"] as? Double
-            ),
-            9.266,
-            accuracy: 0.000_001
         )
 
         XCTAssertFalse(
@@ -1652,89 +1043,4 @@ extension WorldRenderingTests {
         XCTAssertFalse(capacityPlan.draws.isEmpty)
     }
 
-    func testConcussionKillOfDestroyRobotOpensGalleryBarrier() throws {
-        // A real concussion missile kills DestroyBot2 (4112). The kill opens
-        // the gallery barrier portals and their reciprocals, as the
-        // double-sided aPortalRenderSet does (DallasFuncs.cpp:1098).
-        var level = try makePlayerConcussionLevel()
-        // The room graph must be reciprocal, as Level.validate requires
-        // (invalidPortal, nonreciprocalPortal).
-        for room in level.rooms {
-            for (portalIndex, portal) in room.portals.enumerated() {
-                let connected = try XCTUnwrap(level.rooms.first {
-                    $0.sourceIndex == portal.connectedRoom
-                })
-                XCTAssertTrue(
-                    connected.portals.indices.contains(portal.connectedPortal),
-                    "room \(room.sourceIndex) portal \(portalIndex)"
-                )
-                guard connected.portals.indices.contains(
-                    portal.connectedPortal
-                ) else { continue }
-                let inverse = connected.portals[portal.connectedPortal]
-                XCTAssertEqual(inverse.connectedRoom, room.sourceIndex)
-                XCTAssertEqual(inverse.connectedPortal, portalIndex)
-            }
-        }
-        let player = try XCTUnwrap(level.objects.first {
-            $0.handle == level.defaultPlayerBinding?.objectHandle
-        })
-        let robotIndex = try XCTUnwrap(level.objects.firstIndex {
-            $0.handle == 4_112
-        })
-        level.objects[robotIndex].position = .init(
-            x: player.position.x + player.orientation.forward.x * 15,
-            y: player.position.y + player.orientation.forward.y * 15,
-            z: player.position.z + player.orientation.forward.z * 15
-        )
-        level.objects[robotIndex].location = player.location
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0,
-            authoritativeRandomSeed: 0x1234_5678
-        )
-        // One direct hit (9) kills it. The shockwave pushes the robot off
-        // the line of fire, so later missiles would miss.
-        simulation.world.trainingRobotGuidebotState?.robotShields = 5
-
-        var time: Double = 0
-        while simulation.world.trainingRobotGuidebotState?.robotWasDestroyed
-            == false, time < 10
-        {
-            time += 0.1
-            _ = simulation.update(
-                at: time,
-                input: .init(firesSecondaryWeapon: true)
-            )
-        }
-        XCTAssertEqual(
-            simulation.world.trainingRobotGuidebotState?.robotWasDestroyed,
-            true
-        )
-        for _ in 0..<30 {
-            time += 0.1
-            _ = simulation.update(at: time, input: .zero)
-        }
-
-        let barrier = try XCTUnwrap(level.trainingGalleryBarrier)
-        let roomIndex = try XCTUnwrap(level.rooms.firstIndex {
-            $0.sourceIndex == barrier.barrierRoomSourceIndex
-        })
-        for portalIndex in barrier.orderedPortalIndices {
-            XCTAssertEqual(
-                simulation.world.rooms[roomIndex].portalFlags[portalIndex] & 1,
-                0
-            )
-            let portal = level.rooms[roomIndex].portals[portalIndex]
-            let connectedIndex = try XCTUnwrap(level.rooms.firstIndex {
-                $0.sourceIndex == portal.connectedRoom
-            })
-            XCTAssertEqual(
-                simulation.world.rooms[connectedIndex]
-                    .portalFlags[portal.connectedPortal] & 1,
-                0
-            )
-        }
-        XCTAssertNoThrow(try simulation.world.validate(against: level))
-    }
 }

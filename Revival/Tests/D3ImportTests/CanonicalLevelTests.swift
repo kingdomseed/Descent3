@@ -2278,18 +2278,9 @@ func replacing(
     shipDefinitions: [CanonicalShipDefinition]? = nil,
     defaultPlayerBinding: DefaultPlayerBinding? = nil,
     objectPresentations: [ObjectPresentationReference]? = nil,
-    trainingFollowBotDestruction: TrainingFollowBotDestructionHandoff? = nil,
     trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
     trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
     trainingCameraMonitorChain: TrainingCameraMonitorChain? = nil,
-    trainingRASBot1DeathChain: TrainingRASBot1DeathChain? = nil,
-    trainingRASBot2DeathChain: TrainingRASBot2DeathChain? = nil,
-    trainingRASBot3DeathChain: TrainingRASBot3DeathChain? = nil,
-    trainingRASBot4DeathChain: TrainingRASBot4DeathChain? = nil,
-    trainingLastBot1DeathChain: TrainingLastBot1DeathChain? = nil,
-    trainingLastBot3DeathChain: TrainingLastBot3DeathChain? = nil,
-    trainingLastBot4DeathChain: TrainingLastBot4DeathChain? = nil,
-    trainingLastBot5DeathChain: TrainingLastBot5DeathChain? = nil,
     trainingInvulnerabilityPickupChain:
         TrainingInvulnerabilityPickupChain? = nil,
     trainingCloakPickupChain: TrainingCloakPickupChain? = nil,
@@ -2334,24 +2325,12 @@ func replacing(
         shipDefinitions: shipDefinitions ?? level.shipDefinitions,
         defaultPlayerBinding: defaultPlayerBinding ?? level.defaultPlayerBinding,
         objectPresentations: objectPresentations ?? level.objectPresentations,
-        trainingFollowBotDestruction:
-            trainingFollowBotDestruction ?? level.trainingFollowBotDestruction,
         trainingGalleryBarrier:
             trainingGalleryBarrier ?? level.trainingGalleryBarrier,
         trainingRobotGuidebotChain:
             trainingRobotGuidebotChain ?? level.trainingRobotGuidebotChain,
         trainingCameraMonitorChain:
             trainingCameraMonitorChain ?? level.trainingCameraMonitorChain,
-        trainingRASBot1DeathChain:
-            trainingRASBot1DeathChain ?? level.trainingRASBot1DeathChain,
-        trainingRASBot2DeathChain:
-            trainingRASBot2DeathChain ?? level.trainingRASBot2DeathChain,
-        trainingRASBot3DeathChain:
-            trainingRASBot3DeathChain ?? level.trainingRASBot3DeathChain,
-        trainingRASBot4DeathChain:
-            trainingRASBot4DeathChain ?? level.trainingRASBot4DeathChain,
-        trainingLastBot1DeathChain:
-            trainingLastBot1DeathChain ?? level.trainingLastBot1DeathChain,
         trainingInvulnerabilityPickupChain:
             trainingInvulnerabilityPickupChain
             ?? level.trainingInvulnerabilityPickupChain,
@@ -2373,14 +2352,6 @@ func replacing(
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
         sourceChunks: sourceChunks ?? level.sourceChunks
     )
-    replaced.trainingLastBot2DeathChain =
-        level.trainingLastBot2DeathChain
-    replaced.trainingLastBot3DeathChain =
-        trainingLastBot3DeathChain ?? level.trainingLastBot3DeathChain
-    replaced.trainingLastBot4DeathChain =
-        trainingLastBot4DeathChain ?? level.trainingLastBot4DeathChain
-    replaced.trainingLastBot5DeathChain =
-        trainingLastBot5DeathChain ?? level.trainingLastBot5DeathChain
     replaced.trainingFinalBotsCompletionChain =
         trainingFinalBotsCompletionChain
         ?? level.trainingFinalBotsCompletionChain

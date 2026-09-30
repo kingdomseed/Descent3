@@ -54,7 +54,10 @@ struct ObjectTable: Codable, Equatable, Sendable {
                 location: placed.location,
                 position: placed.position,
                 orientation: placed.orientation,
-                flags: placed.flags
+                // ReadObject keeps only OBJECT_SAVE_LOAD_FLAGS
+                // (OF_OUTSIDE_MINE) of the stored flags (LoadLevel.cpp:1660);
+                // ObjInit sets the rest (GameWorld.objInitPlacedObjects).
+                flags: placed.flags & GameObject.outsideMineFlag
             )
         }
         resetFreeSlots()

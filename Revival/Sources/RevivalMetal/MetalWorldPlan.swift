@@ -123,16 +123,10 @@ private func makeMetalWorldPlan(
     let preparedWeaponObjectDraws =
         extractPreparedWeaponObjectDrawItems(level)
         .map(makeMetalWorldDraw)
-    let preparedBlueLaserDraws =
-        extractPreparedTrainingBlueLaserDrawItems(level)
-        .map(makeMetalWorldDraw)
-    let preparedConcussionMissileDraws =
-        extractPreparedPlayerConcussionMissileDrawItems(level)
-        .map(makeMetalWorldDraw)
-    let preparedConcussionExplosionDraws =
-        makePreparedPlayerConcussionExplosionDraws(level)
-    let preparedConcussionSparkDraws =
-        makePreparedPlayerConcussionSparkDraws(level)
+    let preparedExplosionDraws =
+        makePreparedVisEffectExplosionDraws(level)
+    let preparedLineSparkDraws =
+        makePreparedVisEffectLineSparkDraws(level)
     let preparedYellowFlareDraws =
         extractPreparedTrainingGuidebotYellowFlareDrawItems(level)
         .map(makeMetalWorldDraw)
@@ -170,10 +164,8 @@ private func makeMetalWorldPlan(
         + preparedObjectDraws
         + preparedObjectDraws
         + preparedWeaponObjectDraws
-        + preparedBlueLaserDraws
-        + preparedConcussionMissileDraws
-        + preparedConcussionExplosionDraws
-        + preparedConcussionSparkDraws
+        + preparedExplosionDraws
+        + preparedLineSparkDraws
         + preparedYellowFlareDraws
         + preparedYellowFlareParticleDraws
         + preparedYellowFlareTimeoutExplosionDraws
@@ -216,11 +208,8 @@ func updateMetalWorldPlan(
     presentationFrame: MetalPresentationFrame? = nil,
     trainingCameraMonitor: TrainingCameraMonitorFrame? = nil,
     trainingCloak: TrainingCloakFrame? = nil,
-    trainingPrimaryProjectiles:
-        [TrainingBlueLaserProjectileFrame] = [],
-    playerConcussionMissiles: [PlayerConcussionMissileFrame] = [],
-    playerConcussionExplosions: [PlayerConcussionExplosionFrame] = [],
-    playerConcussionSparks: [PlayerConcussionSparkFrame] = [],
+    visEffectExplosions: [VisEffectExplosionFrame] = [],
+    visEffectLineSparks: [VisEffectLineSparkFrame] = [],
     trainingGuidebotYellowFlares:
         [TrainingGuidebotYellowFlareFrame] = [],
     trainingGuidebotYellowFlareParticles:
@@ -232,8 +221,6 @@ func updateMetalWorldPlan(
     trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame] = [],
     trainingGuidebotReturnMarkerLightDistance: Float? = nil,
-    trainingLastRoomMarkerLightDistance: Float? = nil,
-    trainingFinalBotsMarkerLightDistance: Float? = nil,
     playerFastHeadlight: PlayerFastHeadlightFrame? = nil
 ) throws -> MetalWorldPlan {
     try updateMetalWorldPlan(
@@ -247,11 +234,8 @@ func updateMetalWorldPlan(
         presentationFrame: presentationFrame,
         trainingCameraMonitor: trainingCameraMonitor,
         trainingCloak: trainingCloak,
-        trainingPrimaryProjectiles:
-            trainingPrimaryProjectiles,
-        playerConcussionMissiles: playerConcussionMissiles,
-        playerConcussionExplosions: playerConcussionExplosions,
-        playerConcussionSparks: playerConcussionSparks,
+        visEffectExplosions: visEffectExplosions,
+        visEffectLineSparks: visEffectLineSparks,
         trainingGuidebotYellowFlares:
             trainingGuidebotYellowFlares,
         trainingGuidebotYellowFlareParticles:
@@ -264,10 +248,6 @@ func updateMetalWorldPlan(
             trainingGuidebotYellowFlareTimeoutSparkParticles,
         trainingGuidebotReturnMarkerLightDistance:
             trainingGuidebotReturnMarkerLightDistance,
-        trainingLastRoomMarkerLightDistance:
-            trainingLastRoomMarkerLightDistance,
-        trainingFinalBotsMarkerLightDistance:
-            trainingFinalBotsMarkerLightDistance,
         playerFastHeadlight: playerFastHeadlight
     )
 }
@@ -307,10 +287,8 @@ func updateMetalWorldPlan(
         ),
         trainingCameraMonitor: frame.trainingCameraMonitor,
         trainingCloak: frame.trainingCloak,
-        trainingPrimaryProjectiles: frame.trainingPrimaryProjectiles,
-        playerConcussionMissiles: frame.playerConcussionMissiles,
-        playerConcussionExplosions: frame.playerConcussionExplosions,
-        playerConcussionSparks: frame.playerConcussionSparks,
+        visEffectExplosions: frame.visEffectExplosions,
+        visEffectLineSparks: frame.visEffectLineSparks,
         trainingGuidebotYellowFlares: frame.trainingGuidebotYellowFlares,
         trainingGuidebotYellowFlareParticles:
             frame.trainingGuidebotYellowFlareParticles,
@@ -322,10 +300,6 @@ func updateMetalWorldPlan(
             frame.trainingGuidebotYellowFlareTimeoutSparkParticles,
         trainingGuidebotReturnMarkerLightDistance:
             frame.trainingGuidebotReturnMarkerLightDistance,
-        trainingLastRoomMarkerLightDistance:
-            frame.trainingLastRoomMarkerLightDistance,
-        trainingFinalBotsMarkerLightDistance:
-            frame.trainingFinalBotsMarkerLightDistance,
         playerFastHeadlight: frame.playerFastHeadlight
     )
 }
@@ -346,18 +320,14 @@ func updateMetalWorldPlan(
         presentationFrame: presentationFrame,
         trainingCameraMonitor: nil,
         trainingCloak: nil,
-        trainingPrimaryProjectiles: [],
-        playerConcussionMissiles: [],
-        playerConcussionExplosions: [],
-        playerConcussionSparks: [],
+        visEffectExplosions: [],
+        visEffectLineSparks: [],
         trainingGuidebotYellowFlares: [],
         trainingGuidebotYellowFlareParticles: [],
         trainingGuidebotYellowFlareTimeoutExplosions: [],
         trainingGuidebotYellowFlareTimeoutSparks: [],
         trainingGuidebotYellowFlareTimeoutSparkParticles: [],
         trainingGuidebotReturnMarkerLightDistance: nil,
-        trainingLastRoomMarkerLightDistance: nil,
-        trainingFinalBotsMarkerLightDistance: nil,
         playerFastHeadlight: nil
     )
 }
@@ -373,11 +343,8 @@ private func updateMetalWorldPlan(
     presentationFrame: MetalPresentationFrame?,
     trainingCameraMonitor: TrainingCameraMonitorFrame?,
     trainingCloak: TrainingCloakFrame?,
-    trainingPrimaryProjectiles:
-        [TrainingBlueLaserProjectileFrame],
-    playerConcussionMissiles: [PlayerConcussionMissileFrame],
-    playerConcussionExplosions: [PlayerConcussionExplosionFrame],
-    playerConcussionSparks: [PlayerConcussionSparkFrame],
+    visEffectExplosions: [VisEffectExplosionFrame],
+    visEffectLineSparks: [VisEffectLineSparkFrame],
     trainingGuidebotYellowFlares:
         [TrainingGuidebotYellowFlareFrame],
     trainingGuidebotYellowFlareParticles:
@@ -389,8 +356,6 @@ private func updateMetalWorldPlan(
     trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame],
     trainingGuidebotReturnMarkerLightDistance: Float?,
-    trainingLastRoomMarkerLightDistance: Float?,
-    trainingFinalBotsMarkerLightDistance: Float?,
     playerFastHeadlight: PlayerFastHeadlightFrame?
 ) throws -> MetalWorldPlan {
     let extraction = try extractWorldForRendering(
@@ -412,26 +377,14 @@ private func updateMetalWorldPlan(
             objects: objects,
             camera: camera
         ).map(makeMetalWorldDraw)
-    let blueLaserDraws =
-        extractTrainingBlueLaserDrawItems(
+    let explosionDraws =
+        makeVisEffectExplosionDraws(
             level,
-            projectiles: trainingPrimaryProjectiles,
-            camera: camera
-        ).map(makeMetalWorldDraw)
-    let concussionMissileDraws =
-        extractPlayerConcussionMissileDrawItems(
-            level,
-            missiles: playerConcussionMissiles,
-            camera: camera
-        ).map(makeMetalWorldDraw)
-    let concussionExplosionDraws =
-        makePlayerConcussionExplosionDraws(
-            level,
-            explosions: playerConcussionExplosions,
+            explosions: visEffectExplosions,
             camera: camera
         )
-    let concussionSparkDraws = makePlayerConcussionSparkDraws(
-        playerConcussionSparks,
+    let lineSparkDraws = makeVisEffectLineSparkDraws(
+        visEffectLineSparks,
         camera: camera
     )
     let yellowFlareDraws =
@@ -509,18 +462,10 @@ private func updateMetalWorldPlan(
     let weaponObjectIndices = weaponObjectDraws.map {
         objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
     }
-    let blueLaserIndices = blueLaserDraws.map {
-        objectIndicesByIdentity[
-            MetalModelDrawIdentity($0)
-        ]!.first!.offset
-    }
-    let concussionMissileIndices = concussionMissileDraws.map {
+    let explosionIndices = explosionDraws.map {
         objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
     }
-    let concussionExplosionIndices = concussionExplosionDraws.map {
-        objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
-    }
-    let concussionSparkIndices = concussionSparkDraws.map {
+    let lineSparkIndices = lineSparkDraws.map {
         objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
     }
     let yellowFlareIndices = yellowFlareDraws.map {
@@ -557,9 +502,9 @@ private func updateMetalWorldPlan(
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
     let activeDrawIndices = opaqueIndices + objectIndices
-        + weaponObjectIndices + blueLaserIndices
-        + concussionMissileIndices + concussionExplosionIndices
-        + concussionSparkIndices
+        + weaponObjectIndices
+        + explosionIndices
+        + lineSparkIndices
         + yellowFlareIndices + yellowFlareParticleIndices
         + yellowFlareTimeoutExplosionIndices
         + yellowFlareTimeoutSparkIndices
@@ -631,12 +576,6 @@ private func updateMetalWorldPlan(
         updatedPreparedDraws[index] = draw
     }
     for (index, draw) in zip(
-        blueLaserIndices,
-        blueLaserDraws
-    ) {
-        updatedPreparedDraws[index] = draw
-    }
-    for (index, draw) in zip(
         yellowFlareIndices,
         yellowFlareDraws
     ) {
@@ -669,16 +608,10 @@ private func updateMetalWorldPlan(
     for (index, draw) in zip(translucentIndices, translucentRoomDraws) {
         updatedPreparedDraws[index] = draw
     }
-    for (index, draw) in zip(concussionMissileIndices, concussionMissileDraws) {
+    for (index, draw) in zip(explosionIndices, explosionDraws) {
         updatedPreparedDraws[index] = draw
     }
-    for (index, draw) in zip(
-        concussionExplosionIndices,
-        concussionExplosionDraws
-    ) {
-        updatedPreparedDraws[index] = draw
-    }
-    for (index, draw) in zip(concussionSparkIndices, concussionSparkDraws) {
+    for (index, draw) in zip(lineSparkIndices, lineSparkDraws) {
         updatedPreparedDraws[index] = draw
     }
     for (index, draw) in zip(auxiliaryObjectIndices, auxiliaryObjects) {
@@ -761,52 +694,6 @@ private func updateMetalWorldPlan(
             }
         }
     }
-    if let distance = trainingLastRoomMarkerLightDistance,
-       distance > 0,
-       let chain = level.trainingLastRoomChain,
-       let marker = objects[ObjectHandle(chain.markerLightObjectHandle)],
-       let gameTime = presentationFrame?.systemsGameTime {
-        let light = sourceObjectLight(
-            chain.markerLightPresentation,
-            gameTime: gameTime
-        )
-        if light.distanceScale > 0 {
-            for index in Set(
-                activeDrawIndices + auxiliaryActiveDrawIndices
-            ) {
-                updatedPreparedDraws[index] =
-                    applyingObjectLight(
-                        to: updatedPreparedDraws[index],
-                        position: marker.position,
-                        distance: distance * light.distanceScale,
-                        color: light.color
-                    )
-            }
-        }
-    }
-    if let distance = trainingFinalBotsMarkerLightDistance,
-       distance > 0,
-       let chain = level.trainingFinalBotsCompletionChain,
-       let marker = objects[ObjectHandle(chain.markerLightObjectHandle)],
-       let gameTime = presentationFrame?.systemsGameTime {
-        let light = sourceObjectLight(
-            chain.markerLightPresentation,
-            gameTime: gameTime
-        )
-        if light.distanceScale > 0 {
-            for index in Set(
-                activeDrawIndices + auxiliaryActiveDrawIndices
-            ) {
-                updatedPreparedDraws[index] =
-                    applyingObjectLight(
-                        to: updatedPreparedDraws[index],
-                        position: marker.position,
-                        distance: distance * light.distanceScale,
-                        color: light.color
-                    )
-            }
-        }
-    }
     if let headlight = playerFastHeadlight,
        headlight.lightDistance > 0 {
         for index in Set(
@@ -839,17 +726,26 @@ private func updateMetalWorldPlan(
                 )
         }
     }
-    for missile in playerConcussionMissiles where missile.lightDistance > 0 {
+    // A flying weapon's page light (lighting_info), at its distance and
+    // primary color.
+    for object in objects where object.type == .weapon {
+        guard let index = object.weapon,
+              let weapon = level.weapons?[index],
+              let distance = weapon.lightDistance, distance > 0,
+              let lighting = weapon.lighting
+        else {
+            continue
+        }
         let color = SIMD3<Float>(
-            missile.lightPresentation.primaryColor.x,
-            missile.lightPresentation.primaryColor.y,
-            missile.lightPresentation.primaryColor.z
+            lighting.primaryColor.x,
+            lighting.primaryColor.y,
+            lighting.primaryColor.z
         )
-        for index in Set(activeDrawIndices + auxiliaryActiveDrawIndices) {
-            updatedPreparedDraws[index] = applyingObjectLight(
-                to: updatedPreparedDraws[index],
-                position: missile.position,
-                distance: missile.lightDistance,
+        for drawIndex in Set(activeDrawIndices + auxiliaryActiveDrawIndices) {
+            updatedPreparedDraws[drawIndex] = applyingObjectLight(
+                to: updatedPreparedDraws[drawIndex],
+                position: object.position,
+                distance: distance,
                 color: color
             )
         }
@@ -1533,41 +1429,53 @@ private func makeTrainingGuidebotYellowFlareParticleDraws(
 }
 
 
-private func makePreparedPlayerConcussionExplosionDraws(
+/// The explosion textures of every weapon in the level, in weapon order,
+/// each once.
+private func weaponExplosionTextures(_ level: Level) -> [SourceResource] {
+    var textures: [SourceResource] = []
+    for weapon in level.weapons ?? [] {
+        for texture in weapon.explosion?.frames ?? []
+        where !textures.contains(texture) {
+            textures.append(texture)
+        }
+    }
+    return textures
+}
+
+private func makePreparedVisEffectExplosionDraws(
     _ level: Level
 ) -> [MetalWorldDraw] {
-    guard let binding = level.shipDefinitions.first?.playerConcussion,
-          let player = level.objects.first(where: {
+    guard let player = level.objects.first(where: {
               $0.handle == level.defaultPlayerBinding?.objectHandle
           }),
           case let .room(roomSourceIndex) = player.location else {
         return []
     }
-    return binding.explosionFrames.flatMap { texture in
+    return weaponExplosionTextures(level).flatMap { texture in
         makeTrainingGuidebotYellowFlareQuadDraws(
             level,
-            particles: (0..<playerConcussionExplosionPresentationCapacity)
+            particles: (0..<visEffectExplosionPresentationCapacity)
                 .map { _ in .init(
                     roomSourceIndex: roomSourceIndex,
                     position: player.position,
-                    size: binding.explosionSize,
-                    lifeRemaining: binding.explosionLifetime,
-                    lifetime: binding.explosionLifetime,
-                    sourceSize: binding.explosionSize,
-                    sourceLifetime: binding.explosionLifetime,
+                    size: 1,
+                    lifeRemaining: 1,
+                    lifetime: 1,
+                    sourceSize: 1,
+                    sourceLifetime: 1,
                     texture: texture,
                     opacity: 1
                 ) },
             camera: .trainingRoom3,
-            capacity: playerConcussionExplosionPresentationCapacity,
+            capacity: visEffectExplosionPresentationCapacity,
             handleBase: UInt32.max - 7_000
         )
     }
 }
 
-private func makePlayerConcussionExplosionDraws(
+private func makeVisEffectExplosionDraws(
     _ level: Level,
-    explosions: [PlayerConcussionExplosionFrame],
+    explosions: [VisEffectExplosionFrame],
     camera: RoomCamera
 ) -> [MetalWorldDraw] {
     makeTrainingGuidebotYellowFlareQuadDraws(
@@ -1584,23 +1492,23 @@ private func makePlayerConcussionExplosionDraws(
             opacity: 1
         ) },
         camera: camera,
-        capacity: playerConcussionExplosionPresentationCapacity,
+        capacity: visEffectExplosionPresentationCapacity,
         handleBase: UInt32.max - 7_000
     )
 }
 
-private func makePreparedPlayerConcussionSparkDraws(
+private func makePreparedVisEffectLineSparkDraws(
     _ level: Level
 ) -> [MetalWorldDraw] {
-    guard level.shipDefinitions.first?.playerConcussion != nil,
+    guard !(level.weapons ?? []).isEmpty,
           let player = level.objects.first(where: {
               $0.handle == level.defaultPlayerBinding?.objectHandle
           }),
           case let .room(roomSourceIndex) = player.location else {
         return []
     }
-    return makePlayerConcussionSparkDraws(
-        (0..<playerConcussionSparkPresentationCapacity).map { _ in .init(
+    return makeVisEffectLineSparkDraws(
+        (0..<visEffectLineSparkPresentationCapacity).map { _ in .init(
             roomSourceIndex: roomSourceIndex,
             start: player.position,
             end: added(player.position, player.orientation.right)
@@ -1609,11 +1517,11 @@ private func makePreparedPlayerConcussionSparkDraws(
     )
 }
 
-private func makePlayerConcussionSparkDraws(
-    _ sparks: [PlayerConcussionSparkFrame],
+private func makeVisEffectLineSparkDraws(
+    _ sparks: [VisEffectLineSparkFrame],
     camera: RoomCamera
 ) -> [MetalWorldDraw] {
-    precondition(sparks.count <= playerConcussionSparkPresentationCapacity)
+    precondition(sparks.count <= visEffectLineSparkPresentationCapacity)
     let cameraForward = normalized(subtract(camera.target, camera.position))
     return sparks.enumerated().map { slot, spark in
         let line = normalized(subtract(spark.end, spark.start))

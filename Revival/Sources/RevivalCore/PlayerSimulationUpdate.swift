@@ -60,8 +60,11 @@ extension GameSession {
         let binding = level.defaultPlayerBinding!
         let playerHandle = ObjectHandle(binding.objectHandle)
         var object = world.objects[playerHandle]!
+        // A dying or dead player has CT_NONE (StartPlayerDeath,
+        // Player.cpp:2191), so its controls do nothing.
         let controlsAreSuspended =
             trainingFinalGoalState?.endLevelWasRequested == true
+                || world.playerDeath != nil
         let currentEnabledControls = controlsAreSuspended
             ? PlayerControlMask(rawValue: 0)
             : trainingPlayerControlMask(
@@ -76,7 +79,6 @@ extension GameSession {
             ? InputSnapshot.zero
             : input.applying(currentEnabledControls)
         var playerHeadlightFeedback: TrainingOpeningFeedback?
-        var playerConcussionFeedback: [TrainingOpeningFeedback] = []
         if input.togglesHeadlight {
             playerHeadlightIsOn.toggle()
             playerHeadlightFeedback = TrainingOpeningFeedback(
@@ -148,21 +150,23 @@ extension GameSession {
         // it.
         world.aiFrameAll(level: level)
         world.objDoFrameSlots(0..<playerHandle.slot, level: level)
-        let combatResult = advanceTrainingCombat(
-            input: input,
-            object: object,
-            ship: ship,
-            startRoom: startRoom,
-            systemsFrameDuration: systemsFrameDuration,
-            systemsGameTime: systemsGameTime,
-            playerConcussionFeedback: &playerConcussionFeedback
+        // The player's ObjDoFrame fires its weapons before it moves
+        // (object.cpp:2431-2436).
+        world.fireWeaponFromPlayer(
+            playerHandle,
+            weaponType: PlayerWeaponState.primary,
+            isDown: input.firesPrimaryWeapon,
+            downTime: input.firesPrimaryWeapon ? systemsFrameDuration : 0,
+            level: level
         )
-        let followBotTimer11StartedThisFrame =
-            combatResult.followBotTimer11StartedThisFrame
-        let destroyBot2PathStartedThisFrame =
-            combatResult.destroyBot2PathStartedThisFrame
-        let destructionTimer12StartedThisFrame =
-            combatResult.destructionTimer12StartedThisFrame
+        world.fireWeaponFromPlayer(
+            playerHandle,
+            weaponType: PlayerWeaponState.secondary,
+            isDown: input.firesSecondaryWeapon,
+            downTime: input.firesSecondaryWeapon ? systemsFrameDuration : 0,
+            level: level
+        )
+        object = world.objects[playerHandle]!
         let playerFlareFeedback = input.firesPlayerFlare
             ? firePlayerYellowFlare(
                 from: object,
@@ -315,7 +319,7 @@ extension GameSession {
                     in: level,
                     objects: world.objects,
                     state: trainingFinalGoalState,
-                    finalBotsState: trainingFinalBotsCompletionState,
+                    world: world,
                     playerStart: traceStart,
                     playerEnd: trace.finalPosition,
                     playerRadius: view.collisionRadius,
@@ -444,7 +448,7 @@ extension GameSession {
                     in: level,
                     objects: world.objects,
                     state: trainingFinalGoalState,
-                    finalBotsState: trainingFinalBotsCompletionState,
+                    world: world,
                     playerStart: traceStart,
                     playerEnd: trace.finalPosition,
                     playerRadius: view.collisionRadius,
@@ -558,7 +562,7 @@ extension GameSession {
             (playerHandle.slot + 1)..<ObjectTable.capacity,
             level: level
         )
-        world.objDeleteDead()
+        world.objDoFrameAllTail(level: level)
         let playerFastHeadlight = playerHeadlightIsOn
             ? fastPlayerHeadlight(from: world.objects[playerHandle]!)
             : nil
@@ -577,9 +581,6 @@ extension GameSession {
         )
         guidebotEnteredShipThisFrame =
             guidebotAdvanceEvent == .enteredShip
-        if destroyBot2PathStartedThisFrame {
-            startTrainingDestroyBot2Path()
-        }
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
         if let playerHeadlightFeedback {
@@ -591,7 +592,6 @@ extension GameSession {
         if let guidebotActiveGoalFeedback {
             trainingOpeningFeedback.append(guidebotActiveGoalFeedback)
         }
-        trainingOpeningFeedback.append(contentsOf: playerConcussionFeedback)
         if let playerFlareFeedback {
             trainingOpeningFeedback.append(playerFlareFeedback)
         }
@@ -616,14 +616,6 @@ extension GameSession {
            ) {
             trainingOpeningFeedback.append(greeting)
         }
-        advanceTrainingFollowBotDestructionTimer(
-            systemsFrameDuration: systemsFrameDuration,
-            followBotTimer11StartedThisFrame:
-                followBotTimer11StartedThisFrame,
-            trainingOpeningFeedback: &trainingOpeningFeedback
-        )
-        var trainingLastRoomWasTriggeredThisFrame = false
-        var trainingFinalBotsWasTriggeredThisFrame = false
         if trainingFinalGoalWasHitThisFrame,
            var state = trainingFinalGoalState,
            !state.endLevelWasRequested {
@@ -692,40 +684,6 @@ extension GameSession {
                 ))
             }
             trainingCloakPickupState = state
-        }
-        if var state = trainingLastRoomState,
-            !state.wasTriggered,
-            trainingRASBot1DeathState?.wasDestroyed == true,
-            trainingRASBot2DeathState?.wasDestroyed == true,
-            trainingRASBot3DeathState?.wasDestroyed == true,
-            trainingRASBot4DeathState?.wasDestroyed == true,
-            trainingInvulnerabilityPickupState?.scriptWasTriggered == true,
-            trainingCloakPickupState?.scriptWasTriggered == true,
-            let chain = level.trainingLastRoomChain
-        {
-            state.wasTriggered = true
-            state.markerLightDistance = chain.openMarkerLightDistance
-            state.timerRemaining = chain.timerDuration
-            trainingLastRoomState = state
-            trainingLastRoomWasTriggeredThisFrame = true
-            openTrainingLastRoomBarrier(in: &world, level: level)
-        }
-        if var state = trainingFinalBotsCompletionState,
-            !state.wasTriggered,
-            trainingLastBot1DeathState?.wasDestroyed == true,
-            trainingLastBot2DeathState?.wasDestroyed == true,
-            trainingLastBot3DeathState?.wasDestroyed == true,
-            trainingLastBot4DeathState?.wasDestroyed == true,
-            trainingLastBot5DeathState?.wasDestroyed == true,
-            let chain = level.trainingFinalBotsCompletionChain
-        {
-            state.wasTriggered = true
-            state.markerLightDistance =
-                chain.openMarkerLightDistance
-            state.timerRemaining = chain.timerDuration
-            trainingFinalBotsCompletionState = state
-            trainingFinalBotsWasTriggeredThisFrame = true
-            openTrainingFinalBotsBarrier(in: &world, level: level)
         }
         if guidebotReturnWasRequestedThisFrame,
             let chain = level.trainingCameraMonitorChain?.returnToShip
@@ -804,7 +762,12 @@ extension GameSession {
                 voiceSourceName: barrier.voiceSourceName,
                 voicePrecedesHUDMessages: true
             ))
-            galleryState.markerLightDistance = 0
+            // Script 032's aObjSetLightingDist(Object_handles[1], 0)
+            // (TrainingMission.cpp:2331).
+            world.setObjectLightDistance(
+                ObjectHandle(barrier.markerLightObjectHandle),
+                0
+            )
             closeTrainingGalleryBarrier(in: &world, level: level)
             if var robotState = trainingRobotGuidebotState {
                 robotState.controlsWereRestored = false
@@ -831,11 +794,22 @@ extension GameSession {
         }
         if var state = trainingFinalRoomEntryState,
            !state.wasTriggered,
-           trainingLastRoomState?.wasTriggered == true,
+           let lastRoom = level.trainingLastRoomChain,
+           trainingBarrierIsOpen(
+               world,
+               level: level,
+               roomSourceIndex: lastRoom.barrierRoomSourceIndex,
+               portalIndices: lastRoom.orderedPortalIndices
+           ),
            trainingFinalRoomEntryWasCrossedThisFrame,
            let chain = level.trainingFinalRoomEntryChain
         {
-            trainingLastRoomState?.markerLightDistance = 0
+            // The bespoke Script 050 (TrainingMission.cpp:2371-2383): the
+            // trigger lies past the portals Script 034 opened.
+            world.setObjectLightDistance(
+                ObjectHandle(lastRoom.markerLightObjectHandle),
+                0
+            )
             trainingOpeningFeedback.append(.init(
                 hudMessages: [chain.successMessage],
                 voiceSourceName: "",
@@ -898,50 +872,6 @@ extension GameSession {
             }
             trainingCloakPickupState = state
         }
-        if var state = trainingLastRoomState,
-            !trainingLastRoomWasTriggeredThisFrame,
-            var remaining = state.timerRemaining,
-            let chain = level.trainingLastRoomChain
-        {
-            remaining -= systemsFrameDuration
-            if remaining <= 0.000_001 {
-                state.timerRemaining = nil
-                if !state.wasPresented {
-                    state.wasPresented = true
-                    trainingOpeningFeedback.append(.init(
-                        hudMessages: chain.completionMessages,
-                        voiceSourceName:
-                            chain.completionVoiceSourceName,
-                        voicePrecedesHUDMessages: false
-                    ))
-                }
-            } else {
-                state.timerRemaining = remaining
-            }
-            trainingLastRoomState = state
-        }
-        if var state = trainingFinalBotsCompletionState,
-            !trainingFinalBotsWasTriggeredThisFrame,
-            var remaining = state.timerRemaining,
-            let chain = level.trainingFinalBotsCompletionChain
-        {
-            remaining -= systemsFrameDuration
-            if remaining <= 0.000_001 {
-                state.timerRemaining = nil
-                if !state.wasPresented {
-                    state.wasPresented = true
-                    trainingOpeningFeedback.append(.init(
-                        hudMessages: [chain.completionMessage],
-                        voiceSourceName:
-                            chain.completionVoiceSourceName,
-                        voicePrecedesHUDMessages: false
-                    ))
-                }
-            } else {
-                state.timerRemaining = remaining
-            }
-            trainingFinalBotsCompletionState = state
-        }
         if var state = trainingRobotGuidebotState,
             let chain = level.trainingRobotGuidebotChain
         {
@@ -958,28 +888,6 @@ extension GameSession {
                 ))
                 state.guidebotContinuationWasPresented = true
                 state.controlsWereRestored = true
-            }
-            if var timer = state.destructionTimerRemaining,
-               !state.destructionFeedbackWasPresented {
-                if !destructionTimer12StartedThisFrame {
-                    timer -= systemsFrameDuration
-                }
-                if timer <= 0.000_001 {
-                    trainingOpeningFeedback.append(.init(
-                        hudMessages: [
-                            chain.destructionMessage,
-                            chain.exitInstruction,
-                        ],
-                        voiceSourceName:
-                            chain.destructionVoiceSourceName,
-                        voicePrecedesHUDMessages: false
-                    ))
-                    state.destructionFeedbackWasPresented = true
-                    state.enabledControlHUDIsVisible = false
-                    state.destructionTimerRemaining = nil
-                } else {
-                    state.destructionTimerRemaining = timer
-                }
             }
             trainingRobotGuidebotState = state
         }
@@ -1029,9 +937,11 @@ extension GameSession {
             trainingOpeningFeedback: trainingOpeningFeedback,
             playerFastHeadlight: playerFastHeadlight
         )
-        // GameRenderFrame (GameLoop.cpp:2556) fills AI_RenderedList from
-        // the view it draws (renderobject.cpp:1239).
-        world.aiRenderedList = renderedAIObjectHandles(
+        // GameRenderFrame (GameLoop.cpp:3051) marks the rooms it draws and
+        // fills AI_RenderedList from that view (renderobject.cpp:1239); then
+        // ProcessNormalEvents runs (:3059). Both happen before Gametime
+        // advances (:3090).
+        let rendered = renderedRoomsAndAIObjects(
             level,
             objects: world.objects,
             roomStates: world.rooms,
@@ -1039,6 +949,18 @@ extension GameSession {
             startRoomSourceIndex: frame.playerView.roomSourceIndex,
             excludedObjectHandle: frame.playerView.objectHandle
         )
+        world.aiRenderedList = rendered.aiObjects
+        let advancedGameTime = world.gameTime
+        world.gameTime = systemsGameTime
+        for roomSourceIndex in rendered.rooms {
+            if let room = level.rooms.firstIndex(where: {
+                $0.sourceIndex == roomSourceIndex
+            }) {
+                world.rooms[room].lastRenderTime = systemsGameTime
+            }
+        }
+        world.processNormalEvents(level: level)
+        world.gameTime = advancedGameTime
         return frame
     }
     private func advanceIndoorPlayerRotation(
@@ -1301,74 +1223,18 @@ extension GameSession {
                     : PlayerControlMask(rawValue: 0),
             showsEnabledPlayerControls:
                 finalGoalFrame == nil
-                    && (
-                        trainingRobotGuidebotState?
-                            .enabledControlHUDIsVisible
-                            ?? world.hudShowControls
-                    ),
+                    && world.hudShowControls,
             trainingOpeningFeedback: trainingOpeningFeedback,
             playerFastHeadlight:
                 finalGoalFrame == nil ? playerFastHeadlight : nil,
             shields: shields,
             energy: energy,
             afterburnerFuel: afterburnerFuel,
-            trainingPrimaryProjectiles:
-                level.trainingFollowBotDestruction.map { handoff in
-                        trainingRobotGuidebotState?
-                            .projectiles.map {
-                                .init(
-                                    position: $0.position,
-                                    velocity: $0.velocity,
-                                    roomSourceIndex:
-                                        $0.roomSourceIndex,
-                                    model:
-                                        handoff.projectileModel
-                                )
-                            } ?? []
-                    } ?? [],
-            playerConcussionMissiles:
-                ship.playerConcussion.map { concussion in
-                    playerConcussionState?.missiles.map {
-                        .init(
-                            roomSourceIndex: $0.roomSourceIndex,
-                            position: $0.position,
-                            orientation: $0.orientation,
-                            velocity: $0.velocity,
-                            model: concussion.model,
-                            lightDistance: concussion.lightDistance,
-                            lightPresentation: concussion.lightPresentation
-                        )
-                    } ?? []
-                } ?? [],
-            playerConcussionExplosions:
-                ship.playerConcussion.map { concussion in
-                    playerConcussionState?.explosions.filter(\.isPresented)
-                        .map { explosion in
-                        let age = concussion.explosionLifetime
-                            - explosion.lifeRemaining
-                        let frameIndex = min(
-                            concussion.explosionFrames.count - 1,
-                            max(
-                                0,
-                                Int(age / concussion.explosionSourceFrameTime)
-                            )
-                        )
-                        return .init(
-                            roomSourceIndex: explosion.roomSourceIndex,
-                            position: explosion.position,
-                            size: concussion.explosionSize,
-                            texture: concussion.explosionFrames[frameIndex]
-                        )
-                    } ?? []
-                } ?? [],
-            playerConcussionSparks:
-                playerConcussionState?.sparks.map {
-                    .init(
-                        roomSourceIndex: $0.roomSourceIndex,
-                        start: $0.position,
-                        end: $0.position - sourceVectorNormalized($0.velocity) * $0.size
-                    )
-                } ?? [],
+            visEffectExplosions: visEffectExplosionFrames(
+                level,
+                effects: world.visEffects
+            ),
+            visEffectLineSparks: visEffectLineSparkFrames(world.visEffects),
             trainingGuidebotYellowFlares:
                 level.trainingRobotGuidebotChain?.yellowFlare.map {
                     definition in
@@ -1510,8 +1376,6 @@ extension GameSession {
                             )
                         }
                 } ?? [],
-            trainingGalleryMarkerLightDistance:
-                trainingGalleryBarrierState?.markerLightDistance,
             trainingGuidebotReturnMarkerLightDistance:
                 trainingKillbotEntryState?.wasTriggered == true
                     ? level.trainingCameraMonitorChain?.returnToShip?
@@ -1535,93 +1399,10 @@ extension GameSession {
                 state: trainingCloakPickupState,
                 chain: level.trainingCloakPickupChain
             ),
-            trainingLastRoomMarkerLightDistance:
-                trainingLastRoomState?.markerLightDistance,
-            trainingFinalBotsMarkerLightDistance:
-                trainingFinalBotsCompletionState?
-                    .markerLightDistance,
             trainingFinalGoal: finalGoalFrame
         )
     }
 
-    /// The bespoke Script 027 (TrainingMission.cpp:1560-1572), level timer
-    /// 11 after FollowBot1's Script 037, until M1 step 7 moves robot death
-    /// onto Osiris timers. Its actions are the generic DALLAS calls.
-    func advanceTrainingFollowBotDestructionTimer(
-        systemsFrameDuration: Float,
-        followBotTimer11StartedThisFrame: Bool,
-        trainingOpeningFeedback: inout [TrainingOpeningFeedback]
-    ) {
-        guard let handoff = level.trainingFollowBotDestruction,
-              var destruction = trainingFollowBotDestructionState,
-              var timer = destruction.levelTimer11Remaining
-        else {
-            return
-        }
-        if !followBotTimer11StartedThisFrame {
-            timer -= systemsFrameDuration
-        }
-        guard timer <= 0.000_001, destruction.script027Count < 1 else {
-            destruction.levelTimer11Remaining = timer
-            trainingFollowBotDestructionState = destruction
-            return
-        }
-        destruction.levelTimer11Remaining = nil
-        trainingOpeningFeedback.append(
-            .init(
-                hudMessages: [handoff.successMessage],
-                voiceSourceName: "",
-                voicePrecedesHUDMessages: false
-            )
-        )
-        let destroyBot2 = ObjectHandle(handoff.destroyBot2ObjectHandle)
-        let destroyBot1 = ObjectHandle(handoff.destroyBot1ObjectHandle)
-        world.aAISetTeam(Int32(bitPattern: handoff.movingTeamFlags), destroyBot2)
-        world.aAISetTeam(Int32(bitPattern: handoff.movingTeamFlags), destroyBot1)
-        destruction.destroyBot1IsVisible = true
-        // Script 027 unghosts DestroyBot1, which Script 000 ghosted
-        // (TrainingMission.cpp:1563).
-        world.aObjGhostSet(0, destroyBot1)
-        world.setObjectRendered(handoff.destroyBot1ObjectHandle, true)
-        trainingOpeningFeedback.append(
-            .init(
-                hudMessages: [handoff.movingInstruction],
-                voiceSourceName: handoff.voiceSourceName,
-                voicePrecedesHUDMessages: false
-            )
-        )
-        destruction.destroyBot1Destruction = .init(
-            destroyBot1Shields: handoff.combat.robotShields
-        )
-        destruction.script027Count = min(
-            destruction.script027Count + 1,
-            trainingScriptActionCounterMaximum
-        )
-        trainingFollowBotDestructionState = destruction
-        world.aAIGoalFollowPathSimple(
-            destroyBot1,
-            handoff.movingPathIndex,
-            Int32(bitPattern: handoff.movingPathGoalFlags),
-            Int32(handoff.goalID),
-            handoff.goalPriority,
-            level: level
-        )
-    }
-
-    /// Script 028's path goal for DestroyBot2 (TrainingMission.cpp:2020),
-    /// given after the object frame of the frame DestroyBot1 died in, as its
-    /// EVT_DESTROY comes from ObjDeleteDead after the loop (object.cpp:2004).
-    func startTrainingDestroyBot2Path() {
-        guard let handoff = level.trainingFollowBotDestruction else { return }
-        world.aAIGoalFollowPathSimple(
-            ObjectHandle(handoff.destroyBot2ObjectHandle),
-            handoff.movingPathIndex,
-            Int32(bitPattern: handoff.movingPathGoalFlags),
-            Int32(handoff.goalID),
-            handoff.goalPriority,
-            level: level
-        )
-    }
 }
 
 private func trainingGalleryTriggerWasCrossed(
@@ -1748,7 +1529,7 @@ private func trainingFinalGoalWasHit(
     in level: Level,
     objects: ObjectTable,
     state: TrainingFinalGoalState?,
-    finalBotsState: TrainingFinalBotsCompletionState?,
+    world: GameWorld,
     playerStart: Vector3,
     playerEnd: Vector3,
     playerRadius: Float,
@@ -1756,7 +1537,14 @@ private func trainingFinalGoalWasHit(
 ) -> Bool {
     guard let state,
           !state.endLevelWasRequested,
-          finalBotsState?.wasTriggered == true,
+          // FinalGoal lies past the portals Script 035 opened.
+          let finalBots = level.trainingFinalBotsCompletionChain,
+          trainingBarrierIsOpen(
+              world,
+              level: level,
+              roomSourceIndex: finalBots.barrierRoomSourceIndex,
+              portalIndices: finalBots.orderedPortalIndices
+          ),
           let chain = level.trainingFinalGoalChain,
           let goal = objects[ObjectHandle(chain.goalObjectHandle)],
           goal.location == .room(chain.goalRoomSourceIndex),
@@ -1800,6 +1588,23 @@ func closeTrainingGalleryBarrier(in world: inout GameWorld, level: Level) {
             portalIndex: portalIndex,
             level: level
         )
+    }
+}
+
+/// Whether every listed portal of the room has PF_RENDER_FACES clear.
+func trainingBarrierIsOpen(
+    _ world: GameWorld,
+    level: Level,
+    roomSourceIndex: Int,
+    portalIndices: [Int]
+) -> Bool {
+    guard let room = level.rooms.firstIndex(where: {
+        $0.sourceIndex == roomSourceIndex
+    }) else {
+        return false
+    }
+    return portalIndices.allSatisfy {
+        world.rooms[room].portalFlags[$0] & LevelPortal.renderFacesFlag == 0
     }
 }
 

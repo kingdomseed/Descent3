@@ -115,8 +115,8 @@ struct GameObject: Codable, Equatable, Sendable {
     var weapon: Int? = nil
     /// `size`.
     var size: Float = 0
-    /// `shields` of a generic object: its page hit points at ObjInit.
-    /// Damage changes it from M1 step 7. The player's shields are
+    /// `shields` of a generic object: its page hit points at ObjInit, less
+    /// the damage ApplyDamageToGeneric applies. The player's shields are
     /// `GameWorld.shields`.
     var shields: Float = 0
     /// `movement_type`: MT_PHYSICS or MT_NONE.
@@ -130,17 +130,115 @@ struct GameObject: Codable, Equatable, Sendable {
     var parent: ObjectHandle = .none
     /// `lifeleft` while OF_USES_LIFELEFT is set; `nil` while it is clear.
     var lifeLeft: Float? = nil
-    /// `dynamic_wb`: one per model weapon battery of a CT_AI object.
+    /// `dynamic_wb`: one per model weapon battery of a CT_AI object, and
+    /// MAX_WBS_PER_OBJ (21) for the player.
     var weaponBatteries: [DynamicWeaponBattery] = []
+    /// `creation_time`: the Gametime of ObjCreate.
+    var creationTime: Float = 0
+    /// `ctype.dying_info` while the object has CT_DYING (KillObject with a
+    /// delay, damage.cpp:1221-1245).
+    var dying: ObjectDyingInfo? = nil
+    /// The impact values and `mtype.shock_info` of an OBJ_SHOCKWAVE
+    /// (MakeShockwave, fireball.cpp:1752).
+    var shockwave: ShockwaveInfo? = nil
+    /// `attach_ultimate_handle` while OF_ATTACHED is set.
+    var attachUltimateHandle: ObjectHandle = .none
+    /// PF_NO_COLLIDE_PARENT of a weapon: its parent is not hit.
+    var noCollideParent = false
+    /// `mtype.phys_info` of an object the generic physics moves (debris,
+    /// splinters, spewed powerups, and dying objects that fall or fly;
+    /// ObjectPhysics.swift). Weapons and AI objects keep their own movers.
+    var physics: ObjectPhysics? = nil
+    /// `ctype.debris_info` while the object has CT_DEBRIS.
+    var debris: DebrisInfo? = nil
+    /// CT_SPLINTER: the face of its model's submodel 0 it shows.
+    var splinterFace: Int? = nil
+    /// `ctype.blast_info` of an OBJ_FIREBALL (CT_EXPLOSION).
+    var fireball: FireballObjectInfo? = nil
+    /// `rtype.pobj_info.model_num` when it is not the placed object's
+    /// primary model: a debris piece's or splinter's parent model, or a
+    /// dying object's `dying_model_num`.
+    var model: SourceResource? = nil
+    /// `rtype.pobj_info.subobj_flags` of a debris piece: the one submodel
+    /// it shows.
+    var submodel: Int? = nil
+}
+
+/// `ctype.debris_info` (object_external_struct.h).
+struct DebrisInfo: Codable, Equatable, Sendable {
+    /// The DF_ flags of the death that made it.
+    var deathFlags: UInt32
+    var lastSmokeTime: Float = -1
+}
+
+/// `ctype.blast_info` and the Fireballs[] id of an OBJ_FIREBALL.
+struct FireballObjectInfo: Codable, Equatable, Sendable {
+    var id: UInt8
+    var maximumSize: Float
+    var lifetime: Float
+}
+
+/// `ctype.dying_info` (object_external_struct.h).
+struct ObjectDyingInfo: Codable, Equatable, Sendable {
+    /// The DF_ flags.
+    var deathFlags: UInt32
+    var delayTime: Float
+    /// `killer_playernum`, or nil for -1.
+    var killerPlayer: Int?
+    var lastSparkTime: Float = -1
+    var lastFireballTime: Float = -1
+    var lastSmokeTime: Float = -1
+}
+
+/// An OBJ_SHOCKWAVE's impact values and `shock_info.damaged_list`
+/// (object_external_struct.h:376).
+struct ShockwaveInfo: Codable, Equatable, Sendable {
+    /// `(MAX_OBJECTS / 32) + 1` words.
+    static let damagedListWordCount = ObjectTable.capacity / 32 + 1
+
+    let size: Float
+    let time: Float
+    let playerDamage: Float
+    let genericDamage: Float
+    let force: Float
+    /// One bit per object slot that the shockwave already reached.
+    var damagedList = Array(repeating: UInt32(0), count: damagedListWordCount)
 }
 
 extension GameObject {
     /// OF_DEAD (`object_external.h:270`).
     static let deadFlag: UInt32 = 0x0000_0002
+    /// OF_FORCE_CEILING_CHECK.
+    static let forceCeilingCheckFlag: UInt32 = 0x0000_0001
+    /// OF_OUTSIDE_MINE: OBJECT_SAVE_LOAD_FLAGS (object_external.h:310).
+    static let outsideMineFlag: UInt32 = 0x0000_0200
+    /// OF_BIG_OBJECT.
+    static let bigObjectFlag: UInt32 = 0x0000_0800
+    /// OF_ATTACHED (`object_external.h:273`).
+    static let attachedFlag: UInt32 = 0x0000_0010
+    /// OF_AI_DO_DEATH (`object_external.h:275`).
+    static let aiDoDeathFlag: UInt32 = 0x0000_0040
     /// OF_DESTROYABLE (`object_external.h:279`).
     static let destroyableFlag: UInt32 = 0x0000_0400
+    /// OF_POLYGON_OBJECT (`object_external.h:281`).
+    static let polygonObjectFlag: UInt32 = 0x0000_1000
+    /// OF_DYING (`object_external.h:282`).
+    static let dyingFlag: UInt32 = 0x0000_2000
+    /// OF_USE_DESTROYED_POLYMODEL (`object_external.h:283`).
+    static let useDestroyedPolymodelFlag: UInt32 = 0x0000_4000
     /// OF_NO_OBJECT_COLLISIONS (`object_external.h:286`).
     static let noObjectCollisionsFlag: UInt32 = 0x0001_0000
+    /// OF_AI_DEATH (`object_external.h:293`).
+    static let aiDeathFlag: UInt32 = 0x0080_0000
+    /// OF_INPLAYERINVENTORY (`object_external.h:299`).
+    static let inPlayerInventoryFlag: UInt32 = 0x0800_0000
+    /// OF_INFORM_DESTROY_TO_LG (`object_external.h:302`).
+    static let informDestroyToLevelGoalsFlag: UInt32 = 0x4000_0000
+
+    /// IS_GENERIC (`object_external.h`): robot, powerup, clutter, building.
+    var isGeneric: Bool {
+        [.robot, .powerup, .clutter, .building].contains(type)
+    }
 }
 
 /// The script-set fields of `light_info` (MSAFE_OBJECT_LIGHT_DIST and

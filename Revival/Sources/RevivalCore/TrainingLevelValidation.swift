@@ -9,15 +9,7 @@ func validateStockTrainingRobotGuidebotPackage(
     flareSound: CanonicalSoundClip? = nil
 ) throws {
     guard let chain,
-          chain.destroyRobotObjectHandle == 4_112,
           chain.guidebotObjectHandle == 6_164,
-          chain.destroyRobotRoomSourceIndex == 37,
-          chain.destroyRobotFlags == 5_121,
-          chain.destructionDelay == 2,
-          chain.destructionMessage == "Excellent!",
-          chain.exitInstruction
-            == "Now go through the open doorway, and into the next room.",
-          chain.destructionVoiceSourceName == "proceed5.osf",
           chain.deployedGuidebotObjectType == 2,
           chain.deployedGuidebotMessage
             == "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
@@ -161,7 +153,6 @@ func validateStockTrainingRobotGuidebotPackage(
                   && flareSound?.importVolume.bitPattern
                     == Float(0.300_000_07).bitPattern
           ),
-          chain.combat == .stockTraining,
           chain.guidebot == .stockTraining,
           guidebotB?.sourceName.caseInsensitiveCompare("guidebotb.osf")
             == .orderedSame,
@@ -188,72 +179,6 @@ func validateStockTrainingRobotGuidebotPackage(
     else {
         throw LevelValidationError.invalidDependency(
             "Training robot and Guidebot package"
-        )
-    }
-}
-
-func validateTrainingFollowBotDestructionHandoff(
-    _ handoff: TrainingFollowBotDestructionHandoff,
-    level: Level
-) throws {
-    let handles = [
-        handoff.followBotObjectHandle,
-        handoff.destroyBot2ObjectHandle,
-        handoff.destroyBot1ObjectHandle,
-    ]
-    let objectsByHandle = Dictionary(
-        uniqueKeysWithValues: level.objects.map {
-            ($0.handle, $0)
-        }
-    )
-    let presentationsByHandle = Dictionary(
-        uniqueKeysWithValues: level.objectPresentations.map {
-            ($0.objectHandle, $0)
-        }
-    )
-    let followBotModel =
-        presentationsByHandle[handoff.followBotObjectHandle]?.primaryModel
-    guard Set(handles).count == handles.count,
-          handles.allSatisfy({ objectsByHandle[$0] != nil }),
-          followBotModel != nil,
-          handles.allSatisfy({
-              presentationsByHandle[$0]?.primaryModel == followBotModel
-          }),
-          presentationsByHandle[
-            handoff.destroyBot2ObjectHandle
-          ]?.isVisible == false,
-          presentationsByHandle[
-            handoff.destroyBot1ObjectHandle
-          ]?.isVisible == false,
-          handoff.combat == .stockTraining,
-          level.models.contains(where: {
-              $0.source == handoff.projectileModel
-          }),
-          handoff.projectileModel.sourceName
-            .caseInsensitiveCompare("bluelaser.OOF")
-            == .orderedSame,
-          handoff.destructionDelay == 2,
-          handoff.levelTimerID == 11,
-          handoff.movingTeamFlags == 65_536,
-          level.paths.indices.contains(
-            handoff.movingPathIndex
-          ),
-          level.paths[handoff.movingPathIndex].name == "FollowLoop1",
-          handoff.movingPathGoalFlags == 8_392_960,
-          handoff.goalID == -1,
-          handoff.goalPriority == 3,
-          handoff.successMessage == "Excellent!",
-          handoff.movingInstruction
-            == "Now destroy 2 more robots. This time they will be moving.",
-          handoff.voiceSourceName == "kill1.osf",
-          level.voiceClips.contains(where: {
-              $0.sourceName.caseInsensitiveCompare(
-                  handoff.voiceSourceName
-              ) == .orderedSame
-          })
-    else {
-        throw LevelValidationError.invalidDependency(
-            "Training Scripts 031,037,027 handoff"
         )
     }
 }
@@ -315,11 +240,6 @@ func validateStockTrainingFinalBotsCompletionPackage(
           chain.completionMessage
             == "Great Job! Now fly through the opened doorway to end your training. Good job Recruit!",
           chain.completionVoiceSourceName == "done.osf",
-          level.trainingLastBot1DeathChain != nil,
-          level.trainingLastBot2DeathChain != nil,
-          level.trainingLastBot3DeathChain != nil,
-          level.trainingLastBot4DeathChain != nil,
-          level.trainingLastBot5DeathChain != nil,
           let room = level.rooms.first(where: {
               $0.sourceIndex == chain.barrierRoomSourceIndex
           }),
@@ -426,8 +346,7 @@ func validateStockTrainingRobotGuidebotPresentation(
     chain: TrainingRobotGuidebotChain,
     modelSources: [SourceResource],
     objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference],
-    destroyRobotIsInitiallyVisible: Bool = true
+    objectPresentations: [ObjectPresentationReference]
 ) throws {
     let buddybotModels = modelSources.filter {
         $0.sourceName.caseInsensitiveCompare("Buddybot.oof") == .orderedSame
@@ -459,7 +378,6 @@ func validateStockTrainingRobotGuidebotPresentation(
                   && $0.mediumDistance == nil
                   && $0.lowDistance == nil
                   && $0.isVisible
-                    == destroyRobotIsInitiallyVisible
           }) else {
         throw LevelValidationError.invalidDependency(
             "Training robot and Guidebot presentation"
@@ -591,198 +509,6 @@ func validateTrainingGuidebotYellowFlareBinding(
             "Training Guidebot Yellow flare binding"
         )
     }
-}
-
-private func validateStockTrainingRASBotDeathPackage(
-    chain: TrainingRobotDeathChain?,
-    expectedHandle: UInt32,
-    expectedRoomSourceIndex: Int,
-    expectedInstanceName: String,
-    dependencyName: String,
-    objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
-) throws {
-    let gyroModels = Set(
-        objectPresentations.compactMap { presentation in
-            presentation.primaryModel.sourceName.caseInsensitiveCompare(
-                "gyro.oof"
-            ) == .orderedSame
-                ? presentation.primaryModel
-                : nil
-        }
-    )
-    guard let chain,
-          chain.robotObjectHandle == expectedHandle,
-          chain.robotRoomSourceIndex == expectedRoomSourceIndex,
-          chain.robotFlags == 5_121,
-          chain.combat == .stockTraining,
-          gyroModels.count == 1,
-          objects.contains(where: {
-              $0.handle == chain.robotObjectHandle
-                  && $0.type == 2
-                  && $0.storedID == 106
-                  && $0.definition?.sourceName
-                    == "RAS1 Light Security Flyer"
-                  && $0.instanceName == expectedInstanceName
-                  && $0.flags == chain.robotFlags
-                  && $0.location == .room(chain.robotRoomSourceIndex)
-          }),
-          objectPresentations.contains(where: {
-              $0.objectHandle == chain.robotObjectHandle
-                  && $0.primaryModel == gyroModels.first
-                  && $0.mediumModel == nil
-                  && $0.lowModel == nil
-                  && $0.dyingModel == nil
-                  && $0.mediumDistance == nil
-                  && $0.lowDistance == nil
-                  && $0.isVisible
-          }) else {
-        throw LevelValidationError.invalidDependency(dependencyName)
-    }
-}
-
-func validateStockTrainingRASBot1DeathPackage(
-    chain: TrainingRASBot1DeathChain?,
-    objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
-) throws {
-    try validateStockTrainingRASBotDeathPackage(
-        chain: chain,
-        expectedHandle: 2_074,
-        expectedRoomSourceIndex: 11,
-        expectedInstanceName: "RASBot1",
-        dependencyName: "Training RASBot1 package",
-        objects: objects,
-        objectPresentations: objectPresentations
-    )
-}
-
-func validateStockTrainingRASBot2DeathPackage(
-    chain: TrainingRASBot2DeathChain?,
-    objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
-) throws {
-    try validateStockTrainingRASBotDeathPackage(
-        chain: chain,
-        expectedHandle: 2_075,
-        expectedRoomSourceIndex: 12,
-        expectedInstanceName: "RASBot2",
-        dependencyName: "Training RASBot2 package",
-        objects: objects,
-        objectPresentations: objectPresentations
-    )
-}
-
-func validateStockTrainingRASBot3DeathPackage(
-    chain: TrainingRASBot3DeathChain?,
-    objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
-) throws {
-    try validateStockTrainingRASBotDeathPackage(
-        chain: chain,
-        expectedHandle: 2_077,
-        expectedRoomSourceIndex: 42,
-        expectedInstanceName: "RASBot3",
-        dependencyName: "Training RASBot3 package",
-        objects: objects,
-        objectPresentations: objectPresentations
-    )
-}
-
-func validateStockTrainingRASBot4DeathPackage(
-    chain: TrainingRASBot4DeathChain?,
-    objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
-) throws {
-    try validateStockTrainingRASBotDeathPackage(
-        chain: chain,
-        expectedHandle: 2_078,
-        expectedRoomSourceIndex: 0,
-        expectedInstanceName: "RASBot4",
-        dependencyName: "Training RASBot4 package",
-        objects: objects,
-        objectPresentations: objectPresentations
-    )
-}
-
-func validateStockTrainingLastBot1DeathPackage(
-    chain: TrainingLastBot1DeathChain?,
-    objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
-) throws {
-    try validateStockTrainingRASBotDeathPackage(
-        chain: chain,
-        expectedHandle: 4_127,
-        expectedRoomSourceIndex: 14,
-        expectedInstanceName: "LastBot1",
-        dependencyName: "Training LastBot1 package",
-        objects: objects,
-        objectPresentations: objectPresentations
-    )
-}
-
-func validateStockTrainingLastBot2DeathPackage(
-    chain: TrainingLastBot2DeathChain?,
-    objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
-) throws {
-    try validateStockTrainingRASBotDeathPackage(
-        chain: chain,
-        expectedHandle: 2_080,
-        expectedRoomSourceIndex: 46,
-        expectedInstanceName: "LastBot2",
-        dependencyName: "Training LastBot2 package",
-        objects: objects,
-        objectPresentations: objectPresentations
-    )
-}
-
-func validateStockTrainingLastBot3DeathPackage(
-    chain: TrainingLastBot3DeathChain?,
-    objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
-) throws {
-    try validateStockTrainingRASBotDeathPackage(
-        chain: chain,
-        expectedHandle: 2_081,
-        expectedRoomSourceIndex: 47,
-        expectedInstanceName: "LastBot3",
-        dependencyName: "Training LastBot3 package",
-        objects: objects,
-        objectPresentations: objectPresentations
-    )
-}
-
-func validateStockTrainingLastBot4DeathPackage(
-    chain: TrainingLastBot4DeathChain?,
-    objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
-) throws {
-    try validateStockTrainingRASBotDeathPackage(
-        chain: chain,
-        expectedHandle: 2_082,
-        expectedRoomSourceIndex: 47,
-        expectedInstanceName: "LastBot4",
-        dependencyName: "Training LastBot4 package",
-        objects: objects,
-        objectPresentations: objectPresentations
-    )
-}
-
-func validateStockTrainingLastBot5DeathPackage(
-    chain: TrainingLastBot5DeathChain?,
-    objects: [PlacedObject],
-    objectPresentations: [ObjectPresentationReference]
-) throws {
-    try validateStockTrainingRASBotDeathPackage(
-        chain: chain,
-        expectedHandle: 2_083,
-        expectedRoomSourceIndex: 48,
-        expectedInstanceName: "LastBot5",
-        dependencyName: "Training LastBot5 package",
-        objects: objects,
-        objectPresentations: objectPresentations
-    )
 }
 
 func validateStockTrainingCameraMonitorPackage(

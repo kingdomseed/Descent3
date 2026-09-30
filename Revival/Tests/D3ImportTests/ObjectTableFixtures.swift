@@ -144,7 +144,10 @@ let fixtureFlyerInfo = CanonicalObjectInfo(
         lifePreservation: 0.21,
         dodgeVelocityPercent: 0.9
     ),
-    weaponBatteries: []
+    weaponBatteries: [],
+    score: 200,
+    impact: .init(size: 0, time: 0, damage: 0),
+    deathTypes: fixtureFlyerDeathTypes
 )
 
 /// A flashing light clutter page like Blinking Red Light-DM.

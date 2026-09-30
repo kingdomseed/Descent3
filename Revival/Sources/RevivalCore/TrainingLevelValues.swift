@@ -1,27 +1,5 @@
 import Foundation
 
-/// The follow-bot destruction chain (TrainingMission.cpp Scripts 037, 027,
-/// and 028), still bespoke until M1 step 7 translates robot death.
-struct TrainingFollowBotDestructionHandoff:
-    Codable, Equatable, Sendable
-{
-    let followBotObjectHandle: UInt32
-    let destroyBot2ObjectHandle: UInt32
-    let destroyBot1ObjectHandle: UInt32
-    let combat: TrainingRobotCombatDefinition
-    let projectileModel: SourceResource
-    let destructionDelay: Float
-    let levelTimerID: Int
-    let movingTeamFlags: UInt32
-    let movingPathIndex: Int
-    let movingPathGoalFlags: UInt32
-    let goalID: Int
-    let goalPriority: Int
-    let successMessage: String
-    let movingInstruction: String
-    let voiceSourceName: String
-}
-
 struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
     let triggerName: String
     let triggerRoomSourceIndex: Int
@@ -36,21 +14,13 @@ struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
 }
 
 struct TrainingRobotGuidebotChain: Codable, Equatable, Sendable {
-    let destroyRobotObjectHandle: UInt32
     let guidebotObjectHandle: UInt32
-    let destroyRobotRoomSourceIndex: Int
-    let destroyRobotFlags: UInt32
-    let destructionDelay: Float
-    let destructionMessage: String
-    let exitInstruction: String
-    let destructionVoiceSourceName: String
     let deployedGuidebotObjectType: UInt8
     let deployedGuidebotMessage: String
     let deployedGuidebotVoiceSourceName: String
     var releaseSoundSourceName: String? = nil
     var ambientEngineSoundSourceName: String? = nil
     var yellowFlare: TrainingGuidebotYellowFlareDefinition? = nil
-    let combat: TrainingRobotCombatDefinition
     let guidebot: TrainingGuidebotDefinition
 }
 
@@ -161,23 +131,6 @@ struct TrainingKillbotEntryChain: Codable, Equatable, Sendable {
     let followupMessage: String
     let followupVoiceSourceName: String
 }
-
-struct TrainingRobotDeathChain: Codable, Equatable, Sendable {
-    let robotObjectHandle: UInt32
-    let robotRoomSourceIndex: Int
-    let robotFlags: UInt32
-    let combat: TrainingRobotCombatDefinition
-}
-
-typealias TrainingRASBot1DeathChain = TrainingRobotDeathChain
-typealias TrainingRASBot2DeathChain = TrainingRobotDeathChain
-typealias TrainingRASBot3DeathChain = TrainingRobotDeathChain
-typealias TrainingRASBot4DeathChain = TrainingRobotDeathChain
-typealias TrainingLastBot1DeathChain = TrainingRobotDeathChain
-typealias TrainingLastBot2DeathChain = TrainingRobotDeathChain
-typealias TrainingLastBot3DeathChain = TrainingRobotDeathChain
-typealias TrainingLastBot4DeathChain = TrainingRobotDeathChain
-typealias TrainingLastBot5DeathChain = TrainingRobotDeathChain
 
 struct TrainingInvulnerabilityPickupChain:
     Codable, Equatable, Sendable
@@ -354,19 +307,6 @@ func validTrainingGuidebotReturnBarrier(
         && portalsAreAtomic
 }
 
-struct TrainingRobotCombatDefinition: Codable, Equatable, Sendable {
-    let robotShields: Float
-    let robotCollisionRadius: Float
-    let batteryEnergyCost: Float
-    let batteryFireWait: Float
-    let gunpoints: [Vector3]
-    let projectileSourceName: String
-    let projectileDamage: Float
-    let projectileRadius: Float
-    let projectileSpeed: Float
-    let projectileLifetime: Float
-}
-
 struct TrainingGuidebotDefinition: Codable, Equatable, Sendable {
     let collisionRadius: Float
     let maximumVelocity: Float
@@ -448,36 +388,6 @@ let trainingGuidebotYellowFlareAnimationFrames: [SourceResource] = [
     .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 5"),
 ]
 let trainingGuidebotYellowFlareSourceFrameTime: Float = 0.07
-
-extension TrainingRobotCombatDefinition {
-    // d3.hog/table.gam generic page "RAS1 Light Security Flyer",
-    // version 27 score field. All ten Training combat chains use this page.
-    static let stockTrainingScore = 200
-
-    static let stockTraining = Self(
-        robotShields: 55,
-        robotCollisionRadius: 4.576_441_8,
-        batteryEnergyCost: 0.15,
-        batteryFireWait: 0.25,
-        gunpoints: [
-            .init(
-                x: 2.792_412_5,
-                y: -1.186_958_9,
-                z: 2.687_090_9
-            ),
-            .init(
-                x: -2.804_046_4,
-                y: -1.186_885,
-                z: 2.687_135_2
-            ),
-        ],
-        projectileSourceName: "Laser Level 2 - Blue",
-        projectileDamage: 7.5,
-        projectileRadius: 1.25,
-        projectileSpeed: 225,
-        projectileLifetime: 5
-    )
-}
 
 extension TrainingGuidebotDefinition {
     static let stockTraining = Self(

@@ -4,7 +4,13 @@ extension WorldRenderingTests {
     func testScripts035And056OpenPortalRoomSevenThenPresentOnceAfterTimer()
         throws
     {
-        let level = makeTrainingFinalBotsCompletionLevel()
+        // The Training module runs Scripts 051-055 as the five last bots
+        // die (TrainingMission.cpp:2204-2307), then Script 035 in the level
+        // EVT_INTERVAL (:1417-1429) and Script 056 on level timer 10
+        // (:1614-1622).
+        let level = addingTrainingMissionScripting(
+            makeTrainingFinalBotsCompletionLevel()
+        )
         try level.validate()
         let chain = try XCTUnwrap(
             level.trainingFinalBotsCompletionChain
@@ -14,12 +20,16 @@ extension WorldRenderingTests {
             presentationReadyTimestamp: 0
         )
 
-        simulation.destroyTrainingLastBot1(handle: 4_127)
-        simulation.destroyTrainingLastBot2(handle: 2_080)
-        simulation.destroyTrainingLastBot3(handle: 2_081)
-        simulation.destroyTrainingLastBot4(handle: 2_082)
-        simulation.destroyTrainingLastBot5(handle: 2_083)
+        simulation.killRobotsAsPlayer([4_127, 2_080, 2_081, 2_082, 2_083])
         var frame = simulation.update(at: 0.1, input: .zero)
+        for counter in [\TrainingMissionState.script051Count,
+                        \.script052Count, \.script053Count,
+                        \.script054Count, \.script055Count] {
+            XCTAssertEqual(
+                simulation.world.testTrainingMission?[keyPath: counter],
+                1
+            )
+        }
 
         func assertBarrierIsOpen(in level: Level) throws {
             let barrier = try XCTUnwrap(level.rooms.first {
@@ -39,30 +49,21 @@ extension WorldRenderingTests {
         }
 
         try assertBarrierIsOpen(in: simulation.runtimeLevel)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script035Count, 1)
+        let marker = ObjectHandle(chain.markerLightObjectHandle)
+        XCTAssertEqual(level.findObjectName("FlashLight-5"), marker)
         XCTAssertEqual(
-            frame.trainingFinalBotsMarkerLightDistance,
+            simulation.world.objects[marker]?.localLighting?.lightDistance,
             50
         )
         XCTAssertFalse(frame.trainingOpeningFeedback.contains {
-            $0.voiceSourceName == chain.completionVoiceSourceName
+            $0.voiceSourceName == "done.osf"
         })
-        let pendingData = try JSONEncoder().encode(
-            simulation.world
-        )
-        let pendingObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: pendingData)
-                as? [String: Any]
-        )
-        let pendingState = try XCTUnwrap(
-            pendingObject["trainingFinalBotsCompletionState"]
-                as? [String: Any]
-        )
-        XCTAssertEqual(pendingState["wasTriggered"] as? Bool, true)
-        XCTAssertEqual(
-            try XCTUnwrap(pendingState["timerRemaining"] as? Double),
-            2,
-            accuracy: 0.000_1
-        )
+        let timer = try XCTUnwrap(simulation.world.osirisTimers.entries.first {
+            $0.isUsed && $0.owner == .level && $0.id == 10
+        })
+        XCTAssertEqual(timer.end, simulation.world.gameTime + 2, accuracy: 0.11)
+        let pendingData = try JSONEncoder().encode(simulation.world)
 
         let restored = try GameSession(
             level: level,
@@ -73,22 +74,19 @@ extension WorldRenderingTests {
             resumedAtTimestamp: 100
         )
         try assertBarrierIsOpen(in: restored.runtimeLevel)
+        var log: [String] = []
         for frameIndex in 1...20 {
             frame = restored.update(
                 at: 100 + Double(frameIndex) * 0.1,
                 input: .zero
             )
+            log += presentationLog(frame)
         }
+        XCTAssertEqual(restored.world.testTrainingMission?.script056Count, 1)
         XCTAssertEqual(
-            frame.trainingOpeningFeedback,
-            [
-                .init(
-                    hudMessages: [chain.completionMessage],
-                    voiceSourceName: chain.completionVoiceSourceName,
-                    voicePrecedesHUDMessages: false
-                )
-            ]
+            log.filter { $0 == "hud:\(trainingText("AllDone"))" }.count, 1
         )
+        XCTAssertEqual(log.filter { $0 == "voice:done.osf" }.count, 1)
         XCTAssertTrue(
             restored.update(
                 at: 102.1,
@@ -127,16 +125,15 @@ extension WorldRenderingTests {
             level: level,
             presentationReadyTimestamp: 0
         )
-        initial.destroyTrainingRobot(handle: 4_112)
-        initial.destroyTrainingRASBot1(handle: 2_074)
-        initial.destroyTrainingRASBot2(handle: 2_075)
-        initial.destroyTrainingRASBot3(handle: 2_077)
-        initial.destroyTrainingRASBot4(handle: 2_078)
-        initial.destroyTrainingLastBot1(handle: 4_127)
-        initial.destroyTrainingLastBot2(handle: 2_080)
-        initial.destroyTrainingLastBot3(handle: 2_081)
-        initial.destroyTrainingLastBot4(handle: 2_082)
-        initial.destroyTrainingLastBot5(handle: 2_083)
+        // The player shot down the ten robots (each scores its page's 200,
+        // PlayerScoreAdd), and the last five opened the final bots barrier
+        // (Scripts 051-055 and 035; this unscripted fixture takes the
+        // state the scripts leave).
+        initial.killRobotsAsPlayer([
+            4_112, 2_074, 2_075, 2_077, 2_078,
+            4_127, 2_080, 2_081, 2_082, 2_083,
+        ])
+        openTrainingFinalBotsBarrier(in: &initial.world, level: level)
         _ = initial.update(at: 0.1, input: .zero)
         var ready = try XCTUnwrap(
             testWorldObject(initial.world)
@@ -458,16 +455,15 @@ extension WorldRenderingTests {
             level: level,
             presentationReadyTimestamp: 0
         )
-        initial.destroyTrainingRobot(handle: 4_112)
-        initial.destroyTrainingRASBot1(handle: 2_074)
-        initial.destroyTrainingRASBot2(handle: 2_075)
-        initial.destroyTrainingRASBot3(handle: 2_077)
-        initial.destroyTrainingRASBot4(handle: 2_078)
-        initial.destroyTrainingLastBot1(handle: 4_127)
-        initial.destroyTrainingLastBot2(handle: 2_080)
-        initial.destroyTrainingLastBot3(handle: 2_081)
-        initial.destroyTrainingLastBot4(handle: 2_082)
-        initial.destroyTrainingLastBot5(handle: 2_083)
+        // The player shot down the ten robots (each scores its page's 200,
+        // PlayerScoreAdd), and the last five opened the final bots barrier
+        // (Scripts 051-055 and 035; this unscripted fixture takes the
+        // state the scripts leave).
+        initial.killRobotsAsPlayer([
+            4_112, 2_074, 2_075, 2_077, 2_078,
+            4_127, 2_080, 2_081, 2_082, 2_083,
+        ])
+        openTrainingFinalBotsBarrier(in: &initial.world, level: level)
         _ = initial.update(at: 0.1, input: .zero)
         var ready = try XCTUnwrap(
             testWorldObject(initial.world)

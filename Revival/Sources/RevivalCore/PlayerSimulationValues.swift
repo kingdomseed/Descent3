@@ -4,14 +4,9 @@ import Foundation
 
 struct TrainingGalleryBarrierState: Codable, Equatable, Sendable {
     var wasTriggered = false
-    var markerLightDistance: Float
 }
 
 struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
-    var robotWasDestroyed = false
-    var robotShields: Float
-    var nextPrimaryFireTime: Float = 0
-    var projectiles: [TrainingLaserProjectileState] = []
     var guidebotIsDeployed = false
     var guidebot: TrainingGuidebotRuntimeState?
     var guidebotContinuationWasPresented = false
@@ -42,9 +37,6 @@ struct TrainingRobotGuidebotState: Codable, Equatable, Sendable {
     var guidebotEnteredShip = false
     var arrivalFeedbackWasPresented = false
     var controlsWereRestored = false
-    var enabledControlHUDIsVisible = true
-    var destructionTimerRemaining: Float?
-    var destructionFeedbackWasPresented = false
 }
 
 struct TrainingGuidebotYellowFlareGoalSlots:
@@ -148,57 +140,6 @@ struct PlayerYellowFlareState: Codable, Equatable, Sendable {
         [TrainingGuidebotYellowFlareParticleState] = []
 }
 
-struct PlayerConcussionMissileState:
-    Codable, Equatable, Sendable
-{
-    let creationOrdinal: UInt64
-    var roomSourceIndex: Int
-    var position: Vector3
-    var orientation: Matrix3
-    let velocity: Vector3
-    var lifeRemaining: Float
-}
-
-struct PlayerConcussionExplosionState:
-    Codable, Equatable, Sendable
-{
-    let creationOrdinal: UInt64
-    let roomSourceIndex: Int
-    let position: Vector3
-    var lifeRemaining: Float
-    var shockwaveLifeRemaining: Float
-    var damagedObjectHandles: Set<UInt32> = []
-    var damagedPlayer = false
-    /// False when the visual explosion could not be allocated. The entry
-    /// then carries only the shockwave, which DoWeaponExploded creates
-    /// before the visual (`WeaponFire.cpp:3066`).
-    var isPresented = true
-}
-
-struct PlayerConcussionSparkState:
-    Codable, Equatable, Sendable
-{
-    let creationOrdinal: UInt64
-    let roomSourceIndex: Int
-    var position: Vector3
-    var velocity: Vector3
-    let size: Float
-    let lifetime: Float
-    var lifeRemaining: Float
-}
-
-struct PlayerConcussionState: Codable, Equatable, Sendable {
-    var ammo = 6
-    var nextFireTime: Float = 0
-    var nextFiringMaskIndex = 0
-    var nextCreationOrdinal: UInt64 = 0
-    var missiles: [PlayerConcussionMissileState] = []
-    var explosions: [PlayerConcussionExplosionState] = []
-    var sparks: [PlayerConcussionSparkState] = []
-}
-
-let playerConcussionExplosionPresentationCapacity = 6
-let playerConcussionSparkPresentationCapacity = 48
 let trainingGuidebotYellowFlarePresentationCapacity = 6
 let trainingGuidebotYellowFlareParticlePresentationCapacity = 64
 let trainingGuidebotYellowFlareTimeoutExplosionPresentationCapacity = 1
@@ -235,23 +176,6 @@ struct TrainingKillbotEntryState:
     var followupWasPresented = false
 }
 
-struct TrainingRobotDeathState:
-    Codable, Equatable, Sendable
-{
-    var wasDestroyed = false
-    var shields: Float
-}
-
-typealias TrainingRASBot1DeathState = TrainingRobotDeathState
-typealias TrainingRASBot2DeathState = TrainingRobotDeathState
-typealias TrainingRASBot3DeathState = TrainingRobotDeathState
-typealias TrainingRASBot4DeathState = TrainingRobotDeathState
-typealias TrainingLastBot1DeathState = TrainingRobotDeathState
-typealias TrainingLastBot2DeathState = TrainingRobotDeathState
-typealias TrainingLastBot3DeathState = TrainingRobotDeathState
-typealias TrainingLastBot4DeathState = TrainingRobotDeathState
-typealias TrainingLastBot5DeathState = TrainingRobotDeathState
-
 struct TrainingInvulnerabilityPickupState:
     Codable, Equatable, Sendable
 {
@@ -267,22 +191,6 @@ struct TrainingCloakPickupState:
     var wasConsumed = false
     var phase: TrainingCloakPhase?
     var phaseRemaining: Float?
-}
-
-struct TrainingLastRoomState: Codable, Equatable, Sendable {
-    var wasTriggered = false
-    var markerLightDistance: Float = 0
-    var timerRemaining: Float?
-    var wasPresented = false
-}
-
-struct TrainingFinalBotsCompletionState:
-    Codable, Equatable, Sendable
-{
-    var wasTriggered = false
-    var markerLightDistance: Float = 0
-    var timerRemaining: Float?
-    var wasPresented = false
 }
 
 struct TrainingFinalGoalState:
@@ -353,39 +261,6 @@ struct TrainingGuidebotRuntimeState:
     }
 }
 
-struct TrainingLaserProjectileState:
-    Codable, Equatable, Sendable
-{
-    var roomSourceIndex: Int
-    var position: Vector3
-    let velocity: Vector3
-    var lifeRemaining: Float
-}
-
-/// The bespoke follow-bot destruction chain (TrainingMission.cpp Scripts
-/// 037, 027, and 028), until M1 step 7 translates robot death. The robots
-/// move by their AI follow-path goals.
-struct TrainingFollowBotDestructionState:
-    Codable, Equatable, Sendable
-{
-    var followBotShields: Float
-    var followBotWasDestroyed = false
-    var script037Count = 0
-    var script027Count = 0
-    var levelTimer11Remaining: Float?
-    var destroyBot2IsVisible = false
-    var destroyBot1IsVisible = false
-    var destroyBot1Destruction: TrainingDestroyBot1DestructionState? = nil
-}
-
-struct TrainingDestroyBot1DestructionState:
-    Codable, Equatable, Sendable
-{
-    var destroyBot1Shields: Float
-    var destroyBot1WasDestroyed = false
-    var script028Count = 0
-}
-
 struct PlayerRearViewState: Codable, Equatable, Sendable {
     var leaveMode: Bool
     let entryGameTime: Float
@@ -401,26 +276,11 @@ extension GameWorld {
     /// The level-start state of the bespoke Training script types. Later M1
     /// steps replace these with the Training level module.
     mutating func initializeTrainingState(level: Level) {
-        trainingFollowBotDestructionState =
-            level.trainingFollowBotDestruction.map {
-                TrainingFollowBotDestructionState(
-                    followBotShields: $0.combat.robotShields
-                )
-            }
         trainingGalleryBarrierState = level.trainingGalleryBarrier.map {
-            TrainingGalleryBarrierState(
-                markerLightDistance:
-                    trainingGalleryBarrierRendersFaces(
-                        in: level,
-                        barrier: $0
-                    )
-                    ? 0
-                    : $0.openMarkerLightDistance
-            )
+            _ in TrainingGalleryBarrierState()
         }
         trainingRobotGuidebotState = level.trainingRobotGuidebotChain.map {
             TrainingRobotGuidebotState(
-                robotShields: $0.combat.robotShields,
                 yellowFlares: $0.yellowFlare == nil ? nil : [],
                 yellowFlareParticles:
                     $0.yellowFlare == nil ? nil : [],
@@ -442,33 +302,6 @@ extension GameWorld {
             level.trainingCameraMonitorChain?.returnToShip?.killbotEntry.map {
                 _ in TrainingKillbotEntryState()
             }
-        trainingRASBot1DeathState = level.trainingRASBot1DeathChain.map {
-            TrainingRASBot1DeathState(shields: $0.combat.robotShields)
-        }
-        trainingRASBot2DeathState = level.trainingRASBot2DeathChain.map {
-            TrainingRASBot2DeathState(shields: $0.combat.robotShields)
-        }
-        trainingRASBot3DeathState = level.trainingRASBot3DeathChain.map {
-            TrainingRASBot3DeathState(shields: $0.combat.robotShields)
-        }
-        trainingRASBot4DeathState = level.trainingRASBot4DeathChain.map {
-            TrainingRASBot4DeathState(shields: $0.combat.robotShields)
-        }
-        trainingLastBot1DeathState = level.trainingLastBot1DeathChain.map {
-            TrainingLastBot1DeathState(shields: $0.combat.robotShields)
-        }
-        trainingLastBot2DeathState = level.trainingLastBot2DeathChain.map {
-            TrainingLastBot2DeathState(shields: $0.combat.robotShields)
-        }
-        trainingLastBot3DeathState = level.trainingLastBot3DeathChain.map {
-            TrainingLastBot3DeathState(shields: $0.combat.robotShields)
-        }
-        trainingLastBot4DeathState = level.trainingLastBot4DeathChain.map {
-            TrainingLastBot4DeathState(shields: $0.combat.robotShields)
-        }
-        trainingLastBot5DeathState = level.trainingLastBot5DeathChain.map {
-            TrainingLastBot5DeathState(shields: $0.combat.robotShields)
-        }
         trainingInvulnerabilityPickupState =
             level.trainingInvulnerabilityPickupChain.map {
                 _ in TrainingInvulnerabilityPickupState()
@@ -476,16 +309,9 @@ extension GameWorld {
         trainingCloakPickupState = level.trainingCloakPickupChain.map {
             _ in TrainingCloakPickupState()
         }
-        trainingLastRoomState = level.trainingLastRoomChain.map {
-            _ in TrainingLastRoomState()
-        }
         trainingFinalRoomEntryState =
             level.trainingFinalRoomEntryChain.map {
                 _ in TrainingFinalRoomEntryState()
-            }
-        trainingFinalBotsCompletionState =
-            level.trainingFinalBotsCompletionChain.map {
-                _ in TrainingFinalBotsCompletionState()
             }
         trainingFinalGoalState = level.trainingFinalGoalChain.map {
             _ in TrainingFinalGoalState()

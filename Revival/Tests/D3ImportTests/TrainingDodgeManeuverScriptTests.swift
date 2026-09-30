@@ -151,7 +151,10 @@ final class TrainingDodgeManeuverScriptTests: XCTestCase {
     /// and Script 018 (TrainingMission.cpp:1348-1361) then restores the
     /// shields to 100, restarts timers 3 and 2, and shows DodgeHit.
     func testTurretBoltsHitThePlayerAndScript018RestartsTheDodge() throws {
-        let session = try startedDodgeSession()
+        // The turret's fire spread and each wall hit's random small
+        // explosion (DoWeaponExploded) draw ps_rand, so whether a bolt hits
+        // the waiting pilot depends on the seed; with seed 10 one does.
+        let session = try startedDodgeSession(seed: 10)
         let turret = session.level.findObjectName("DodgeTurrett")
         var timestamp = session.world.gameTime.double + 1.2
         var sawWeapon = false
@@ -442,7 +445,14 @@ final class TrainingDodgeManeuverScriptTests: XCTestCase {
         XCTAssertEqual(laser.speed, 200)
         XCTAssertEqual(laser.playerDamage, 6.75)
 
-        let session = GameSession(level: level, presentationReadyTimestamp: 0)
+        // Whether a spread shot meets the hull depends on the ps_rand
+        // draws, which now include each wall hit's random small explosion
+        // (DoWeaponExploded); with this seed a shot hits within 7 s.
+        let session = GameSession(
+            level: level,
+            presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x1234_5678
+        )
         XCTAssertNotEqual(
             session.world.objects[turret]!.ai!.flags
                 & ObjectAIFrame.disabledFlag,
@@ -562,8 +572,16 @@ final class TrainingDodgeManeuverScriptTests: XCTestCase {
     }
 
     /// The dodge fixture after Script 033 and Script 016.
-    private func startedDodgeSession() throws -> GameSession {
-        let session = GameSession(
+    private func startedDodgeSession(
+        seed: UInt32? = nil
+    ) throws -> GameSession {
+        let session = seed.map {
+            GameSession(
+                level: makeTrainingDodgeAttemptLevel(),
+                presentationReadyTimestamp: 0,
+                authoritativeRandomSeed: $0
+            )
+        } ?? GameSession(
             level: makeTrainingDodgeAttemptLevel(),
             presentationReadyTimestamp: 0
         )

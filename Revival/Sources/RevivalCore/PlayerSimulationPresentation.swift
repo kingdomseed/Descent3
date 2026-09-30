@@ -77,10 +77,10 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let shields: Float
     let energy: Float
     let afterburnerFuel: Float
-    let trainingPrimaryProjectiles: [TrainingBlueLaserProjectileFrame]
-    let playerConcussionMissiles: [PlayerConcussionMissileFrame]
-    let playerConcussionExplosions: [PlayerConcussionExplosionFrame]
-    let playerConcussionSparks: [PlayerConcussionSparkFrame]
+    /// The custom weapon explosions among the visual effects.
+    let visEffectExplosions: [VisEffectExplosionFrame]
+    /// The fading line sparks among the visual effects.
+    let visEffectLineSparks: [VisEffectLineSparkFrame]
     let trainingGuidebotYellowFlares:
         [TrainingGuidebotYellowFlareFrame]
     let trainingGuidebotYellowFlareParticles:
@@ -91,15 +91,12 @@ struct PlayerSimulationFrame: Equatable, Sendable {
         [TrainingGuidebotYellowFlareTimeoutSparkFrame]
     let trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame]
-    let trainingGalleryMarkerLightDistance: Float?
     let trainingGuidebotReturnMarkerLightDistance: Float?
     let trainingGuidebot: TrainingGuidebotFrame?
     let trainingGuidebotAmbientEngineIsActive: Bool
     let trainingCameraMonitor: TrainingCameraMonitorFrame?
     let trainingInvulnerabilityRemaining: Float?
     let trainingCloak: TrainingCloakFrame?
-    let trainingLastRoomMarkerLightDistance: Float?
-    let trainingFinalBotsMarkerLightDistance: Float?
     let trainingFinalGoal: TrainingFinalGoalFrame?
 }
 
@@ -109,31 +106,18 @@ struct PlayerFastHeadlightFrame: Equatable, Sendable {
     let lightDistance: Float
 }
 
-struct TrainingBlueLaserProjectileFrame: Equatable, Sendable {
-    let position: Vector3
-    let velocity: Vector3
-    let roomSourceIndex: Int
-    let model: SourceResource
-}
-
-struct PlayerConcussionMissileFrame: Equatable, Sendable {
-    let roomSourceIndex: Int
-    let position: Vector3
-    let orientation: Matrix3
-    let velocity: Vector3
-    let model: SourceResource
-    let lightDistance: Float
-    let lightPresentation: ObjectLightPresentation
-}
-
-struct PlayerConcussionExplosionFrame: Equatable, Sendable {
+/// A custom explosion (CUSTOM_EXPLOSION_INDEX) at its current animation
+/// frame.
+struct VisEffectExplosionFrame: Equatable, Sendable {
     let roomSourceIndex: Int
     let position: Vector3
     let size: Float
     let texture: SourceResource
 }
 
-struct PlayerConcussionSparkFrame: Equatable, Sendable {
+/// A fading line spark (FADING_LINE_INDEX), drawn from its position back
+/// along its velocity by its size.
+struct VisEffectLineSparkFrame: Equatable, Sendable {
     let roomSourceIndex: Int
     let start: Vector3
     let end: Vector3

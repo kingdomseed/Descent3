@@ -83,26 +83,6 @@ struct D3ImportReport: Codable, Equatable, Sendable {
 
 typealias D3ImportCancellationCheck = () -> Int32?
 
-func canonicalPlayerConcussionLightPresentation(
-    _ retail: ObjectLightPresentation
-) -> ObjectLightPresentation {
-    .init(
-        primaryColor: .init(
-            x: retail.primaryColor.x,
-            y: retail.primaryColor.y,
-            z: 0
-        ),
-        secondaryColor: retail.secondaryColor,
-        timeInterval: retail.timeInterval,
-        flickerDistance: retail.flickerDistance,
-        directionalDot: retail.directionalDot,
-        flags: retail.flags,
-        timebits: retail.timebits,
-        angle: retail.angle,
-        lightingRenderType: retail.lightingRenderType
-    )
-}
-
 func canonicalTrainingYellowFlareGunpoint(
     _ retail: ReachedModelGunpoint
 ) -> ReachedModelGunpoint {
@@ -532,10 +512,6 @@ func runD3Import(
         overlay: overlayData,
         named: "Concussion"
     )
-    let concussionLightPresentation =
-        canonicalPlayerConcussionLightPresentation(
-            concussionWeapon.lightPresentation
-        )
     precondition(
         concussionWeapon.name == "Concussion"
             && concussionWeapon.fireImageName
@@ -558,8 +534,6 @@ func runD3Import(
             && concussionWeapon.lightDistance == 12.5
             && concussionWeapon.lightPresentation.primaryColor
                 == .init(x: 1, y: 0.5, z: 0.25)
-            && concussionLightPresentation.primaryColor
-                == .init(x: 1, y: 0.5, z: 0)
     )
     let yellowFlareWeapon = try resolveRetailWeaponPresentation(
         table: tableData,
@@ -723,10 +697,7 @@ func runD3Import(
             && $0.caseInsensitiveCompare(
                 yellowFlareWeapon.fireImageName
             ) != .orderedSame
-    }.sorted {
-        $0.localizedCaseInsensitiveCompare($1)
-            == .orderedAscending
-    } + [
+    }.sorted(by: legacyNameOrder) + [
         blueLaserWeapon.fireImageName,
         concussionWeapon.fireImageName,
         yellowFlareWeapon.fireImageName,
@@ -793,12 +764,7 @@ func runD3Import(
             ($0.name.lowercased(), SourceResource(storedIndex: $0.storedIndex, sourceName: $0.name))
         }
     )
-    var modelTextureBySlotName = modelTextureByName
-    for definition in reachedTextureDefinitions {
-        let bitmapKey = URL(fileURLWithPath: definition.bitmapSourceName)
-            .deletingPathExtension().lastPathComponent.lowercased()
-        modelTextureBySlotName[bitmapKey] = modelTextureByName[definition.name.lowercased()]!
-    }
+    var modelTextureBySlotName = modelTextureSlotTable(reachedTextureDefinitions)
     if let energyTexture = modelTextureByName["energy"] {
         modelTextureBySlotName["energy.tga1"] = energyTexture
     }
@@ -967,8 +933,6 @@ func runD3Import(
             isVisible: object.handle != 6_180 && object.handle != 6_150
                 && object.handle != 4_106
                 && object.handle != 12_302
-                && object.handle != 4_112
-                && object.handle != 4_113
         )
     }
     precondition(reachedObjectPresentations.count == 27)
@@ -989,13 +953,6 @@ func runD3Import(
         }
     })
     let retailShip = ship.shipDefinition!
-    let playerConcussionBattery = retailShip.playerConcussion
-    let playerConcussionGunpoints = try [1, 2].map { index in
-        try reachedOutrageModelGunpoint(
-            modelPayloadByName[ship.primaryModelName.lowercased()]!.data,
-            index: index
-        )
-    }
     let playerYellowFlareBattery = retailShip.playerYellowFlare
     let parsedPlayerYellowFlareGunpoint = try playerYellowFlareBattery.map { _ in
         try reachedOutrageModelGunpoint(
@@ -1025,42 +982,10 @@ func runD3Import(
             && retailShip.physics.hitDieDot == -1
             && retailShip.physics.maximumTurnrollRate == 8_000
             && retailShip.physics.turnrollRatio == 0.13
-            && playerConcussionBattery?.batteryIndex == 10
-            && playerConcussionBattery?.firingMasks == [1, 2]
-            && playerConcussionBattery?.weaponName == "Concussion"
-            && playerConcussionBattery?.fireSoundLogicalNames
-                == ["concmissilefire71", "concmissilefire71"]
-            && playerConcussionBattery?.fireWaits == [0.5, 0.5]
-            && playerConcussionBattery?.energyUsage == 0
-            && playerConcussionBattery?.ammoUsage == 1
-            && playerConcussionBattery?.fireFlags == 0
-            && playerConcussionBattery?.weaponFlags == 0
-            && playerConcussionGunpoints[0].parentSubmodelIndex == 0
-            && playerConcussionGunpoints[0].localPosition.x.bitPattern
-                == Float(2.792_412_5).bitPattern
-            && playerConcussionGunpoints[0].localPosition.y.bitPattern
-                == Float(-1.186_958_9).bitPattern
-            && playerConcussionGunpoints[0].localPosition.z.bitPattern
-                == Float(2.687_090_9).bitPattern
-            && playerConcussionGunpoints[0].forward.x.bitPattern
-                == Float(0.000_007_629_434_5).bitPattern
-            && playerConcussionGunpoints[0].forward.y.bitPattern
-                == Float(0.000_003_337_758_7).bitPattern
-            && playerConcussionGunpoints[0].forward.z.bitPattern
-                == Float(1).bitPattern
-            && playerConcussionGunpoints[1].parentSubmodelIndex == 0
-            && playerConcussionGunpoints[1].localPosition.x.bitPattern
-                == Float(-2.804_046_4).bitPattern
-            && playerConcussionGunpoints[1].localPosition.y.bitPattern
-                == Float(-1.186_885_0).bitPattern
-            && playerConcussionGunpoints[1].localPosition.z.bitPattern
-                == Float(2.687_135_2).bitPattern
-            && playerConcussionGunpoints[1].forward.x.bitPattern
-                == Float(0.000_008_106_278).bitPattern
-            && playerConcussionGunpoints[1].forward.y.bitPattern
-                == Float(0.000_003_814_590_4).bitPattern
-            && playerConcussionGunpoints[1].forward.z.bitPattern
-                == Float(1).bitPattern
+            && retailShip.weaponBatteries?[0].weaponNames[1]
+                == "Laser Level 2 - Blue"
+            && retailShip.weaponBatteries?[10].weaponNames[1]
+                == "Concussion"
             && playerYellowFlareBattery?.batteryIndex == 20
             && playerYellowFlareBattery?.firingMask == 1
             && playerYellowFlareBattery?.weaponName == "Yellow flare"
@@ -1091,53 +1016,6 @@ func runD3Import(
             primaryModel: modelSources[ship.primaryModelName.lowercased()]!,
             presentationSize: retailShip.presentationSize,
             physics: retailShip.physics,
-            playerConcussion: .init(
-                batteryIndex: playerConcussionBattery!.batteryIndex,
-                firingMasks: playerConcussionBattery!.firingMasks,
-                weapon: .init(
-                    storedIndex: concussionWeapon.storedIndex,
-                    sourceName: concussionWeapon.name
-                ),
-                model: modelSources[
-                    concussionWeapon.fireImageName.lowercased()
-                ]!,
-                fireSoundLogicalNames:
-                    playerConcussionBattery!.fireSoundLogicalNames,
-                fireSoundSourceName: "concmissilefire7.wav",
-                impactSoundLogicalName: "Explode1",
-                impactSoundSourceName: "Explode1.wav",
-                fireWaits: playerConcussionBattery!.fireWaits,
-                energyUsage: playerConcussionBattery!.energyUsage,
-                ammoUsage: playerConcussionBattery!.ammoUsage,
-                fireFlags: playerConcussionBattery!.fireFlags,
-                weaponFlags: playerConcussionBattery!.weaponFlags,
-                gunpoints: zip([1, 2], playerConcussionGunpoints).map {
-                    index, gunpoint in
-                    .init(
-                        index: index,
-                        parentSubmodelIndex: gunpoint.parentSubmodelIndex,
-                        localPosition: gunpoint.localPosition,
-                        localForward: gunpoint.forward
-                    )
-                },
-                collisionRadius: concussionWeapon.customSize,
-                speed: concussionWeapon.speed,
-                lifetime: concussionWeapon.lifetime,
-                rotationalVelocity:
-                    concussionWeapon.rotationalVelocity.z,
-                lightDistance: concussionWeapon.lightDistance,
-                lightPresentation: concussionLightPresentation,
-                explosionFrames: concussionExplosionAnimation.resources,
-                explosionSourceFrameTime:
-                    concussionExplosionAnimation.sourceFrameTime,
-                explosionSize: concussionWeapon.explosionSize,
-                explosionLifetime: concussionWeapon.explosionLifetime,
-                directRobotDamage: concussionWeapon.genericDamage * 1.5,
-                shockwaveDuration: concussionWeapon.impactTime,
-                shockwaveRadius: concussionWeapon.impactSize,
-                shockwaveDamage: concussionWeapon.impactGenericDamage,
-                shockwaveForce: concussionWeapon.impactForce
-            ),
             playerYellowFlare: .init(
                 batteryIndex: playerYellowFlareBattery!.batteryIndex,
                 firingMask: playerYellowFlareBattery!.firingMask,
@@ -1485,29 +1363,9 @@ func runD3Import(
         ),
         voiceClip: voiceClips[2]
     )
-    let destroyRobot = galleryLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("DestroyBot2")
-            == .orderedSame
-    }!
-    precondition(
-        destroyRobot.handle == 4_112
-            && destroyRobot.type == 2
-            && destroyRobot.storedID == 106
-            && destroyRobot.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && destroyRobot.flags == 5_121
-            && destroyRobot.location == .room(37)
-    )
     let robotGuidebotLevel = galleryLevel.addingTrainingRobotGuidebotChain(
         .init(
-            destroyRobotObjectHandle: destroyRobot.handle,
             guidebotObjectHandle: 6_164,
-            destroyRobotRoomSourceIndex: 37,
-            destroyRobotFlags: 5_121,
-            destructionDelay: 2,
-            destructionMessage: messages["GoodJob"]!,
-            exitInstruction: messages["ExitManuveur"]!,
-            destructionVoiceSourceName: "proceed5.osf",
             deployedGuidebotObjectType: 2,
             deployedGuidebotMessage: messages["GetCameraMonitor"]!,
             deployedGuidebotVoiceSourceName: "guidebotb.osf",
@@ -1591,7 +1449,6 @@ func runD3Import(
                         yellowSparkAnimation.sourceFrameTime
                 )
             ),
-            combat: .stockTraining,
             guidebot: .stockTraining
         ),
         voiceClips: [voiceClips[3], voiceClips[4]],
@@ -1621,37 +1478,6 @@ func runD3Import(
     }!
     let finalRoomEntryTrigger = robotGuidebotLevel.triggers.first {
         $0.name.caseInsensitiveCompare("Portal4") == .orderedSame
-    }!
-    let rasBot1 = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("RASBot1")
-            == .orderedSame
-    }!
-    let rasBot2 = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("RASBot2")
-            == .orderedSame
-    }!
-    let rasBot3 = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("RASBot3")
-            == .orderedSame
-    }!
-    let rasBot4 = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("RASBot4")
-            == .orderedSame
-    }!
-    let lastBot1 = robotGuidebotLevel.objects.first {
-        $0.instanceName == "LastBot1"
-    }!
-    let lastBot2 = robotGuidebotLevel.objects.first {
-        $0.instanceName == "LastBot2"
-    }!
-    let lastBot3 = robotGuidebotLevel.objects.first {
-        $0.instanceName == "LastBot3"
-    }!
-    let lastBot4 = robotGuidebotLevel.objects.first {
-        $0.instanceName == "LastBot4"
-    }!
-    let lastBot5 = robotGuidebotLevel.objects.first {
-        $0.instanceName == "LastBot5"
     }!
     let invulnerabilityPickup = robotGuidebotLevel.objects.first {
         $0.instanceName?.caseInsensitiveCompare("InvulnPowerup2")
@@ -1968,92 +1794,6 @@ func runD3Import(
             && killbotEntryTrigger.flags == 8
             && killbotEntryTrigger.activator == 1
     )
-    precondition(
-        rasBot1.handle == 2_074
-            && rasBot1.type == 2
-            && rasBot1.storedID == 106
-            && rasBot1.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && rasBot1.flags == 5_121
-            && rasBot1.location == .room(11)
-    )
-    precondition(
-        rasBot2.handle == 2_075
-            && rasBot2.type == 2
-            && rasBot2.storedID == 106
-            && rasBot2.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && rasBot2.flags == 5_121
-            && rasBot2.location == .room(12)
-    )
-    precondition(
-        rasBot3.handle == 2_077
-            && rasBot3.type == 2
-            && rasBot3.storedID == 106
-            && rasBot3.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && rasBot3.flags == 5_121
-            && rasBot3.location == .room(42)
-    )
-    precondition(
-        rasBot4.handle == 2_078
-            && rasBot4.type == 2
-            && rasBot4.storedID == 106
-            && rasBot4.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && rasBot4.flags == 5_121
-            && rasBot4.location == .room(0)
-    )
-    precondition(
-        lastBot1.handle == 4_127
-            && lastBot1.type == 2
-            && lastBot1.storedID == 106
-            && lastBot1.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && lastBot1.instanceName == "LastBot1"
-            && lastBot1.flags == 5_121
-            && lastBot1.location == .room(14)
-    )
-    precondition(
-        lastBot2.handle == 2_080
-            && lastBot2.type == 2
-            && lastBot2.storedID == 106
-            && lastBot2.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && lastBot2.instanceName == "LastBot2"
-            && lastBot2.flags == 5_121
-            && lastBot2.location == .room(46)
-    )
-    precondition(
-        lastBot3.handle == 2_081
-            && lastBot3.type == 2
-            && lastBot3.storedID == 106
-            && lastBot3.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && lastBot3.instanceName == "LastBot3"
-            && lastBot3.flags == 5_121
-            && lastBot3.location == .room(47)
-    )
-    precondition(
-        lastBot4.handle == 2_082
-            && lastBot4.type == 2
-            && lastBot4.storedID == 106
-            && lastBot4.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && lastBot4.instanceName == "LastBot4"
-            && lastBot4.flags == 5_121
-            && lastBot4.location == .room(47)
-    )
-    precondition(
-        lastBot5.handle == 2_083
-            && lastBot5.type == 2
-            && lastBot5.storedID == 106
-            && lastBot5.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && lastBot5.instanceName == "LastBot5"
-            && lastBot5.flags == 5_121
-            && lastBot5.location == .room(48)
-    )
     let finalGoal = topologyLevel.objects.first {
         $0.handle == 6_180
     }!
@@ -2103,40 +1843,8 @@ func runD3Import(
             && cloakPickup.flags == 5_120
             && cloakPickup.location == .room(11)
     )
-    let rasBot1Level = cameraMonitorLevel.addingTrainingRASBot1DeathChain(
-        .init(
-            robotObjectHandle: rasBot1.handle,
-            robotRoomSourceIndex: 11,
-            robotFlags: rasBot1.flags,
-            combat: .stockTraining
-        )
-    )
-    let rasBot2Level = rasBot1Level.addingTrainingRASBot2DeathChain(
-        .init(
-            robotObjectHandle: rasBot2.handle,
-            robotRoomSourceIndex: 12,
-            robotFlags: rasBot2.flags,
-            combat: .stockTraining
-        )
-    )
-    let rasBot3Level = rasBot2Level.addingTrainingRASBot3DeathChain(
-        .init(
-            robotObjectHandle: rasBot3.handle,
-            robotRoomSourceIndex: 42,
-            robotFlags: rasBot3.flags,
-            combat: .stockTraining
-        )
-    )
-    let rasBot4Level = rasBot3Level.addingTrainingRASBot4DeathChain(
-        .init(
-            robotObjectHandle: rasBot4.handle,
-            robotRoomSourceIndex: 0,
-            robotFlags: rasBot4.flags,
-            combat: .stockTraining
-        )
-    )
     let invulnerabilityLevel =
-        rasBot4Level.addingTrainingInvulnerabilityPickupChain(
+        cameraMonitorLevel.addingTrainingInvulnerabilityPickupChain(
         .init(
             pickupObjectHandle: invulnerabilityPickup.handle,
             pickupRoomSourceIndex: 12,
@@ -2336,47 +2044,6 @@ func runD3Import(
             ),
             voiceClip: voiceClips[10]
         )
-    let lastBot1Level =
-        finalRoomEntryLevel.addingTrainingLastBot1DeathChain(
-        .init(
-            robotObjectHandle: lastBot1.handle,
-            robotRoomSourceIndex: 14,
-            robotFlags: lastBot1.flags,
-            combat: .stockTraining
-        )
-    )
-    let lastBot2Level = lastBot1Level.addingTrainingLastBot2DeathChain(
-        .init(
-            robotObjectHandle: lastBot2.handle,
-            robotRoomSourceIndex: 46,
-            robotFlags: lastBot2.flags,
-            combat: .stockTraining
-        )
-    )
-    let lastBot3Level = lastBot2Level.addingTrainingLastBot3DeathChain(
-        .init(
-            robotObjectHandle: lastBot3.handle,
-            robotRoomSourceIndex: 47,
-            robotFlags: lastBot3.flags,
-            combat: .stockTraining
-        )
-    )
-    let lastBot4Level = lastBot3Level.addingTrainingLastBot4DeathChain(
-        .init(
-            robotObjectHandle: lastBot4.handle,
-            robotRoomSourceIndex: 47,
-            robotFlags: lastBot4.flags,
-            combat: .stockTraining
-        )
-    )
-    let lastBot5Level = lastBot4Level.addingTrainingLastBot5DeathChain(
-        .init(
-            robotObjectHandle: lastBot5.handle,
-            robotRoomSourceIndex: 48,
-            robotFlags: lastBot5.flags,
-            combat: .stockTraining
-        )
-    )
     precondition(
         finalBotsMarker.handle == 4_118
             && finalBotsMarker.type == 11
@@ -2390,7 +2057,7 @@ func runD3Import(
             }
     )
     let finalBotsLevel =
-        lastBot5Level.addingTrainingFinalBotsCompletionChain(
+        finalRoomEntryLevel.addingTrainingFinalBotsCompletionChain(
         .init(
             barrierRoomSourceIndex: finalBotsBarrier.sourceIndex,
             orderedPortalIndices: [0, 1],
@@ -2453,10 +2120,10 @@ func runD3Import(
             && destroyBot1.location == .room(37)
             && level.objectPresentations.first {
                 $0.objectHandle == destroyBot2.handle
-            }?.isVisible == false
+            }?.isVisible == true
             && level.objectPresentations.first {
                 $0.objectHandle == destroyBot1.handle
-            }?.isVisible == false
+            }?.isVisible == true
             && level.models.first {
                 $0.source == blueLaserModel
             }?.sourceSHA256
@@ -2467,31 +2134,19 @@ func runD3Import(
             && level.paths[1].name == "GoToDie"
             && level.paths[1].nodes.count == 1
     )
-    // The follow-bot destruction chain stays bespoke until M1 step 7.
-    level.trainingFollowBotDestruction = .init(
-        followBotObjectHandle: followBot.handle,
-        destroyBot2ObjectHandle: destroyBot2.handle,
-        destroyBot1ObjectHandle: destroyBot1.handle,
-        combat: .stockTraining,
-        projectileModel: blueLaserModel,
-        destructionDelay: 2,
-        levelTimerID: 11,
-        movingTeamFlags: 65_536,
-        movingPathIndex: 0,
-        movingPathGoalFlags: 8_392_960,
-        goalID: -1,
-        goalPriority: 3,
-        successMessage: messages["GoodJob"]!,
-        movingInstruction: messages["Movingbotintro"]!,
-        voiceSourceName: "kill1.osf"
-    )
     // Object tables: object_info for the placed generic objects, the model
-    // gun points and batteries, and the weapons. A sound page the tables
-    // name joins the level's sound clips.
+    // gun points and batteries, the ship batteries of the laser and the
+    // Concussion that InitPlayerNewShip gives (Player.cpp:1502-1503; the
+    // flare battery stays with the bespoke flare until M1 step 8), and the
+    // weapons. A sound page the tables name joins the level's sound clips.
     var addedSoundClips: [CanonicalSoundClip] = []
     let knownSoundClips = level.soundClips
     level = try level.addingObjectTables(
         genericPages: genericPages,
+        shipBatteries: (retailShip.weaponBatteries ?? []).filter {
+            [PlayerWeaponState.laserIndex, PlayerWeaponState.concussionIndex]
+                .contains($0.index)
+        },
         weapon: { name in
             try resolveRetailWeaponPresentation(
                 table: tableData,
@@ -2501,6 +2156,11 @@ func runD3Import(
         },
         weaponModel: { modelSources[$0.lowercased()] },
         modelPayload: { modelPayloadByName[$0]?.data },
+        explosionFrames: { name in
+            name.caseInsensitiveCompare(concussionWeapon.explosionTextureName)
+                == .orderedSame
+                ? concussionExplosionAnimation.resources : []
+        },
         soundKey: { name in
             let clip = try reachedSoundClip(named: name)
             if !(knownSoundClips + addedSoundClips).contains(where: {

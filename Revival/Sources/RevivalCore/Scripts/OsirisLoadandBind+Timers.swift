@@ -194,9 +194,10 @@ extension GameWorld {
 
             if let detonator = timer.detonator {
                 let object = objects[detonator]
-                // A dying or dead player also cancels the timer; player death
-                // arrives in M1 step 7.
-                if object == nil || object?.type == .ghost {
+                // A ghost, or a dying or dead player, also cancels it
+                // (OsirisLoadandBind.cpp:2298-2300).
+                if object == nil || object?.type == .ghost
+                    || (object?.type == .player && playerDeath != nil) {
                     timer.isUsed = false
                     timer.repeatCount = 0
                     osirisTimers.setEntry(index, timer)

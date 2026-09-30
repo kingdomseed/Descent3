@@ -410,7 +410,7 @@ func makeTrainingMovingTargetHandoffLevel() -> Level {
                 dyingModel: nil,
                 mediumDistance: nil,
                 lowDistance: nil,
-                isVisible: false
+                isVisible: true
             ),
             .init(
                 objectHandle: 4_113,
@@ -420,7 +420,7 @@ func makeTrainingMovingTargetHandoffLevel() -> Level {
                 dyingModel: nil,
                 mediumDistance: nil,
                 lowDistance: nil,
-                isVisible: false
+                isVisible: true
             ),
         ],
         voiceClips: level.voiceClips + [voice],
@@ -446,27 +446,10 @@ func makeTrainingMovingTargetHandoffLevel() -> Level {
                 level.dependencyManifest.historicalEagerBaseline
         )
     )
-    level.trainingFollowBotDestruction = .init(
-            followBotObjectHandle: 8_200,
-            destroyBot2ObjectHandle: 4_112,
-            destroyBot1ObjectHandle: 4_113,
-            combat: .stockTraining,
-            projectileModel: projectile,
-            destructionDelay: 2,
-            levelTimerID: 11,
-            movingTeamFlags: 65_536,
-            movingPathIndex: 0,
-            movingPathGoalFlags: 8_392_960,
-            goalID: -1,
-            goalPriority: 3,
-            successMessage: "Excellent!",
-            movingInstruction:
-                "Now destroy 2 more robots. This time they will be moving.",
-            voiceSourceName: "kill1.osf"
-        )
+    // The blue laser model is the player's laser weapon's model.
     return rescriptedTrainingLevel(
         level
-    )
+    ).addingFixturePlayerWeapons()
 }
 
 private func pathNode(
@@ -596,23 +579,16 @@ func makeTrainingRobotGuidebotLevel() -> Level {
                 level.dependencyManifest.historicalEagerBaseline
         )
     )
+    // DestroyBot2's page: a destroyable RAS1 flyer (no AI here).
+    level = level.addingObjectInfo(fixtureTargetRobotInfo)
     return rescriptedTrainingLevel(
         level.addingTrainingRobotGuidebotChain(
             .init(
-                destroyRobotObjectHandle: 4_112,
                 guidebotObjectHandle: 6_164,
-                destroyRobotRoomSourceIndex: 2,
-                destroyRobotFlags: 5_121,
-                destructionDelay: 2,
-                destructionMessage: "Excellent!",
-                exitInstruction:
-                    "Now go through the open doorway, and into the next room.",
-                destructionVoiceSourceName: "proceed5.osf",
                 deployedGuidebotObjectType: 2,
                 deployedGuidebotMessage:
                     "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
                 deployedGuidebotVoiceSourceName: "guidebotb.osf",
-                combat: .stockTraining,
                 guidebot: .stockTraining
             ),
             voiceClips: [
@@ -640,7 +616,7 @@ func makeTrainingRobotGuidebotLevel() -> Level {
                 ),
             ]
         )
-    )
+    ).addingFixturePlayerWeapons()
 }
 
 func makeTrainingGuidebotYellowFlareLevel() -> Level {
@@ -794,15 +770,7 @@ func makeTrainingGuidebotYellowFlareLevel() -> Level {
         timeout: timeout
     )
     let boundChain = TrainingRobotGuidebotChain(
-        destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
         guidebotObjectHandle: chain.guidebotObjectHandle,
-        destroyRobotRoomSourceIndex: chain.destroyRobotRoomSourceIndex,
-        destroyRobotFlags: chain.destroyRobotFlags,
-        destructionDelay: chain.destructionDelay,
-        destructionMessage: chain.destructionMessage,
-        exitInstruction: chain.exitInstruction,
-        destructionVoiceSourceName:
-            chain.destructionVoiceSourceName,
         deployedGuidebotObjectType:
             chain.deployedGuidebotObjectType,
         deployedGuidebotMessage: chain.deployedGuidebotMessage,
@@ -812,7 +780,6 @@ func makeTrainingGuidebotYellowFlareLevel() -> Level {
         ambientEngineSoundSourceName:
             chain.ambientEngineSoundSourceName,
         yellowFlare: yellowFlare,
-        combat: chain.combat,
         guidebot: chain.guidebot
     )
     let dependencies = level.dependencyManifest.current + [

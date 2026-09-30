@@ -41,6 +41,7 @@ extension GameWorld {
     static let seeTargetNotify = 4
     static let playerSeesYouNotify = 5
     static let weaponHitObjectNotify = 6
+    static let hitByWeaponNotify = 14
     // AIVIS_ levels (AImain.cpp:1639-1642).
     static let aiVisibilityBarely: Float = 1
     static let aiVisibilityMostly: Float = 2
@@ -98,6 +99,18 @@ extension GameWorld {
             )
         } ?? info.size
         object.shields = Float(info.hitPoints)
+        // ObjInitGeneric's flags (ObjInit.cpp:766-771).
+        if info.flags & CanonicalObjectInfo.destroyableFlag != 0 {
+            object.flags |= GameObject.destroyableFlag
+        }
+        if info.flags & CanonicalObjectInfo.aiScriptedDeathFlag != 0 {
+            object.flags |= GameObject.aiDoDeathFlag
+        }
+        if info.flags & CanonicalObjectInfo.doCeilingCheckFlag != 0 {
+            object.flags |= GameObject.forceCeilingCheckFlag
+        }
+        // ObjSetRenderPolyobj (ObjInit.cpp:779).
+        object.flags |= GameObject.polygonObjectFlag
         // OIF_USES_PHYSICS (objinfo.h:334).
         object.usesPhysics = info.flags & 0x02 != 0
         if let ai = info.ai,
@@ -741,6 +754,71 @@ extension GameWorld {
         }
         objects[handle]?.ai = ai
         osirisCallEvent(handle, .aiNotify(.other, it: hit), level: level)
+    }
+
+    /// AINotify(AIN_HIT_BY_WEAPON) (AImain.cpp:3148): the object counts
+    /// the hit and becomes fully aware; it may flinch; a neutral-until-shot
+    /// object stays neutral only toward a friend; and it may turn on the
+    /// weapon's parent (20% per hit for the player it already knows about).
+    /// Flinching needs AIG_SET_ANIM and the angry sound needs the AI sounds
+    /// (M2), so only their random draw remains.
+    mutating func aiNotifyHitByWeapon(_ handle: ObjectHandle,
+                                      weapon: ObjectHandle,
+                                      level: Level) {
+        guard aiNotifyReaches(handle), var ai = objects[handle]?.ai else {
+            return
+        }
+        ai.memory[0].numberOfTimesHit &+= 1
+        if ai.notifies(Self.hitByWeaponNotify) {
+            ai.awareness = ObjectAIFrame.awareFully
+            if gameTime > ai.nextFlinchTime {
+                _ = psRand() % 10
+            }
+        }
+        objects[handle]?.ai = ai
+        let newEnemy = objects[weapon].flatMap { objects[$0.parent] }
+        if ai.flags & ObjectAIFrame.actAsNeutralUntilShotFlag != 0 {
+            ai.flags &= ~ObjectAIFrame.actAsNeutralUntilShotFlag
+            objects[handle]?.ai = ai
+            if let object = objects[handle],
+               !(newEnemy.map { aiObjEnemy(object, $0, level: level) }
+                   ?? false) {
+                ai.flags |= ObjectAIFrame.actAsNeutralUntilShotFlag
+                objects[handle]?.ai = ai
+            }
+        }
+        guard let object = objects[handle] else { return }
+        let isEnemy = newEnemy.map {
+            aiObjEnemy(object, $0, level: level)
+        } ?? false
+        let randomValue = psRandFraction()
+        if let enemy = newEnemy, enemy.handle != handle {
+            let sameKind = enemy.info == object.info
+                && enemy.type == object.type
+            let switches: Bool
+            if let enemyAI = enemy.ai {
+                switches = enemyAI.targetHandle == handle
+                    || (!isEnemy && sameKind && randomValue < ai.fightSame)
+                    || (!isEnemy && !sameKind && randomValue < ai.fightTeam)
+            } else {
+                switches = false
+            }
+            if switches
+                || (isEnemy && enemy.type == .player
+                    && (ai.awareness <= ObjectAIFrame.awareBarely
+                        || randomValue > 0.8
+                        || ai.targetHandle == .none)) {
+                ai.flags |= ObjectAIFrame.determineTargetFlag
+                let spread = Self.maximumTargetUpdateInterval
+                    - Self.minimumTargetUpdateInterval
+                ai.nextTargetUpdateTime = gameTime
+                    + Self.minimumTargetUpdateInterval
+                    + psRandFraction() * spread
+                objects[handle]?.ai = ai
+                aiSetTarget(handle, enemy.handle, level: level)
+            }
+        }
+        osirisCallEvent(handle, .aiNotify(.other, it: weapon), level: level)
     }
 
     /// AINotify for a goal (AIN_GOAL_COMPLETE, AIN_GOAL_INVALID,

@@ -16,6 +16,16 @@ import Foundation
 struct CanonicalObjectInfo: Codable, Equatable, Sendable {
     /// OIF_CONTROL_AI (objinfo.h:333).
     static let controlAIFlag: UInt32 = 0x01
+    /// OIF_USES_PHYSICS (objinfo.h:334).
+    static let usesPhysicsFlag: UInt32 = 0x02
+    /// OIF_DESTROYABLE (objinfo.h:335).
+    static let destroyableFlag: UInt32 = 0x04
+    /// OIF_AI_SCRIPTED_DEATH (objinfo.h:340).
+    static let aiScriptedDeathFlag: UInt32 = 0x100
+    /// OIF_DO_CEILING_CHECK.
+    static let doCeilingCheckFlag: UInt32 = 0x200
+    /// OIF_NO_DIFF_SCALE_DAMAGE (objinfo.h:344).
+    static let noDifficultyScaleDamageFlag: UInt32 = 0x800
     /// OIF_NO_DIFF_SCALE_MOVE (objinfo.h:345).
     static let noDifficultyScaleMoveFlag: UInt32 = 0x1000
 
@@ -40,6 +50,65 @@ struct CanonicalObjectInfo: Codable, Equatable, Sendable {
     /// page carries them here: ai_fire (AImain.cpp:5116) is the only reader
     /// that the runtime translates.
     let weaponBatteries: [CanonicalWeaponBattery]
+    /// `score`, which PlayerScoreAdd gives the player who kills the object
+    /// (damage.cpp:1216). Absent in packages imported before M1 step 7.
+    var score: Int16? = nil
+    /// `impact_size`, `impact_time`, and `damage`, which ObjInitGeneric
+    /// copies to the object for the shockwave of its death
+    /// (ObjInit.cpp:760-764).
+    var impact: CanonicalObjectImpact? = nil
+    /// `death_types` with their `death_probabilities` (objinfo.h:502-503),
+    /// all MAX_DEATH_TYPES (4) of them, which KillObject picks from
+    /// (damage.cpp:1037).
+    var deathTypes: [CanonicalDeathType]? = nil
+    /// `sounds[GSI_EXPLODE]` (object_external.h:351): the page's explode
+    /// sound, or empty for SOUND_NONE_INDEX. Absent before this field.
+    var explodeSound: String? = nil
+    /// `f_dspew`, `dspew`, `dspew_percent`, and `dspew_number`
+    /// (objinfo.h:383-385): what DoDeathSpew throws out.
+    var deathSpew: CanonicalDeathSpew? = nil
+    /// `phys_info`: the physics a page with OIF_USES_PHYSICS gives the
+    /// objects made from it at run time (ObjInit.cpp:774).
+    var physics: ObjectPhysics? = nil
+}
+
+/// The death spew of an object page.
+struct CanonicalDeathSpew: Codable, Equatable, Sendable {
+    /// DSF_ONLY_IF_PLAYER_HAS_OBJ_1 and DSF_ONLY_IF_NO_1 (objinfo.h:384-385).
+    static let onlyIfPlayerHasFirstFlag: UInt8 = 1
+    static let onlyIfNoFirstFlag: UInt8 = 2
+
+    struct Entry: Codable, Equatable, Sendable {
+        /// The spewed page (`dspew_name`), found by FindObjectIDName.
+        let pageName: String
+        let percent: Float
+        let number: Int16
+    }
+
+    let flags: UInt8
+    /// MAX_DSPEW_TYPES (2) entries.
+    let entries: [Entry]
+}
+
+/// The impact fields of an object page (objinfo.h).
+struct CanonicalObjectImpact: Codable, Equatable, Sendable {
+    let size: Float
+    let time: Float
+    let damage: Float
+}
+
+/// One `death_info` of an object page with its probability
+/// (objinfo.h:391-395, :502-503).
+struct CanonicalDeathType: Codable, Equatable, Sendable {
+    /// MAX_DEATH_TYPES (objinfo.h:388).
+    static let maximumCount = 4
+
+    /// The DF_ flags (deathinfo_external.h:61-106).
+    let flags: UInt32
+    var delayMinimum: Float
+    var delayMaximum: Float
+    /// 0 to 100 percent.
+    let probability: UInt8
 }
 
 /// The flicker and color fields of `light_info` (lib/object_external_struct.h),
@@ -150,8 +219,20 @@ struct CanonicalWeapon: Codable, Equatable, Sendable {
     static let matterWeaponFlag: UInt32 = 1 << 3
     /// WF_IMAGE_VCLIP (weapon.h:223).
     static let imageVClipFlag: UInt32 = 1 << 5
-    /// WF_ELECTRICAL (weapon.h).
-    static let electricalFlag: UInt32 = 1 << 12
+    /// WF_ELECTRICAL (weapon.h:222).
+    static let electricalFlag: UInt32 = 1 << 4
+    /// WF_BLAST_RING (weapon.h:229).
+    static let blastRingFlag: UInt32 = 1 << 11
+    /// WF_PLANAR_BLAST (weapon.h:230).
+    static let planarBlastFlag: UInt32 = 1 << 12
+    /// WF_SPAWNS_TIMEOUT (weapon.h:234).
+    static let spawnsTimeoutFlag: UInt32 = 1 << 16
+    /// WF_EXPAND (weapon.h:235).
+    static let expandFlag: UInt32 = 1 << 17
+    /// WF_NAPALM (weapon.h:238).
+    static let napalmFlag: UInt32 = 1 << 20
+    /// WF_TIMEOUT_WALL (weapon.h:244).
+    static let timeoutWallFlag: UInt32 = 1 << 26
     /// WF_CUSTOM_SIZE (weapon.h:249).
     static let customSizeFlag: UInt32 = 1 << 31
     /// WSI_IMPACT_WALL (weapon.h:263).
@@ -179,6 +260,41 @@ struct CanonicalWeapon: Codable, Equatable, Sendable {
     let genericDamage: Float
     /// `sounds`, as sound page names. An empty name is SOUND_NONE_INDEX.
     let sounds: [String]
+    /// `impact_size`, `impact_time`, `impact_player_damage`,
+    /// `impact_generic_damage`, and `impact_force`, which ObjInitWeapon
+    /// copies to the weapon object (ObjInit.cpp:1002-1006). Absent in
+    /// packages imported before M1 step 7.
+    var impact: CanonicalWeaponImpact? = nil
+    /// The explosion DoWeaponExploded shows (`explode_image_handle`,
+    /// `explode_time`, `explode_size`).
+    var explosion: CanonicalWeaponExplosion? = nil
+    /// `lighting_info`: the light of the flying weapon.
+    var lightDistance: Float? = nil
+    var lighting: ObjectLightPresentation? = nil
+}
+
+/// The shockwave values of a weapon page (weapon.h).
+struct CanonicalWeaponImpact: Codable, Equatable, Sendable {
+    let size: Float
+    let time: Float
+    let playerDamage: Float
+    let genericDamage: Float
+    let force: Float
+}
+
+/// The explosion of a weapon page. `frames` are the imported frames of the
+/// explosion texture's animation, shown evenly over the explosion's life;
+/// they are empty when the texture is not imported yet, and then the visual
+/// effect is created but not drawn.
+struct CanonicalWeaponExplosion: Codable, Equatable, Sendable {
+    /// Whether `explode_image_handle` names a texture (> 0). Without one,
+    /// DoWeaponExploded picks a random small explosion (WeaponFire.cpp:3154).
+    let hasImage: Bool
+    let frames: [SourceResource]
+    /// `explode_time`.
+    let lifetime: Float
+    /// `explode_size`.
+    let size: Float
 }
 
 /// A model gun point (`w_bank`, lib/polymodel.h), read from the GPNT chunk.
@@ -291,7 +407,19 @@ extension Level {
                                 $0.isEmpty
                                     || soundNames.contains($0.lowercased())
                             }
-                    },
+                    }
+                    && (info.explodeSound.map {
+                        $0.isEmpty || soundNames.contains($0.lowercased())
+                    } ?? true)
+                    && (info.physics.map {
+                        $0.mass.isFinite && $0.mass >= 0 && $0.drag.isFinite
+                            && $0.drag >= 0 && $0.restitution.isFinite
+                            && isFinite($0.rotationalVelocity)
+                    } ?? true)
+                    && (info.deathSpew.map {
+                        $0.entries.count <= 2
+                            && $0.entries.allSatisfy { $0.percent.isFinite }
+                    } ?? true),
                 "object info \(info.name)"
             )
             if let ai = info.ai {

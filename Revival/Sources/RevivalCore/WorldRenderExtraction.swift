@@ -353,14 +353,17 @@ private func admittedRenderObjects(
 /// from `camera` draws, in draw order. GameRenderFrame fills it at the end
 /// of the frame (GameLoop.cpp:2556), and the next frame's AIFrameAll reads
 /// it. A view the visibility pass rejects draws nothing.
-func renderedAIObjectHandles(
+/// The rooms and the CT_AI objects the player view renders: GameRenderFrame
+/// (GameLoop.cpp:2556) sets each drawn room's `last_render_time`
+/// (render.cpp:2930) and fills AI_RenderedList (renderobject.cpp:1239).
+func renderedRoomsAndAIObjects(
     _ level: Level,
     objects: ObjectTable,
     roomStates: [RoomState],
     camera: RoomCamera,
     startRoomSourceIndex: Int,
     excludedObjectHandle: UInt32?
-) -> [ObjectHandle] {
+) -> (rooms: [Int], aiObjects: [ObjectHandle]) {
     guard let visibility = try? extractSourceVisibleWorld(
         level,
         roomStates: roomStates,
@@ -372,9 +375,9 @@ func renderedAIObjectHandles(
             }
         )
     ) else {
-        return []
+        return ([], [])
     }
-    return admittedRenderObjects(
+    let aiObjects = admittedRenderObjects(
         level,
         objects: objects,
         camera: camera,
@@ -382,6 +385,25 @@ func renderedAIObjectHandles(
         visibility: visibility,
         excludedObjectHandle: excludedObjectHandle
     ).compactMap { $0.object.ai == nil ? nil : $0.object.handle }
+    return (visibility.visibleRoomSourceIndices, aiObjects)
+}
+
+func renderedAIObjectHandles(
+    _ level: Level,
+    objects: ObjectTable,
+    roomStates: [RoomState],
+    camera: RoomCamera,
+    startRoomSourceIndex: Int,
+    excludedObjectHandle: UInt32?
+) -> [ObjectHandle] {
+    renderedRoomsAndAIObjects(
+        level,
+        objects: objects,
+        roomStates: roomStates,
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        excludedObjectHandle: excludedObjectHandle
+    ).aiObjects
 }
 
 func sourceObjectPresentationSize(
@@ -751,9 +773,13 @@ let trainingScriptActionCounterMaximum = 100_000
 
 /// The draws the renderer prepares for the weapon objects of one weapon
 /// model. More weapon objects of a model than this in one frame are not
-/// drawn; robots fire far fewer (a battery fires once a second, and a shot
-/// lives a few seconds).
-let weaponObjectPresentationCapacity = 8
+/// drawn. The player's lasers need the most: two every quarter second, each
+/// living up to five seconds in a long room.
+let weaponObjectPresentationCapacity = 40
+/// The custom explosions and line sparks the renderer prepares draws for.
+/// More live visual effects than this are simulated but not drawn.
+let visEffectExplosionPresentationCapacity = 6
+let visEffectLineSparkPresentationCapacity = 48
 
 /// The weapons with a polygon model, in `Level.weapons` order, with their
 /// models: one group of prepared draws each.
@@ -864,159 +890,57 @@ private func weaponObjectDrawItems(
     )
 }
 
-let trainingBlueLaserPresentationCapacity = 40
-let playerConcussionMissilePresentationCapacity = 6
-
-func extractPreparedTrainingBlueLaserDrawItems(
-    _ level: Level
-) -> [ModelDrawItem] {
-    guard let handoff =
-            level.trainingFollowBotDestruction,
-          let destroyBot1 = level.objects.first(where: {
-              $0.handle == handoff.destroyBot1ObjectHandle
-          }),
-          case let .room(roomSourceIndex) = destroyBot1.location
-    else {
-        return []
-    }
-    return extractTrainingBlueLaserDrawItems(
-        level,
-        projectiles:
-            (0..<trainingBlueLaserPresentationCapacity).map {
-                _ in
-                .init(
-                    position: destroyBot1.position,
-                    velocity:
-                        destroyBot1.orientation.forward
-                            * handoff.combat.projectileSpeed,
-                    roomSourceIndex: roomSourceIndex,
-                    model: handoff.projectileModel
-                )
-            },
-        camera: .trainingRoom3
-    )
-}
-
-func extractTrainingBlueLaserDrawItems(
+/// The custom weapon explosions (CUSTOM_EXPLOSION_INDEX) the renderer draws,
+/// in list order, each at the animation frame its age reaches.
+func visEffectExplosionFrames(
     _ level: Level,
-    projectiles: [TrainingBlueLaserProjectileFrame],
-    camera: RoomCamera
-) -> [ModelDrawItem] {
-    guard let handoff =
-            level.trainingFollowBotDestruction,
-          let model = level.models.first(where: {
-              $0.source == handoff.projectileModel
-          })
-    else {
-        return []
-    }
-    precondition(
-        projectiles.count
-            <= trainingBlueLaserPresentationCapacity
-    )
-    let materialByTexture = Dictionary(
-        uniqueKeysWithValues: level.presentationMaterials.map {
-            ($0.texture, $0)
+    effects: [VisEffect]
+) -> [VisEffectExplosionFrame] {
+    var frames: [VisEffectExplosionFrame] = []
+    for effect in effects
+    where effect.id == VisEffect.customExplosionID
+        && effect.flags & VisEffect.deadFlag == 0 {
+        guard frames.count < visEffectExplosionPresentationCapacity,
+              let weapon = effect.customWeapon,
+              let explosion = level.weapons?[weapon].explosion,
+              !explosion.frames.isEmpty,
+              effect.lifetime > 0
+        else {
+            continue
         }
-    )
-    return projectiles.enumerated().flatMap {
-        slot, projectile in
-        let forward = sourceVectorNormalized(projectile.velocity)
-        let referenceUp =
-            abs(forward.y) < 0.99
-            ? Vector3(x: 0, y: 1, z: 0)
-            : Vector3(x: 1, y: 0, z: 0)
-        let right = sourceVectorNormalized(sourceVectorCross(referenceUp, forward))
-        let up = sourceVectorCross(forward, right)
-        let object = GameObject(
-            handle: ObjectHandle(
-                UInt32.max
-                    - UInt32(
-                        trainingBlueLaserPresentationCapacity
-                    )
-                    - UInt32(slot)
-            ),
-            type: .weapon,
-            renderType: .polyobj,
-            location: .room(projectile.roomSourceIndex),
-            position: projectile.position,
-            orientation: .init(
-                right: right,
-                up: up,
-                forward: forward
-            )
+        // The fraction of its life the effect has lived, in 0...1, picks
+        // the frame; clamping first keeps any saved lifetime in range.
+        let lived = Double(effect.lifetime - effect.lifeLeft)
+            / Double(effect.lifetime)
+        let fraction = lived.isFinite ? min(1, max(0, lived)) : 0
+        let index = min(
+            explosion.frames.count - 1,
+            Int(fraction * Double(explosion.frames.count))
         )
-        return makeModelDrawItems(
-            object: object,
-            model: model,
-            materialByTexture: materialByTexture,
-            camera: camera,
-            cullBackfaces: false
-        )
+        frames.append(.init(
+            roomSourceIndex: effect.roomSourceIndex,
+            position: effect.position,
+            size: effect.size,
+            texture: explosion.frames[index]
+        ))
     }
+    return frames
 }
 
-func extractPreparedPlayerConcussionMissileDrawItems(
-    _ level: Level
-) -> [ModelDrawItem] {
-    guard let binding = level.shipDefinitions.first?.playerConcussion,
-          let player = level.objects.first(where: {
-              $0.handle == level.defaultPlayerBinding?.objectHandle
-          }),
-          case let .room(roomSourceIndex) = player.location else {
-        return []
-    }
-    return extractPlayerConcussionMissileDrawItems(
-        level,
-        missiles: (0..<playerConcussionMissilePresentationCapacity).map {
-            _ in .init(
-                roomSourceIndex: roomSourceIndex,
-                position: player.position,
-                orientation: player.orientation,
-                velocity: player.orientation.forward * binding.speed,
-                model: binding.model,
-                lightDistance: binding.lightDistance,
-                lightPresentation: binding.lightPresentation
-            )
-        },
-        camera: .trainingRoom3
-    )
-}
-
-func extractPlayerConcussionMissileDrawItems(
-    _ level: Level,
-    missiles: [PlayerConcussionMissileFrame],
-    camera: RoomCamera
-) -> [ModelDrawItem] {
-    guard let binding = level.shipDefinitions.first?.playerConcussion,
-          let model = level.models.first(where: {
-              $0.source == binding.model
-          }) else {
-        return []
-    }
-    precondition(missiles.count <= playerConcussionMissilePresentationCapacity)
-    let materialByTexture = Dictionary(
-        uniqueKeysWithValues: level.presentationMaterials.map {
-            ($0.texture, $0)
-        }
-    )
-    return missiles.enumerated().flatMap { slot, missile in
-        let object = GameObject(
-            handle: ObjectHandle(
-                UInt32.max - 6_000 - UInt32(slot)
-            ),
-            type: .weapon,
-            renderType: .polyobj,
-            location: .room(missile.roomSourceIndex),
-            position: missile.position,
-            orientation: missile.orientation
-        )
-        return makeModelDrawItems(
-            object: object,
-            model: model,
-            materialByTexture: materialByTexture,
-            camera: camera,
-            cullBackfaces: false
+/// The fading line sparks (FADING_LINE_INDEX) the renderer draws, in list
+/// order.
+func visEffectLineSparkFrames(
+    _ effects: [VisEffect]
+) -> [VisEffectLineSparkFrame] {
+    effects.lazy.filter {
+        $0.id == VisEffect.fadingLineID
+            && $0.flags & VisEffect.deadFlag == 0
+            && $0.velocity != .zero
+    }.prefix(visEffectLineSparkPresentationCapacity).map {
+        VisEffectLineSparkFrame(
+            roomSourceIndex: $0.roomSourceIndex,
+            start: $0.position,
+            end: $0.position - sourceVectorNormalized($0.velocity) * $0.size
         )
     }
 }

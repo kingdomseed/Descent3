@@ -58,95 +58,34 @@ extension Level {
               ship.physics.fullRotationalThrust >= 0 else {
             throw LevelValidationError.invalidDependency("default player ship physics")
         }
-        if let concussion = ship.playerConcussion {
-            let fireSound = soundClips.first {
-                $0.logicalName == concussion.fireSoundLogicalNames.first
-                    && $0.sourceName == concussion.fireSoundSourceName
-            }
-            let impactSound = soundClips.first {
-                $0.logicalName == concussion.impactSoundLogicalName
-                    && $0.sourceName == concussion.impactSoundSourceName
-            }
-            let expectedExplosionNames = ["ExplosionE"]
-                + (1..<15).map { "ExplosionE.oaf frame \($0)" }
-            let forwardLengths = concussion.gunpoints.map {
-                sqrt(levelDot($0.localForward, $0.localForward))
-            }
-            guard schemaVersion >= 11,
-                  concussion.batteryIndex == 10,
-                  concussion.firingMasks == [1, 2],
-                  concussion.weapon.sourceName == "Concussion",
-                  concussion.model.sourceName
-                    .caseInsensitiveCompare("ConcussionMissile.OOF")
-                    == .orderedSame,
-                  models.contains(where: { $0.source == concussion.model }),
-                  concussion.fireSoundLogicalNames
-                    == ["concmissilefire71", "concmissilefire71"],
-                  concussion.fireSoundSourceName == "concmissilefire7.wav",
-                  concussion.impactSoundLogicalName == "Explode1",
-                  concussion.impactSoundSourceName == "Explode1.wav",
-                  fireSound != nil,
-                  impactSound != nil,
-                  concussion.fireWaits == [0.5, 0.5],
-                  concussion.energyUsage == 0,
-                  concussion.ammoUsage == 1,
-                  concussion.fireFlags == 0,
-                  concussion.weaponFlags == 0,
-                  concussion.gunpoints.map(\.index) == [1, 2],
-                  concussion.gunpoints.map(\.parentSubmodelIndex) == [0, 0],
-                  concussion.gunpoints[0].localPosition.x.bitPattern
-                    == Float(2.792_412_5).bitPattern,
-                  concussion.gunpoints[0].localPosition.y.bitPattern
-                    == Float(-1.186_958_9).bitPattern,
-                  concussion.gunpoints[0].localPosition.z.bitPattern
-                    == Float(2.687_090_9).bitPattern,
-                  concussion.gunpoints[1].localPosition.x.bitPattern
-                    == Float(-2.804_046_4).bitPattern,
-                  concussion.gunpoints[1].localPosition.y.bitPattern
-                    == Float(-1.186_885_0).bitPattern,
-                  concussion.gunpoints[1].localPosition.z.bitPattern
-                    == Float(2.687_135_2).bitPattern,
-                  concussion.gunpoints[0].localForward.x.bitPattern
-                    == Float(0.000_007_629_434_5).bitPattern,
-                  concussion.gunpoints[0].localForward.y.bitPattern
-                    == Float(0.000_003_337_758_7).bitPattern,
-                  concussion.gunpoints[0].localForward.z.bitPattern
-                    == Float(1).bitPattern,
-                  concussion.gunpoints[1].localForward.x.bitPattern
-                    == Float(0.000_008_106_278).bitPattern,
-                  concussion.gunpoints[1].localForward.y.bitPattern
-                    == Float(0.000_003_814_590_4).bitPattern,
-                  concussion.gunpoints[1].localForward.z.bitPattern
-                    == Float(1).bitPattern,
-                  forwardLengths.allSatisfy({
-                      $0.isFinite && abs($0 - 1) < 0.000_1
-                  }),
-                  concussion.collisionRadius == 1,
-                  concussion.speed == 175,
-                  concussion.lifetime == 15,
-                  concussion.rotationalVelocity == 35_000,
-                  concussion.lightDistance == 12.5,
-                  concussion.lightPresentation.primaryColor
-                    == .init(x: 1, y: 0.5, z: 0),
-                  concussion.explosionFrames.map(\.sourceName)
-                    == expectedExplosionNames,
-                  Set(concussion.explosionFrames.map(\.storedIndex)).count == 1,
-                  concussion.explosionFrames.allSatisfy({ frame in
-                      presentationMaterials.contains { $0.texture == frame }
-                  }),
-                  concussion.explosionSourceFrameTime.bitPattern
-                    == (Float(0.5) / 15).bitPattern,
-                  concussion.explosionSize == 10,
-                  concussion.explosionLifetime == 0.5,
-                  concussion.directRobotDamage == 9,
-                  concussion.shockwaveDuration == 0.1,
-                  concussion.shockwaveRadius == 32,
-                  concussion.shockwaveDamage == 19,
-                  concussion.shockwaveForce == 3_000 else {
-                throw LevelValidationError.invalidDependency(
-                    "default player Concussion binding"
-                )
-            }
+        // The ship batteries the package carries: one per battery index,
+        // each firing weapons of the level's weapon table.
+        let batteries = ship.weaponBatteries ?? []
+        let weaponNames = Set((weapons ?? []).map { $0.name.lowercased() })
+        let soundNames = Set(soundClips.map { $0.logicalName.lowercased() })
+        guard Set(batteries.map(\.index)).count == batteries.count,
+              batteries.allSatisfy({ ship in
+                  let battery = ship.battery
+                  return (0..<PlayerWeaponState.maximumPlayerWeapons)
+                      .contains(ship.index)
+                      && ship.energyUsage.isFinite && ship.energyUsage >= 0
+                      && ship.ammoUsage.isFinite && ship.ammoUsage >= 0
+                      && !battery.fireMasks.isEmpty
+                      && battery.fireMasks.count <= 8
+                      && battery.fireWaits.count == battery.fireMasks.count
+                      && battery.fireSounds.count == battery.fireMasks.count
+                      && battery.fireWaits.allSatisfy { $0.isFinite }
+                      && battery.gunpointWeapons.count <= 8
+                      && battery.gunpointWeapons.allSatisfy {
+                          $0.isEmpty || weaponNames.contains($0.lowercased())
+                      }
+                      && battery.fireSounds.allSatisfy {
+                          $0.isEmpty || soundNames.contains($0.lowercased())
+                      }
+              }) else {
+            throw LevelValidationError.invalidDependency(
+                "default player ship weapon batteries"
+            )
         }
         if let flare = ship.playerYellowFlare {
             let yellow = trainingRobotGuidebotChain?.yellowFlare
@@ -259,10 +198,7 @@ extension Level {
                         } ?? [])
                 } ?? []
             )
-            .union(
-                shipDefinitions.first?.playerConcussion?.explosionFrames
-                    ?? []
-            )
+            .union((weapons ?? []).flatMap { $0.explosion?.frames ?? [] })
         guard Set(presentationMaterials.map(\.texture)) == requiredTextures else {
             throw LevelValidationError.invalidDependency("player-component textures")
         }

@@ -7,16 +7,20 @@
 // ClearGlobalActionCtrs (:251-330, only the counters used below),
 // InitializeDLL (:916), GetGOScriptID (:1007), GetTriggerScriptID (:1264),
 // GetCOScriptList (:1280), the custom block's player functions (:519-640),
-// the level script's EVT_INTERVAL (Scripts 018, 025, 031, and 030,
-// :1347-1392), EVT_LEVELSTART (Script 000, :1457), and EVT_TIMER (Scripts
-// 002, 023, 024, and 022, :1501-1556), and the object scripts of the
-// opening, return, dodge, and maneuver lessons: CustomObjectScript_300D
-// (Scripts 001 and 008, :1633), _300C (003, 005, 007, 009, 011, 013, :1662),
-// _300B (004 and 010, :1745), _4809 (006 and 012, :1778), _1803 (014,
-// :1811), _1806 (015, :1829), _100A (033 and 016, :1851), _300E (019 and
-// 017, :1887), _2007 (020, :1926), _080F (021, :1943), and _2008's EVT_TIMER
-// (026, :1985). The other scripts are still the bespoke Training code; M1
-// steps 7-9 move them here.
+// the level script's EVT_INTERVAL (Scripts 018, 025, 031, 030, 034, and
+// 035, :1347-1429), EVT_LEVELSTART (Script 000, :1457), and EVT_TIMER
+// (Scripts 002, 023, 024, 022, 027, 029, 049, and 056, :1501-1622), and
+// the object scripts of
+// the opening, return, dodge, maneuver, and robot lessons:
+// CustomObjectScript_300D (Scripts 001 and 008, :1633), _300C (003, 005,
+// 007, 009, 011, 013, :1662), _300B (004 and 010, :1745), _4809 (006 and
+// 012, :1778), _1803 (014, :1811), _1806 (015, :1829), _100A (033 and 016,
+// :1851), _300E (019 and 017, :1887), _2007 (020, :1926), _080F (021,
+// :1943), _2008 (037 and 026, :1969), _1011 (028, :2008), _1010 (036,
+// :2031), _081A, _081B, _081D, and _081E (043-046, :2090-2172), _081C
+// and _0819 (047 and 048, :2174-2200), and _101F,
+// _0820, _0821, _0822, and _0823 (051-055, :2204-2307). The other scripts
+// are still the bespoke Training code; M1 steps 8 and 9 move them here.
 
 /// The Training module's state: the DALLAS globals of the module
 /// (ScriptActionCtr_nnn and the DallasFuncs variables).
@@ -56,6 +60,34 @@ struct TrainingMissionState: Codable, Equatable, Sendable {
     var script030Count: Int = 0
     /// ScriptActionCtr_031.
     var script031Count: Int = 0
+    /// ScriptActionCtr_027 to ScriptActionCtr_029, _036, and _037: the
+    /// robot lesson.
+    var script027Count: Int = 0
+    var script028Count: Int = 0
+    var script029Count: Int = 0
+    var script036Count: Int = 0
+    var script037Count: Int = 0
+    /// ScriptActionCtr_043 to ScriptActionCtr_046: RASBot1 to RASBot4
+    /// killed.
+    var script043Count: Int = 0
+    var script044Count: Int = 0
+    var script045Count: Int = 0
+    var script046Count: Int = 0
+    /// ScriptActionCtr_051 to ScriptActionCtr_055: LastBot1 to LastBot5
+    /// killed.
+    var script051Count: Int = 0
+    var script052Count: Int = 0
+    var script053Count: Int = 0
+    var script054Count: Int = 0
+    var script055Count: Int = 0
+    /// ScriptActionCtr_047 and _048: the pickups; _034 and _049: the last
+    /// room; _035 and _056: the final bots.
+    var script047Count: Int = 0
+    var script048Count: Int = 0
+    var script034Count: Int = 0
+    var script049Count: Int = 0
+    var script035Count: Int = 0
+    var script056Count: Int = 0
     var dallas = DallasState.dfInit()
 
     /// Every action counter, for save validation.
@@ -69,6 +101,13 @@ struct TrainingMissionState: Codable, Equatable, Sendable {
             script020Count, script021Count, script022Count, script023Count,
             script024Count, script025Count, script026Count,
             script033Count, script030Count, script031Count,
+            script027Count, script028Count, script029Count,
+            script036Count, script037Count, script043Count,
+            script044Count, script045Count, script046Count,
+            script051Count, script052Count, script053Count,
+            script054Count, script055Count,
+            script047Count, script048Count, script034Count, script049Count,
+            script035Count, script056Count,
         ]
     }
 }
@@ -233,7 +272,8 @@ enum TrainingMissionScript {
     /// returns CONTINUE_CHAIN | CONTINUE_DEFAULT (for example
     /// TrainingMission.cpp:1657). The handlers of the later lessons are
     /// still the bespoke Training code, so the events that reach them now
-    /// only take that return.
+    /// only take that return. An EVT_DESTROY handler runs only for a dying
+    /// object; a destroy at level end breaks out (for example :2014).
     static func callCustomObjectEvent(
         id: Int32,
         event: ScriptEvent,
@@ -262,6 +302,42 @@ enum TrainingMissionScript {
             collideManuverRoomCenter(world: &world, level: level)
         case let (0x00b, .timer(timerID, _)):
             timerFollowBot1(id: timerID, world: &world, level: level)
+        case (0x00b, .destroy(isDying: true)):
+            destroyFollowBot1(world: &world, level: level)
+        case (0x00c, .destroy(isDying: true)):
+            destroyDestroyBot1(world: &world, level: level)
+        case (0x00d, .destroy(isDying: true)):
+            destroyDestroyBot2(world: &world, level: level)
+        // Scripts 043-046: RASBot1 to RASBot4 Killed (:2099-2170).
+        case (0x00f, .destroy(isDying: true)):
+            increment(\.script043Count, world: &world)
+        case (0x010, .destroy(isDying: true)):
+            increment(\.script044Count, world: &world)
+        case (0x011, .destroy(isDying: true)):
+            increment(\.script045Count, world: &world)
+        case (0x012, .destroy(isDying: true)):
+            increment(\.script046Count, world: &world)
+        // Script 047: InvulnPowerup2 Picked up (:2174-2186).
+        case (0x013, .collide):
+            if world.trainingMission.script047Count < 1 {
+                increment(\.script047Count, world: &world)
+            }
+        // Script 048: CloakPowerup2 Picked up (:2188-2200).
+        case (0x014, .collide):
+            if world.trainingMission.script048Count < 1 {
+                increment(\.script048Count, world: &world)
+            }
+        // Scripts 051-055: Lastbot1 to Lastbot5 Killed (:2213-2305).
+        case (0x015, .destroy(isDying: true)):
+            increment(\.script051Count, world: &world)
+        case (0x016, .destroy(isDying: true)):
+            increment(\.script052Count, world: &world)
+        case (0x017, .destroy(isDying: true)):
+            increment(\.script053Count, world: &world)
+        case (0x018, .destroy(isDying: true)):
+            increment(\.script054Count, world: &world)
+        case (0x019, .destroy(isDying: true)):
+            increment(\.script055Count, world: &world)
         default: break
         }
         return .all
@@ -296,7 +372,8 @@ enum TrainingMissionScript {
     }
 
     /// EVT_INTERVAL (TrainingMission.cpp:1347-1456). Scripts 018, 025, 031,
-    /// and 030 are translated; the later interval scripts are still bespoke.
+    /// 030, 034, and 035 are translated; Scripts 038 and 060 are still
+    /// bespoke.
     private static func levelInterval(world: inout GameWorld, level: Level) {
         func object(_ index: Int) -> ObjectHandle {
             objectHandle(index, level: level)
@@ -353,6 +430,41 @@ enum TrainingMissionScript {
                 world.trainingMission.script030Count += 1
             }
         }
+
+        // Script 034: Ready for last room Delay
+        let mission = world.trainingMission
+        if mission.script034Count < 1,
+           (mission.script043Count > 0) == true,
+           (mission.script044Count > 0) == true,
+           (mission.script045Count > 0) == true,
+           (mission.script046Count > 0) == true,
+           (mission.script047Count > 0) == true,
+           (mission.script048Count > 0) == true {
+            world.aPortalRenderSet(0, 1, roomIndex(5, level: level), true, level: level)
+            world.aPortalRenderSet(0, 0, roomIndex(5, level: level), true, level: level)
+            world.aObjSetLightingDist(object(3), 50)
+            world.aSetLevelTimer(2, 9)
+
+            // Increment the script action counter
+            increment(\.script034Count, world: &world)
+        }
+
+        // Script 035: All Bots killed Delay
+        let bots = world.trainingMission
+        if bots.script035Count < 1,
+           (bots.script051Count > 0) == true,
+           (bots.script052Count > 0) == true,
+           (bots.script053Count > 0) == true,
+           (bots.script054Count > 0) == true,
+           (bots.script055Count > 0) == true {
+            world.aSetLevelTimer(2, 10)
+            world.aObjSetLightingDist(object(4), 50)
+            world.aPortalRenderSet(0, 0, roomIndex(6, level: level), true, level: level)
+            world.aPortalRenderSet(0, 1, roomIndex(6, level: level), true, level: level)
+
+            // Increment the script action counter
+            increment(\.script035Count, world: &world)
+        }
     }
 
     /// EVT_LEVELSTART (TrainingMission.cpp:1457-1500).
@@ -404,7 +516,8 @@ enum TrainingMissionScript {
     }
 
     /// EVT_TIMER (TrainingMission.cpp:1501-1626). Scripts 002, 023, 024,
-    /// and 022 are translated; the later timer scripts are still bespoke.
+    /// 022, 027, and 029 are translated; the later timer scripts are still
+    /// bespoke.
     private static func levelTimer(
         id: Int32,
         world: inout GameWorld,
@@ -475,6 +588,57 @@ enum TrainingMissionScript {
 
             // Increment the script action counter
             increment(\.script022Count, world: &world)
+        }
+
+        // Script 027: Follow Bot Destroyed
+        if world.trainingMission.script027Count < 1, id == 11 {
+            world.aShowHUDMessage(message(0, level: level))
+            world.aAISetTeam(65536, object(15))
+            world.aAISetTeam(65536, object(16))
+            world.aObjGhostSet(0, object(16))
+            world.aShowHUDMessage(message(25, level: level))
+            world.aSoundPlaySteamingText("kill1.osf", 1)
+            world.aAIGoalFollowPathSimple(
+                object(16),
+                pathIndex(0, level: level),
+                8_392_960,
+                -1,
+                3,
+                level: level
+            )
+
+            // Increment the script action counter
+            increment(\.script027Count, world: &world)
+        }
+
+        // Script 029: DestroyBot2 Destroyed
+        if id == 12 {
+            world.aShowHUDMessage(message(0, level: level))
+            world.aShowHUDMessage(message(26, level: level))
+            world.aToggleShowPlayerControl(0, 0, level: level)
+            world.aSoundPlaySteamingText("proceed5.osf", 1)
+
+            // Increment the script action counter
+            increment(\.script029Count, world: &world)
+        }
+
+        // Script 049: Ready for last room
+        if world.trainingMission.script049Count < 1, id == 9 {
+            world.aShowHUDMessage(message(0, level: level))
+            world.aShowHUDMessage(message(31, level: level))
+            world.aSoundPlaySteamingText("proceed5.osf", 1)
+
+            // Increment the script action counter
+            increment(\.script049Count, world: &world)
+        }
+
+        // Script 056: All Bots killed
+        if world.trainingMission.script056Count < 1, id == 10 {
+            world.aShowHUDMessage(message(33, level: level))
+            world.aSoundPlaySteamingText("done.osf", 1)
+
+            // Increment the script action counter
+            increment(\.script056Count, world: &world)
         }
     }
 }
@@ -752,9 +916,7 @@ extension TrainingMissionScript {
     }
 
     /// CustomObjectScript_2008 EVT_TIMER, FollowBot1
-    /// (TrainingMission.cpp:1985-2001). It has no counter test of its own.
-    /// Its EVT_DESTROY (Script 037) is still the bespoke follow-bot
-    /// destruction (M1 step 7).
+    /// (TrainingMission.cpp:1987-2003). It has no counter test of its own.
     static func timerFollowBot1(id: Int32, world: inout GameWorld, level: Level) {
         // Script 026: Done Following
         if (world.trainingMission.script025Count > 0) == true, id == 7 {
@@ -775,6 +937,54 @@ extension TrainingMissionScript {
             // Increment the script action counter
             increment(\.script026Count, world: &world)
         }
+    }
+
+    /// CustomObjectScript_2008 EVT_DESTROY, FollowBot1
+    /// (TrainingMission.cpp:1971-1985).
+    static func destroyFollowBot1(world: inout GameWorld, level: Level) {
+        // Script 037: Follow Bot Destroyed Delay
+        if world.trainingMission.script037Count < 1,
+           (world.trainingMission.script026Count > 0) == true {
+            world.aSetLevelTimer(2, 11)
+
+            // Increment the script action counter
+            increment(\.script037Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_1011 EVT_DESTROY, DestroyBot1
+    /// (TrainingMission.cpp:2010-2027).
+    static func destroyDestroyBot1(world: inout GameWorld, level: Level) {
+        // Script 028: DestroyBot1 Destroyed
+        if world.trainingMission.script028Count < 1,
+           (world.trainingMission.script027Count > 0) == true {
+            world.aObjGhostSet(0, objectHandle(15, level: level))
+            world.aAIGoalFollowPathSimple(
+                objectHandle(15, level: level),
+                pathIndex(0, level: level),
+                8_392_960,
+                -1,
+                3,
+                level: level
+            )
+
+            // Increment the script action counter
+            increment(\.script028Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_1010 EVT_DESTROY, DestroyBot2
+    /// (TrainingMission.cpp:2033-2053). It has no counter test.
+    static func destroyDestroyBot2(world: inout GameWorld, level: Level) {
+        // Script 036: DestroyBot2 Destroyed Delay
+        world.aSetLevelTimer(2, 12)
+        world.aObjSetLightingDist(objectHandle(1, level: level), 50)
+        world.aPortalRenderSet(0, 1, roomIndex(3, level: level), true, level: level)
+        world.aPortalRenderSet(0, 0, roomIndex(3, level: level), true, level: level)
+        world.aToggleAllPlayerControls(1, 0, level: level)
+
+        // Increment the script action counter
+        increment(\.script036Count, world: &world)
     }
 
     /// CustomObjectScript_100A EVT_COLLIDE, StartDodge

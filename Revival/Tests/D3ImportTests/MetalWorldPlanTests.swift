@@ -99,108 +99,93 @@ final class MetalWorldPlanTests: XCTestCase {
         )
     }
 
-    func testFollowBotBlueLaserUsesRetainedObjectDrawPath() throws {
+    /// The player's laser bolts are weapon objects, drawn through the
+    /// retained weapon-object path (RT_WEAPON).
+    func testPlayerLaserWeaponObjectsUseRetainedObjectDrawPath() throws {
         let level = makeTrainingMovingTargetHandoffLevel()
-        let handoff = try XCTUnwrap(level.trainingFollowBotDestruction)
-        let playerView = defaultPlayerView(in: level)
+        let session = GameSession(level: level, presentationReadyTimestamp: 0)
+        let frame = session.update(at: 0.01, input: .zero)
+        session.world.fireWeaponFromPlayer(
+            session.world.testPlayerObject.handle,
+            weaponType: PlayerWeaponState.primary,
+            isDown: true,
+            downTime: 0.01,
+            level: level
+        )
+        let laser = try XCTUnwrap(
+            level.weapon(named: "Laser Level 2 - Blue")?.model
+        )
+        XCTAssertEqual(
+            session.world.objects.filter { $0.type == .weapon }.count,
+            2
+        )
         let initial = try makeMetalWorldPlan(
             level: level,
-            playerView: playerView
-        )
-        let projectile = TrainingBlueLaserProjectileFrame(
-            position: playerView.camera.position,
-            velocity: .init(
-                x: 0,
-                y: 0,
-                z: handoff.combat.projectileSpeed
-            ),
-            roomSourceIndex: playerView.roomSourceIndex,
-            model: handoff.projectileModel
+            playerView: frame.playerView
         )
         let updated = try updateMetalWorldPlan(
             initial,
             level: level,
-            objects: ObjectTable(level: level),
-            roomStates: RoomState.canonical(level),
-            playerView: playerView,
-            trainingPrimaryProjectiles: [projectile]
+            objects: session.world.objects,
+            roomStates: session.world.rooms,
+            playerView: frame.playerView
         )
-        let expectedVertexPositions =
-            extractTrainingBlueLaserDrawItems(
-                level,
-                projectiles: [projectile],
-                camera: playerView.camera
-            ).flatMap {
-                $0.vertices.map(\.position)
-            }
+        let expectedVertexPositions = extractWeaponObjectDrawItems(
+            level,
+            objects: session.world.objects,
+            camera: frame.playerView.camera
+        ).filter { $0.model == laser }.flatMap {
+            $0.vertices.map(\.position)
+        }
         let actualVertexPositions = updated.draws.filter {
-            $0.objectHandle == UInt32.max - 40
-                && $0.model == handoff.projectileModel
+            $0.model == laser
         }.flatMap {
             $0.vertices.map {
-                Vector3(
-                    x: $0.position.x,
-                    y: $0.position.y,
-                    z: $0.position.z
-                )
+                Vector3(x: $0.position.x, y: $0.position.y, z: $0.position.z)
             }
         }
-
-        XCTAssertTrue(updated.draws.contains {
-            $0.objectHandle == UInt32.max - 40
-                && $0.model == handoff.projectileModel
-        })
-        XCTAssertEqual(
-            actualVertexPositions,
-            expectedVertexPositions
-        )
+        XCTAssertFalse(actualVertexPositions.isEmpty)
+        XCTAssertEqual(actualVertexPositions, expectedVertexPositions)
     }
 
-    func testRookieConcussionUsesRetainedMissileExplosionSparkAndLightDraws()
-        throws
-    {
+    /// A flying weapon lights the world with its page light, and the
+    /// explosion and line-spark visual effects use the prepared quads.
+    func testWeaponLightExplosionAndSparkDrawsReachRetainedPlan() throws {
         let level = try makePlayerConcussionLevel()
+        var world = GameWorld(level: level)
         let playerView = defaultPlayerView(in: level)
-        let binding = try XCTUnwrap(
-            level.shipDefinitions.first?.playerConcussion
-        )
+        let concussion = try XCTUnwrap(level.weapon(named: "Concussion"))
+        let frames = try XCTUnwrap(concussion.explosion?.frames)
         let initial = try makeMetalWorldPlan(
             level: level,
             playerView: playerView
         )
         XCTAssertTrue(initial.preparedDraws.contains {
-            $0.objectHandle == UInt32.max - 6_000
-                && $0.model == binding.model
-        })
-        XCTAssertTrue(initial.preparedDraws.contains {
             $0.objectHandle == UInt32.max - 7_000
-                && $0.texture == binding.explosionFrames[0]
+                && $0.texture == frames[0]
         })
         XCTAssertTrue(initial.preparedDraws.contains {
             $0.objectHandle == UInt32.max - 8_000
         })
 
+        world.playerWeapons[PlayerWeaponState.secondary].index =
+            PlayerWeaponState.concussionIndex
+        world.fireWeaponFromPlayer(
+            world.testPlayerObject.handle,
+            weaponType: PlayerWeaponState.secondary,
+            isDown: true,
+            downTime: 0.1,
+            level: level
+        )
+        let missile = try XCTUnwrap(world.objects.first { $0.type == .weapon })
         let position = playerView.camera.position
-        let missile = PlayerConcussionMissileFrame(
+        let explosion = VisEffectExplosionFrame(
             roomSourceIndex: playerView.roomSourceIndex,
             position: position,
-            orientation: .init(
-                right: .init(x: 1, y: 0, z: 0),
-                up: .init(x: 0, y: 1, z: 0),
-                forward: .init(x: 0, y: 0, z: 1)
-            ),
-            velocity: .init(x: 0, y: 0, z: binding.speed),
-            model: binding.model,
-            lightDistance: binding.lightDistance,
-            lightPresentation: binding.lightPresentation
+            size: 10,
+            texture: frames[0]
         )
-        let explosion = PlayerConcussionExplosionFrame(
-            roomSourceIndex: playerView.roomSourceIndex,
-            position: position,
-            size: binding.explosionSize,
-            texture: binding.explosionFrames[0]
-        )
-        let spark = PlayerConcussionSparkFrame(
+        let spark = VisEffectLineSparkFrame(
             roomSourceIndex: playerView.roomSourceIndex,
             start: position,
             end: .init(x: position.x + 1, y: position.y, z: position.z)
@@ -208,25 +193,24 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: level,
-            objects: ObjectTable(level: level),
-            roomStates: RoomState.canonical(level),
+            objects: world.objects,
+            roomStates: world.rooms,
             playerView: playerView,
-            playerConcussionMissiles: [missile],
-            playerConcussionExplosions: [explosion],
-            playerConcussionSparks: [spark]
+            visEffectExplosions: [explosion],
+            visEffectLineSparks: [spark]
         )
-        let missileDraw = try XCTUnwrap(updated.draws.first {
-            $0.objectHandle == UInt32.max - 6_000
-                && $0.model == binding.model
+        // The Concussion's page light is (1, 0.5, 0.25).
+        XCTAssertTrue(updated.draws.contains { draw in
+            draw.model == concussion.model
+                && draw.vertices.contains {
+                    $0.dynamicLight.x > 0 && $0.dynamicLight.y > 0
+                        && $0.dynamicLight.z > 0
+                }
         })
-        XCTAssertTrue(missileDraw.vertices.contains {
-            $0.dynamicLight.x > 0
-                && $0.dynamicLight.y > 0
-                && $0.dynamicLight.z == 0
-        })
+        XCTAssertNotNil(missile.weapon)
         XCTAssertTrue(updated.draws.contains {
             $0.objectHandle == UInt32.max - 7_000
-                && $0.texture == binding.explosionFrames[0]
+                && $0.texture == frames[0]
         })
         XCTAssertTrue(updated.draws.contains {
             $0.objectHandle == UInt32.max - 8_000
@@ -238,9 +222,9 @@ final class MetalWorldPlanTests: XCTestCase {
         )
     }
 
-    func testRookieConcussionSimulationFrameReachesRendererComposition()
-        throws
-    {
+    /// The frame's visual effects and the world's weapon objects reach the
+    /// renderer's composition.
+    func testConcussionSimulationFrameReachesRendererComposition() throws {
         let level = try makePlayerConcussionLevel()
         let simulation = GameSession(
             level: level,
@@ -250,7 +234,11 @@ final class MetalWorldPlanTests: XCTestCase {
             at: 0.01,
             input: .init(firesSecondaryWeapon: true)
         )
-        XCTAssertEqual(frame.playerConcussionMissiles.count, 1)
+        let concussion = try XCTUnwrap(level.weapon(named: "Concussion"))
+        XCTAssertEqual(
+            simulation.world.objects.filter { $0.type == .weapon }.count,
+            1
+        )
         let initial = try makeMetalWorldPlan(
             level: level,
             playerView: frame.playerView
@@ -258,13 +246,11 @@ final class MetalWorldPlanTests: XCTestCase {
         let updated = try updateMetalWorldPlan(
             initial,
             level: level,
-            world: GameWorld(level: level),
+            world: simulation.world,
             frame: frame,
             drawableAspect: 1
         )
-        XCTAssertTrue(updated.draws.contains {
-            $0.objectHandle == UInt32.max - 6_000
-        })
+        XCTAssertTrue(updated.draws.contains { $0.model == concussion.model })
     }
 
     /// The turret's dynamic_wb angles turn its turret submodels, and its
@@ -379,93 +365,6 @@ final class MetalWorldPlanTests: XCTestCase {
         XCTAssertEqual(try lit(world), 0)
         world.aObjSetLightingDist(marker, 50)
         XCTAssertGreaterThan(try lit(world), 0)
-    }
-
-    func testScript034MarkerDistanceLightsReachedMetalWorld() throws {
-        var level = makeTrainingCloakPickupLevel()
-        let playerView = defaultPlayerView(in: level)
-        let markerHandle = try XCTUnwrap(
-            level.trainingLastRoomChain?.markerLightObjectHandle
-        )
-        let markerIndex = try XCTUnwrap(level.objects.firstIndex {
-            $0.handle == markerHandle
-        })
-        let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: playerView
-        )
-        let target = try XCTUnwrap(
-            initial.draws.first?.vertices.first?.position
-        )
-        level.objects[markerIndex].location =
-            .room(playerView.roomSourceIndex)
-        level.objects[markerIndex].position = .init(
-            x: target.x + 20,
-            y: target.y,
-            z: target.z
-        )
-
-        let lit = try updateMetalWorldPlan(
-            initial,
-            level: level,
-            objects: ObjectTable(level: level),
-            roomStates: RoomState.canonical(level),
-            playerView: playerView,
-            presentationFrame: .init(
-                systemsFrameDuration: 0.1,
-                systemsGameTime: 0.5
-            ),
-            trainingLastRoomMarkerLightDistance: 50
-        )
-
-        XCTAssertGreaterThan(
-            lit.draws[0].vertices[0].dynamicLight.x,
-            0
-        )
-    }
-
-    func testScript035MarkerDistanceLightsReachedMetalWorld() throws {
-        var level = makeTrainingFinalBotsCompletionLevel()
-        let playerView = defaultPlayerView(in: level)
-        let markerHandle = try XCTUnwrap(
-            level.trainingFinalBotsCompletionChain?
-                .markerLightObjectHandle
-        )
-        let markerIndex = try XCTUnwrap(level.objects.firstIndex {
-            $0.handle == markerHandle
-        })
-        let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: playerView
-        )
-        let target = try XCTUnwrap(
-            initial.draws.first?.vertices.first?.position
-        )
-        level.objects[markerIndex].location =
-            .room(playerView.roomSourceIndex)
-        level.objects[markerIndex].position = .init(
-            x: target.x + 20,
-            y: target.y,
-            z: target.z
-        )
-
-        let lit = try updateMetalWorldPlan(
-            initial,
-            level: level,
-            objects: ObjectTable(level: level),
-            roomStates: RoomState.canonical(level),
-            playerView: playerView,
-            presentationFrame: .init(
-                systemsFrameDuration: 0.1,
-                systemsGameTime: 0.5
-            ),
-            trainingFinalBotsMarkerLightDistance: 50
-        )
-
-        XCTAssertGreaterThan(
-            lit.draws[0].vertices[0].dynamicLight.x,
-            0
-        )
     }
 
     func testCloakAlphaReachesAuxiliaryCameraPlayerDraws() throws {

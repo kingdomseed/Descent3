@@ -643,6 +643,9 @@ struct ModelSubmodel: Codable, Equatable, Sendable {
     let vertices: [ModelVertex]
     let faces: [ModelFace]
     let presentation: ModelSubmodelPresentation
+    /// `rad` (SOBJ chunk, model/polymodel.cpp:1383; recomputed for a facing
+    /// submodel, :1972). Absent in packages imported before this field.
+    var radius: Float? = nil
 }
 
 struct CanonicalModel: Codable, Equatable, Sendable {
@@ -689,47 +692,23 @@ struct CanonicalShipDefinition: Codable, Equatable, Sendable {
     let primaryModel: SourceResource
     let presentationSize: Float
     let physics: CanonicalShipPhysics
-    var playerConcussion: PlayerConcussionBinding? = nil
     var playerYellowFlare: PlayerYellowFlareBinding? = nil
+    /// The ship page's `static_wb` batteries whose weapons the package
+    /// carries, with their energy and ammo use (ship.h). Absent in packages
+    /// imported before M1 step 7.
+    var weaponBatteries: [CanonicalShipWeaponBattery]? = nil
 }
 
-struct PlayerConcussionGunpoint: Codable, Equatable, Sendable {
+/// One `static_wb` battery of a ship page with its `fire_flags`.
+struct CanonicalShipWeaponBattery: Codable, Equatable, Sendable {
+    /// The battery index: 0 to 9 primaries, 10 to 19 secondaries, 20 the
+    /// flare.
     let index: Int
-    let parentSubmodelIndex: Int
-    let localPosition: Vector3
-    let localForward: Vector3
-}
-
-struct PlayerConcussionBinding: Codable, Equatable, Sendable {
-    let batteryIndex: Int
-    let firingMasks: [UInt8]
-    let weapon: SourceResource
-    let model: SourceResource
-    let fireSoundLogicalNames: [String]
-    let fireSoundSourceName: String
-    let impactSoundLogicalName: String
-    let impactSoundSourceName: String
-    let fireWaits: [Float]
+    let battery: CanonicalWeaponBattery
     let energyUsage: Float
     let ammoUsage: Float
+    /// The SFF_ flags (ship.h).
     let fireFlags: UInt8
-    let weaponFlags: UInt16
-    let gunpoints: [PlayerConcussionGunpoint]
-    let collisionRadius: Float
-    let speed: Float
-    let lifetime: Float
-    let rotationalVelocity: Float
-    let lightDistance: Float
-    let lightPresentation: ObjectLightPresentation
-    let explosionFrames: [SourceResource]
-    let explosionSourceFrameTime: Float
-    let explosionSize: Float
-    let explosionLifetime: Float
-    let directRobotDamage: Float
-    let shockwaveDuration: Float
-    let shockwaveRadius: Float
-    let shockwaveDamage: Float
-    let shockwaveForce: Float
 }
 
 struct PlayerYellowFlareBinding: Codable, Equatable, Sendable {

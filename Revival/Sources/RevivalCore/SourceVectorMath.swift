@@ -116,7 +116,7 @@ func sourceTransposed(_ matrix: Matrix3) -> Matrix3 {
     )
 }
 
-private func sourceTransform(_ value: Vector3, by matrix: Matrix3) -> Vector3 {
+func sourceTransform(_ value: Vector3, by matrix: Matrix3) -> Vector3 {
     Vector3(
         x: matrix.right.x * value.x
             + matrix.up.x * value.y
@@ -223,4 +223,28 @@ func sourceVectorCross(_ lhs: Vector3, _ rhs: Vector3) -> Vector3 {
         y: lhs.z * rhs.x - lhs.x * rhs.z,
         z: lhs.x * rhs.y - lhs.y * rhs.x
     )
+}
+
+/// vm_VectorToMatrix(forward, up, NULL) (DoVectorToMatrix,
+/// vecmat/vector.cpp:474-543): forward normalized, right = up x forward
+/// normalized, and up = forward x right. When the up vector is zero or
+/// parallel to forward, the right vector comes from forward alone
+/// (bad_vector2).
+func sourceVectorToMatrix(forward: Vector3, up: Vector3) -> Matrix3 {
+    func normalizedOrZero(_ vector: Vector3) -> Vector3 {
+        let length = sqrt(dot(vector, vector))
+        return length > 0 ? vector / length : .zero
+    }
+    let z = normalizedOrZero(forward)
+    var x = Vector3.zero
+    let y = normalizedOrZero(up)
+    if y != .zero {
+        x = normalizedOrZero(sourceVectorCross(y, z))
+    }
+    if x == .zero {
+        x = z.x == 0 && z.z == 0
+            ? Vector3(x: 1, y: 0, z: 0)
+            : normalizedOrZero(Vector3(x: z.z, y: 0, z: -z.x))
+    }
+    return Matrix3(right: x, up: sourceVectorCross(z, x), forward: z)
 }

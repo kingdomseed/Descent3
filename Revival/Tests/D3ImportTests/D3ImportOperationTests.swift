@@ -23,7 +23,9 @@ final class D3ImportOperationTests: XCTestCase {
         )
     }
 
-    func testCanonicalDefaultPlayerShipMarksConcussionExplosionFramesImported() {
+    /// A weapon's explosion frames join the dependency manifest as
+    /// imported textures, each once.
+    func testWeaponExplosionFramesAreMarkedImported() {
         let explosionFrames = [
             .init(storedIndex: 398, sourceName: "ExplosionE"),
         ] + (1..<15).map {
@@ -32,80 +34,11 @@ final class D3ImportOperationTests: XCTestCase {
                 sourceName: "ExplosionE.oaf frame \($0)"
             )
         }
-        let concussion = PlayerConcussionBinding(
-            batteryIndex: 10,
-            firingMasks: [1, 2],
-            weapon: .init(storedIndex: 3, sourceName: "Concussion"),
-            model: .init(storedIndex: 0, sourceName: "ConcussionMissile.OOF"),
-            fireSoundLogicalNames: [],
-            fireSoundSourceName: "concmissilefire7.wav",
-            impactSoundLogicalName: "Explode1",
-            impactSoundSourceName: "Explode1.wav",
-            fireWaits: [],
-            energyUsage: 0,
-            ammoUsage: 0,
-            fireFlags: 0,
-            weaponFlags: 0,
-            gunpoints: [],
-            collisionRadius: 1,
-            speed: 175,
-            lifetime: 15,
-            rotationalVelocity: 35_000,
-            lightDistance: 12.5,
-            lightPresentation: .init(
-                primaryColor: .init(x: 1, y: 0.5, z: 0),
-                secondaryColor: .zero,
-                timeInterval: 0,
-                flickerDistance: 0,
-                directionalDot: 0,
-                flags: 0,
-                timebits: 0,
-                angle: 0,
-                lightingRenderType: 0
-            ),
-            explosionFrames: explosionFrames,
-            explosionSourceFrameTime: Float(0.5) / 15,
-            explosionSize: 10,
-            explosionLifetime: 0.5,
-            directRobotDamage: 9,
-            shockwaveDuration: 0.1,
-            shockwaveRadius: 32,
-            shockwaveDamage: 19,
-            shockwaveForce: 3_000
-        )
-        let ship = CanonicalShipDefinition(
-            source: .init(storedIndex: 0, sourceName: "Pyro-GL"),
-            primaryModel: .init(storedIndex: 0, sourceName: "PyroGL.OOF"),
-            presentationSize: 1,
-            physics: .init(
-                mass: 1,
-                drag: 1,
-                fullThrust: 1,
-                behaviors: [],
-                rotationalDrag: 1,
-                fullRotationalThrust: 1,
-                numberOfBounces: 0,
-                initialForwardVelocity: 0,
-                initialAngularVelocity: .zero,
-                wiggleAmplitude: 0,
-                wigglesPerSecond: 0,
-                coefficientOfRestitution: 1,
-                hitDieDot: -1,
-                maximumTurnrollRate: 0,
-                turnrollRatio: 0
-            ),
-            playerConcussion: concussion
-        )
-
-        let updated = makeMinimalCanonicalLevel().addingDefaultPlayerShip(
-            ship,
-            binding: .init(
-                playerID: 0,
-                objectHandle: 2_048,
-                ship: ship.source
+        let updated = makeMinimalCanonicalLevel()
+            .appendingTextureDependencies(
+                explosionFrames + explosionFrames,
+                provenance: "synthetic weapon page"
             )
-        )
-
         let importedExplosionFrames = updated.dependencyManifest.current
             .filter {
                 $0.category == "texture"
@@ -183,27 +116,6 @@ final class D3ImportOperationTests: XCTestCase {
         )
     }
 
-    func testCanonicalizesStockConcussionBatteryDefaults() {
-        let retail = RetailPlayerConcussionBinding(
-            batteryIndex: 10,
-            firingMasks: [2, 4],
-            weaponName: "Laser",
-            fireSoundLogicalNames: [
-                "concmissilefire71", "concmissilefire71",
-            ],
-            fireWaits: [0.5, 0.5],
-            energyUsage: 0,
-            ammoUsage: 1,
-            fireFlags: 0,
-            weaponFlags: 0
-        )
-
-        let canonical = canonicalPlayerConcussionBinding(retail)
-
-        XCTAssertEqual(canonical.firingMasks, [1, 2])
-        XCTAssertEqual(canonical.weaponName, "Concussion")
-    }
-
     func testCanonicalizesStockYellowFlareGunpointPrecision() {
         let retail = ReachedModelGunpoint(
             parentSubmodelIndex: 0,
@@ -243,38 +155,6 @@ final class D3ImportOperationTests: XCTestCase {
             Float(-0.000_015_258_7).bitPattern
         )
         XCTAssertEqual(canonical.forward.z.bitPattern, Float(1).bitPattern)
-    }
-
-    func testCanonicalizesRetailConcussionLightToStockTrainingColor() {
-        let retail = ObjectLightPresentation(
-            primaryColor: .init(x: 1, y: 0.5, z: 0.25),
-            secondaryColor: .init(x: 0.1, y: 0.2, z: 0.3),
-            timeInterval: 0.2,
-            flickerDistance: 5,
-            directionalDot: 0.25,
-            flags: 16,
-            timebits: .max,
-            angle: 0,
-            lightingRenderType: 0
-        )
-
-        let canonical = canonicalPlayerConcussionLightPresentation(retail)
-
-        XCTAssertEqual(
-            canonical.primaryColor,
-            .init(x: 1, y: 0.5, z: 0)
-        )
-        XCTAssertEqual(canonical.secondaryColor, retail.secondaryColor)
-        XCTAssertEqual(canonical.timeInterval, retail.timeInterval)
-        XCTAssertEqual(canonical.flickerDistance, retail.flickerDistance)
-        XCTAssertEqual(canonical.directionalDot, retail.directionalDot)
-        XCTAssertEqual(canonical.flags, retail.flags)
-        XCTAssertEqual(canonical.timebits, retail.timebits)
-        XCTAssertEqual(canonical.angle, retail.angle)
-        XCTAssertEqual(
-            canonical.lightingRenderType,
-            retail.lightingRenderType
-        )
     }
 
     func testAdmitsRetailConcussionAnimationUsingWeaponLifetimeCadence() throws {
@@ -346,20 +226,21 @@ final class D3ImportOperationTests: XCTestCase {
                 weaponFlags: 0
             )
         )
+        // All 21 batteries, each with its first num_masks masks and waits.
+        XCTAssertEqual(definition.weaponBatteries?.count, 21)
         XCTAssertEqual(
-            definition.playerConcussion,
+            definition.weaponBatteries?[10],
             .init(
-                batteryIndex: 10,
-                firingMasks: [1, 2],
-                weaponName: "Concussion",
-                fireSoundLogicalNames: [
-                    "concmissilefire71", "concmissilefire71",
-                ],
-                fireWaits: [0.5, 0.5],
+                index: 10,
+                fireFlags: 0,
                 energyUsage: 0,
                 ammoUsage: 1,
-                fireFlags: 0,
-                weaponFlags: 0
+                fireMasks: [1, 2],
+                fireWaits: [0.5, 0.5],
+                flags: 0,
+                fireSoundNames: ["concmissilefire71", "concmissilefire71"],
+                weaponNames: ["Concussion", "Concussion", "", "", "", "",
+                              "", ""]
             )
         )
     }
@@ -381,6 +262,16 @@ final class D3ImportOperationTests: XCTestCase {
             textureResources: [texture]
         )
         XCTAssertEqual(facing.submodels[1].presentation, .facing)
+        // SOBJ's rad, and for a facing submodel half the square root of its
+        // face's area (model/polymodel.cpp:1383, :1963-1972): the 31-gon
+        // of radius 1 has area 31/2 sin(2 pi / 31).
+        XCTAssertEqual(custom.submodels[1].radius, 1)
+        let area = Float(31) / 2 * sin(2 * Float.pi / 31)
+        XCTAssertEqual(
+            try XCTUnwrap(facing.submodels[1].radius),
+            sqrt(area) / 2,
+            accuracy: 0.000_1
+        )
         let rotating = try parseReachedOutrageModel(
             makeReachedOOFFixture(properties: "$rotate=1"),
             sourceName: "Synthetic.OOF",

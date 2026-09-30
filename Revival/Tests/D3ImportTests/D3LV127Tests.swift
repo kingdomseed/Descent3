@@ -545,6 +545,119 @@ final class D3LV127Tests: XCTestCase {
         }
     }
 
+    /// FindTextureBitmapName (Descent3/gametexture.cpp:372) scans the texture
+    /// slots in index order, so the lowest page that shows a bitmap wins. The
+    /// result must not depend on Dictionary order, which changes per
+    /// instance and per process.
+    func testBitmapNameResolvesToLowestIndexedPageThatShowsTheBitmap() throws {
+        let sharedNames = (0..<12).map { "shared page \($0)" }
+        let table = sharedNames.map {
+            makeSimpleTextureTablePage(
+                name: $0,
+                bitmapSourceName: "Shared.ogf",
+                flags: 0
+            )
+        }.reduce(Data(), +)
+        let overlay = makeSimpleTextureTablePage(
+            name: "overlay shared page",
+            bitmapSourceName: "shared.ogf",
+            flags: 0
+        )
+
+        for _ in 0..<32 {
+            let resolved = try resolveRetailTextureDefinitions(
+                table: table,
+                overlay: overlay,
+                names: ["Shared.tga1", "shared page 7"]
+            )
+            XCTAssertEqual(
+                resolved.map(\.name),
+                ["shared page 0", "shared page 7"]
+            )
+            XCTAssertEqual(resolved.map(\.storedIndex), [0, 7])
+        }
+    }
+
+    func testOverlayReplacementKeepsTheReplacedStoredIndex() throws {
+        let table = makeSimpleTextureTablePage(
+            name: "one", bitmapSourceName: "one.ogf", flags: 0
+        ) + makeSimpleTextureTablePage(
+            name: "two", bitmapSourceName: "two.ogf", flags: 0
+        )
+        let overlay = makeSimpleTextureTablePage(
+            name: "Two", bitmapSourceName: "two-new.ogf", flags: 0
+        ) + makeSimpleTextureTablePage(
+            name: "three", bitmapSourceName: "three.ogf", flags: 0
+        )
+
+        let resolved = try resolveRetailTextureDefinitions(
+            table: table,
+            overlay: overlay,
+            names: ["two", "three"]
+        )
+
+        XCTAssertEqual(resolved.map(\.name), ["three", "Two"])
+        XCTAssertEqual(resolved.map(\.storedIndex), [2, 1])
+        XCTAssertEqual(resolved.map(\.bitmapSourceName), ["three.ogf", "two-new.ogf"])
+    }
+
+    func testOverlayReplacementThatDropsTheBitmapHandsItToTheNextPage() throws {
+        let table = makeSimpleTextureTablePage(
+            name: "first", bitmapSourceName: "shared.ogf", flags: 0
+        ) + makeSimpleTextureTablePage(
+            name: "second", bitmapSourceName: "shared.ogf", flags: 0
+        )
+        let overlay = makeSimpleTextureTablePage(
+            name: "first", bitmapSourceName: "other.ogf", flags: 0
+        )
+
+        for _ in 0..<32 {
+            let resolved = try resolveRetailTextureDefinitions(
+                table: table,
+                overlay: overlay,
+                names: ["other", "shared"]
+            )
+            XCTAssertEqual(resolved.map(\.name), ["first", "second"])
+            XCTAssertEqual(resolved.map(\.storedIndex), [0, 1])
+        }
+    }
+
+    /// ReadModelTexture (model/polymodel.cpp:949): a slot takes the lowest
+    /// page that shows its bitmap, even when a higher page with the same
+    /// bitmap is reached by its own name.
+    func testModelSlotTakesTheLowestPageThatShowsItsBitmap() throws {
+        let table = makeSimpleTextureTablePage(
+            name: "low", bitmapSourceName: "Shared.ogf", flags: 0
+        ) + makeSimpleTextureTablePage(
+            name: "high", bitmapSourceName: "shared.ogf", flags: 0
+        )
+        let resolved = try resolveRetailTextureDefinitions(
+            table: table,
+            overlay: Data(),
+            names: ["high", "low", "shared"]
+        )
+        var definitions: [RetailTextureDefinition] = []
+        for definition in resolved.sorted(by: { $0.storedIndex < $1.storedIndex })
+        where definitions.last?.storedIndex != definition.storedIndex {
+            definitions.append(definition)
+        }
+
+        let slots = modelTextureSlotTable(definitions)
+
+        XCTAssertEqual(slots["shared"], SourceResource(storedIndex: 0, sourceName: "low"))
+        XCTAssertEqual(slots["low"], SourceResource(storedIndex: 0, sourceName: "low"))
+        XCTAssertEqual(slots["high"], SourceResource(storedIndex: 1, sourceName: "high"))
+    }
+
+    /// stricmp order: lowercase ASCII fold, then the exact bytes. `_` (0x5f)
+    /// comes after the digits, whatever the user's locale says.
+    func testLegacyNameOrderIsLowercaseASCIIFoldThenBytes() {
+        XCTAssertEqual(
+            ["b", "a_1", "a01", "A01", "B"].sorted(by: legacyNameOrder),
+            ["A01", "a01", "a_1", "B", "b"]
+        )
+    }
+
     func testRejectsOscillatingWaterBeforeCanonicalization() {
         let table = makeTextureTablePage(
             name: "unsupported-water-oscillation",

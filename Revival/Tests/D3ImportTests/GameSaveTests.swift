@@ -46,9 +46,7 @@ final class GameSaveTests: XCTestCase {
         try assertSaveContinuation(
             level: level,
             prepare: { session in
-                session.destroyTrainingRobot(
-                    handle: chain.destroyRobotObjectHandle
-                )
+                session.applyTrainingScript036Outcome()
             },
             firstInput: .init(deploysTrainingGuidebot: true),
             warmupFrames: 12,
@@ -70,26 +68,123 @@ final class GameSaveTests: XCTestCase {
 
     func testSavedWorldAdvancesIdenticallyAfterRobotDeath() throws {
         let level = makeTrainingRASBot1DeathLevel()
-        let chain = try XCTUnwrap(level.trainingRASBot1DeathChain)
+        let rasBot1 = ObjectHandle(2_074)
         let placedCount = ObjectTable(level: level).count
         try assertSaveContinuation(
             level: level,
             prepare: { session in
-                session.destroyTrainingRASBot1(handle: chain.robotObjectHandle)
+                session.killRobotsAsPlayer([rasBot1.rawValue])
             },
             warmupFrames: 6,
             followFrames: 30,
             atSave: { session in
-                XCTAssertNil(
-                    session.world.objects[ObjectHandle(chain.robotObjectHandle)]
-                )
-                XCTAssertEqual(session.world.objects.count, placedCount - 1)
+                XCTAssertNil(session.world.objects[rasBot1])
+                // The frame-6 laser pair is in flight at the save, with the
+                // death's debris and splinters.
+                let weapons = session.world.objects.filter {
+                    $0.type == .weapon
+                }
+                XCTAssertEqual(weapons.count, 2)
+                XCTAssertFalse(session.world.objects.filter {
+                    $0.type == .debris || $0.type == .splinter
+                }.isEmpty)
+                let placed = Set(level.objects.map(\.handle))
                 XCTAssertEqual(
-                    session.world.trainingRASBot1DeathState?.wasDestroyed,
-                    true
+                    session.world.objects.filter {
+                        placed.contains($0.handle.rawValue)
+                    }.count,
+                    placedCount - 1
                 )
+                XCTAssertEqual(session.world.playerKillsLevel, 1)
+                XCTAssertEqual(session.world.playerScore, 200)
             }
         )
+    }
+
+    /// A robot saved while it is dying (CT_DYING, KillObject with a delay,
+    /// damage.cpp:1175) finishes its death on the same frame as the
+    /// uninterrupted world, and a shockwave in flight continues too.
+    func testSavedWorldAdvancesIdenticallyWithADyingRobot() throws {
+        let level = makeTrainingRASBot1DeathLevel()
+        let rasBot1 = ObjectHandle(2_074)
+        try assertSaveContinuation(
+            level: level,
+            prepare: { session in
+                session.world.killObject(
+                    rasBot1,
+                    killer: session.world.testPlayerObject.handle,
+                    damage: 10,
+                    deathFlags: DeathFlags.fireball,
+                    delayTime: 1.5,
+                    level: session.level
+                )
+            },
+            warmupFrames: 6,
+            followFrames: 30,
+            atSave: { session in
+                guard let dying = session.world.objects[rasBot1] else {
+                    return XCTFail("RASBot1 is still dying at the save")
+                }
+                XCTAssertNotEqual(dying.flags & GameObject.dyingFlag, 0)
+                XCTAssertNotNil(dying.dying)
+                XCTAssertEqual(session.world.playerScore, 0)
+            }
+        )
+    }
+
+    /// PlayerScoreAdd (Player.cpp:3853) adds to the int score and the
+    /// int16_t kill counters (player_external_struct.h:150), which wrap in
+    /// the source's integer widths; a saved extreme value cannot trap.
+    func testScoreAndKillCountersWrapInTheirSourceWidths() throws {
+        var world = GameWorld(level: makeTrainingRobotGuidebotLevel())
+        world.playerScore = Int32.max
+        world.playerKillsLevel = Int16.max
+        world.playerFriendlyKillsLevel = Int16.max
+        world.playerScoreAdd(200)
+        world.playerScoreAdd(-5)
+        XCTAssertEqual(world.playerScore, Int32.min &+ 194)
+        XCTAssertEqual(world.playerKillsLevel, Int16.min)
+        XCTAssertEqual(world.playerFriendlyKillsLevel, Int16.min)
+    }
+
+    /// Saved object physics stays in the domains the integrator converts
+    /// and divides by: a spin of 1e30 would trap converting to an angle.
+    func testSavedPhysicsAndAttachmentsAreBounded() throws {
+        let level = makeTrainingRobotGuidebotLevel()
+        let base = GameSession(level: level, presentationReadyTimestamp: 0)
+            .world
+        var world = base
+        world.killObject(
+            ObjectHandle(4_112), killer: .none, damage: 10, level: level
+        )
+        let debris = try XCTUnwrap(world.objects.first { $0.type == .debris })
+        XCTAssertNoThrow(try world.validate(against: level))
+        for bad in [Float(1e30), .nan, .infinity] {
+            var hostile = world
+            hostile.objects[debris.handle]?.physics?.rotationalVelocity =
+                Vector3(x: bad, y: 0, z: 0)
+            XCTAssertThrowsError(try hostile.validate(against: level))
+        }
+        var heavy = world
+        heavy.objects[debris.handle]?.physics?.mass = .infinity
+        XCTAssertThrowsError(try heavy.validate(against: level))
+        var attached = base
+        attached.visEffects = [VisEffect(
+            id: VisEffect.lightningBoltID,
+            roomSourceIndex: level.rooms[0].sourceIndex,
+            position: .zero,
+            size: 1,
+            lifeLeft: 1,
+            lifetime: 1,
+            creationTime: 0,
+            flags: VisEffect.usesLifeLeftFlag | VisEffect.attachedFlag,
+            attachedObject: ObjectHandle(4_112)
+        )]
+        XCTAssertNoThrow(try attached.validate(against: level))
+        attached.visEffects[0].attachedObject = nil
+        XCTAssertThrowsError(try attached.validate(against: level))
+        attached.visEffects[0].attachedObject = ObjectHandle(0xffff_fff0)
+        XCTAssertThrowsError(try attached.validate(against: level))
     }
 
     func testInterruptedWriteLeavesThePriorSaveReadable() throws {
@@ -318,50 +413,63 @@ final class GameSaveTests: XCTestCase {
             presentationReadyTimestamp: 0
         ).world
         XCTAssertNoThrow(try concussionWorld.validate(against: concussionLevel))
-        var maskIndex = concussionWorld
-        maskIndex.playerConcussionState?.nextFiringMaskIndex = 2
-        assertRejected(
-            .indexOutOfRange("playerConcussionState.nextFiringMaskIndex"),
-            maskIndex,
-            level: concussionLevel
-        )
-        var missiles = concussionWorld
+        // The player's dynamic battery mask indexes its ship battery's
+        // masks (WBFireBattery).
         let player = concussionWorld.testPlayerObject
         guard case let .room(playerRoom) = player.location else {
             return XCTFail("indoor player")
         }
-        let missile = PlayerConcussionMissileState(
-            creationOrdinal: 0,
-            roomSourceIndex: playerRoom,
-            position: player.position,
-            orientation: player.orientation,
-            velocity: .zero,
-            lifeRemaining: 1
-        )
-        missiles.playerConcussionState?.missiles = Array(
-            repeating: missile,
-            count: playerConcussionMissilePresentationCapacity + 1
-        )
+        var maskIndex = concussionWorld
+        maskIndex.objects[player.handle]?.weaponBatteries[10]
+            .currentFiringMask = 2
         assertRejected(
-            .capacity("playerConcussionState.missiles"),
-            missiles,
+            .indexOutOfRange("object \(player.handle.slot) weapon battery 10"),
+            maskIndex,
             level: concussionLevel
         )
-
-        var damagedHandle = concussionWorld
-        damagedHandle.playerConcussionState?.explosions = [
-            .init(
-                creationOrdinal: 0,
-                roomSourceIndex: playerRoom,
-                position: player.position,
-                lifeRemaining: 1,
-                shockwaveLifeRemaining: 1,
-                damagedObjectHandles: [0x7ff]
-            ),
-        ]
+        // VisEffects hold at most MAX_VIS_EFFECTS.
+        var effects = concussionWorld
+        let effect = VisEffect(
+            id: VisEffect.fadingLineID,
+            roomSourceIndex: playerRoom,
+            position: player.position,
+            size: 1,
+            lifeLeft: 1,
+            lifetime: 1,
+            creationTime: 0,
+            flags: VisEffect.usesLifeLeftFlag
+        )
+        effects.visEffects = Array(
+            repeating: effect,
+            count: VisEffect.capacity + 1
+        )
+        assertRejected(.capacity("visEffects"), effects, level: concussionLevel)
+        var effectRoom = concussionWorld
+        var roomless = effect
+        roomless.roomSourceIndex = 99_999
+        effectRoom.visEffects = [roomless]
+        assertRejected(
+            .roomReference("roomSourceIndex"),
+            effectRoom,
+            level: concussionLevel
+        )
+        // A weapon's parent is a well-formed handle.
+        var parentHandle = concussionWorld
+        parentHandle.fireWeaponFromPlayer(
+            player.handle,
+            weaponType: PlayerWeaponState.primary,
+            isDown: true,
+            downTime: 0.1,
+            level: concussionLevel
+        )
+        let bolt = try XCTUnwrap(parentHandle.objects.first {
+            $0.type == .weapon
+        })
+        XCTAssertNoThrow(try parentHandle.validate(against: concussionLevel))
+        parentHandle.objects[bolt.handle]?.parent = ObjectHandle(0x7ff)
         assertRejected(
             .objectReference(0x7ff),
-            damagedHandle,
+            parentHandle,
             level: concussionLevel
         )
 
@@ -385,21 +493,6 @@ final class GameSaveTests: XCTestCase {
             routeIndex,
             level: guidebotLevel
         )
-        var projectileRoom = deployed
-        projectileRoom.trainingRobotGuidebotState?.projectiles = [
-            .init(
-                roomSourceIndex: 99_999,
-                position: player.position,
-                velocity: .zero,
-                lifeRemaining: 1
-            ),
-        ]
-        assertRejected(
-            .roomReference("roomSourceIndex"),
-            projectileRoom,
-            level: guidebotLevel
-        )
-
         let dodgeLevel = makeTrainingMovingTargetHandoffLevel()
         let dodgeWorld = GameSession(
             level: dodgeLevel,
@@ -476,22 +569,28 @@ final class GameSaveTests: XCTestCase {
         guard case let .room(playerRoom) = player.location else {
             return XCTFail("indoor player")
         }
-        var missileBasis = world
-        missileBasis.playerConcussionState?.missiles = [
-            .init(
-                creationOrdinal: 0,
-                roomSourceIndex: playerRoom,
-                position: player.position,
-                orientation: .init(
-                    right: player.orientation.forward,
-                    up: player.orientation.forward,
-                    forward: player.orientation.forward
-                ),
-                velocity: .zero,
-                lifeRemaining: 1
-            ),
-        ]
-        assertRejected(.orientation("orientation"), missileBasis, level: level)
+        // A weapon object keeps an orthonormal basis.
+        var weaponBasis = world
+        weaponBasis.fireWeaponFromPlayer(
+            player.handle,
+            weaponType: PlayerWeaponState.primary,
+            isDown: true,
+            downTime: 0.1,
+            level: level
+        )
+        let bolt = try XCTUnwrap(weaponBasis.objects.first {
+            $0.type == .weapon
+        })
+        weaponBasis.objects[bolt.handle]?.orientation = .init(
+            right: player.orientation.forward,
+            up: player.orientation.forward,
+            forward: player.orientation.forward
+        )
+        assertRejected(
+            .orientation("object \(bolt.handle.slot)"),
+            weaponBasis,
+            level: level
+        )
     }
 
     func testLoadValidationRejectsHostileCountersDomainsAndOrphanState()
@@ -565,65 +664,84 @@ final class GameSaveTests: XCTestCase {
             level: dodgeLevel
         )
 
-        let cameraLevel = makeTrainingCameraMonitorLevel()
-        XCTAssertNil(cameraLevel.trainingFollowBotDestruction)
-        let cameraSession = GameSession(
-            level: cameraLevel,
-            presentationReadyTimestamp: 0
-        )
-        var orphanDestruction = cameraSession.world
-        orphanDestruction.trainingFollowBotDestructionState =
-            .init(followBotShields: 1)
-        assertRejected(
-            .unexpectedState("trainingFollowBotDestructionState"),
-            orphanDestruction,
-            level: cameraLevel
-        )
-        var stillLaser = cameraSession.world
-        stillLaser.trainingRobotGuidebotState?.projectiles = [
-            .init(
-                roomSourceIndex: playerRoom,
-                position: player.position,
-                velocity: .zero,
-                lifeRemaining: 1
-            ),
-        ]
-        assertRejected(
-            .outOfDomain("trainingRobotGuidebotState.projectiles.velocity"),
-            stillLaser,
-            level: cameraLevel
-        )
-
         let concussionLevel = try makePlayerConcussionLevel()
         let concussionWorld = GameSession(
             level: concussionLevel,
             presentationReadyTimestamp: 0
         ).world
-        var ordinal = concussionWorld
-        ordinal.playerConcussionState?.nextCreationOrdinal = UInt64.max
-        assertRejected(
-            .outOfDomain("nextCreationOrdinal"),
-            ordinal,
-            level: concussionLevel
-        )
         let concussionPlayer = concussionWorld.testPlayerObject
         guard case let .room(concussionRoom) = concussionPlayer.location
         else {
             return XCTFail("indoor player")
         }
-        var explosionLife = concussionWorld
-        explosionLife.playerConcussionState?.explosions = [
-            .init(
-                creationOrdinal: 0,
+        // A live visual effect has life left of at most its lifetime.
+        var effectLife = concussionWorld
+        effectLife.visEffects = [VisEffect(
+            id: VisEffect.customExplosionID,
+            roomSourceIndex: concussionRoom,
+            position: concussionPlayer.position,
+            size: 1,
+            lifeLeft: 5,
+            lifetime: 0.5,
+            creationTime: 0,
+            flags: VisEffect.usesLifeLeftFlag
+        )]
+        assertRejected(
+            .outOfDomain("visEffects.lifeLeft"),
+            effectLife,
+            level: concussionLevel
+        )
+        // An effect that never ages (no VF_USES_LIFELEFT) or whose life
+        // already ran out is not a live effect; VisEffectMoveAll marks an
+        // effect dead when its life left drops below 0.
+        for (lifeLeft, lifetime, flags) in [
+            (Float(-1), Float(1e-20), UInt16(0)),
+            (0.1, 0.5, 0),
+            (-0.1, 0.5, VisEffect.usesLifeLeftFlag),
+            (0.1, 0.5, VisEffect.usesLifeLeftFlag | 0x4000),
+        ] {
+            var unaged = concussionWorld
+            unaged.visEffects = [VisEffect(
+                id: VisEffect.customExplosionID,
                 roomSourceIndex: concussionRoom,
                 position: concussionPlayer.position,
-                lifeRemaining: -5,
-                shockwaveLifeRemaining: 0
-            ),
-        ]
+                size: 1,
+                lifeLeft: lifeLeft,
+                lifetime: lifetime,
+                creationTime: 0,
+                flags: flags,
+                customWeapon: 0
+            )]
+            assertRejected(
+                .outOfDomain("visEffects.lifeLeft"),
+                unaged,
+                level: concussionLevel
+            )
+        }
+        // A shockwave divides by its impact time (DoConcussiveForce).
+        var shockwave = concussionWorld
+        let wave = try XCTUnwrap(shockwave.objects.create(
+            type: .shockwave,
+            renderType: .none,
+            location: concussionPlayer.location,
+            position: concussionPlayer.position,
+            orientation: concussionPlayer.orientation
+        ))
+        shockwave.objects[wave]?.lifeLeft = 0.1
+        shockwave.objects[wave]?.shockwave = .init(
+            size: 32, time: 0, playerDamage: 19, genericDamage: 19,
+            force: 3_000
+        )
         assertRejected(
-            .outOfDomain("playerConcussionState.explosions.lifeRemaining"),
-            explosionLife,
+            .outOfDomain("object \(wave.slot) shockwave"),
+            shockwave,
+            level: concussionLevel
+        )
+        var ammo = concussionWorld
+        ammo.playerWeaponAmmo[10] = -1
+        assertRejected(
+            .outOfDomain("playerWeaponAmmo"),
+            ammo,
             level: concussionLevel
         )
         var hugeClock = concussionWorld
@@ -632,23 +750,23 @@ final class GameSaveTests: XCTestCase {
 
         // Every saved number and vector component stays within the magnitude
         // bound, so no deadline, timer, or vector overflows its consumer.
-        var hugeDeadline = cameraSession.world
-        hugeDeadline.trainingRobotGuidebotState?.nextPrimaryFireTime = 1e30
-        assertRejected(
-            .outOfDomain("nextPrimaryFireTime"),
-            hugeDeadline,
-            level: cameraLevel
+        var hugeVelocity = concussionWorld
+        hugeVelocity.fireWeaponFromPlayer(
+            concussionPlayer.handle,
+            weaponType: PlayerWeaponState.primary,
+            isDown: true,
+            downTime: 0.1,
+            level: concussionLevel
         )
-        var hugeVelocity = cameraSession.world
-        hugeVelocity.trainingRobotGuidebotState?.projectiles = [
-            .init(
-                roomSourceIndex: playerRoom,
-                position: player.position,
-                velocity: .init(x: 1e30, y: 0, z: 0),
-                lifeRemaining: 1
-            ),
-        ]
-        assertRejected(.outOfDomain("velocity"), hugeVelocity, level: cameraLevel)
+        let bolt = try XCTUnwrap(hugeVelocity.objects.first {
+            $0.type == .weapon
+        })
+        hugeVelocity.objects[bolt.handle]?.velocity = .init(x: 1e30, y: 0, z: 0)
+        assertRejected(
+            .outOfDomain("object \(bolt.handle.slot)"),
+            hugeVelocity,
+            level: concussionLevel
+        )
 
         var ordinalFreeFlare = concussionWorld
         ordinalFreeFlare.playerYellowFlareState?.parents = [

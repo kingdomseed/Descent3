@@ -29,4 +29,5 @@ enum Difficulty {
     static let aiWeaponSpeed: [Float] = [0.50, 0.75, 1.00, 1.20, 1.40]
     static let aiTurretSpeed: [Float] = [0.6, 0.7, 1.0, 1.0, 1.0]
     static let aiMinimumFireSpread: [Float] = [0.30, 0.15, 0.0, 0.0, 0.0]
+    static let robotDamage: [Float] = [2.75, 1.50, 1.00, 0.80, 0.60]
 }

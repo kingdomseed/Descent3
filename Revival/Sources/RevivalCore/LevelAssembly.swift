@@ -85,11 +85,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -176,11 +171,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -224,11 +214,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
@@ -253,20 +238,6 @@ extension Level {
                     provenance: "D3Import-resolved default player ship"
                 )
             )
-        }
-        if let concussion = ship.playerConcussion {
-            for texture in concussion.explosionFrames
-            where !dependencies.contains(where: {
-                $0.category == "texture" && $0.source == texture
-            }) {
-                dependencies.append(.init(
-                    category: "texture",
-                    source: texture,
-                    state: "presentation-payload-imported",
-                    provenance:
-                        "manage/weaponpage.cpp:653-901; Descent3/WeaponFire.cpp:3058-3201"
-                ))
-            }
         }
         return Level(
             schemaVersion: schemaVersion,
@@ -295,11 +266,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -370,11 +336,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             voiceClips: voiceClips + addedVoiceClips,
             soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
@@ -427,11 +388,6 @@ extension Level {
             trainingGalleryBarrier: barrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             voiceClips: voiceClips + [voiceClip],
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -598,11 +554,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: chain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             voiceClips: voiceClips + addedVoiceClips,
             soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
@@ -678,11 +629,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: chain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             voiceClips: voiceClips + addedVoiceClips,
             soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
@@ -692,253 +638,6 @@ extension Level {
             ),
             sourceChunks: sourceChunks
         ).preservingScripting(of: self)
-    }
-
-    func addingTrainingRASBot1DeathChain(
-        _ chain: TrainingRASBot1DeathChain
-    ) -> Level {
-        Level(
-            schemaVersion: 11,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: chain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
-            voiceClips: voiceClips,
-            soundClips: soundClips,
-            dependencyManifest: dependencyManifest,
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
-    func addingTrainingRASBot2DeathChain(
-        _ chain: TrainingRASBot2DeathChain
-    ) -> Level {
-        Level(
-            schemaVersion: 11,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: chain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
-            voiceClips: voiceClips,
-            soundClips: soundClips,
-            dependencyManifest: dependencyManifest,
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
-    func addingTrainingRASBot3DeathChain(
-        _ chain: TrainingRASBot3DeathChain
-    ) -> Level {
-        Level(
-            schemaVersion: 11,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: chain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
-            voiceClips: voiceClips,
-            soundClips: soundClips,
-            dependencyManifest: dependencyManifest,
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
-    func addingTrainingRASBot4DeathChain(
-        _ chain: TrainingRASBot4DeathChain
-    ) -> Level {
-        Level(
-            schemaVersion: 11,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: chain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
-            voiceClips: voiceClips,
-            soundClips: soundClips,
-            dependencyManifest: dependencyManifest,
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
-    func addingTrainingLastBot1DeathChain(
-        _ chain: TrainingLastBot1DeathChain
-    ) -> Level {
-        Level(
-            schemaVersion: 11,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: chain,
-            trainingInvulnerabilityPickupChain:
-                trainingInvulnerabilityPickupChain,
-            trainingCloakPickupChain: trainingCloakPickupChain,
-            trainingLastRoomChain: trainingLastRoomChain,
-            trainingFinalRoomEntryChain: trainingFinalRoomEntryChain,
-            voiceClips: voiceClips,
-            soundClips: soundClips,
-            dependencyManifest: dependencyManifest,
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
-    func addingTrainingLastBot2DeathChain(
-        _ chain: TrainingLastBot2DeathChain
-    ) -> Level {
-        var level = self
-        level.trainingLastBot2DeathChain = chain
-        return level
-    }
-
-    func addingTrainingLastBot3DeathChain(
-        _ chain: TrainingLastBot3DeathChain
-    ) -> Level {
-        var level = self
-        level.trainingLastBot3DeathChain = chain
-        return level
-    }
-
-    func addingTrainingLastBot4DeathChain(
-        _ chain: TrainingLastBot4DeathChain
-    ) -> Level {
-        var level = self
-        level.trainingLastBot4DeathChain = chain
-        return level
-    }
-
-    func addingTrainingLastBot5DeathChain(
-        _ chain: TrainingLastBot5DeathChain
-    ) -> Level {
-        var level = self
-        level.trainingLastBot5DeathChain = chain
-        return level
     }
 
     func addingTrainingFinalBotsCompletionChain(
@@ -982,11 +681,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             trainingInvulnerabilityPickupChain:
                 trainingInvulnerabilityPickupChain,
             trainingCloakPickupChain: trainingCloakPickupChain,
@@ -1002,14 +696,6 @@ extension Level {
             ),
             sourceChunks: sourceChunks
         ).preservingScripting(of: self)
-        level.trainingLastBot2DeathChain =
-            trainingLastBot2DeathChain
-        level.trainingLastBot3DeathChain =
-            trainingLastBot3DeathChain
-        level.trainingLastBot4DeathChain =
-            trainingLastBot4DeathChain
-        level.trainingLastBot5DeathChain =
-            trainingLastBot5DeathChain
         return level
     }
 
@@ -1089,11 +775,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             trainingInvulnerabilityPickupChain: chain,
             voiceClips: voiceClips,
             soundClips: soundClips + addedSoundClips,
@@ -1171,11 +852,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             trainingInvulnerabilityPickupChain:
                 trainingInvulnerabilityPickupChain,
             trainingCloakPickupChain: chain,
@@ -1220,11 +896,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             trainingInvulnerabilityPickupChain:
                 trainingInvulnerabilityPickupChain,
             trainingCloakPickupChain: trainingCloakPickupChain,
@@ -1277,11 +948,6 @@ extension Level {
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingRASBot1DeathChain: trainingRASBot1DeathChain,
-            trainingRASBot2DeathChain: trainingRASBot2DeathChain,
-            trainingRASBot3DeathChain: trainingRASBot3DeathChain,
-            trainingRASBot4DeathChain: trainingRASBot4DeathChain,
-            trainingLastBot1DeathChain: trainingLastBot1DeathChain,
             trainingInvulnerabilityPickupChain:
                 trainingInvulnerabilityPickupChain,
             trainingCloakPickupChain: trainingCloakPickupChain,

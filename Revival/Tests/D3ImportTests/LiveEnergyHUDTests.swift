@@ -80,16 +80,14 @@ extension WorldRenderingTests {
             level: finalLevel,
             presentationReadyTimestamp: 0
         )
-        initialFinalSimulation.destroyTrainingRobot(handle: 4_112)
-        initialFinalSimulation.destroyTrainingRASBot1(handle: 2_074)
-        initialFinalSimulation.destroyTrainingRASBot2(handle: 2_075)
-        initialFinalSimulation.destroyTrainingRASBot3(handle: 2_077)
-        initialFinalSimulation.destroyTrainingRASBot4(handle: 2_078)
-        initialFinalSimulation.destroyTrainingLastBot1(handle: 4_127)
-        initialFinalSimulation.destroyTrainingLastBot2(handle: 2_080)
-        initialFinalSimulation.destroyTrainingLastBot3(handle: 2_081)
-        initialFinalSimulation.destroyTrainingLastBot4(handle: 2_082)
-        initialFinalSimulation.destroyTrainingLastBot5(handle: 2_083)
+        // The player shot down the ten robots, and the last five opened
+        // the final bots barrier (Scripts 051-055 and 035; this
+        // unscripted fixture takes the state the scripts leave).
+        initialFinalSimulation.killRobotsAsPlayer([
+            4_112, 2_074, 2_075, 2_077, 2_078,
+            4_127, 2_080, 2_081, 2_082, 2_083,
+        ])
+        openTrainingFinalBotsBarrier(in: &initialFinalSimulation.world, level: initialFinalSimulation.level)
         _ = initialFinalSimulation.update(at: 0.1, input: .zero)
         var ready = try XCTUnwrap(
             testWorldObject(initialFinalSimulation.world)

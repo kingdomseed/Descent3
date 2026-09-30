@@ -2,11 +2,10 @@ import XCTest
 
 func makeTrainingRASBot1DeathLevel() -> Level {
     var level = makeTrainingKillbotEntryLevel()
-    let chain = level.trainingRobotGuidebotChain!
     let playerIndex = level.objects.firstIndex { $0.handle == 2_048 }!
     let player = level.objects[playerIndex]
     let robotModel = level.objectPresentations.first {
-        $0.objectHandle == chain.destroyRobotObjectHandle
+        $0.objectHandle == 4_112
     }!.primaryModel
     let robotPosition = Vector3(
         x: player.position.x + player.orientation.forward.x * 20,
@@ -45,19 +44,7 @@ func makeTrainingRASBot1DeathLevel() -> Level {
         mediumDistance: nil,
         lowDistance: nil
     ))
-    return rescriptedTrainingLevel(
-        level.addingTrainingRASBot1DeathChain(.init(
-            robotObjectHandle: 2_074,
-            robotRoomSourceIndex: {
-                guard case let .room(roomSourceIndex) = player.location else {
-                    preconditionFailure("Synthetic Training player is indoor")
-                }
-                return roomSourceIndex
-            }(),
-            robotFlags: 5_121,
-            combat: .stockTraining
-        ))
-    )
+    return rescriptedTrainingLevel(level)
 }
 
 func makeTrainingRASBot2DeathLevel() -> Level {
@@ -109,19 +96,7 @@ func makeTrainingRASBot2DeathLevel() -> Level {
         mediumDistance: nil,
         lowDistance: nil
     ))
-    return rescriptedTrainingLevel(
-        level.addingTrainingRASBot2DeathChain(.init(
-            robotObjectHandle: 2_075,
-            robotRoomSourceIndex: {
-                guard case let .room(roomSourceIndex) = player.location else {
-                    preconditionFailure("Synthetic Training player is indoor")
-                }
-                return roomSourceIndex
-            }(),
-            robotFlags: 5_121,
-            combat: .stockTraining
-        ))
-    )
+    return rescriptedTrainingLevel(level)
 }
 
 func makeTrainingRASBot3DeathLevel() -> Level {
@@ -212,14 +187,7 @@ func makeTrainingRASBot3DeathLevel() -> Level {
         mediumDistance: nil,
         lowDistance: nil
     ))
-    return rescriptedTrainingLevel(
-        level.addingTrainingRASBot3DeathChain(.init(
-            robotObjectHandle: 2_077,
-            robotRoomSourceIndex: 42,
-            robotFlags: 5_121,
-            combat: .stockTraining
-        ))
-    )
+    return rescriptedTrainingLevel(level)
 }
 
 func makeTrainingRASBot4DeathLevel() -> Level {
@@ -304,14 +272,7 @@ func makeTrainingRASBot4DeathLevel() -> Level {
         mediumDistance: nil,
         lowDistance: nil
     ))
-    return rescriptedTrainingLevel(
-        level.addingTrainingRASBot4DeathChain(.init(
-            robotObjectHandle: 2_078,
-            robotRoomSourceIndex: 0,
-            robotFlags: 5_121,
-            combat: .stockTraining
-        ))
-    )
+    return rescriptedTrainingLevel(level)
 }
 
 func makeTrainingInvulnerabilityPickupLevel() -> Level {
@@ -1016,14 +977,7 @@ func makeTrainingLastBot1DeathLevel() -> Level {
         mediumDistance: nil,
         lowDistance: nil
     ))
-    return rescriptedTrainingLevel(
-        level.addingTrainingLastBot1DeathChain(.init(
-            robotObjectHandle: 4_127,
-            robotRoomSourceIndex: 14,
-            robotFlags: 5_121,
-            combat: .stockTraining
-        ))
-    )
+    return rescriptedTrainingLevel(level)
 }
 
 func makeTrainingLastBot2DeathLevel() -> Level {
@@ -1111,14 +1065,7 @@ func makeTrainingLastBot2DeathLevel() -> Level {
         mediumDistance: lastBot1Presentation.mediumDistance,
         lowDistance: lastBot1Presentation.lowDistance
     ))
-    return rescriptedTrainingLevel(
-        level.addingTrainingLastBot2DeathChain(.init(
-            robotObjectHandle: 2_080,
-            robotRoomSourceIndex: 46,
-            robotFlags: 5_121,
-            combat: .stockTraining
-        ))
-    )
+    return rescriptedTrainingLevel(level)
 }
 
 func makeTrainingLastBot3DeathLevel() -> Level {
@@ -1206,14 +1153,7 @@ func makeTrainingLastBot3DeathLevel() -> Level {
         mediumDistance: lastBot2Presentation.mediumDistance,
         lowDistance: lastBot2Presentation.lowDistance
     ))
-    return rescriptedTrainingLevel(
-        level.addingTrainingLastBot3DeathChain(.init(
-            robotObjectHandle: 2_081,
-            robotRoomSourceIndex: 47,
-            robotFlags: 5_121,
-            combat: .stockTraining
-        ))
-    )
+    return rescriptedTrainingLevel(level)
 }
 
 func makeTrainingLastBot4DeathLevel() -> Level {
@@ -1254,14 +1194,7 @@ func makeTrainingLastBot4DeathLevel() -> Level {
         mediumDistance: lastBot3Presentation.mediumDistance,
         lowDistance: lastBot3Presentation.lowDistance
     ))
-    return rescriptedTrainingLevel(
-        level.addingTrainingLastBot4DeathChain(.init(
-            robotObjectHandle: 2_082,
-            robotRoomSourceIndex: 47,
-            robotFlags: 5_121,
-            combat: .stockTraining
-        ))
-    )
+    return rescriptedTrainingLevel(level)
 }
 
 func makeTrainingLastBot5DeathLevel() -> Level {
@@ -1345,14 +1278,7 @@ func makeTrainingLastBot5DeathLevel() -> Level {
         mediumDistance: lastBot4Presentation.mediumDistance,
         lowDistance: lastBot4Presentation.lowDistance
     ))
-    return rescriptedTrainingLevel(
-        level.addingTrainingLastBot5DeathChain(.init(
-            robotObjectHandle: 2_083,
-            robotRoomSourceIndex: 48,
-            robotFlags: 5_121,
-            combat: .stockTraining
-        ))
-    )
+    return rescriptedTrainingLevel(level)
 }
 
 func makeTrainingFinalBotsCompletionLevel() -> Level {

@@ -38,6 +38,8 @@ let fixtureTrainingMessages = [
     ("WeaponsEnabled", "Now your weapons have been enabled. There is a primary and a secondary."),
     ("DestroyFollowbot", "Now, destroy the robot."),
     ("Movingbotintro", "Now destroy 2 more robots. This time they will be moving."),
+    ("ProceedtoLastRoom", "Now proceed through the doorway that just opened to begin the last stage of your training."),
+    ("AllDone", "Great Job! Now fly through the opened doorway to end your training. Good job Recruit!"),
 ].map { LevelScriptMessage(name: $0.0, text: $0.1) }
 
 /// The level with Training script data (package schema 12), so the world
@@ -48,7 +50,50 @@ func addingTrainingMissionScripting(
     _ level: Level,
     messages: [LevelScriptMessage] = fixtureTrainingMessages
 ) -> Level {
-    let level = withTrainingStreamPadding(level)
+    var level = withTrainingStreamPadding(level)
+    // Silent clips for the module's sounds the level lacks.
+    let pcm = Data(repeating: 0, count: 2)
+    let missingSounds = TrainingMissionScript.soundNames.enumerated()
+        .filter { _, name in
+            !level.soundClips.contains { $0.logicalName == name }
+        }
+        .map { offset, name in
+            CanonicalSoundClip(
+                logicalName: name,
+                sourceName: "\(name) padding.wav",
+                sourceEntryIndex: 30_000 + offset,
+                sampleRate: 22_050,
+                channelCount: 1,
+                frameCount: 1,
+                pcm16LittleEndian: pcm,
+                pcmSHA256: canonicalSHA256(pcm),
+                sourceArchive: "missions/training.mn3",
+                sourceSHA256: String(repeating: "b", count: 64),
+                importVolume: 1
+            )
+        }
+    if !missingSounds.isEmpty {
+        level = replacing(
+            level,
+            soundClips: level.soundClips + missingSounds,
+            dependencyManifest: .init(
+                current: level.dependencyManifest.current
+                    + missingSounds.map {
+                        DependencyRecord(
+                            category: "sound",
+                            source: .init(
+                                storedIndex: $0.sourceEntryIndex,
+                                sourceName: $0.sourceName
+                            ),
+                            state: "canonical-pcm-imported",
+                            provenance: "synthetic canonical fixture"
+                        )
+                    },
+                historicalEagerBaseline:
+                    level.dependencyManifest.historicalEagerBaseline
+            )
+        )
+    }
     let bindings = level.objects
         .filter { LevelScripting.scriptableObjectTypes.contains($0.type) }
         .map { object in
@@ -316,5 +361,47 @@ func startDodgeTimer(_ session: GameSession) -> OsirisTimer? {
     let startDodge = session.level.findObjectName("StartDodge")
     return session.world.osirisTimers.entries.first {
         $0.isUsed && $0.owner == .object(startDodge) && $0.id == 8
+    }
+}
+
+extension GameSession {
+    /// Kills each object as the player's weapons would: KillObject with the
+    /// player as the killer (damage.cpp:1175), so the player scores the
+    /// page's score. ObjDeleteDead runs at the end of the next object frame.
+    func killRobotsAsPlayer(_ handles: [UInt32]) {
+        for handle in handles {
+            world.killObject(
+                ObjectHandle(handle),
+                killer: world.testPlayerObject.handle,
+                damage: 1,
+                level: level
+            )
+        }
+    }
+}
+
+extension GameSession {
+    /// The world Script 036 leaves when DestroyBot2 dies
+    /// (TrainingMission.cpp:2040-2046), for an unscripted fixture: the robot
+    /// is gone, FlashLight-2 is lit, the gallery barrier is open, and every
+    /// control is on. The scripted path is TrainingRobotScriptTests.
+    func applyTrainingScript036Outcome() {
+        world.objects.delete(ObjectHandle(4_112))
+        if let barrier = level.trainingGalleryBarrier {
+            world.setObjectLightDistance(
+                ObjectHandle(barrier.markerLightObjectHandle),
+                50
+            )
+        }
+        openTrainingGalleryBarrier(in: &world, level: level)
+        world.aToggleAllPlayerControls(1, 0, level: level)
+    }
+
+    /// FlashLight-2's script light distance (the gallery marker), or 0.
+    var galleryMarkerLightDistance: Float {
+        level.trainingGalleryBarrier.flatMap {
+            world.objects[ObjectHandle($0.markerLightObjectHandle)]?
+                .localLighting?.lightDistance
+        } ?? 0
     }
 }

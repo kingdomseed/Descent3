@@ -77,47 +77,6 @@ extension CanonicalLevelTests {
         }
     }
 
-    func testSchemaElevenRequiresExactFollowBotDestructionHandoff()
-        throws
-    {
-        let level = makeTrainingMovingTargetHandoffLevel()
-        let handoff = try XCTUnwrap(level.trainingFollowBotDestruction)
-
-        XCTAssertEqual(handoff.followBotObjectHandle, 8_200)
-        XCTAssertEqual(handoff.destroyBot2ObjectHandle, 4_112)
-        XCTAssertEqual(handoff.destroyBot1ObjectHandle, 4_113)
-        XCTAssertEqual(handoff.combat, .stockTraining)
-        XCTAssertEqual(handoff.projectileModel.sourceName, "bluelaser.OOF")
-        XCTAssertEqual(handoff.destructionDelay, 2)
-        XCTAssertEqual(handoff.levelTimerID, 11)
-        XCTAssertEqual(handoff.movingTeamFlags, 65_536)
-        XCTAssertEqual(handoff.movingPathIndex, 0)
-        XCTAssertEqual(handoff.movingPathGoalFlags, 0x80_11_00)
-        XCTAssertEqual(handoff.goalID, -1)
-        XCTAssertEqual(handoff.goalPriority, 3)
-        XCTAssertEqual(handoff.successMessage, "Excellent!")
-        XCTAssertEqual(
-            handoff.movingInstruction,
-            "Now destroy 2 more robots. This time they will be moving."
-        )
-        XCTAssertEqual(handoff.voiceSourceName, "kill1.osf")
-        XCTAssertFalse(
-            try XCTUnwrap(
-                level.objectPresentations.first {
-                    $0.objectHandle == handoff.destroyBot2ObjectHandle
-                }
-            ).isVisible
-        )
-        XCTAssertFalse(
-            try XCTUnwrap(
-                level.objectPresentations.first {
-                    $0.objectHandle == handoff.destroyBot1ObjectHandle
-                }
-            ).isVisible
-        )
-        XCTAssertNoThrow(try level.validate())
-    }
-
     func testManeuverFixtureCarriesStockPathsAndFlyerAI() throws {
         let level = makeTrainingManeuverFollowLevel()
         XCTAssertEqual(level.paths[0].name, "FollowLoop1")

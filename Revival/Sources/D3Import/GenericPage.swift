@@ -5,7 +5,9 @@
 // Parallax Software, GPL-3.0-or-later): mng_ReadNewGenericPage (:1083) and
 // mng_SetAndLoadGeneric's AI allocation (:1840); from manage/manage.cpp,
 // mng_ReadPhysicsChunk (:2359), mng_ReadWeaponBatteryChunk (:2423), and
-// mng_ReadLightingChunk (:2471); and from model/polymodel.cpp, the GPNT
+// mng_ReadLightingChunk (:2471); the ship page batteries the player starts
+// with (InitPlayerNewShip, Descent3/Player.cpp:1502-1508); and from
+// model/polymodel.cpp, the GPNT
 // (:1618) and WBAT (:1686) chunks of ReadNewModelFile. The weapon pages come
 // from the existing weapon page reader (PresentationImport.swift).
 
@@ -30,6 +32,18 @@ struct RetailGenericPage: Equatable, Sendable {
     let weaponNames: [[String]]
     /// `fire_sound_name[wb][mask]`.
     let fireSoundNames: [[String]]
+    /// `score`.
+    let score: Int16
+    /// `impact_size`, `impact_time`, and `damage`.
+    let impact: CanonicalObjectImpact
+    /// `death_types` and `death_probabilities` (version 22 and later).
+    let deathTypes: [CanonicalDeathType]
+    /// `phys_info` (mng_ReadPhysicsChunk).
+    let physics: ObjectPhysics
+    /// The death spew: `f_dspew` and each spew's percent, number, and page.
+    let deathSpew: CanonicalDeathSpew
+    /// `sound_name[GSI_EXPLODE]`, or empty.
+    let explodeSoundName: String
 }
 
 /// otype_wb_info as mng_ReadWeaponBatteryChunk reads it.
@@ -110,8 +124,12 @@ private func readRetailGenericPage(
     let primaryModelName = try cursor.readCString(allowEmpty: true)
     _ = try cursor.readCString(allowEmpty: true)   // med_image_name
     _ = try cursor.readCString(allowEmpty: true)   // lo_image_name
-    try cursor.skip(12)                            // impact size, time, damage
-    try cursor.skip(2)                             // score (version >= 24)
+    let impact = CanonicalObjectImpact(
+        size: try cursor.readFloat(),
+        time: try cursor.readFloat(),
+        damage: try cursor.readFloat()
+    )
+    let score = Int16(bitPattern: try cursor.readUInt16())  // version >= 24
     if type == 7, version >= 25 { try cursor.skip(2) }  // ammo_count
     _ = try cursor.readCString(allowEmpty: true)   // script name
     if version >= 18 { _ = try cursor.readCString(allowEmpty: true) }
@@ -121,7 +139,24 @@ private func readRetailGenericPage(
     }
     _ = try cursor.readCString(allowEmpty: true)   // icon_name
     try cursor.skip(8)                             // LOD distances
-    try cursor.skip(68)                            // mng_ReadPhysicsChunk
+    // mng_ReadPhysicsChunk (manage.cpp:2359).
+    let physicsMass = try cursor.readFloat()
+    let physicsDrag = try cursor.readFloat()
+    _ = try cursor.readFloat()                     // full_thrust
+    let physicsFlags = try cursor.readUInt32()
+    _ = try cursor.readFloat()                     // rotdrag
+    _ = try cursor.readFloat()                     // full_rotthrust
+    let physicsBounces = Int32(bitPattern: try cursor.readUInt32())
+    _ = try cursor.readFloat()                     // velocity.z
+    let physicsSpin = Vector3(
+        x: try cursor.readFloat(),
+        y: try cursor.readFloat(),
+        z: try cursor.readFloat()
+    )
+    _ = try cursor.readFloat()                     // wiggle_amplitude
+    _ = try cursor.readFloat()                     // wiggles_per_sec
+    let physicsRestitution = try cursor.readFloat()
+    try cursor.skip(12)                            // hit_die_dot, turnroll
     let size = try cursor.readFloat()
     // mng_ReadLightingChunk (manage.cpp:2471).
     let lightDistance = try cursor.readFloat()
@@ -181,10 +216,21 @@ private func readRetailGenericPage(
     let biasedFlightMinimum = try cursor.readFloat()
     let biasedFlightMaximum = try cursor.readFloat()
 
-    // Spew types, animations (version >= 20: shorts).
+    // The death spew (generic.cpp:1237-1244); each entry rereads
+    // f_dspew, so the last byte stands. Then animations (version >= 20:
+    // shorts).
+    var spewFlags: UInt8 = 0
+    var spewEntries: [CanonicalDeathSpew.Entry] = []
     for _ in 0..<2 {
-        try cursor.skip(1 + 4 + 2)
-        _ = try cursor.readCString(allowEmpty: true)
+        spewFlags = try cursor.readUInt8()
+        let percent = try cursor.readFloat()
+        let number = Int16(bitPattern: try cursor.readUInt16())
+        let spewName = try cursor.readCString(allowEmpty: true)
+        spewEntries.append(.init(
+            pageName: spewName,
+            percent: percent,
+            number: number
+        ))
     }
     try cursor.skip(5 * 24 * (2 + 2 + 4))
 
@@ -229,7 +275,10 @@ private func readRetailGenericPage(
     }
     // MAX_OBJ_SOUNDS (2) object sounds; before version 26 a third,
     // obsolete one follows (generic.cpp:1274-1281). Then MAX_AI_SOUNDS (5).
-    for _ in 0..<2 { _ = try cursor.readCString(allowEmpty: true) }
+    let objectSounds = [
+        try cursor.readCString(allowEmpty: true),
+        try cursor.readCString(allowEmpty: true),
+    ]
     if version < 26 { _ = try cursor.readCString(allowEmpty: true) }
     for _ in 0..<5 { _ = try cursor.readCString(allowEmpty: true) }
     var fireSoundNames: [[String]] = []
@@ -238,13 +287,44 @@ private func readRetailGenericPage(
             try cursor.readCString(allowEmpty: true)
         })
     }
+    // NUM_MOVEMENT_CLASSES (5) x NUM_ANIMS_PER_CLASS (24) animation sounds,
+    // then the respawn scalar (version >= 21) and the death types
+    // (version >= 22, generic.cpp:1297-1324).
+    for _ in 0..<(5 * 24) { _ = try cursor.readCString(allowEmpty: true) }
+    _ = try cursor.readFloat()
+    let deathTypeCount = Int(try cursor.readUInt16())
+    guard deathTypeCount <= CanonicalDeathType.maximumCount else {
+        throw GenericPageImportError.invalidValue(name)
+    }
+    var deathTypes: [CanonicalDeathType] = []
+    for _ in 0..<deathTypeCount {
+        var deathType = CanonicalDeathType(
+            flags: try cursor.readUInt32(),
+            delayMinimum: try cursor.readFloat(),
+            delayMaximum: try cursor.readFloat(),
+            probability: try cursor.readUInt8()
+        )
+        // Before version 27, only OLD_DF_DELAY_MIN_MAX kept its delays
+        // (generic.cpp:1316-1322). The DF_UNUSED clear there changes a
+        // local copy only, so the stored flags stay as read.
+        if version < 27, deathType.flags & 0x3 != 0x1 {
+            deathType.delayMinimum = 0
+            deathType.delayMaximum = 0
+        }
+        deathTypes.append(deathType)
+    }
     let values = [size, lightDistance, timeInterval, flickerDistance,
                   directionalDot, fov, maxVelocity, maxDeltaVelocity,
                   maxTurnRate, maxDeltaTurnRate, circleDistance,
                   leadAccuracy, fireSpread, aggression, lifePreservation,
-                  avoidFriendsDistance]
+                  avoidFriendsDistance, impact.size, impact.time,
+                  impact.damage, physicsMass, physicsDrag,
+                  physicsRestitution]
+        + deathTypes.flatMap { [$0.delayMinimum, $0.delayMaximum] }
+        + spewEntries.map(\.percent)
     guard values.allSatisfy(\.isFinite),
-          isFinite(primaryColor), isFinite(secondaryColor)
+          isFinite(primaryColor), isFinite(secondaryColor),
+          isFinite(physicsSpin)
     else {
         throw GenericPageImportError.invalidValue(name)
     }
@@ -306,7 +386,20 @@ private func readRetailGenericPage(
         ),
         weaponBatteries: batteries,
         weaponNames: weaponNames,
-        fireSoundNames: fireSoundNames
+        fireSoundNames: fireSoundNames,
+        score: score,
+        impact: impact,
+        deathTypes: deathTypes,
+        physics: ObjectPhysics(
+            flags: physicsFlags,
+            mass: physicsMass,
+            drag: physicsDrag,
+            restitution: physicsRestitution,
+            numberOfBounces: physicsBounces,
+            rotationalVelocity: physicsSpin
+        ),
+        deathSpew: CanonicalDeathSpew(flags: spewFlags, entries: spewEntries),
+        explodeSoundName: objectSounds[1]
     )
 }
 
@@ -443,15 +536,19 @@ func retailAIWeaponNames(
 extension Level {
     /// The object tables for the placed objects (additive in package schema
     /// 12): one object_info per generic page a placed generic object uses,
-    /// the gun points and weapon batteries of those pages' models, and the
-    /// weapons their AI batteries fire. `soundKey` maps a sound page name
-    /// to the level's canonical clip key, importing the clip if needed;
-    /// `modelPayload` returns an OOF by lowercased name.
+    /// the gun points and weapon batteries of those pages' models, the ship
+    /// batteries `shipBatteries` with the ship model's guns, and the weapons
+    /// all those batteries fire. `soundKey` maps a sound page name to the
+    /// level's canonical clip key, importing the clip if needed;
+    /// `modelPayload` returns an OOF by lowercased name; `explosionFrames`
+    /// returns the imported frames of an explosion texture, if any.
     func addingObjectTables(
         genericPages: [String: RetailGenericPage],
+        shipBatteries: [RetailShipWeaponBattery] = [],
         weapon: (String) throws -> RetailWeaponPresentationSelection,
         weaponModel: (String) -> SourceResource?,
         modelPayload: (String) -> Data?,
+        explosionFrames: (String) -> [SourceResource] = { _ in [] },
         soundKey: (String) throws -> String
     ) throws -> Level {
         var level = self
@@ -545,8 +642,118 @@ extension Level {
                 lightDistance: page.lightDistance,
                 lighting: page.lighting,
                 ai: controlsAI ? page.ai : nil,
-                weaponBatteries: batteries
+                weaponBatteries: batteries,
+                score: page.score,
+                impact: page.impact,
+                deathTypes: page.deathTypes,
+                explodeSound: page.explodeSoundName.isEmpty
+                    ? "" : try soundKey(page.explodeSoundName),
+                deathSpew: page.deathSpew,
+                physics: page.physics
             ))
+        }
+        // The pages a death makes objects from without placing them: the
+        // spewed objects (DoDeathSpew, fireball.cpp:1134) and the dead
+        // models (CreateDeadObject, fireball.cpp:1316). They have no AI
+        // batteries here.
+        let deadModels = [
+            "swatter": "swatter(deadmodel)",
+            "hangturret": "Securityturret(DEAD)",
+            "lance": "Lance(DEAD)",
+            "l10 swatter": "swatter(deadmodel)",
+        ]
+        var madePages: [String] = []
+        for info in infos {
+            for entry in info.deathSpew?.entries ?? []
+            where entry.number > 0 && !entry.pageName.isEmpty {
+                madePages.append(entry.pageName)
+            }
+            if info.type == 2, let dead = deadModels[info.name.lowercased()] {
+                madePages.append(dead)
+            }
+        }
+        for name in madePages {
+            guard !infos.contains(where: {
+                      $0.name.caseInsensitiveCompare(name) == .orderedSame
+                  }),
+                  let page = genericPages[name.lowercased()]
+            else {
+                continue
+            }
+            infos.append(.init(
+                name: page.name,
+                type: page.type,
+                flags: page.flags,
+                size: page.size,
+                hitPoints: page.hitPoints,
+                lightDistance: page.lightDistance,
+                lighting: page.lighting,
+                ai: page.flags & CanonicalObjectInfo.controlAIFlag != 0
+                    ? page.ai : nil,
+                weaponBatteries: [],
+                score: page.score,
+                impact: page.impact,
+                deathTypes: page.deathTypes,
+                explodeSound: page.explodeSoundName.isEmpty
+                    ? "" : try soundKey(page.explodeSoundName),
+                deathSpew: page.deathSpew,
+                physics: page.physics
+            ))
+        }
+        // The ship batteries fire from the ship model's battery 0
+        // (WeaponFire.cpp:2977); their gun points follow its gun points.
+        var shipWeaponBatteries: [CanonicalShipWeaponBattery] = []
+        if !shipBatteries.isEmpty,
+           let ship = shipDefinitions.first {
+            guard let payload = modelPayload(
+                ship.primaryModel.sourceName.lowercased()
+            ) else {
+                throw GenericPageImportError.missingModel(
+                    ship.primaryModel.sourceName
+                )
+            }
+            let guns = try readOutrageModelGuns(
+                payload,
+                name: ship.primaryModel.sourceName
+            )
+            modelGuns[ship.primaryModel] = guns
+            let gunCount = guns.batteries.first?.gunpoints.count ?? 0
+            for retail in shipBatteries {
+                let weaponsFired = retail.weaponNames.prefix(gunCount)
+                for (bit, weaponName) in weaponsFired.enumerated()
+                where retail.fireMasks.contains(where: { $0 & (1 << bit) != 0 })
+                    && !weaponNames.contains(where: {
+                        $0.caseInsensitiveCompare(weaponName) == .orderedSame
+                    }) {
+                    weaponNames.append(weaponName)
+                }
+                shipWeaponBatteries.append(.init(
+                    index: retail.index,
+                    battery: .init(
+                        gunpointWeapons: weaponsFired.enumerated().map {
+                            bit, weaponName in
+                            retail.fireMasks.contains(where: {
+                                $0 & (1 << bit) != 0
+                            }) ? weaponName : ""
+                        },
+                        fireMasks: retail.fireMasks,
+                        fireWaits: retail.fireWaits,
+                        fireSounds: try retail.fireSoundNames.map { name in
+                            name.isEmpty ? "" : try soundKey(name)
+                        },
+                        aimingGunpointIndex: 0,
+                        aimingFlags: 0,
+                        aiming3DDot: 0,
+                        aiming3DDistance: 0,
+                        aimingXZDot: 0,
+                        flags: retail.flags,
+                        quadFireMask: 0
+                    ),
+                    energyUsage: retail.energyUsage,
+                    ammoUsage: retail.ammoUsage,
+                    fireFlags: retail.fireFlags
+                ))
+            }
         }
         var weapons: [CanonicalWeapon] = []
         for name in weaponNames {
@@ -575,7 +782,23 @@ extension Level {
                 lifetime: page.lifetime,
                 playerDamage: page.playerDamage,
                 genericDamage: page.genericDamage,
-                sounds: sounds + Array(repeating: "", count: 7 - sounds.count)
+                sounds: sounds + Array(repeating: "", count: 7 - sounds.count),
+                impact: .init(
+                    size: page.impactSize,
+                    time: page.impactTime,
+                    playerDamage: page.impactPlayerDamage,
+                    genericDamage: page.impactGenericDamage,
+                    force: page.impactForce
+                ),
+                explosion: .init(
+                    hasImage: !page.explosionTextureName.isEmpty,
+                    frames: page.explosionTextureName.isEmpty
+                        ? [] : explosionFrames(page.explosionTextureName),
+                    lifetime: page.explosionLifetime,
+                    size: page.explosionSize
+                ),
+                lightDistance: page.lightDistance,
+                lighting: page.lightPresentation
             ))
         }
         level.models = models.map { model in
@@ -588,6 +811,13 @@ extension Level {
         }
         level.objectInfos = infos
         level.weapons = weapons
-        return level
+        if !shipWeaponBatteries.isEmpty {
+            level.shipDefinitions[0].weaponBatteries = shipWeaponBatteries
+        }
+        return level.appendingTextureDependencies(
+            weapons.flatMap { $0.explosion?.frames ?? [] },
+            provenance:
+                "manage/weaponpage.cpp:653-901; Descent3/WeaponFire.cpp:3058-3201"
+        )
     }
 }

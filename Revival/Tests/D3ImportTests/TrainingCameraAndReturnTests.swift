@@ -400,7 +400,6 @@ extension WorldRenderingTests {
                 as? [String: Any]
         )
         initialGalleryState["wasTriggered"] = true
-        initialGalleryState["markerLightDistance"] = 0
         initialContinuationObject["trainingGalleryBarrierState"] =
             initialGalleryState
         let gallerySimulation = try GameSession(
@@ -408,19 +407,13 @@ extension WorldRenderingTests {
             world: (decodeTestWorld(initialContinuationObject)).rebased(onto: level),
             resumedAtTimestamp: 0
         )
-        gallerySimulation.destroyTrainingRobot(handle: 4_112)
-        var readyContinuationObject = try XCTUnwrap(
+        // Scripts 036 and 029 ran: DestroyBot2 is gone, and Script 029 hid
+        // the enabled-control summary (TrainingMission.cpp:1580).
+        gallerySimulation.applyTrainingScript036Outcome()
+        gallerySimulation.world.hudShowControls = false
+        let readyContinuationObject = try XCTUnwrap(
             testWorldObject(gallerySimulation.world)
         )
-        var readyRobotState = try XCTUnwrap(
-            readyContinuationObject["trainingRobotGuidebotState"]
-                as? [String: Any]
-        )
-        readyRobotState.removeValue(forKey: "destructionTimerRemaining")
-        readyRobotState["destructionFeedbackWasPresented"] = true
-        readyRobotState["enabledControlHUDIsVisible"] = false
-        readyContinuationObject["trainingRobotGuidebotState"] =
-            readyRobotState
         let simulation = try GameSession(
             level: level,
             world: (decodeTestWorld(readyContinuationObject)).rebased(onto: level),

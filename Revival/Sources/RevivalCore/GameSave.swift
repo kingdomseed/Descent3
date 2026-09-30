@@ -235,17 +235,9 @@ extension GameWorld {
     private func validateStateDefinitions(
         level: Level
     ) throws(GameWorldValidationError) {
-        let ship = level.defaultPlayerBinding.flatMap { binding in
-            level.shipDefinitions.first { $0.source == binding.ship }
-        }
         let pairs: [(String, Bool, Bool)] = [
-            ("playerConcussionState", playerConcussionState != nil,
-             ship?.playerConcussion != nil),
             ("playerYellowFlareState", playerYellowFlareState != nil,
              level.shipDefinitions.first?.playerYellowFlare != nil),
-            ("trainingFollowBotDestructionState",
-             trainingFollowBotDestructionState != nil,
-             level.trainingFollowBotDestruction != nil),
             ("trainingGalleryBarrierState",
              trainingGalleryBarrierState != nil,
              level.trainingGalleryBarrier != nil),
@@ -258,37 +250,14 @@ extension GameWorld {
             ("trainingKillbotEntryState", trainingKillbotEntryState != nil,
              level.trainingCameraMonitorChain?.returnToShip?.killbotEntry
                 != nil),
-            ("trainingRASBot1DeathState", trainingRASBot1DeathState != nil,
-             level.trainingRASBot1DeathChain != nil),
-            ("trainingRASBot2DeathState", trainingRASBot2DeathState != nil,
-             level.trainingRASBot2DeathChain != nil),
-            ("trainingRASBot3DeathState", trainingRASBot3DeathState != nil,
-             level.trainingRASBot3DeathChain != nil),
-            ("trainingRASBot4DeathState", trainingRASBot4DeathState != nil,
-             level.trainingRASBot4DeathChain != nil),
-            ("trainingLastBot1DeathState", trainingLastBot1DeathState != nil,
-             level.trainingLastBot1DeathChain != nil),
-            ("trainingLastBot2DeathState", trainingLastBot2DeathState != nil,
-             level.trainingLastBot2DeathChain != nil),
-            ("trainingLastBot3DeathState", trainingLastBot3DeathState != nil,
-             level.trainingLastBot3DeathChain != nil),
-            ("trainingLastBot4DeathState", trainingLastBot4DeathState != nil,
-             level.trainingLastBot4DeathChain != nil),
-            ("trainingLastBot5DeathState", trainingLastBot5DeathState != nil,
-             level.trainingLastBot5DeathChain != nil),
             ("trainingInvulnerabilityPickupState",
              trainingInvulnerabilityPickupState != nil,
              level.trainingInvulnerabilityPickupChain != nil),
             ("trainingCloakPickupState", trainingCloakPickupState != nil,
              level.trainingCloakPickupChain != nil),
-            ("trainingLastRoomState", trainingLastRoomState != nil,
-             level.trainingLastRoomChain != nil),
             ("trainingFinalRoomEntryState",
              trainingFinalRoomEntryState != nil,
              level.trainingFinalRoomEntryChain != nil),
-            ("trainingFinalBotsCompletionState",
-             trainingFinalBotsCompletionState != nil,
-             level.trainingFinalBotsCompletionChain != nil),
             ("trainingFinalGoalState", trainingFinalGoalState != nil,
              level.trainingFinalGoalChain != nil),
         ]
@@ -374,12 +343,6 @@ extension GameWorld {
         func nonzero(_ vector: Vector3) -> Bool {
             levelDot(vector, vector) > 0
         }
-        if let state = trainingRobotGuidebotState {
-            try require(
-                state.projectiles.allSatisfy { nonzero($0.velocity) },
-                "trainingRobotGuidebotState.projectiles.velocity"
-            )
-        }
         // The player flare timeout reads the parent's creation ordinal
         // without a check.
         try require(
@@ -388,47 +351,77 @@ extension GameWorld {
             } ?? true,
             "playerYellowFlareState.parents.creationOrdinal"
         )
-        let ship = level.defaultPlayerBinding.flatMap { binding in
-            level.shipDefinitions.first { $0.source == binding.ship }
-        }
-        if let state = playerConcussionState,
-           let binding = ship?.playerConcussion {
-            // Expired entries are removed in the frame they expire, so a
-            // saved entry has life left and never more than it started with.
+        // Visual effects: a live effect ages (VF_USES_LIFELEFT), has life
+        // left between 0 and its lifetime (VisEffectMoveAll marks it dead
+        // below 0), and carries only the VF_ flags the runtime sets.
+        let knownFlags = VisEffect.usesLifeLeftFlag | VisEffect.planarFlag
+            | VisEffect.expandFlag | VisEffect.attachedFlag
+        for effect in visEffects {
             try require(
-                state.missiles.allSatisfy {
-                    $0.lifeRemaining > 0 && $0.lifeRemaining <= binding.lifetime
-                },
-                "playerConcussionState.missiles.lifeRemaining"
-            )
-            try require(
-                state.explosions.allSatisfy {
-                    $0.lifeRemaining > 0
-                        && $0.lifeRemaining <= binding.explosionLifetime
-                },
-                "playerConcussionState.explosions.lifeRemaining"
-            )
-            try require(
-                state.explosions.allSatisfy {
-                    abs($0.shockwaveLifeRemaining) <= maximumSavedTime
-                        && $0.shockwaveLifeRemaining
-                            <= binding.shockwaveDuration
-                },
-                "playerConcussionState.explosions.shockwaveLifeRemaining"
-            )
-            try require(
-                state.sparks.allSatisfy { nonzero($0.velocity) },
-                "playerConcussionState.sparks.velocity"
-            )
-            try require(
-                state.sparks.allSatisfy {
-                    $0.lifetime > 0 && $0.lifetime <= maximumSavedTime
-                        && $0.lifeRemaining <= $0.lifetime
-                        && $0.lifeRemaining >= -maximumSavedTime
-                },
-                "playerConcussionState.sparks.lifeRemaining"
+                effect.lifetime > 0
+                    && effect.lifeLeft >= 0
+                    && effect.lifeLeft <= effect.lifetime
+                    && effect.flags & VisEffect.usesLifeLeftFlag != 0
+                    && effect.flags & ~knownFlags == 0
+                    && effect.mass >= 0 && effect.drag >= 0,
+                "visEffects.lifeLeft"
             )
         }
+        for object in objects {
+            let name = "object \(object.handle.slot)"
+            if let shockwave = object.shockwave {
+                // DoConcussiveForce divides by the impact time and size.
+                try require(
+                    shockwave.time > 0 && shockwave.size > 0,
+                    "\(name) shockwave"
+                )
+            }
+            if let dying = object.dying {
+                try require(dying.killerPlayer.map { $0 == 0 } ?? true,
+                            "\(name) dying")
+            }
+        }
+        try require(
+            playerWeapons.allSatisfy { $0.firingTime >= 0 },
+            "playerWeapons.firingTime"
+        )
+        // Rendered rooms and object physics hold values the runtime makes.
+        try require(
+            rooms.allSatisfy { $0.lastRenderTime <= gameTime },
+            "rooms.lastRenderTime"
+        )
+        for object in objects {
+            if let physics = object.physics {
+                // Every scalar and the spin stay finite and within the save
+                // bound, as the integrator divides by mass and drag and
+                // converts spin times Frametime to an angle.
+                func bounded(_ value: Float) -> Bool {
+                    value.isFinite && abs(value) <= 1e6
+                }
+                let spin = physics.rotationalVelocity
+                try require(
+                    bounded(physics.mass) && physics.mass >= 0
+                        && bounded(physics.drag) && physics.drag >= 0
+                        && bounded(physics.restitution)
+                        && bounded(spin.x) && bounded(spin.y)
+                        && bounded(spin.z)
+                        && physics.numberOfBounces >= -1,
+                    "object \(object.handle.slot) physics"
+                )
+            }
+        }
+        for event in gameEvents.compactMap({ $0 }) {
+            try require(event.endTime >= event.startTime, "gameEvents.time")
+        }
+        // The player's death started at or before the saved game time.
+        try require(
+            playerDeath.map { $0.initialDeathTime <= gameTime } ?? true,
+            "playerDeath.initialDeathTime"
+        )
+        try require(
+            playerWeaponAmmo.allSatisfy { (0...Int(UInt16.max)).contains($0) },
+            "playerWeaponAmmo"
+        )
     }
 
     /// Indices and array lengths that the runtime and the renderer's
@@ -446,42 +439,94 @@ extension GameWorld {
         {
             if count > capacity { throw .capacity(name) }
         }
-        let ship = level.defaultPlayerBinding.flatMap { binding in
-            level.shipDefinitions.first { $0.source == binding.ship }
-        }
-
-        if let state = playerConcussionState {
-            guard let binding = ship?.playerConcussion else {
-                throw .indexOutOfRange("playerConcussionState")
-            }
+        try limit(visEffects.count, VisEffect.capacity, "visEffects")
+        for effect in visEffects {
+            // NUM_FIREBALLS (fireball.cpp:622-674).
+            try require(effect.id < 52, "visEffects.id")
+            // An attached effect names a well-formed object handle
+            // (VisEffectMoveOne reads its slot) and in-range attach fields.
             try require(
-                (0..<min(binding.gunpoints.count, binding.fireWaits.count))
-                    .contains(state.nextFiringMaskIndex),
-                "playerConcussionState.nextFiringMaskIndex"
+                effect.attachedSubmodel >= 0 && effect.attachedVertex >= 0
+                    && effect.attachedEndVertex >= 0
+                    && effect.attachedSubmodel < 1_000
+                    && effect.attachedVertex < 100_000
+                    && effect.attachedEndVertex < 100_000
+                    && (effect.flags & VisEffect.attachedFlag == 0
+                        || effect.attachedObject.map {
+                            $0.slot < ObjectTable.capacity
+                        } == true),
+                "visEffects.attached"
             )
-            try limit(
-                state.missiles.count,
-                playerConcussionMissilePresentationCapacity,
-                "playerConcussionState.missiles"
-            )
-            try limit(
-                state.explosions.count(where: \.isPresented),
-                playerConcussionExplosionPresentationCapacity,
-                "playerConcussionState.explosions"
-            )
-            // Entries without a visual carry only a shockwave, an object in
-            // the source, so the object capacity bounds them.
-            try limit(
-                state.explosions.count,
-                ObjectTable.capacity,
-                "playerConcussionState.explosions"
-            )
-            try limit(
-                state.sparks.count,
-                playerConcussionSparkPresentationCapacity,
-                "playerConcussionState.sparks"
-            )
+            if let weapon = effect.customWeapon {
+                try require(
+                    level.weapons?.indices.contains(weapon) == true,
+                    "visEffects.customWeapon"
+                )
+            }
         }
+        // Pending events: MAX_EVENTS slots, each in a real room with a
+        // Fireballs[] id.
+        try require(
+            gameEvents.count == GameEvent.capacity,
+            "gameEvents"
+        )
+        let roomSources = Set(level.rooms.map(\.sourceIndex))
+        for event in gameEvents.compactMap({ $0 }) {
+            switch event.action {
+            case let .explosion(_, id, room, _, _):
+                try require(
+                    id < 52 && roomSources.contains(room),
+                    "gameEvents.explosion"
+                )
+            case let .blastRing(_, _, room):
+                try require(roomSources.contains(room), "gameEvents.blastRing")
+            }
+        }
+        // The objects a death made: their model, submodel, and face.
+        for object in objects {
+            let name = "object \(object.handle.slot)"
+            if let source = object.model {
+                guard let model = level.models.first(where: {
+                    $0.source == source
+                }) else {
+                    throw .indexOutOfRange("\(name) model")
+                }
+                try require(
+                    object.submodel.map {
+                        model.submodels.indices.contains($0)
+                    } ?? true,
+                    "\(name) submodel"
+                )
+                try require(
+                    object.splinterFace.map {
+                        model.submodels[0].faces.indices.contains($0)
+                    } ?? true,
+                    "\(name) splinter"
+                )
+            } else {
+                try require(
+                    object.submodel == nil && object.splinterFace == nil,
+                    "\(name) model"
+                )
+            }
+            if let fireball = object.fireball {
+                try require(
+                    fireball.id < 52 && object.type == .fireball,
+                    "\(name) fireball"
+                )
+            }
+        }
+        // Players[0].weapon indexes the ship batteries and the ammo.
+        try require(
+            playerWeapons.count == 2
+                && playerWeapons.allSatisfy {
+                    (0..<PlayerWeaponState.maximumPlayerWeapons)
+                        .contains($0.index)
+                }
+                && playerWeaponAmmo.count
+                    == PlayerWeaponState.maximumPlayerWeapons,
+            "playerWeapons"
+        )
         if let state = playerYellowFlareState {
             try limit(
                 state.parents.count,
@@ -510,11 +555,6 @@ extension GameWorld {
             )
         }
         if let state = trainingRobotGuidebotState {
-            try limit(
-                state.projectiles.count,
-                trainingBlueLaserPresentationCapacity,
-                "trainingRobotGuidebotState.projectiles"
-            )
             try limit(
                 state.yellowFlares?.count ?? 0,
                 trainingGuidebotYellowFlarePresentationCapacity,
@@ -598,7 +638,38 @@ extension GameWorld {
             try sweep.visit(object.shields, label: name)
             try sweep.visit(object.velocity, label: name)
             try sweep.visit(object.lastPosition, label: name)
+            try sweep.visit(object.creationTime, label: name)
             try require(object.size >= 0, name)
+            // Stored handles are well formed; they may name an object that
+            // has since been deleted, which the runtime looks up optionally.
+            for handle in [object.parent, object.attachUltimateHandle]
+            where handle != .none {
+                guard D3SourceIdentity.isValidHandle(handle.rawValue) else {
+                    throw .objectReference(handle.rawValue)
+                }
+            }
+            try require(
+                (object.shockwave != nil) == (object.type == .shockwave)
+                    && (object.shockwave?.damagedList.count
+                        ?? ShockwaveInfo.damagedListWordCount)
+                        == ShockwaveInfo.damagedListWordCount,
+                "\(name) shockwave"
+            )
+            if let shockwave = object.shockwave {
+                try sweep.visit(shockwave, label: name)
+            }
+            if let dying = object.dying {
+                try sweep.visit(dying, label: name)
+                try require(
+                    object.flags & GameObject.dyingFlag != 0,
+                    "\(name) dying"
+                )
+            }
+            // A weapon keeps its lifetime (OF_USES_LIFELEFT), which the
+            // object frame counts down.
+            if object.type == .weapon {
+                try require(object.lifeLeft != nil, "\(name) lifeleft")
+            }
             if let lifeLeft = object.lifeLeft {
                 try sweep.visit(lifeLeft, label: name)
             }
@@ -619,16 +690,33 @@ extension GameWorld {
                 ? []
                 : level.placedObjectModel(object.handle)?.weaponBatteries
                     ?? []
+            // An AI object has one dynamic battery per model battery
+            // (WBClearInfo, ObjInit.cpp:815-817), which ai_fire indexes;
+            // the player has MAX_WBS_PER_OBJ, one per ship battery, which
+            // its fire indexes; any other object has none.
+            let isBoundPlayer = object.handle.rawValue
+                == level.defaultPlayerBinding?.objectHandle
             let pageBatteries = object.info.flatMap {
                 level.objectInfos?[$0].weaponBatteries
             } ?? []
-            // An AI object has one dynamic battery per model battery
-            // (WBClearInfo, ObjInit.cpp:815-817), which ai_fire indexes;
-            // any other object has none.
+            let shipBatteries = level.defaultPlayerBinding.flatMap { binding in
+                level.shipDefinitions.first { $0.source == binding.ship }
+            }?.weaponBatteries ?? []
+            func fireMaskCount(_ index: Int) -> Int {
+                if isBoundPlayer {
+                    return shipBatteries.first { $0.index == index }?
+                        .battery.fireMasks.count ?? 1
+                }
+                return pageBatteries.indices.contains(index)
+                    ? pageBatteries[index].fireMasks.count : 1
+            }
             try require(
-                object.ai != nil
-                    ? object.weaponBatteries.count == modelBatteries.count
-                    : object.weaponBatteries.isEmpty,
+                isBoundPlayer
+                    ? object.weaponBatteries.count
+                        == PlayerWeaponState.maximumPlayerWeapons
+                    : object.ai != nil
+                        ? object.weaponBatteries.count == modelBatteries.count
+                        : object.weaponBatteries.isEmpty,
                 "\(name) weaponBatteries"
             )
             for (index, battery) in object.weaponBatteries.enumerated() {
@@ -646,9 +734,7 @@ extension GameWorld {
                         && battery.turretDirections.allSatisfy { $0 <= 2 }
                         && battery.currentFiringMask >= 0
                         && battery.currentFiringMask
-                            < max(1, pageBatteries.indices.contains(index)
-                                ? pageBatteries[index].fireMasks.count
-                                : 1),
+                            < max(1, fireMaskCount(index)),
                     "\(name) weapon battery \(index)"
                 )
                 for time in battery.turretNextThinkTimes {

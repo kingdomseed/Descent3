@@ -25,6 +25,25 @@ final class GenericPageImportTests: XCTestCase {
                 "LastFireSound",
                 "version \(version)"
             )
+            // mng_ReadPhysicsChunk, the death spew, and sounds[GSI_EXPLODE]
+            // (generic.cpp:1237-1244, :1274).
+            XCTAssertEqual(page.physics.mass, 40)
+            XCTAssertEqual(page.physics.drag, 60)
+            XCTAssertEqual(page.physics.flags, 0x3)
+            XCTAssertEqual(page.physics.numberOfBounces, -1)
+            XCTAssertEqual(page.physics.restitution, 0.5)
+            XCTAssertEqual(
+                page.physics.rotationalVelocity,
+                .init(x: 1, y: 2, z: 3)
+            )
+            XCTAssertEqual(page.deathSpew, CanonicalDeathSpew(
+                flags: 0,
+                entries: [
+                    .init(pageName: "Energy", percent: 0.3, number: 2),
+                    .init(pageName: "Shield", percent: 0.4, number: 1),
+                ]
+            ))
+            XCTAssertEqual(page.explodeSoundName, "ExplodeSound")
         }
     }
 
@@ -85,7 +104,12 @@ private func syntheticGenericPageTable(version: UInt16) -> Data {
     u8(0)                                   // no description
     string("")                              // icon name
     zeros(8)                                // LOD distances
-    zeros(68)                               // physics chunk
+    // Physics chunk: mass, drag, full_thrust, flags, rotdrag,
+    // full_rotthrust, num_bounces, velocity.z, rotvel, wiggle, coeff,
+    // hit_die_dot, turnroll.
+    f32(40); f32(60); f32(0); u32(0x3); f32(115); f32(0)
+    u32(UInt32(bitPattern: -1)); f32(0); f32(1); f32(2); f32(3)
+    f32(0); f32(0); f32(0.5); f32(0); f32(0); f32(0)
     f32(5)                                  // size
     zeros(4 + 12 + 4 + 4 + 4 + 12 + 4 + 4 + 1 + 1) // lighting chunk
     zeros(4)                                // hit points
@@ -94,9 +118,13 @@ private func syntheticGenericPageTable(version: UInt16) -> Data {
     zeros(4 * 4)                            // fov, velocities, turn rate
     u32(0)                                  // notify flags
     zeros(4 * 27)                           // the other AI floats
-    for _ in 0..<2 {                        // spew types
-        zeros(1 + 4 + 2)
-        string("")
+    for (percent, number, name) in [       // death spew
+        (Float(0.3), UInt16(2), "Energy"), (Float(0.4), UInt16(1), "Shield"),
+    ] {
+        u8(0)
+        f32(percent)
+        u16(number)
+        string(name)
     }
     zeros(5 * 24 * (2 + 2 + 4))             // animations (version >= 20)
     for _ in 0..<21 {                       // weapon battery chunk, v2
@@ -106,7 +134,7 @@ private func syntheticGenericPageTable(version: UInt16) -> Data {
     }
     for _ in 0..<(21 * 8) { string("") }    // weapon names
     string("Sound0")
-    string("Sound1")
+    string("ExplodeSound")
     if version < 26 { string("ObsoleteSound") }
     for index in 0..<5 { string("AISound\(index)") }
     for battery in 0..<21 {
@@ -119,6 +147,7 @@ private func syntheticGenericPageTable(version: UInt16) -> Data {
     }
     for _ in 0..<(5 * 24) { string("") }    // animation sounds
     zeros(4)                                // respawn scalar
+    u16(0)                                  // no death types
 
     var table = Data([10])
     let length = UInt32(page.count + 4)

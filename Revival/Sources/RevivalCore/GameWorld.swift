@@ -13,6 +13,9 @@ import Foundation
 /// immutable canonical content in `Level.rooms`.
 struct RoomState: Codable, Equatable, Sendable {
     var portalFlags: [UInt32]
+    /// `last_render_time`: the Gametime of the last frame that rendered the
+    /// room (render.cpp:2930), 0 at level start (room.cpp:556).
+    var lastRenderTime: Float = 0
 
     /// The level-start state of every room, indexed like `Level.rooms`.
     static func canonical(_ level: Level) -> [RoomState] {
@@ -48,14 +51,41 @@ struct GameWorld: Codable, Equatable, Sendable {
     var lastThrustTime: Float = 0
     var playerHeadlightIsOn = false
     var playerRearViewState: PlayerRearViewState?
-    var playerConcussionState: PlayerConcussionState?
     var playerYellowFlareState: PlayerYellowFlareState?
+    /// `Players[0].weapon[PW_PRIMARY]` and `[PW_SECONDARY]`: the selected
+    /// battery and how long the fire control has been held.
+    var playerWeapons = [
+        PlayerWeaponState(index: PlayerWeaponState.laserIndex),
+        PlayerWeaponState(index: PlayerWeaponState.concussionIndex),
+    ]
+    /// `Players[0].weapon_ammo`, one per ship battery.
+    var playerWeaponAmmo = Array(
+        repeating: 0,
+        count: PlayerWeaponState.maximumPlayerWeapons
+    )
+    /// `Players[0].score`, `num_kills_level`, and `friendly_kills_level`
+    /// (PlayerScoreAdd, Player.cpp:3853).
+    var playerScore: Int32 = 0
+    var playerKillsLevel: Int16 = 0
+    var playerFriendlyKillsLevel: Int16 = 0
+    /// VisEffects (viseffect.cpp): the live visual effects.
+    var visEffects: [VisEffect] = []
+    /// GameEvent[MAX_EVENTS] (gameevent.cpp:35): the pending normal events.
+    var gameEvents: [GameEvent?] = Array(
+        repeating: nil,
+        count: GameEvent.capacity
+    )
     /// `Players[0].controller_bitflags`. InitPlayerNewShip enables every
     /// control (Player.cpp:1554).
     var playerControllerBitflags = PlayerControlMask.all
     /// `Players[0].invulnerable_time` while PLAYER_FLAGS_INVULNERABLE is
     /// set; `nil` while it is clear.
     var playerInvulnerableTime: Float?
+    /// PLAYER_FLAGS_DYING or PLAYER_FLAGS_DEAD with the death values
+    /// StartPlayerDeath keeps; `nil` while the player is alive.
+    var playerDeath: PlayerDeathState?
+    /// `Players[0].num_deaths_level`.
+    var playerDeathsLevel: Int16 = 0
     /// Hud_show_controls (hud.cpp:503).
     var hudShowControls = false
 
@@ -77,26 +107,14 @@ struct GameWorld: Codable, Equatable, Sendable {
 
     // Training script state. These move into the Training level module in
     // later M1 steps.
-    var trainingFollowBotDestructionState: TrainingFollowBotDestructionState?
     var trainingGalleryBarrierState: TrainingGalleryBarrierState?
     var trainingRobotGuidebotState: TrainingRobotGuidebotState?
     var trainingCameraMonitorState: TrainingCameraMonitorState?
     var trainingKillbotEntryState: TrainingKillbotEntryState?
-    var trainingRASBot1DeathState: TrainingRASBot1DeathState?
-    var trainingRASBot2DeathState: TrainingRASBot2DeathState?
-    var trainingRASBot3DeathState: TrainingRASBot3DeathState?
-    var trainingRASBot4DeathState: TrainingRASBot4DeathState?
-    var trainingLastBot1DeathState: TrainingLastBot1DeathState?
-    var trainingLastBot2DeathState: TrainingLastBot2DeathState?
-    var trainingLastBot3DeathState: TrainingLastBot3DeathState?
-    var trainingLastBot4DeathState: TrainingLastBot4DeathState?
-    var trainingLastBot5DeathState: TrainingLastBot5DeathState?
     var trainingInvulnerabilityPickupState:
         TrainingInvulnerabilityPickupState?
     var trainingCloakPickupState: TrainingCloakPickupState?
-    var trainingLastRoomState: TrainingLastRoomState?
     var trainingFinalRoomEntryState: TrainingFinalRoomEntryState?
-    var trainingFinalBotsCompletionState: TrainingFinalBotsCompletionState?
     var trainingFinalGoalState: TrainingFinalGoalState?
     var trainingPostLevelResult: TrainingPostLevelResult?
     var trainingSessionOutcome: TrainingSessionOutcome?
@@ -113,10 +131,20 @@ struct GameWorld: Codable, Equatable, Sendable {
         rooms = RoomState.canonical(level)
         goals = level.goals
         angularVelocity = ship.physics.initialAngularVelocity
-        playerConcussionState = ship.playerConcussion == nil ? nil : .init()
         playerYellowFlareState = level.shipDefinitions.first?
             .playerYellowFlare == nil ? nil : .init()
         objInitPlacedObjects(level: level, playerSize: ship.presentationSize)
+        // ObjLink's BigObjAdd (object.cpp:1438): an indoor object of at
+        // least MIN_BIG_OBJ_RAD (16) is OF_BIG_OBJECT.
+        for slot in 0..<ObjectTable.capacity {
+            guard let object = objects.slots[slot],
+                  case .room = object.location,
+                  object.size >= 16
+            else {
+                continue
+            }
+            objects[object.handle]?.flags |= GameObject.bigObjectFlag
+        }
         initializeTrainingState(level: level)
         // StartLevel runs AIInitAll before the level script starts
         // (gamesequence.cpp:1482, :1584).
@@ -136,9 +164,26 @@ struct GameWorld: Codable, Equatable, Sendable {
             if let size = level.placedObjectSize(handle) {
                 objects[handle]?.size = size
             }
+            // ObjSetRenderPolyobj (ObjInit.cpp:633) for the generic objects
+            // (:779) and doors (ObjInitDoor, :1064).
+            if [2, 7, 11, 16, 17].contains(placed.type),
+               level.placedObjectModel(handle) != nil {
+                objects[handle]?.flags |= GameObject.polygonObjectFlag
+            }
         }
         if let binding = level.defaultPlayerBinding {
-            objects[ObjectHandle(binding.objectHandle)]?.size = playerSize
+            // InitPlayerNewShip (Player.cpp:1500-1505, :2507): the ship's
+            // size and flags, MAX_WBS_PER_OBJ cleared batteries, and
+            // 2 + MAX_DIFFICULTY_LEVELS - DIFF_LEVEL concussion missiles.
+            let player = ObjectHandle(binding.objectHandle)
+            objects[player]?.size = playerSize
+            objects[player]?.flags = GameObject.polygonObjectFlag
+                | GameObject.destroyableFlag
+            objects[player]?.weaponBatteries = Self.clearedWeaponBatteries(
+                count: PlayerWeaponState.maximumPlayerWeapons
+            )
+            playerWeaponAmmo[PlayerWeaponState.concussionIndex] =
+                2 + Difficulty.levelCount - Difficulty.level
         }
         guard let infos = level.objectInfos else { return }
         for placed in level.objects {

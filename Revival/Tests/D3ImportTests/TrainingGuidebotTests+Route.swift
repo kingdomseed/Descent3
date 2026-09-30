@@ -382,22 +382,12 @@ extension WorldRenderingTests {
         let shortGoalLevel = replacing(
             level,
             trainingRobotGuidebotChain: .init(
-                destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
                 guidebotObjectHandle: chain.guidebotObjectHandle,
-                destroyRobotRoomSourceIndex:
-                    chain.destroyRobotRoomSourceIndex,
-                destroyRobotFlags: chain.destroyRobotFlags,
-                destructionDelay: chain.destructionDelay,
-                destructionMessage: chain.destructionMessage,
-                exitInstruction: chain.exitInstruction,
-                destructionVoiceSourceName:
-                    chain.destructionVoiceSourceName,
                 deployedGuidebotObjectType:
                     chain.deployedGuidebotObjectType,
                 deployedGuidebotMessage: chain.deployedGuidebotMessage,
                 deployedGuidebotVoiceSourceName:
                     chain.deployedGuidebotVoiceSourceName,
-                combat: chain.combat,
                 guidebot: .init(
                     collisionRadius: chain.guidebot.collisionRadius,
                     maximumVelocity: chain.guidebot.maximumVelocity,
@@ -511,22 +501,12 @@ extension WorldRenderingTests {
         level = replacing(
             level,
             trainingRobotGuidebotChain: .init(
-                destroyRobotObjectHandle: chain.destroyRobotObjectHandle,
                 guidebotObjectHandle: chain.guidebotObjectHandle,
-                destroyRobotRoomSourceIndex:
-                    chain.destroyRobotRoomSourceIndex,
-                destroyRobotFlags: chain.destroyRobotFlags,
-                destructionDelay: chain.destructionDelay,
-                destructionMessage: chain.destructionMessage,
-                exitInstruction: chain.exitInstruction,
-                destructionVoiceSourceName:
-                    chain.destructionVoiceSourceName,
                 deployedGuidebotObjectType:
                     chain.deployedGuidebotObjectType,
                 deployedGuidebotMessage: chain.deployedGuidebotMessage,
                 deployedGuidebotVoiceSourceName:
                     chain.deployedGuidebotVoiceSourceName,
-                combat: chain.combat,
                 guidebot: .init(
                     collisionRadius: chain.guidebot.collisionRadius,
                     maximumVelocity: chain.guidebot.maximumVelocity,
@@ -625,7 +605,7 @@ extension WorldRenderingTests {
             input: .init(deploysTrainingGuidebot: true)
         )
         XCTAssertNotNil(deployed.trainingGuidebot?.routeFailure)
-        simulation.destroyTrainingRobot(handle: 4_112)
+        simulation.applyTrainingScript036Outcome()
         let continuation = try JSONDecoder().decode(
             GameWorld.self,
             from: JSONEncoder().encode(simulation.world)

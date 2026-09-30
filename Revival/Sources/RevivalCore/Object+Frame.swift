@@ -2,19 +2,24 @@
 //
 // Translated from Descent3/object.cpp (Descent 3, Copyright (C) 2024
 // Parallax Software, GPL-3.0-or-later): ObjDoFrameAll's loop over the
-// objects in ascending slots, ObjDoFrame (:2615) for CT_AI and weapon
-// objects, and ObjDeleteDead (:2004) for dead weapons.
+// objects in ascending slots and its tail (:2926-3004), ObjDoFrame (:2615)
+// for the objects other than the player, TimeoutObject (:2156), and
+// ObjDeleteDead (:2004).
 //
-// Scope (M1 step 6): ObjDoFrameAll is one ascending-slot loop that
+// ObjDoFrameAll is one ascending-slot loop that
 // includes the player (object.cpp:2969). The player's ObjDoFrame is still
 // the session's player move (PlayerSimulationUpdate.swift), so the session
 // runs this loop in two parts around it: the slots below the player's, the
-// player's move, then the slots above. For the other objects this runs
-// last_pos, lifeleft, the AI control (AIDoFrame), the lifeleft timeout, and
-// the physics move of AI and weapon objects. The object EVT_INTERVAL,
-// animation, effects, and the dead-object sequence of robots
-// (EVT_CHILD_DIED, EVT_DESTROY) arrive with the general object frame and
-// KillObject (M1 step 7, M2).
+// player's move, then the slots above; then `objDoFrameAllTail`. For the
+// other objects this runs last_pos, lifeleft, the control (AIDoFrame,
+// DoDyingFrame, DoDebrisFrame, DoSplinterFrame, DoExplosionFrame;
+// WeaponDoFrame's parent-collision timer is read where a weapon moves), the
+// lifeleft timeout, and the movement (AI, weapon, shockwave, and generic
+// physics). The object EVT_INTERVAL, animation, and effects arrive
+// with the general object frame (M2). ObjDeleteDead keeps the order of the
+// original; the level goal inform and the inventory removal arrive with
+// level goals and inventory (M1 step 9), and no imported object sets their
+// flags before then.
 
 import Foundation
 
@@ -37,7 +42,14 @@ extension GameWorld {
         }
     }
 
-    /// ObjDoFrame (object.cpp:2615) for AI and weapon objects.
+    /// The end of ObjDoFrameAll (object.cpp:2992-3003): the visual effects
+    /// move, and then everything that died is deleted.
+    mutating func objDoFrameAllTail(level: Level) {
+        visEffectMoveAll(level: level)
+        objDeleteDead(level: level)
+    }
+
+    /// ObjDoFrame (object.cpp:2615) for an object other than the player.
     private mutating func objDoFrame(_ handle: ObjectHandle, level: Level) {
         guard var object = objects[handle] else { return }
         object.lastPosition = object.position
@@ -45,12 +57,24 @@ extension GameWorld {
             object.lifeLeft = lifeLeft - frameDuration
         }
         objects[handle] = object
-        if object.ai != nil {
+        // The control: CT_DYING, CT_AI, CT_DEBRIS, CT_SPLINTER, or
+        // CT_EXPLOSION.
+        if object.dying != nil {
+            doDyingFrame(handle, level: level)
+        } else if object.ai != nil {
             aiDoFrame(handle, level: level)
+        } else if object.debris != nil {
+            doDebrisFrame(handle, level: level)
+        } else if object.type == .splinter, object.splinterFace != nil {
+            doSplinterFrame(handle, level: level)
+        } else if object.type == .fireball, object.fireball != nil {
+            doExplosionFrame(handle)
         }
-        // Death of old age: TimeoutObject and SetObjectDeadFlag. A weapon's
-        // timeout effects arrive with visual effects.
-        if let lifeLeft = objects[handle]?.lifeLeft, lifeLeft < 0 {
+        // Death of old age: TimeoutObject and SetObjectDeadFlag.
+        if let aged = objects[handle],
+           aged.flags & GameObject.deadFlag == 0,
+           let lifeLeft = aged.lifeLeft, lifeLeft < 0 {
+            timeoutObject(handle, level: level)
             objects[handle]?.flags |= GameObject.deadFlag
         }
         guard let moving = objects[handle],
@@ -58,26 +82,71 @@ extension GameWorld {
         else {
             return
         }
-        if moving.type == .weapon {
+        switch moving.type {
+        case .weapon:
             moveWeapon(handle, level: level)
-        } else if moving.ai != nil {
-            moveAIObject(handle, level: level)
+        case .shockwave:
+            shockwaveConcussiveForce(handle, level: level)
+        default:
+            if moving.physics != nil, moving.ai == nil || moving.dying != nil {
+                movePhysicsObject(handle, level: level)
+            } else if moving.ai != nil, moving.usesPhysics {
+                moveAIObject(handle, level: level)
+            }
         }
     }
 
-    /// ObjDeleteDead (object.cpp:2004), run after the ObjDoFrameAll loop,
-    /// for dead weapons: they free their slots. A weapon has no scripts,
-    /// level goals, or inventory, so none of the robot death sequence
-    /// applies to it.
-    mutating func objDeleteDead() {
+    /// TimeoutObject (object.cpp:2156).
+    private mutating func timeoutObject(
+        _ handle: ObjectHandle,
+        level: Level
+    ) {
+        switch objects[handle]?.type {
+        case .weapon:
+            timeoutWeapon(handle, level: level)
+        case .shockwave:
+            shockwaveConcussiveForce(handle, level: level)
+        default:
+            break
+        }
+    }
+
+    /// ObjDeleteDead (object.cpp:2004), run after the ObjDoFrameAll loop:
+    /// for each dead object in slot order, a ghost is unghosted, an attached
+    /// polygon object's attach parent hears EVT_CHILD_DIED, the object's
+    /// scripts hear EVT_DESTROY (dying), its scripts are detached, and it is
+    /// deleted (the player is not). The dead visual effects go last.
+    mutating func objDeleteDead(level: Level) {
         for slot in 0..<ObjectTable.capacity {
-            guard let object = objects.slots[slot],
-                  object.flags & GameObject.deadFlag != 0,
-                  object.type == .weapon
+            guard var object = objects.slots[slot],
+                  object.flags & GameObject.deadFlag != 0
             else {
                 continue
             }
-            objects.delete(object.handle)
+            let handle = object.handle
+            if object.type == .dummy {
+                unghostObject(handle)
+                object = objects[handle]!
+            }
+            if object.flags & GameObject.polygonObjectFlag != 0 {
+                if object.flags & GameObject.attachedFlag != 0 {
+                    osirisCallEvent(
+                        object.attachUltimateHandle,
+                        .childDied(it: handle),
+                        level: level
+                    )
+                }
+                // UnattachFromParent and UnattachChildren.
+                objects[handle]?.flags &= ~GameObject.attachedFlag
+                objects[handle]?.attachUltimateHandle = .none
+            }
+            osirisCallEvent(handle, .destroy(isDying: true), level: level)
+            // Osiris_DetachScriptsFromObject.
+            objects[handle]?.scripts = nil
+            if objects[handle]?.type != .player {
+                objects.delete(handle)
+            }
         }
+        visEffectDeleteDead()
     }
 }

@@ -176,16 +176,14 @@ extension WorldRenderingTests {
             level: finalLevel,
             presentationReadyTimestamp: 0
         )
-        initialFinalSimulation.destroyTrainingRobot(handle: 4_112)
-        initialFinalSimulation.destroyTrainingRASBot1(handle: 2_074)
-        initialFinalSimulation.destroyTrainingRASBot2(handle: 2_075)
-        initialFinalSimulation.destroyTrainingRASBot3(handle: 2_077)
-        initialFinalSimulation.destroyTrainingRASBot4(handle: 2_078)
-        initialFinalSimulation.destroyTrainingLastBot1(handle: 4_127)
-        initialFinalSimulation.destroyTrainingLastBot2(handle: 2_080)
-        initialFinalSimulation.destroyTrainingLastBot3(handle: 2_081)
-        initialFinalSimulation.destroyTrainingLastBot4(handle: 2_082)
-        initialFinalSimulation.destroyTrainingLastBot5(handle: 2_083)
+        // The player shot down the ten robots, and the last five opened
+        // the final bots barrier (Scripts 051-055 and 035; this
+        // unscripted fixture takes the state the scripts leave).
+        initialFinalSimulation.killRobotsAsPlayer([
+            4_112, 2_074, 2_075, 2_077, 2_078,
+            4_127, 2_080, 2_081, 2_082, 2_083,
+        ])
+        openTrainingFinalBotsBarrier(in: &initialFinalSimulation.world, level: initialFinalSimulation.level)
         _ = initialFinalSimulation.update(at: 0.1, input: .zero)
         var ready = try XCTUnwrap(
             testWorldObject(initialFinalSimulation.world)
@@ -362,34 +360,19 @@ extension WorldRenderingTests {
             )
         }
 
-        func destructionState(
-            _ simulation: GameSession
-        ) throws -> [String: Any] {
-            let object = try continuationObject(simulation)
-            return try XCTUnwrap(
-                object["trainingFollowBotDestructionState"]
-                    as? [String: Any]
-            )
-        }
-
+        // FollowBot1, DestroyBot1, and DestroyBot2 of the moving-target
+        // lesson, and the player's laser (WeaponFixtures.swift).
+        let followBot: UInt32 = 8_200
+        let destroyBot1: UInt32 = 4_113
+        let destroyBot2: UInt32 = 4_112
         var level = makeTrainingMovingTargetHandoffLevel()
-        let handoff = try XCTUnwrap(level.trainingFollowBotDestruction)
         level = replacing(
             level,
             trainingRobotGuidebotChain: .init(
-                destroyRobotObjectHandle: handoff.destroyBot2ObjectHandle,
                 guidebotObjectHandle: 12_288,
-                destroyRobotRoomSourceIndex: 37,
-                destroyRobotFlags: 5_121,
-                destructionDelay: 2,
-                destructionMessage: "Excellent!",
-                exitInstruction:
-                    "Now go through the open doorway, and into the next room.",
-                destructionVoiceSourceName: "proceed5.osf",
                 deployedGuidebotObjectType: 2,
                 deployedGuidebotMessage: "",
                 deployedGuidebotVoiceSourceName: "",
-                combat: .stockTraining,
                 guidebot: .stockTraining
             )
         )
@@ -533,7 +516,7 @@ extension WorldRenderingTests {
         for _ in 0..<210 where simulation.world.testTrainingMission?.script026Count == 0 {
             simulation = try aiming(
                 simulation,
-                at: handoff.followBotObjectHandle,
+                at: followBot,
                 timestamp: timestamp,
                 level: level
             )
@@ -563,156 +546,110 @@ extension WorldRenderingTests {
             "AFTERBURNER_STAGE Script026 controls=\(frame.enabledPlayerControls.rawValue) afterburner=false"
         )
 
-        for volley in 1...4 {
-            simulation = try aiming(
-                simulation,
-                at: handoff.followBotObjectHandle,
-                timestamp: timestamp,
-                level: level
-            )
-            timestamp += 0.25
-            frame = simulation.update(
-                at: timestamp,
-                input: .init(firesPrimaryWeapon: true)
-            )
-            if volley == 3 {
-                XCTAssertTrue(
-                    simulation.runtimeLevel.objects.contains {
-                        $0.handle == handoff.followBotObjectHandle
-                    },
-                    "FollowBot1 must survive three real two-bolt volleys at 10 shields"
+        // Each two-bolt volley does 2 x 7.5 x Diff_robot_damage[Rookie]
+        // (1.5) = 22.5 (damage.cpp:1311), so a 55-shield robot dies in the
+        // third volley.
+        func shoot(
+            _ target: UInt32,
+            volleys: Int,
+            input: InputSnapshot = .init(firesPrimaryWeapon: true)
+        ) throws {
+            for _ in 0..<volleys {
+                simulation = try aiming(
+                    simulation,
+                    at: target,
+                    timestamp: timestamp,
+                    level: level
                 )
+                timestamp += 0.25
+                frame = simulation.update(at: timestamp, input: input)
             }
         }
-        var destruction = try destructionState(simulation)
+        try shoot(followBot, volleys: 2)
         XCTAssertEqual(
-            destruction["followBotShields"] as? Double,
-            -5,
-            "FollowBot1 must die only after real projectile damage is strictly negative"
+            simulation.world.objects[ObjectHandle(followBot)]?.shields ?? 0,
+            10,
+            accuracy: 0.001,
+            "FollowBot1 must take 22.5 shields per real two-bolt volley"
+        )
+        try shoot(followBot, volleys: 1)
+        XCTAssertNil(
+            simulation.world.objects[ObjectHandle(followBot)],
+            "FollowBot1 must die in the third real volley"
         )
         XCTAssertEqual(
-            destruction["script037Count"] as? Int,
+            simulation.world.testTrainingMission?.script037Count,
             1,
-            "FollowBot1 real dying must start timer 11 through Script 037"
+            "FollowBot1's EVT_DESTROY must start timer 11 through Script 037"
         )
-        XCTAssertFalse(
-            simulation.runtimeLevel.objects.contains {
-                $0.handle == handoff.followBotObjectHandle
-            },
-            "FollowBot1 real dying must remove the target"
-        )
-        print("AFTERBURNER_STAGE FollowBot1 death shields=-5 Script037=1")
+        print("AFTERBURNER_STAGE FollowBot1 death Script037=1")
 
         for _ in 0..<12 where activeFollowPath(
             simulation.world,
-            handoff.destroyBot1ObjectHandle
+            destroyBot1
         ) == nil {
             timestamp += 0.25
             frame = simulation.update(at: timestamp, input: .zero)
         }
-        destruction = try destructionState(simulation)
         XCTAssertEqual(
-            destruction["script027Count"] as? Int,
+            simulation.world.testTrainingMission?.script027Count,
             1,
             "timer 11 must reach Script 027 through ordinary updates"
         )
         XCTAssertEqual(
-            activeFollowPath(simulation.world, handoff.destroyBot1ObjectHandle),
-            handoff.movingPathIndex,
+            activeFollowPath(simulation.world, destroyBot1),
+            0,
             "Script 027 must give DestroyBot1 its follow-path goal"
         )
         print("AFTERBURNER_STAGE Script027 timer11 target=DestroyBot1")
 
-        for volley in 1...4 {
-            simulation = try aiming(
-                simulation,
-                at: handoff.destroyBot1ObjectHandle,
-                timestamp: timestamp,
-                level: level
-            )
-            timestamp += 0.25
-            frame = simulation.update(
-                at: timestamp,
-                input: .init(firesPrimaryWeapon: true)
-            )
-            if volley == 3 {
-                XCTAssertTrue(
-                    simulation.runtimeLevel.objects.contains {
-                        $0.handle == handoff.destroyBot1ObjectHandle
-                    },
-                    "DestroyBot1 must survive three real two-bolt volleys at 10 shields"
-                )
-            }
+        // The moving bots can be out of range of the first volley: the
+        // bolts fly on and hit later, so shoot until the bot dies.
+        for _ in 0..<8
+        where simulation.world.objects[ObjectHandle(destroyBot1)] != nil {
+            try shoot(destroyBot1, volleys: 1)
         }
-        destruction = try destructionState(simulation)
-        let destroyBot1State = try XCTUnwrap(
-            destruction["destroyBot1Destruction"] as? [String: Any]
+        XCTAssertNil(
+            simulation.world.objects[ObjectHandle(destroyBot1)],
+            "DestroyBot1 must die to real volleys"
         )
         XCTAssertEqual(
-            destroyBot1State["destroyBot1Shields"] as? Double,
-            -5,
-            "DestroyBot1 must die only after real projectile damage is strictly negative"
-        )
-        XCTAssertEqual(
-            destroyBot1State["script028Count"] as? Int,
+            simulation.world.testTrainingMission?.script028Count,
             1,
-            "DestroyBot1 real dying must execute Script 028"
+            "DestroyBot1's EVT_DESTROY must execute Script 028"
         )
         XCTAssertEqual(
-            activeFollowPath(simulation.world, handoff.destroyBot2ObjectHandle),
-            handoff.movingPathIndex,
+            activeFollowPath(simulation.world, destroyBot2),
+            0,
             "Script 028 must give DestroyBot2 its follow-path goal"
         )
-        print("AFTERBURNER_STAGE DestroyBot1 death shields=-5 Script028=1")
+        print("AFTERBURNER_STAGE DestroyBot1 death Script028=1")
 
-        timestamp += 0.25
-        frame = simulation.update(at: timestamp, input: .zero)
-        for volley in 1...3 {
+        // Afterburner is held on every frame, and filtered while its
+        // control is off, up to the frame that kills DestroyBot2.
+        var script036Frame = frame
+        for _ in 0..<24
+        where simulation.world.objects[ObjectHandle(destroyBot2)] != nil {
             simulation = try aiming(
                 simulation,
-                at: handoff.destroyBot2ObjectHandle,
+                at: destroyBot2,
                 timestamp: timestamp,
                 level: level
             )
-            timestamp += 0.25
-            frame = simulation.update(
+            timestamp += 0.1
+            script036Frame = simulation.update(
                 at: timestamp,
-                input: .init(firesPrimaryWeapon: true)
-            )
-            XCTAssertTrue(
-                simulation.runtimeLevel.objects.contains {
-                    $0.handle == handoff.destroyBot2ObjectHandle
-                },
-                "DestroyBot2 must survive real volley \(volley) before strict-negative death"
+                input: .init(afterburner: 1, firesPrimaryWeapon: true)
             )
         }
-        timestamp += 0.15
-        _ = simulation.update(at: timestamp, input: .zero)
-        simulation = try aiming(
-            simulation,
-            at: handoff.destroyBot2ObjectHandle,
-            timestamp: timestamp,
-            level: level
-        )
-        timestamp += 0.1
-        let script036Frame = simulation.update(
-            at: timestamp,
-            input: .init(afterburner: 1, firesPrimaryWeapon: true)
-        )
-        XCTAssertFalse(
-            simulation.runtimeLevel.objects.contains {
-                $0.handle == handoff.destroyBot2ObjectHandle
-            },
-            "DestroyBot2 real strict-negative death must remove the target in Script 036"
-        )
-        let robotState = try XCTUnwrap(
-            try continuationObject(simulation)["trainingRobotGuidebotState"]
-                as? [String: Any]
+        XCTAssertNil(
+            simulation.world.objects[ObjectHandle(destroyBot2)],
+            "DestroyBot2's real death must remove the target"
         )
         XCTAssertEqual(
-            robotState["robotShields"] as? Double,
-            -5,
-            "DestroyBot2 must reach Script 036 only after real shields are strictly negative"
+            simulation.world.testTrainingMission?.script036Count,
+            1,
+            "DestroyBot2's EVT_DESTROY must execute Script 036"
         )
         XCTAssertEqual(
             script036Frame.enabledPlayerControls,
@@ -730,7 +667,7 @@ extension WorldRenderingTests {
             "death-frame Afterburner input must be filtered before Script 036 restores controls"
         )
         print(
-            "AFTERBURNER_STAGE DestroyBot2 death shields=-5 Script036 controls=all fuel=5.0"
+            "AFTERBURNER_STAGE DestroyBot2 death Script036 controls=all fuel=5.0"
         )
 
         var playerInput = PlayerInputState(rampDuration: 0)

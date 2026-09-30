@@ -2,13 +2,15 @@
 //
 // Translated from Descent3/robotfire.cpp (Descent 3, Copyright (C) 2024
 // Parallax Software, GPL-3.0-or-later): WBIsBatteryReady (:88),
-// WBFireBattery (:111, the AI path), and WBClearInfo (:282), with the
-// dynamic_wb_info state of lib/robotfirestruct.h (:80). The fire cadence is
-// the maintained-fork correction 3MASTERED dbd611e4 (docs/revival/
-// sources.md section 2): a battery is ready when last_fire_time + wait <=
-// Gametime, and a continuous burst keeps its sub-frame overshoot.
-// Animated batteries (WBF_ANIM_LOCAL/FULL), quad fire, and the player and
-// multiplayer branches arrive with the robots and ship weapons that use them.
+// WBFireBattery (:111), and WBClearInfo (:282), with the dynamic_wb_info
+// state of lib/robotfirestruct.h (:80). The fire cadence is the
+// maintained-fork correction 3MASTERED dbd611e4 (docs/revival/sources.md
+// section 2): a battery is ready when last_fire_time + wait <= Gametime, a
+// continuous burst keeps its sub-frame overshoot, and a new press starts a
+// new burst at Gametime. Animated batteries (WBF_ANIM_LOCAL/FULL), quad
+// fire, recoil, guided and user-timeout missiles, the player's
+// AIN_HEAR_NOISE, and the multiplayer branches arrive with the robots and
+// ship weapons that use them.
 
 import Foundation
 
@@ -59,20 +61,27 @@ extension GameWorld {
         return battery.lastFireTime + fireWait(battery, info) <= gameTime
     }
 
-    /// WBFireBattery (robotfire.cpp:111) for an AI object: fire every gun
-    /// point of the current mask, play the mask's fire sound, then move the
-    /// fire time and the mask on, and record the next weapon's speed.
+    /// WBFireBattery (robotfire.cpp:111): fire every gun point of the
+    /// current mask, play the mask's fire sound, then move the fire time and
+    /// the mask on, and record an AI object's next weapon speed. The gun
+    /// points are those of the model battery `polyBattery`; the player fires
+    /// every ship battery from model battery 0 (WeaponFire.cpp:2977).
+    /// `startsBurst` marks the first shot of a new press. Returns the number
+    /// of weapons made.
+    @discardableResult
     mutating func fireBattery(
         _ handle: ObjectHandle,
         battery index: Int,
         info: CanonicalWeaponBattery,
+        polyBattery: Int? = nil,
+        startsBurst: Bool = false,
         level: Level
-    ) {
+    ) -> Int {
         guard let object = objects[handle],
-              let model = level.placedObjectModel(handle),
-              let modelBattery = model.weaponBatteries?[index]
+              let model = level.polygonModel(of: object),
+              let modelBattery = model.weaponBatteries?[polyBattery ?? index]
         else {
-            return
+            return 0
         }
         let battery = object.weaponBatteries[index]
         let fireMask = info.fireMasks[battery.currentFiringMask]
@@ -102,14 +111,14 @@ extension GameWorld {
             }
         }
 
-        guard var updated = objects[handle] else { return }
+        guard var updated = objects[handle] else { return numberFired }
         var dynamic = updated.weaponBatteries[index]
         // WBAdvanceFireTime (3MASTERED dbd611e4).
         let wait = fireWait(dynamic, info)
         let scheduled = dynamic.lastFireTime + wait
         let overdue = gameTime - scheduled
         let continuityWindow = max(wait, frameDuration * 1.5)
-        if dynamic.lastFireTime >= 0, overdue >= 0,
+        if !startsBurst, dynamic.lastFireTime >= 0, overdue >= 0,
            overdue <= continuityWindow {
             dynamic.lastFireTime = scheduled
         } else {
@@ -150,5 +159,6 @@ extension GameWorld {
             updated.ai = ai
         }
         objects[handle] = updated
+        return numberFired
     }
 }
