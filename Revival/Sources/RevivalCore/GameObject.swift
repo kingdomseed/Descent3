@@ -214,6 +214,8 @@ extension GameObject {
     static let outsideMineFlag: UInt32 = 0x0000_0200
     /// OF_BIG_OBJECT.
     static let bigObjectFlag: UInt32 = 0x0000_0800
+    /// OF_DESTROYED (`object_external.h:271`).
+    static let destroyedFlag: UInt32 = 0x0000_0004
     /// OF_ATTACHED (`object_external.h:273`).
     static let attachedFlag: UInt32 = 0x0000_0010
     /// OF_AI_DO_DEATH (`object_external.h:275`).

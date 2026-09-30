@@ -151,6 +151,27 @@ func vectorDistance(_ lhs: Vector3, _ rhs: Vector3) -> Float {
     let z = rhs.z - lhs.z
     return sqrt(x * x + y * y + z * z)
 }
+/// vm_NormalizeVector (vecmat/vector.cpp:175): normalizes `vector` and
+/// returns its magnitude. A zero vector becomes `vector::id(0)`, the x unit
+/// vector (lib/vecmat_external.h:137), and the call returns 0.
+@discardableResult
+func vmNormalizeVector(_ vector: inout Vector3) -> Float {
+    let magnitude = sqrt(dot(vector, vector))
+    if magnitude > 0 {
+        vector = vector / magnitude
+        return magnitude
+    }
+    vector = Vector3(x: 1, y: 0, z: 0)
+    return 0
+}
+
+/// vm_NormalizeVector as a value.
+func vmNormalized(_ vector: Vector3) -> Vector3 {
+    var vector = vector
+    vmNormalizeVector(&vector)
+    return vector
+}
+
 func sourceVectorNormalized(_ value: Vector3) -> Vector3 {
     let magnitude = sqrt(dot(value, value))
     precondition(magnitude > 0, "camera basis vectors must be nonzero")

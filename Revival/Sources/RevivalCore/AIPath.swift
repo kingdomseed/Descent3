@@ -6,11 +6,14 @@
 // AIPathSetAtEnd (:270), AIPathSetAtStart (:275), AIPathMoveToPrevNode
 // (:280), AIPathGetNextNodePos (:308), AIPathGetPrevNodePos (:319),
 // AIPathMoveTurnTowardsNode (:332), AIPathInitPath (:537), AIPathFreePath
-// (:550), AIPathAddStaticPath (:590), and AIPathSetAsStaticPath (:1126).
+// (:550), AIPathAddDPath (:564), AIPathAddStaticPath (:590),
+// AIPathAddDPathNode (:608), AIPathAllocPath (:977), and
+// AIPathSetAsStaticPath (:1126).
 //
-// Only static game paths (AIP_STATIC) exist so far, and a path holds one of
-// them: AIPathSetAsStaticPath is the only maker. Dynamic paths
-// (AIPathAllocPath, BOA) and walking movement arrive in M2.
+// A path holds one static game path (AIP_STATIC) or one dynamic path. The
+// dynamic path's route comes from BOA.swift: it follows the reciprocal
+// portals, not the cached CBOA and BNode tables (architecture.md section 9).
+// Walking movement arrives in M2.
 
 import Foundation
 
@@ -21,6 +24,7 @@ extension AIPathInfo {
         currentNode = 0
         goalIndex = -1
         goalUniqueID = -1
+        dynamicNodes = []
     }
 
     /// AIPathAtStart (aipath.cpp:256).
@@ -46,9 +50,27 @@ extension AIPathInfo {
         return true
     }
 
+    /// The position of node `node` of the path.
+    func nodePosition(_ node: Int, _ level: Level) -> Vector3 {
+        isDynamic
+            ? dynamicNodes[node].position
+            : level.paths[pathID].nodes[node].position
+    }
+
     /// AIPathGetCurrentNodePos (aipath.cpp:201).
     func currentNodePosition(_ level: Level) -> Vector3 {
-        level.paths[pathID].nodes[currentNode].position
+        nodePosition(currentNode, level)
+    }
+
+    /// The room of the current node (AIPathGetCurrentNodePos's `room`).
+    func currentNodeRoom(_ level: Level) -> Int? {
+        if isDynamic { return dynamicNodes[currentNode].roomSourceIndex }
+        guard case let .room(room) =
+            level.paths[pathID].nodes[currentNode].location
+        else {
+            return nil
+        }
+        return room
     }
 
     /// AIPathGetNextNodePos (aipath.cpp:308).
@@ -223,5 +245,70 @@ extension GameWorld {
         object.ai = ai
         objects[handle] = object
         return (direction, moved)
+    }
+
+    /// MIN_NEXT_PATH_INTERVAL (aistruct_external.h:338).
+    static let minimumNextPathInterval: Float = 2
+
+    /// AIPathAllocPath (aipath.cpp:977): a dynamic path for goal
+    /// `goalIndex` from the object's position to `endPosition` in
+    /// `endRoom`. When BOA finds no room route the path is freed and the
+    /// call fails. A clear straight line (the size probe, fq.rad =
+    /// size - 0.1) makes a path of the end point only; otherwise the route
+    /// of `boaRoute` (BOA.swift) leads to it. Returns whether a path was
+    /// made.
+    @discardableResult
+    mutating func aiPathAllocPath(
+        _ handle: ObjectHandle,
+        goalIndex: Int,
+        endRoom: Int,
+        endPosition: Vector3,
+        level: Level
+    ) -> Bool {
+        guard var object = objects[handle], var ai = object.ai,
+              case let .room(startRoom) = object.location
+        else {
+            return false
+        }
+        ai.path.free()
+        ai.path.goalIndex = goalIndex
+        ai.path.goalUniqueID = ai.goals[goalIndex].uniqueID
+        guard boaRoomRoute(from: startRoom, to: endRoom, level: level) != nil
+        else {
+            ai.path.free()
+            object.ai = ai
+            objects[handle] = object
+            return false
+        }
+        let speed = sqrt(dot(object.velocity, object.velocity))
+        let startForward = speed > 0
+            ? object.velocity / speed
+            : object.orientation.forward
+        guard let route = boaRoute(
+            startRoom: startRoom,
+            start: object.position,
+            startForward: startForward,
+            endRoom: endRoom,
+            end: endPosition,
+            radius: max(0.1, object.size - 0.1),
+            level: level
+        ) else {
+            ai.path.free()
+            object.ai = ai
+            objects[handle] = object
+            return false
+        }
+        // AIPathAddDPath, then AIPathAddDPathNode for each node and the end
+        // point.
+        ai.path.dynamicNodes = route + [
+            AIPathNode(position: endPosition, roomSourceIndex: endRoom),
+        ]
+        ai.path.numberOfPaths = 1
+        ai.path.startNode = 0
+        ai.path.endNode = ai.path.dynamicNodes.count - 1
+        ai.path.currentNode = 0
+        object.ai = ai
+        objects[handle] = object
+        return true
     }
 }

@@ -57,21 +57,6 @@ extension GameWorld {
         Float(psRand()) / Float(Self.randMax)
     }
 
-    /// BOA_IsVisible: whether one room can see another. Revival uses the
-    /// rooms joined by reciprocal portals until BOA (M2).
-    func boaIsVisible(_ from: SpatialLocation, _ to: SpatialLocation,
-                      level: Level) -> Bool {
-        guard case let .room(fromRoom) = from, case let .room(toRoom) = to
-        else {
-            return false
-        }
-        return fromRoom == toRoom
-            || reciprocalPortalComponent(
-                rooms: level.rooms,
-                startRoomSourceIndex: fromRoom
-            ).contains(toRoom)
-    }
-
     /// The velocity of an object: the player's is the ship's.
     func objectVelocity(_ object: GameObject) -> Vector3 {
         object.type == .player ? velocity : object.velocity
@@ -180,22 +165,25 @@ extension GameWorld {
             ai.maxTurnRate *= fluctuation(&self)
         }
         ai.awareness = ObjectAIFrame.awareNone
-        let level = Difficulty.level
-        ai.dodgeVelocityPercent *= noScale ? 1 : Difficulty.aiDodgeSpeed[level]
-        ai.maxVelocity *= noScale ? 1 : Difficulty.aiSpeed[level]
-        ai.maxTurnRate *= noScale ? 1 : Difficulty.aiRotationSpeed[level]
-        ai.circleDistance *= noScale ? 1 : Difficulty.aiCircleDistance[level]
+        let difficulty = Difficulty.level
+        ai.dodgeVelocityPercent *=
+            noScale ? 1 : Difficulty.aiDodgeSpeed[difficulty]
+        ai.maxVelocity *= noScale ? 1 : Difficulty.aiSpeed[difficulty]
+        ai.maxTurnRate *= noScale ? 1 : Difficulty.aiRotationSpeed[difficulty]
+        ai.circleDistance *=
+            noScale ? 1 : Difficulty.aiCircleDistance[difficulty]
         ai.lastSeeTargetPosition = object.position
         ai.vecToTargetActual = object.orientation.forward
         ai.vecToTargetPerceived = object.orientation.forward
         ai.distToTargetActual = 1
         ai.distToTargetPerceived = 10_000
-        // GoalInitTypeGoals: GoalClearAll. The per-type goals arrive with
-        // ai_move's other branches in M2.
         ai.goals = Array(repeating: AIGoal(), count: ai.goals.count)
         ai.path.free()
         object.ai = ai
         objects[handle] = object
+        // Clear out the goals and give the type's goals
+        // (AImain.cpp:3799, GoalInitTypeGoals AIGoal.cpp:1295).
+        goalInitTypeGoals(handle, type: ai.aiType, level: level)
     }
 
     // MARK: Power and team
@@ -622,25 +610,17 @@ extension GameWorld {
                                             level: Level) {
         guard var ai = objects[handle]?.ai else { return }
         if let target = objects[ai.targetHandle] {
-            let distance = ai.distToTargetPerceived
-            let circle = ai.circleDistance
-            let persistent = ai.flags & ObjectAIFrame.persistentFlag != 0
-            if ai.statusRegister & ObjectAIFrame.circleDistanceStatus != 0 {
-                if distance > circle * 1.5
-                    || (ai.awareness <= ObjectAIFrame.awareBarely
-                        && !persistent) {
-                    ai.statusRegister &= ~ObjectAIFrame.circleDistanceStatus
-                }
-            } else if distance <= circle + 0.1,
-                      ai.awareness >= ObjectAIFrame.awareBarely
-                        || persistent {
-                ai.statusRegister |= ObjectAIFrame.circleDistanceStatus
-                objects[handle]?.ai = ai
-                // AINotify(AIN_NEAR_TARGET).
-                aiNotifyObject(handle, .other, it: target.handle,
-                               level: level)
-                ai = objects[handle]?.ai ?? ai
-            }
+            var status = ai.statusRegister
+            aiStatusCircleFrame(
+                handle,
+                goalObject: target.handle,
+                distance: ai.distToTargetPerceived,
+                circleDistance: ai.circleDistance,
+                status: &status,
+                level: level
+            )
+            ai = objects[handle]?.ai ?? ai
+            ai.statusRegister = status
         } else {
             ai.statusRegister &= ~ObjectAIFrame.circleDistanceStatus
         }
@@ -828,9 +808,76 @@ extension GameWorld {
                                _ type: AINotifyType,
                                goalIndex: Int,
                                level: Level) -> Bool {
+        guard aiNotifyReaches(handle),
+              let guid = objects[handle]?.ai?.goals[goalIndex].guid
+        else {
+            return false
+        }
+        let event = ScriptEvent.aiNotify(
+            type, it: handle, info: .goal(index: goalIndex, guid: guid)
+        )
+        osirisCallLevelEvent(event, level: level)
+        return osirisCallEvent(handle, event, level: level)
+    }
+
+    /// AINotify(AIN_NEAR_TARGET): the object reached its circle distance
+    /// from `target`.
+    mutating func aiNotifyNearTarget(_ handle: ObjectHandle,
+                                     target: ObjectHandle, level: Level) {
+        aiNotifyObject(handle, .other, it: target, level: level)
+    }
+
+    /// AINotify(AIN_SCRIPTED_ENABLER) (AImain.cpp:2913): the scripts decide
+    /// whether the enabler holds.
+    mutating func aiNotifyScriptedEnabler(_ handle: ObjectHandle,
+                                          goalIndex: Int, enablerIndex: Int,
+                                          level: Level) -> Bool {
         guard aiNotifyReaches(handle) else { return false }
-        osirisCallLevelEvent(.aiNotify(type, it: handle), level: level)
-        return osirisCallEvent(handle, .aiNotify(type, it: handle),
-                               level: level)
+        return osirisCallEvent(
+            handle,
+            .aiNotify(.scriptedEnabler, it: .none,
+                      info: .goal(index: goalIndex, guid: -1,
+                                  enabler: enablerIndex)),
+            level: level
+        )
+    }
+
+    /// AINotify(AIN_SCRIPTED_ORIENT) (AImain.cpp:3113-3124): the level
+    /// script hears it first, then the object.
+    mutating func aiNotifyScriptedOrient(_ handle: ObjectHandle,
+                                         goalIndex: Int, level: Level) {
+        guard aiNotifyReaches(handle),
+              let guid = objects[handle]?.ai?.goals[goalIndex].guid
+        else {
+            return
+        }
+        let event = ScriptEvent.aiNotify(
+            .scriptedOrient, it: handle,
+            info: .goal(index: goalIndex, guid: guid)
+        )
+        osirisCallLevelEvent(event, level: level)
+        osirisCallEvent(handle, event, level: level)
+    }
+
+    /// AINotify(AIN_USER_DEFINED) (AImain.cpp:3250): the command goes to the
+    /// object's scripts, even a ghosted object's (:2900). Returns the
+    /// script result.
+    @discardableResult
+    mutating func aiNotifyUserDefined(_ handle: ObjectHandle,
+                                      command: GuideBotCommand,
+                                      it: ObjectHandle = .none,
+                                      level: Level) -> Bool {
+        guard let object = objects[handle],
+              object.ai.map({
+                  $0.flags & ObjectAIFrame.disabledFlag == 0
+              }) ?? true
+        else {
+            return false
+        }
+        return osirisCallEvent(
+            handle,
+            .aiNotify(.userDefined, it: it, info: .command(command)),
+            level: level
+        )
     }
 }

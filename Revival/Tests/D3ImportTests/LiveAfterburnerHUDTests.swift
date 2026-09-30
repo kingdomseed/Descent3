@@ -627,8 +627,10 @@ extension WorldRenderingTests {
 
         // Afterburner is held on every frame, and filtered while its
         // control is off, up to the frame that kills DestroyBot2.
+        // DestroyBot2 avoids its friends (AIF_AUTO_AVOID_FRIENDS, ai_move
+        // AImain.cpp:4670), so its path wanders and some volleys miss.
         var script036Frame = frame
-        for _ in 0..<24
+        for _ in 0..<80
         where simulation.world.objects[ObjectHandle(destroyBot2)] != nil {
             simulation = try aiming(
                 simulation,

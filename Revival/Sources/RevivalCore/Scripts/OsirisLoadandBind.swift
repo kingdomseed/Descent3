@@ -21,7 +21,8 @@ enum ScriptEvent: Equatable, Sendable {
     case destroy(isDying: Bool)                            // EVT_DESTROY
     case timer(id: Int32, gameTime: Float)                 // EVT_TIMER
     case use(it: ObjectHandle)                             // EVT_USE
-    case aiNotify(AINotifyType, it: ObjectHandle)          // EVT_AI_NOTIFY
+    case aiNotify(AINotifyType, it: ObjectHandle,          // EVT_AI_NOTIFY
+                  info: AINotifyInfo = .none)
     case aiInit                                            // EVT_AI_INIT
     case levelStart                                        // EVT_LEVELSTART
     case levelEnd                                          // EVT_LEVELEND
@@ -63,8 +64,45 @@ enum AINotifyType: Equatable, Sendable {
     case meleeAttackFrame
     case movieStart
     case movieEnd
+    /// AIN_SCRIPTED_ORIENT: a GF_ORIENT_SCRIPTED goal asks the script to
+    /// turn the object (AImain.cpp:4436).
+    case scriptedOrient
+    /// AIN_SCRIPTED_ENABLER: an AIE_SCRIPTED enabler asks the script.
+    case scriptedEnabler
+    /// AIN_USER_DEFINED: a command from the engine or another script
+    /// (`extra_info`).
+    case userDefined
     /// Any other notify type. It has no child event.
     case other
+}
+
+/// The payload fields of tOSIRISEVTAINOTIFY beyond the notify type and
+/// `it_handle`.
+enum AINotifyInfo: Equatable, Sendable {
+    case none
+    /// `goal_num` and `goal_uid` (the goal's guid) of a goal notify
+    /// (AImain.cpp:3120-3121), and `enabler_num` of a scripted enabler.
+    case goal(index: Int, guid: Int32, enabler: Int = -1)
+    /// `extra_info` of AIN_USER_DEFINED: a Guide-Bot command (`gb_com`,
+    /// osiris_common.h:958).
+    case command(GuideBotCommand)
+}
+
+/// `gb_com` (osiris_common.h:958): a Guide-Bot menu command. `text` is the
+/// string `ptr` of a GBCT_STRING_DIALOG command.
+struct GuideBotCommand: Equatable, Sendable {
+    /// COM_GET_MENU, COM_DO_ACTION, COM_REINIT (osiris_common.h:954-956),
+    /// and the AIGame extensions COM_POWERUP_NOTIFY (4) and
+    /// COM_POWERUP_PICKUP (5) (AIGame.cpp:1470).
+    static let getMenu: Int8 = 0
+    static let doAction: Int8 = 1
+    static let reinit: Int8 = 2
+    static let powerupNotify: Int8 = 4
+    static let powerupPickup: Int8 = 5
+
+    var action: Int8
+    var index: Int8 = 0
+    var text: String? = nil
 }
 
 /// The value a script's CallEvent returns (osiris_common.h:357-358).
@@ -101,7 +139,7 @@ extension ScriptEvent {
     /// The child event Osiris_CallEvent sends first to each object script
     /// slot for an EVT_AI_NOTIFY (OsirisLoadandBind.cpp:2139-2175).
     var objectChildEvent: ScriptEvent? {
-        guard case let .aiNotify(type, _) = self else { return nil }
+        guard case let .aiNotify(type, _, _) = self else { return nil }
         switch type {
         case .objectKilled: return .ainObjectKilled
         case .seeTarget: return .ainSeePlayer
@@ -112,7 +150,8 @@ extension ScriptEvent {
         case .meleeAttackFrame: return .ainMeleeAttackFrame
         case .movieStart: return .ainMovieStart
         case .movieEnd: return .ainMovieEnd
-        case .other: return nil
+        case .scriptedOrient, .scriptedEnabler, .userDefined, .other:
+            return nil
         }
     }
 
@@ -120,7 +159,7 @@ extension ScriptEvent {
     /// after an EVT_AI_NOTIFY. Only the goal types have one
     /// (OsirisLoadandBind.cpp:1964-1979, :2029-2044).
     var levelChildEvent: ScriptEvent? {
-        guard case let .aiNotify(type, _) = self else { return nil }
+        guard case let .aiNotify(type, _, _) = self else { return nil }
         switch type {
         case .goalComplete: return .ainGoalComplete
         case .goalInvalid, .goalFail, .goalError: return .ainGoalFail

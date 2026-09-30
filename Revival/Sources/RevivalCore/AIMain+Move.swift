@@ -56,15 +56,64 @@ extension GameWorld {
             objects[handle] = object
             return
         }
+        // IsTargetLocal (AImain.cpp:4122) assigns rather than compares
+        // the rooms, so any target outside room 0 counts as local.
+        let targetIsLocal = objects[ai.targetHandle] != nil
+            && object.location != .room(0)
         if object.usesPhysics,
-           ai.awareness >= ObjectAIFrame.awareBarely
+           targetIsLocal || ai.awareness >= ObjectAIFrame.awareBarely
             || ai.flags & ObjectAIFrame.persistentFlag != 0 {
             objects[handle]?.ai = ai
+            var avoided = false
+            // The blend goals (AImain.cpp:4614-4668).
+            for index in ObjectAIFrame.activationLevels
+                ..< ObjectAIFrame.maximumGoals {
+                guard objects[handle]?.ai?.goals[index].used == true,
+                      goalIsGoalEnabled(handle, index, level: level),
+                      let goal = objects[handle]?.ai?.goals[index],
+                      goal.type == AIGoal.getAroundObjectType
+                else {
+                    continue
+                }
+                goalFound = true
+                guard let me = objects[handle],
+                      let other = objects[goal.objectHandle],
+                      other.handle != handle,
+                      !objectsAreRelated(me, other)
+                else {
+                    continue
+                }
+                let distance = goal.circleDistance
+                let current = max(
+                    0,
+                    vectorDistance(me.position, other.position)
+                        - me.size - other.size
+                )
+                guard current <= distance else { continue }
+                let scale = goal.influence * ((distance - current) / distance)
+                if let away = aiGoalAvoid(me, other, distance: distance) {
+                    let direction = objects[handle]!.ai!.movementDirection
+                    objects[handle]?.ai?.movementDirection =
+                        direction + away * scale
+                    avoided = true
+                    aiDetermineSpeed(objects[handle]!.ai!, flags: goal.flags,
+                                     speed: &highestSpeed)
+                }
+            }
+            if let me = objects[handle], let meAI = me.ai,
+               meAI.flags & ObjectAIFrame.autoAvoidFriendsFlag != 0 {
+                goalFound = true
+                if avoidFriends(handle, level: level) {
+                    avoided = true
+                    aiDetermineSpeed(objects[handle]!.ai!, flags: 0,
+                                     speed: &highestSpeed)
+                }
+            }
             var goalDirection = Vector3.zero
             var goalMoved = false
             var goalSet = false
             var influence: Float = 0
-            if let current = goalGetCurrentGoal(handle) {
+            if let current = goalGetCurrentGoal(handle, level: level) {
                 goalFound = true
                 highestInfluenceGoal = current
                 turned = false
@@ -72,14 +121,12 @@ extension GameWorld {
                 influence = goal.influence
                 aiDetermineSpeed(objects[handle]!.ai!, flags: goal.flags,
                                  speed: &highestSpeed)
-                if goal.type == AIGoal.followPathType,
-                   objects[handle]!.ai!.path.numberOfPaths > 0 {
-                    let step = aiPathMoveTurnTowardsNode(handle, level: level)
-                    goalDirection = step.direction
-                    goalMoved = step.moved
-                    goalSet = true
-                }
-            } else if var still = objects[handle], var stillAI = still.ai {
+                let step = aiMoveCurrentGoal(handle, current, level: level)
+                goalDirection = step.direction
+                goalMoved = step.moved
+                goalSet = step.set
+            } else if !avoided, var still = objects[handle],
+                      var stillAI = still.ai {
                 let result = aiMoveTowardsPosition(
                     &still, &stillAI, position: still.position, scale: 1,
                     stopAtEndPoint: false
@@ -92,12 +139,17 @@ extension GameWorld {
             guard var moving = objects[handle], var movingAI = moving.ai else {
                 return
             }
-            if !goalMoved, goalSet {
-                movingAI.movementDirection = movingAI.movementDirection
-                    + goalDirection * influence
+            if avoided || (!goalMoved && goalSet) {
+                if !goalMoved, goalSet {
+                    movingAI.movementDirection = movingAI.movementDirection
+                        + goalDirection * influence
+                }
+                // vm_NormalizeVector, then a random direction when the
+                // length is 0 (AImain.cpp:4980-4983). A NaN direction (a 0
+                // circle distance at the goal) fails `mag > 0` and so has
+                // length 0 too (vecmat/vector.cpp:175).
                 var direction = movingAI.movementDirection
-                let length = sqrt(dot(direction, direction))
-                if length == 0 {
+                if vmNormalizeVector(&direction) == 0 {
                     // vm_MakeRandomVector.
                     let half = Float(Self.randMax / 2)
                     direction = Vector3(
@@ -105,11 +157,7 @@ extension GameWorld {
                         y: Float(psRand()) - half,
                         z: Float(psRand()) - half
                     )
-                    let randomLength = sqrt(dot(direction, direction))
-                    direction = randomLength > 0
-                        ? direction / randomLength : direction
-                } else {
-                    direction = direction / length
+                    vmNormalizeVector(&direction)
                 }
                 movingAI.movementDirection = direction
                 aiMoveTowardsDir(&moving, movingAI, direction: direction,
@@ -132,6 +180,306 @@ extension GameWorld {
            final.maxTurnRate > 0 {
             aiDoOrient(handle, goalIndex: highestInfluenceGoal, level: level)
         }
+    }
+
+    /// The current goal's case of ai_move (AImain.cpp:4715-4990) for the
+    /// translated goal types: the movement direction, whether the call
+    /// already set the velocity, and whether it gave a direction.
+    private mutating func aiMoveCurrentGoal(
+        _ handle: ObjectHandle,
+        _ index: Int,
+        level: Level
+    ) -> (direction: Vector3, moved: Bool, set: Bool) {
+        guard var object = objects[handle], var ai = object.ai else {
+            return (.zero, false, false)
+        }
+        let goal = ai.goals[index]
+        switch goal.type {
+        case Self.guardAreaGoalType:
+            guard goal.statusRegister & ObjectAIFrame.circleDistanceStatus
+                == 0 else {
+                return (.zero, false, false)
+            }
+            if case let .room(room) = object.location,
+               goal.roomSourceIndex != room {
+                ai.goals[index].roomSourceIndex = room
+                ai.goals[index].position = object.position
+            }
+            let result = aiMoveTowardsPosition(
+                &object, &ai, position: ai.goals[index].position, scale: 1,
+                stopAtEndPoint: false
+            )
+            object.ai = ai
+            objects[handle] = object
+            return (result.direction, result.moved, true)
+        case AIGoal.getToObjectType, AIGoal.getToPositionType,
+             AIGoal.followPathType:
+            let seesGoal = goal.statusRegister
+                & ObjectAIFrame.seesGoalStatus != 0
+                && goal.flags & AIGoal.useBlineIfSeesGoalFlag != 0
+            if ai.path.numberOfPaths > 0, !seesGoal {
+                let step = aiPathMoveTurnTowardsNode(handle, level: level)
+                return (step.direction, step.moved, true)
+            }
+            if goal.type == AIGoal.getToPositionType {
+                let stops = abs(goal.circleDistance) < 0.001
+                let result = aiMoveTowardsPosition(
+                    &object, &ai, position: goal.position, scale: 1,
+                    stopAtEndPoint: stops
+                )
+                object.ai = ai
+                objects[handle] = object
+                if result.atEnd, stops {
+                    goalClearGoal(handle, index, reason: .goalComplete,
+                                  level: level)
+                }
+                return (result.direction, result.moved, true)
+            }
+            if goal.type == AIGoal.getToObjectType,
+               let target = objects[goal.objectHandle] {
+                let result = aiMoveTowardsPosition(
+                    &object, &ai, position: target.position, scale: 1,
+                    stopAtEndPoint: false
+                )
+                object.ai = ai
+                objects[handle] = object
+                return (result.direction, result.moved, true)
+            }
+            return (.zero, false, false)
+        case AIGoal.moveRelativeObjectVectorType:
+            guard let target = objects[goal.objectHandle] else {
+                goalClearGoal(handle, index, reason: .goalInvalid,
+                              level: level)
+                return (.zero, false, false)
+            }
+            var vectorID = goal.subtype & ~1
+            let toward = goal.subtype & 1 != 0
+            if ![AIGoal.forwardSubtype, AIGoal.rightSubtype,
+                 AIGoal.upSubtype].contains(vectorID) {
+                vectorID = AIGoal.forwardSubtype
+                ai.goals[index].subtype = AIGoal.forwardSubtype
+                    | (toward ? 1 : 0)
+            }
+            let vector = vectorID == AIGoal.rightSubtype
+                ? target.orientation.right
+                : vectorID == AIGoal.upSubtype
+                    ? target.orientation.up : target.orientation.forward
+            let result = moveRelativeObjectVector(
+                &object, &ai, vector: vector, target: target,
+                circleDistance: goal.circleDistance, toward: toward
+            )
+            object.ai = ai
+            objects[handle] = object
+            if result.done {
+                goalClearGoal(handle, index, reason: .goalComplete,
+                              level: level)
+            }
+            return (result.direction, result.moved, true)
+        case AIGoal.moveRelativeObjectType:
+            let circle = goal.circleDistance
+            if ai.distToTargetPerceived < 0.7 * circle {
+                // move_away_from_position (AImain.cpp:1849). The flee sound
+                // needs the AI sounds (M2).
+                var away = object.position - ai.lastSeeTargetPosition
+                let length = sqrt(dot(away, away))
+                away = length > 0 ? away / length : away
+                return (away, false, true)
+            }
+            if goal.statusRegister & ObjectAIFrame.circleDistanceStatus != 0 {
+                let time = (Int(gameTime) + handle.slot) % 8
+                let relative = ai.flags & ObjectAIFrame.orientToVelocityFlag
+                    != 0 ? objects[goal.objectHandle] : object
+                let direction: Vector3
+                if let relative {
+                    direction = time < 2 ? relative.orientation.right
+                        : time < 4 ? relative.orientation.right * -1
+                        : time < 6 ? relative.orientation.up
+                        : relative.orientation.up * -1
+                } else {
+                    direction = object.orientation.right
+                }
+                return (direction, false, true)
+            }
+            let result = aiMoveTowardsPosition(
+                &object, &ai, position: ai.lastSeeTargetPosition, scale: 1,
+                stopAtEndPoint: false
+            )
+            object.ai = ai
+            objects[handle] = object
+            return (result.direction, result.moved, true)
+        default:
+            return (.zero, false, false)
+        }
+    }
+
+    /// move_relative_object_vec (AImain.cpp:1802): get to the side of
+    /// `target` along `vector` (its negative when `toward`), at the circle
+    /// distance. Done when within the object's size of that point.
+    private func moveRelativeObjectVector(
+        _ object: inout GameObject,
+        _ ai: inout ObjectAIFrame,
+        vector: Vector3,
+        target: GameObject,
+        circleDistance: Float,
+        toward: Bool
+    ) -> (direction: Vector3, moved: Bool, done: Bool) {
+        let fromTarget = object.position - target.position
+        let opposite = toward ? vector * -1 : vector
+        var done = false
+        let goalPosition: Vector3
+        if dot(fromTarget, opposite) > 0 {
+            let normal = opposite * dot(opposite, fromTarget)
+            let plane = fromTarget - normal
+            let direction = plane == .zero
+                ? target.orientation.right
+                : vmNormalized(plane)
+            goalPosition = target.position
+                + direction * (object.size + target.size + circleDistance)
+        } else {
+            goalPosition = target.position
+                - opposite * (object.size + target.size + circleDistance)
+            if vectorDistance(goalPosition, object.position) < object.size {
+                done = true
+            }
+        }
+        let result = aiMoveTowardsPosition(
+            &object, &ai, position: goalPosition, scale: 1,
+            stopAtEndPoint: false
+        )
+        return (result.direction, result.moved, done)
+    }
+
+    /// AiGoalAvoid (AImain.cpp:4075): the direction away from `other`.
+    /// Each vm_NormalizeVector of a zero vector gives the x unit vector.
+    private func aiGoalAvoid(_ object: GameObject, _ other: GameObject,
+                             distance: Float) -> Vector3? {
+        guard object.usesPhysics else { return nil }
+        let otherVelocity = other.usesPhysics || other.type == .player
+            ? objectVelocity(other) : .zero
+        let toAvoid = other.position - object.position
+        var relative = object.velocity - otherVelocity
+        if abs(relative.x) < 0.1, abs(relative.y) < 0.1,
+           abs(relative.z) < 0.1 {
+            return vmNormalized(toAvoid * -1)
+        }
+        vmNormalizeVector(&relative)
+        let along = dot(relative, toAvoid)
+        if along <= 0 {
+            return vmNormalized(toAvoid * -1)
+        }
+        let side = (toAvoid - relative * along) * -1
+        let point = other.position + side * distance
+        return vmNormalized(point - object.position)
+    }
+
+    /// ObjectsAreRelated (WeaponFire.cpp:962) for the parent links the
+    /// runtime keeps.
+    func objectsAreRelated(_ a: GameObject, _ b: GameObject) -> Bool {
+        a.parent == b.handle || b.parent == a.handle
+            || (a.parent != .none && a.parent == b.parent)
+    }
+
+    /// AIObjFriend (AImain.cpp:5606) in single player.
+    func aiObjFriend(_ object: GameObject, _ target: GameObject,
+                     level: Level) -> Bool {
+        guard target.type == .player || target.ai != nil,
+              object.type == .player || object.ai != nil,
+              object.type != .ghost, object.type != .powerup,
+              object.flags & GameObject.destroyedFlag == 0
+        else {
+            return false
+        }
+        if target.ai != nil, !target.usesPhysics,
+           (level.placedObjectModel(target.handle)?.weaponBatteries?.count
+                ?? 0) == 0 {
+            return false
+        }
+        if object.type == .player, playerDeath != nil { return false }
+        let team = aiGetTeam(object)
+        let targetTeam = aiGetTeam(target)
+        if target.ai?.targetHandle == object.handle { return false }
+        if team == ObjectAIFrame.teamHostile { return false }
+        if objectsAreRelated(object, target) { return true }
+        switch team {
+        case ObjectAIFrame.teamPTMC:
+            return targetTeam == ObjectAIFrame.teamPTMC
+        case ObjectAIFrame.teamNeutral:
+            return targetTeam == ObjectAIFrame.teamNeutral
+        default:
+            return targetTeam == ObjectAIFrame.teamRebel
+                || team == ObjectAIFrame.teamRebel || targetTeam == team
+        }
+    }
+
+    /// AIF_AUTO_AVOID_FRIENDS (AImain.cpp:4670-4720): turn away from the
+    /// friends within `avoid_friends_distance`. The near list is the
+    /// objects in the object's room and the rooms its portals join, in slot
+    /// order, at most 10 (fvi_QuickDistObjectList). Returns whether it
+    /// avoided any.
+    private mutating func avoidFriends(_ handle: ObjectHandle,
+                                       level: Level) -> Bool {
+        guard let object = objects[handle], let ai = object.ai,
+              case let .room(room) = object.location
+        else {
+            return false
+        }
+        // fvi_QuickDistObjectList(pos, room, dist + size, 10, false, true)
+        // (AImain.cpp:4686): players and AI objects of a type the ray
+        // collides with (findintersection.cpp:2237-2239; an OBJ_DUMMY does
+        // not), whose box meets the query box, in the object's room and
+        // then the rooms it sees; at most 10. The object itself is in the
+        // list and takes a place (:4692 skips it).
+        let reach = ai.avoidFriendsDistance + object.size
+        let rayCollides: Set<ObjectType> = [
+            .robot, .player, .weapon, .powerup, .clutter, .building, .door,
+            .room,
+        ]
+        let near = objects.filter { other in
+            guard rayCollides.contains(other.type),
+                  other.type == .player || other.ai != nil,
+                  case let .room(otherRoom) = other.location,
+                  otherRoom == room
+                    || boaIsVisible(object.location, other.location,
+                                    level: level)
+            else {
+                return false
+            }
+            let delta = other.position - object.position
+            let extent = reach + other.size
+            return abs(delta.x) <= extent && abs(delta.y) <= extent
+                && abs(delta.z) <= extent
+        }.sorted {
+            ($0.location == object.location ? 0 : 1, $0.handle.slot)
+                < ($1.location == object.location ? 0 : 1, $1.handle.slot)
+        }.prefix(10)
+        var avoided = false
+        for other in near {
+            guard other.type != .powerup, other.handle != handle,
+                  !objectsAreRelated(object, other),
+                  aiObjFriend(object, other, level: level)
+            else {
+                continue
+            }
+            let current = max(
+                0,
+                vectorDistance(object.position, other.position)
+                    - object.size - other.size
+            )
+            guard current <= ai.avoidFriendsDistance,
+                  let away = aiGoalAvoid(object, other,
+                                         distance: ai.avoidFriendsDistance)
+            else {
+                continue
+            }
+            // `if (scale < 0.01f) scale = 0.01f;` (AImain.cpp:4704) keeps a
+            // NaN, as Swift's max would not.
+            var scale = 1 - current / ai.avoidFriendsDistance
+            if scale < 0.01 { scale = 0.01 }
+            let direction = objects[handle]!.ai!.movementDirection
+            objects[handle]?.ai?.movementDirection = direction + away * scale
+            avoided = true
+        }
+        return avoided
     }
 
     /// AIMoveTowardsDir (AImain.cpp:1707): accelerate toward
@@ -222,10 +570,26 @@ extension GameWorld {
             } else {
                 aiDoOrientVelocity(&object)
             }
+        } else if goal.isObjectGoal,
+                  goal.flags & AIGoal.orientGoalObjectFlag != 0 {
+            if let goalObject = objects[goal.objectHandle],
+               goalObject.handle == ai.targetHandle {
+                aiTurnTowardsPosition(&object, ai.lastSeeTargetPosition)
+            } else if let goalObject = objects[goal.objectHandle] {
+                aiTurnTowardsPosition(&object, goalObject.position)
+            } else {
+                aiDoOrientVelocity(&object)
+            }
         } else if goal.flags & AIGoal.orientVelocityFlag != 0 {
             aiDoOrientVelocity(&object)
+        } else if goal.flags & AIGoal.orientScriptedFlag != 0 {
+            objects[handle] = object
+            aiNotifyScriptedOrient(handle, goalIndex: goalIndex, level: level)
+            return
         } else if goal.flags & AIGoal.orientPathNodeFlag != 0 {
             let path = ai.path
+            // Only a static path turns the object (AImain.cpp:4443).
+            guard !path.isDynamic, path.numberOfPaths > 0 else { return }
             let reverse = goal.flags & AIGoal.pathMoveReverseFlag != 0
             let nodes = level.paths[path.pathID].nodes
             let current = path.currentNodePosition(level)

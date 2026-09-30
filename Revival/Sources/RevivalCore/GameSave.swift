@@ -753,30 +753,59 @@ extension GameWorld {
                 "\(name) ai arrays"
             )
             for goal in ai.goals where goal.used {
+                let translatedTypes: [UInt32] = [
+                    AIGoal.followPathType, AIGoal.getToObjectType,
+                    AIGoal.getToPositionType, Self.guardAreaGoalType,
+                    AIGoal.moveRelativeObjectType,
+                    AIGoal.moveRelativeObjectVectorType,
+                    AIGoal.getAroundObjectType,
+                ]
+                // A circle distance of 0 is valid page data; ai_move's
+                // blend handles the 0/0 it gives (AImain.cpp:4649, :4980).
                 try require(
-                    goal.type == AIGoal.followPathType
-                        && pathNodeIsValid(
-                            goal.pathID,
-                            goal.staticPathCurrentNode
-                        )
-                        && pathNodeIsValid(
-                            goal.pathID,
-                            goal.staticPathStartNode
-                        )
-                        && pathNodeIsValid(goal.pathID, goal.staticPathEndNode),
+                    translatedTypes.contains(goal.type)
+                        && goal.circleDistance.isFinite
+                        && goal.enablers.count <= AIGoal.maximumEnablers
+                        && goal.enablers.allSatisfy {
+                            (AIGoalEnabler.near...AIGoalEnabler.clearTime)
+                                .contains($0.type)
+                                && ![AIGoalEnabler.fear, AIGoalEnabler.angry,
+                                     AIGoalEnabler.curious,
+                                     AIGoalEnabler.frustrated]
+                                    .contains($0.type)
+                        }
+                        && (goal.type != AIGoal.followPathType
+                            || (pathNodeIsValid(
+                                    goal.pathID,
+                                    goal.staticPathCurrentNode
+                                )
+                                && pathNodeIsValid(
+                                    goal.pathID,
+                                    goal.staticPathStartNode
+                                )
+                                && pathNodeIsValid(
+                                    goal.pathID,
+                                    goal.staticPathEndNode
+                                ))),
                     "\(name) goal"
                 )
             }
             let path = ai.path
             try require(
-                (0...1).contains(path.numberOfPaths),
+                (0...1).contains(path.numberOfPaths)
+                    && (path.numberOfPaths == 1 || !path.isDynamic),
                 "\(name) path"
             )
             if path.numberOfPaths == 1 {
-                try require(
-                    pathNodeIsValid(path.pathID, path.currentNode)
+                let nodesAreValid = path.isDynamic
+                    ? path.dynamicNodes.indices.contains(path.currentNode)
+                        && path.dynamicNodes.indices.contains(path.startNode)
+                        && path.dynamicNodes.indices.contains(path.endNode)
+                    : pathNodeIsValid(path.pathID, path.currentNode)
                         && pathNodeIsValid(path.pathID, path.startNode)
                         && pathNodeIsValid(path.pathID, path.endNode)
+                try require(
+                    nodesAreValid
                         && path.startNode <= path.endNode
                         && (0..<ObjectAIFrame.maximumGoals)
                             .contains(path.goalIndex),
