@@ -2,8 +2,7 @@
 //
 // Translated from Descent3/object.h (handle masks, :640-644),
 // Descent3/object_external.h (OBJ_ and RT_ constants, :153-266),
-// lib/object_external_struct.h (struct object, :401, and light_info), and
-// Descent3/aistruct_external.h (AIF_DISABLED, :362).
+// and lib/object_external_struct.h (struct object, :401, and light_info).
 
 import Foundation
 
@@ -105,10 +104,34 @@ struct GameObject: Codable, Equatable, Sendable {
     /// uses the object page's lighting.
     var localLighting: ObjectLocalLighting? = nil
     /// `ai_info` of a CT_AI object. The object page decides CT_AI
-    /// (objinit.cpp:807); the page import in M2 fills it.
+    /// (objinit.cpp:807).
     var ai: ObjectAIFrame? = nil
     /// `osiris_script`: the bound scripts.
     var scripts: ObjectScripts? = nil
+    /// `id` of a generic object: the index of its object_info in
+    /// `Level.objectInfos`.
+    var info: Int? = nil
+    /// `id` of a weapon object: the index of its weapon in `Level.weapons`.
+    var weapon: Int? = nil
+    /// `size`.
+    var size: Float = 0
+    /// `shields` of a generic object: its page hit points at ObjInit.
+    /// Damage changes it from M1 step 7. The player's shields are
+    /// `GameWorld.shields`.
+    var shields: Float = 0
+    /// `movement_type`: MT_PHYSICS or MT_NONE.
+    var usesPhysics = false
+    /// `mtype.phys_info.velocity` of an object that the object frame moves.
+    /// The player's velocity is `GameWorld.velocity`.
+    var velocity = Vector3.zero
+    /// `last_pos`: the position before the latest physics move.
+    var lastPosition = Vector3.zero
+    /// `parent_handle`.
+    var parent: ObjectHandle = .none
+    /// `lifeleft` while OF_USES_LIFELEFT is set; `nil` while it is clear.
+    var lifeLeft: Float? = nil
+    /// `dynamic_wb`: one per model weapon battery of a CT_AI object.
+    var weaponBatteries: [DynamicWeaponBattery] = []
 }
 
 extension GameObject {
@@ -128,12 +151,4 @@ struct ObjectLocalLighting: Codable, Equatable, Sendable {
     var lightDistance: Float?
     /// `red_light1`, `green_light1`, `blue_light1`.
     var color: Vector3?
-}
-
-/// The `ai_frame` fields the runtime uses.
-struct ObjectAIFrame: Codable, Equatable, Sendable {
-    /// AIF_DISABLED (aistruct_external.h:362).
-    static let disabledFlag: UInt32 = 0x0000_4000
-
-    var flags: UInt32 = 0
 }

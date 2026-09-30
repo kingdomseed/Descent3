@@ -493,8 +493,6 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         pathPopup.isEnabled = !isPlaying && pathPopup.numberOfItems > 0
         pathNodePopup.isEnabled = !isPlaying && pathNodePopup.numberOfItems > 0
         orientPathNodeButton.isEnabled = pathNodePopup.isEnabled
-            && selectedPathIndex
-                == level.trainingDodgeAttempt?.maneuverFollow?.followPathIndex
         objectPopup.isEnabled = !isPlaying && objectPopup.numberOfItems > 0
         rotateObjectButton.isEnabled = objectPopup.isEnabled
         playerStartPopup.isEnabled = !isPlaying && playerStartPopup.numberOfItems > 0
@@ -1377,8 +1375,6 @@ func editorIdleStatusMessage(
     let status =
         "Editing \(level.metadata.name) — \(level.rooms.count) complete resident rooms — source room \(selection.room.sourceIndex), face \(selection.face.faceIndex) selected — \(project.semanticDiff.count) authored changes."
     let sourceDiagnostics = [
-        project.trainingDodgeAttemptSourceDiagnostic,
-        project.trainingManeuverFollowSourceDiagnostic,
         project.trainingGalleryBarrierSourceDiagnostic,
         project.trainingRobotGuidebotSourceDiagnostic,
         project.trainingGuidebotReturnSourceDiagnostic,
@@ -1407,14 +1403,7 @@ func editorPlayStatusMessage(
     project: RevivalProject,
     frame: PlayerSimulationFrame
 ) -> String {
-    let status =
-        "Playing a separately owned complete-level copy. Use W/S to thrust and A/D to slide."
-    guard let diagnostic =
-            project.trainingManeuverFollowRuntimeDiagnostic(frame: frame)
-    else {
-        return status
-    }
-    return "\(status)\nRuntime: \(diagnostic)"
+    "Playing a separately owned complete-level copy. Use W/S to thrust and A/D to slide."
 }
 
 func indoorMovementDiagnosticMessage(_ trace: IndoorMovementTrace) -> String {

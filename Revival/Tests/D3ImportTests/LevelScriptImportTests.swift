@@ -338,6 +338,58 @@ final class LevelScriptImportTests: XCTestCase {
             $0.name == "welcome.osf" ? .init(name: $0.name, key: "missing.osf") : $0
         }))
     }
+
+    /// Hull collision keeps one edge bit per corner in a 32-bit mask
+    /// (findintersection.cpp:1600 asserts nv <= 32), so a package model
+    /// face with more corners is rejected at the canonical boundary.
+    func testModelFaceWithMoreThan32CornersIsRejected() throws {
+        var (level, _) = try makeScriptedTrainingLevel()
+        XCTAssertNoThrow(try level.validate())
+        let modelIndex = try XCTUnwrap(level.models.firstIndex {
+            $0.submodels.contains { !$0.faces.isEmpty }
+        })
+        let model = level.models[modelIndex]
+        let submodelIndex = try XCTUnwrap(
+            model.submodels.firstIndex { !$0.faces.isEmpty }
+        )
+        func replacingFirstFace(cornerCount: Int) -> CanonicalModel {
+            var submodels = model.submodels
+            let submodel = submodels[submodelIndex]
+            let face = submodel.faces[0]
+            let corners = (0..<cornerCount).map {
+                face.corners[$0 % face.corners.count]
+            }
+            var faces = submodel.faces
+            faces[0] = ModelFace(
+                normal: face.normal,
+                corners: corners,
+                material: face.material
+            )
+            submodels[submodelIndex] = ModelSubmodel(
+                sourceIndex: submodel.sourceIndex,
+                parentIndex: submodel.parentIndex,
+                offset: submodel.offset,
+                vertices: submodel.vertices,
+                faces: faces,
+                presentation: submodel.presentation
+            )
+            var replaced = CanonicalModel(
+                source: model.source,
+                collisionRadius: model.collisionRadius,
+                submodels: submodels,
+                bounds: model.bounds,
+                sourceArchive: model.sourceArchive,
+                sourceSHA256: model.sourceSHA256
+            )
+            replaced.gunpoints = model.gunpoints
+            replaced.weaponBatteries = model.weaponBatteries
+            return replaced
+        }
+        level.models[modelIndex] = replacingFirstFace(cornerCount: 32)
+        XCTAssertNoThrow(try level.validate())
+        level.models[modelIndex] = replacingFirstFace(cornerCount: 33)
+        XCTAssertThrowsError(try level.validate())
+    }
 }
 
 // MARK: - Synthetic fixtures

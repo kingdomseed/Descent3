@@ -268,60 +268,8 @@ func makeTrainingManeuverFollowLevel() -> Level {
                 level.dependencyManifest.historicalEagerBaseline
         )
     )
-    level.trainingDodgeAttempt?.maneuverFollow = .init(
-        maneuverObjectHandle: 2_063,
-        maneuverCollisionRadius: 10.052_409,
-        flashLightObjectHandle: 4_120,
-        portalRoomSourceIndex: 36,
-        orderedPortalIndices: [1, 0],
-        headingControlMask: 768,
-        pitchControlMask: 192,
-        bankControlMask: 3_072,
-        rotationalControlMask: 4_032,
-        weaponControlMask: 12_288,
-        headingDuration: 20,
-        pitchDuration: 12,
-        bankDuration: 15,
-        followDuration: 20,
-        followBotObjectHandle: 8_200,
-        friendlyTeamFlags: 65_536,
-        followPathIndex: 0,
-        followPathGoalFlags: 9_437_444,
-        destroyPathIndex: 1,
-        destroyPathGoalFlags: 4_352,
-        goalSlot: 0,
-        goalPriority: 3,
-        maneuverIntroduction:
-            "Now you are going to learn the other controls, which are pitch, heading and bank.",
-        headingInstruction:
-            "Now your heading controls are enabled. Try them out by rotating to the left and right.",
-        successMessage: "Excellent!",
-        pitchInstruction:
-            "Now your pitch controls are enabled. Try them out by pitching up and down.",
-        bankInstruction:
-            "Now your bank controls are enabled. Try them out by banking to the left and right.",
-        followIntroduction:
-            "Now you will use the rotational skills you just learned to follow one of the two robots that are circling this room",
-        followInstruction:
-            "Keep one of the robots on your screen for 20 seconds using only your rotational controls to complete this step.",
-        weaponsEnabledInstruction:
-            "Now your weapons have been enabled. There is a primary and a secondary.",
-        destroyInstruction: "Now, destroy the robot.",
-        headingVoiceSourceName: "intro3.osf",
-        pitchVoiceSourceName: "pitch.osf",
-        bankVoiceSourceName: "bank.osf",
-        followVoiceSourceName: "follow.osf",
-        weaponVoiceSourceName: "intro4.osf",
-        followBot: .init(
-            model: gyro,
-            collisionRadius: 4.576_441_8,
-            maximumVelocity: 40,
-            maximumDeltaVelocity: 80,
-            maximumTurnRate: 12_000,
-            maximumDeltaTurnRate: 16_000,
-            circleDistance: 25
-        )
-    )
+    // FollowBot1's page: a flying robot with AI.
+    level = level.addingObjectInfo(fixtureFlyerInfo)
     return rescriptedTrainingLevel(
         level
     )
@@ -330,7 +278,8 @@ func makeTrainingManeuverFollowLevel() -> Level {
 func makeTrainingMovingTargetHandoffLevel() -> Level {
     var level = makeTrainingManeuverFollowLevel()
     let gyro = try! XCTUnwrap(
-        level.trainingDodgeAttempt?.maneuverFollow?.followBot.model
+        level.objectPresentations.first { $0.objectHandle == 8_200 }?
+            .primaryModel
     )
     let definition = try! XCTUnwrap(
         level.objects.first { $0.handle == 8_200 }?.definition
@@ -497,8 +446,7 @@ func makeTrainingMovingTargetHandoffLevel() -> Level {
                 level.dependencyManifest.historicalEagerBaseline
         )
     )
-    level.trainingDodgeAttempt?.maneuverFollow?
-        .destructionHandoff = .init(
+    level.trainingFollowBotDestruction = .init(
             followBotObjectHandle: 8_200,
             destroyBot2ObjectHandle: 4_112,
             destroyBot1ObjectHandle: 4_113,

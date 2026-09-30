@@ -86,7 +86,7 @@ extension WorldRenderingTests {
     func testScript029ThenPortal2RunsScript032OnceAndRestoresLaterState() throws {
         let level = makeTrainingRobotGuidebotLevel()
         try level.validate()
-        XCTAssertNil(level.trainingDodgeAttempt)
+        XCTAssertNil(level.trainingFollowBotDestruction)
         let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0

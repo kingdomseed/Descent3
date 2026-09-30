@@ -406,34 +406,58 @@ final class GameSaveTests: XCTestCase {
             presentationReadyTimestamp: 0
         ).world
         XCTAssertNoThrow(try dodgeWorld.validate(against: dodgeLevel))
+        // The turret's dynamic_wb keeps MAX_WB_TURRETS angles.
+        let turret = dodgeLevel.findObjectName("DodgeTurrett")
         var angles = dodgeWorld
-        angles.trainingDodgeAttemptState?.turretAngles = [0]
+        angles.objects[turret]?.weaponBatteries[0].turretAngles = [0]
         assertRejected(
-            .indexOutOfRange("trainingDodgeAttemptState.turretAngles"),
+            .indexOutOfRange("object \(turret.slot) weapon battery 0"),
             angles,
+            level: dodgeLevel
+        )
+        // A goal names a node of a game path.
+        let followBot = dodgeLevel.findObjectName("FollowBot1")
+        var goal = dodgeWorld
+        goal.aiGoalFollowPathSimple(
+            followBot, pathID: 0, guid: 0, flags: 0, slot: 3,
+            level: dodgeLevel
+        )
+        XCTAssertNoThrow(try goal.validate(against: dodgeLevel))
+        goal.objects[followBot]?.ai?.goals[3].staticPathCurrentNode = 99
+        assertRejected(
+            .indexOutOfRange("object \(followBot.slot) goal"),
+            goal,
+            level: dodgeLevel
+        )
+        // A weapon object names a weapon of the level.
+        var weapon = dodgeWorld
+        let shot = try XCTUnwrap(weapon.createAndFireWeapon(
+            position: try XCTUnwrap(weapon.objects[turret]).position,
+            direction: .init(x: 0, y: 0, z: -1),
+            parent: turret,
+            weaponIndex: 0,
+            level: dodgeLevel
+        ))
+        XCTAssertNoThrow(try weapon.validate(against: dodgeLevel))
+        weapon.objects[shot]?.weapon = 5
+        assertRejected(
+            .indexOutOfRange("object \(shot.slot) weapon"),
+            weapon,
             level: dodgeLevel
         )
     }
 
-    func testLoadValidationRejectsMissingRequiredObjects() throws {
+    func testLoadValidationAcceptsMissingScriptObjects() throws {
         let level = makeTrainingMovingTargetHandoffLevel()
-        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
         let world = GameSession(level: level, presentationReadyTimestamp: 0)
             .world
-        // A script goal is found by handle at each use, so a world without
-        // it still loads (ObjGet returns NULL, object.cpp:3231).
-        var missingGoal = world
-        missingGoal.objects.delete(level.findObjectName("ForwardGoal"))
-        XCTAssertNoThrow(try missingGoal.validate(against: level))
-        var missingTurret = world
-        missingTurret.objects.delete(
-            ObjectHandle(dodge.dodgeTurretObjectHandle)
-        )
-        assertRejected(
-            .objectReference(dodge.dodgeTurretObjectHandle),
-            missingTurret,
-            level: level
-        )
+        // Scripts and the AI find objects by handle at each use, so a world
+        // without one still loads (ObjGet returns NULL, object.cpp:3231).
+        for name in ["ForwardGoal", "DodgeTurrett", "FollowBot1"] {
+            var missing = world
+            missing.objects.delete(level.findObjectName(name))
+            XCTAssertNoThrow(try missing.validate(against: level), name)
+        }
     }
 
     func testLoadValidationRejectsNonCanonicalSavedOrientations() throws {
@@ -474,7 +498,6 @@ final class GameSaveTests: XCTestCase {
         throws
     {
         let dodgeLevel = makeTrainingMovingTargetHandoffLevel()
-        let dodge = try XCTUnwrap(dodgeLevel.trainingDodgeAttempt)
         let dodgeWorld = GameSession(
             level: dodgeLevel,
             presentationReadyTimestamp: 0
@@ -483,33 +506,53 @@ final class GameSaveTests: XCTestCase {
         guard case let .room(playerRoom) = player.location else {
             return XCTFail("indoor player")
         }
+        let turret = dodgeLevel.findObjectName("DodgeTurrett")
+        // The firing mask indexes the page's masks (WBFireBattery).
         var firingMask = dodgeWorld
-        firingMask.trainingDodgeAttemptState?.firingMaskIndex =
-            dodge.turret.gunpoints.count
+        firingMask.objects[turret]?.weaponBatteries[0].currentFiringMask = 2
         assertRejected(
-            .indexOutOfRange("trainingDodgeAttemptState.firingMaskIndex"),
+            .indexOutOfRange("object \(turret.slot) weapon battery 0"),
             firingMask,
             level: dodgeLevel
         )
-        var stillProjectile = dodgeWorld
-        stillProjectile.trainingDodgeAttemptState?.projectiles = [
-            .init(
-                roomSourceIndex: playerRoom,
-                position: player.position,
-                velocity: .zero,
-                lifeRemaining: 1
-            ),
-        ]
+        // ai_fire wraps turret angles into 0...1.
+        var turretAngle = dodgeWorld
+        turretAngle.objects[turret]?.weaponBatteries[0].turretAngles[0] = 1.5
         assertRejected(
-            .outOfDomain("trainingDodgeAttemptState.projectiles.velocity"),
-            stillProjectile,
+            .indexOutOfRange("object \(turret.slot) weapon battery 0"),
+            turretAngle,
             level: dodgeLevel
         )
-        var turretAngle = dodgeWorld
-        turretAngle.trainingDodgeAttemptState?.turretAngles = [1.5, 0]
+        // An AI object keeps one dynamic battery per model battery
+        // (WBClearInfo, ObjInit.cpp:817); ai_fire indexes them.
+        var noBatteries = dodgeWorld
+        noBatteries.objects[turret]?.weaponBatteries = []
         assertRejected(
-            .outOfDomain("trainingDodgeAttemptState.turretAngles"),
-            turretAngle,
+            .indexOutOfRange("object \(turret.slot) weaponBatteries"),
+            noBatteries,
+            level: dodgeLevel
+        )
+        // ai_mem's counters are int16_t (aistruct.h:724-727); a saved count
+        // out of that range does not load.
+        var hitCountObject = try XCTUnwrap(testWorldObject(dodgeWorld))
+        var table = try XCTUnwrap(hitCountObject["objects"] as? [String: Any])
+        var slots = try XCTUnwrap(table["slots"] as? [Any])
+        var turretSlot = try XCTUnwrap(slots[turret.slot] as? [String: Any])
+        var turretAI = try XCTUnwrap(turretSlot["ai"] as? [String: Any])
+        var memory = try XCTUnwrap(turretAI["memory"] as? [[String: Any]])
+        memory[0]["numberOfHitEnemy"] = Int.max
+        turretAI["memory"] = memory
+        turretSlot["ai"] = turretAI
+        slots[turret.slot] = turretSlot
+        table["slots"] = slots
+        hitCountObject["objects"] = table
+        XCTAssertThrowsError(try decodeTestWorld(hitCountObject))
+        var awareness = dodgeWorld
+        awareness.objects[turret]?.ai?.awareness = .infinity
+        // The world's finite-value sweep names the field.
+        assertRejected(
+            .nonFiniteValue("awareness"),
+            awareness,
             level: dodgeLevel
         )
         var scriptCounter = dodgeWorld
@@ -523,16 +566,17 @@ final class GameSaveTests: XCTestCase {
         )
 
         let cameraLevel = makeTrainingCameraMonitorLevel()
-        XCTAssertNil(cameraLevel.trainingDodgeAttempt)
+        XCTAssertNil(cameraLevel.trainingFollowBotDestruction)
         let cameraSession = GameSession(
             level: cameraLevel,
             presentationReadyTimestamp: 0
         )
-        var orphanDodge = cameraSession.world
-        orphanDodge.trainingDodgeAttemptState = TrainingDodgeAttemptState()
+        var orphanDestruction = cameraSession.world
+        orphanDestruction.trainingFollowBotDestructionState =
+            .init(followBotShields: 1)
         assertRejected(
-            .unexpectedState("trainingDodgeAttemptState"),
-            orphanDodge,
+            .unexpectedState("trainingFollowBotDestructionState"),
+            orphanDestruction,
             level: cameraLevel
         )
         var stillLaser = cameraSession.world

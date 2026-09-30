@@ -306,6 +306,17 @@ extension GameWorld {
     /// all of this, as the original skips EVT_LEVELSTART when IsRestoredGame
     /// is set; the saved world already holds the result.
     mutating func startLevelScripts(level: Level) {
+        startLevelScripts(level: level) { world, handle, event in
+            world.osirisCallEvent(handle, event, level: level)
+        }
+    }
+
+    /// The level start sequence with the object events passed in, so a test
+    /// can record them.
+    mutating func startLevelScripts(
+        level: Level,
+        sendObjectEvent: (inout GameWorld, ObjectHandle, ScriptEvent) -> Void
+    ) {
         osirisTimers.resetAll()
         levelModule = LevelModule.load(level: level)
         osirisCallLevelEvent(.levelStart, level: level)
@@ -315,10 +326,11 @@ extension GameWorld {
                 continue
             }
             osirisBindScriptsToObject(object.handle, level: level)
+            // A CT_AI object is one with an AI frame (ObjScript.cpp:206).
             if objects[object.handle]?.ai != nil {
-                osirisCallEvent(object.handle, .aiInit, level: level)
+                sendObjectEvent(&self, object.handle, .aiInit)
             }
-            osirisCallEvent(object.handle, .created, level: level)
+            sendObjectEvent(&self, object.handle, .created)
         }
     }
 }

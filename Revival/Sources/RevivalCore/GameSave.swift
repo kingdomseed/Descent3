@@ -224,7 +224,7 @@ extension GameWorld {
         }
         try validateStateDefinitions(level: level)
         try validateScriptState(level: level)
-        try validateRequiredObjects(level: level)
+        try validateObjectRuntimeState(level: level)
         try validateIndicesAndCapacities(level: level)
         try validateNumericDomains(level: level)
     }
@@ -243,11 +243,9 @@ extension GameWorld {
              ship?.playerConcussion != nil),
             ("playerYellowFlareState", playerYellowFlareState != nil,
              level.shipDefinitions.first?.playerYellowFlare != nil),
-            ("trainingDodgeAttemptState", trainingDodgeAttemptState != nil,
-             level.trainingDodgeAttempt != nil),
-            ("trainingManeuverFollowState",
-             trainingManeuverFollowState != nil,
-             level.trainingDodgeAttempt?.maneuverFollow != nil),
+            ("trainingFollowBotDestructionState",
+             trainingFollowBotDestructionState != nil,
+             level.trainingFollowBotDestruction != nil),
             ("trainingGalleryBarrierState",
              trainingGalleryBarrierState != nil,
              level.trainingGalleryBarrier != nil),
@@ -376,17 +374,6 @@ extension GameWorld {
         func nonzero(_ vector: Vector3) -> Bool {
             levelDot(vector, vector) > 0
         }
-        if let state = trainingDodgeAttemptState {
-            // constrainedTrainingTurretAngle keeps every angle in 0...1.
-            try require(
-                state.turretAngles.allSatisfy { (0...1).contains($0) },
-                "trainingDodgeAttemptState.turretAngles"
-            )
-            try require(
-                state.projectiles.allSatisfy { nonzero($0.velocity) },
-                "trainingDodgeAttemptState.projectiles.velocity"
-            )
-        }
         if let state = trainingRobotGuidebotState {
             try require(
                 state.projectiles.allSatisfy { nonzero($0.velocity) },
@@ -441,21 +428,6 @@ extension GameWorld {
                 },
                 "playerConcussionState.sparks.lifeRemaining"
             )
-        }
-    }
-
-    /// Objects the runtime reads without an existence check. Level data
-    /// names them, and nothing deletes them during play.
-    private func validateRequiredObjects(
-        level: Level
-    ) throws(GameWorldValidationError) {
-        var required: [UInt32] = []
-        if trainingDodgeAttemptState != nil,
-           let dodge = level.trainingDodgeAttempt {
-            required.append(dodge.dodgeTurretObjectHandle)
-        }
-        for handle in required where objects[ObjectHandle(handle)] == nil {
-            throw .objectReference(handle)
         }
     }
 
@@ -589,59 +561,141 @@ extension GameWorld {
                 )
             }
         }
-        if let state = trainingDodgeAttemptState,
-           let dodge = level.trainingDodgeAttempt {
-            try require(
-                dodge.turret.gunpoints.indices
-                    .contains(state.firingMaskIndex),
-                "trainingDodgeAttemptState.firingMaskIndex"
-            )
-            let joints = dodge.turret.joints.count
-            try require(
-                state.turretAngles.count == joints,
-                "trainingDodgeAttemptState.turretAngles"
-            )
-            try require(
-                state.turretDirections.count == joints,
-                "trainingDodgeAttemptState.turretDirections"
-            )
-            try limit(
-                state.projectiles.count,
-                trainingDodgeProjectilePresentationCapacity,
-                "trainingDodgeAttemptState.projectiles"
-            )
-        }
-        func requirePath(_ path: Int?, node: Int, _ name: String)
+    }
+
+    /// The per-object runtime state: object_info and weapon indices name
+    /// the level's tables, an AI frame belongs to a CT_AI page and keeps its
+    /// fixed arrays, goal and path nodes name game path nodes, weapon
+    /// batteries match the model, turret angles stay in 0...1 (ai_fire
+    /// wraps them), and every float and vector is finite and in range.
+    private func validateObjectRuntimeState(
+        level: Level
+    ) throws(GameWorldValidationError) {
+        func require(_ condition: Bool, _ name: String)
             throws(GameWorldValidationError)
         {
-            guard let path else { return }
-            try require(
-                level.paths.indices.contains(path)
-                    && level.paths[path].nodes.indices.contains(node),
-                name
-            )
+            if !condition { throw .indexOutOfRange(name) }
         }
-        if let state = trainingManeuverFollowState {
-            try requirePath(
-                state.activePathIndex,
-                node: state.pathNodeIndex,
-                "trainingManeuverFollowState.activePathIndex"
-            )
-            if let destruction = state.destruction {
-                let bot1 = destruction.destroyBot1Motion
-                try requirePath(
-                    bot1.activePathIndex,
-                    node: bot1.pathNodeIndex,
-                    "destroyBot1Motion.activePathIndex"
+        let sweep = NestedStateSweep(
+            roomSourceIndices: Set(level.rooms.map(\.sourceIndex))
+        )
+        func pathNodeIsValid(_ path: Int, _ node: Int) -> Bool {
+            level.paths.indices.contains(path)
+                && level.paths[path].nodes.indices.contains(node)
+        }
+        // AI_RenderedList holds object numbers (AImain.cpp:1624). A listed
+        // object deleted since the render is skipped by AIFrameAll.
+        try require(
+            aiRenderedList.count <= ObjectTable.capacity
+                && aiRenderedList.allSatisfy {
+                    $0.slot < ObjectTable.capacity
+                },
+            "aiRenderedList"
+        )
+        for object in objects {
+            let name = "object \(object.handle.slot)"
+            try sweep.visit(object.size, label: name)
+            try sweep.visit(object.shields, label: name)
+            try sweep.visit(object.velocity, label: name)
+            try sweep.visit(object.lastPosition, label: name)
+            try require(object.size >= 0, name)
+            if let lifeLeft = object.lifeLeft {
+                try sweep.visit(lifeLeft, label: name)
+            }
+            if let info = object.info {
+                try require(
+                    level.objectInfos?.indices.contains(info) == true,
+                    "\(name) info"
                 )
-                if let bot2 =
-                    destruction.destroyBot1Destruction?.destroyBot2Motion {
-                    try requirePath(
-                        bot2.activePathIndex,
-                        node: bot2.pathNodeIndex,
-                        "destroyBot2Motion.activePathIndex"
-                    )
+            }
+            if let weapon = object.weapon {
+                try require(
+                    object.type == .weapon
+                        && level.weapons?.indices.contains(weapon) == true,
+                    "\(name) weapon"
+                )
+            }
+            let modelBatteries = object.info == nil
+                ? []
+                : level.placedObjectModel(object.handle)?.weaponBatteries
+                    ?? []
+            let pageBatteries = object.info.flatMap {
+                level.objectInfos?[$0].weaponBatteries
+            } ?? []
+            // An AI object has one dynamic battery per model battery
+            // (WBClearInfo, ObjInit.cpp:815-817), which ai_fire indexes;
+            // any other object has none.
+            try require(
+                object.ai != nil
+                    ? object.weaponBatteries.count == modelBatteries.count
+                    : object.weaponBatteries.isEmpty,
+                "\(name) weaponBatteries"
+            )
+            for (index, battery) in object.weaponBatteries.enumerated() {
+                try sweep.visit(battery.lastFireTime, label: name)
+                try require(
+                    battery.turretAngles.count
+                        == DynamicWeaponBattery.maximumTurrets
+                        && battery.turretNextThinkTimes.count
+                            == DynamicWeaponBattery.maximumTurrets
+                        && battery.turretDirections.count
+                            == DynamicWeaponBattery.maximumTurrets
+                        && battery.turretAngles.allSatisfy {
+                            (0...1).contains($0)
+                        }
+                        && battery.turretDirections.allSatisfy { $0 <= 2 }
+                        && battery.currentFiringMask >= 0
+                        && battery.currentFiringMask
+                            < max(1, pageBatteries.indices.contains(index)
+                                ? pageBatteries[index].fireMasks.count
+                                : 1),
+                    "\(name) weapon battery \(index)"
+                )
+                for time in battery.turretNextThinkTimes {
+                    try sweep.visit(time, label: name)
                 }
+            }
+            guard let ai = object.ai else { continue }
+            try require(
+                object.info.flatMap({ level.objectInfos?[$0].ai }) != nil,
+                "\(name) ai"
+            )
+            try sweep.visit(ai, label: name)
+            try require(
+                ai.goals.count == ObjectAIFrame.maximumGoals
+                    && ai.memory.count == ObjectAIFrame.memoryDepth,
+                "\(name) ai arrays"
+            )
+            for goal in ai.goals where goal.used {
+                try require(
+                    goal.type == AIGoal.followPathType
+                        && pathNodeIsValid(
+                            goal.pathID,
+                            goal.staticPathCurrentNode
+                        )
+                        && pathNodeIsValid(
+                            goal.pathID,
+                            goal.staticPathStartNode
+                        )
+                        && pathNodeIsValid(goal.pathID, goal.staticPathEndNode),
+                    "\(name) goal"
+                )
+            }
+            let path = ai.path
+            try require(
+                (0...1).contains(path.numberOfPaths),
+                "\(name) path"
+            )
+            if path.numberOfPaths == 1 {
+                try require(
+                    pathNodeIsValid(path.pathID, path.currentNode)
+                        && pathNodeIsValid(path.pathID, path.startNode)
+                        && pathNodeIsValid(path.pathID, path.endNode)
+                        && path.startNode <= path.endNode
+                        && (0..<ObjectAIFrame.maximumGoals)
+                            .contains(path.goalIndex),
+                    "\(name) path"
+                )
             }
         }
     }

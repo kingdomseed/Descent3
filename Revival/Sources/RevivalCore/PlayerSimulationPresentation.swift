@@ -77,9 +77,6 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let shields: Float
     let energy: Float
     let afterburnerFuel: Float
-    let trainingDodgeMarkerLightDistance: Float?
-    let trainingDodgeTurretAngles: [Float]
-    let trainingDodgeProjectiles: [TrainingDodgeProjectileFrame]
     let trainingPrimaryProjectiles: [TrainingBlueLaserProjectileFrame]
     let playerConcussionMissiles: [PlayerConcussionMissileFrame]
     let playerConcussionExplosions: [PlayerConcussionExplosionFrame]
@@ -94,8 +91,6 @@ struct PlayerSimulationFrame: Equatable, Sendable {
         [TrainingGuidebotYellowFlareTimeoutSparkFrame]
     let trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame]
-    let trainingFollowBot: TrainingFollowBotFrame?
-    let trainingMovingTarget: TrainingMovingTargetFrame?
     let trainingGalleryMarkerLightDistance: Float?
     let trainingGuidebotReturnMarkerLightDistance: Float?
     let trainingGuidebot: TrainingGuidebotFrame?
@@ -114,37 +109,6 @@ struct PlayerFastHeadlightFrame: Equatable, Sendable {
     let lightDistance: Float
 }
 
-enum TrainingFollowBotPathFailure: String, Codable, Equatable, Sendable {
-    case invalidPath
-    case movementBlocked
-}
-
-struct TrainingFollowBotFrame: Equatable, Sendable {
-    let isPowered: Bool
-    let teamFlags: UInt32
-    let roomSourceIndex: Int
-    let position: Vector3
-    let orientation: Matrix3
-    let velocity: Vector3
-    let activePathIndex: Int?
-    let pathNodeIndex: Int
-    let objectTimerRemaining: Float?
-    let pathFailure: TrainingFollowBotPathFailure?
-    let script021Count: Int
-    let script022Count: Int
-    let script024Count: Int
-    let script023Count: Int
-    let script025Count: Int
-    let script026Count: Int
-}
-
-struct TrainingDodgeProjectileFrame: Equatable, Sendable {
-    let position: Vector3
-    let velocity: Vector3
-    let roomSourceIndex: Int
-    let model: SourceResource
-}
-
 struct TrainingBlueLaserProjectileFrame: Equatable, Sendable {
     let position: Vector3
     let velocity: Vector3
@@ -159,7 +123,7 @@ struct PlayerConcussionMissileFrame: Equatable, Sendable {
     let velocity: Vector3
     let model: SourceResource
     let lightDistance: Float
-    let lightPresentation: TrainingMarkerLightPresentation
+    let lightPresentation: ObjectLightPresentation
 }
 
 struct PlayerConcussionExplosionFrame: Equatable, Sendable {
@@ -185,7 +149,7 @@ struct TrainingGuidebotYellowFlareFrame: Equatable, Sendable {
     let lifeRemaining: Float
     let sourceLightDistance: Float
     let lightDistance: Float
-    let lightPresentation: TrainingMarkerLightPresentation
+    let lightPresentation: ObjectLightPresentation
 }
 
 struct TrainingGuidebotYellowFlareParticleFrame:
@@ -217,15 +181,7 @@ struct TrainingGuidebotYellowFlareTimeoutSparkFrame:
     let texture: SourceResource
     let sourceLightDistance: Float
     let lightDistance: Float
-    let lightPresentation: TrainingMarkerLightPresentation
-}
-
-struct TrainingMovingTargetFrame: Equatable, Sendable {
-    let objectHandle: UInt32
-    let roomSourceIndex: Int
-    let activePathIndex: Int
-    let pathNodeIndex: Int
-    let pathFailure: TrainingFollowBotPathFailure?
+    let lightPresentation: ObjectLightPresentation
 }
 
 enum TrainingEndLevelState: String, Codable, Equatable, Sendable {

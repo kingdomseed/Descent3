@@ -84,8 +84,8 @@ struct D3ImportReport: Codable, Equatable, Sendable {
 typealias D3ImportCancellationCheck = () -> Int32?
 
 func canonicalPlayerConcussionLightPresentation(
-    _ retail: TrainingMarkerLightPresentation
-) -> TrainingMarkerLightPresentation {
+    _ retail: ObjectLightPresentation
+) -> ObjectLightPresentation {
     .init(
         primaryColor: .init(
             x: retail.primaryColor.x,
@@ -647,7 +647,42 @@ func runD3Import(
                 lightingRenderType: 0
             )
     )
-    let reachedModelNames = Set([
+    // Object tables (GenericPage.swift): the placed objects' generic pages
+    // and the weapons their AI batteries fire, whose models join the
+    // reached models.
+    let genericPages = try resolveRetailGenericPages(
+        table: tableData,
+        overlay: overlayData
+    )
+    func archivePayload(_ name: String) -> Data? {
+        guard let indexed = presentationArchives.first(where: {
+                  $0.archive.entry(named: name) != nil
+              }),
+              let entry = indexed.archive.entry(named: name)
+        else {
+            return nil
+        }
+        return indexed.validated.data.subdata(in: entry.payloadRange)
+    }
+    let aiWeapons = try retailAIWeaponNames(
+        placedDefinitions: parsedLevel.objects
+            .filter { [2, 7, 11, 16].contains($0.type) }
+            .compactMap { $0.definition?.sourceName },
+        genericPages: genericPages,
+        modelPayload: archivePayload
+    ).map {
+        try resolveRetailWeaponPresentation(
+            table: tableData,
+            overlay: overlayData,
+            named: $0
+        )
+    }
+    let aiWeaponModelNames = aiWeapons.filter {
+        $0.weaponFlags
+            & (CanonicalWeapon.imageBitmapFlag | CanonicalWeapon.imageVClipFlag)
+            == 0
+    }.map(\.fireImageName)
+    let reachedModelNames = Set(aiWeaponModelNames + [
         reachedPages.ship.primaryModelName,
         reachedPages.ship.mediumModelName,
         reachedPages.ship.lowModelName,
@@ -2384,367 +2419,9 @@ func runD3Import(
         goalObjectFlags: finalGoal.flags,
         goalCollisionRadius: invisiblePowerupModel.collisionRadius
         ))
-    let startDodge = level.objects.first {
-        $0.handle == 4_106
-    }!
-    let doneDodgeingGoal = level.objects.first {
-        $0.handle == 12_302
-    }!
-    let dodgeTurret = level.objects.first {
-        $0.handle == 8_199
-    }!
-    let dodgeMarker = level.objects.first {
-        $0.handle == 4_120
-    }!
-    let portalRoomThree = level.rooms.first {
-        $0.sourceIndex == 36
-    }!
-    let dodgeTurretModelSource =
-        modelSources[dodgeTurretPage.primaryModelName.lowercased()]!
-    let dodgeTurretModel = level.models.first {
-        $0.source == dodgeTurretModelSource
-    }!
-    let dodgeTurretPayload =
-        modelPayloadByName[
-            dodgeTurretPage.primaryModelName.lowercased()
-        ]!.data
-    let dodgeGunpointZero = try reachedOutrageModelGunpoint(
-        dodgeTurretPayload,
-        index: 0
-    )
-    let dodgeGunpointOne = try reachedOutrageModelGunpoint(
-        dodgeTurretPayload,
-        index: 1
-    )
-    let dodgeAimGunpoint = try reachedOutrageModelGunpoint(
-        dodgeTurretPayload,
-        index: 2
-    )
-    let dodgeTurretJoints: [TrainingDodgeTurretDefinition.Joint] =
-        dodgeTurretModel.submodels.compactMap { submodel in
-            guard let parent = submodel.parentIndex,
-                case .turret(
-                    let
-                        fieldOfView,
-                    let
-                        rotationsPerSecond,
-                    let
-                        thinkInterval,
-                    let
-                        axis
-                ) = submodel.presentation
-            else {
-                return nil
-            }
-            return .init(
-                submodelIndex: submodel.sourceIndex,
-                parentSubmodelIndex: parent,
-                rotationAxis: axis,
-                fieldOfView: fieldOfView,
-                rotationsPerSecond: rotationsPerSecond,
-                thinkInterval: thinkInterval
-            )
-        }
-    precondition(
-        startDodge.type == 7
-            && startDodge.storedID == 67
-            && startDodge.definition?.sourceName == "Invisiblepowerup"
-            && startDodge.definition?.referenceRuntimeIndex == 68
-            && startDodge.instanceName == "StartDodge"
-            && startDodge.flags == 4_096
-            && startDodge.location == .room(35)
-            && startDodge.position
-                == .init(
-                    x: 2_061.8765,
-                    y: -752.8663,
-                    z: 2_199.4517
-                )
-            && doneDodgeingGoal.type == 7
-            && doneDodgeingGoal.storedID == 67
-            && doneDodgeingGoal.definition == startDodge.definition
-            && doneDodgeingGoal.instanceName == "DoneDodgeingGoal"
-            && doneDodgeingGoal.flags == 4_096
-            && doneDodgeingGoal.location == .room(35)
-            && doneDodgeingGoal.position
-                == .init(
-                    x: 2_061.31,
-                    y: -755.9523,
-                    z: 2_421.182
-                )
-            && dodgeTurret.type == 2
-            && dodgeTurret.storedID == 115
-            && dodgeTurret.definition?.sourceName == "Hangturret"
-            && dodgeTurret.instanceName == "DodgeTurrett"
-            && dodgeTurret.flags == 5_120
-            && dodgeTurret.location == .room(35)
-            && dodgeMarker.type == 11
-            && dodgeMarker.storedID == 205
-            && dodgeMarker.instanceName == "FlashLight-1"
-            && dodgeMarker.location == .room(36)
-            && portalRoomThree.name == "PortalRoom3"
-            && portalRoomThree.portals.count == 2
-            && portalRoomThree.portals[0].connectedRoom == 35
-            && portalRoomThree.portals[0].connectedPortal == 1
-            && portalRoomThree.portals[1].connectedRoom == 37
-            && portalRoomThree.portals[1].connectedPortal == 0
-            && dodgeTurretPage.primaryModelName == "securityturret.OOF"
-            && dodgeTurretModel.sourceSHA256
-                == "41c69958947ddc7673ddfe2ffb6f559c6892eafed8b759a02b47c05b22f137e4"
-            && dodgeGunpointZero.localPosition
-                == .init(
-                    x: 1.706_505_8,
-                    y: -2.224_015_2,
-                    z: 2.190_463_5
-                )
-            && dodgeGunpointOne.localPosition
-                == .init(
-                    x: 0.457_947_73,
-                    y: -2.224_015_2,
-                    z: 2.190_463_5
-                )
-            && dodgeGunpointZero.parentSubmodelIndex == 2
-            && dodgeGunpointOne.parentSubmodelIndex == 2
-            && dodgeAimGunpoint.parentSubmodelIndex == 2
-            && dodgeTurretJoints == [
-                .init(
-                    submodelIndex: 1,
-                    parentSubmodelIndex: 0,
-                    rotationAxis: .init(x: 0, y: -1, z: 0),
-                    fieldOfView: 0.5,
-                    rotationsPerSecond: 0.125,
-                    thinkInterval: 10
-                ),
-                .init(
-                    submodelIndex: 2,
-                    parentSubmodelIndex: 1,
-                    rotationAxis: .init(
-                        x: 1,
-                        y: -3.410_774_8e-16,
-                        z: -4.371_139e-8
-                    ),
-                    fieldOfView: 0.125,
-                    rotationsPerSecond: 0.125,
-                    thinkInterval: 10
-                ),
-            ]
-            && dodgeAimGunpoint.localPosition
-                == .init(
-                    x: 1.085_584_6,
-                    y: -2.224_015_2,
-                    z: 2.190_463_5
-                )
-    )
-    level.trainingDodgeAttempt = .init(
-        startDodgeObjectHandle: startDodge.handle,
-        startDodgeCollisionRadius: sourceObjectPresentationSize(
-            model: invisiblePowerupModel,
-            objectType: startDodge.type
-        ),
-        doneDodgeingGoalObjectHandle: doneDodgeingGoal.handle,
-        doneDodgeingGoalCollisionRadius: sourceObjectPresentationSize(
-            model: invisiblePowerupModel,
-            objectType: doneDodgeingGoal.type
-        ),
-        dodgeTurretObjectHandle: dodgeTurret.handle,
-        flashLightObjectHandle: dodgeMarker.handle,
-        triggerDelay: 10,
-        successDelay: 20,
-        almostDoneDelay: 14,
-        portalRoomTwoSourceIndex: portalRoomTwo.sourceIndex,
-        portalRoomThreeSourceIndex: portalRoomThree.sourceIndex,
-        orderedPortalIndices: [0, 1],
-        disabledControlMask: 3,
-        enabledDodgeControlMask: 60,
-        successControlMask: 3,
-        introduction: messages["DodgeIntro"]!,
-        instruction: messages["Dodge30"]!,
-        hitInstruction: messages["KeepDodging"]!,
-        almostDoneInstruction: messages["AlmostDoneDodge"]!,
-        successMessage: messages["GoodJob"]!,
-        leaveInstruction: messages["LeaveDodge"]!,
-        introductionVoiceSourceName: "intro2.osf",
-        almostDoneVoiceSourceName: "almost.osf",
-        successVoiceSourceName: "proceed3.osf",
-        restoredPlayerShields: 100,
-        successMarkerLightDistance: 50,
-        markerLightPresentation: .init(
-            primaryColor: .init(x: 0.2, y: 1, z: 0.2),
-            secondaryColor:
-                returnMarkerLightPresentation.secondaryColor,
-            timeInterval: returnMarkerLightPresentation.timeInterval,
-            flickerDistance:
-                returnMarkerLightPresentation.flickerDistance,
-            directionalDot:
-                returnMarkerLightPresentation.directionalDot,
-            flags: returnMarkerLightPresentation.flags,
-            timebits: returnMarkerLightPresentation.timebits,
-            angle: returnMarkerLightPresentation.angle,
-            lightingRenderType:
-                returnMarkerLightPresentation.lightingRenderType
-        ),
-        turret: .init(
-            model: dodgeTurretModelSource,
-            collisionRadius: 5.402_855_4,
-            fieldOfViewDot: -1,
-            maximumTargetDistance: 1_000,
-            fireAlignmentDot: 0.93,
-            fixedLeadAccuracy: 0.81,
-            fireWait: 1,
-            gunpoints: [
-                dodgeGunpointZero.localPosition,
-                dodgeGunpointOne.localPosition,
-            ],
-            aimingGunpoint: dodgeAimGunpoint.localPosition,
-            gunpointForward: dodgeGunpointZero.forward,
-            gunpointParentSubmodelIndex:
-                dodgeGunpointZero.parentSubmodelIndex,
-            joints: dodgeTurretJoints,
-            projectileSourceName: "Laser Level 1 - Red",
-            projectileModel:
-                modelSources["redlaser.oof"]!,
-            fireSoundSourceName: "WpmLaserBlueFire",
-            impactSoundSourceName: "LazorHitshrt",
-            projectileDamage: 6.75,
-            projectileRadius: 0.5,
-            projectileSpeed: 200,
-            projectileLifetime: 5
-    ))
-    level.trainingDodgeAttempt?.dodgeExit = .init(
-        objectHandle: doneDodgeingGoal.handle,
-        collisionRadius: sourceObjectPresentationSize(
-            model: invisiblePowerupModel,
-            objectType: doneDodgeingGoal.type
-        ),
-        markerLightObjectHandle: dodgeMarker.handle,
-        markerLightDistance: 50,
-        portalRoomSourceIndex: portalRoomThree.sourceIndex,
-        orderedPortalIndices: [0, 1],
-        disabledControlMask: 62,
-        instruction: messages["KeepMovingOutofDodging"]!,
-        voiceSourceName: "proceed4.osf"
-    )
-    let maneuverCenter = level.objects.first {
-        $0.handle == 2_063
-    }!
     let followBot = level.objects.first {
         $0.handle == 8_200
     }!
-    let followBotPresentation = level.objectPresentations.first {
-        $0.objectHandle == followBot.handle
-    }!
-    let followBotModel = level.models.first {
-        $0.source == followBotPresentation.primaryModel
-    }!
-    let followBotAI = destroyRobotPage.genericAI!
-    precondition(
-        maneuverCenter.type == 7
-            && maneuverCenter.storedID == 67
-            && maneuverCenter.definition == startDodge.definition
-            && maneuverCenter.instanceName == "ManuverRoomCenter"
-            && maneuverCenter.flags == 4_096
-            && maneuverCenter.location == .room(37)
-            && maneuverCenter.position
-                == .init(
-                    x: 2_061.7336,
-                    y: -755.4103,
-                    z: 2_566.1135
-                )
-            && followBot.type == 2
-            && followBot.storedID == 106
-            && followBot.definition?.sourceName
-                == "RAS1 Light Security Flyer"
-            && followBot.instanceName == "FollowBot1"
-            && followBot.flags == 5_121
-            && followBot.location == .room(37)
-            && followBot.position
-                == .init(
-                    x: 2_059.3496,
-                    y: -723.2588,
-                    z: 2_469.1072
-                )
-            && followBot.orientation
-                == .init(
-                    right: .init(
-                        x: -0.999_645_05,
-                        y: -0.010_065_023,
-                        z: 0.024_667_98
-                    ),
-                    up: .init(
-                        x: -0.008_759_673,
-                        y: 0.998_584_4,
-                        z: 0.052_465_245
-                    ),
-                    forward: .init(
-                        x: -0.025_161_121,
-                        y: 0.052_230_537,
-                        z: -0.998_318_1
-                    )
-                )
-            && followBotModel.source.sourceName == "gyro.OOF"
-            && followBotModel.sourceSHA256
-                == "896cc33ba0c7ec00fd2fd693a0e8f10868a47076eda0b7914cc90a790e87eb61"
-            && level.paths.count == 2
-            && level.paths[0].name == "FollowLoop1"
-            && level.paths[0].nodes.count == 13
-            && level.paths[0].nodes.allSatisfy {
-                $0.location == .room(37)
-            }
-            && level.paths[1].name == "GoToDie"
-            && level.paths[1].nodes.count == 1
-            && level.paths[1].nodes[0].location == .room(37)
-            && followBotAI.objectSize == 4.576_441_8
-    )
-    level.trainingDodgeAttempt?.maneuverFollow = .init(
-        maneuverObjectHandle: maneuverCenter.handle,
-        maneuverCollisionRadius: sourceObjectPresentationSize(
-            model: invisiblePowerupModel,
-            objectType: maneuverCenter.type
-        ),
-        flashLightObjectHandle: dodgeMarker.handle,
-        portalRoomSourceIndex: portalRoomThree.sourceIndex,
-        orderedPortalIndices: [1, 0],
-        headingControlMask: 768,
-        pitchControlMask: 192,
-        bankControlMask: 3_072,
-        rotationalControlMask: 4_032,
-        weaponControlMask: 12_288,
-        headingDuration: 20,
-        pitchDuration: 12,
-        bankDuration: 15,
-        followDuration: 20,
-        followBotObjectHandle: followBot.handle,
-        friendlyTeamFlags: 65_536,
-        followPathIndex: 0,
-        followPathGoalFlags: 9_437_444,
-        destroyPathIndex: 1,
-        destroyPathGoalFlags: 4_352,
-        goalSlot: 0,
-        goalPriority: 3,
-        maneuverIntroduction: messages["ManuverIntro"]!,
-        headingInstruction: messages["HeadingIntro"]!,
-        successMessage: messages["GoodJob"]!,
-        pitchInstruction: messages["PitchIntro"]!,
-        bankInstruction: messages["BankIntro"]!,
-        followIntroduction: messages["FollowIntro"]!,
-        followInstruction: messages["FollowInstructions"]!,
-        weaponsEnabledInstruction: messages["WeaponsEnabled"]!,
-        destroyInstruction: messages["DestroyFollowbot"]!,
-        headingVoiceSourceName: "intro3.osf",
-        pitchVoiceSourceName: "pitch.osf",
-        bankVoiceSourceName: "bank.osf",
-        followVoiceSourceName: "follow.osf",
-        weaponVoiceSourceName: "intro4.osf",
-        followBot: .init(
-            model: followBotModel.source,
-            collisionRadius: followBotAI.objectSize,
-            maximumVelocity: followBotAI.maximumVelocity,
-            maximumDeltaVelocity: followBotAI.maximumDeltaVelocity,
-            maximumTurnRate: followBotAI.maximumTurnRate,
-            maximumDeltaTurnRate:
-                followBotAI.maximumDeltaTurnRate,
-            circleDistance: followBotAI.circleDistance
-        )
-    )
     let destroyBot2 = level.objects.first {
         $0.handle == 4_112
     }!
@@ -2756,19 +2433,17 @@ func runD3Import(
             blueLaserWeapon.fireImageName.lowercased()
         ]!
     precondition(
-        destroyBot2.type == 2
+        followBot.type == 2
+            && followBot.definition?.sourceName
+                == "RAS1 Light Security Flyer"
+            && followBot.instanceName == "FollowBot1"
+            && destroyBot2.type == 2
             && destroyBot2.storedID == 106
             && destroyBot2.definition?.sourceName
                 == "RAS1 Light Security Flyer"
             && destroyBot2.instanceName == "DestroyBot2"
             && destroyBot2.flags == 5_121
             && destroyBot2.location == .room(37)
-            && destroyBot2.position
-                == .init(
-                    x: 2_121.0835,
-                    y: -787.4891,
-                    z: 2_556.6667
-                )
             && destroyBot1.type == 2
             && destroyBot1.storedID == 106
             && destroyBot1.definition?.sourceName
@@ -2776,12 +2451,6 @@ func runD3Import(
             && destroyBot1.instanceName == "DestroyBot1"
             && destroyBot1.flags == 5_121
             && destroyBot1.location == .room(37)
-            && destroyBot1.position
-                == .init(
-                    x: 1_998.6289,
-                    y: -789.663_15,
-                    z: 2_556.2332
-                )
             && level.objectPresentations.first {
                 $0.objectHandle == destroyBot2.handle
             }?.isVisible == false
@@ -2792,25 +2461,57 @@ func runD3Import(
                 $0.source == blueLaserModel
             }?.sourceSHA256
                 == "717a9a2ac254eba76c7992fc834e3a5bc3992f86674af972afd9cf0c2967b31b"
+            && level.paths.count == 2
+            && level.paths[0].name == "FollowLoop1"
+            && level.paths[0].nodes.count == 13
+            && level.paths[1].name == "GoToDie"
+            && level.paths[1].nodes.count == 1
     )
-    level.trainingDodgeAttempt?.maneuverFollow?
-        .destructionHandoff = .init(
-            followBotObjectHandle: followBot.handle,
-            destroyBot2ObjectHandle: destroyBot2.handle,
-            destroyBot1ObjectHandle: destroyBot1.handle,
-            combat: .stockTraining,
-            projectileModel: blueLaserModel,
-            destructionDelay: 2,
-            levelTimerID: 11,
-            movingTeamFlags: 65_536,
-            movingPathIndex: 0,
-            movingPathGoalFlags: 8_392_960,
-            goalID: -1,
-            goalPriority: 3,
-            successMessage: messages["GoodJob"]!,
-            movingInstruction: messages["Movingbotintro"]!,
-            voiceSourceName: "kill1.osf"
-        )
+    // The follow-bot destruction chain stays bespoke until M1 step 7.
+    level.trainingFollowBotDestruction = .init(
+        followBotObjectHandle: followBot.handle,
+        destroyBot2ObjectHandle: destroyBot2.handle,
+        destroyBot1ObjectHandle: destroyBot1.handle,
+        combat: .stockTraining,
+        projectileModel: blueLaserModel,
+        destructionDelay: 2,
+        levelTimerID: 11,
+        movingTeamFlags: 65_536,
+        movingPathIndex: 0,
+        movingPathGoalFlags: 8_392_960,
+        goalID: -1,
+        goalPriority: 3,
+        successMessage: messages["GoodJob"]!,
+        movingInstruction: messages["Movingbotintro"]!,
+        voiceSourceName: "kill1.osf"
+    )
+    // Object tables: object_info for the placed generic objects, the model
+    // gun points and batteries, and the weapons. A sound page the tables
+    // name joins the level's sound clips.
+    var addedSoundClips: [CanonicalSoundClip] = []
+    let knownSoundClips = level.soundClips
+    level = try level.addingObjectTables(
+        genericPages: genericPages,
+        weapon: { name in
+            try resolveRetailWeaponPresentation(
+                table: tableData,
+                overlay: overlayData,
+                named: name
+            )
+        },
+        weaponModel: { modelSources[$0.lowercased()] },
+        modelPayload: { modelPayloadByName[$0]?.data },
+        soundKey: { name in
+            let clip = try reachedSoundClip(named: name)
+            if !(knownSoundClips + addedSoundClips).contains(where: {
+                $0.logicalName == clip.logicalName
+            }) {
+                addedSoundClips.append(clip)
+            }
+            return clip.logicalName
+        }
+    )
+    level = level.appendingSoundClips(addedSoundClips)
     // Package schema 12 (LevelScriptImport.swift). Archives in cfile search
     // order: the mission, then the base archives in reverse opening order.
     level = level.addingScripting(try importLevelScripting(

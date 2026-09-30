@@ -652,6 +652,12 @@ struct CanonicalModel: Codable, Equatable, Sendable {
     let bounds: ModelBounds
     let sourceArchive: String
     let sourceSHA256: String
+    /// `gun_slots` (GPNT chunk, model/polymodel.cpp:1618). Optional in
+    /// package schema 12.
+    var gunpoints: [ModelGunpoint]? = nil
+    /// `poly_wb` (WBAT chunk, model/polymodel.cpp:1686). Optional in
+    /// package schema 12.
+    var weaponBatteries: [ModelWeaponBattery]? = nil
 }
 
 enum ShipPhysicsBehavior: String, Codable, Equatable, Hashable, Sendable {
@@ -714,7 +720,7 @@ struct PlayerConcussionBinding: Codable, Equatable, Sendable {
     let lifetime: Float
     let rotationalVelocity: Float
     let lightDistance: Float
-    let lightPresentation: TrainingMarkerLightPresentation
+    let lightPresentation: ObjectLightPresentation
     let explosionFrames: [SourceResource]
     let explosionSourceFrameTime: Float
     let explosionSize: Float

@@ -366,17 +366,14 @@ extension WorldRenderingTests {
             _ simulation: GameSession
         ) throws -> [String: Any] {
             let object = try continuationObject(simulation)
-            let maneuver = try XCTUnwrap(
-                object["trainingManeuverFollowState"] as? [String: Any]
-            )
             return try XCTUnwrap(
-                maneuver["destruction"] as? [String: Any]
+                object["trainingFollowBotDestructionState"]
+                    as? [String: Any]
             )
         }
 
         var level = makeTrainingMovingTargetHandoffLevel()
-        let lesson = try XCTUnwrap(level.trainingDodgeAttempt?.maneuverFollow)
-        let handoff = try XCTUnwrap(lesson.destructionHandoff)
+        let handoff = try XCTUnwrap(level.trainingFollowBotDestruction)
         level = replacing(
             level,
             trainingRobotGuidebotChain: .init(
@@ -401,7 +398,7 @@ extension WorldRenderingTests {
             $0.handle == level.defaultPlayerBinding?.objectHandle
         })
         let maneuver = try XCTUnwrap(level.objects.first {
-            $0.handle == lesson.maneuverObjectHandle
+            $0.handle == level.findObjectName("ManuverRoomCenter").rawValue
         })
         level.objects[playerIndex].location = maneuver.location
         level.objects[playerIndex].position = maneuver.position
@@ -484,19 +481,10 @@ extension WorldRenderingTests {
             authoritativeRandomSeed: 0x1234_5678
         )
         var preScript021 = try continuationObject(seed)
-        var dodgeState = try XCTUnwrap(
-            preScript021["trainingDodgeAttemptState"] as? [String: Any]
-        )
-        try setTrainingCounter(&preScript021, "script033Count", 1)
-        dodgeState["script016Count"] = 1
-        dodgeState["script017Count"] = 1
-        dodgeState["script018Count"] = 0
-        dodgeState["script020Count"] = 1
-        dodgeState["successTimerRemaining"] = nil
-        dodgeState["almostDoneTimerRemaining"] = nil
-        dodgeState["turretIsPowered"] = false
-        dodgeState["markerLightDistance"] = 50
-        preScript021["trainingDodgeAttemptState"] = dodgeState
+        for name in ["script033Count", "script016Count", "script017Count",
+                     "script020Count"] {
+            try setTrainingCounter(&preScript021, name, 1)
+        }
         preScript021["playerControllerBitflags"] = 63
         try deferringOsirisTimers(&preScript021, to: 1_000)
         var simulation = try GameSession(
@@ -505,10 +493,12 @@ extension WorldRenderingTests {
             resumedAtTimestamp: 0
         )
 
+        // The player flies into ManuverRoomCenter (Script 021's
+        // EVT_COLLIDE, TrainingMission.cpp:1943).
         var timestamp = 0.1
-        var frame = simulation.update(at: timestamp, input: .zero)
+        var frame = simulation.touch("ManuverRoomCenter", at: timestamp)
         XCTAssertEqual(
-            frame.trainingFollowBot?.script021Count,
+            simulation.world.testTrainingMission?.script021Count,
             1,
             "released Script 021 must start the normal maneuver lesson"
         )
@@ -517,7 +507,7 @@ extension WorldRenderingTests {
         timestamp = 20.2
         frame = simulation.update(at: timestamp, input: .zero)
         XCTAssertEqual(
-            frame.trainingFollowBot?.script022Count,
+            simulation.world.testTrainingMission?.script022Count,
             1,
             "released Script 022 must follow Script 021"
         )
@@ -526,7 +516,7 @@ extension WorldRenderingTests {
         timestamp = 32.3
         frame = simulation.update(at: timestamp, input: .zero)
         XCTAssertEqual(
-            frame.trainingFollowBot?.script024Count,
+            simulation.world.testTrainingMission?.script024Count,
             1,
             "released Script 024 must follow Script 022"
         )
@@ -535,12 +525,12 @@ extension WorldRenderingTests {
         timestamp = 47.4
         frame = simulation.update(at: timestamp, input: .zero)
         XCTAssertEqual(
-            frame.trainingFollowBot?.script023Count,
+            simulation.world.testTrainingMission?.script023Count,
             1,
             "released Script 023 must follow Script 024"
         )
 
-        for _ in 0..<210 where frame.trainingFollowBot?.script026Count == 0 {
+        for _ in 0..<210 where simulation.world.testTrainingMission?.script026Count == 0 {
             simulation = try aiming(
                 simulation,
                 at: handoff.followBotObjectHandle,
@@ -551,18 +541,18 @@ extension WorldRenderingTests {
             frame = simulation.update(at: timestamp, input: .zero)
         }
         XCTAssertGreaterThan(
-            try XCTUnwrap(frame.trainingFollowBot?.script025Count),
+            try XCTUnwrap(simulation.world.testTrainingMission?.script025Count),
             0,
             "released Script 025 must run during the normal follow interval"
         )
         XCTAssertEqual(
-            frame.trainingFollowBot?.script026Count,
+            simulation.world.testTrainingMission?.script026Count,
             1,
             "released timer 7 must reach Script 026 through normal updates"
         )
         XCTAssertEqual(
             frame.enabledPlayerControls.rawValue,
-            lesson.rotationalControlMask | lesson.weaponControlMask,
+            4_032 | 12_288,
             "Script 026 must enable only its released rotation and weapon masks"
         )
         XCTAssertFalse(
@@ -613,9 +603,10 @@ extension WorldRenderingTests {
         )
         print("AFTERBURNER_STAGE FollowBot1 death shields=-5 Script037=1")
 
-        for _ in 0..<12 where frame.trainingMovingTarget?.objectHandle
-            != handoff.destroyBot1ObjectHandle
-        {
+        for _ in 0..<12 where activeFollowPath(
+            simulation.world,
+            handoff.destroyBot1ObjectHandle
+        ) == nil {
             timestamp += 0.25
             frame = simulation.update(at: timestamp, input: .zero)
         }
@@ -626,9 +617,9 @@ extension WorldRenderingTests {
             "timer 11 must reach Script 027 through ordinary updates"
         )
         XCTAssertEqual(
-            frame.trainingMovingTarget?.objectHandle,
-            handoff.destroyBot1ObjectHandle,
-            "Script 027 must publish DestroyBot1 as the first real moving target"
+            activeFollowPath(simulation.world, handoff.destroyBot1ObjectHandle),
+            handoff.movingPathIndex,
+            "Script 027 must give DestroyBot1 its follow-path goal"
         )
         print("AFTERBURNER_STAGE Script027 timer11 target=DestroyBot1")
 
@@ -668,9 +659,9 @@ extension WorldRenderingTests {
             "DestroyBot1 real dying must execute Script 028"
         )
         XCTAssertEqual(
-            frame.trainingMovingTarget?.objectHandle,
-            handoff.destroyBot2ObjectHandle,
-            "Script 028 must publish DestroyBot2 as the next real moving target"
+            activeFollowPath(simulation.world, handoff.destroyBot2ObjectHandle),
+            handoff.movingPathIndex,
+            "Script 028 must give DestroyBot2 its follow-path goal"
         )
         print("AFTERBURNER_STAGE DestroyBot1 death shields=-5 Script028=1")
 

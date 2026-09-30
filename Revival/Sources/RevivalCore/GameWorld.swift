@@ -59,6 +59,13 @@ struct GameWorld: Codable, Equatable, Sendable {
     /// Hud_show_controls (hud.cpp:503).
     var hudShowControls = false
 
+    /// AI_unique_goal_id (AImain.cpp:1557): the next goal's `goal_uid`.
+    var aiUniqueGoalID: Int32 = 0
+    /// AI_RenderedList (AImain.cpp:1624): the CT_AI objects the last
+    /// frame's render drew (renderobject.cpp:1239), which the next
+    /// AIFrameAll reads.
+    var aiRenderedList: [ObjectHandle] = []
+
     // Osiris.
     /// The loaded level module and its state.
     var levelModule = LevelModule.none
@@ -70,8 +77,7 @@ struct GameWorld: Codable, Equatable, Sendable {
 
     // Training script state. These move into the Training level module in
     // later M1 steps.
-    var trainingDodgeAttemptState: TrainingDodgeAttemptState?
-    var trainingManeuverFollowState: TrainingManeuverFollowState?
+    var trainingFollowBotDestructionState: TrainingFollowBotDestructionState?
     var trainingGalleryBarrierState: TrainingGalleryBarrierState?
     var trainingRobotGuidebotState: TrainingRobotGuidebotState?
     var trainingCameraMonitorState: TrainingCameraMonitorState?
@@ -110,8 +116,59 @@ struct GameWorld: Codable, Equatable, Sendable {
         playerConcussionState = ship.playerConcussion == nil ? nil : .init()
         playerYellowFlareState = level.shipDefinitions.first?
             .playerYellowFlare == nil ? nil : .init()
+        objInitPlacedObjects(level: level, playerSize: ship.presentationSize)
         initializeTrainingState(level: level)
+        // StartLevel runs AIInitAll before the level script starts
+        // (gamesequence.cpp:1482, :1584).
+        aiInitAll(level: level)
         startLevelScripts(level: level)
+    }
+
+    /// ObjInit for the placed objects (LoadLevel.cpp:1657,
+    /// ObjInit.cpp:807): a generic object gets its object_info, size, and
+    /// hit points, and, for a CT_AI page, its AI frame and weapon
+    /// batteries. The player gets its ship size.
+    private mutating func objInitPlacedObjects(level: Level, playerSize: Float) {
+        // Every placed polygon object gets its model size (ObjInit's
+        // PageInPolymodel, ObjInit.cpp:788); the player gets its ship's.
+        for placed in level.objects {
+            let handle = ObjectHandle(placed.handle)
+            if let size = level.placedObjectSize(handle) {
+                objects[handle]?.size = size
+            }
+        }
+        if let binding = level.defaultPlayerBinding {
+            objects[ObjectHandle(binding.objectHandle)]?.size = playerSize
+        }
+        guard let infos = level.objectInfos else { return }
+        for placed in level.objects {
+            // IS_GENERIC: robot, powerup, clutter, building.
+            guard [2, 7, 11, 16].contains(placed.type),
+                  let name = placed.definition?.sourceName,
+                  let infoIndex = infos.firstIndex(where: {
+                      $0.name.caseInsensitiveCompare(name) == .orderedSame
+                  }),
+                  let object = objects[ObjectHandle(placed.handle)]
+            else {
+                continue
+            }
+            objects[object.handle] = Self.initialGenericObject(
+                object,
+                info: infos[infoIndex],
+                infoIndex: infoIndex,
+                model: level.placedObjectModel(object.handle)
+            )
+        }
+    }
+
+    /// D3_RAND_MAX (misc/psrand.h).
+    static let randMax: Int32 = 0x7fff
+
+    /// ps_rand (misc/psrand.cpp): the released LCG, drawn in source order.
+    mutating func psRand() -> Int32 {
+        authoritativeRandomState =
+            authoritativeRandomState &* 214_013 &+ 2_531_011
+        return Int32((authoritativeRandomState >> 16) & 0x7fff)
     }
 
     /// `MSAFE_OBJECT_NO_RENDER` and its inverse (`multisafe.cpp:1733`).

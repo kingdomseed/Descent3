@@ -1,59 +1,7 @@
 import Foundation
 
-struct TrainingDodgeTurretDefinition: Codable, Equatable, Sendable {
-    struct Joint: Codable, Equatable, Sendable {
-        let submodelIndex: Int
-        let parentSubmodelIndex: Int
-        let rotationAxis: Vector3
-        let fieldOfView: Float
-        let rotationsPerSecond: Float
-        let thinkInterval: Float
-    }
-
-    let model: SourceResource
-    let collisionRadius: Float
-    let fieldOfViewDot: Float
-    let maximumTargetDistance: Float
-    let fireAlignmentDot: Float
-    let fixedLeadAccuracy: Float
-    let fireWait: Float
-    let gunpoints: [Vector3]
-    let aimingGunpoint: Vector3
-    let gunpointForward: Vector3
-    let gunpointParentSubmodelIndex: Int
-    let joints: [Joint]
-    let projectileSourceName: String
-    let projectileModel: SourceResource
-    let fireSoundSourceName: String
-    let impactSoundSourceName: String
-    let projectileDamage: Float
-    let projectileRadius: Float
-    let projectileSpeed: Float
-    let projectileLifetime: Float
-}
-
-struct TrainingDodgeExitLesson: Codable, Equatable, Sendable {
-    let objectHandle: UInt32
-    let collisionRadius: Float
-    let markerLightObjectHandle: UInt32
-    let markerLightDistance: Float
-    let portalRoomSourceIndex: Int
-    let orderedPortalIndices: [Int]
-    let disabledControlMask: UInt32
-    let instruction: String
-    let voiceSourceName: String
-}
-
-struct TrainingFollowBotDefinition: Codable, Equatable, Sendable {
-    let model: SourceResource
-    let collisionRadius: Float
-    let maximumVelocity: Float
-    let maximumDeltaVelocity: Float
-    let maximumTurnRate: Float
-    let maximumDeltaTurnRate: Float
-    let circleDistance: Float
-}
-
+/// The follow-bot destruction chain (TrainingMission.cpp Scripts 037, 027,
+/// and 028), still bespoke until M1 step 7 translates robot death.
 struct TrainingFollowBotDestructionHandoff:
     Codable, Equatable, Sendable
 {
@@ -72,80 +20,6 @@ struct TrainingFollowBotDestructionHandoff:
     let successMessage: String
     let movingInstruction: String
     let voiceSourceName: String
-}
-
-struct TrainingManeuverFollowLesson: Codable, Equatable, Sendable {
-    let maneuverObjectHandle: UInt32
-    let maneuverCollisionRadius: Float
-    let flashLightObjectHandle: UInt32
-    let portalRoomSourceIndex: Int
-    let orderedPortalIndices: [Int]
-    let headingControlMask: UInt32
-    let pitchControlMask: UInt32
-    let bankControlMask: UInt32
-    let rotationalControlMask: UInt32
-    let weaponControlMask: UInt32
-    let headingDuration: Float
-    let pitchDuration: Float
-    let bankDuration: Float
-    let followDuration: Float
-    let followBotObjectHandle: UInt32
-    let friendlyTeamFlags: UInt32
-    let followPathIndex: Int
-    let followPathGoalFlags: UInt32
-    let destroyPathIndex: Int
-    let destroyPathGoalFlags: UInt32
-    let goalSlot: Int
-    let goalPriority: Int
-    let maneuverIntroduction: String
-    let headingInstruction: String
-    let successMessage: String
-    let pitchInstruction: String
-    let bankInstruction: String
-    let followIntroduction: String
-    let followInstruction: String
-    let weaponsEnabledInstruction: String
-    let destroyInstruction: String
-    let headingVoiceSourceName: String
-    let pitchVoiceSourceName: String
-    let bankVoiceSourceName: String
-    let followVoiceSourceName: String
-    let weaponVoiceSourceName: String
-    let followBot: TrainingFollowBotDefinition
-    var destructionHandoff: TrainingFollowBotDestructionHandoff? = nil
-}
-
-struct TrainingDodgeAttempt: Codable, Equatable, Sendable {
-    let startDodgeObjectHandle: UInt32
-    let startDodgeCollisionRadius: Float
-    let doneDodgeingGoalObjectHandle: UInt32
-    let doneDodgeingGoalCollisionRadius: Float
-    let dodgeTurretObjectHandle: UInt32
-    let flashLightObjectHandle: UInt32
-    let triggerDelay: Float
-    let successDelay: Float
-    let almostDoneDelay: Float
-    let portalRoomTwoSourceIndex: Int
-    let portalRoomThreeSourceIndex: Int
-    let orderedPortalIndices: [Int]
-    let disabledControlMask: UInt32
-    let enabledDodgeControlMask: UInt32
-    let successControlMask: UInt32
-    let introduction: String
-    let instruction: String
-    let hitInstruction: String
-    let almostDoneInstruction: String
-    let successMessage: String
-    let leaveInstruction: String
-    let introductionVoiceSourceName: String
-    let almostDoneVoiceSourceName: String
-    let successVoiceSourceName: String
-    let restoredPlayerShields: Float
-    let successMarkerLightDistance: Float
-    let markerLightPresentation: TrainingMarkerLightPresentation
-    let turret: TrainingDodgeTurretDefinition
-    var dodgeExit: TrainingDodgeExitLesson? = nil
-    var maneuverFollow: TrainingManeuverFollowLesson? = nil
 }
 
 struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
@@ -234,7 +108,7 @@ struct TrainingCameraMonitorChain: Codable, Equatable, Sendable {
 
 struct TrainingGuidebotReturnChain: Codable, Equatable, Sendable {
     let markerLightObjectHandle: UInt32
-    let markerLightPresentation: TrainingMarkerLightPresentation?
+    let markerLightPresentation: ObjectLightPresentation?
     let barrierRoomSourceIndex: Int
     let orderedPortalIndices: [Int]
     let openMarkerLightDistance: Float
@@ -248,7 +122,7 @@ struct TrainingGuidebotReturnChain: Codable, Equatable, Sendable {
 
     init(
         markerLightObjectHandle: UInt32,
-        markerLightPresentation: TrainingMarkerLightPresentation? = nil,
+        markerLightPresentation: ObjectLightPresentation? = nil,
         barrierRoomSourceIndex: Int,
         orderedPortalIndices: [Int],
         openMarkerLightDistance: Float,
@@ -338,7 +212,7 @@ struct TrainingLastRoomChain: Codable, Equatable, Sendable {
     let barrierRoomSourceIndex: Int
     let orderedPortalIndices: [Int]
     let markerLightObjectHandle: UInt32
-    let markerLightPresentation: TrainingMarkerLightPresentation
+    let markerLightPresentation: ObjectLightPresentation
     let openMarkerLightDistance: Float
     let timerDuration: Float
     let completionMessages: [String]
@@ -351,7 +225,7 @@ struct TrainingFinalBotsCompletionChain:
     let barrierRoomSourceIndex: Int
     let orderedPortalIndices: [Int]
     let markerLightObjectHandle: UInt32
-    let markerLightPresentation: TrainingMarkerLightPresentation
+    let markerLightPresentation: ObjectLightPresentation
     let openMarkerLightDistance: Float
     let timerDuration: Float
     let completionMessage: String
@@ -374,19 +248,6 @@ struct TrainingFinalRoomEntryChain: Codable, Equatable, Sendable {
     let voiceSourceName: String
 }
 
-struct TrainingMarkerLightPresentation:
-    Codable, Equatable, Sendable
-{
-    let primaryColor: Vector3
-    let secondaryColor: Vector3
-    let timeInterval: Float
-    let flickerDistance: Float
-    let directionalDot: Float
-    let flags: UInt32
-    let timebits: UInt32
-    let angle: UInt8
-    let lightingRenderType: UInt8
-}
 
 func validTrainingGuidebotReturnBarrier(
     _ chain: TrainingGuidebotReturnChain,
@@ -532,7 +393,7 @@ struct TrainingGuidebotYellowFlareDefinition:
     let drag: Float
     let coefficientOfRestitution: Float
     let lightDistance: Float
-    let lightPresentation: TrainingMarkerLightPresentation
+    let lightPresentation: ObjectLightPresentation
     let particleCount: Int
     let particleInterval: Float
     let particleSize: Float
@@ -558,7 +419,7 @@ struct TrainingGuidebotYellowFlareTimeoutDefinition:
     let childDrag: Float
     let childCoefficientOfRestitution: Float
     let childLightDistance: Float
-    let childLightPresentation: TrainingMarkerLightPresentation
+    let childLightPresentation: ObjectLightPresentation
     let childParticleCount: Int
     let childParticleInterval: Float
     let childParticleSize: Float

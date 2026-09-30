@@ -295,16 +295,12 @@ extension WorldRenderingTests {
     {
         var level = makeTrainingMovingTargetHandoffLevel()
         try level.validate()
-        let lesson = try XCTUnwrap(
-            level.trainingDodgeAttempt?.maneuverFollow
-        )
-        let handoff = try XCTUnwrap(lesson.destructionHandoff)
+        let handoff = try XCTUnwrap(level.trainingFollowBotDestruction)
         let destroyBot2Initial = try XCTUnwrap(
             level.objects.first {
                 $0.handle == handoff.destroyBot2ObjectHandle
             }
         )
-        let project = try makeProject(importedBase: level)
         level = replacing(
             level,
             trainingRobotGuidebotChain: .init(
@@ -477,9 +473,9 @@ extension WorldRenderingTests {
         continuationObject["frameDuration"] = 0.1
         continuationObject["gameTime"] = 1
         continuationObject["energy"] = 50.1
-        continuationObject["playerControllerBitflags"] =
-            lesson.rotationalControlMask
-            | lesson.weaponControlMask
+        // Rotation and weapons on, as Script 023 leaves them
+        // (TrainingMission.cpp:1545-1546).
+        continuationObject["playerControllerBitflags"] = 4_032 | 12_288
         try deferringOsirisTimers(&continuationObject, to: 1_000)
         var galleryState = try XCTUnwrap(
             continuationObject["trainingGalleryBarrierState"]
@@ -488,34 +484,14 @@ extension WorldRenderingTests {
         galleryState["markerLightDistance"] = 0
         continuationObject["trainingGalleryBarrierState"] =
             galleryState
-        var dodgeState = try XCTUnwrap(
-            continuationObject["trainingDodgeAttemptState"]
-                as? [String: Any]
-        )
-        try setTrainingCounter(&continuationObject, "script033Count", 1)
-        dodgeState["script016Count"] = 1
-        dodgeState["script017Count"] = 1
-        dodgeState["script019Count"] = 1
-        dodgeState["script018Count"] = 1
-        dodgeState["script020Count"] = 1
-        dodgeState["markerLightDistance"] = 0
-        continuationObject["trainingDodgeAttemptState"] =
-            dodgeState
-        var maneuverState = try XCTUnwrap(
-            continuationObject["trainingManeuverFollowState"]
-                as? [String: Any]
-        )
-        maneuverState["script021Count"] = 1
-        maneuverState["script022Count"] = 1
-        maneuverState["script024Count"] = 1
-        maneuverState["script023Count"] = 1
-        maneuverState["script025Count"] = 1
-        maneuverState["script026Count"] = 1
-        maneuverState["followBotIsPowered"] = true
-        maneuverState["followBotTeamFlags"] = 65_536
-        maneuverState.removeValue(forKey: "activePathIndex")
-        continuationObject["trainingManeuverFollowState"] =
-            maneuverState
+        for name in [
+            "script033Count", "script016Count", "script017Count",
+            "script019Count", "script018Count", "script020Count",
+            "script021Count", "script022Count", "script024Count",
+            "script023Count", "script025Count", "script026Count",
+        ] {
+            try setTrainingCounter(&continuationObject, name, 1)
+        }
         var simulation = try GameSession(
             level: level,
             world: (decodeTestWorld(continuationObject)).rebased(onto: level),
@@ -556,17 +532,12 @@ extension WorldRenderingTests {
         var continuationState = try XCTUnwrap(
             testWorldObject(simulation.world)
         )
-        var continuedManeuver = try XCTUnwrap(
-            continuationState["trainingManeuverFollowState"]
+        var continuedDestruction = try XCTUnwrap(
+            continuationState["trainingFollowBotDestructionState"]
                 as? [String: Any]
         )
-        var continuedDestruction = try XCTUnwrap(
-            continuedManeuver["destruction"] as? [String: Any]
-        )
-        XCTAssertEqual(
-            continuedDestruction["script031Count"] as? Int,
-            1
-        )
+        // Script 031 (TrainingMission.cpp:1376-1382) put the energy back.
+        XCTAssertEqual(simulation.world.testTrainingMission?.script031Count, 1)
         XCTAssertEqual(
             continuedDestruction["followBotShields"] as? Double,
             55
@@ -589,12 +560,9 @@ extension WorldRenderingTests {
         continuationState = try XCTUnwrap(
             testWorldObject(simulation.world)
         )
-        continuedManeuver = try XCTUnwrap(
-            continuationState["trainingManeuverFollowState"]
-                as? [String: Any]
-        )
         continuedDestruction = try XCTUnwrap(
-            continuedManeuver["destruction"] as? [String: Any]
+            continuationState["trainingFollowBotDestructionState"]
+                as? [String: Any]
         )
         XCTAssertEqual(
             continuedDestruction["script037Count"] as? Int,
@@ -632,33 +600,22 @@ extension WorldRenderingTests {
         let continuationAfterHandoff = try XCTUnwrap(
             testWorldObject(simulation.world)
         )
-        let maneuverAfterHandoff = try XCTUnwrap(
-            continuationAfterHandoff[
-                "trainingManeuverFollowState"
-            ] as? [String: Any]
-        )
         let destructionAfterHandoff = try XCTUnwrap(
-            maneuverAfterHandoff["destruction"] as? [String: Any]
+            continuationAfterHandoff[
+                "trainingFollowBotDestructionState"
+            ] as? [String: Any]
         )
         XCTAssertEqual(
             destructionAfterHandoff["script027Count"] as? Int,
             1
         )
+        // Script 027's aAIGoalFollowPathSimple (TrainingMission.cpp:1569).
         XCTAssertEqual(
-            frame.trainingMovingTarget?.activePathIndex,
-            handoff.movingPathIndex
-        )
-        XCTAssertEqual(
-            project.trainingManeuverFollowRuntimeDiagnostic(
-                frame: frame
+            activeFollowPath(
+                simulation.world,
+                handoff.destroyBot1ObjectHandle
             ),
-            "\(project.trainingManeuverFollowSourceDiagnostic!) / active moving target DestroyBot1 path \(handoff.movingPathIndex) node 0 room 37 failure none"
-        )
-        XCTAssertTrue(
-            editorPlayStatusMessage(
-                project: project,
-                frame: frame
-            ).contains("active moving target DestroyBot1")
+            handoff.movingPathIndex
         )
         let destroyBot1BeforeMotion = try XCTUnwrap(
             simulation.runtimeLevel.objects.first {
@@ -711,21 +668,15 @@ extension WorldRenderingTests {
         XCTAssertGreaterThan(movedAlignment, initialAlignment)
 
         var oldSchemaSeven = continuationAfterHandoff
-        var oldSchemaSevenManeuver = try XCTUnwrap(
-            oldSchemaSeven["trainingManeuverFollowState"]
-                as? [String: Any]
-        )
         var oldSchemaSevenDestruction = try XCTUnwrap(
-            oldSchemaSevenManeuver["destruction"]
+            oldSchemaSeven["trainingFollowBotDestructionState"]
                 as? [String: Any]
         )
         oldSchemaSevenDestruction.removeValue(
             forKey: "destroyBot1Destruction"
         )
-        oldSchemaSevenManeuver["destruction"] =
+        oldSchemaSeven["trainingFollowBotDestructionState"] =
             oldSchemaSevenDestruction
-        oldSchemaSeven["trainingManeuverFollowState"] =
-            oldSchemaSevenManeuver
         let oldSchemaSevenSimulation = try GameSession(
             level: level,
             world: (decodeTestWorld(oldSchemaSeven)).rebased(onto: level),
@@ -739,8 +690,11 @@ extension WorldRenderingTests {
             oldSchemaSevenFrame.trainingOpeningFeedback.isEmpty
         )
         XCTAssertEqual(
-            oldSchemaSevenFrame.trainingMovingTarget?.objectHandle,
-            handoff.destroyBot1ObjectHandle
+            activeFollowPath(
+                oldSchemaSevenSimulation.world,
+                handoff.destroyBot1ObjectHandle
+            ),
+            handoff.movingPathIndex
         )
 
         func restoringAim(
@@ -825,30 +779,21 @@ extension WorldRenderingTests {
             $0.handle == handoff.destroyBot2ObjectHandle
         })
         XCTAssertTrue(frame.trainingOpeningFeedback.isEmpty)
+        // Script 028's aAIGoalFollowPathSimple (TrainingMission.cpp:2020).
         XCTAssertEqual(
-            frame.trainingMovingTarget?.objectHandle,
-            handoff.destroyBot2ObjectHandle
-        )
-        XCTAssertEqual(
-            frame.trainingMovingTarget?.activePathIndex,
-            handoff.movingPathIndex
-        )
-        XCTAssertEqual(
-            project.trainingManeuverFollowRuntimeDiagnostic(
-                frame: frame
+            activeFollowPath(
+                simulation.world,
+                handoff.destroyBot2ObjectHandle
             ),
-            "\(project.trainingManeuverFollowSourceDiagnostic!) / active moving target DestroyBot2 path \(handoff.movingPathIndex) node \(frame.trainingMovingTarget!.pathNodeIndex) room 37 failure none"
+            handoff.movingPathIndex
         )
         var script028Continuation = try XCTUnwrap(
             testWorldObject(simulation.world)
         )
-        var script028Maneuver = try XCTUnwrap(
-            script028Continuation[
-                "trainingManeuverFollowState"
-            ] as? [String: Any]
-        )
         var script028Destruction = try XCTUnwrap(
-            script028Maneuver["destruction"] as? [String: Any]
+            script028Continuation[
+                "trainingFollowBotDestructionState"
+            ] as? [String: Any]
         )
         let destroyBot1Destruction = try XCTUnwrap(
             script028Destruction["destroyBot1Destruction"]
@@ -907,8 +852,11 @@ extension WorldRenderingTests {
         )
         XCTAssertTrue(script028Silent.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(
-            script028Silent.trainingMovingTarget?.objectHandle,
-            handoff.destroyBot2ObjectHandle
+            activeFollowPath(
+                script028Restored.world,
+                handoff.destroyBot2ObjectHandle
+            ),
+            handoff.movingPathIndex
         )
         simulation = script028Restored
         timestamp = 400
@@ -966,7 +914,11 @@ extension WorldRenderingTests {
             $0.handle == handoff.destroyBot2ObjectHandle
         })
         XCTAssertTrue(frame.trainingOpeningFeedback.isEmpty)
-        XCTAssertNil(frame.trainingMovingTarget)
+        XCTAssertNil(
+            simulation.world.objects[
+                ObjectHandle(handoff.destroyBot2ObjectHandle)
+            ]
+        )
         XCTAssertEqual(frame.enabledPlayerControls, .all)
         XCTAssertTrue(frame.showsEnabledPlayerControls)
         XCTAssertEqual(frame.trainingGalleryMarkerLightDistance, 50)
@@ -1013,34 +965,14 @@ extension WorldRenderingTests {
             true
         )
 
-        script028Maneuver = try XCTUnwrap(
-            script028Continuation[
-                "trainingManeuverFollowState"
-            ] as? [String: Any]
-        )
         script028Destruction = try XCTUnwrap(
-            script028Maneuver["destruction"] as? [String: Any]
+            script028Continuation[
+                "trainingFollowBotDestructionState"
+            ] as? [String: Any]
         )
         XCTAssertEqual(
             script028Destruction["destroyBot2IsVisible"] as? Bool,
             false
-        )
-        let postDeathDestroyBot1State = try XCTUnwrap(
-            script028Destruction["destroyBot1Destruction"]
-                as? [String: Any]
-        )
-        let postDeathDestroyBot2Motion = try XCTUnwrap(
-            postDeathDestroyBot1State["destroyBot2Motion"]
-                as? [String: Any]
-        )
-        XCTAssertNil(postDeathDestroyBot2Motion["activePathIndex"])
-        XCTAssertEqual(
-            postDeathDestroyBot2Motion["pathNodeIndex"] as? Int,
-            0
-        )
-        XCTAssertEqual(
-            postDeathDestroyBot2Motion["velocity"] as? [String: Double],
-            ["x": 0, "y": 0, "z": 0]
         )
 
         let pendingTimerSimulation = try GameSession(
@@ -1135,7 +1067,6 @@ extension WorldRenderingTests {
         XCTAssertFalse(
             presentedTimerFrame.showsEnabledPlayerControls
         )
-        XCTAssertNil(presentedTimerFrame.trainingMovingTarget)
         XCTAssertFalse(presentedTimerSimulation.runtimeLevel.objects.contains {
             $0.handle == handoff.destroyBot2ObjectHandle
         })
@@ -1145,17 +1076,13 @@ extension WorldRenderingTests {
         )
 
         var timerCoincidence = continuationObject
-        var timerManeuver = try XCTUnwrap(
-            timerCoincidence["trainingManeuverFollowState"]
+        var timerDestruction = try XCTUnwrap(
+            timerCoincidence["trainingFollowBotDestructionState"]
                 as? [String: Any]
         )
-        var timerDestruction = try XCTUnwrap(
-            timerManeuver["destruction"] as? [String: Any]
-        )
         timerDestruction["levelTimer11Remaining"] = 0.05
-        timerManeuver["destruction"] = timerDestruction
-        timerCoincidence["trainingManeuverFollowState"] =
-            timerManeuver
+        timerCoincidence["trainingFollowBotDestructionState"] =
+            timerDestruction
         let coincidentSimulation = try GameSession(
             level: level,
             world: (decodeTestWorld(timerCoincidence)).rebased(onto: level),
@@ -1165,8 +1092,12 @@ extension WorldRenderingTests {
             at: 20.25,
             input: .zero
         )
+        XCTAssertFalse(coincidentFrame.trainingOpeningFeedback.isEmpty)
         XCTAssertEqual(
-            coincidentFrame.trainingMovingTarget?.activePathIndex,
+            activeFollowPath(
+                coincidentSimulation.world,
+                handoff.destroyBot1ObjectHandle
+            ),
             handoff.movingPathIndex
         )
         XCTAssertNoThrow(
@@ -1184,7 +1115,6 @@ extension WorldRenderingTests {
         )
         let silent = restored.update(at: 100.25, input: .zero)
         XCTAssertTrue(silent.trainingOpeningFeedback.isEmpty)
-        XCTAssertNil(silent.trainingMovingTarget)
         XCTAssertFalse(restored.runtimeLevel.objects.contains {
             $0.handle == handoff.destroyBot2ObjectHandle
         })

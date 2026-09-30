@@ -2278,7 +2278,7 @@ func replacing(
     shipDefinitions: [CanonicalShipDefinition]? = nil,
     defaultPlayerBinding: DefaultPlayerBinding? = nil,
     objectPresentations: [ObjectPresentationReference]? = nil,
-    trainingDodgeAttempt: TrainingDodgeAttempt? = nil,
+    trainingFollowBotDestruction: TrainingFollowBotDestructionHandoff? = nil,
     trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
     trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
     trainingCameraMonitorChain: TrainingCameraMonitorChain? = nil,
@@ -2334,8 +2334,8 @@ func replacing(
         shipDefinitions: shipDefinitions ?? level.shipDefinitions,
         defaultPlayerBinding: defaultPlayerBinding ?? level.defaultPlayerBinding,
         objectPresentations: objectPresentations ?? level.objectPresentations,
-        trainingDodgeAttempt:
-            trainingDodgeAttempt ?? level.trainingDodgeAttempt,
+        trainingFollowBotDestruction:
+            trainingFollowBotDestruction ?? level.trainingFollowBotDestruction,
         trainingGalleryBarrier:
             trainingGalleryBarrier ?? level.trainingGalleryBarrier,
         trainingRobotGuidebotChain:
@@ -2386,6 +2386,8 @@ func replacing(
         ?? level.trainingFinalBotsCompletionChain
     replaced.trainingFinalGoalChain =
         trainingFinalGoalChain ?? level.trainingFinalGoalChain
+    replaced.objectInfos = level.objectInfos
+    replaced.weapons = level.weapons
     // Package schema 12 keeps the level's script data, bound again to the
     // replaced objects and clips.
     return replaced.schemaVersion == 12 && level.scripting != nil

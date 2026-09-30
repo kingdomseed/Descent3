@@ -568,23 +568,19 @@ extension GameSession {
 extension GameWorld {
     /// A saved Training world restored into a test level whose placement or
     /// goals a test edited (for example a goal moved into contact). Static
-    /// objects take the level's placement. The player, and the objects whose
-    /// motion Training state owns, keep the saved placement. Deleted objects
-    /// stay deleted.
+    /// objects take the level's placement. The player, the Guide-Bot, and
+    /// the AI objects, whose motion the runtime owns, keep the saved
+    /// placement. Deleted objects stay deleted.
     func rebased(onto level: Level) -> GameWorld {
         var world = self
-        let handoff = level.trainingDodgeAttempt?.maneuverFollow?
-            .destructionHandoff
         let moving = Set([
             level.defaultPlayerBinding?.objectHandle,
             level.trainingRobotGuidebotChain?.guidebotObjectHandle,
-            level.trainingDodgeAttempt?.maneuverFollow?.followBotObjectHandle,
-            handoff?.destroyBot1ObjectHandle,
-            handoff?.destroyBot2ObjectHandle,
         ].compactMap { $0 })
         for placed in level.objects where !moving.contains(placed.handle) {
             let handle = ObjectHandle(placed.handle)
-            guard var object = world.objects[handle] else { continue }
+            guard var object = world.objects[handle], object.ai == nil
+            else { continue }
             object.location = placed.location
             object.position = placed.position
             object.orientation = placed.orientation

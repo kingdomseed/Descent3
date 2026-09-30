@@ -748,14 +748,12 @@ final class TrainingMissionScriptTests: XCTestCase {
     // MARK: Script 016 start through StartDodge's timer 8
 
     /// Script 033's timer 8 reaches StartDodge's EVT_TIMER at
-    /// Osiris_ProcessTimers (GameLoop.cpp:3014), which starts the dodge
+    /// Osiris_ProcessTimers (GameLoop.cpp:3014), which runs Script 016
     /// (TrainingMission.cpp:1869): on the frame whose pre-update Gametime
     /// reaches the timer's end, and last in that frame's presentation.
     func testStartDodgeTimerStartsTheDodgeOnTheFrameItFires() throws {
         let session = openingSession(makeTrainingDodgeAttemptLevel())
-        let instruction = try XCTUnwrap(
-            session.level.trainingDodgeAttempt
-        ).instruction
+        let instruction = trainingText("Dodge30")
         session.touch("StartDodge", at: 1.2)
         let end = try XCTUnwrap(startDodgeTimer(session)).end
         var timestamp = 1.2
@@ -764,7 +762,7 @@ final class TrainingMissionScriptTests: XCTestCase {
             timestamp += 0.1
             let frame = session.update(at: timestamp, input: .zero)
             let started =
-                session.world.trainingDodgeAttemptState?.script016Count == 1
+                session.world.testTrainingMission?.script016Count == 1
             XCTAssertEqual(started, frame.systemsGameTime >= end)
             if started { startFrame = frame }
         }
@@ -778,9 +776,7 @@ final class TrainingMissionScriptTests: XCTestCase {
     /// dodge never starts.
     func testCancelledStartDodgeTimerNeverStartsTheDodge() throws {
         let session = openingSession(makeTrainingDodgeAttemptLevel())
-        let instruction = try XCTUnwrap(
-            session.level.trainingDodgeAttempt
-        ).instruction
+        let instruction = trainingText("Dodge30")
         session.touch("StartDodge", at: 1.2)
         XCTAssertNotNil(startDodgeTimer(session))
         session.world.osirisCancelTimerID(8, level: session.level)
@@ -792,6 +788,6 @@ final class TrainingMissionScriptTests: XCTestCase {
             )
         }
         XCTAssertFalse(log.contains("hud:\(instruction)"))
-        XCTAssertEqual(session.world.trainingDodgeAttemptState?.script016Count, 0)
+        XCTAssertEqual(session.world.testTrainingMission?.script016Count, 0)
     }
 }

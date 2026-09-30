@@ -4,60 +4,6 @@ import XCTest
 
 extension EditorProjectTests {
     @MainActor
-    func testMovingTargetHandoffExtendsReadOnlySourceDiagnostic()
-        throws
-    {
-        let level = makeTrainingMovingTargetHandoffLevel()
-        let project = try makeProject(importedBase: level)
-
-        XCTAssertEqual(
-            project.trainingManeuverFollowSourceDiagnostic,
-            "TrainingMission.cpp Scripts 021,022,024,023,025,026,031,037,027,028 / ManuverRoomCenter 2063 / FollowBot1 8200 / DestroyBot1 4113 then DestroyBot2 4112 / timer 11 = 2.0s / stock orientation-editable FollowLoop1 path 0 nodes 13 flags 0x801100 + GoToDie path 1 nodes 1 flags 0x1100 / goal -1 priority 3 / Laser Level 2 - Blue via bluelaser.OOF / runtime path failure: invalidPath|movementBlocked"
-        )
-    }
-
-    @MainActor
-    func testManeuverFollowDiagnosticKeepsStockPathsReadOnlyAndSurfacesFailure()
-        throws
-    {
-        let level = makeTrainingManeuverFollowLevel()
-        let project = try makeProject(importedBase: level)
-        XCTAssertEqual(
-            project.trainingManeuverFollowSourceDiagnostic,
-            "TrainingMission.cpp Scripts 021,022,024,023,025,026 / ManuverRoomCenter 2063 / FollowBot1 8200 / stock orientation-editable FollowLoop1 path 0 nodes 13 flags 0x900104 + GoToDie path 1 nodes 1 flags 0x1100 / slot 0 priority 3 / runtime path failure: invalidPath|movementBlocked"
-        )
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        let frame = simulation.update(at: 0.1, input: .zero)
-        XCTAssertEqual(
-            project.trainingManeuverFollowRuntimeDiagnostic(
-                frame: frame
-            ),
-            "\(project.trainingManeuverFollowSourceDiagnostic!) / active path none node 0 room 37 failure none"
-        )
-        let selection = try RevivalEditorSelection(
-            roomSourceIndex: 37,
-            in: level
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: project,
-                selection: selection
-            ).contains(
-                project.trainingManeuverFollowSourceDiagnostic!
-            )
-        )
-        XCTAssertEqual(
-            editorPlayStatusMessage(
-                project: project,
-                frame: frame
-            ),
-            "Playing a separately owned complete-level copy. Use W/S to thrust and A/D to slide.\nRuntime: \(project.trainingManeuverFollowRuntimeDiagnostic(frame: frame)!)"
-        )
-    }
-    @MainActor
     func testTrainingScript005HasDiagnosticNamedUndoAndDisposablePlayOwnership()
         throws
     {
@@ -108,17 +54,10 @@ extension EditorProjectTests {
                 $0.handle == 6_150
             }
         )
+        // The object tables come from the package unchanged.
         XCTAssertEqual(
-            document.project.trainingDodgeAttemptSourceDiagnostic,
-            "TrainingMission.cpp Scripts 033,016,017,018,020,019 / StartDodge 4106 / DoneDodgeingGoal 12302 / DodgeTurrett 8199 / FlashLight-1 4120 / PortalRoom2+3 portals 0,1 / intro2.osf+almost.osf+proceed3.osf+proceed4.osf"
-        )
-        XCTAssertTrue(
-            editorIdleStatusMessage(
-                project: document.project,
-                selection: document.editorSelection
-            ).contains(
-                "TrainingMission.cpp Scripts 033,016,017,018,020,019 / StartDodge 4106"
-            )
+            document.project.level.objectInfos,
+            immutableBase.objectInfos
         )
 
         try document.selectRoom(sourceIndex: 2)
@@ -313,10 +252,6 @@ extension EditorProjectTests {
         )
         XCTAssertEqual(reopened.project, document.project)
         XCTAssertEqual(
-            reopened.project.trainingDodgeAttemptSourceDiagnostic,
-            document.project.trainingDodgeAttemptSourceDiagnostic
-        )
-        XCTAssertEqual(
             immutableBase.objects.first {
                 $0.handle == upGoal.handle
             }?.orientation,
@@ -362,8 +297,12 @@ extension EditorProjectTests {
             )
         }
         XCTAssertEqual(
-            playSession.level.trainingDodgeAttempt?.dodgeExit,
-            reopened.project.level.trainingDodgeAttempt?.dodgeExit
+            playSession.level.objectInfos,
+            reopened.project.level.objectInfos
+        )
+        XCTAssertEqual(
+            playSession.level.weapons,
+            reopened.project.level.weapons
         )
         XCTAssertEqual(
             reopened.project.level.objects.first {
@@ -2246,7 +2185,7 @@ extension EditorProjectTests {
     }
 
     @MainActor
-    func testFollowLoop1NodeOrientationAuthoringPersistsAndChangesDisposablePlay()
+    func testPathNodeOrientationAuthoringPersistsAndChangesDisposablePlay()
         throws
     {
         let root = FileManager.default.temporaryDirectory
@@ -2317,10 +2256,11 @@ extension EditorProjectTests {
         XCTAssertEqual(forwardLabel.lineBreakMode, .byWordWrapping)
         XCTAssertEqual(upLabel.maximumNumberOfLines, 0)
         XCTAssertEqual(upLabel.lineBreakMode, .byWordWrapping)
+        // Any game path's nodes can be oriented.
         pathPopup.selectItem(at: 1)
         pathPopup.sendAction(pathPopup.action, to: pathPopup.target)
         XCTAssertEqual(pathPopup.titleOfSelectedItem, "GoToDie — Path 1")
-        XCTAssertFalse(orientButton.isEnabled)
+        XCTAssertTrue(orientButton.isEnabled)
         pathPopup.selectItem(at: 0)
         pathPopup.sendAction(pathPopup.action, to: pathPopup.target)
         nodePopup.selectItem(at: 1)
@@ -2395,99 +2335,74 @@ extension EditorProjectTests {
         XCTAssertEqual(session.level, authored)
         reopened.commitPlaySession(session, renderingWorld: false)
         XCTAssertEqual(reopened.playSession?.level, authored)
-        let lesson = try XCTUnwrap(
-            session.level.trainingDodgeAttempt?.maneuverFollow
-        )
-        XCTAssertEqual(lesson.followPathGoalFlags, 0x900104)
+        let followBot = session.level.findObjectName("FollowBot1")
         let runtimeLevel = try makePathNodeOrientationRuntimeLevel(
             session.level
         )
         let baseRuntimeLevel = try makePathNodeOrientationRuntimeLevel(base)
         let simulation = try makeScript021ReadySimulation(level: runtimeLevel)
-        let script021 = simulation.update(at: 0.1, input: .zero)
-        XCTAssertEqual(script021.trainingFollowBot?.script021Count, 1)
+        // Scripts 021, 022, 024, and 023 through level timer 4
+        // (TrainingMission.cpp:1515-1556, :1943-1966).
+        simulation.collidePlayer(with: "ManuverRoomCenter")
+        _ = simulation.update(at: 0.1, input: .zero)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script021Count, 1)
+        // Osiris_ProcessTimers reads the Gametime before the frame, so each
+        // timer fires on the frame after the one that passes its end.
         _ = simulation.update(at: 20.1, input: .zero)
-        let script022 = simulation.update(at: 20.2, input: .zero)
-        XCTAssertEqual(script022.trainingFollowBot?.script022Count, 1)
+        _ = simulation.update(at: 20.2, input: .zero)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script022Count, 1)
         _ = simulation.update(at: 32.2, input: .zero)
-        let script024 = simulation.update(at: 32.3, input: .zero)
-        XCTAssertEqual(script024.trainingFollowBot?.script024Count, 1)
+        _ = simulation.update(at: 32.3, input: .zero)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script024Count, 1)
         _ = simulation.update(at: 47.3, input: .zero)
-        let script023 = simulation.update(at: 47.4, input: .zero)
-        XCTAssertEqual(script023.trainingFollowBot?.script023Count, 1)
+        _ = simulation.update(at: 47.4, input: .zero)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script023Count, 1)
+        let followAI = try XCTUnwrap(simulation.world.objects[followBot]?.ai)
+        XCTAssertEqual(followAI.goals[3].type, AIGoal.followPathType)
+        XCTAssertEqual(followAI.goals[3].pathID, 0)
+        XCTAssertEqual(followAI.goals[3].flags, 0x900104)
         XCTAssertEqual(
-            script023.trainingFollowBot?.activePathIndex,
-            lesson.followPathIndex
-        )
-        XCTAssertEqual(
-            script023.trainingFollowBot?.teamFlags,
-            lesson.friendlyTeamFlags
+            followAI.flags & ObjectAIFrame.teamMask,
+            ObjectAIFrame.teamRebel
         )
 
+        // The follow bot halfway between nodes 0 and 1, heading for node 1,
+        // turns toward the blend of the nodes' orientations
+        // (AIDoOrient, GF_ORIENT_PATH_NODE, AImain.cpp:4421-4457).
         let node0 = authored.paths[0].nodes[0]
         let node1 = authored.paths[0].nodes[1]
         let midpoint = (node0.position + node1.position) * 0.5
-        let node0Orientation = sourceOrientation(
+        var midpointWorld = simulation.world
+        var bot = try XCTUnwrap(midpointWorld.objects[followBot])
+        bot.position = midpoint
+        bot.orientation = sourceOrientation(
             forward: node0.forward,
             up: node0.up
         )
-        var midpointObject = try XCTUnwrap(
-            testWorldObject(simulation.world)
-        )
-        midpointObject["frameDuration"] = 0.1
-        var midpointState = try XCTUnwrap(
-            midpointObject["trainingManeuverFollowState"] as? [String: Any]
-        )
-        midpointState["position"] = try JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(midpoint)
-        )
-        midpointState["orientation"] = try JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(node0Orientation)
-        )
-        midpointState["velocity"] = try JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(Vector3.zero)
-        )
-        midpointState["activePathIndex"] = 0
-        midpointState["pathNodeIndex"] = 1
-        midpointObject["trainingManeuverFollowState"] = midpointState
-        let midpointContinuation = try decodeTestWorld(midpointObject)
+        bot.velocity = .zero
+        bot.ai?.path.currentNode = 1
+        bot.ai?.goals[3].staticPathCurrentNode = 1
+        midpointWorld.objects[followBot] = bot
         let editedInterpolation = try GameSession(
             level: runtimeLevel,
-            world: midpointContinuation.rebased(onto: runtimeLevel),
-            resumedAtTimestamp: 47.4
+            world: midpointWorld,
+            resumedAtTimestamp: 47.1
         )
         let baseInterpolation = try GameSession(
             level: baseRuntimeLevel,
-            world: midpointContinuation.rebased(onto: baseRuntimeLevel),
-            resumedAtTimestamp: 47.4
+            world: midpointWorld,
+            resumedAtTimestamp: 47.1
         )
-        let editedFrame = editedInterpolation.update(
-            at: 47.5,
-            input: .zero
-        )
-        let baseFrame = baseInterpolation.update(at: 47.5, input: .zero)
-        XCTAssertEqual(editedFrame.trainingFollowBot?.pathNodeIndex, 1)
-        XCTAssertEqual(
-            editedFrame.trainingFollowBot?.position,
-            baseFrame.trainingFollowBot?.position
-        )
-        XCTAssertNotEqual(
-            editedFrame.trainingFollowBot?.orientation,
-            baseFrame.trainingFollowBot?.orientation
-        )
+        let editedFrame = editedInterpolation.update(at: 47.2, input: .zero)
+        let baseFrame = baseInterpolation.update(at: 47.2, input: .zero)
+        let editedBot = try XCTUnwrap(editedInterpolation.world.objects[followBot])
+        let baseBot = try XCTUnwrap(baseInterpolation.world.objects[followBot])
+        XCTAssertEqual(editedBot.ai?.path.currentNode, 1)
+        XCTAssertEqual(editedBot.position, baseBot.position)
+        XCTAssertNotEqual(editedBot.orientation, baseBot.orientation)
         XCTAssertGreaterThan(
-            dot(
-                try XCTUnwrap(
-                    editedFrame.trainingFollowBot?.orientation.forward
-                ),
-                node1.forward
-            ),
-            dot(
-                try XCTUnwrap(
-                    baseFrame.trainingFollowBot?.orientation.forward
-                ),
-                node1.forward
-            )
+            dot(editedBot.orientation.forward, node1.forward),
+            dot(baseBot.orientation.forward, node1.forward)
         )
 
         let editedPlan = try updateMetalWorldPlan(
@@ -2511,42 +2426,29 @@ extension EditorProjectTests {
             drawableAspect: 1
         )
         let editedDraw = try XCTUnwrap(editedPlan.draws.first {
-            $0.objectHandle == lesson.followBotObjectHandle
+            $0.objectHandle == followBot.rawValue
         })
         let baseDraw = try XCTUnwrap(basePlan.draws.first {
-            $0.objectHandle == lesson.followBotObjectHandle
+            $0.objectHandle == followBot.rawValue
         })
         XCTAssertEqual(editedDraw.model, baseDraw.model)
         XCTAssertNotEqual(editedDraw.vertices, baseDraw.vertices)
 
-        let savedContinuation = editedInterpolation.world
+        let savedContinuation = try JSONDecoder().decode(
+            GameWorld.self,
+            from: JSONEncoder().encode(editedInterpolation.world)
+        )
         let restored = try GameSession(
             level: runtimeLevel,
-            world: savedContinuation.rebased(onto: runtimeLevel),
-            resumedAtTimestamp: 47.5
+            world: savedContinuation,
+            resumedAtTimestamp: 47.2
         )
-        let liveNext = editedInterpolation.update(at: 47.6, input: .zero)
-        let restoredNext = restored.update(at: 47.6, input: .zero)
-        XCTAssertEqual(
-            restoredNext.trainingFollowBot?.position,
-            liveNext.trainingFollowBot?.position
-        )
-        XCTAssertEqual(
-            restoredNext.trainingFollowBot?.orientation,
-            liveNext.trainingFollowBot?.orientation
-        )
-        XCTAssertEqual(
-            restoredNext.trainingFollowBot?.pathNodeIndex,
-            liveNext.trainingFollowBot?.pathNodeIndex
-        )
+        let liveNext = editedInterpolation.update(at: 47.3, input: .zero)
+        let restoredNext = restored.update(at: 47.3, input: .zero)
+        XCTAssertEqual(restored.world, editedInterpolation.world)
         XCTAssertEqual(
             restoredNext.trainingOpeningFeedback,
             liveNext.trainingOpeningFeedback
-        )
-        XCTAssertTrue(restoredNext.trainingOpeningFeedback.isEmpty)
-        XCTAssertEqual(
-            restored.world.authoritativeRandomState,
-            editedInterpolation.world.authoritativeRandomState
         )
 
         reopened.returnToEditor(renderingWorld: false)
@@ -2593,12 +2495,6 @@ extension EditorProjectTests {
             up: .init(x: 0, y: 0, z: 1)
         )
         let cases: [[RevivalPathNodeOrientationEdit]] = [
-            [.init(
-                pathIndex: 1,
-                nodeIndex: 0,
-                forward: validA.forward,
-                up: validA.up
-            )],
             [.init(
                 pathIndex: 99,
                 nodeIndex: 0,
@@ -2659,9 +2555,8 @@ private func makePathNodeOrientationRuntimeLevel(
     _ source: Level
 ) throws -> Level {
     var level = source
-    let lesson = try XCTUnwrap(level.trainingDodgeAttempt?.maneuverFollow)
     let maneuver = try XCTUnwrap(level.objects.first {
-        $0.handle == lesson.maneuverObjectHandle
+        $0.handle == level.findObjectName("ManuverRoomCenter").rawValue
     })
     let playerIndex = try XCTUnwrap(level.objects.firstIndex {
         $0.handle == level.defaultPlayerBinding?.objectHandle
@@ -2710,65 +2605,25 @@ private func makePathNodeOrientationRuntimeLevel(
         faces: containmentFaces,
         portals: containmentPortals
     )
-    // The full Training package uses this existing carrier for schema 7.
-    let schemaSevenCarrier = makeTrainingRASBot1DeathLevel()
-    let rasBot = try XCTUnwrap(schemaSevenCarrier.objects.first {
-        $0.handle == 2_074
-    })
-    let rasPresentation = try XCTUnwrap(
-        schemaSevenCarrier.objectPresentations.first {
-            $0.objectHandle == rasBot.handle
-        }
-    )
-    if !level.models.contains(where: {
-        $0.source == rasPresentation.primaryModel
-    }) {
-        level = replacing(
-            level,
-            models: level.models + [try XCTUnwrap(
-                schemaSevenCarrier.models.first {
-                    $0.source == rasPresentation.primaryModel
-                }
-            )]
-        )
-    }
-    level.objects.append(rasBot)
-    level.objectPresentations.append(rasPresentation)
-    level = level.addingTrainingRASBot1DeathChain(
-        try XCTUnwrap(schemaSevenCarrier.trainingRASBot1DeathChain)
-    )
-    level = replacing(
-        level,
-        trainingDodgeAttempt: source.trainingDodgeAttempt
-    )
     return level
 }
 
+/// A session past the dodge (Scripts 033, 016, 017, and 020 ran) with no
+/// pending timer, the six slide controls on, and the turret off.
 private func makeScript021ReadySimulation(
     level: Level
 ) throws -> GameSession {
     let seed = GameSession(level: level, presentationReadyTimestamp: 0)
-    var object = try XCTUnwrap(
-        testWorldObject(seed.world)
-    )
-    var dodge = try XCTUnwrap(
-        object["trainingDodgeAttemptState"] as? [String: Any]
-    )
-    try setTrainingCounter(&object, "script033Count", 1)
-    dodge["script016Count"] = 1
-    dodge["script017Count"] = 1
-    dodge["script018Count"] = 0
-    dodge["script020Count"] = 1
-    dodge["successTimerRemaining"] = nil
-    dodge["almostDoneTimerRemaining"] = nil
-    dodge["turretIsPowered"] = false
-    dodge["markerLightDistance"] = 50
-    object["trainingDodgeAttemptState"] = dodge
+    var object = try XCTUnwrap(testWorldObject(seed.world))
+    for name in ["script033Count", "script016Count", "script017Count",
+                 "script020Count"] {
+        try setTrainingCounter(&object, name, 1)
+    }
     object["playerControllerBitflags"] = 63
     try deferringOsirisTimers(&object, to: 1_000)
     return try GameSession(
         level: level,
-        world: (decodeTestWorld(object)).rebased(onto: level),
+        world: decodeTestWorld(object),
         resumedAtTimestamp: 0
     )
 }

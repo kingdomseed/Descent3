@@ -120,8 +120,8 @@ private func makeMetalWorldPlan(
         startRoomSourceIndex: startRoomSourceIndex,
         excludedObjectHandle: nil
     ).map(makeMetalWorldDraw)
-    let preparedDodgeProjectileDraws =
-        extractPreparedTrainingDodgeProjectileDrawItems(level)
+    let preparedWeaponObjectDraws =
+        extractPreparedWeaponObjectDrawItems(level)
         .map(makeMetalWorldDraw)
     let preparedBlueLaserDraws =
         extractPreparedTrainingBlueLaserDrawItems(level)
@@ -169,7 +169,7 @@ private func makeMetalWorldPlan(
         preparedRoomDraws
         + preparedObjectDraws
         + preparedObjectDraws
-        + preparedDodgeProjectileDraws
+        + preparedWeaponObjectDraws
         + preparedBlueLaserDraws
         + preparedConcussionMissileDraws
         + preparedConcussionExplosionDraws
@@ -216,8 +216,6 @@ func updateMetalWorldPlan(
     presentationFrame: MetalPresentationFrame? = nil,
     trainingCameraMonitor: TrainingCameraMonitorFrame? = nil,
     trainingCloak: TrainingCloakFrame? = nil,
-    trainingDodgeTurretAngles: [Float] = [],
-    trainingDodgeProjectiles: [TrainingDodgeProjectileFrame] = [],
     trainingPrimaryProjectiles:
         [TrainingBlueLaserProjectileFrame] = [],
     playerConcussionMissiles: [PlayerConcussionMissileFrame] = [],
@@ -233,7 +231,6 @@ func updateMetalWorldPlan(
         [TrainingGuidebotYellowFlareTimeoutSparkFrame] = [],
     trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame] = [],
-    trainingDodgeMarkerLightDistance: Float? = nil,
     trainingGuidebotReturnMarkerLightDistance: Float? = nil,
     trainingLastRoomMarkerLightDistance: Float? = nil,
     trainingFinalBotsMarkerLightDistance: Float? = nil,
@@ -250,8 +247,6 @@ func updateMetalWorldPlan(
         presentationFrame: presentationFrame,
         trainingCameraMonitor: trainingCameraMonitor,
         trainingCloak: trainingCloak,
-        trainingDodgeTurretAngles: trainingDodgeTurretAngles,
-        trainingDodgeProjectiles: trainingDodgeProjectiles,
         trainingPrimaryProjectiles:
             trainingPrimaryProjectiles,
         playerConcussionMissiles: playerConcussionMissiles,
@@ -267,8 +262,6 @@ func updateMetalWorldPlan(
             trainingGuidebotYellowFlareTimeoutSparks,
         trainingGuidebotYellowFlareTimeoutSparkParticles:
             trainingGuidebotYellowFlareTimeoutSparkParticles,
-        trainingDodgeMarkerLightDistance:
-            trainingDodgeMarkerLightDistance,
         trainingGuidebotReturnMarkerLightDistance:
             trainingGuidebotReturnMarkerLightDistance,
         trainingLastRoomMarkerLightDistance:
@@ -314,8 +307,6 @@ func updateMetalWorldPlan(
         ),
         trainingCameraMonitor: frame.trainingCameraMonitor,
         trainingCloak: frame.trainingCloak,
-        trainingDodgeTurretAngles: frame.trainingDodgeTurretAngles,
-        trainingDodgeProjectiles: frame.trainingDodgeProjectiles,
         trainingPrimaryProjectiles: frame.trainingPrimaryProjectiles,
         playerConcussionMissiles: frame.playerConcussionMissiles,
         playerConcussionExplosions: frame.playerConcussionExplosions,
@@ -329,8 +320,6 @@ func updateMetalWorldPlan(
             frame.trainingGuidebotYellowFlareTimeoutSparks,
         trainingGuidebotYellowFlareTimeoutSparkParticles:
             frame.trainingGuidebotYellowFlareTimeoutSparkParticles,
-        trainingDodgeMarkerLightDistance:
-            frame.trainingDodgeMarkerLightDistance,
         trainingGuidebotReturnMarkerLightDistance:
             frame.trainingGuidebotReturnMarkerLightDistance,
         trainingLastRoomMarkerLightDistance:
@@ -357,8 +346,6 @@ func updateMetalWorldPlan(
         presentationFrame: presentationFrame,
         trainingCameraMonitor: nil,
         trainingCloak: nil,
-        trainingDodgeTurretAngles: [],
-        trainingDodgeProjectiles: [],
         trainingPrimaryProjectiles: [],
         playerConcussionMissiles: [],
         playerConcussionExplosions: [],
@@ -368,7 +355,6 @@ func updateMetalWorldPlan(
         trainingGuidebotYellowFlareTimeoutExplosions: [],
         trainingGuidebotYellowFlareTimeoutSparks: [],
         trainingGuidebotYellowFlareTimeoutSparkParticles: [],
-        trainingDodgeMarkerLightDistance: nil,
         trainingGuidebotReturnMarkerLightDistance: nil,
         trainingLastRoomMarkerLightDistance: nil,
         trainingFinalBotsMarkerLightDistance: nil,
@@ -387,8 +373,6 @@ private func updateMetalWorldPlan(
     presentationFrame: MetalPresentationFrame?,
     trainingCameraMonitor: TrainingCameraMonitorFrame?,
     trainingCloak: TrainingCloakFrame?,
-    trainingDodgeTurretAngles: [Float],
-    trainingDodgeProjectiles: [TrainingDodgeProjectileFrame],
     trainingPrimaryProjectiles:
         [TrainingBlueLaserProjectileFrame],
     playerConcussionMissiles: [PlayerConcussionMissileFrame],
@@ -404,7 +388,6 @@ private func updateMetalWorldPlan(
         [TrainingGuidebotYellowFlareTimeoutSparkFrame],
     trainingGuidebotYellowFlareTimeoutSparkParticles:
         [TrainingGuidebotYellowFlareParticleFrame],
-    trainingDodgeMarkerLightDistance: Float?,
     trainingGuidebotReturnMarkerLightDistance: Float?,
     trainingLastRoomMarkerLightDistance: Float?,
     trainingFinalBotsMarkerLightDistance: Float?,
@@ -418,16 +401,15 @@ private func updateMetalWorldPlan(
         startRoomSourceIndex: startRoomSourceIndex,
         excludedObjectHandle: excludedObjectHandle,
         presentationGameTime:
-            presentationFrame?.systemsGameTime ?? 0,
-        trainingDodgeTurretAngles: trainingDodgeTurretAngles
+            presentationFrame?.systemsGameTime ?? 0
     )
     let opaqueRoomDraws = extraction.opaqueDrawItems.map(makeMetalWorldDraw)
     let translucentRoomDraws = extraction.translucentDrawItems.map(makeMetalWorldDraw)
     let objectDraws = extraction.modelDrawItems.map(makeMetalWorldDraw)
-    let dodgeProjectileDraws =
-        extractTrainingDodgeProjectileDrawItems(
+    let weaponObjectDraws =
+        extractWeaponObjectDrawItems(
             level,
-            projectiles: trainingDodgeProjectiles,
+            objects: objects,
             camera: camera
         ).map(makeMetalWorldDraw)
     let blueLaserDraws =
@@ -524,7 +506,7 @@ private func updateMetalWorldPlan(
     let objectIndices = objectDraws.map {
         objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
     }
-    let dodgeProjectileIndices = dodgeProjectileDraws.map {
+    let weaponObjectIndices = weaponObjectDraws.map {
         objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
     }
     let blueLaserIndices = blueLaserDraws.map {
@@ -575,7 +557,7 @@ private func updateMetalWorldPlan(
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
     let activeDrawIndices = opaqueIndices + objectIndices
-        + dodgeProjectileIndices + blueLaserIndices
+        + weaponObjectIndices + blueLaserIndices
         + concussionMissileIndices + concussionExplosionIndices
         + concussionSparkIndices
         + yellowFlareIndices + yellowFlareParticleIndices
@@ -594,9 +576,7 @@ private func updateMetalWorldPlan(
                 level.trainingCameraMonitorChain?
                     .securityCameraObjectHandle,
             presentationGameTime:
-                presentationFrame?.systemsGameTime ?? 0,
-            trainingDodgeTurretAngles:
-                trainingDodgeTurretAngles
+                presentationFrame?.systemsGameTime ?? 0
         )
     }
     let auxiliaryOpaque = auxiliaryExtraction?.opaqueDrawItems
@@ -645,8 +625,8 @@ private func updateMetalWorldPlan(
         updatedPreparedDraws[index] = draw
     }
     for (index, draw) in zip(
-        dodgeProjectileIndices,
-        dodgeProjectileDraws
+        weaponObjectIndices,
+        weaponObjectDraws
     ) {
         updatedPreparedDraws[index] = draw
     }
@@ -713,24 +693,43 @@ private func updateMetalWorldPlan(
     ) {
         updatedPreparedDraws[index] = draw
     }
-    if let distance = trainingDodgeMarkerLightDistance,
-        distance > 0,
-        let dodge = level.trainingDodgeAttempt,
-        let marker = objects[ObjectHandle(dodge.flashLightObjectHandle)],
-        let gameTime = presentationFrame?.systemsGameTime
-    {
-        let light = sourceTrainingMarkerLight(
-            dodge.markerLightPresentation,
-            gameTime: gameTime
-        )
-        if light.distanceScale > 0 {
+    // Object lights a script turned on (MSAFE_OBJECT_LIGHT_DIST and
+    // MSAFE_OBJECT_LIGHT_COLOR): the page's light_info flicker with the
+    // script's distance and color.
+    if let gameTime = presentationFrame?.systemsGameTime {
+        for object in objects {
+            guard let distance = object.localLighting?.lightDistance,
+                  distance > 0,
+                  let infoIndex = object.info,
+                  let info = level.objectInfos?[infoIndex]
+            else {
+                continue
+            }
+            let page = info.lighting
+            let presentation = ObjectLightPresentation(
+                primaryColor: object.localLighting?.color
+                    ?? page.primaryColor,
+                secondaryColor: page.secondaryColor,
+                timeInterval: page.timeInterval,
+                flickerDistance: page.flickerDistance,
+                directionalDot: page.directionalDot,
+                flags: page.flags,
+                timebits: page.timebits,
+                angle: page.angle,
+                lightingRenderType: page.lightingRenderType
+            )
+            let light = sourceObjectLight(
+                presentation,
+                gameTime: gameTime
+            )
+            guard light.distanceScale > 0 else { continue }
             for index in Set(
                 activeDrawIndices + auxiliaryActiveDrawIndices
             ) {
                 updatedPreparedDraws[index] =
-                    applyingTrainingMarkerLight(
+                    applyingObjectLight(
                         to: updatedPreparedDraws[index],
-                        position: marker.position,
+                        position: object.position,
                         distance: distance * light.distanceScale,
                         color: light.color
                     )
@@ -744,7 +743,7 @@ private func updateMetalWorldPlan(
        let presentation = returnChain.markerLightPresentation,
        let marker = objects[ObjectHandle(returnChain.markerLightObjectHandle)],
        let gameTime = presentationFrame?.systemsGameTime {
-        let light = sourceTrainingMarkerLight(
+        let light = sourceObjectLight(
             presentation,
             gameTime: gameTime
         )
@@ -753,7 +752,7 @@ private func updateMetalWorldPlan(
                 activeDrawIndices + auxiliaryActiveDrawIndices
             ) {
                 updatedPreparedDraws[index] =
-                    applyingTrainingMarkerLight(
+                    applyingObjectLight(
                         to: updatedPreparedDraws[index],
                         position: marker.position,
                         distance: distance * light.distanceScale,
@@ -767,7 +766,7 @@ private func updateMetalWorldPlan(
        let chain = level.trainingLastRoomChain,
        let marker = objects[ObjectHandle(chain.markerLightObjectHandle)],
        let gameTime = presentationFrame?.systemsGameTime {
-        let light = sourceTrainingMarkerLight(
+        let light = sourceObjectLight(
             chain.markerLightPresentation,
             gameTime: gameTime
         )
@@ -776,7 +775,7 @@ private func updateMetalWorldPlan(
                 activeDrawIndices + auxiliaryActiveDrawIndices
             ) {
                 updatedPreparedDraws[index] =
-                    applyingTrainingMarkerLight(
+                    applyingObjectLight(
                         to: updatedPreparedDraws[index],
                         position: marker.position,
                         distance: distance * light.distanceScale,
@@ -790,7 +789,7 @@ private func updateMetalWorldPlan(
        let chain = level.trainingFinalBotsCompletionChain,
        let marker = objects[ObjectHandle(chain.markerLightObjectHandle)],
        let gameTime = presentationFrame?.systemsGameTime {
-        let light = sourceTrainingMarkerLight(
+        let light = sourceObjectLight(
             chain.markerLightPresentation,
             gameTime: gameTime
         )
@@ -799,7 +798,7 @@ private func updateMetalWorldPlan(
                 activeDrawIndices + auxiliaryActiveDrawIndices
             ) {
                 updatedPreparedDraws[index] =
-                    applyingTrainingMarkerLight(
+                    applyingObjectLight(
                         to: updatedPreparedDraws[index],
                         position: marker.position,
                         distance: distance * light.distanceScale,
@@ -813,7 +812,7 @@ private func updateMetalWorldPlan(
         for index in Set(
             activeDrawIndices + auxiliaryActiveDrawIndices
         ) {
-            updatedPreparedDraws[index] = applyingTrainingMarkerLight(
+            updatedPreparedDraws[index] = applyingObjectLight(
                 to: updatedPreparedDraws[index],
                 position: headlight.position,
                 distance: headlight.lightDistance,
@@ -832,7 +831,7 @@ private func updateMetalWorldPlan(
             activeDrawIndices + auxiliaryActiveDrawIndices
         ) {
             updatedPreparedDraws[index] =
-                applyingTrainingMarkerLight(
+                applyingObjectLight(
                     to: updatedPreparedDraws[index],
                     position: flare.position,
                     distance: flare.lightDistance,
@@ -847,7 +846,7 @@ private func updateMetalWorldPlan(
             missile.lightPresentation.primaryColor.z
         )
         for index in Set(activeDrawIndices + auxiliaryActiveDrawIndices) {
-            updatedPreparedDraws[index] = applyingTrainingMarkerLight(
+            updatedPreparedDraws[index] = applyingObjectLight(
                 to: updatedPreparedDraws[index],
                 position: missile.position,
                 distance: missile.lightDistance,
@@ -865,7 +864,7 @@ private func updateMetalWorldPlan(
         for index in Set(
             activeDrawIndices + auxiliaryActiveDrawIndices
         ) {
-            updatedPreparedDraws[index] = applyingTrainingMarkerLight(
+            updatedPreparedDraws[index] = applyingObjectLight(
                 to: updatedPreparedDraws[index],
                 position: spark.position,
                 distance: spark.lightDistance,
@@ -968,8 +967,8 @@ private func applyingObjectCloak(
     )
 }
 
-private func sourceTrainingMarkerLight(
-    _ presentation: TrainingMarkerLightPresentation,
+private func sourceObjectLight(
+    _ presentation: ObjectLightPresentation,
     gameTime: Float
 ) -> (color: SIMD3<Float>, distanceScale: Float) {
     let primary = SIMD3<Float>(
@@ -1024,7 +1023,7 @@ private func sourceTrainingMarkerLight(
     return (primary, 1)
 }
 
-private func applyingTrainingMarkerLight(
+private func applyingObjectLight(
     to draw: MetalWorldDraw,
     position: Vector3,
     distance: Float,

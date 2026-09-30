@@ -101,10 +101,7 @@ final class MetalWorldPlanTests: XCTestCase {
 
     func testFollowBotBlueLaserUsesRetainedObjectDrawPath() throws {
         let level = makeTrainingMovingTargetHandoffLevel()
-        let handoff = try XCTUnwrap(
-            level.trainingDodgeAttempt?.maneuverFollow?
-                .destructionHandoff
-        )
+        let handoff = try XCTUnwrap(level.trainingFollowBotDestruction)
         let playerView = defaultPlayerView(in: level)
         let initial = try makeMetalWorldPlan(
             level: level,
@@ -270,18 +267,21 @@ final class MetalWorldPlanTests: XCTestCase {
         })
     }
 
-    func testTimedDodgeAnglesProjectilesAndMarkerReachRetainedMetalPlan()
+    /// The turret's dynamic_wb angles turn its turret submodels, and its
+    /// weapon objects draw with their weapon model (RT_WEAPON), through the
+    /// retained plan.
+    func testTurretAnglesAndWeaponObjectsReachRetainedMetalPlan()
         throws
     {
         var level = makeTrainingDodgeAttemptLevel()
-        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
+        let turret = level.findObjectName("DodgeTurrett")
         let playerIndex = try XCTUnwrap(
             level.objects.firstIndex {
                 $0.handle == level.defaultPlayerBinding?.objectHandle
             })
         let start = try XCTUnwrap(
             level.objects.first {
-                $0.handle == dodge.startDodgeObjectHandle
+                $0.handle == level.findObjectName("StartDodge").rawValue
             })
         level.objects[playerIndex].location = start.location
         level.objects[playerIndex].position = start.position
@@ -294,22 +294,25 @@ final class MetalWorldPlanTests: XCTestCase {
         simulation.collidePlayer(with: "StartDodge")
         var frame = simulation.update(at: 0.1, input: .zero)
         var timestamp = 0.1
-        for _ in 0..<180 where frame.trainingDodgeProjectiles.isEmpty {
+        func weapons() -> [GameObject] {
+            simulation.world.objects.filter { $0.type == .weapon }
+        }
+        for _ in 0..<300 where weapons().isEmpty {
             timestamp += 0.1
             frame = simulation.update(at: timestamp, input: .zero)
         }
-        XCTAssertFalse(frame.trainingDodgeProjectiles.isEmpty)
+        XCTAssertFalse(weapons().isEmpty)
         XCTAssertTrue(
-            frame.trainingDodgeTurretAngles.contains {
-                $0 != 0
-            })
+            try XCTUnwrap(simulation.world.objects[turret])
+                .weaponBatteries[0].turretAngles.contains { $0 != 0 }
+        )
 
         let initial = try makeMetalWorldPlan(
             level: simulation.runtimeLevel,
             playerView: frame.playerView
         )
         let initialTurretVertices = initial.draws.filter {
-            $0.objectHandle == dodge.dodgeTurretObjectHandle
+            $0.objectHandle == turret.rawValue
         }.flatMap(\.vertices)
         let updated = try updateMetalWorldPlan(
             initial,
@@ -320,27 +323,64 @@ final class MetalWorldPlanTests: XCTestCase {
             presentationFrame: .init(
                 systemsFrameDuration: frame.systemsFrameDuration,
                 systemsGameTime: frame.systemsGameTime
-            ),
-            trainingDodgeTurretAngles:
-                frame.trainingDodgeTurretAngles,
-            trainingDodgeProjectiles:
-                frame.trainingDodgeProjectiles,
-            trainingDodgeMarkerLightDistance:
-                frame.trainingDodgeMarkerLightDistance
+            )
         )
         let updatedTurretVertices = updated.draws.filter {
-            $0.objectHandle == dodge.dodgeTurretObjectHandle
+            $0.objectHandle == turret.rawValue
         }.flatMap(\.vertices)
         XCTAssertNotEqual(
             updatedTurretVertices,
             initialTurretVertices
         )
+        let laser = try XCTUnwrap(level.weapons?.first?.model)
         XCTAssertTrue(
             updated.draws.contains {
-                $0.objectHandle == UInt32.max
-                    && $0.model == dodge.turret.projectileModel
+                $0.objectHandle == UInt32.max && $0.model == laser
             })
     }
+
+    /// An object light a script turns on (aObjSetLightingDist, Script 019)
+    /// lights the world with its page's flicker and the script's color.
+    func testScriptObjectLightReachesRetainedMetalPlan() throws {
+        let level = makeTrainingDodgeAttemptLevel()
+        let playerView = defaultPlayerView(in: level)
+        let marker = level.findObjectName("FlashLight-1")
+        let initial = try makeMetalWorldPlan(
+            level: level,
+            playerView: playerView
+        )
+        var world = GameWorld(level: level)
+        func plan(_ world: GameWorld) throws -> MetalWorldPlan {
+            try updateMetalWorldPlan(
+                initial,
+                level: level,
+                objects: world.objects,
+                roomStates: RoomState.canonical(level),
+                playerView: playerView,
+                // At Gametime 0.5 the page's LF_PULSE (interval 0.5) is at
+                // its full distance.
+                presentationFrame: .init(
+                    systemsFrameDuration: 0.1,
+                    systemsGameTime: 0.5
+                )
+            )
+        }
+        let target = try XCTUnwrap(
+            plan(world).draws.first?.vertices.first?.position
+        )
+        var light = try XCTUnwrap(world.objects[marker])
+        light.location = .room(playerView.roomSourceIndex)
+        light.position = .init(x: target.x + 20, y: target.y, z: target.z)
+        world.objects[marker] = light
+        func lit(_ world: GameWorld) throws -> Float {
+            try plan(world).draws[0].vertices[0].dynamicLight.y
+        }
+        // Script 000 set its distance to 0: no light.
+        XCTAssertEqual(try lit(world), 0)
+        world.aObjSetLightingDist(marker, 50)
+        XCTAssertGreaterThan(try lit(world), 0)
+    }
+
     func testScript034MarkerDistanceLightsReachedMetalWorld() throws {
         var level = makeTrainingCloakPickupLevel()
         let playerView = defaultPlayerView(in: level)

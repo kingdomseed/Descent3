@@ -7,14 +7,16 @@
 // ClearGlobalActionCtrs (:251-330, only the counters used below),
 // InitializeDLL (:916), GetGOScriptID (:1007), GetTriggerScriptID (:1264),
 // GetCOScriptList (:1280), the custom block's player functions (:519-640),
-// the level script's EVT_INTERVAL (Script 030, :1385), EVT_LEVELSTART
-// (Script 000, :1457), and EVT_TIMER (Script 002, :1501), and the EVT_COLLIDE
-// handlers of the opening and return lessons: CustomObjectScript_300D
+// the level script's EVT_INTERVAL (Scripts 018, 025, 031, and 030,
+// :1347-1392), EVT_LEVELSTART (Script 000, :1457), and EVT_TIMER (Scripts
+// 002, 023, 024, and 022, :1501-1556), and the object scripts of the
+// opening, return, dodge, and maneuver lessons: CustomObjectScript_300D
 // (Scripts 001 and 008, :1633), _300C (003, 005, 007, 009, 011, 013, :1662),
 // _300B (004 and 010, :1745), _4809 (006 and 012, :1778), _1803 (014,
-// :1811), _1806 (015, :1829), and _100A (033, :1851; its EVT_TIMER calls the
-// bespoke Script 016 start). The other scripts are
-// still the bespoke Training code; M1 steps 6-9 move them here.
+// :1811), _1806 (015, :1829), _100A (033 and 016, :1851), _300E (019 and
+// 017, :1887), _2007 (020, :1926), _080F (021, :1943), and _2008's EVT_TIMER
+// (026, :1985). The other scripts are still the bespoke Training code; M1
+// steps 7-9 move them here.
 
 /// The Training module's state: the DALLAS globals of the module
 /// (ScriptActionCtr_nnn and the DallasFuncs variables).
@@ -36,10 +38,24 @@ struct TrainingMissionState: Codable, Equatable, Sendable {
     var script013Count: Int = 0
     var script014Count: Int = 0
     var script015Count: Int = 0
+    /// ScriptActionCtr_016 to ScriptActionCtr_026.
+    var script016Count: Int = 0
+    var script017Count: Int = 0
+    var script018Count: Int = 0
+    var script019Count: Int = 0
+    var script020Count: Int = 0
+    var script021Count: Int = 0
+    var script022Count: Int = 0
+    var script023Count: Int = 0
+    var script024Count: Int = 0
+    var script025Count: Int = 0
+    var script026Count: Int = 0
     /// ScriptActionCtr_033.
     var script033Count: Int = 0
     /// ScriptActionCtr_030.
     var script030Count: Int = 0
+    /// ScriptActionCtr_031.
+    var script031Count: Int = 0
     var dallas = DallasState.dfInit()
 
     /// Every action counter, for save validation.
@@ -49,7 +65,10 @@ struct TrainingMissionState: Codable, Equatable, Sendable {
             script004Count, script005Count, script006Count, script007Count,
             script008Count, script009Count, script010Count, script011Count,
             script012Count, script013Count, script014Count, script015Count,
-            script033Count, script030Count,
+            script016Count, script017Count, script018Count, script019Count,
+            script020Count, script021Count, script022Count, script023Count,
+            script024Count, script025Count, script026Count,
+            script033Count, script030Count, script031Count,
         ]
     }
 }
@@ -75,6 +94,9 @@ enum TrainingMissionScript {
         "PortalRoom1", "PortalRoom2", "PortalRoom3", "PortalRoom4",
         "PortalRoom5", "PortalRoom6", "PortalRoom7",
     ]
+
+    /// Path_names (TrainingMission.cpp:863).
+    static let pathNames = ["FollowLoop1", "GoToDie"]
 
     /// Trigger_names (TrainingMission.cpp:849).
     static let triggerNames = ["Portal2", "Portal3", "Portal4"]
@@ -157,6 +179,11 @@ enum TrainingMissionScript {
         level.findRoomName(roomNames[index])
     }
 
+    /// Path_indexes[index]: Scrpt_FindPathName(Path_names[index]).
+    static func pathIndex(_ index: Int, level: Level) -> Int {
+        level.findPathName(pathNames[index])
+    }
+
     /// Sound_indexes[index]: Scrpt_FindSoundName(Sound_names[index]).
     static func soundIndex(_ index: Int, level: Level) -> Int {
         level.findSoundName(soundNames[index])
@@ -225,6 +252,16 @@ enum TrainingMissionScript {
             collideStartDodge(me: me, world: &world, level: level)
         case let (0x007, .timer(timerID, _)):
             timerStartDodge(id: timerID, world: &world, level: level)
+        case (0x008, .collide):
+            collideDoneDodgeingGoal(world: &world, level: level)
+        case let (0x008, .timer(timerID, _)):
+            timerDoneDodgeingGoal(id: timerID, world: &world, level: level)
+        case let (0x009, .timer(timerID, _)):
+            timerDodgeTurrett(id: timerID, world: &world, level: level)
+        case (0x00a, .collide):
+            collideManuverRoomCenter(world: &world, level: level)
+        case let (0x00b, .timer(timerID, _)):
+            timerFollowBot1(id: timerID, world: &world, level: level)
         default: break
         }
         return .all
@@ -250,17 +287,62 @@ enum TrainingMissionScript {
             levelInterval(world: &world, level: level)
         case .levelStart:
             levelStart(world: &world, level: level)
-        case .timer:
-            levelTimer(world: &world, level: level)
+        case let .timer(id, _):
+            levelTimer(id: id, world: &world, level: level)
         default:
             break
         }
         return .all
     }
 
-    /// EVT_INTERVAL (TrainingMission.cpp:1347-1456). Only Script 030 is
-    /// translated; the other interval scripts are still bespoke.
+    /// EVT_INTERVAL (TrainingMission.cpp:1347-1456). Scripts 018, 025, 031,
+    /// and 030 are translated; the later interval scripts are still bespoke.
     private static func levelInterval(world: inout GameWorld, level: Level) {
+        func object(_ index: Int) -> ObjectHandle {
+            objectHandle(index, level: level)
+        }
+
+        // Script 018: Player Hit, cancel timer & restart
+        if world.qObjShields(world.qGetPlayerObj(0, level: level)) < 100,
+           (world.trainingMission.script016Count > 0) == true,
+           (world.trainingMission.script017Count > 0) == false {
+            world.aCancelTimer(3, level: level)
+            world.aCancelTimer(2, level: level)
+            world.aSetObjectTimer(object(12), 14, 3)
+            world.aSetObjectTimer(object(5), 20, 2)
+            world.aShowHUDMessage(message(16, level: level))
+            world.aObjSetShields(world.qGetPlayerObj(0, level: level), 100)
+
+            // Increment the script action counter
+            increment(\.script018Count, world: &world)
+        }
+
+        // Script 025: Follow Test
+        if (world.trainingMission.script023Count > 0) == true,
+           (world.trainingMission.script026Count > 0) == false {
+            if world.qObjCanSeeObj(
+                object(13),
+                90,
+                world.qGetPlayerObj(0, level: level)
+            ) == true {
+            } else {
+                world.aCancelTimer(7, level: level)
+                world.aSetObjectTimer(object(13), 20, 7)
+            }
+
+            // Increment the script action counter
+            increment(\.script025Count, world: &world)
+        }
+
+        // Script 031: Keep Energy up
+        if (world.trainingMission.script021Count > 0) == true,
+           world.qObjEnergy(world.qGetPlayerObj(0, level: level)) < 50 {
+            world.aObjSetEnergy(world.qGetPlayerObj(0, level: level), 50)
+
+            // Increment the script action counter
+            increment(\.script031Count, world: &world)
+        }
+
         // Script 030: Keep sheilds up
         if (world.trainingMission.script014Count > 0) == true,
            world.qObjShields(world.qGetPlayerObj(0, level: level)) < 50 {
@@ -321,9 +403,13 @@ enum TrainingMissionScript {
         }
     }
 
-    /// EVT_TIMER (TrainingMission.cpp:1501-1626). Only Script 002 is
-    /// translated; the other timer scripts are still bespoke.
-    private static func levelTimer(world: inout GameWorld, level: Level) {
+    /// EVT_TIMER (TrainingMission.cpp:1501-1626). Scripts 002, 023, 024,
+    /// and 022 are translated; the later timer scripts are still bespoke.
+    private static func levelTimer(
+        id: Int32,
+        world: inout GameWorld,
+        level: Level
+    ) {
         // Script 002: First Hud Mesage Timer
         let script002Count = world.trainingMission.script002Count
         if script002Count < 1, (script002Count > 0) == false {
@@ -336,12 +422,66 @@ enum TrainingMissionScript {
                 world.trainingMission.script002Count += 1
             }
         }
+
+        func object(_ index: Int) -> ObjectHandle {
+            objectHandle(index, level: level)
+        }
+
+        // Script 023: Done Bank -- Start Follow
+        if world.trainingMission.script023Count < 1,
+           (world.trainingMission.script024Count > 0) == true, 4 == id {
+            world.aTogglePlayerControl(1, 0, 4032, level: level)
+            world.aShowHUDMessage(message(14, level: level))
+            world.aShowHUDMessage(message(15, level: level))
+            world.aAISetState(1, object(13))
+            world.aAISetTeam(65536, object(13))
+            world.aSetObjectTimer(object(13), 20, 7)
+            world.aSoundPlaySteamingText("follow.osf", 1)
+            world.aAIGoalFollowPathSimple(
+                object(13),
+                pathIndex(0, level: level),
+                9_437_444,
+                0,
+                3,
+                level: level
+            )
+
+            // Increment the script action counter
+            increment(\.script023Count, world: &world)
+        }
+
+        // Script 024: Done Pitch -- Start Bank
+        if world.trainingMission.script024Count < 1,
+           (world.trainingMission.script022Count > 0) == true {
+            world.aToggleAllPlayerControls(0, 0, level: level)
+            world.aTogglePlayerControl(1, 0, 3072, level: level)
+            world.aShowHUDMessage(message(18, level: level))
+            world.aSoundPlaySteamingText("bank.osf", 1)
+            world.aSetLevelTimer(15, 4)
+
+            // Increment the script action counter
+            increment(\.script024Count, world: &world)
+        }
+
+        // Script 022: Done Heading -- Start Pitch Time
+        if world.trainingMission.script022Count < 1,
+           (world.trainingMission.script021Count > 0) == true {
+            world.aShowHUDMessage(message(0, level: level))
+            world.aToggleAllPlayerControls(0, 0, level: level)
+            world.aTogglePlayerControl(1, 0, 192, level: level)
+            world.aShowHUDMessage(message(22, level: level))
+            world.aSoundPlaySteamingText("pitch.osf", 1)
+            world.aSetLevelTimer(12, 4)
+
+            // Increment the script action counter
+            increment(\.script022Count, world: &world)
+        }
     }
 }
 
 extension TrainingMissionScript {
     /// Increments a ScriptActionCtr up to MAX_ACTION_CTR_VALUE.
-    private static func increment(
+    fileprivate static func increment(
         _ counter: WritableKeyPath<TrainingMissionState, Int>,
         world: inout GameWorld
     ) {
@@ -519,13 +659,121 @@ extension TrainingMissionScript {
     }
 
     /// CustomObjectScript_100A EVT_TIMER, StartDodge
-    /// (TrainingMission.cpp:1868-1882). Script 016's actions are still the
-    /// bespoke dodge lesson's start (M1 step 6 translates them); its
-    /// ScriptActionCtr_016 is that lesson's `script016Count`.
+    /// (TrainingMission.cpp:1865-1882).
     static func timerStartDodge(id: Int32, world: inout GameWorld, level: Level) {
         // Script 016: Start Dodge
-        if id == 8 {
-            world.startTrainingDodgeAttempt(level: level)
+        if world.trainingMission.script016Count < 1, id == 8 {
+            world.aObjSetShields(world.qGetPlayerObj(0, level: level), 100)
+            world.aShowHUDMessage(message(12, level: level))
+            world.aSetObjectTimer(objectHandle(5, level: level), 20, 2)
+            world.aSetObjectTimer(objectHandle(12, level: level), 14, 3)
+            world.aAISetState(1, objectHandle(12, level: level))
+
+            // Increment the script action counter
+            increment(\.script016Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_300E EVT_COLLIDE, DoneDodgeingGoal
+    /// (TrainingMission.cpp:1887-1902).
+    static func collideDoneDodgeingGoal(world: inout GameWorld, level: Level) {
+        // Script 019: Leaving Dodging Room
+        if world.trainingMission.script019Count < 1 {
+            world.aObjSetLightingDist(objectHandle(0, level: level), 50)
+            world.aPortalRenderSet(0, 0, roomIndex(2, level: level), true, level: level)
+            world.aPortalRenderSet(0, 1, roomIndex(2, level: level), true, level: level)
+            world.aTogglePlayerControl(0, 0, 62, level: level)
+            world.aSoundPlaySteamingText("proceed4.osf", 1)
+            world.aShowHUDMessage(message(17, level: level))
+
+            // Increment the script action counter
+            increment(\.script019Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_300E EVT_TIMER, DoneDodgeingGoal
+    /// (TrainingMission.cpp:1903-1921).
+    static func timerDoneDodgeingGoal(
+        id: Int32,
+        world: inout GameWorld,
+        level: Level
+    ) {
+        // Script 017: Player Done Dodging
+        if world.trainingMission.script017Count < 1,
+           (world.trainingMission.script016Count > 0) == true, id == 2 {
+            world.aObjSetLightingDist(objectHandle(0, level: level), 50)
+            world.aPortalRenderSet(0, 0, roomIndex(2, level: level), true, level: level)
+            world.aPortalRenderSet(0, 1, roomIndex(2, level: level), true, level: level)
+            world.aAISetState(0, objectHandle(12, level: level))
+            world.aTogglePlayerControl(1, 0, 3, level: level)
+            world.aSoundPlaySteamingText("proceed3.osf", 1)
+            world.aShowHUDMessage(message(0, level: level))
+            world.aShowHUDMessage(message(13, level: level))
+
+            // Increment the script action counter
+            increment(\.script017Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_2007 EVT_TIMER, DodgeTurrett
+    /// (TrainingMission.cpp:1926-1941). It has no counter test, so every
+    /// timer 3 runs it.
+    static func timerDodgeTurrett(id: Int32, world: inout GameWorld, level: Level) {
+        // Script 020: Almost Done dodging
+        if id == 3 {
+            world.aSoundPlaySteamingText("almost.osf", 1)
+            world.aShowHUDMessage(message(19, level: level))
+
+            // Increment the script action counter
+            increment(\.script020Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_080F EVT_COLLIDE, ManuverRoomCenter
+    /// (TrainingMission.cpp:1943-1966).
+    static func collideManuverRoomCenter(world: inout GameWorld, level: Level) {
+        // Script 021: Enter Manuver room
+        if world.trainingMission.script021Count < 1,
+           (world.trainingMission.script020Count > 0) == true {
+            world.aToggleShowPlayerControl(1, 0, level: level)
+            world.aObjSetLightingDist(objectHandle(0, level: level), 0)
+            world.aToggleAllPlayerControls(0, 0, level: level)
+            world.aPortalRenderSet(1, 1, roomIndex(2, level: level), true, level: level)
+            world.aPortalRenderSet(1, 0, roomIndex(2, level: level), true, level: level)
+            world.aShowHUDMessage(message(20, level: level))
+            world.aTogglePlayerControl(1, 0, 768, level: level)
+            world.aSetLevelTimer(20, 4)
+            world.aSoundPlaySteamingText("intro3.osf", 1)
+            world.aShowHUDMessage(message(21, level: level))
+
+            // Increment the script action counter
+            increment(\.script021Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_2008 EVT_TIMER, FollowBot1
+    /// (TrainingMission.cpp:1985-2001). It has no counter test of its own.
+    /// Its EVT_DESTROY (Script 037) is still the bespoke follow-bot
+    /// destruction (M1 step 7).
+    static func timerFollowBot1(id: Int32, world: inout GameWorld, level: Level) {
+        // Script 026: Done Following
+        if (world.trainingMission.script025Count > 0) == true, id == 7 {
+            world.aTogglePlayerControl(1, 0, 12288, level: level)
+            world.aAIGoalFollowPathSimple(
+                objectHandle(13, level: level),
+                pathIndex(1, level: level),
+                4352,
+                0,
+                3,
+                level: level
+            )
+            world.aShowHUDMessage(message(0, level: level))
+            world.aShowHUDMessage(message(23, level: level))
+            world.aSoundPlaySteamingText("intro4.osf", 1)
+            world.aShowHUDMessage(message(24, level: level))
+
+            // Increment the script action counter
+            increment(\.script026Count, world: &world)
         }
     }
 

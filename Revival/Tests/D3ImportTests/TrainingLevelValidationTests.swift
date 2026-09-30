@@ -81,10 +81,7 @@ extension CanonicalLevelTests {
         throws
     {
         let level = makeTrainingMovingTargetHandoffLevel()
-        let lesson = try XCTUnwrap(
-            level.trainingDodgeAttempt?.maneuverFollow
-        )
-        let handoff = try XCTUnwrap(lesson.destructionHandoff)
+        let handoff = try XCTUnwrap(level.trainingFollowBotDestruction)
 
         XCTAssertEqual(handoff.followBotObjectHandle, 8_200)
         XCTAssertEqual(handoff.destroyBot2ObjectHandle, 4_112)
@@ -121,654 +118,154 @@ extension CanonicalLevelTests {
         XCTAssertNoThrow(try level.validate())
     }
 
-    func testOwnedFollowBotHandoffRejectsHostileRetailProvenance()
-        throws
-    {
-        let fallbackPath =
-            "/tmp/revival-followbot-handoff-visibility-corrected-import-3/training.revival/levels/descent3.level.training-mission/level.json"
-        let path = ProcessInfo.processInfo.environment[
-            "REVIVAL_FOLLOWBOT_HANDOFF_OWNED_LEVEL"
-        ] ?? fallbackPath
-        let stockLevel = try JSONDecoder().decode(
-            Level.self,
-            from: Data(contentsOf: URL(fileURLWithPath: path))
-        )
-        XCTAssertNoThrow(try stockLevel.validate())
-        let handoff = try XCTUnwrap(
-            stockLevel.trainingDodgeAttempt?.maneuverFollow?
-                .destructionHandoff
-        )
-        XCTAssertEqual(handoff.projectileModel.storedIndex, 16)
-        XCTAssertEqual(
-            stockLevel.models.first {
-                $0.source == handoff.projectileModel
-            }?.sourceSHA256,
-            "717a9a2ac254eba76c7992fc834e3a5bc3992f86674af972afd9cf0c2967b31b"
-        )
-        XCTAssertEqual(
-            stockLevel.voiceClips.first {
-                $0.sourceName == handoff.voiceSourceName
-            }?.pcmSHA256,
-            "0b1eae26d812929a08faa05efde07926dc4a96ac3873320b6f39805f69877b06"
-        )
-
-        var authoredLevel = stockLevel
-        let authoredDestroyBot1Index = try XCTUnwrap(
-            authoredLevel.objects.firstIndex {
-                $0.handle == handoff.destroyBot1ObjectHandle
-            }
-        )
-        let authoredPosition =
-            authoredLevel.objects[authoredDestroyBot1Index].position
-        authoredLevel.objects[authoredDestroyBot1Index].position =
-            .init(
-                x: authoredPosition.x + 0.25,
-                y: authoredPosition.y,
-                z: authoredPosition.z
-            )
-        XCTAssertNoThrow(try authoredLevel.validateForAuthoring())
-
-        var hostileObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(stockLevel)
-            ) as? [String: Any]
-        )
-        var hostileVoices = try XCTUnwrap(
-            hostileObject["voiceClips"] as? [[String: Any]]
-        )
-        let killIndex = try XCTUnwrap(
-            hostileVoices.firstIndex {
-                ($0["sourceName"] as? String) == "kill1.osf"
-            }
-        )
-        hostileVoices[killIndex]["sourceSHA256"] = String(repeating: "0", count: 64)
-        hostileObject["voiceClips"] = hostileVoices
-        let hostileVoiceLevel = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: hostileObject)
-        )
-        assertValidationError(
-            .invalidDependency(
-                "Training Scripts 031,037,027 stock package"
-            ),
-            hostileVoiceLevel
-        )
-
-        hostileObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(stockLevel)
-            ) as? [String: Any]
-        )
-        hostileVoices = try XCTUnwrap(
-            hostileObject["voiceClips"] as? [[String: Any]]
-        )
-        let hostilePCMString = try XCTUnwrap(
-            hostileVoices[killIndex]["pcm16LittleEndian"] as? String
-        )
-        var hostilePCM = try XCTUnwrap(
-            Data(base64Encoded: hostilePCMString)
-        )
-        hostilePCM[hostilePCM.startIndex] ^= 0xff
-        hostileVoices[killIndex]["pcm16LittleEndian"] =
-            hostilePCM.base64EncodedString()
-        hostileVoices[killIndex]["pcmSHA256"] =
-            canonicalSHA256(hostilePCM)
-        hostileObject["voiceClips"] = hostileVoices
-        let hostilePCMLevel = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: hostileObject)
-        )
-        assertValidationError(
-            .invalidDependency(
-                "Training Scripts 031,037,027 stock package"
-            ),
-            hostilePCMLevel
-        )
-
-        hostileObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(stockLevel)
-            ) as? [String: Any]
-        )
-        var hostileObjects = try XCTUnwrap(
-            hostileObject["objects"] as? [[String: Any]]
-        )
-        let destroyBot1Index = try XCTUnwrap(
-            hostileObjects.firstIndex {
-                ($0["handle"] as? UInt32) == 4_113
-                    || ($0["handle"] as? Int) == 4_113
-            }
-        )
-        hostileObjects[destroyBot1Index]["orientation"] = [
-            "right": ["x": 1, "y": 0, "z": 0],
-            "up": ["x": 0, "y": 1, "z": 0],
-            "forward": ["x": 0, "y": 0, "z": 1],
-        ]
-        hostileObject["objects"] = hostileObjects
-        let hostilePoseLevel = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: hostileObject)
-        )
-        assertValidationError(
-            .invalidDependency(
-                "Training Scripts 031,037,027 stock package"
-            ),
-            hostilePoseLevel
-        )
-    }
-
-    func testSchemaElevenLeavesTrainingManeuverFollowOptionalForOlderPackages()
-        throws
-    {
-        let current = makeTrainingManeuverFollowLevel()
-        var object = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(current)
-            ) as? [String: Any]
-        )
-        var hostileObject = object
-        var hostileDodge = try XCTUnwrap(
-            hostileObject["trainingDodgeAttempt"]
-                as? [String: Any]
-        )
-        var hostileLesson = try XCTUnwrap(
-            hostileDodge["maneuverFollow"] as? [String: Any]
-        )
-        hostileLesson["headingControlMask"] = 769
-        hostileDodge["maneuverFollow"] = hostileLesson
-        hostileObject["trainingDodgeAttempt"] = hostileDodge
-        var dodge = try XCTUnwrap(
-            object["trainingDodgeAttempt"] as? [String: Any]
-        )
-        dodge.removeValue(forKey: "maneuverFollow")
-        object["trainingDodgeAttempt"] = dodge
-        let level = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: object)
-        )
-        XCTAssertNil(
-            level.trainingDodgeAttempt?.maneuverFollow
-        )
-        XCTAssertNoThrow(try level.validate())
-
-        let hostile = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(
-                withJSONObject: hostileObject
-            )
-        )
-        let hostileDodgeAttempt = try XCTUnwrap(
-            hostile.trainingDodgeAttempt
-        )
-        XCTAssertThrowsError(
-            try validateStockTrainingManeuverFollowPackage(
-                try XCTUnwrap(
-                    hostileDodgeAttempt.maneuverFollow
-                ),
-                dodge: hostileDodgeAttempt,
-                level: hostile
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .invalidDependency(
-                    "Training Scripts 021-026 stock package"
-                )
-            )
-        }
-    }
-
-    func testManeuverFollowLessonRequiresExactStockCarrierPathsAndActions()
-        throws
-    {
+    func testManeuverFixtureCarriesStockPathsAndFlyerAI() throws {
         let level = makeTrainingManeuverFollowLevel()
-        let lesson = try XCTUnwrap(
-            level.trainingDodgeAttempt?.maneuverFollow
-        )
-
-        XCTAssertEqual(lesson.maneuverObjectHandle, 2_063)
-        XCTAssertEqual(lesson.orderedPortalIndices, [1, 0])
-        XCTAssertEqual(lesson.headingControlMask, 768)
-        XCTAssertEqual(lesson.pitchControlMask, 192)
-        XCTAssertEqual(lesson.bankControlMask, 3_072)
-        XCTAssertEqual(lesson.rotationalControlMask, 4_032)
-        XCTAssertEqual(lesson.weaponControlMask, 12_288)
-        XCTAssertEqual(lesson.followBotObjectHandle, 8_200)
-        XCTAssertEqual(lesson.followPathGoalFlags, 0x90_01_04)
-        XCTAssertEqual(lesson.destroyPathGoalFlags, 0x11_00)
         XCTAssertEqual(level.paths[0].name, "FollowLoop1")
         XCTAssertEqual(level.paths[0].nodes.count, 13)
         XCTAssertEqual(level.paths[1].name, "GoToDie")
         XCTAssertEqual(level.paths[1].nodes.count, 1)
-        XCTAssertEqual(
-            canonicalSHA256(try canonicalJSONData(level.paths)),
-            "56997a7e05b017a65778bd48badf453f72bdf5f3f34d60fbd1d6cd8b4fdcdbe5"
-        )
-        XCTAssertEqual(lesson.followBot.collisionRadius, 4.576_441_8)
-        XCTAssertEqual(lesson.followBot.maximumVelocity, 40)
-        XCTAssertEqual(lesson.followBot.maximumDeltaVelocity, 80)
-        XCTAssertEqual(lesson.followBot.maximumTurnRate, 12_000)
-        XCTAssertEqual(
-            lesson.followBot.maximumDeltaTurnRate,
-            16_000
-        )
-        XCTAssertEqual(lesson.followBot.circleDistance, 25)
-        let bot = try XCTUnwrap(
-            level.objects.first {
-                $0.handle == lesson.followBotObjectHandle
-            }
-        )
+        let bot = try XCTUnwrap(level.objects.first { $0.handle == 8_200 })
         XCTAssertEqual(bot.flags, 5_121)
         XCTAssertEqual(bot.location, .room(37))
-        XCTAssertEqual(bot.definition?.sourceName, "RAS1 Light Security Flyer")
-    }
-
-    func testOwnedManeuverFollowPackageAdmissionPinsStockBoundary()
-        throws
-    {
-        let path = try XCTUnwrap(
-            ProcessInfo.processInfo.environment[
-                "REVIVAL_MANEUVER_FOLLOW_OWNED_LEVEL"
-            ],
-            "requires the ignored exact-final owned Script 026 level"
-        )
-        let level = try JSONDecoder().decode(
-            Level.self,
-            from: Data(contentsOf: URL(fileURLWithPath: path))
-        )
+        let ai = try XCTUnwrap(level.objectInfo(for: ObjectHandle(bot.handle))?.ai)
+        XCTAssertEqual(ai.maxVelocity, 40)
+        XCTAssertEqual(ai.maxDeltaVelocity, 80)
+        XCTAssertEqual(ai.maxTurnRate, 12_000)
+        XCTAssertEqual(ai.maxDeltaTurnRate, 16_000)
+        XCTAssertEqual(ai.circleDistance, 25)
         XCTAssertNoThrow(try level.validate())
-        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
-        let lesson = try XCTUnwrap(dodge.maneuverFollow)
-        XCTAssertNoThrow(
-            try validateStockTrainingManeuverFollowPackage(
-                lesson,
-                dodge: dodge,
-                level: level
-            )
-        )
-        XCTAssertEqual(
-            level.voiceClips.filter {
-                [
-                    "intro3.osf",
-                    "pitch.osf",
-                    "bank.osf",
-                    "follow.osf",
-                    "intro4.osf",
-                ].contains($0.sourceName)
-            }.map(\.sourceEntryIndex),
-            [12, 20, 1, 3, 13]
-        )
-        XCTAssertEqual(lesson.followBot.maximumVelocity, 40)
-        XCTAssertEqual(lesson.followBot.maximumDeltaVelocity, 80)
-        XCTAssertEqual(lesson.followBot.maximumTurnRate, 12_000)
-        XCTAssertEqual(
-            lesson.followBot.maximumDeltaTurnRate,
-            16_000
-        )
-        XCTAssertEqual(lesson.followBot.circleDistance, 25)
     }
 
-    func testScript019DodgeExitRequiresExactStockBindingsAndMedia() throws {
+    func testObjectTablesRejectHostileWeaponsBatteriesAndGuns() throws {
         let level = makeTrainingDodgeAttemptLevel()
-        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
-        let exit = try XCTUnwrap(dodge.dodgeExit)
-
-        XCTAssertEqual(exit.objectHandle, 12_302)
-        XCTAssertEqual(exit.collisionRadius, 10.052_409)
-        XCTAssertEqual(exit.markerLightObjectHandle, 4_120)
-        XCTAssertEqual(exit.markerLightDistance, 50)
-        XCTAssertEqual(exit.portalRoomSourceIndex, 36)
-        XCTAssertEqual(exit.orderedPortalIndices, [0, 1])
-        XCTAssertEqual(exit.disabledControlMask, 62)
-        XCTAssertEqual(
-            exit.instruction,
-            "Now keep moving forward into the next room."
-        )
-        XCTAssertEqual(exit.voiceSourceName, "proceed4.osf")
-        XCTAssertNotNil(
-            level.voiceClips.first {
-                $0.sourceName == exit.voiceSourceName
-            }
-        )
         XCTAssertNoThrow(try level.validate())
-
-        var oldLevel = level
-        oldLevel.trainingDodgeAttempt?.dodgeExit = nil
-        oldLevel = replacing(
-            oldLevel,
-            voiceClips: oldLevel.voiceClips.filter {
-                $0.sourceName != "proceed4.osf"
-            },
-            dependencyManifest: .init(
-                current: oldLevel.dependencyManifest.current.filter {
-                    $0.source.sourceName != "proceed4.osf"
-                },
-                historicalEagerBaseline:
-                    oldLevel.dependencyManifest.historicalEagerBaseline
-            )
-        )
-        var oldObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(oldLevel)
-            ) as? [String: Any]
-        )
-        var oldDodge = try XCTUnwrap(
-            oldObject["trainingDodgeAttempt"] as? [String: Any]
-        )
-        oldDodge.removeValue(forKey: "dodgeExit")
-        oldObject["trainingDodgeAttempt"] = oldDodge
-        let decodedOldLevel = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: oldObject)
-        )
-        XCTAssertNil(decodedOldLevel.trainingDodgeAttempt?.dodgeExit)
-        XCTAssertNoThrow(try decodedOldLevel.validate())
-
-        var hostileObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(level)
-            ) as? [String: Any]
-        )
-        var hostileDodge = try XCTUnwrap(
-            hostileObject["trainingDodgeAttempt"] as? [String: Any]
-        )
-        var hostileExit = try XCTUnwrap(
-            hostileDodge["dodgeExit"] as? [String: Any]
-        )
-        hostileExit["disabledControlMask"] = 63
-        hostileDodge["dodgeExit"] = hostileExit
-        hostileObject["trainingDodgeAttempt"] = hostileDodge
-        let hostileLevel = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: hostileObject)
-        )
-        XCTAssertThrowsError(try hostileLevel.validate())
-    }
-
-    func testTimedDodgeAttemptRequiresExactStockBindingsAndMedia() throws {
-        let level = makeTrainingDodgeAttemptLevel()
-        let dodge = try XCTUnwrap(level.trainingDodgeAttempt)
-
-        XCTAssertEqual(dodge.startDodgeObjectHandle, 4_106)
-        XCTAssertEqual(dodge.doneDodgeingGoalObjectHandle, 12_302)
-        XCTAssertEqual(dodge.dodgeTurretObjectHandle, 8_199)
-        XCTAssertEqual(dodge.flashLightObjectHandle, 4_120)
-        XCTAssertEqual(dodge.triggerDelay, 10)
-        XCTAssertEqual(dodge.successDelay, 20)
-        XCTAssertEqual(dodge.almostDoneDelay, 14)
-        XCTAssertEqual(dodge.portalRoomTwoSourceIndex, 49)
-        XCTAssertEqual(dodge.portalRoomThreeSourceIndex, 36)
-        XCTAssertEqual(dodge.orderedPortalIndices, [0, 1])
-        XCTAssertEqual(dodge.disabledControlMask, 3)
-        XCTAssertEqual(dodge.enabledDodgeControlMask, 60)
-        XCTAssertEqual(dodge.successControlMask, 3)
-        XCTAssertEqual(
-            dodge.introduction,
-            "Next you are going to practice dodging."
-        )
-        XCTAssertEqual(
-            dodge.instruction,
-            "To complete this step, dodge the turrett fire for 20 seconds."
-        )
-        XCTAssertEqual(
-            dodge.hitInstruction,
-            "Oops, you were hit! Keep moving!"
-        )
-        XCTAssertEqual(
-            dodge.almostDoneInstruction,
-            "You are almost done! Keep up the good work!"
-        )
-        XCTAssertEqual(dodge.successMessage, "Excellent!")
-        XCTAssertEqual(
-            dodge.leaveInstruction,
-            "Now using your sliding skills, proceed forward to the flashing green light."
-        )
-        XCTAssertEqual(
-            [
-                dodge.introductionVoiceSourceName,
-                dodge.almostDoneVoiceSourceName,
-                dodge.successVoiceSourceName,
-            ],
-            ["intro2.osf", "almost.osf", "proceed3.osf"]
-        )
-        XCTAssertEqual(dodge.restoredPlayerShields, 100)
-        XCTAssertEqual(dodge.successMarkerLightDistance, 50)
-        XCTAssertEqual(
-            dodge.markerLightPresentation.primaryColor,
-            .init(x: 0.2, y: 1, z: 0.2)
-        )
-        XCTAssertEqual(
-            dodge.turret.gunpoints,
-            [
-                .init(
-                    x: 1.706_505_8,
-                    y: -2.224_015_2,
-                    z: 2.190_463_5
-                ),
-                .init(
-                    x: 0.457_947_73,
-                    y: -2.224_015_2,
-                    z: 2.190_463_5
-                ),
-            ]
-        )
-        XCTAssertEqual(
-            dodge.turret.aimingGunpoint,
-            .init(
-                x: 1.085_584_6,
-                y: -2.224_015_2,
-                z: 2.190_463_5
-            )
-        )
-        XCTAssertNoThrow(try level.validate())
-
         let encoded = try JSONEncoder().encode(level)
-        let oldPackage = try JSONDecoder().decode(
-            Level.self,
-            from: JSONEncoder().encode(
-                makeTrainingScript015Level()
-            )
-        )
-        XCTAssertNil(oldPackage.trainingDodgeAttempt)
-        XCTAssertNoThrow(try oldPackage.validate())
 
-        var hostileObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: encoded)
-                as? [String: Any]
-        )
-        var hostileDodge = try XCTUnwrap(
-            hostileObject["trainingDodgeAttempt"]
-                as? [String: Any]
-        )
-        var hostileTurret = try XCTUnwrap(
-            hostileDodge["turret"] as? [String: Any]
-        )
-        hostileTurret["projectileDamage"] = 0
-        hostileDodge["turret"] = hostileTurret
-        hostileObject["trainingDodgeAttempt"] = hostileDodge
-        let hostilePackage = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(
-                withJSONObject: hostileObject
-            )
-        )
-        XCTAssertThrowsError(try hostilePackage.validate())
-
-        var hostileTransformObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: encoded)
-                as? [String: Any]
-        )
-        var hostileObjects = try XCTUnwrap(
-            hostileTransformObject["objects"] as? [[String: Any]]
-        )
-        let startIndex = try XCTUnwrap(
-            hostileObjects.firstIndex {
-                ($0["handle"] as? NSNumber)?.uint32Value == 4_106
-            }
-        )
-        var hostileStart = hostileObjects[startIndex]
-        var hostilePosition = try XCTUnwrap(
-            hostileStart["position"] as? [String: Any]
-        )
-        hostilePosition["x"] = 0
-        hostileStart["position"] = hostilePosition
-        hostileObjects[startIndex] = hostileStart
-        hostileTransformObject["objects"] = hostileObjects
-        let hostileTransformPackage = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(
-                withJSONObject: hostileTransformObject
-            )
-        )
-        XCTAssertThrowsError(try hostileTransformPackage.validate())
-    }
-
-    func testTimedDodgeAttemptRejectsHostilePortalMetadataWithoutTrapping()
-        throws
-    {
-        let encoded = try JSONEncoder().encode(
-            makeTrainingDodgeAttemptLevel()
-        )
-
-        func hostileLevel(
-            mutate: (inout [String: Any]) -> Void
+        func hostile(
+            _ mutate: (inout [String: Any]) throws -> Void
         ) throws -> Level {
             var object = try XCTUnwrap(
                 JSONSerialization.jsonObject(with: encoded)
                     as? [String: Any]
             )
-            var dodge = try XCTUnwrap(
-                object["trainingDodgeAttempt"] as? [String: Any]
-            )
-            mutate(&dodge)
-            object["trainingDodgeAttempt"] = dodge
+            try mutate(&object)
             return try JSONDecoder().decode(
                 Level.self,
                 from: JSONSerialization.data(withJSONObject: object)
             )
         }
 
-        let hostileRoom = try hostileLevel {
-            $0["portalRoomTwoSourceIndex"] = 35
-        }
-        XCTAssertThrowsError(try hostileRoom.validate())
-
-        let hostilePortal = try hostileLevel {
-            $0["orderedPortalIndices"] = [0, 2]
-        }
-        XCTAssertThrowsError(try hostilePortal.validate())
-    }
-
-    func testOwnedTimedDodgePackageAdmissionRejectsHostileMutation()
-        throws
-    {
-        let path = try XCTUnwrap(
-            ProcessInfo.processInfo.environment[
-                "REVIVAL_DODGE_OWNED_LEVEL"
-            ],
-            "requires the ignored promoted timed-dodge owned level"
-        )
-        let stockLevel = try JSONDecoder().decode(
-            Level.self,
-            from: Data(contentsOf: URL(fileURLWithPath: path))
-        )
-        XCTAssertNoThrow(try stockLevel.validate())
-        let dodge = try XCTUnwrap(stockLevel.trainingDodgeAttempt)
-        XCTAssertEqual(
-            stockLevel.models.first {
-                $0.source == dodge.turret.model
-            }?.sourceSHA256,
-            "41c69958947ddc7673ddfe2ffb6f559c6892eafed8b759a02b47c05b22f137e4"
-        )
-        XCTAssertEqual(
-            stockLevel.models.first {
-                $0.source == dodge.turret.projectileModel
-            }?.sourceSHA256,
-            "67e6ff8f84fbcbc60b33a61b222e04be6cfbd4b53ad367ac14f82cca2a76a1ab"
-        )
-        XCTAssertEqual(
-            stockLevel.voiceClips.first {
-                $0.sourceName == "intro2.osf"
-            }?.pcmSHA256,
-            "c43858617c694a1c41dbcc2b9b0c31e0b0f73ff7e33423ef3b80bcf501ef9def"
-        )
-        XCTAssertEqual(
-            stockLevel.voiceClips.first {
-                $0.sourceName == "almost.osf"
-            }?.pcmSHA256,
-            "4d90c15e4c1f9a22fb9b4a3808739d6eecd8590b688b10a84abe7bf641ef8017"
-        )
-        XCTAssertEqual(
-            stockLevel.voiceClips.first {
-                $0.sourceName == "proceed3.osf"
-            }?.pcmSHA256,
-            "abc67c37d716253959d0ec615b364b6ff59b896179fc3f93256be3870ed3dabd"
-        )
-        let exit = try XCTUnwrap(dodge.dodgeExit)
-        XCTAssertEqual(
-            stockLevel.voiceClips.first {
-                $0.sourceName == exit.voiceSourceName
-            }?.sourceEntryIndex,
-            24
-        )
-        XCTAssertEqual(
-            stockLevel.voiceClips.first {
-                $0.sourceName == exit.voiceSourceName
-            }?.sourceSHA256,
-            "d7442b4192e34ed6b7b529f3b3d555be64ef3437c000611ff7fa57d6989550e9"
-        )
-        XCTAssertEqual(
-            stockLevel.voiceClips.first {
-                $0.sourceName == exit.voiceSourceName
-            }?.pcmSHA256,
-            "92228006e3a802cc067a1650f735cc1a04865bf68d35ab3bc94343049e3dadc7"
-        )
-
-        var hostileObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(stockLevel)
-            ) as? [String: Any]
-        )
-        var hostileDodge = try XCTUnwrap(
-            hostileObject["trainingDodgeAttempt"] as? [String: Any]
-        )
-        var hostileTurret = try XCTUnwrap(
-            hostileDodge["turret"] as? [String: Any]
-        )
-        hostileTurret["projectileSpeed"] = 199
-        hostileDodge["turret"] = hostileTurret
-        hostileObject["trainingDodgeAttempt"] = hostileDodge
-        let hostileLevel = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: hostileObject)
+        assertValidationError(
+            .invalidObjectTables("weapon Laser Level 1 - Red"),
+            try hostile { object in
+                var weapons = try XCTUnwrap(
+                    object["weapons"] as? [[String: Any]]
+                )
+                weapons[0]["sounds"] = ["", "", ""]
+                object["weapons"] = weapons
+            }
         )
         assertValidationError(
-            .invalidDependency("Training timed dodge stock package"),
-            hostileLevel
-        )
-
-        hostileObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(stockLevel)
-            ) as? [String: Any]
-        )
-        hostileDodge = try XCTUnwrap(
-            hostileObject["trainingDodgeAttempt"] as? [String: Any]
-        )
-        var hostileExit = try XCTUnwrap(
-            hostileDodge["dodgeExit"] as? [String: Any]
-        )
-        hostileExit["voiceSourceName"] = "proceed3.osf"
-        hostileDodge["dodgeExit"] = hostileExit
-        hostileObject["trainingDodgeAttempt"] = hostileDodge
-        let hostileExitLevel = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: hostileObject)
+            .invalidObjectTables("weapon names"),
+            try hostile { object in
+                let weapons = try XCTUnwrap(
+                    object["weapons"] as? [[String: Any]]
+                )
+                object["weapons"] = weapons + weapons
+            }
         )
         assertValidationError(
-            .invalidDependency("Training timed dodge attempt"),
-            hostileExitLevel
+            .invalidObjectTables("object info Hangturret"),
+            try hostile { object in
+                var infos = try XCTUnwrap(
+                    object["objectInfos"] as? [[String: Any]]
+                )
+                let index = try XCTUnwrap(infos.firstIndex {
+                    ($0["name"] as? String) == "Hangturret"
+                })
+                var batteries = try XCTUnwrap(
+                    infos[index]["weaponBatteries"] as? [[String: Any]]
+                )
+                batteries[0]["gunpointWeapons"] = ["No Such Weapon"]
+                infos[index]["weaponBatteries"] = batteries
+                object["objectInfos"] = infos
+            }
+        )
+        // Each placed AI object's page matches its model
+        // (WBFireBattery, robotfire.cpp:111): one page battery per model
+        // battery, a weapon entry per gun point, and a weapon for every
+        // gun point a mask fires.
+        let turretHandle = level.findObjectName("DodgeTurrett").rawValue
+        func hostileTurretBattery(
+            _ mutate: @escaping (inout [String: Any]) -> Void
+        ) throws -> Level {
+            try hostile { object in
+                var infos = try XCTUnwrap(
+                    object["objectInfos"] as? [[String: Any]]
+                )
+                let index = try XCTUnwrap(infos.firstIndex {
+                    ($0["name"] as? String) == "Hangturret"
+                })
+                var batteries = try XCTUnwrap(
+                    infos[index]["weaponBatteries"] as? [[String: Any]]
+                )
+                mutate(&batteries[0])
+                infos[index]["weaponBatteries"] = batteries
+                object["objectInfos"] = infos
+            }
+        }
+        assertValidationError(
+            .invalidObjectTables("object \(turretHandle) guns"),
+            try hostileTurretBattery {
+                $0["gunpointWeapons"] = [
+                    "Laser Level 1 - Red", "Laser Level 1 - Red",
+                ]
+            }
+        )
+        assertValidationError(
+            .invalidObjectTables("object \(turretHandle) guns"),
+            try hostileTurretBattery {
+                $0["gunpointWeapons"] = ["", "Laser Level 1 - Red", ""]
+            }
+        )
+        assertValidationError(
+            .invalidObjectTables("object \(turretHandle) guns"),
+            try hostile { object in
+                var infos = try XCTUnwrap(
+                    object["objectInfos"] as? [[String: Any]]
+                )
+                let index = try XCTUnwrap(infos.firstIndex {
+                    ($0["name"] as? String) == "Hangturret"
+                })
+                var batteries = try XCTUnwrap(
+                    infos[index]["weaponBatteries"] as? [[String: Any]]
+                )
+                batteries.append(batteries[0])
+                infos[index]["weaponBatteries"] = batteries
+                object["objectInfos"] = infos
+            }
+        )
+        let turretModel = try XCTUnwrap(
+            level.models.first { $0.gunpoints != nil }
+        )
+        assertValidationError(
+            .invalidObjectTables(
+                "model guns \(turretModel.source.sourceName)"
+            ),
+            try hostile { object in
+                var models = try XCTUnwrap(
+                    object["models"] as? [[String: Any]]
+                )
+                let index = try XCTUnwrap(models.firstIndex {
+                    $0["gunpoints"] != nil
+                })
+                var gunpoints = try XCTUnwrap(
+                    models[index]["gunpoints"] as? [[String: Any]]
+                )
+                gunpoints[0]["parent"] = 99
+                models[index]["gunpoints"] = gunpoints
+                object["models"] = models
+            }
         )
     }
-
 }

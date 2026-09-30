@@ -1020,6 +1020,7 @@ struct RetailWeaponPresentationSelection:
     let modelPageSize: Float
     let mass: Float
     let drag: Float
+    var fullThrust: Float = 0
     let physicsFlags: UInt32
     let coefficientOfRestitution: Float
     let speed: Float
@@ -1036,7 +1037,7 @@ struct RetailWeaponPresentationSelection:
     let impactGenericDamage: Float
     let impactForce: Float
     let lightDistance: Float
-    let lightPresentation: TrainingMarkerLightPresentation
+    let lightPresentation: ObjectLightPresentation
     let soundLogicalNames: [String]
 }
 
@@ -1114,7 +1115,7 @@ private func parseRetailWeaponPresentations(
             _ = try cursor.readFloat()
             let mass = try cursor.readFloat()
             let drag = try cursor.readFloat()
-            _ = try cursor.readFloat()
+            let fullThrust = try cursor.readFloat()
             let physicsFlags = try cursor.readUInt32()
             _ = try cursor.readFloat()
             _ = try cursor.readFloat()
@@ -1190,6 +1191,7 @@ private func parseRetailWeaponPresentations(
                 modelPageSize: modelPageSize,
                 mass: mass,
                 drag: drag,
+                fullThrust: fullThrust,
                 physicsFlags: physicsFlags,
                 coefficientOfRestitution:
                     coefficientOfRestitution,
@@ -2249,7 +2251,7 @@ private func parseSubmodelPresentation(_ properties: String) throws -> ModelSubm
     return .standard
 }
 
-private struct OutrageModelCursor {
+struct OutrageModelCursor {
     let data: Data
     var offset = 0
     var remaining: Int { data.count - offset }

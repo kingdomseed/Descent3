@@ -362,94 +362,20 @@ struct TrainingLaserProjectileState:
     var lifeRemaining: Float
 }
 
-struct TrainingDodgeProjectileState:
+/// The bespoke follow-bot destruction chain (TrainingMission.cpp Scripts
+/// 037, 027, and 028), until M1 step 7 translates robot death. The robots
+/// move by their AI follow-path goals.
+struct TrainingFollowBotDestructionState:
     Codable, Equatable, Sendable
 {
-    var roomSourceIndex: Int
-    var position: Vector3
-    let velocity: Vector3
-    var lifeRemaining: Float
-}
-
-struct TrainingDodgeAttemptState:
-    Codable, Equatable, Sendable
-{
-    var script016Count = 0
-    var script017Count = 0
-    var script019Count: Int? = nil
-    var script018Count = 0
-    var script020Count = 0
-    var successTimerRemaining: Float?
-    var almostDoneTimerRemaining: Float?
-    var turretIsPowered = false
-    var nextFireTime: Float = 0
-    var firingMaskIndex = 0
-    var turretAngles: [Float] = [0, 0]
-    var turretDirections: [Int] = [0, 0]
-    var retainedTargetPosition: Vector3?
-    var lastVisibleTargetTime: Float = -14
-    var nextVisibilityCheckTime: Float = 0
-    var seesTarget = false
-    var awareness: Float = 0
-    var weaponSpeed: Float = 0
-    var projectiles: [TrainingDodgeProjectileState] = []
-    var markerLightDistance: Float = 0
-}
-
-struct TrainingManeuverFollowState:
-    Codable, Equatable, Sendable
-{
-    var script021Count = 0
-    var script022Count = 0
-    var script024Count = 0
-    var script023Count = 0
-    var script025Count = 0
-    var script026Count = 0
-    var levelTimerRemaining: Float?
-    var objectTimerRemaining: Float?
-    var followBotIsPowered = false
-    var followBotTeamFlags: UInt32 = 0
-    var roomSourceIndex: Int
-    var position: Vector3
-    var orientation: Matrix3
-    var velocity = Vector3.zero
-    var activePathIndex: Int?
-    var pathNodeIndex = 0
-    var pathFailure: TrainingFollowBotPathFailure?
-    var destruction: TrainingFollowBotDestructionState? = nil
-
-    var frame: TrainingFollowBotFrame {
-        .init(
-            isPowered: followBotIsPowered,
-            teamFlags: followBotTeamFlags,
-            roomSourceIndex: roomSourceIndex,
-            position: position,
-            orientation: orientation,
-            velocity: velocity,
-            activePathIndex: activePathIndex,
-            pathNodeIndex: pathNodeIndex,
-            objectTimerRemaining: objectTimerRemaining,
-            pathFailure: pathFailure,
-            script021Count: script021Count,
-            script022Count: script022Count,
-            script024Count: script024Count,
-            script023Count: script023Count,
-            script025Count: script025Count,
-            script026Count: script026Count
-        )
-    }
-}
-
-struct TrainingAuthoredPathMotion:
-    Codable, Equatable, Sendable
-{
-    var roomSourceIndex: Int
-    var position: Vector3
-    var orientation: Matrix3
-    var velocity = Vector3.zero
-    var activePathIndex: Int?
-    var pathNodeIndex = 0
-    var pathFailure: TrainingFollowBotPathFailure?
+    var followBotShields: Float
+    var followBotWasDestroyed = false
+    var script037Count = 0
+    var script027Count = 0
+    var levelTimer11Remaining: Float?
+    var destroyBot2IsVisible = false
+    var destroyBot1IsVisible = false
+    var destroyBot1Destruction: TrainingDestroyBot1DestructionState? = nil
 }
 
 struct TrainingDestroyBot1DestructionState:
@@ -458,65 +384,8 @@ struct TrainingDestroyBot1DestructionState:
     var destroyBot1Shields: Float
     var destroyBot1WasDestroyed = false
     var script028Count = 0
-    var destroyBot2Motion: TrainingAuthoredPathMotion
 }
 
-struct TrainingFollowBotDestructionState:
-    Codable, Equatable, Sendable
-{
-    var followBotShields: Float
-    var followBotWasDestroyed = false
-    var script031Count = 0
-    var script037Count = 0
-    var script027Count = 0
-    var levelTimer11Remaining: Float?
-    var destroyBot2IsVisible = false
-    var destroyBot1IsVisible = false
-    var destroyBot2TeamFlags: UInt32 = 0
-    var destroyBot1TeamFlags: UInt32 = 0
-    var destroyBot1Motion: TrainingAuthoredPathMotion
-    var destroyBot1Destruction:
-        TrainingDestroyBot1DestructionState? = nil
-
-    func movingTargetFrame(
-        handoff: TrainingFollowBotDestructionHandoff
-    ) -> TrainingMovingTargetFrame? {
-        if let destroyBot1Destruction,
-           destroyBot1Destruction.script028Count > 0,
-           destroyBot2IsVisible,
-           let activePathIndex =
-            destroyBot1Destruction.destroyBot2Motion.activePathIndex
-        {
-            return .init(
-                objectHandle: handoff.destroyBot2ObjectHandle,
-                roomSourceIndex:
-                    destroyBot1Destruction.destroyBot2Motion
-                        .roomSourceIndex,
-                activePathIndex: activePathIndex,
-                pathNodeIndex:
-                    destroyBot1Destruction.destroyBot2Motion
-                        .pathNodeIndex,
-                pathFailure:
-                    destroyBot1Destruction.destroyBot2Motion
-                        .pathFailure
-            )
-        }
-        guard script027Count > 0,
-              destroyBot1IsVisible,
-              let activePathIndex =
-                destroyBot1Motion.activePathIndex
-        else {
-            return nil
-        }
-        return .init(
-            objectHandle: handoff.destroyBot1ObjectHandle,
-            roomSourceIndex: destroyBot1Motion.roomSourceIndex,
-            activePathIndex: activePathIndex,
-            pathNodeIndex: destroyBot1Motion.pathNodeIndex,
-            pathFailure: destroyBot1Motion.pathFailure
-        )
-    }
-}
 struct PlayerRearViewState: Codable, Equatable, Sendable {
     var leaveMode: Bool
     let entryGameTime: Float
@@ -532,15 +401,10 @@ extension GameWorld {
     /// The level-start state of the bespoke Training script types. Later M1
     /// steps replace these with the Training level module.
     mutating func initializeTrainingState(level: Level) {
-        let objects = objects
-        trainingDodgeAttemptState = level.trainingDodgeAttempt.map {
-            _ in TrainingDodgeAttemptState()
-        }
-        trainingManeuverFollowState =
-            level.trainingDodgeAttempt?.maneuverFollow.flatMap {
-                initialTrainingManeuverFollowState(
-                    objects: objects,
-                    lesson: $0
+        trainingFollowBotDestructionState =
+            level.trainingFollowBotDestruction.map {
+                TrainingFollowBotDestructionState(
+                    followBotShields: $0.combat.robotShields
                 )
             }
         trainingGalleryBarrierState = level.trainingGalleryBarrier.map {
@@ -627,54 +491,6 @@ extension GameWorld {
             _ in TrainingFinalGoalState()
         }
     }
-}
-
-func initialTrainingManeuverFollowState(
-    objects: ObjectTable,
-    lesson: TrainingManeuverFollowLesson
-) -> TrainingManeuverFollowState? {
-    guard let followBot = objects[ObjectHandle(lesson.followBotObjectHandle)],
-          case let .room(roomSourceIndex) = followBot.location
-    else {
-        return nil
-    }
-    var state = TrainingManeuverFollowState(
-        roomSourceIndex: roomSourceIndex,
-        position: followBot.position,
-        orientation: followBot.orientation
-    )
-    if let handoff = lesson.destructionHandoff,
-       let destroyBot1 = objects[ObjectHandle(handoff.destroyBot1ObjectHandle)],
-       case let .room(destroyBot1Room) = destroyBot1.location {
-        state.destruction = .init(
-            followBotShields: handoff.combat.robotShields,
-            destroyBot1Motion: .init(
-                roomSourceIndex: destroyBot1Room,
-                position: destroyBot1.position,
-                orientation: destroyBot1.orientation
-            )
-        )
-    }
-    return state
-}
-
-func initialTrainingDestroyBot1DestructionState(
-    objects: ObjectTable,
-    handoff: TrainingFollowBotDestructionHandoff
-) -> TrainingDestroyBot1DestructionState? {
-    guard let destroyBot2 = objects[ObjectHandle(handoff.destroyBot2ObjectHandle)],
-          case let .room(roomSourceIndex) = destroyBot2.location
-    else {
-        return nil
-    }
-    return .init(
-        destroyBot1Shields: handoff.combat.robotShields,
-        destroyBot2Motion: .init(
-            roomSourceIndex: roomSourceIndex,
-            position: destroyBot2.position,
-            orientation: destroyBot2.orientation
-        )
-    )
 }
 
 func trainingGalleryBarrierRendersFaces(

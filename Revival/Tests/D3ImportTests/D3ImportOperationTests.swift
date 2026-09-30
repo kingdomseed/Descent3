@@ -246,7 +246,7 @@ final class D3ImportOperationTests: XCTestCase {
     }
 
     func testCanonicalizesRetailConcussionLightToStockTrainingColor() {
-        let retail = TrainingMarkerLightPresentation(
+        let retail = ObjectLightPresentation(
             primaryColor: .init(x: 1, y: 0.5, z: 0.25),
             secondaryColor: .init(x: 0.1, y: 0.2, z: 0.3),
             timeInterval: 0.2,

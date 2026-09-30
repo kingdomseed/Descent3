@@ -24,6 +24,9 @@ enum ScriptPresentationRequest: Codable, Equatable, Sendable {
     /// MSAFE_SOUND_2D for all players: Play2dSound(index, volume). The
     /// index is a `Level.soundClips` index (`Level.findSoundName`).
     case sound2D(index: Int, volume: Float)
+    /// Play3dSound of an engine sound, named by its sound page. RevivalMac
+    /// plays it without 3D placement until the 3D audio port (M2).
+    case sound(name: String)
 }
 
 extension GameWorld {
@@ -152,6 +155,13 @@ extension GameWorld {
     /// step 8.
     mutating func addHUDMessage(_ message: String) {
         presentationRequests.append(.hudMessage(message))
+    }
+
+    /// Sound_system.Play3dSound for an engine sound (a weapon fire or
+    /// impact sound). An empty name is SOUND_NONE_INDEX and plays nothing.
+    mutating func play3DSound(_ name: String) {
+        guard !name.isEmpty else { return }
+        presentationRequests.append(.sound(name: name))
     }
 
     /// MSAFE_SOUND_2D for all players (multisafe.cpp:1955). An invalid

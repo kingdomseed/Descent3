@@ -75,18 +75,17 @@ extension GameSession {
                 playerConcussionState = concussionState
             }
 
-            var maneuverState = trainingManeuverFollowState
             var followBotDestructionState =
-                maneuverState?.destruction
+                trainingFollowBotDestructionState
             var destroyBot1DestructionState =
                 followBotDestructionState?
                     .destroyBot1Destruction
-            let handoff =
-                level.trainingDodgeAttempt?.maneuverFollow?
-                    .destructionHandoff
+            let handoff = level.trainingFollowBotDestruction
+            let script026Count = world.levelModule == .none
+                ? 0 : world.trainingMission.script026Count
             let followBot: GameObject? = handoff.flatMap {
                 handoff in
-                guard maneuverState?.script026Count ?? 0 > 0,
+                guard script026Count > 0,
                       followBotDestructionState?
                         .followBotWasDestroyed == false
                 else {
@@ -121,9 +120,6 @@ extension GameSession {
                         .destroyBot1WasDestroyed == true
                     && followBotDestructionState?
                         .destroyBot2IsVisible == true
-                    && destroyBot1DestructionState?
-                        .destroyBot2Motion.activePathIndex
-                        == handoff.movingPathIndex
                     ? robot
                     : nil
             }
@@ -862,9 +858,7 @@ extension GameSession {
             followBotDestructionState?
                 .destroyBot1Destruction =
                     destroyBot1DestructionState
-            maneuverState?.destruction =
-                followBotDestructionState
-            trainingManeuverFollowState = maneuverState
+            trainingFollowBotDestructionState = followBotDestructionState
             if followBotWasKilled {
                 destroyTrainingFollowBot(isDying: true)
                 followBotTimer11StartedThisFrame = true

@@ -140,8 +140,7 @@ func extractWorldForRendering(
     camera: RoomCamera,
     startRoomSourceIndex: Int,
     excludedObjectHandle: UInt32?,
-    presentationGameTime: Float = 0,
-    trainingDodgeTurretAngles: [Float] = []
+    presentationGameTime: Float = 0
 ) throws -> WorldRenderExtraction {
     try extractWorldForRendering(
         level,
@@ -150,8 +149,7 @@ func extractWorldForRendering(
         camera: camera,
         startRoomSourceIndex: startRoomSourceIndex,
         excludedObjectHandle: excludedObjectHandle,
-        presentationGameTime: presentationGameTime,
-        trainingDodgeTurretAngles: trainingDodgeTurretAngles
+        presentationGameTime: presentationGameTime
     )
 }
 
@@ -163,8 +161,7 @@ func extractWorldForRendering(
     camera: RoomCamera,
     startRoomSourceIndex: Int,
     excludedObjectHandle: UInt32?,
-    presentationGameTime: Float = 0,
-    trainingDodgeTurretAngles: [Float] = []
+    presentationGameTime: Float = 0
 ) throws -> WorldRenderExtraction {
     let visibility = try extractSourceVisibleWorld(
         level,
@@ -242,9 +239,7 @@ func extractWorldForRendering(
         startRoomSourceIndex: startRoomSourceIndex,
         visibility: visibility,
         excludedObjectHandle: excludedObjectHandle,
-        presentationGameTime: presentationGameTime,
-        trainingDodgeTurretAngles:
-            trainingDodgeTurretAngles
+        presentationGameTime: presentationGameTime
     )
     return WorldRenderExtraction(
         visibleRoomSourceIndices: visibility.visibleRoomSourceIndices,
@@ -264,23 +259,58 @@ private func extractObjectPresentation(
     startRoomSourceIndex: Int,
     visibility: SourceVisibleWorld,
     excludedObjectHandle: UInt32?,
-    presentationGameTime: Float,
-    trainingDodgeTurretAngles: [Float]
+    presentationGameTime: Float
 ) -> (handles: [UInt32], drawItems: [ModelDrawItem]) {
-    guard !level.objectPresentations.isEmpty else { return ([], []) }
+    let materialByTexture = Dictionary(
+        uniqueKeysWithValues: level.presentationMaterials.map { ($0.texture, $0) }
+    )
+    let accepted = admittedRenderObjects(
+        level,
+        objects: objects,
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        visibility: visibility,
+        excludedObjectHandle: excludedObjectHandle
+    )
+    return (
+        accepted.map { $0.object.handle.rawValue },
+        accepted.flatMap {
+            makeModelDrawItems(
+                object: $0.object,
+                model: $0.model,
+                materialByTexture: materialByTexture,
+                camera: camera,
+                presentationGameTime: presentationGameTime,
+                turretAnglesBySubmodel: objectTurretAngles(
+                    $0.object,
+                    model: $0.model
+                )
+            )
+        }
+    )
+}
+
+/// The objects RenderObject draws (renderobject.cpp:1200-1245), in draw
+/// order (far to near), with the LOD model each uses.
+private func admittedRenderObjects(
+    _ level: Level,
+    objects: ObjectTable,
+    camera: RoomCamera,
+    startRoomSourceIndex: Int,
+    visibility: SourceVisibleWorld,
+    excludedObjectHandle: UInt32?
+) -> [(object: GameObject, model: CanonicalModel)] {
+    guard !level.objectPresentations.isEmpty else { return [] }
     let presentationByHandle = Dictionary(
         uniqueKeysWithValues: level.objectPresentations.map { ($0.objectHandle, $0) }
     )
     let modelBySource = Dictionary(
         uniqueKeysWithValues: level.models.map { ($0.source, $0) }
     )
-    let materialByTexture = Dictionary(
-        uniqueKeysWithValues: level.presentationMaterials.map { ($0.texture, $0) }
-    )
     let visibleRooms = Set(visibility.visibleRoomSourceIndices)
     let view = CameraView(camera)
     var accepted: [(depth: Float, ordinal: Int, object: GameObject,
-                    presentation: ObjectPresentationReference, model: CanonicalModel)] = []
+                    model: CanonicalModel)] = []
     for (ordinal, object) in objects.enumerated() {
         // RenderObject draws no OBJ_DUMMY (ghosted) object
         // (renderobject.cpp:1214).
@@ -311,35 +341,47 @@ private func extractObjectPresentation(
         guard let model = modelBySource[selectedSource] else {
             preconditionFailure("validated object presentation references must resolve")
         }
-        accepted.append((depth, ordinal, object, presentation, model))
+        accepted.append((depth, ordinal, object, model))
     }
     accepted.sort {
         $0.depth == $1.depth ? $0.ordinal < $1.ordinal : $0.depth > $1.depth
     }
-    return (
-        accepted.map { $0.object.handle.rawValue },
-        accepted.flatMap {
-            makeModelDrawItems(
-                object: $0.object,
-                model: $0.model,
-                materialByTexture: materialByTexture,
-                camera: camera,
-                presentationGameTime: presentationGameTime,
-                turretAnglesBySubmodel:
-                    $0.object.handle.rawValue
-                    == level.trainingDodgeAttempt?
-                    .dodgeTurretObjectHandle
-                    ? Dictionary(
-                        uniqueKeysWithValues: zip(
-                            level.trainingDodgeAttempt!.turret.joints.map(
-                                \.submodelIndex
-                            ),
-                            trainingDodgeTurretAngles
-                        ))
-                    : [:]
-            )
-        }
-    )
+    return accepted.map { ($0.object, $0.model) }
+}
+
+/// AI_RenderedList (renderobject.cpp:1239): the CT_AI objects the render
+/// from `camera` draws, in draw order. GameRenderFrame fills it at the end
+/// of the frame (GameLoop.cpp:2556), and the next frame's AIFrameAll reads
+/// it. A view the visibility pass rejects draws nothing.
+func renderedAIObjectHandles(
+    _ level: Level,
+    objects: ObjectTable,
+    roomStates: [RoomState],
+    camera: RoomCamera,
+    startRoomSourceIndex: Int,
+    excludedObjectHandle: UInt32?
+) -> [ObjectHandle] {
+    guard let visibility = try? extractSourceVisibleWorld(
+        level,
+        roomStates: roomStates,
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        portalBlends: Dictionary(
+            uniqueKeysWithValues: level.presentationMaterials.map {
+                ($0.texture, $0.blend)
+            }
+        )
+    ) else {
+        return []
+    }
+    return admittedRenderObjects(
+        level,
+        objects: objects,
+        camera: camera,
+        startRoomSourceIndex: startRoomSourceIndex,
+        visibility: visibility,
+        excludedObjectHandle: excludedObjectHandle
+    ).compactMap { $0.object.ai == nil ? nil : $0.object.handle }
 }
 
 func sourceObjectPresentationSize(
@@ -705,85 +747,121 @@ private func makeModelDrawItems(
     return opaque + alpha
 }
 
-let trainingDodgeProjectilePresentationCapacity = 8
 let trainingScriptActionCounterMaximum = 100_000
 
-func extractPreparedTrainingDodgeProjectileDrawItems(
-    _ level: Level
-) -> [ModelDrawItem] {
-    guard let dodge = level.trainingDodgeAttempt,
-        let turret = level.objects.first(where: {
-            $0.handle == dodge.dodgeTurretObjectHandle
-        }),
-        case .room(let roomSourceIndex) = turret.location
-    else {
-        return []
+/// The draws the renderer prepares for the weapon objects of one weapon
+/// model. More weapon objects of a model than this in one frame are not
+/// drawn; robots fire far fewer (a battery fires once a second, and a shot
+/// lives a few seconds).
+let weaponObjectPresentationCapacity = 8
+
+/// The weapons with a polygon model, in `Level.weapons` order, with their
+/// models: one group of prepared draws each.
+private func weaponModels(_ level: Level) -> [(index: Int, model: CanonicalModel)] {
+    (level.weapons ?? []).enumerated().compactMap { index, weapon in
+        guard let source = weapon.model,
+              let model = level.models.first(where: { $0.source == source })
+        else {
+            return nil
+        }
+        return (index, model)
     }
-    return extractTrainingDodgeProjectileDrawItems(
-        level,
-        projectiles: (0..<trainingDodgeProjectilePresentationCapacity)
-            .map { _ in
-                .init(
-                    position: turret.position,
-                    velocity:
-                        turret.orientation.forward
-                        * dodge.turret.projectileSpeed,
-                    roomSourceIndex: roomSourceIndex,
-                    model: dodge.turret.projectileModel
-                )
-            },
-        camera: .trainingRoom3
-    )
 }
 
-func extractTrainingDodgeProjectileDrawItems(
+/// The draws prepared for the weapon objects: `weaponObjectPresentationCapacity`
+/// placeholders per weapon model.
+func extractPreparedWeaponObjectDrawItems(_ level: Level) -> [ModelDrawItem] {
+    guard let room = level.rooms.first else { return [] }
+    return weaponModels(level).enumerated().flatMap { group, weapon in
+        (0..<weaponObjectPresentationCapacity).flatMap { slot in
+            weaponObjectDrawItems(
+                level,
+                group: group,
+                slot: slot,
+                model: weapon.model,
+                position: room.pathPoint,
+                velocity: Vector3(x: 0, y: 0, z: 1),
+                roomSourceIndex: room.sourceIndex,
+                camera: .trainingRoom3
+            )
+        }
+    }
+}
+
+/// The draws of the weapon objects in the object table, in slot order,
+/// each facing along its velocity (RT_WEAPON).
+func extractWeaponObjectDrawItems(
     _ level: Level,
-    projectiles: [TrainingDodgeProjectileFrame],
+    objects: ObjectTable,
     camera: RoomCamera
 ) -> [ModelDrawItem] {
-    guard let dodge = level.trainingDodgeAttempt,
-        let model = level.models.first(where: {
-            $0.source == dodge.turret.projectileModel
-        })
-    else {
-        return []
+    let groups = weaponModels(level)
+    var slots = Array(repeating: 0, count: groups.count)
+    var items: [ModelDrawItem] = []
+    for object in objects where object.type == .weapon {
+        guard let weapon = object.weapon,
+              let group = groups.firstIndex(where: { $0.index == weapon }),
+              slots[group] < weaponObjectPresentationCapacity,
+              case let .room(room) = object.location,
+              object.velocity != .zero
+        else {
+            continue
+        }
+        items += weaponObjectDrawItems(
+            level,
+            group: group,
+            slot: slots[group],
+            model: groups[group].model,
+            position: object.position,
+            velocity: object.velocity,
+            roomSourceIndex: room,
+            camera: camera
+        )
+        slots[group] += 1
     }
-    precondition(
-        projectiles.count <= trainingDodgeProjectilePresentationCapacity
-    )
+    return items
+}
+
+private func weaponObjectDrawItems(
+    _ level: Level,
+    group: Int,
+    slot: Int,
+    model: CanonicalModel,
+    position: Vector3,
+    velocity: Vector3,
+    roomSourceIndex: Int,
+    camera: RoomCamera
+) -> [ModelDrawItem] {
     let materialByTexture = Dictionary(
         uniqueKeysWithValues: level.presentationMaterials.map {
             ($0.texture, $0)
         }
     )
-    return projectiles.enumerated().flatMap { slot, projectile in
-        let forward = sourceVectorNormalized(projectile.velocity)
-        let referenceUp =
-            abs(forward.y) < 0.99
-            ? Vector3(x: 0, y: 1, z: 0)
-            : Vector3(x: 1, y: 0, z: 0)
-        let right = sourceVectorNormalized(sourceVectorCross(referenceUp, forward))
-        let up = sourceVectorCross(forward, right)
-        let object = GameObject(
-            handle: ObjectHandle(UInt32.max - UInt32(slot)),
-            type: .weapon,
-            renderType: .polyobj,
-            location: .room(projectile.roomSourceIndex),
-            position: projectile.position,
-            orientation: .init(
-                right: right,
-                up: up,
-                forward: forward
-            )
-        )
-        return makeModelDrawItems(
-            object: object,
-            model: model,
-            materialByTexture: materialByTexture,
-            camera: camera,
-            cullBackfaces: false
-        )
-    }
+    let forward = sourceVectorNormalized(velocity)
+    let referenceUp =
+        abs(forward.y) < 0.99
+        ? Vector3(x: 0, y: 1, z: 0)
+        : Vector3(x: 1, y: 0, z: 0)
+    let right = sourceVectorNormalized(sourceVectorCross(referenceUp, forward))
+    let up = sourceVectorCross(forward, right)
+    let object = GameObject(
+        handle: ObjectHandle(
+            UInt32.max
+                - UInt32(group * weaponObjectPresentationCapacity + slot)
+        ),
+        type: .weapon,
+        renderType: .polyobj,
+        location: .room(roomSourceIndex),
+        position: position,
+        orientation: .init(right: right, up: up, forward: forward)
+    )
+    return makeModelDrawItems(
+        object: object,
+        model: model,
+        materialByTexture: materialByTexture,
+        camera: camera,
+        cullBackfaces: false
+    )
 }
 
 let trainingBlueLaserPresentationCapacity = 40
@@ -793,8 +871,7 @@ func extractPreparedTrainingBlueLaserDrawItems(
     _ level: Level
 ) -> [ModelDrawItem] {
     guard let handoff =
-            level.trainingDodgeAttempt?.maneuverFollow?
-                .destructionHandoff,
+            level.trainingFollowBotDestruction,
           let destroyBot1 = level.objects.first(where: {
               $0.handle == handoff.destroyBot1ObjectHandle
           }),
@@ -826,8 +903,7 @@ func extractTrainingBlueLaserDrawItems(
     camera: RoomCamera
 ) -> [ModelDrawItem] {
     guard let handoff =
-            level.trainingDodgeAttempt?.maneuverFollow?
-                .destructionHandoff,
+            level.trainingFollowBotDestruction,
           let model = level.models.first(where: {
               $0.source == handoff.projectileModel
           })
@@ -1027,7 +1103,7 @@ func extractTrainingGuidebotYellowFlareDrawItems(
     }
 }
 
-private func accumulatedModelOffsets(_ model: CanonicalModel) -> [Vector3] {
+func accumulatedModelOffsets(_ model: CanonicalModel) -> [Vector3] {
     var offsets = [Vector3?](repeating: nil, count: model.submodels.count)
 
     func resolve(_ sourceIndex: Int) -> Vector3 {

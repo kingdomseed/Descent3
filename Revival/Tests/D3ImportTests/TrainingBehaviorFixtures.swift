@@ -921,122 +921,17 @@ func makeTrainingDodgeAttemptLevel() -> Level {
                 level.dependencyManifest.historicalEagerBaseline
         )
     )
-    level.trainingDodgeAttempt = .init(
-        startDodgeObjectHandle: 4_106,
-        startDodgeCollisionRadius: 10.052_409,
-        doneDodgeingGoalObjectHandle: 12_302,
-        doneDodgeingGoalCollisionRadius: 10.052_409,
-        dodgeTurretObjectHandle: 8_199,
-        flashLightObjectHandle: 4_120,
-        triggerDelay: 10,
-        successDelay: 20,
-        almostDoneDelay: 14,
-        portalRoomTwoSourceIndex: 49,
-        portalRoomThreeSourceIndex: 36,
-        orderedPortalIndices: [0, 1],
-        disabledControlMask: 3,
-        enabledDodgeControlMask: 60,
-        successControlMask: 3,
-        introduction: "Next you are going to practice dodging.",
-        instruction:
-            "To complete this step, dodge the turrett fire for 20 seconds.",
-        hitInstruction: "Oops, you were hit! Keep moving!",
-        almostDoneInstruction:
-            "You are almost done! Keep up the good work!",
-        successMessage: "Excellent!",
-        leaveInstruction:
-            "Now using your sliding skills, proceed forward to the flashing green light.",
-        introductionVoiceSourceName: "intro2.osf",
-        almostDoneVoiceSourceName: "almost.osf",
-        successVoiceSourceName: "proceed3.osf",
-        restoredPlayerShields: 100,
-        successMarkerLightDistance: 50,
-        markerLightPresentation: .init(
-            primaryColor: .init(x: 0.2, y: 1, z: 0.2),
-            secondaryColor: .zero,
-            timeInterval: 0.5,
-            flickerDistance: 0.2,
-            directionalDot: 0,
-            flags: 4,
-            timebits: .max,
-            angle: 0,
-            lightingRenderType: 2
-        ),
-        turret: .init(
-            model: turretModel,
-            collisionRadius: 5.402_855_4,
-            fieldOfViewDot: -1,
-            maximumTargetDistance: 1_000,
-            fireAlignmentDot: 0.93,
-            fixedLeadAccuracy: 0.81,
-            fireWait: 1,
-            gunpoints: [
-                .init(
-                    x: 1.706_505_8,
-                    y: -2.224_015_2,
-                    z: 2.190_463_5
-                ),
-                .init(
-                    x: 0.457_947_73,
-                    y: -2.224_015_2,
-                    z: 2.190_463_5
-                ),
-            ],
-            aimingGunpoint: .init(
-                x: 1.085_584_6,
-                y: -2.224_015_2,
-                z: 2.190_463_5
-            ),
-            gunpointForward: .init(
-                x: 0,
-                y: -0.707_105_7,
-                z: 0.707_107_84
-            ),
-            gunpointParentSubmodelIndex: 2,
-            joints: [
-                .init(
-                    submodelIndex: 1,
-                    parentSubmodelIndex: 0,
-                    rotationAxis: .init(x: 0, y: -1, z: 0),
-                    fieldOfView: 0.5,
-                    rotationsPerSecond: 0.125,
-                    thinkInterval: 10
-                ),
-                .init(
-                    submodelIndex: 2,
-                    parentSubmodelIndex: 1,
-                    rotationAxis: .init(
-                        x: 1,
-                        y: -3.410_774_8e-16,
-                        z: -4.371_139e-8
-                    ),
-                    fieldOfView: 0.125,
-                    rotationsPerSecond: 0.125,
-                    thinkInterval: 10
-                ),
-            ],
-            projectileSourceName: "Laser Level 1 - Red",
-            projectileModel: projectileModel,
-            fireSoundSourceName: "WpmLaserBlueFire",
-            impactSoundSourceName: "LazorHitshrt",
-            projectileDamage: 6.75,
-            projectileRadius: 0.5,
-            projectileSpeed: 200,
-            projectileLifetime: 5
+    // The object tables: the turret page, the flash light page, the red
+    // laser, and the turret model's gun points and battery.
+    level = level
+        .addingObjectInfo(fixtureTurretInfo)
+        .addingObjectInfo(fixtureFlashLightInfo)
+        .addingWeapon(fixtureRedLaser(model: projectileModel))
+        .settingModelGuns(
+            turretModel,
+            gunpoints: fixtureTurretGunpoints,
+            batteries: fixtureTurretBatteries
         )
-    )
-    level.trainingDodgeAttempt?.dodgeExit = .init(
-        objectHandle: 12_302,
-        collisionRadius: 10.052_409,
-        markerLightObjectHandle: 4_120,
-        markerLightDistance: 50,
-        portalRoomSourceIndex: 36,
-        orderedPortalIndices: [0, 1],
-        disabledControlMask: 62,
-        instruction:
-            "Now keep moving forward into the next room.",
-        voiceSourceName: "proceed4.osf"
-    )
     return rescriptedTrainingLevel(
         level
     )

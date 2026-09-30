@@ -1,7 +1,7 @@
 import XCTest
 
 /// The Training messages the synthetic fixtures use (retail text of
-/// TrainingMission.msg for the names Scripts 000-015 and 033 show).
+/// TrainingMission.msg for the names Scripts 000-026 and 033 show).
 let fixtureTrainingMessages = [
     ("GoodJob", "Excellent!"),
     ("GoBackwards", "Now use the reverse Key to return to where you started!"),
@@ -18,6 +18,26 @@ let fixtureTrainingMessages = [
         "Now, manuever through this tunnel using the sliding skills you just learned."
     ),
     ("DodgeIntro", "Next you are going to practice dodging."),
+    ("Dodge30", "To complete this step, dodge the turrett fire for 20 seconds."),
+    (
+        "LeaveDodge",
+        "Now using your sliding skills, proceed forward to the flashing green light."
+    ),
+    ("FollowIntro", "Now you will use the rotational skills you just learned to follow one of the two robots that are circling this room"),
+    (
+        "FollowInstructions",
+        "Keep one of the robots on your screen for 20 seconds using only your rotational controls to complete this step."
+    ),
+    ("KeepDodging", "Oops, you were hit! Keep moving!"),
+    ("KeepMovingOutofDodging", "Now keep moving forward into the next room."),
+    ("BankIntro", "Now your bank controls are enabled. Try them out by banking to the left and right."),
+    ("AlmostDoneDodge", "You are almost done! Keep up the good work!"),
+    ("ManuverIntro", "Now you are going to learn the other controls, which are pitch, heading and bank."),
+    ("HeadingIntro", "Now your heading controls are enabled. Try them out by rotating to the left and right."),
+    ("PitchIntro", "Now your pitch controls are enabled. Try them out by pitching up and down."),
+    ("WeaponsEnabled", "Now your weapons have been enabled. There is a primary and a secondary."),
+    ("DestroyFollowbot", "Now, destroy the robot."),
+    ("Movingbotintro", "Now destroy 2 more robots. This time they will be moving."),
 ].map { LevelScriptMessage(name: $0.0, text: $0.1) }
 
 /// The level with Training script data (package schema 12), so the world

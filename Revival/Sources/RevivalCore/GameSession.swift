@@ -126,13 +126,10 @@ final class GameSession {
         get { world.playerYellowFlareState }
         set { world.playerYellowFlareState = newValue }
     }
-    var trainingDodgeAttemptState: TrainingDodgeAttemptState? {
-        get { world.trainingDodgeAttemptState }
-        set { world.trainingDodgeAttemptState = newValue }
-    }
-    var trainingManeuverFollowState: TrainingManeuverFollowState? {
-        get { world.trainingManeuverFollowState }
-        set { world.trainingManeuverFollowState = newValue }
+    var trainingFollowBotDestructionState:
+        TrainingFollowBotDestructionState? {
+        get { world.trainingFollowBotDestructionState }
+        set { world.trainingFollowBotDestructionState = newValue }
     }
     var trainingGalleryBarrierState: TrainingGalleryBarrierState? {
         get { world.trainingGalleryBarrierState }
@@ -240,25 +237,9 @@ final class GameSession {
         state.robotWasDestroyed = true
         trainingRobotGuidebotState = state
 
-        if let handoff =
-                level.trainingDodgeAttempt?.maneuverFollow?
-                    .destructionHandoff,
-           handle == handoff.destroyBot2ObjectHandle,
-           var maneuverState = trainingManeuverFollowState,
-           var destruction = maneuverState.destruction,
-           var destroyBot1Destruction =
-                destruction.destroyBot1Destruction
-        {
-            destruction.destroyBot2IsVisible = false
-            destroyBot1Destruction.destroyBot2Motion.velocity = .zero
-            destroyBot1Destruction.destroyBot2Motion.activePathIndex =
-                nil
-            destroyBot1Destruction.destroyBot2Motion.pathNodeIndex = 0
-            destroyBot1Destruction.destroyBot2Motion.pathFailure = nil
-            destruction.destroyBot1Destruction =
-                destroyBot1Destruction
-            maneuverState.destruction = destruction
-            trainingManeuverFollowState = maneuverState
+        if let handoff = level.trainingFollowBotDestruction,
+           handle == handoff.destroyBot2ObjectHandle {
+            trainingFollowBotDestructionState?.destroyBot2IsVisible = false
         }
         world.objects.delete(ObjectHandle(handle))
     }
@@ -398,13 +379,12 @@ final class GameSession {
         trainingLastBot5DeathState = state
     }
 
+    /// CustomObjectScript_2008 EVT_DESTROY, FollowBot1 (Script 037,
+    /// TrainingMission.cpp:1972-1983), still bespoke until M1 step 7.
     func destroyTrainingFollowBot(isDying: Bool) {
         guard isDying,
-              let lesson =
-                  level.trainingDodgeAttempt?.maneuverFollow,
-              let handoff = lesson.destructionHandoff,
-              var maneuverState = trainingManeuverFollowState,
-              var destruction = maneuverState.destruction,
+              let handoff = level.trainingFollowBotDestruction,
+              var destruction = trainingFollowBotDestructionState,
               !destruction.followBotWasDestroyed,
               world.objects[ObjectHandle(handoff.followBotObjectHandle)] != nil
         else {
@@ -417,7 +397,7 @@ final class GameSession {
             -0.000_001
         )
         if destruction.script037Count < 1,
-           maneuverState.script026Count > 0 {
+           (world.trainingMission.script026Count > 0) == true {
             destruction.levelTimer11Remaining =
                 handoff.destructionDelay
             destruction.script037Count = min(
@@ -425,17 +405,17 @@ final class GameSession {
                 trainingScriptActionCounterMaximum
             )
         }
-        maneuverState.destruction = destruction
-        trainingManeuverFollowState = maneuverState
+        trainingFollowBotDestructionState = destruction
     }
 
+    /// CustomObjectScript_1011 EVT_DESTROY, DestroyBot1 (Script 028,
+    /// TrainingMission.cpp:2007-2023), still bespoke until M1 step 7. Its
+    /// path goal is `startTrainingDestroyBot2Path`, given after the frame's
+    /// object loop.
     func destroyTrainingDestroyBot1(isDying: Bool) {
         guard isDying,
-              let lesson =
-                level.trainingDodgeAttempt?.maneuverFollow,
-              let handoff = lesson.destructionHandoff,
-              var maneuverState = trainingManeuverFollowState,
-              var destruction = maneuverState.destruction,
+              let handoff = level.trainingFollowBotDestruction,
+              var destruction = trainingFollowBotDestructionState,
               destruction.script027Count > 0,
               var destroyBot1Destruction =
                 destruction.destroyBot1Destruction,
@@ -457,19 +437,13 @@ final class GameSession {
             // (TrainingMission.cpp:2019).
             world.aObjGhostSet(0, ObjectHandle(handoff.destroyBot2ObjectHandle))
             world.setObjectRendered(handoff.destroyBot2ObjectHandle, true)
-            assignTrainingAuthoredPath(
-                handoff.movingPathIndex,
-                motion: &destroyBot1Destruction.destroyBot2Motion
-            )
             destroyBot1Destruction.script028Count = min(
                 destroyBot1Destruction.script028Count + 1,
                 trainingScriptActionCounterMaximum
             )
         }
-        destruction.destroyBot1Destruction =
-            destroyBot1Destruction
-        maneuverState.destruction = destruction
-        trainingManeuverFollowState = maneuverState
+        destruction.destroyBot1Destruction = destroyBot1Destruction
+        trainingFollowBotDestructionState = destruction
     }
 
     func fastPlayerHeadlight(
@@ -634,6 +608,13 @@ final class GameSession {
                     voicePrecedesHUDMessages: false,
                     soundSourceName: level.soundClips[index].logicalName,
                     soundEventVolume: volume
+                )
+            case let .sound(name):
+                TrainingOpeningFeedback(
+                    hudMessages: [],
+                    voiceSourceName: "",
+                    voicePrecedesHUDMessages: false,
+                    soundSourceName: name
                 )
             }
         }

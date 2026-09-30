@@ -205,6 +205,14 @@ extension Level {
             .min() ?? -1
     }
 
+    /// osipf_AIGetPathID (osiris_predefs.cpp:551) and FindGamePathName:
+    /// the index of the first game path with this name (stricmp), or -1.
+    func findPathName(_ name: String) -> Int {
+        paths.firstIndex {
+            $0.name.caseInsensitiveCompare(name) == .orderedSame
+        } ?? -1
+    }
+
     /// osipf_FindSoundName (osiris_predefs.cpp:3356) and FindSoundName
     /// (sndlib/soundload.cpp:560): the index of the first sound whose page
     /// name matches (stricmp), or -1. The level's sound clips are its
@@ -215,9 +223,14 @@ extension Level {
         } ?? -1
     }
 
-    /// This level with the script data of `source`, if it has any. The
-    /// assembly steps rebuild a level from its fields, which would drop it.
+    /// This level with the script data, object tables, and follow-bot
+    /// destruction handoff of `source`, if it has any. The assembly steps
+    /// rebuild a level from its fields, which would drop them.
     func preservingScripting(of source: Level) -> Level {
-        source.scripting.map(addingScripting) ?? self
+        var level = source.scripting.map(addingScripting) ?? self
+        level.objectInfos = source.objectInfos
+        level.weapons = source.weapons
+        level.trainingFollowBotDestruction = source.trainingFollowBotDestruction
+        return level
     }
 }

@@ -484,53 +484,6 @@ struct RevivalProject: Equatable, Sendable {
 
     var baseReference: CanonicalPackageReference { source.base }
     var persistedSource: RevivalProjectSource { source }
-    var trainingDodgeAttemptSourceDiagnostic: String? {
-        guard let dodge = level.trainingDodgeAttempt else {
-            return nil
-        }
-        if dodge.dodgeExit != nil {
-            return
-                "TrainingMission.cpp Scripts 033,016,017,018,020,019 / StartDodge 4106 / DoneDodgeingGoal 12302 / DodgeTurrett 8199 / FlashLight-1 4120 / PortalRoom2+3 portals 0,1 / intro2.osf+almost.osf+proceed3.osf+proceed4.osf"
-        }
-        return
-            "TrainingMission.cpp Scripts 033,016,017,018,020 / StartDodge 4106 / DoneDodgeingGoal 12302 / DodgeTurrett 8199 / FlashLight-1 4120 / PortalRoom2+3 portals 0,1 / intro2.osf+almost.osf+proceed3.osf"
-    }
-    var trainingManeuverFollowSourceDiagnostic: String? {
-        guard let lesson =
-                level.trainingDodgeAttempt?.maneuverFollow,
-              level.paths.indices.contains(lesson.followPathIndex),
-              level.paths.indices.contains(lesson.destroyPathIndex)
-        else {
-            return nil
-        }
-        let followPath = level.paths[lesson.followPathIndex]
-        let destroyPath = level.paths[lesson.destroyPathIndex]
-        if let handoff = lesson.destructionHandoff {
-            return
-                "TrainingMission.cpp Scripts 021,022,024,023,025,026,031,037,027,028 / ManuverRoomCenter \(lesson.maneuverObjectHandle) / FollowBot1 \(handoff.followBotObjectHandle) / DestroyBot1 \(handoff.destroyBot1ObjectHandle) then DestroyBot2 \(handoff.destroyBot2ObjectHandle) / timer \(handoff.levelTimerID) = \(handoff.destructionDelay)s / stock orientation-editable \(followPath.name) path \(handoff.movingPathIndex) nodes \(followPath.nodes.count) flags 0x\(String(handoff.movingPathGoalFlags, radix: 16)) + \(destroyPath.name) path \(lesson.destroyPathIndex) nodes \(destroyPath.nodes.count) flags 0x\(String(lesson.destroyPathGoalFlags, radix: 16)) / goal \(handoff.goalID) priority \(handoff.goalPriority) / \(handoff.combat.projectileSourceName) via \(handoff.projectileModel.sourceName) / runtime path failure: invalidPath|movementBlocked"
-        }
-        return
-            "TrainingMission.cpp Scripts 021,022,024,023,025,026 / ManuverRoomCenter \(lesson.maneuverObjectHandle) / FollowBot1 \(lesson.followBotObjectHandle) / stock orientation-editable \(followPath.name) path \(lesson.followPathIndex) nodes \(followPath.nodes.count) flags 0x\(String(lesson.followPathGoalFlags, radix: 16)) + \(destroyPath.name) path \(lesson.destroyPathIndex) nodes \(destroyPath.nodes.count) flags 0x\(String(lesson.destroyPathGoalFlags, radix: 16)) / slot \(lesson.goalSlot) priority \(lesson.goalPriority) / runtime path failure: invalidPath|movementBlocked"
-    }
-    func trainingManeuverFollowRuntimeDiagnostic(
-        frame: PlayerSimulationFrame
-    ) -> String? {
-        guard let source = trainingManeuverFollowSourceDiagnostic else {
-            return nil
-        }
-        if let movingTarget = frame.trainingMovingTarget {
-            let movingTargetName = level.objects.first {
-                $0.handle == movingTarget.objectHandle
-            }?.instanceName ?? "moving target \(movingTarget.objectHandle)"
-            return
-                "\(source) / active moving target \(movingTargetName) path \(movingTarget.activePathIndex) node \(movingTarget.pathNodeIndex) room \(movingTarget.roomSourceIndex) failure \(movingTarget.pathFailure?.rawValue ?? "none")"
-        }
-        guard let followBot = frame.trainingFollowBot else {
-            return nil
-        }
-        return
-            "\(source) / active path \(followBot.activePathIndex.map { String($0) } ?? "none") node \(followBot.pathNodeIndex) room \(followBot.roomSourceIndex) failure \(followBot.pathFailure?.rawValue ?? "none")"
-    }
     var trainingGalleryBarrierSourceDiagnostic: String? {
         level.trainingGalleryBarrier.map {
             "TrainingMission.cpp Script 032 / \($0.triggerName)"
@@ -936,9 +889,6 @@ struct RevivalProject: Equatable, Sendable {
         for edit in source.pathNodeOrientationEdits {
             let identity = (edit.pathIndex, edit.nodeIndex)
             guard previousPathNodeIdentity.map({ $0 < identity }) ?? true,
-                  edit.pathIndex
-                    == importedBase.trainingDodgeAttempt?.maneuverFollow?
-                        .followPathIndex,
                   importedBase.paths.indices.contains(edit.pathIndex),
                   importedBase.paths[edit.pathIndex].nodes.indices.contains(
                     edit.nodeIndex
@@ -1364,9 +1314,7 @@ struct RevivalProject: Equatable, Sendable {
         forward: Vector3,
         up: Vector3
     ) throws -> (forward: Vector3, up: Vector3) {
-        guard pathIndex
-                == level.trainingDodgeAttempt?.maneuverFollow?.followPathIndex,
-              level.paths.indices.contains(pathIndex),
+        guard level.paths.indices.contains(pathIndex),
               level.paths[pathIndex].nodes.indices.contains(nodeIndex),
               isValidPathNodeOrientation(forward: forward, up: up) else {
             throw RevivalProjectError.invalidPathNodeOrientationEdit(
@@ -1705,14 +1653,6 @@ struct RevivalProject: Equatable, Sendable {
                     )
                 }
                 if baseNode.forward != node.forward || baseNode.up != node.up {
-                    guard pathIndex
-                            == level.trainingDodgeAttempt?.maneuverFollow?
-                                .followPathIndex else {
-                        throw RevivalProjectError.invalidPathNodeOrientationEdit(
-                            pathIndex: pathIndex,
-                            nodeIndex: nodeIndex
-                        )
-                    }
                     expectedPathNodeEdits.append(.init(
                         pathIndex: pathIndex,
                         nodeIndex: nodeIndex,
