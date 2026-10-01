@@ -441,52 +441,6 @@ extension Level {
                     "\(clip.sourceArchive) \(clip.sourceSHA256)"
             )
         }
-        if let flare = chain.yellowFlare {
-            dependencies.append(.init(
-                category: "weapon-definition",
-                source: flare.source,
-                state: "canonical-page-bound",
-                provenance:
-                    "manage/weaponpage.cpp:653-901; scripts/AIGame.cpp:6086-6115"
-            ))
-            if !dependencyManifest.current.contains(where: {
-                $0.category == "texture"
-                    && $0.source == flare.particleTexture
-            }) {
-                dependencies.append(.init(
-                    category: "texture",
-                    source: flare.particleTexture,
-                    state: "presentation-payload-imported",
-                    provenance:
-                        "manage/weaponpage.cpp:653-901; viseffect.cpp:899-933"
-                ))
-            }
-            if let timeout = flare.timeout {
-                dependencies.append(.init(
-                    category: "weapon-definition",
-                    source: timeout.childSource,
-                    state: "canonical-page-bound",
-                    provenance:
-                        "manage/weaponpage.cpp:653-901; Descent3/WeaponFire.cpp:3162-3201"
-                ))
-                for texture in [timeout.explosionTexture]
-                    + (timeout.childAnimationFrames
-                        ?? [timeout.childTexture])
-                where !dependencyManifest.current.contains(where: {
-                    $0.category == "texture" && $0.source == texture
-                }) && !dependencies.contains(where: {
-                    $0.category == "texture" && $0.source == texture
-                }) {
-                    dependencies.append(.init(
-                        category: "texture",
-                        source: texture,
-                        state: "presentation-payload-imported",
-                        provenance:
-                            "manage/weaponpage.cpp:653-901; Descent3/WeaponFire.cpp:3058-3201"
-                    ))
-                }
-            }
-        }
         let player = objects.first {
             $0.handle == defaultPlayerBinding?.objectHandle
         }!

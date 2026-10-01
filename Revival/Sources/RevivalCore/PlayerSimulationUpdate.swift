@@ -3,54 +3,6 @@
 import Foundation
 
 extension GameSession {
-    private func advancePlayerAndGuidebotYellowFlares(
-        duration systemsFrameDuration: Float,
-        gameTime systemsGameTime: Float
-    ) -> Void {
-        if playerYellowFlareState == nil {
-            advanceTrainingGuidebotYellowFlares(
-                duration: systemsFrameDuration,
-                gameTime: systemsGameTime
-            )
-        } else {
-            let creationOrdinals = Set(
-                (playerYellowFlareState?.parents.compactMap(\.creationOrdinal)
-                    ?? [])
-                + (playerYellowFlareState?.timeoutSparks.compactMap(
-                    \.generationOrdinal
-                ) ?? [])
-                + (trainingRobotGuidebotState?.yellowFlares?.compactMap(
-                    \.creationOrdinal
-                ) ?? [])
-                + (trainingRobotGuidebotState?.yellowFlareTimeoutSparks?
-                    .compactMap(\.generationOrdinal) ?? [])
-            ).sorted()
-            for ordinal in creationOrdinals {
-                advancePlayerYellowFlares(
-                    duration: systemsFrameDuration,
-                    gameTime: systemsGameTime,
-                    selection: .ordinal(ordinal),
-                    advancesPassiveState: false
-                )
-                advanceTrainingGuidebotYellowFlares(
-                    duration: systemsFrameDuration,
-                    gameTime: systemsGameTime,
-                    selection: .ordinal(ordinal),
-                    advancesPassiveState: false
-                )
-            }
-            advancePlayerYellowFlares(
-                duration: systemsFrameDuration,
-                gameTime: systemsGameTime,
-                selection: .none
-            )
-            advanceTrainingGuidebotYellowFlares(
-                duration: systemsFrameDuration,
-                gameTime: systemsGameTime,
-                selection: .none
-            )
-        }
-    }
     func update(at timestamp: Double, input: InputSnapshot) -> PlayerSimulationFrame {
         precondition(timestamp.isFinite && timestamp >= lastTimestamp)
         precondition(pauseDepth == 0)
@@ -143,15 +95,11 @@ extension GameSession {
             downTime: input.firesSecondaryWeapon ? systemsFrameDuration : 0,
             level: level
         )
+        // Then the flare (object.cpp:2438-2440).
+        if input.firesPlayerFlare {
+            world.fireFlareFromPlayer(playerHandle, level: level)
+        }
         object = world.objects[playerHandle]!
-        let playerFlareFeedback = input.firesPlayerFlare
-            ? firePlayerYellowFlare(
-                from: object,
-                roomSourceIndex: startRoom,
-                systemsFrameDuration: systemsFrameDuration,
-                systemsGameTime: systemsGameTime
-            )
-            : nil
         updatePlayerRearView(
             input: input,
             systemsGameTime: systemsGameTime
@@ -472,6 +420,7 @@ extension GameSession {
                 world.collideTwoObjects(
                     playerHandle,
                     objectHit.handle,
+                    link: objectHit.link,
                     level: level
                 )
                 continue
@@ -558,18 +507,10 @@ extension GameSession {
         let playerFastHeadlight = playerHeadlightIsOn
             ? fastPlayerHeadlight(from: world.objects[playerHandle]!)
             : nil
-        advancePlayerAndGuidebotYellowFlares(
-            duration: systemsFrameDuration,
-            gameTime: systemsGameTime
-        )
-        createTrainingGuidebotFlareShots(gameTime: systemsGameTime)
 
         var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
         if let playerHeadlightFeedback {
             trainingOpeningFeedback.append(playerHeadlightFeedback)
-        }
-        if let playerFlareFeedback {
-            trainingOpeningFeedback.append(playerFlareFeedback)
         }
         if trainingFinalGoalWasHitThisFrame,
            var state = trainingFinalGoalState,
@@ -831,6 +772,7 @@ extension GameSession {
             excludedObjectHandle: frame.playerView.objectHandle
         )
         world.aiRenderedList = rendered.aiObjects
+        world.lastRenderCamera = frame.playerView.camera
         let advancedGameTime = world.gameTime
         world.gameTime = systemsGameTime
         for roomSourceIndex in rendered.rooms {
@@ -1006,63 +948,8 @@ extension GameSession {
             trainingCameraMonitorState = state
         }
 
-        let yellowFlareParents: [TrainingGuidebotYellowFlareState]
-        let yellowFlareParticles:
-            [TrainingGuidebotYellowFlareParticleState]
-        let yellowFlareTimeoutExplosions:
-            [TrainingGuidebotYellowFlareTimeoutExplosionState]
-        let yellowFlareTimeoutSparks:
-            [TrainingGuidebotYellowFlareTimeoutSparkState]
-        let yellowFlareTimeoutSparkParticles:
-            [TrainingGuidebotYellowFlareParticleState]
-        if let playerState = playerYellowFlareState {
-            yellowFlareParents = (
-                (trainingRobotGuidebotState?.yellowFlares ?? [])
-                    + playerState.parents
-            ).sorted {
-                ($0.creationOrdinal ?? 0) < ($1.creationOrdinal ?? 0)
-            }
-            yellowFlareParticles = (
-                (trainingRobotGuidebotState?.yellowFlareParticles ?? [])
-                    + playerState.parentParticles
-            ).sorted {
-                ($0.generationOrdinal ?? 0, $0.sourceAttemptIndex ?? 0)
-                    < ($1.generationOrdinal ?? 0, $1.sourceAttemptIndex ?? 0)
-            }
-            yellowFlareTimeoutExplosions = (
-                (trainingRobotGuidebotState?
-                    .yellowFlareTimeoutExplosions ?? [])
-                    + playerState.timeoutExplosions
-            ).sorted {
-                ($0.generationOrdinal ?? 0) < ($1.generationOrdinal ?? 0)
-            }
-            yellowFlareTimeoutSparks = (
-                (trainingRobotGuidebotState?.yellowFlareTimeoutSparks ?? [])
-                    + playerState.timeoutSparks
-            ).sorted {
-                ($0.generationOrdinal ?? 0, $0.sourceAttemptIndex)
-                    < ($1.generationOrdinal ?? 0, $1.sourceAttemptIndex)
-            }
-            yellowFlareTimeoutSparkParticles = (
-                (trainingRobotGuidebotState?
-                    .yellowFlareTimeoutSparkParticles ?? [])
-                    + playerState.timeoutSparkParticles
-            ).sorted {
-                ($0.generationOrdinal ?? 0, $0.sourceAttemptIndex ?? 0)
-                    < ($1.generationOrdinal ?? 0, $1.sourceAttemptIndex ?? 0)
-            }
-        } else {
-            yellowFlareParents =
-                trainingRobotGuidebotState?.yellowFlares ?? []
-            yellowFlareParticles =
-                trainingRobotGuidebotState?.yellowFlareParticles ?? []
-            yellowFlareTimeoutExplosions = trainingRobotGuidebotState?
-                .yellowFlareTimeoutExplosions ?? []
-            yellowFlareTimeoutSparks =
-                trainingRobotGuidebotState?.yellowFlareTimeoutSparks ?? []
-            yellowFlareTimeoutSparkParticles = trainingRobotGuidebotState?
-                .yellowFlareTimeoutSparkParticles ?? []
-        }
+        let objectLights = world.objectLights
+        world.objectLights = []
 
         frameDuration = Float(timestamp - lastTimestamp)
         lastTimestamp = timestamp
@@ -1102,152 +989,18 @@ extension GameSession {
             shields: shields,
             energy: energy,
             afterburnerFuel: afterburnerFuel,
-            visEffectExplosions: visEffectExplosionFrames(
+            visEffectBillboards: visEffectBillboardFrames(
                 level,
-                effects: world.visEffects
+                effects: world.visEffects,
+                gameTime: systemsGameTime
             ),
             visEffectLineSparks: visEffectLineSparkFrames(world.visEffects),
-            trainingGuidebotYellowFlares:
-                level.trainingRobotGuidebotChain?.yellowFlare.map {
-                    definition in
-                    yellowFlareParents.map {
-                        .init(
-                            roomSourceIndex: $0.roomSourceIndex,
-                            position: $0.position,
-                            orientation: $0.orientation,
-                            velocity: $0.velocity,
-                            model: definition.model,
-                            collisionRadius:
-                                definition.collisionRadius,
-                            lifeRemaining: $0.lifeRemaining,
-                            sourceLightDistance:
-                                definition.lightDistance,
-                            lightDistance:
-                                $0.presentedLightDistance,
-                            lightPresentation:
-                                definition.lightPresentation
-                        )
-                    }
-                } ?? [],
-            trainingGuidebotYellowFlareParticles:
-                level.trainingRobotGuidebotChain?.yellowFlare.map {
-                    definition in
-                    yellowFlareParticles.map {
-                            .init(
-                                roomSourceIndex: $0.roomSourceIndex,
-                                position: $0.position,
-                                size: $0.size,
-                                lifeRemaining: $0.lifeRemaining,
-                                lifetime: $0.lifetime,
-                                sourceSize: definition.particleSize,
-                                sourceLifetime:
-                                    definition.particleLifetime,
-                                texture:
-                                    trainingGuidebotYellowFlareParticleTexture(
-                                        timeout: definition.timeout,
-                                        creationTime: $0.creationTime,
-                                        lifetime: $0.lifetime,
-                                        lifeRemaining: $0.lifeRemaining,
-                                        gameTime: systemsGameTime,
-                                        fallback: definition.particleTexture
-                                    ),
-                                opacity:
-                                    trainingGuidebotYellowFlareVisualOpacity(
-                                        creationTime: $0.creationTime,
-                                        lifetime: $0.lifetime,
-                                        lifeRemaining: $0.lifeRemaining,
-                                        gameTime: systemsGameTime
-                                    )
-                            )
-                        }
-                } ?? [],
-            trainingGuidebotYellowFlareTimeoutExplosions:
-                level.trainingRobotGuidebotChain?.yellowFlare?.timeout.map {
-                    timeout in
-                    yellowFlareTimeoutExplosions.map {
-                            .init(
-                                roomSourceIndex: $0.roomSourceIndex,
-                                position: $0.position,
-                                size: $0.size,
-                                lifeRemaining: $0.lifeRemaining,
-                                lifetime: $0.lifetime,
-                                sourceSize: timeout.explosionSize,
-                                sourceLifetime:
-                                    timeout.explosionLifetime,
-                                texture: timeout.explosionTexture,
-                                opacity:
-                                    trainingGuidebotYellowFlareVisualOpacity(
-                                        creationTime: $0.creationTime,
-                                        lifetime: $0.lifetime,
-                                        lifeRemaining: $0.lifeRemaining,
-                                        gameTime: systemsGameTime
-                                    )
-                            )
-                        }
-                } ?? [],
-            trainingGuidebotYellowFlareTimeoutSparks:
-                level.trainingRobotGuidebotChain?.yellowFlare?.timeout.map {
-                    timeout in
-                    yellowFlareTimeoutSparks.map {
-                            .init(
-                                sourceAttemptIndex: $0.sourceAttemptIndex,
-                                sourceObjectSlot: $0.sourceObjectSlot,
-                                receivedControlOnCreationFrame:
-                                    $0.receivedControlOnCreationFrame,
-                                roomSourceIndex: $0.roomSourceIndex,
-                                position: $0.position,
-                                orientation: $0.orientation,
-                                velocity: $0.velocity,
-                                collisionRadius:
-                                    timeout.childCollisionRadius,
-                                lifeRemaining: $0.lifeRemaining,
-                                texture:
-                                    trainingGuidebotYellowFlareCarrierTexture(
-                                        timeout: timeout,
-                                        gameTime: systemsGameTime
-                                    ),
-                                sourceLightDistance:
-                                    timeout.childLightDistance,
-                                lightDistance:
-                                    $0.presentedLightDistance,
-                                lightPresentation:
-                                    timeout.childLightPresentation
-                            )
-                        }
-                } ?? [],
-            trainingGuidebotYellowFlareTimeoutSparkParticles:
-                level.trainingRobotGuidebotChain?.yellowFlare?.timeout.map {
-                    timeout in
-                    yellowFlareTimeoutSparkParticles.map {
-                            .init(
-                                roomSourceIndex: $0.roomSourceIndex,
-                                position: $0.position,
-                                size: $0.size,
-                                lifeRemaining: $0.lifeRemaining,
-                                lifetime: $0.lifetime,
-                                sourceSize:
-                                    timeout.childParticleSize,
-                                sourceLifetime:
-                                    timeout.childParticleLifetime,
-                                texture:
-                                    trainingGuidebotYellowFlareParticleTexture(
-                                        timeout: timeout,
-                                        creationTime: $0.creationTime,
-                                        lifetime: $0.lifetime,
-                                        lifeRemaining: $0.lifeRemaining,
-                                        gameTime: systemsGameTime,
-                                        fallback: timeout.childTexture
-                                    ),
-                                opacity:
-                                    trainingGuidebotYellowFlareVisualOpacity(
-                                        creationTime: $0.creationTime,
-                                        lifetime: $0.lifetime,
-                                        lifeRemaining: $0.lifeRemaining,
-                                        gameTime: systemsGameTime
-                                    )
-                            )
-                        }
-                } ?? [],
+            weaponBillboards: weaponBillboardFrames(
+                level,
+                objects: world.objects,
+                gameTime: systemsGameTime
+            ),
+            objectLights: objectLights,
             objectSoundLoops: world.soundSystem.objectLoops.compactMap { loop in
                 guard let object = world.objects[loop.object],
                       case let .room(room) = object.location
@@ -1528,5 +1281,101 @@ func closeTrainingKillbotEntryBarrier(
         roomSourceIndex: barrier.barrierRoomSourceIndex,
         portalIndices: entry.orderedPortalIndices,
         rendersFaces: true
+    )
+}
+
+// The bespoke Camera Monitor presentation (M1 step 9 replaces it with
+// Script 059's actions, Inventory use, and aCreatePopupView): the pickup
+// completes the level's locate goal, and the used monitor shows the
+// security camera's view for the popup's time. It moved here from the
+// deleted TrainingGuidebotSimulation.swift in M1 step 8d unchanged.
+func completeTrainingCameraMonitorLocateGoal(
+    in world: inout GameWorld,
+    pickupObjectHandle: UInt32
+) {
+    guard let goalIndex = world.goals.firstIndex(where: { goal in
+        goal.status & 0x0000_0400 != 0
+            && goal.items.contains {
+                $0.type == 2
+                    && $0.objectHandle == pickupObjectHandle
+            }
+    }) else {
+        return
+    }
+    let goal = world.goals[goalIndex]
+    world.goals[goalIndex] = .init(
+        status: goal.status | 0x0000_0008,
+        priority: goal.priority,
+        list: goal.list,
+        name: goal.name,
+        itemName: goal.itemName,
+        description: goal.description,
+        completionMessage: goal.completionMessage,
+        items: goal.items.map { item in
+            guard item.type == 2,
+                  item.objectHandle == pickupObjectHandle else {
+                return item
+            }
+            return .init(
+                type: item.type,
+                sourceHandle: item.sourceHandle,
+                objectHandle: item.objectHandle,
+                done: true
+            )
+        }
+    )
+}
+
+func trainingCameraMonitorFrame(
+    level: Level,
+    world: GameWorld,
+    state: TrainingCameraMonitorState?
+) -> TrainingCameraMonitorFrame? {
+    guard let chain = level.trainingCameraMonitorChain,
+          let remainingDuration = state?.popupRemaining,
+          let cameraObject =
+              world.objects[ObjectHandle(chain.securityCameraObjectHandle)],
+          case let .room(roomSourceIndex) = cameraObject.location else {
+        return nil
+    }
+    let localPosition = chain.cameraLocalPosition
+    let position = cameraObject.position
+        + cameraObject.orientation.right * localPosition.x
+        + cameraObject.orientation.up * localPosition.y
+        + cameraObject.orientation.forward * localPosition.z
+    let gunpointRoomSourceIndex = traceIndoorMovement(
+        in: level,
+        roomStates: world.rooms,
+        startRoom: roomSourceIndex,
+        start: cameraObject.position,
+        end: position,
+        radius: 0
+    ).containingRoomSourceIndex
+    let localForward = chain.cameraLocalForward
+    let forward = sourceVectorNormalized(
+        cameraObject.orientation.right * localForward.x
+            + cameraObject.orientation.up * localForward.y
+            + cameraObject.orientation.forward * localForward.z
+    )
+    let up: Vector3
+    if forward.x == 0 && forward.z == 0 {
+        up = .init(x: 0, y: 0, z: forward.y < 0 ? 1 : -1)
+    } else {
+        let right = sourceVectorNormalized(.init(
+            x: forward.z,
+            y: 0,
+            z: -forward.x
+        ))
+        up = sourceVectorCross(forward, right)
+    }
+    return .init(
+        camera: .init(
+            position: position,
+            target: position + forward,
+            up: up,
+            projection: .sourceDefault
+        ),
+        roomSourceIndex: gunpointRoomSourceIndex,
+        remainingDuration: remainingDuration
     )
 }

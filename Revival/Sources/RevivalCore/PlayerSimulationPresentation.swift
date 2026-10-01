@@ -77,20 +77,15 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let shields: Float
     let energy: Float
     let afterburnerFuel: Float
-    /// The custom weapon explosions among the visual effects.
-    let visEffectExplosions: [VisEffectExplosionFrame]
+    /// The custom weapon explosions and the particles among the visual
+    /// effects.
+    let visEffectBillboards: [BillboardFrame]
     /// The fading line sparks among the visual effects.
     let visEffectLineSparks: [VisEffectLineSparkFrame]
-    let trainingGuidebotYellowFlares:
-        [TrainingGuidebotYellowFlareFrame]
-    let trainingGuidebotYellowFlareParticles:
-        [TrainingGuidebotYellowFlareParticleFrame]
-    let trainingGuidebotYellowFlareTimeoutExplosions:
-        [TrainingGuidebotYellowFlareParticleFrame]
-    let trainingGuidebotYellowFlareTimeoutSparks:
-        [TrainingGuidebotYellowFlareTimeoutSparkFrame]
-    let trainingGuidebotYellowFlareTimeoutSparkParticles:
-        [TrainingGuidebotYellowFlareParticleFrame]
+    /// The bitmap and vclip weapons (DrawWeaponObject).
+    let weaponBillboards: [BillboardFrame]
+    /// The lights DoObjectLight cast this frame (ObjectLighting.swift).
+    let objectLights: [ObjectLightRequest]
     /// The playing looping sounds linked to an object (SoundSystem.swift),
     /// at the object's place this frame.
     let objectSoundLoops: [ObjectSoundLoopFrame]
@@ -106,13 +101,16 @@ struct PlayerFastHeadlightFrame: Equatable, Sendable {
     let lightDistance: Float
 }
 
-/// A custom explosion (CUSTOM_EXPLOSION_INDEX) at its current animation
-/// frame.
-struct VisEffectExplosionFrame: Equatable, Sendable {
+/// A camera-facing bitmap at its current frame: a custom explosion or a
+/// particle (DrawVisEffect, viseffect.cpp:1900), or a bitmap or vclip
+/// weapon (DrawWeaponObject, WeaponFire.cpp:2589). `opacity` scales the
+/// texture's own alpha.
+struct BillboardFrame: Equatable, Sendable {
     let roomSourceIndex: Int
     let position: Vector3
     let size: Float
     let texture: SourceResource
+    let opacity: Float
 }
 
 /// A fading line spark (FADING_LINE_INDEX), drawn from its position back
@@ -121,51 +119,6 @@ struct VisEffectLineSparkFrame: Equatable, Sendable {
     let roomSourceIndex: Int
     let start: Vector3
     let end: Vector3
-}
-
-struct TrainingGuidebotYellowFlareFrame: Equatable, Sendable {
-    let roomSourceIndex: Int
-    let position: Vector3
-    let orientation: Matrix3
-    let velocity: Vector3
-    let model: SourceResource
-    let collisionRadius: Float
-    let lifeRemaining: Float
-    let sourceLightDistance: Float
-    let lightDistance: Float
-    let lightPresentation: ObjectLightPresentation
-}
-
-struct TrainingGuidebotYellowFlareParticleFrame:
-    Equatable, Sendable
-{
-    let roomSourceIndex: Int
-    let position: Vector3
-    let size: Float
-    let lifeRemaining: Float
-    let lifetime: Float
-    let sourceSize: Float
-    let sourceLifetime: Float
-    let texture: SourceResource
-    let opacity: Float
-}
-
-struct TrainingGuidebotYellowFlareTimeoutSparkFrame:
-    Equatable, Sendable
-{
-    let sourceAttemptIndex: Int
-    let sourceObjectSlot: Int
-    let receivedControlOnCreationFrame: Bool
-    let roomSourceIndex: Int
-    let position: Vector3
-    let orientation: Matrix3
-    let velocity: Vector3
-    let collisionRadius: Float
-    let lifeRemaining: Float
-    let texture: SourceResource
-    let sourceLightDistance: Float
-    let lightDistance: Float
-    let lightPresentation: ObjectLightPresentation
 }
 
 enum TrainingEndLevelState: String, Codable, Equatable, Sendable {

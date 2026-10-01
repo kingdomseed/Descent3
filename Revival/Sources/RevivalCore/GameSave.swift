@@ -238,11 +238,6 @@ extension GameWorld {
         level: Level
     ) throws(GameWorldValidationError) {
         let pairs: [(String, Bool, Bool)] = [
-            ("playerYellowFlareState", playerYellowFlareState != nil,
-             level.shipDefinitions.first?.playerYellowFlare != nil),
-            ("trainingRobotGuidebotState",
-             trainingRobotGuidebotState != nil,
-             level.trainingRobotGuidebotChain != nil),
             ("trainingCameraMonitorState",
              trainingCameraMonitorState != nil,
              level.trainingCameraMonitorChain != nil),
@@ -284,10 +279,9 @@ extension GameWorld {
             triggerFlags.count == level.triggers.count,
             "triggerFlags"
         )
-        try require(
-            trainingGuidebotFlareShots.isEmpty,
-            "trainingGuidebotFlareShots"
-        )
+        // The frame's link list and lights are consumed within the update.
+        try require(physicsLinkList.isEmpty, "physicsLinkList")
+        try require(objectLights.isEmpty, "objectLights")
         try require(
             levelModule.isValidSavedState(
                 forLoaded: LevelModule.load(level: level)
@@ -362,14 +356,6 @@ extension GameWorld {
         func nonzero(_ vector: Vector3) -> Bool {
             levelDot(vector, vector) > 0
         }
-        // The player flare timeout reads the parent's creation ordinal
-        // without a check.
-        try require(
-            playerYellowFlareState?.parents.allSatisfy {
-                $0.creationOrdinal != nil
-            } ?? true,
-            "playerYellowFlareState.parents.creationOrdinal"
-        )
         // Visual effects: a live effect ages (VF_USES_LIFELEFT), has life
         // left between 0 and its lifetime (VisEffectMoveAll marks it dead
         // below 0), and carries only the VF_ flags the runtime sets.
@@ -546,60 +532,6 @@ extension GameWorld {
                     == PlayerWeaponState.maximumPlayerWeapons,
             "playerWeapons"
         )
-        if let state = playerYellowFlareState {
-            try limit(
-                state.parents.count,
-                playerYellowFlarePresentationCapacity,
-                "playerYellowFlareState.parents"
-            )
-            try limit(
-                state.parentParticles.count,
-                playerYellowFlareParticlePresentationCapacity,
-                "playerYellowFlareState.parentParticles"
-            )
-            try limit(
-                state.timeoutExplosions.count,
-                playerYellowFlareTimeoutExplosionPresentationCapacity,
-                "playerYellowFlareState.timeoutExplosions"
-            )
-            try limit(
-                state.timeoutSparks.count,
-                playerYellowFlareTimeoutSparkPresentationCapacity,
-                "playerYellowFlareState.timeoutSparks"
-            )
-            try limit(
-                state.timeoutSparkParticles.count,
-                playerYellowFlareTimeoutSparkParticlePresentationCapacity,
-                "playerYellowFlareState.timeoutSparkParticles"
-            )
-        }
-        if let state = trainingRobotGuidebotState {
-            try limit(
-                state.yellowFlares?.count ?? 0,
-                trainingGuidebotYellowFlarePresentationCapacity,
-                "trainingRobotGuidebotState.yellowFlares"
-            )
-            try limit(
-                state.yellowFlareParticles?.count ?? 0,
-                trainingGuidebotYellowFlareParticlePresentationCapacity,
-                "trainingRobotGuidebotState.yellowFlareParticles"
-            )
-            try limit(
-                state.yellowFlareTimeoutExplosions?.count ?? 0,
-                trainingGuidebotYellowFlareTimeoutExplosionPresentationCapacity,
-                "trainingRobotGuidebotState.yellowFlareTimeoutExplosions"
-            )
-            try limit(
-                state.yellowFlareTimeoutSparks?.count ?? 0,
-                trainingGuidebotYellowFlareTimeoutSparkPresentationCapacity,
-                "trainingRobotGuidebotState.yellowFlareTimeoutSparks"
-            )
-            try limit(
-                state.yellowFlareTimeoutSparkParticles?.count ?? 0,
-                trainingGuidebotYellowFlareTimeoutSparkParticlePresentationCapacity,
-                "trainingRobotGuidebotState.yellowFlareTimeoutSparkParticles"
-            )
-        }
         // The sound system's loops name a level sound and have distinct
         // handles.
         try require(
@@ -656,6 +588,24 @@ extension GameWorld {
                 },
             "aiRenderedList"
         )
+        // The last rendered view is a proper camera: IsPointVisible builds
+        // its basis and projection from it.
+        if let camera = lastRenderCamera {
+            try sweep.visit(camera.position, label: "lastRenderCamera")
+            try sweep.visit(camera.target, label: "lastRenderCamera")
+            try sweep.visit(camera.up, label: "lastRenderCamera")
+            let forward = camera.target - camera.position
+            let side = sourceVectorCross(camera.up, forward)
+            let fov = camera.projection.horizontalFieldOfViewRadians
+            let aspect = camera.projection.aspectRatio
+            try require(
+                levelDot(forward, forward) > 0.000_001
+                    && levelDot(side, side) > 0.000_001
+                    && fov.isFinite && fov > 0.01 && fov < 3
+                    && aspect.isFinite && aspect > 0.01 && aspect < 100,
+                "lastRenderCamera"
+            )
+        }
         for object in objects {
             let name = "object \(object.handle.slot)"
             try sweep.visit(object.size, label: name)
@@ -710,6 +660,39 @@ extension GameWorld {
                     "\(name) weapon"
                 )
             }
+            // A weapon's particle clock, its link to the object it stuck
+            // to (a well-formed handle, a submodel DoPhysLinkedFrame checks,
+            // and a nonzero heading), and the portal it stuck on (a level
+            // room's portal, with OF_STUCK_ON_PORTAL).
+            if let dropTime = object.lastDropTime {
+                try sweep.visit(dropTime, label: name)
+            }
+            if let link = object.objectLink {
+                try sweep.visit(link.position, label: name)
+                try sweep.visit(link.forward, label: name)
+                try sweep.visit(link.up, label: name)
+                guard D3SourceIdentity.isValidHandle(link.parentHandle.rawValue)
+                else {
+                    throw .objectReference(link.parentHandle.rawValue)
+                }
+                try require(
+                    object.type == .weapon && !object.usesPhysics
+                        && link.submodel >= 0
+                        && levelDot(link.forward, link.forward) > 0,
+                    "\(name) objectLink"
+                )
+            }
+            try require(
+                (object.stuckPortal != nil)
+                    == (object.flags & GameObject.stuckOnPortalFlag != 0)
+                    && object.stuckPortal.map { stuck in
+                        level.rooms.first {
+                            $0.sourceIndex == stuck.roomSourceIndex
+                        }.map { $0.portals.indices.contains(stuck.portal) }
+                            == true
+                    } != false,
+                "\(name) stuckPortal"
+            )
             let modelBatteries = object.info == nil
                 ? []
                 : level.placedObjectModel(object.handle)?.weaponBatteries

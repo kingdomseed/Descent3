@@ -14,10 +14,11 @@
 // player and a powerup (ENABLE_COLLISION_SPHERE_SPHERE, :2624), whose
 // response is the script alone (NO_COLLISION(OBJ_PLAYER, OBJ_POWERUP),
 // :2519); the player and a weapon (:2623); and a robot, clutter, or
-// building and a weapon (:2621, :2626, :2632). The other pairs (the player
-// and robots, weapons and weapons, doors) bump, and they arrive with the
-// general physics and doors (M2). bump_two_objects, the weapon's impact
-// spawns, sticking, and the building surface effects arrive with them.
+// building and a weapon (:2621, :2626, :2632), where a PF_STICK weapon
+// sticks to the object it hit (MakeWeaponStick, :2146). The other pairs
+// (the player and robots, weapons and weapons, doors) bump, and they arrive
+// with the general physics and doors (M2). bump_two_objects, the weapon's
+// impact spawns, and the building surface effects arrive with them.
 
 import Foundation
 
@@ -79,9 +80,13 @@ extension GameWorld {
     /// imported object sets yet. The dying or dead player check (:2476)
     /// arrives with player death (M2). Each object's script chain gets
     /// EVT_COLLIDE, and then the pair's response runs.
+    /// `link` is the submodel frame of a weapon's polygon hit
+    /// (`hit_info`), which a sticking weapon keeps; without it a sticking
+    /// weapon dies like any other.
     mutating func collideTwoObjects(
         _ a: ObjectHandle,
         _ b: ObjectHandle,
+        link: ObjectLinkInfo? = nil,
         level: Level
     ) {
         for call in collideScriptEvents(a, b) {
@@ -89,24 +94,48 @@ extension GameWorld {
         }
         switch (objects[a]?.type, objects[b]?.type) {
         case (.player, .weapon):
-            collidePlayerAndWeapon(player: a, weapon: b, level: level)
+            collidePlayerAndWeapon(player: a, weapon: b, link: link,
+                                   level: level)
         case (.weapon, .player):
-            collidePlayerAndWeapon(player: b, weapon: a, level: level)
+            collidePlayerAndWeapon(player: b, weapon: a, link: link,
+                                   level: level)
         case (.robot, .weapon), (.clutter, .weapon), (.building, .weapon):
-            collideGenericAndWeapon(a, weapon: b, level: level)
+            collideGenericAndWeapon(a, weapon: b, link: link, level: level)
         case (.weapon, .robot), (.weapon, .clutter), (.weapon, .building):
-            collideGenericAndWeapon(b, weapon: a, level: level)
+            collideGenericAndWeapon(b, weapon: a, link: link, level: level)
         default:
             break
         }
     }
 
+    /// The end of a non-electrical weapon's object hit
+    /// (collide.cpp:2269-2276, :2335-2341): a PF_STICK weapon with a polygon
+    /// hit sticks (MakeWeaponStick, :2146: MT_OBJ_LINKED to the hit
+    /// object's submodel); any other weapon dies. A PF_PERSISTENT weapon,
+    /// which lives on, arrives with the weapons that use it (M2).
+    private mutating func endWeaponObjectHit(
+        _ handle: ObjectHandle,
+        link: ObjectLinkInfo?,
+        level: Level
+    ) {
+        guard let weaponIndex = objects[handle]?.weapon else { return }
+        let sticks = level.weapons![weaponIndex].physicsFlags
+            & ObjectPhysics.stickFlag != 0
+        if sticks, let link {
+            objects[handle]?.objectLink = link
+            objects[handle]?.usesPhysics = false
+        } else {
+            objects[handle]?.flags |= GameObject.deadFlag
+        }
+    }
+
     /// collide_player_and_weapon (collide.cpp:2280): the firing AI object
     /// learns it hit, the weapon explodes, the player takes the weapon's
-    /// damage, and the weapon dies.
+    /// damage, and the weapon dies or sticks.
     mutating func collidePlayerAndWeapon(
         player: ObjectHandle,
         weapon handle: ObjectHandle,
+        link: ObjectLinkInfo? = nil,
         level: Level
     ) {
         guard let weapon = objects[handle],
@@ -134,7 +163,7 @@ extension GameWorld {
             play3DSound(definition.sounds[CanonicalWeapon.impactRobotSound])
         }
         if !electrical {
-            objects[handle]?.flags |= GameObject.deadFlag
+            endWeaponObjectHit(handle, link: link, level: level)
         }
     }
 
@@ -142,10 +171,12 @@ extension GameWorld {
     /// little sooner, the weapon's wall impact sound plays and it explodes,
     /// the firer and the hit AI object hear of it, and the object takes the
     /// weapon's generic damage. A damaging energy or matter hit throws 3 to
-    /// 8 sparks in the weapon's secondary light color. The weapon dies.
+    /// 8 sparks in the weapon's secondary light color. The weapon dies or
+    /// sticks.
     mutating func collideGenericAndWeapon(
         _ hit: ObjectHandle,
         weapon handle: ObjectHandle,
+        link: ObjectLinkInfo? = nil,
         level: Level
     ) {
         guard let weapon = objects[handle],
@@ -202,7 +233,7 @@ extension GameWorld {
             }
         }
         if !electrical {
-            objects[handle]?.flags |= GameObject.deadFlag
+            endWeaponObjectHit(handle, link: link, level: level)
         }
     }
 
@@ -221,17 +252,18 @@ extension GameWorld {
         visitedRoomSourceIndices: [Int],
         ignored: [ObjectHandle],
         level: Level
-    ) -> (handle: ObjectHandle, distance: Float)? {
+    ) -> (handle: ObjectHandle, distance: Float, link: ObjectLinkInfo?)? {
         guard let moving = objects[mover],
               moving.flags & GameObject.noObjectCollisionsFlag == 0
         else {
             return nil
         }
-        var nearest: (handle: ObjectHandle, distance: Float)?
+        var nearest: (handle: ObjectHandle, distance: Float,
+                      link: ObjectLinkInfo?)?
         for object in objects where object.handle != mover {
             guard !ignored.contains(object.handle),
                   // fvi skips related objects (findintersection.cpp:3364).
-                  !objectsAreRelated(moving, object),
+                  !objectsAreRelated(moving, object, level: level),
                   object.flags & GameObject.noObjectCollisionsFlag == 0,
                   object.flags & GameObject.deadFlag == 0,
                   case let .room(room) = object.location,
@@ -240,6 +272,7 @@ extension GameWorld {
                 continue
             }
             let distance: Float?
+            var link: ObjectLinkInfo?
             switch collisionResult(moving.type, object.type) {
             case .nothing:
                 continue
@@ -254,7 +287,7 @@ extension GameWorld {
                 // The other object's sphere moves against the mover by the
                 // mover's move, on the mover's model at its start
                 // (findintersection.cpp:3487-3510).
-                distance = level.polygonModel(of: moving).flatMap {
+                let hit = level.polygonModel(of: moving).flatMap {
                     polyCollideObject(
                         model: $0,
                         position: start,
@@ -262,7 +295,29 @@ extension GameWorld {
                         p0: object.position,
                         p1: object.position + (start - end),
                         radius: object.size
-                    )?.distance
+                    )
+                }
+                distance = hit?.distance
+                // A weapon the move touched keeps the submodel of the
+                // mover's model it touched and its place there, for
+                // MakeWeaponStick (collide.cpp:2146, :2335). The C++ leaves
+                // hit_subobj_pos and the heading unset when the mover is not
+                // a weapon (newstyle_fi.cpp:216); the weapon's own place and
+                // heading in that frame stand for them.
+                if let hit, object.type == .weapon {
+                    link = ObjectLinkInfo(
+                        parentHandle: mover,
+                        submodel: hit.submodel,
+                        position: hit.submodelIntersection,
+                        forward: inverseTransform(
+                            object.orientation.forward,
+                            by: moving.orientation
+                        ),
+                        up: inverseTransform(
+                            object.orientation.up,
+                            by: moving.orientation
+                        )
+                    )
                 }
             case .spherePoly:
                 distance = level.polygonModel(of: object).flatMap {
@@ -281,7 +336,7 @@ extension GameWorld {
             else {
                 continue
             }
-            nearest = (object.handle, distance)
+            nearest = (object.handle, distance, link)
         }
         return nearest
     }

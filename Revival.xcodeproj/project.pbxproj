@@ -45,6 +45,7 @@
 		DBD91F5527066552B7BB225B /* Fireball.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECBEA08BEAC2F7B9183CB57 /* Fireball.swift */; };
 		E7295CFE3977C20C73073B80 /* Fireball+Effects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7912EFB55057C3EE098561 /* Fireball+Effects.swift */; };
 		08302FA230B85E7C92C7A1E6 /* ObjectPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3463E6B6758CDAE17C3B8D /* ObjectPhysics.swift */; };
+		C52ADBDBF0B9DC98FF99C57E /* ObjectLighting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A1BA25108D2A3FC12689E /* ObjectLighting.swift */; };
 		C33BD99BD7895CD98FF063A9 /* GameEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643F1AE0C481CBF346CED2FF /* GameEvent.swift */; };
 		5594934DF4E9F6CFDC3A834F /* VisEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BBB00204E3232F0EFF60BB5 /* VisEffect.swift */; };
 		7B0400000000000000000001 /* RobotFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B04000000000000000000F0 /* RobotFire.swift */; };
@@ -71,6 +72,7 @@
 		06C4B450C73EF4912E2C78A7 /* Fireball.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECBEA08BEAC2F7B9183CB57 /* Fireball.swift */; };
 		23AB721ED1A4CB4D35B64AA9 /* Fireball+Effects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7912EFB55057C3EE098561 /* Fireball+Effects.swift */; };
 		5DECC463858849B28B62F5A5 /* ObjectPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3463E6B6758CDAE17C3B8D /* ObjectPhysics.swift */; };
+		20A122A42B3D73383013D088 /* ObjectLighting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A1BA25108D2A3FC12689E /* ObjectLighting.swift */; };
 		FF1277169053BCDDEF3A34D9 /* GameEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643F1AE0C481CBF346CED2FF /* GameEvent.swift */; };
 		A6943A4C67BDAE8696E92DB1 /* VisEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BBB00204E3232F0EFF60BB5 /* VisEffect.swift */; };
 		7B0400000000000000000002 /* RobotFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B04000000000000000000F0 /* RobotFire.swift */; };
@@ -97,6 +99,7 @@
 		A7826690CFD940F8F4800EFD /* Fireball.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECBEA08BEAC2F7B9183CB57 /* Fireball.swift */; };
 		F0A2DAE453347718378B163E /* Fireball+Effects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7912EFB55057C3EE098561 /* Fireball+Effects.swift */; };
 		3F98EFB0740F0500F891C06D /* ObjectPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3463E6B6758CDAE17C3B8D /* ObjectPhysics.swift */; };
+		BCCF6907151E9D814ACCA40D /* ObjectLighting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A1BA25108D2A3FC12689E /* ObjectLighting.swift */; };
 		CEF6C6B46C3838D37283CE69 /* GameEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643F1AE0C481CBF346CED2FF /* GameEvent.swift */; };
 		8663A844B2EE20F01180BB60 /* VisEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BBB00204E3232F0EFF60BB5 /* VisEffect.swift */; };
 		7B0400000000000000000003 /* RobotFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B04000000000000000000F0 /* RobotFire.swift */; };
@@ -123,6 +126,7 @@
 		5560D5ECE967B257FAFC62CA /* Fireball.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECBEA08BEAC2F7B9183CB57 /* Fireball.swift */; };
 		E0ACCBC64CBEDF9104D86E2A /* Fireball+Effects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7912EFB55057C3EE098561 /* Fireball+Effects.swift */; };
 		D5FF1B6CB52C261D333402B6 /* ObjectPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3463E6B6758CDAE17C3B8D /* ObjectPhysics.swift */; };
+		1FEC2B6827E9631A72017777 /* ObjectLighting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A1BA25108D2A3FC12689E /* ObjectLighting.swift */; };
 		AEFDF5E6D42A08318A4714C9 /* GameEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643F1AE0C481CBF346CED2FF /* GameEvent.swift */; };
 		DA70AE32C9D7A985F0A73601 /* VisEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BBB00204E3232F0EFF60BB5 /* VisEffect.swift */; };
 		7B0400000000000000000004 /* RobotFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B04000000000000000000F0 /* RobotFire.swift */; };
@@ -149,6 +153,7 @@
 		02BAED58F009E05CDB02BF0B /* Fireball.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECBEA08BEAC2F7B9183CB57 /* Fireball.swift */; };
 		821BA9FBCBCEF97A58B3B9FA /* Fireball+Effects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7912EFB55057C3EE098561 /* Fireball+Effects.swift */; };
 		846E812EB1463910C557397B /* ObjectPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3463E6B6758CDAE17C3B8D /* ObjectPhysics.swift */; };
+		418B24820613CA17DA303A0F /* ObjectLighting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A1BA25108D2A3FC12689E /* ObjectLighting.swift */; };
 		698F1962B8804CBAEB65F0BE /* GameEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643F1AE0C481CBF346CED2FF /* GameEvent.swift */; };
 		2F8697B29C30A0EACEA3BB2B /* VisEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BBB00204E3232F0EFF60BB5 /* VisEffect.swift */; };
 		7B0400000000000000000005 /* RobotFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B04000000000000000000F0 /* RobotFire.swift */; };
@@ -377,8 +382,6 @@
 		H10000000000000000000003 /* PilotProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = H20000000000000000000001 /* PilotProfile.swift */; };
 		DB0000000000000000000001 /* PlayerSimulationValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000001 /* PlayerSimulationValues.swift */; };
 		DB0000000000000000000002 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000002 /* GameSession.swift */; };
-		DB0000000000000000000003 /* TrainingGuidebotSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000003 /* TrainingGuidebotSimulation.swift */; };
-		DB0000000000000000000004 /* PlayerWeaponSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000004 /* PlayerWeaponSimulation.swift */; };
 		DB0000000000000000000005 /* PlayerSimulationUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000005 /* PlayerSimulationUpdate.swift */; };
 		DB0000000000000000000007 /* GameWorld.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000007 /* GameWorld.swift */; };
 		DB0000000000000000000008 /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
@@ -386,8 +389,6 @@
 		DB000000000000000000000A /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
 		DB000000000000000000000B /* PlayerSimulationValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000001 /* PlayerSimulationValues.swift */; };
 		DB000000000000000000000C /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000002 /* GameSession.swift */; };
-		DB000000000000000000000D /* TrainingGuidebotSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000003 /* TrainingGuidebotSimulation.swift */; };
-		DB000000000000000000000E /* PlayerWeaponSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000004 /* PlayerWeaponSimulation.swift */; };
 		DB000000000000000000000F /* PlayerSimulationUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000005 /* PlayerSimulationUpdate.swift */; };
 		DB0000000000000000000011 /* GameWorld.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000007 /* GameWorld.swift */; };
 		DB0000000000000000000012 /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
@@ -395,8 +396,6 @@
 		DB0000000000000000000014 /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
 		DB0000000000000000000015 /* PlayerSimulationValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000001 /* PlayerSimulationValues.swift */; };
 		DB0000000000000000000016 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000002 /* GameSession.swift */; };
-		DB0000000000000000000017 /* TrainingGuidebotSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000003 /* TrainingGuidebotSimulation.swift */; };
-		DB0000000000000000000018 /* PlayerWeaponSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000004 /* PlayerWeaponSimulation.swift */; };
 		DB0000000000000000000019 /* PlayerSimulationUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000005 /* PlayerSimulationUpdate.swift */; };
 		DB000000000000000000001B /* GameWorld.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000007 /* GameWorld.swift */; };
 		DB000000000000000000001C /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
@@ -404,8 +403,6 @@
 		DB000000000000000000001E /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
 		DB000000000000000000001F /* PlayerSimulationValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000001 /* PlayerSimulationValues.swift */; };
 		DB0000000000000000000020 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000002 /* GameSession.swift */; };
-		DB0000000000000000000021 /* TrainingGuidebotSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000003 /* TrainingGuidebotSimulation.swift */; };
-		DB0000000000000000000022 /* PlayerWeaponSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000004 /* PlayerWeaponSimulation.swift */; };
 		DB0000000000000000000023 /* PlayerSimulationUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000005 /* PlayerSimulationUpdate.swift */; };
 		DB0000000000000000000025 /* GameWorld.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000007 /* GameWorld.swift */; };
 		DB0000000000000000000026 /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
@@ -413,21 +410,19 @@
 		DB0000000000000000000028 /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
 		DB0000000000000000000029 /* PlayerSimulationValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000001 /* PlayerSimulationValues.swift */; };
 		DB000000000000000000002A /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000002 /* GameSession.swift */; };
-		DB000000000000000000002B /* TrainingGuidebotSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000003 /* TrainingGuidebotSimulation.swift */; };
-		DB000000000000000000002C /* PlayerWeaponSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000004 /* PlayerWeaponSimulation.swift */; };
 		DB000000000000000000002D /* PlayerSimulationUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000005 /* PlayerSimulationUpdate.swift */; };
 		DB000000000000000000002F /* GameWorld.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000007 /* GameWorld.swift */; };
 		DB0000000000000000000030 /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
 		DB0000000000000000000031 /* SourceVectorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000009 /* SourceVectorMath.swift */; };
 		DB0000000000000000000032 /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
 		DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000003 /* TrainingGuidebotTests.swift */; };
-		DC0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift */; };
 		DC0000000000000000000016 /* TrainingGuidebotTests+Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */; };
 		DC0000000000000000000004 /* TrainingCameraAndReturnTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */; };
 		DC0000000000000000000005 /* TrainingCombatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000005 /* TrainingCombatTests.swift */; };
 		DC0000000000000000000006 /* TrainingMissionCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */; };
 		DC0000000000000000000007 /* PlayerInputAndAppKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */; };
 		DC0000000000000000000008 /* PlayerWeaponTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000008 /* PlayerWeaponTests.swift */; };
+		20289F365E81B1B2BD5BC482 /* FlareWeaponTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A616FE3D3F2A8D13B680283D /* FlareWeaponTests.swift */; };
 		DC0000000000000000000009 /* PlayerFlightAndCollisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000009 /* PlayerFlightAndCollisionTests.swift */; };
 		DC000000000000000000000A /* WorldRenderExtractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000A /* WorldRenderExtractionTests.swift */; };
 		DC000000000000000000000B /* WorldRenderFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000B /* WorldRenderFixtures.swift */; };
@@ -499,6 +494,7 @@
 		8ECBEA08BEAC2F7B9183CB57 /* Fireball.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fireball.swift; sourceTree = "<group>"; };
 		3F7912EFB55057C3EE098561 /* Fireball+Effects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Fireball+Effects.swift"; sourceTree = "<group>"; };
 		6F3463E6B6758CDAE17C3B8D /* ObjectPhysics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectPhysics.swift; sourceTree = "<group>"; };
+		7D3A1BA25108D2A3FC12689E /* ObjectLighting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectLighting.swift; sourceTree = "<group>"; };
 		643F1AE0C481CBF346CED2FF /* GameEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameEvent.swift; sourceTree = "<group>"; };
 		1BBB00204E3232F0EFF60BB5 /* VisEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisEffect.swift; sourceTree = "<group>"; };
 		7B04000000000000000000F0 /* RobotFire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotFire.swift; sourceTree = "<group>"; };
@@ -581,21 +577,19 @@
 		H20000000000000000000001 /* PilotProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PilotProfile.swift; sourceTree = "<group>"; };
 		D90000000000000000000001 /* PlayerSimulationValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationValues.swift; sourceTree = "<group>"; };
 		D90000000000000000000002 /* GameSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
-		D90000000000000000000003 /* TrainingGuidebotSimulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingGuidebotSimulation.swift; sourceTree = "<group>"; };
-		D90000000000000000000004 /* PlayerWeaponSimulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerWeaponSimulation.swift; sourceTree = "<group>"; };
 		D90000000000000000000005 /* PlayerSimulationUpdate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationUpdate.swift; sourceTree = "<group>"; };
 		D90000000000000000000007 /* GameWorld.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameWorld.swift; sourceTree = "<group>"; };
 		D90000000000000000000008 /* PlayerSimulationPhysics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationPhysics.swift; sourceTree = "<group>"; };
 		D90000000000000000000009 /* SourceVectorMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceVectorMath.swift; sourceTree = "<group>"; };
 		D9000000000000000000000A /* WorldRenderExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtraction.swift; sourceTree = "<group>"; };
 		DA0000000000000000000003 /* TrainingGuidebotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingGuidebotTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingGuidebotTests+YellowFlare.swift"; sourceTree = "<group>"; };
 		DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingGuidebotTests+Route.swift"; sourceTree = "<group>"; };
 		DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingCameraAndReturnTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000005 /* TrainingCombatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingCombatTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingMissionCompletionTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerInputAndAppKitTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000008 /* PlayerWeaponTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerWeaponTests.swift; sourceTree = "<group>"; };
+		A616FE3D3F2A8D13B680283D /* FlareWeaponTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlareWeaponTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000009 /* PlayerFlightAndCollisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerFlightAndCollisionTests.swift; sourceTree = "<group>"; };
 		DA000000000000000000000A /* WorldRenderExtractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtractionTests.swift; sourceTree = "<group>"; };
 		DA000000000000000000000B /* WorldRenderFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderFixtures.swift; sourceTree = "<group>"; };
@@ -790,6 +784,7 @@
 				8ECBEA08BEAC2F7B9183CB57 /* Fireball.swift */,
 				3F7912EFB55057C3EE098561 /* Fireball+Effects.swift */,
 				6F3463E6B6758CDAE17C3B8D /* ObjectPhysics.swift */,
+				7D3A1BA25108D2A3FC12689E /* ObjectLighting.swift */,
 				643F1AE0C481CBF346CED2FF /* GameEvent.swift */,
 				1BBB00204E3232F0EFF60BB5 /* VisEffect.swift */,
 				7B04000000000000000000F0 /* RobotFire.swift */,
@@ -808,8 +803,6 @@
 				C40000000000000000000001 /* PlayerSimulationPresentation.swift */,
 				D90000000000000000000001 /* PlayerSimulationValues.swift */,
 				D90000000000000000000002 /* GameSession.swift */,
-				D90000000000000000000003 /* TrainingGuidebotSimulation.swift */,
-				D90000000000000000000004 /* PlayerWeaponSimulation.swift */,
 				D90000000000000000000005 /* PlayerSimulationUpdate.swift */,
 				D90000000000000000000007 /* GameWorld.swift */,
 				D90000000000000000000008 /* PlayerSimulationPhysics.swift */,
@@ -895,13 +888,13 @@
 				C20000000000000000000004 /* EditorProjectTests.swift */,
 				BD0000000000000000000001 /* TrainingBehaviorEditorTests.swift */,
 				DA0000000000000000000003 /* TrainingGuidebotTests.swift */,
-				DA0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift */,
 				DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */,
 				DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */,
 				DA0000000000000000000005 /* TrainingCombatTests.swift */,
 				DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */,
 				DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */,
 				DA0000000000000000000008 /* PlayerWeaponTests.swift */,
+				A616FE3D3F2A8D13B680283D /* FlareWeaponTests.swift */,
 				DA0000000000000000000009 /* PlayerFlightAndCollisionTests.swift */,
 				DA000000000000000000000A /* WorldRenderExtractionTests.swift */,
 				DA000000000000000000000B /* WorldRenderFixtures.swift */,
@@ -1150,6 +1143,7 @@
 				02BAED58F009E05CDB02BF0B /* Fireball.swift in Sources */,
 				821BA9FBCBCEF97A58B3B9FA /* Fireball+Effects.swift in Sources */,
 				846E812EB1463910C557397B /* ObjectPhysics.swift in Sources */,
+				418B24820613CA17DA303A0F /* ObjectLighting.swift in Sources */,
 				698F1962B8804CBAEB65F0BE /* GameEvent.swift in Sources */,
 				2F8697B29C30A0EACEA3BB2B /* VisEffect.swift in Sources */,
 				7B0400000000000000000005 /* RobotFire.swift in Sources */,
@@ -1173,8 +1167,6 @@
 				C40000000000000000000002 /* PlayerSimulationPresentation.swift in Sources */,
 				DB0000000000000000000001 /* PlayerSimulationValues.swift in Sources */,
 				DB0000000000000000000002 /* GameSession.swift in Sources */,
-				DB0000000000000000000003 /* TrainingGuidebotSimulation.swift in Sources */,
-				DB0000000000000000000004 /* PlayerWeaponSimulation.swift in Sources */,
 				DB0000000000000000000005 /* PlayerSimulationUpdate.swift in Sources */,
 				DB0000000000000000000007 /* GameWorld.swift in Sources */,
 				DB0000000000000000000008 /* PlayerSimulationPhysics.swift in Sources */,
@@ -1234,6 +1226,7 @@
 				5560D5ECE967B257FAFC62CA /* Fireball.swift in Sources */,
 				E0ACCBC64CBEDF9104D86E2A /* Fireball+Effects.swift in Sources */,
 				D5FF1B6CB52C261D333402B6 /* ObjectPhysics.swift in Sources */,
+				1FEC2B6827E9631A72017777 /* ObjectLighting.swift in Sources */,
 				AEFDF5E6D42A08318A4714C9 /* GameEvent.swift in Sources */,
 				DA70AE32C9D7A985F0A73601 /* VisEffect.swift in Sources */,
 				7B0400000000000000000004 /* RobotFire.swift in Sources */,
@@ -1260,8 +1253,6 @@
 				C40000000000000000000003 /* PlayerSimulationPresentation.swift in Sources */,
 				DB000000000000000000000B /* PlayerSimulationValues.swift in Sources */,
 				DB000000000000000000000C /* GameSession.swift in Sources */,
-				DB000000000000000000000D /* TrainingGuidebotSimulation.swift in Sources */,
-				DB000000000000000000000E /* PlayerWeaponSimulation.swift in Sources */,
 				DB000000000000000000000F /* PlayerSimulationUpdate.swift in Sources */,
 				DB0000000000000000000011 /* GameWorld.swift in Sources */,
 				DB0000000000000000000012 /* PlayerSimulationPhysics.swift in Sources */,
@@ -1316,6 +1307,7 @@
 				A7826690CFD940F8F4800EFD /* Fireball.swift in Sources */,
 				F0A2DAE453347718378B163E /* Fireball+Effects.swift in Sources */,
 				3F98EFB0740F0500F891C06D /* ObjectPhysics.swift in Sources */,
+				BCCF6907151E9D814ACCA40D /* ObjectLighting.swift in Sources */,
 				CEF6C6B46C3838D37283CE69 /* GameEvent.swift in Sources */,
 				8663A844B2EE20F01180BB60 /* VisEffect.swift in Sources */,
 				7B0400000000000000000003 /* RobotFire.swift in Sources */,
@@ -1345,8 +1337,6 @@
 				C40000000000000000000004 /* PlayerSimulationPresentation.swift in Sources */,
 				DB0000000000000000000015 /* PlayerSimulationValues.swift in Sources */,
 				DB0000000000000000000016 /* GameSession.swift in Sources */,
-				DB0000000000000000000017 /* TrainingGuidebotSimulation.swift in Sources */,
-				DB0000000000000000000018 /* PlayerWeaponSimulation.swift in Sources */,
 				DB0000000000000000000019 /* PlayerSimulationUpdate.swift in Sources */,
 				DB000000000000000000001B /* GameWorld.swift in Sources */,
 				DB000000000000000000001C /* PlayerSimulationPhysics.swift in Sources */,
@@ -1404,6 +1394,7 @@
 				06C4B450C73EF4912E2C78A7 /* Fireball.swift in Sources */,
 				23AB721ED1A4CB4D35B64AA9 /* Fireball+Effects.swift in Sources */,
 				5DECC463858849B28B62F5A5 /* ObjectPhysics.swift in Sources */,
+				20A122A42B3D73383013D088 /* ObjectLighting.swift in Sources */,
 				FF1277169053BCDDEF3A34D9 /* GameEvent.swift in Sources */,
 				A6943A4C67BDAE8696E92DB1 /* VisEffect.swift in Sources */,
 				7B0400000000000000000002 /* RobotFire.swift in Sources */,
@@ -1458,13 +1449,13 @@
 				C30000000000000000000005 /* PlayerInput.swift in Sources */,
 				C40000000000000000000005 /* PlayerSimulationPresentation.swift in Sources */,
 				DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */,
-				DC0000000000000000000015 /* TrainingGuidebotTests+YellowFlare.swift in Sources */,
 				DC0000000000000000000016 /* TrainingGuidebotTests+Route.swift in Sources */,
 				DC0000000000000000000004 /* TrainingCameraAndReturnTests.swift in Sources */,
 				DC0000000000000000000005 /* TrainingCombatTests.swift in Sources */,
 				DC0000000000000000000006 /* TrainingMissionCompletionTests.swift in Sources */,
 				DC0000000000000000000007 /* PlayerInputAndAppKitTests.swift in Sources */,
 				DC0000000000000000000008 /* PlayerWeaponTests.swift in Sources */,
+				20289F365E81B1B2BD5BC482 /* FlareWeaponTests.swift in Sources */,
 				DC0000000000000000000009 /* PlayerFlightAndCollisionTests.swift in Sources */,
 				DC000000000000000000000A /* WorldRenderExtractionTests.swift in Sources */,
 				DC000000000000000000000B /* WorldRenderFixtures.swift in Sources */,
@@ -1479,8 +1470,6 @@
 				DC0000000000000000000011 /* LiveShieldsHUDTests.swift in Sources */,
 				DB000000000000000000001F /* PlayerSimulationValues.swift in Sources */,
 				DB0000000000000000000020 /* GameSession.swift in Sources */,
-				DB0000000000000000000021 /* TrainingGuidebotSimulation.swift in Sources */,
-				DB0000000000000000000022 /* PlayerWeaponSimulation.swift in Sources */,
 				DB0000000000000000000023 /* PlayerSimulationUpdate.swift in Sources */,
 				DB0000000000000000000025 /* GameWorld.swift in Sources */,
 				DB0000000000000000000026 /* PlayerSimulationPhysics.swift in Sources */,
@@ -1549,6 +1538,7 @@
 				DBD91F5527066552B7BB225B /* Fireball.swift in Sources */,
 				E7295CFE3977C20C73073B80 /* Fireball+Effects.swift in Sources */,
 				08302FA230B85E7C92C7A1E6 /* ObjectPhysics.swift in Sources */,
+				C52ADBDBF0B9DC98FF99C57E /* ObjectLighting.swift in Sources */,
 				C33BD99BD7895CD98FF063A9 /* GameEvent.swift in Sources */,
 				5594934DF4E9F6CFDC3A834F /* VisEffect.swift in Sources */,
 				7B0400000000000000000001 /* RobotFire.swift in Sources */,
@@ -1576,8 +1566,6 @@
 				C40000000000000000000006 /* PlayerSimulationPresentation.swift in Sources */,
 				DB0000000000000000000029 /* PlayerSimulationValues.swift in Sources */,
 				DB000000000000000000002A /* GameSession.swift in Sources */,
-				DB000000000000000000002B /* TrainingGuidebotSimulation.swift in Sources */,
-				DB000000000000000000002C /* PlayerWeaponSimulation.swift in Sources */,
 				DB000000000000000000002D /* PlayerSimulationUpdate.swift in Sources */,
 				DB000000000000000000002F /* GameWorld.swift in Sources */,
 				DB0000000000000000000030 /* PlayerSimulationPhysics.swift in Sources */,

@@ -216,9 +216,6 @@ struct Level: Codable, Equatable, Sendable {
                     ? []
                     : ["Buddybot.oof"])
                 + (weapons ?? []).compactMap(\.model?.sourceName)
-                + (trainingRobotGuidebotChain?.yellowFlare.map {
-                    [$0.model.sourceName]
-                } ?? [])
         )
         guard rooms.count <= 400,
               rooms.allSatisfy({ (0..<400).contains($0.sourceIndex) }) else {
@@ -602,13 +599,6 @@ struct Level: Codable, Equatable, Sendable {
                     "Training robot Guidebot chain"
                 )
             }
-            try validateTrainingGuidebotYellowFlareBinding(
-                chain: chain,
-                models: models,
-                materials: presentationMaterials,
-                sounds: soundClips,
-                dependencies: dependencyManifest.current
-            )
         }
         if let chain = trainingCameraMonitorChain {
             let clipNames = Set(voiceClips.map {
@@ -1239,9 +1229,6 @@ struct Level: Codable, Equatable, Sendable {
                 },
                 ambientEngineSound: soundClips.first {
                     $0.logicalName == "GBotEngineB1"
-                },
-                flareSound: soundClips.first {
-                    $0.logicalName == "Flare"
                 }
             )
             try validateStockTrainingRobotGuidebotPresentation(

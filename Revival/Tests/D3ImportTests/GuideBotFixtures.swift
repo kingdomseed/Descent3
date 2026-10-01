@@ -249,17 +249,6 @@ func withTrainingGuideBot(
         )
     }
     level = level.appendingSoundClips(missing)
-    // The module's "Yellow flare" weapon page (Wpn_FindID), on the flare
-    // model of the level's bespoke flare (M1 step 8d replaces that flare).
-    if let flare = level.trainingRobotGuidebotChain?.yellowFlare,
-       !(level.weapons ?? []).contains(where: {
-           $0.name.caseInsensitiveCompare("Yellow flare") == .orderedSame
-       }) {
-        level = level.addingWeapon(fixtureRenamedWeapon(
-            fixtureBlueLaser(model: flare.model),
-            name: "Yellow flare"
-        ))
-    }
     level.gameModules = [
         .init(
             module: "aigame",
@@ -323,11 +312,9 @@ extension GameWorld {
 
     /// Makes the translated Guide-Bot's flare due in GBM_AMBIENT
     /// (AIGame.cpp:6106-6120): goal slot 1 used, and slots 2 and 3 used when
-    /// `helperSlotsAreUsed`. The other timed checks wait, and the bespoke
-    /// flares are cleared.
+    /// `helperSlotsAreUsed`. The other timed checks wait.
     mutating func prepareTestGuideBotFlare(
         helperSlotsAreUsed: Bool,
-        clearsFlares: Bool = true,
         level: Level
     ) {
         let me = buddyHandle
@@ -353,9 +340,6 @@ extension GameWorld {
         }
         XCTAssertTrue(aiGoalIsUsed(me, 1))
         XCTAssertEqual(aiGoalIsUsed(me, 2), helperSlotsAreUsed)
-        if clearsFlares {
-            trainingRobotGuidebotState?.yellowFlares = []
-        }
     }
 }
 

@@ -549,15 +549,17 @@ extension Level {
     /// batteries `shipBatteries` with the ship model's guns, and the weapons
     /// all those batteries fire. `soundKey` maps a sound page name to the
     /// level's canonical clip key, importing the clip if needed;
-    /// `modelPayload` returns an OOF by lowercased name; `explosionFrames`
-    /// returns the imported frames of an explosion texture, if any.
+    /// `modelPayload` returns an OOF by lowercased name; `textureFrames`
+    /// returns the imported frames of a texture (an explosion or a
+    /// particle), if any, and `fireImage` a bitmap or vclip fire image.
     func addingObjectTables(
         genericPages: [String: RetailGenericPage],
         shipBatteries: [RetailShipWeaponBattery] = [],
         weapon: (String) throws -> RetailWeaponPresentationSelection,
         weaponModel: (String) -> SourceResource?,
         modelPayload: (String) -> Data?,
-        explosionFrames: (String) -> [SourceResource] = { _ in [] },
+        textureFrames: (String) -> [SourceResource] = { _ in [] },
+        fireImage: (String) -> CanonicalWeaponImage? = { _ in nil },
         soundKey: (String) throws -> String
     ) throws -> Level {
         var level = self
@@ -737,14 +739,31 @@ extension Level {
                 ))
             }
         }
+        // Each weapon's spawns join the table (spawn_handle and
+        // alternate_spawn_handle, weaponpage.cpp:782).
         var weapons: [CanonicalWeapon] = []
-        for name in weaponNames {
-            weapons.append(try Self.canonicalWeapon(
+        var pending = weaponNames
+        while !pending.isEmpty {
+            let name = pending.removeFirst()
+            guard !weapons.contains(where: {
+                $0.name.caseInsensitiveCompare(name) == .orderedSame
+            }) else {
+                continue
+            }
+            let canonical = try Self.canonicalWeapon(
                 try weapon(name),
                 weaponModel: weaponModel,
-                explosionFrames: explosionFrames,
+                textureFrames: textureFrames,
+                fireImage: fireImage,
                 soundKey: soundKey
-            ))
+            )
+            weapons.append(canonical)
+            if let spawn = canonical.spawn {
+                pending.append(spawn.weapon)
+                if !spawn.alternateWeapon.isEmpty {
+                    pending.append(spawn.alternateWeapon)
+                }
+            }
         }
         level.models = models.map { model in
             var model = model
@@ -760,25 +779,28 @@ extension Level {
             level.shipDefinitions[0].weaponBatteries = shipWeaponBatteries
         }
         return level.appendingTextureDependencies(
-            weapons.flatMap { $0.explosion?.frames ?? [] },
+            weapons.flatMap(\.presentationTextures),
             provenance:
                 "manage/weaponpage.cpp:653-901; Descent3/WeaponFire.cpp:3058-3201"
         )
     }
 
     /// The canonical weapon of a retail weapon page (weaponpage.cpp:782):
-    /// its model (unless the page draws a bitmap or vclip), and the sounds
-    /// the runtime plays: WSI_IMPACT_WALL, WSI_FLYING, and WSI_IMPACT_ROBOT
-    /// (weapon.h:263-265).
+    /// its model (unless the page draws a bitmap or vclip, whose fire image
+    /// `fireImage` gives), its particles and spawns, and the sounds the
+    /// runtime plays: WSI_IMPACT_WALL, WSI_FLYING, WSI_IMPACT_ROBOT, and
+    /// WSI_BOUNCE (weapon.h:263-266). `textureFrames` gives the imported
+    /// frames of the explosion and particle textures.
     static func canonicalWeapon(
         _ page: RetailWeaponPresentationSelection,
         weaponModel: (String) -> SourceResource?,
-        explosionFrames: (String) -> [SourceResource],
+        textureFrames: (String) -> [SourceResource],
+        fireImage: (String) -> CanonicalWeaponImage?,
         soundKey: (String) throws -> String
     ) throws -> CanonicalWeapon {
         let sounds = try page.soundLogicalNames.enumerated().map {
             index, sound in
-            [1, 2, 3].contains(index) && !sound.isEmpty
+            [1, 2, 3, 4].contains(index) && !sound.isEmpty
                 ? try soundKey(sound) : ""
         }
         let usesModel = page.weaponFlags
@@ -809,12 +831,33 @@ extension Level {
             explosion: .init(
                 hasImage: !page.explosionTextureName.isEmpty,
                 frames: page.explosionTextureName.isEmpty
-                    ? [] : explosionFrames(page.explosionTextureName),
+                    ? [] : textureFrames(page.explosionTextureName),
                 lifetime: page.explosionLifetime,
                 size: page.explosionSize
             ),
             lightDistance: page.lightDistance,
-            lighting: page.lightPresentation
+            lighting: page.lightPresentation,
+            fireImage: usesModel
+                ? nil
+                : fireImage(page.fireImageName)
+                    ?? .init(frames: [], frameTime: 0),
+            particles: page.particleCount > 0 && !page.particleName.isEmpty
+                ? .init(
+                    count: page.particleCount,
+                    lifetime: page.particleLifetime,
+                    size: page.particleSize,
+                    frames: textureFrames(page.particleName)
+                )
+                : nil,
+            spawn: page.timeoutSpawnCount > 0
+                && !page.timeoutSpawnName.isEmpty
+                ? .init(
+                    weapon: page.timeoutSpawnName,
+                    count: page.timeoutSpawnCount,
+                    alternateWeapon: page.alternateSpawnName,
+                    alternateChance: page.alternateSpawnChance
+                )
+                : nil
         )
     }
 

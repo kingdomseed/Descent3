@@ -59,7 +59,6 @@ struct GameWorld: Codable, Equatable, Sendable {
     var lastThrustTime: Float = 0
     var playerHeadlightIsOn = false
     var playerRearViewState: PlayerRearViewState?
-    var playerYellowFlareState: PlayerYellowFlareState?
     /// `Players[0].weapon[PW_PRIMARY]` and `[PW_SECONDARY]`: the selected
     /// battery and how long the fire control has been held.
     var playerWeapons = [
@@ -112,6 +111,18 @@ struct GameWorld: Codable, Equatable, Sendable {
     /// frame's render drew (renderobject.cpp:1239), which the next
     /// AIFrameAll reads.
     var aiRenderedList: [ObjectHandle] = []
+    /// The view the last frame rendered (the g3 view state that
+    /// IsPointVisible reads, renderobject.cpp:1779), or `nil` before the
+    /// first render.
+    var lastRenderCamera: RoomCamera?
+    /// PhysicsLinkList (object.cpp:2830): the MT_OBJ_LINKED objects the
+    /// ObjDoFrameAll loop listed, which its tail moves. Empty between
+    /// frames, so a saved world has none.
+    var physicsLinkList: [ObjectHandle] = []
+    /// The lights DoObjectLight cast this frame (ObjectLighting.swift). The
+    /// session moves them to the frame's presentation before the update
+    /// returns, so a saved world has none.
+    var objectLights: [ObjectLightRequest] = []
 
     // Osiris.
     /// The loaded level module and its state.
@@ -124,11 +135,6 @@ struct GameWorld: Codable, Equatable, Sendable {
 
     // Training script state. These move into the Training level module in
     // later M1 steps.
-    var trainingRobotGuidebotState: TrainingRobotGuidebotState?
-    /// The flares the Guide-Bot fired this update, for the bespoke flare
-    /// path. The session makes them within the update, so a saved world has
-    /// none.
-    var trainingGuidebotFlareShots: [TrainingGuidebotFlareShot] = []
     var trainingCameraMonitorState: TrainingCameraMonitorState?
     var trainingKillbotEntryState: TrainingKillbotEntryState?
     var trainingInvulnerabilityPickupState:
@@ -152,8 +158,6 @@ struct GameWorld: Codable, Equatable, Sendable {
         goals = level.goals
         triggerFlags = Self.initialTriggerFlags(level)
         angularVelocity = ship.physics.initialAngularVelocity
-        playerYellowFlareState = level.shipDefinitions.first?
-            .playerYellowFlare == nil ? nil : .init()
         objInitPlacedObjects(level: level, playerSize: ship.presentationSize)
         // ObjLink's BigObjAdd (object.cpp:1438): an indoor object of at
         // least MIN_BIG_OBJ_RAD (16) is OF_BIG_OBJECT.

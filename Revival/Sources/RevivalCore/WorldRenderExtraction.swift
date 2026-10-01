@@ -776,9 +776,12 @@ let trainingScriptActionCounterMaximum = 100_000
 /// drawn. The player's lasers need the most: two every quarter second, each
 /// living up to five seconds in a long room.
 let weaponObjectPresentationCapacity = 40
-/// The custom explosions and line sparks the renderer prepares draws for.
-/// More live visual effects than this are simulated but not drawn.
-let visEffectExplosionPresentationCapacity = 6
+/// The billboards (custom explosions and particles) and line sparks the
+/// renderer prepares draws for, per texture. More live visual effects than
+/// this are simulated but not drawn. A weapon that drops 25 particles a
+/// second that live about 0.3 s keeps about 10 alive, and a timeout spawn
+/// of 9 children that drop their own adds about 50.
+let visEffectBillboardPresentationCapacity = 320
 let visEffectLineSparkPresentationCapacity = 48
 
 /// The weapons with a polygon model, in `Level.weapons` order, with their
@@ -806,7 +809,11 @@ func extractPreparedWeaponObjectDrawItems(_ level: Level) -> [ModelDrawItem] {
                 slot: slot,
                 model: weapon.model,
                 position: room.pathPoint,
-                velocity: Vector3(x: 0, y: 0, z: 1),
+                orientation: Matrix3(
+                    right: .init(x: 1, y: 0, z: 0),
+                    up: .init(x: 0, y: 1, z: 0),
+                    forward: .init(x: 0, y: 0, z: 1)
+                ),
                 roomSourceIndex: room.sourceIndex,
                 camera: .trainingRoom3
             )
@@ -814,8 +821,9 @@ func extractPreparedWeaponObjectDrawItems(_ level: Level) -> [ModelDrawItem] {
     }
 }
 
-/// The draws of the weapon objects in the object table, in slot order,
-/// each facing along its velocity (RT_WEAPON).
+/// The draws of the polygon-model weapon objects in the object table, in
+/// slot order, each at its orientation (DrawWeaponObject's
+/// DrawPolygonModel, WeaponFire.cpp:2632).
 func extractWeaponObjectDrawItems(
     _ level: Level,
     objects: ObjectTable,
@@ -826,10 +834,12 @@ func extractWeaponObjectDrawItems(
     var items: [ModelDrawItem] = []
     for object in objects where object.type == .weapon {
         guard let weapon = object.weapon,
+              object.renderType != .none,
+              level.weapons![weapon].flags & CanonicalWeapon.invisibleFlag
+                == 0,
               let group = groups.firstIndex(where: { $0.index == weapon }),
               slots[group] < weaponObjectPresentationCapacity,
-              case let .room(room) = object.location,
-              object.velocity != .zero
+              case let .room(room) = object.location
         else {
             continue
         }
@@ -839,7 +849,7 @@ func extractWeaponObjectDrawItems(
             slot: slots[group],
             model: groups[group].model,
             position: object.position,
-            velocity: object.velocity,
+            orientation: object.orientation,
             roomSourceIndex: room,
             camera: camera
         )
@@ -854,7 +864,7 @@ private func weaponObjectDrawItems(
     slot: Int,
     model: CanonicalModel,
     position: Vector3,
-    velocity: Vector3,
+    orientation: Matrix3,
     roomSourceIndex: Int,
     camera: RoomCamera
 ) -> [ModelDrawItem] {
@@ -863,13 +873,6 @@ private func weaponObjectDrawItems(
             ($0.texture, $0)
         }
     )
-    let forward = sourceVectorNormalized(velocity)
-    let referenceUp =
-        abs(forward.y) < 0.99
-        ? Vector3(x: 0, y: 1, z: 0)
-        : Vector3(x: 1, y: 0, z: 0)
-    let right = sourceVectorNormalized(sourceVectorCross(referenceUp, forward))
-    let up = sourceVectorCross(forward, right)
     let object = GameObject(
         handle: ObjectHandle(
             UInt32.max
@@ -879,7 +882,7 @@ private func weaponObjectDrawItems(
         renderType: .polyobj,
         location: .room(roomSourceIndex),
         position: position,
-        orientation: .init(right: right, up: up, forward: forward)
+        orientation: orientation
     )
     return makeModelDrawItems(
         object: object,
@@ -890,38 +893,96 @@ private func weaponObjectDrawItems(
     )
 }
 
-/// The custom weapon explosions (CUSTOM_EXPLOSION_INDEX) the renderer draws,
-/// in list order, each at the animation frame its age reaches.
-func visEffectExplosionFrames(
+/// The custom weapon explosions (CUSTOM_EXPLOSION_INDEX) and particles
+/// (PARTICLE_INDEX) the renderer draws, in list order, as DrawVisEffect
+/// shows them (viseffect.cpp:1868-1962): the fraction of its life the
+/// effect has lived at the render's Gametime, below 1, picks the frame of
+/// its texture; a VF_EXPAND effect grows from half size; and the effect
+/// fades out over the second half of its life.
+func visEffectBillboardFrames(
     _ level: Level,
-    effects: [VisEffect]
-) -> [VisEffectExplosionFrame] {
-    var frames: [VisEffectExplosionFrame] = []
+    effects: [VisEffect],
+    gameTime: Float
+) -> [BillboardFrame] {
+    var frames: [BillboardFrame] = []
     for effect in effects
-    where effect.id == VisEffect.customExplosionID
+    where (effect.id == VisEffect.customExplosionID
+        || effect.id == VisEffect.particleID)
         && effect.flags & VisEffect.deadFlag == 0 {
-        guard frames.count < visEffectExplosionPresentationCapacity,
+        guard frames.count < visEffectBillboardPresentationCapacity,
               let weapon = effect.customWeapon,
-              let explosion = level.weapons?[weapon].explosion,
-              !explosion.frames.isEmpty,
+              let textures = effect.id == VisEffect.particleID
+                ? level.weapons?[weapon].particles?.frames
+                : level.weapons?[weapon].explosion?.frames,
+              !textures.isEmpty,
               effect.lifetime > 0
         else {
             continue
         }
-        // The fraction of its life the effect has lived, in 0...1, picks
-        // the frame; clamping first keeps any saved lifetime in range.
-        let lived = Double(effect.lifetime - effect.lifeLeft)
-            / Double(effect.lifetime)
-        let fraction = lived.isFinite ? min(1, max(0, lived)) : 0
+        var normalizedTime = (gameTime - effect.creationTime) / effect.lifetime
+        // A saved life can make 0/0; the C++ value is undefined then.
+        if normalizedTime.isNaN || normalizedTime < 0 {
+            normalizedTime = 0
+        }
+        if normalizedTime >= 1 { normalizedTime = 0.99999 }
         let index = min(
-            explosion.frames.count - 1,
-            Int(fraction * Double(explosion.frames.count))
+            textures.count - 1,
+            Int(Float(textures.count) * normalizedTime)
         )
+        let size = effect.flags & VisEffect.expandFlag != 0
+            ? effect.size / 2 + effect.size * normalizedTime / 2
+            : effect.size
+        let opacity = normalizedTime > 0.5
+            ? 1 - (normalizedTime - 0.5) / 0.5
+            : 1
         frames.append(.init(
             roomSourceIndex: effect.roomSourceIndex,
             position: effect.position,
-            size: effect.size,
-            texture: explosion.frames[index]
+            size: size,
+            texture: textures[index],
+            opacity: opacity
+        ))
+    }
+    return frames
+}
+
+/// The bitmap and vclip weapons the renderer draws, in slot order
+/// (DrawWeaponObject, WeaponFire.cpp:2589): a vclip shows the frame
+/// `Gametime / frame_time` reaches, modulo its frames (GetWeaponFireImage,
+/// weapon.cpp:608), at the weapon's size. An invisible weapon is not drawn.
+func weaponBillboardFrames(
+    _ level: Level,
+    objects: ObjectTable,
+    gameTime: Float
+) -> [BillboardFrame] {
+    var frames: [BillboardFrame] = []
+    for object in objects where object.type == .weapon {
+        guard frames.count < weaponObjectPresentationCapacity,
+              let weapon = object.weapon,
+              object.renderType != .none,
+              let definition = level.weapons?[weapon],
+              definition.flags & CanonicalWeapon.invisibleFlag == 0,
+              let image = definition.fireImage,
+              !image.frames.isEmpty,
+              case let .room(room) = object.location
+        else {
+            continue
+        }
+        // `(int)(Gametime / frame_time) % num_frames`, taken in Double so
+        // a tiny frame time cannot overflow the int.
+        let quotient = image.frameTime > 0
+            ? Double(gameTime) / Double(image.frameTime) : 0
+        let frame = quotient.isFinite && quotient >= 0
+            ? Int(quotient.rounded(.towardZero)
+                .truncatingRemainder(dividingBy: Double(image.frames.count)))
+            : 0
+        let texture = image.frames[frame]
+        frames.append(.init(
+            roomSourceIndex: room,
+            position: object.position,
+            size: object.size,
+            texture: texture,
+            opacity: 1
         ))
     }
     return frames
@@ -941,88 +1002,6 @@ func visEffectLineSparkFrames(
             roomSourceIndex: $0.roomSourceIndex,
             start: $0.position,
             end: $0.position - sourceVectorNormalized($0.velocity) * $0.size
-        )
-    }
-}
-
-func extractPreparedTrainingGuidebotYellowFlareDrawItems(
-    _ level: Level
-) -> [ModelDrawItem] {
-    guard let definition =
-            level.trainingRobotGuidebotChain?.yellowFlare,
-          let guidebot = level.objects.first(where: {
-              $0.handle
-                == level.trainingRobotGuidebotChain?
-                    .guidebotObjectHandle
-          }),
-          case let .room(roomSourceIndex) = guidebot.location
-    else {
-        return []
-    }
-    return extractTrainingGuidebotYellowFlareDrawItems(
-        level,
-        flares:
-            (0..<combinedYellowFlarePresentationCapacity).map {
-                _ in .init(
-                    roomSourceIndex: roomSourceIndex,
-                    position: guidebot.position,
-                    orientation: guidebot.orientation,
-                    velocity:
-                        guidebot.orientation.forward
-                            * definition.speed,
-                    model: definition.model,
-                    collisionRadius: definition.collisionRadius,
-                    lifeRemaining: definition.lifetime,
-                    sourceLightDistance:
-                        definition.lightDistance,
-                    lightDistance: definition.lightDistance,
-                    lightPresentation:
-                        definition.lightPresentation
-                )
-            },
-        camera: .trainingRoom3
-    )
-}
-
-func extractTrainingGuidebotYellowFlareDrawItems(
-    _ level: Level,
-    flares: [TrainingGuidebotYellowFlareFrame],
-    camera: RoomCamera
-) -> [ModelDrawItem] {
-    guard let definition =
-            level.trainingRobotGuidebotChain?.yellowFlare,
-          let model = level.models.first(where: {
-              $0.source == definition.model
-          })
-    else {
-        return []
-    }
-    precondition(
-        flares.count
-            <= combinedYellowFlarePresentationCapacity
-    )
-    let materialByTexture = Dictionary(
-        uniqueKeysWithValues: level.presentationMaterials.map {
-            ($0.texture, $0)
-        }
-    )
-    return flares.enumerated().flatMap { slot, flare in
-        let object = GameObject(
-            handle: ObjectHandle(
-                UInt32.max - 1_000 - UInt32(slot)
-            ),
-            type: .weapon,
-            renderType: .polyobj,
-            location: .room(flare.roomSourceIndex),
-            position: flare.position,
-            orientation: flare.orientation
-        )
-        return makeModelDrawItems(
-            object: object,
-            model: model,
-            materialByTexture: materialByTexture,
-            camera: camera,
-            cullBackfaces: false
         )
     }
 }

@@ -1,33 +1,9 @@
 import XCTest
 
+/// The Training yellow flare level (makeTrainingGuidebotYellowFlareLevel),
+/// whose ship fires the flare from its FLARE_INDEX battery.
 func makePlayerYellowFlareLevel() throws -> Level {
-    let level = makeTrainingGuidebotYellowFlareLevel()
-    var ship = level.shipDefinitions[0]
-    ship.playerYellowFlare = .init(
-        batteryIndex: 20,
-        firingMask: 1,
-        weapon: .init(storedIndex: 3, sourceName: "Yellow flare"),
-        fireSoundLogicalName: "Flare",
-        fireSoundSourceName: "Flare.wav",
-        fireWait: 1,
-        energyUsage: 0,
-        ammoUsage: 0,
-        fireFlags: 0,
-        weaponFlags: 0,
-        gunpointIndex: 0,
-        gunpointParentSubmodelIndex: 0,
-        gunpointLocalPosition: .init(
-            x: 0.000_000_444_4,
-            y: -1.046_244_4,
-            z: 3.179_825_1
-        ),
-        gunpointLocalForward: .init(
-            x: 0.000_007_629_6,
-            y: -0.000_015_258_7,
-            z: 1
-        )
-    )
-    return replacing(level, shipDefinitions: [ship])
+    makeTrainingGuidebotYellowFlareLevel()
 }
 
 /// The Training yellow flare level with the player's laser and Concussion

@@ -78,11 +78,13 @@ enum ObjectType: UInt8, Codable, Sendable {
     case waypoint = 25
 }
 
-/// The RT_ render types in use (`object_external.h:257-258`).
+/// The RT_ render types in use (`object_external.h:257-260`).
 /// `MSAFE_OBJECT_NO_RENDER` (`multisafe.cpp:1733`) sets `RT_NONE`.
+/// ObjInitWeapon gives every weapon RT_WEAPON (ObjInit.cpp:1011).
 enum ObjectRenderType: UInt8, Codable, Sendable {
     case none = 0
     case polyobj = 1
+    case weapon = 3
 }
 
 /// The runtime object (`struct object`, `object_external_struct.h:401`).
@@ -162,6 +164,33 @@ struct GameObject: Codable, Equatable, Sendable {
     /// `rtype.pobj_info.subobj_flags` of a debris piece: the one submodel
     /// it shows.
     var submodel: Int? = nil
+    /// `ctype.laser_info.last_drop_time` of a weapon: the Gametime of its
+    /// last particle drop, 0 at ObjInitWeapon (ObjInit.cpp:999).
+    var lastDropTime: Float? = nil
+    /// `mtype.obj_link_info` while the movement type is MT_OBJ_LINKED: a
+    /// weapon stuck to an object (MakeWeaponStick, collide.cpp:2146).
+    var objectLink: ObjectLinkInfo? = nil
+    /// `mtype.phys_info.stuck_room` and `stuck_portal` while
+    /// OF_STUCK_ON_PORTAL is set (physics.cpp:1306-1311).
+    var stuckPortal: StuckPortal? = nil
+}
+
+/// `mtype.obj_link_info` (object_external_struct.h): the object a linked
+/// object follows, the submodel it is on, and its place and heading in
+/// that submodel's frame.
+struct ObjectLinkInfo: Codable, Equatable, Sendable {
+    var parentHandle: ObjectHandle
+    var submodel: Int
+    var position: Vector3
+    var forward: Vector3
+    var up: Vector3
+}
+
+/// The portal face an MT_NONE object stuck to.
+struct StuckPortal: Codable, Equatable, Sendable {
+    /// A room source index.
+    var roomSourceIndex: Int
+    var portal: Int
 }
 
 /// `ctype.debris_info` (object_external_struct.h).
@@ -214,6 +243,8 @@ extension GameObject {
     static let outsideMineFlag: UInt32 = 0x0000_0200
     /// OF_BIG_OBJECT.
     static let bigObjectFlag: UInt32 = 0x0000_0800
+    /// OF_STUCK_ON_PORTAL (`object_external.h:287`).
+    static let stuckOnPortalFlag: UInt32 = 0x0002_0000
     /// OF_DESTROYED (`object_external.h:271`).
     static let destroyedFlag: UInt32 = 0x0000_0004
     /// OF_ATTACHED (`object_external.h:273`).

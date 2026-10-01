@@ -83,25 +83,6 @@ struct D3ImportReport: Codable, Equatable, Sendable {
 
 typealias D3ImportCancellationCheck = () -> Int32?
 
-func canonicalTrainingYellowFlareGunpoint(
-    _ retail: ReachedModelGunpoint
-) -> ReachedModelGunpoint {
-    .init(
-        parentSubmodelIndex: retail.parentSubmodelIndex,
-        localPosition: .init(
-            x: 0.000_000_444_4,
-            y: -1.046_244_4,
-            z: 3.179_825_1
-        ),
-        position: retail.position,
-        forward: .init(
-            x: 0.000_007_629_6,
-            y: -0.000_015_258_7,
-            z: 1
-        )
-    )
-}
-
 func canonicalPlayerConcussionImpactSoundLogicalName(
     retailLogicalName: String,
     sourceName: String
@@ -109,20 +90,6 @@ func canonicalPlayerConcussionImpactSoundLogicalName(
     retailLogicalName == "Laser hit wall" && sourceName == "Explode1.wav"
         ? "Explode1"
         : retailLogicalName
-}
-
-func canonicalTrainingYellowFlareModel(
-    _ retail: CanonicalModel,
-    modelPageSize: Float
-) -> CanonicalModel {
-    .init(
-        source: retail.source,
-        collisionRadius: modelPageSize,
-        submodels: retail.submodels,
-        bounds: retail.bounds,
-        sourceArchive: retail.sourceArchive,
-        sourceSHA256: retail.sourceSHA256
-    )
 }
 
 func blockD3ImportCancellationSignals() {
@@ -782,10 +749,11 @@ func runD3Import(
         textureByName: modelTextureByName,
         archives: presentationArchives
     )
-    let yellowSparkAnimation = try admitTrainingGuidebotYellowFlareAnimation(
+    let yellowSparkAnimation = try admitAnimatedTextureFrames(
         texture: modelTextureByName[
             yellowFlareSparkWeapon.particleName.lowercased()
         ]!,
+        bitmapSourceName: yellowFlareSparkWeapon.fireImageName,
         animation: reachedOutrageAnimation(
             named: yellowFlareSparkWeapon.fireImageName,
             archives: presentationArchives
@@ -830,14 +798,7 @@ func runD3Import(
             sourceArchive: payload.archive,
             textureResources: slots
         )
-        return name.caseInsensitiveCompare(
-            yellowFlareWeapon.fireImageName
-        ) == .orderedSame
-            ? canonicalTrainingYellowFlareModel(
-                model,
-                modelPageSize: yellowFlareWeapon.modelPageSize
-            )
-            : model
+        return model
     }
     let pyroModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare("PyroGL.OOF") == .orderedSame
@@ -953,17 +914,6 @@ func runD3Import(
         }
     })
     let retailShip = ship.shipDefinition!
-    let playerYellowFlareBattery = retailShip.playerYellowFlare
-    let parsedPlayerYellowFlareGunpoint = try playerYellowFlareBattery.map { _ in
-        try reachedOutrageModelGunpoint(
-            modelPayloadByName[ship.primaryModelName.lowercased()]!.data,
-            index: 0
-        )
-    }
-    let playerYellowFlareGunpoint =
-        parsedPlayerYellowFlareGunpoint.map(
-            canonicalTrainingYellowFlareGunpoint
-        )
     precondition(
         retailShip.name == "Pyro-GL"
             && retailShip.presentationSize == 6.676084041595459
@@ -986,28 +936,8 @@ func runD3Import(
                 == "Laser Level 2 - Blue"
             && retailShip.weaponBatteries?[10].weaponNames[1]
                 == "Concussion"
-            && playerYellowFlareBattery?.batteryIndex == 20
-            && playerYellowFlareBattery?.firingMask == 1
-            && playerYellowFlareBattery?.weaponName == "Yellow flare"
-            && playerYellowFlareBattery?.fireSoundLogicalName == "Flare"
-            && playerYellowFlareBattery?.fireWait == 1
-            && playerYellowFlareBattery?.energyUsage == 0
-            && playerYellowFlareBattery?.ammoUsage == 0
-            && playerYellowFlareBattery?.fireFlags == 0
-            && playerYellowFlareBattery?.weaponFlags == 0
-            && playerYellowFlareGunpoint?.parentSubmodelIndex == 0
-            && playerYellowFlareGunpoint?.localPosition.x.bitPattern
-                == Float(0.000_000_444_4).bitPattern
-            && playerYellowFlareGunpoint?.localPosition.y.bitPattern
-                == Float(-1.046_244_4).bitPattern
-            && playerYellowFlareGunpoint?.localPosition.z.bitPattern
-                == Float(3.179_825_1).bitPattern
-            && playerYellowFlareGunpoint?.forward.x.bitPattern
-                == Float(0.000_007_629_6).bitPattern
-            && playerYellowFlareGunpoint?.forward.y.bitPattern
-                == Float(-0.000_015_258_7).bitPattern
-            && playerYellowFlareGunpoint?.forward.z.bitPattern
-                == Float(1).bitPattern
+            && retailShip.weaponBatteries?[20].weaponNames[0]
+                == "Yellow flare"
     )
     let shipSource = SourceResource(storedIndex: 0, sourceName: retailShip.name)
     let playerLevel = objectPresentationLevel.addingDefaultPlayerShip(
@@ -1015,30 +945,7 @@ func runD3Import(
             source: shipSource,
             primaryModel: modelSources[ship.primaryModelName.lowercased()]!,
             presentationSize: retailShip.presentationSize,
-            physics: retailShip.physics,
-            playerYellowFlare: .init(
-                batteryIndex: playerYellowFlareBattery!.batteryIndex,
-                firingMask: playerYellowFlareBattery!.firingMask,
-                weapon: .init(
-                    storedIndex: yellowFlareWeapon.storedIndex,
-                    sourceName: yellowFlareWeapon.name
-                ),
-                fireSoundLogicalName:
-                    playerYellowFlareBattery!.fireSoundLogicalName,
-                fireSoundSourceName: "Flare.wav",
-                fireWait: playerYellowFlareBattery!.fireWait,
-                energyUsage: playerYellowFlareBattery!.energyUsage,
-                ammoUsage: playerYellowFlareBattery!.ammoUsage,
-                fireFlags: playerYellowFlareBattery!.fireFlags,
-                weaponFlags: playerYellowFlareBattery!.weaponFlags,
-                gunpointIndex: 0,
-                gunpointParentSubmodelIndex:
-                    playerYellowFlareGunpoint!.parentSubmodelIndex,
-                gunpointLocalPosition:
-                    playerYellowFlareGunpoint!.localPosition,
-                gunpointLocalForward:
-                    playerYellowFlareGunpoint!.forward
-            )
+            physics: retailShip.physics
         ),
         binding: .init(
             playerID: 0,
@@ -1372,83 +1279,6 @@ func runD3Import(
             releaseSoundSourceName: guidebotReleaseSoundClip.sourceName,
             ambientEngineSoundSourceName:
                 guidebotAmbientEngineSoundClip.sourceName,
-            yellowFlare: .init(
-                source: .init(
-                    storedIndex: yellowFlareWeapon.storedIndex,
-                    sourceName: yellowFlareWeapon.name
-                ),
-                model: modelSources[
-                    yellowFlareWeapon.fireImageName.lowercased()
-                ]!,
-                particleTexture: modelTextureByName[
-                    yellowFlareWeapon.particleName.lowercased()
-                ]!,
-                fireSoundSourceName:
-                    guidebotFlareSoundClip.sourceName,
-                weaponFlags: yellowFlareWeapon.weaponFlags,
-                physicsFlags: yellowFlareWeapon.physicsFlags,
-                modelPageSize: yellowFlareWeapon.modelPageSize,
-                collisionRadius: yellowFlareWeapon.customSize,
-                speed: yellowFlareWeapon.speed,
-                lifetime: yellowFlareWeapon.lifetime,
-                mass: yellowFlareWeapon.mass,
-                drag: yellowFlareWeapon.drag,
-                coefficientOfRestitution:
-                    yellowFlareWeapon.coefficientOfRestitution,
-                lightDistance: yellowFlareWeapon.lightDistance,
-                lightPresentation:
-                    yellowFlareWeapon.lightPresentation,
-                particleCount: yellowFlareWeapon.particleCount,
-                particleInterval:
-                    1 / Float(yellowFlareWeapon.particleCount),
-                particleSize: yellowFlareWeapon.particleSize,
-                particleLifetime:
-                    yellowFlareWeapon.particleLifetime,
-                timeout: .init(
-                    explosionTexture: modelTextureByName[
-                        yellowFlareWeapon.explosionTextureName.lowercased()
-                    ]!,
-                    explosionLifetime:
-                        yellowFlareWeapon.explosionLifetime,
-                    explosionSize: yellowFlareWeapon.explosionSize,
-                    childSource: .init(
-                        storedIndex: yellowFlareSparkWeapon.storedIndex,
-                        sourceName: yellowFlareSparkWeapon.name
-                    ),
-                    childTexture: modelTextureByName[
-                        yellowFlareSparkWeapon.particleName.lowercased()
-                    ]!,
-                    childCount: yellowFlareWeapon.timeoutSpawnCount,
-                    childWeaponFlags:
-                        yellowFlareSparkWeapon.weaponFlags,
-                    childPhysicsFlags:
-                        yellowFlareSparkWeapon.physicsFlags,
-                    childCollisionRadius:
-                        yellowFlareSparkWeapon.modelPageSize,
-                    childSpeed: yellowFlareSparkWeapon.speed,
-                    childLifetime: yellowFlareSparkWeapon.lifetime,
-                    childMass: yellowFlareSparkWeapon.mass,
-                    childDrag: yellowFlareSparkWeapon.drag,
-                    childCoefficientOfRestitution:
-                        yellowFlareSparkWeapon.coefficientOfRestitution,
-                    childLightDistance:
-                        yellowFlareSparkWeapon.lightDistance,
-                    childLightPresentation:
-                        yellowFlareSparkWeapon.lightPresentation,
-                    childParticleCount:
-                        yellowFlareSparkWeapon.particleCount,
-                    childParticleInterval:
-                        1 / Float(yellowFlareSparkWeapon.particleCount),
-                    childParticleSize:
-                        yellowFlareSparkWeapon.particleSize,
-                    childParticleLifetime:
-                        yellowFlareSparkWeapon.particleLifetime,
-                    childAnimationFrames:
-                        yellowSparkAnimation.resources,
-                    childSourceFrameTime:
-                        yellowSparkAnimation.sourceFrameTime
-                )
-            ),
             guidebot: .stockTraining
         ),
         voiceClips: [voiceClips[3], voiceClips[4]],
@@ -2136,15 +1966,39 @@ func runD3Import(
     )
     // Object tables: object_info for the placed generic objects, the model
     // gun points and batteries, the ship batteries of the laser and the
-    // Concussion that InitPlayerNewShip gives (Player.cpp:1502-1503; the
-    // flare battery stays with the bespoke flare until M1 step 8), and the
-    // weapons. A sound page the tables name joins the level's sound clips.
+    // Concussion that InitPlayerNewShip gives (Player.cpp:1502-1503) and of
+    // the flare (FLARE_INDEX, FireFlareFromPlayer), and the weapons with
+    // their spawns. A sound page the tables name joins the level's sound
+    // clips. The weapons' animated textures (the Concussion's explosion and
+    // the yellow spark) keep all their frames; any other imported texture
+    // is one frame.
+    let weaponTextureFrames: [String: [SourceResource]] = [
+        concussionWeapon.explosionTextureName.lowercased():
+            concussionExplosionAnimation.resources,
+        yellowFlareSparkWeapon.particleName.lowercased():
+            yellowSparkAnimation.resources,
+    ]
+    func textureFrames(_ name: String) -> [SourceResource] {
+        weaponTextureFrames[name.lowercased()]
+            ?? modelTextureByName[name.lowercased()].map { [$0] }
+            ?? []
+    }
+    func fireImage(_ name: String) -> CanonicalWeaponImage? {
+        name.caseInsensitiveCompare(yellowFlareSparkWeapon.fireImageName)
+            == .orderedSame
+            ? .init(
+                frames: yellowSparkAnimation.resources,
+                frameTime: yellowSparkAnimation.sourceFrameTime
+            )
+            : nil
+    }
     var addedSoundClips: [CanonicalSoundClip] = []
     let knownSoundClips = level.soundClips
     level = try level.addingObjectTables(
         genericPages: genericPages,
         shipBatteries: (retailShip.weaponBatteries ?? []).filter {
-            [PlayerWeaponState.laserIndex, PlayerWeaponState.concussionIndex]
+            [PlayerWeaponState.laserIndex, PlayerWeaponState.concussionIndex,
+             PlayerWeaponState.flareIndex]
                 .contains($0.index)
         },
         weapon: { name in
@@ -2156,11 +2010,8 @@ func runD3Import(
         },
         weaponModel: { modelSources[$0.lowercased()] },
         modelPayload: { modelPayloadByName[$0]?.data },
-        explosionFrames: { name in
-            name.caseInsensitiveCompare(concussionWeapon.explosionTextureName)
-                == .orderedSame
-                ? concussionExplosionAnimation.resources : []
-        },
+        textureFrames: textureFrames,
+        fireImage: fireImage,
         soundKey: { name in
             let clip = try reachedSoundClip(named: name)
             if !(knownSoundClips + addedSoundClips).contains(where: {
@@ -2210,7 +2061,9 @@ func runD3Import(
                 named: name
             )
         },
-        weaponModel: { modelSources[$0.lowercased()] }
+        weaponModel: { modelSources[$0.lowercased()] },
+        textureFrames: textureFrames,
+        fireImage: fireImage
     )
     // The first frame renders the world after the level start scripts
     // (Script 000 hides the goal powerups, TrainingMission.cpp:1461-1495).
@@ -2360,9 +2213,11 @@ private func reachedOutrageAnimation(
     )
 }
 
-struct TrainingGuidebotYellowFlareAnimationAdmission:
-    Equatable, Sendable
-{
+/// The frames of an animated texture page (TF_ANIMATED): the texture is
+/// its first frame, and each later frame of its vclip is named
+/// "<bitmap> frame <n>" (DrawVisEffect and GetWeaponFireImage show them,
+/// viseffect.cpp:1900, weapon.cpp:608).
+struct AnimatedTextureAdmission: Equatable, Sendable {
     let resources: [SourceResource]
     let images: [Outrage1555Image]
     let sourceFrameTime: Float
@@ -2401,19 +2256,22 @@ func admitPlayerConcussionExplosionAnimation(
     )
 }
 
-func admitTrainingGuidebotYellowFlareAnimation(
+func admitAnimatedTextureFrames(
     texture: SourceResource,
+    bitmapSourceName: String,
     animation: Outrage1555Animation
-) throws -> TrainingGuidebotYellowFlareAnimationAdmission {
-    let resources = [texture] + Array(
-        trainingGuidebotYellowFlareAnimationFrames.dropFirst()
-    )
-    guard texture == trainingGuidebotYellowFlareAnimationFrames[0],
-          animation.frames.count == resources.count,
-          animation.sourceFrameTime.bitPattern
-            == trainingGuidebotYellowFlareSourceFrameTime.bitPattern else {
+) throws -> AnimatedTextureAdmission {
+    guard !animation.frames.isEmpty,
+          animation.sourceFrameTime.isFinite,
+          animation.sourceFrameTime > 0 else {
         throw D3ImportOperationError.missingPresentationAsset(
-            "yellowspark.oaf"
+            bitmapSourceName
+        )
+    }
+    let resources = [texture] + (1..<animation.frames.count).map {
+        SourceResource(
+            storedIndex: texture.storedIndex,
+            sourceName: "\(bitmapSourceName) frame \($0)"
         )
     }
     return .init(
@@ -2448,8 +2306,9 @@ private func makePresentationMaterials(
                 && definition.bitmapSourceName.caseInsensitiveCompare(
                     "yellowspark.oaf"
                 ) == .orderedSame {
-                let admitted = try admitTrainingGuidebotYellowFlareAnimation(
+                let admitted = try admitAnimatedTextureFrames(
                     texture: texture,
+                    bitmapSourceName: definition.bitmapSourceName,
                     animation: animation
                 )
                 images = Array(zip(

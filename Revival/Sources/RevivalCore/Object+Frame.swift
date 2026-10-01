@@ -12,11 +12,13 @@
 // runs this loop in two parts around it: the slots below the player's, the
 // player's move, then the slots above; then `objDoFrameAllTail`. For the
 // other objects this runs last_pos, lifeleft, the control (AIDoFrame,
-// DoDyingFrame, DoDebrisFrame, DoSplinterFrame, DoExplosionFrame;
-// WeaponDoFrame's parent-collision timer is read where a weapon moves), the
-// lifeleft timeout, and the movement (AI, weapon, shockwave, and generic
-// physics), and the object's EVT_INTERVAL. The animation and effects
-// arrive with the general object frame (M2). ObjDeleteDead keeps the order of the
+// DoDyingFrame, DoDebrisFrame, DoSplinterFrame, DoExplosionFrame, and
+// WeaponDoFrame), the lifeleft timeout, the movement (AI, weapon,
+// shockwave, and generic physics; MT_NONE's stuck-on-portal check; and the
+// MT_OBJ_LINKED list that the tail moves with DoPhysLinkedFrame,
+// physics.cpp:87), the object's EVT_INTERVAL, and DoObjectLight
+// (ObjectLighting.swift). The animation and effects arrive with the
+// general object frame (M2). ObjDeleteDead keeps the order of the
 // original; the level goal inform and the inventory removal arrive with
 // level goals and inventory (M1 step 9), and no imported object sets their
 // flags before then.
@@ -43,9 +45,15 @@ extension GameWorld {
         }
     }
 
-    /// The end of ObjDoFrameAll (object.cpp:2992-3003): the visual effects
-    /// move, and then everything that died is deleted.
+    /// The end of ObjDoFrameAll (object.cpp:2984-3003): the linked objects
+    /// follow their parents in the order the loop listed them, the visual
+    /// effects move, and then everything that died is deleted.
     mutating func objDoFrameAllTail(level: Level) {
+        let linked = physicsLinkList
+        physicsLinkList = []
+        for handle in linked {
+            doPhysLinkedFrame(handle, level: level)
+        }
         visEffectMoveAll(level: level)
         objDeleteDead(level: level)
     }
@@ -70,6 +78,8 @@ extension GameWorld {
             doSplinterFrame(handle, level: level)
         } else if object.type == .fireball, object.fireball != nil {
             doExplosionFrame(handle)
+        } else if object.type == .weapon {
+            weaponDoFrame(handle, level: level)
         }
         // Death of old age: TimeoutObject and SetObjectDeadFlag.
         if let aged = objects[handle],
@@ -85,7 +95,23 @@ extension GameWorld {
             return
         }
         // do_physics_sim does not move a ghosted object (physics.cpp:751).
-        if moving.type != .dummy {
+        if moving.objectLink != nil {
+            // MT_OBJ_LINKED (object.cpp:2830).
+            physicsLinkList.append(handle)
+        } else if moving.type == .weapon, !moving.usesPhysics {
+            // MT_NONE (object.cpp:2783-2791): an object stuck on a portal
+            // dies when the portal stops rendering its faces.
+            if moving.flags & GameObject.stuckOnPortalFlag != 0,
+               let stuck = moving.stuckPortal,
+               let room = level.rooms.firstIndex(where: {
+                   $0.sourceIndex == stuck.roomSourceIndex
+               }),
+               rooms[room].portalFlags.indices.contains(stuck.portal),
+               rooms[room].portalFlags[stuck.portal]
+                & LevelPortal.renderFacesFlag == 0 {
+                objects[handle]?.flags |= GameObject.deadFlag
+            }
+        } else if moving.type != .dummy {
             switch moving.type {
             case .weapon:
                 moveWeapon(handle, level: level)
@@ -101,6 +127,7 @@ extension GameWorld {
             }
         }
         objectIntervalEvent(handle, level: level)
+        doObjectLight(handle, level: level)
     }
 
     /// The object's EVT_INTERVAL after its movement (object.cpp:2868-2876),

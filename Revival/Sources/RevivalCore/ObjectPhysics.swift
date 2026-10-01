@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Translated from physics/physics.cpp (Descent 3, Copyright (C) 2024
-// Parallax Software, GPL-3.0-or-later): do_physics_sim (:683-1600) for the
-// objects that only the generic physics moves (debris, splinters, spewed
-// powerups, and dying objects that fall or fly), with PhysicsDoSimRot's
+// Parallax Software, GPL-3.0-or-later): DoPhysLinkedFrame (:87), which
+// moves an MT_OBJ_LINKED object with its parent's submodel; do_physics_sim
+// (:683-1600) for the objects that only the generic physics moves (debris,
+// splinters, spewed powerups, and dying objects that fall or fly), with
+// PhysicsDoSimRot's
 // fixed-rate rotation (:398-409) and PhysicsApplyConstantForce (:260); and
 // from physics/collide.cpp, bump_obj_against_fixed (:1615) with
 // ConvertEulerToAxisAmount (:1523), ConvertAxisAmountToEuler (:1569),
@@ -46,6 +48,44 @@ struct ObjectPhysics: Codable, Equatable, Sendable {
 }
 
 extension GameWorld {
+    /// DoPhysLinkedFrame (physics.cpp:87): the linked object takes the place
+    /// and heading it keeps in its parent's submodel frame, carried up the
+    /// submodel chain and into the world, and the parent's room. The model
+    /// is at its rest pose, as in PolyCollide.swift (architecture.md
+    /// section 9). A linked object whose parent is gone, a ghost or dummy,
+    /// or has no such submodel dies.
+    mutating func doPhysLinkedFrame(_ handle: ObjectHandle, level: Level) {
+        guard var object = objects[handle],
+              let link = object.objectLink
+        else {
+            return
+        }
+        guard let parent = objects[link.parentHandle],
+              parent.type != .ghost, parent.type != .dummy,
+              let model = level.polygonModel(of: parent),
+              model.submodels.indices.contains(link.submodel)
+        else {
+            objects[handle]?.flags |= GameObject.deadFlag
+            return
+        }
+        var point = link.position
+        var index: Int? = link.submodel
+        var steps = 0
+        while let current = index, steps < model.submodels.count {
+            point = point + model.submodels[current].offset
+            index = model.submodels[current].parentIndex
+            steps += 1
+        }
+        object.position = parent.position
+            + transform(point, by: parent.orientation)
+        object.orientation = sourceVectorToMatrix(
+            forward: transform(link.forward, by: parent.orientation),
+            up: transform(link.up, by: parent.orientation)
+        )
+        object.location = parent.location
+        objects[handle] = object
+    }
+
     /// MAX_OBJECT_VEL (physics.cpp:77).
     static let maximumObjectVelocity: Float = 100_000
     /// MAX_NON_PLAYER_SIM_LOOPS (physics.cpp:48).

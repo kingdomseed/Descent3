@@ -460,10 +460,13 @@ extension WorldRenderingTests {
             input: .init(sideways: 1, firesPlayerFlare: true)
         )
         XCTAssertTrue(yellowRearFrame.rearViewIsActive)
+        _ = yellowForwardFrame
+        let rearFlares = yellowRear.world.objects.filter { $0.type == .weapon }
+        XCTAssertFalse(rearFlares.isEmpty)
         XCTAssertEqual(
-            yellowRearFrame.trainingGuidebotYellowFlares,
-            yellowForwardFrame.trainingGuidebotYellowFlares,
-            "rear processing follows flare creation and changes no carrier"
+            rearFlares,
+            yellowForward.world.objects.filter { $0.type == .weapon },
+            "rear processing follows flare creation and changes no flare"
         )
         let yellowRearObject = try XCTUnwrap(
             testWorldObject(yellowRear.world)

@@ -11,9 +11,9 @@
 //   its sound, weapon, and object pages by name at run time
 //   (`DefaultScript.references`). A page the module needs that the tables
 //   do not have is an import error.
-// - manage/weaponpage.cpp:782: a weapon page and its timeout spawn
-//   (spawn_on_timeout), which the weapon makes when it times out
-//   (WeaponFire.cpp:3162).
+// - manage/weaponpage.cpp:782: a weapon page and its spawns, which the
+//   weapon makes when it times out (WeaponFire.cpp:3162), with its fire
+//   image, particle, and explosion frames.
 
 import Foundation
 
@@ -38,7 +38,9 @@ extension Level {
         soundPage: (String) throws -> RetailSoundPageSelection,
         soundClip: (String) throws -> CanonicalSoundClip,
         weapon: (String) throws -> RetailWeaponPresentationSelection,
-        weaponModel: (String) -> SourceResource?
+        weaponModel: (String) -> SourceResource?,
+        textureFrames: (String) -> [SourceResource] = { _ in [] },
+        fireImage: (String) -> CanonicalWeaponImage? = { _ in nil }
     ) throws -> Level {
         let modules = reachedGameModules
         guard !modules.isEmpty else { return self }
@@ -107,15 +109,19 @@ extension Level {
                 } catch {
                     throw GameModuleImportError.unresolvedWeapon(name)
                 }
-                weapons.append(try Level.canonicalWeapon(
+                let canonical = try Level.canonicalWeapon(
                     page,
                     weaponModel: weaponModel,
-                    explosionFrames: { _ in [] },
+                    textureFrames: textureFrames,
+                    fireImage: fireImage,
                     soundKey: soundKey
-                ))
-                if page.weaponFlags & CanonicalWeapon.spawnsTimeoutFlag != 0,
-                   !page.timeoutSpawnName.isEmpty {
-                    pendingWeapons.append(page.timeoutSpawnName)
+                )
+                weapons.append(canonical)
+                if let spawn = canonical.spawn {
+                    pendingWeapons.append(spawn.weapon)
+                    if !spawn.alternateWeapon.isEmpty {
+                        pendingWeapons.append(spawn.alternateWeapon)
+                    }
                 }
             }
             level.weapons = weapons
@@ -139,6 +145,11 @@ extension Level {
         }
         level.gameModules = gameModules
         return level.appendingSoundClips(addedClips)
+            .appendingTextureDependencies(
+                (level.weapons ?? []).flatMap(\.presentationTextures),
+                provenance:
+                    "manage/weaponpage.cpp:653-901; Descent3/WeaponFire.cpp:1706-1716, :3162-3201"
+            )
     }
 }
 

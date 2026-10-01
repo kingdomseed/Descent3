@@ -129,14 +129,6 @@ final class GameSession {
         get { world.playerRearViewState }
         set { world.playerRearViewState = newValue }
     }
-    var playerYellowFlareState: PlayerYellowFlareState? {
-        get { world.playerYellowFlareState }
-        set { world.playerYellowFlareState = newValue }
-    }
-    var trainingRobotGuidebotState: TrainingRobotGuidebotState? {
-        get { world.trainingRobotGuidebotState }
-        set { world.trainingRobotGuidebotState = newValue }
-    }
     var trainingCameraMonitorState: TrainingCameraMonitorState? {
         get { world.trainingCameraMonitorState }
         set { world.trainingCameraMonitorState = newValue }

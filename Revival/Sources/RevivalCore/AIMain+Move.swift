@@ -79,7 +79,7 @@ extension GameWorld {
                 guard let me = objects[handle],
                       let other = objects[goal.objectHandle],
                       other.handle != handle,
-                      !objectsAreRelated(me, other)
+                      !objectsAreRelated(me, other, level: level)
                 else {
                     continue
                 }
@@ -372,13 +372,6 @@ extension GameWorld {
         return vmNormalized(point - object.position)
     }
 
-    /// ObjectsAreRelated (WeaponFire.cpp:962) for the parent links the
-    /// runtime keeps.
-    func objectsAreRelated(_ a: GameObject, _ b: GameObject) -> Bool {
-        a.parent == b.handle || b.parent == a.handle
-            || (a.parent != .none && a.parent == b.parent)
-    }
-
     /// AIObjFriend (AImain.cpp:5606) in single player.
     func aiObjFriend(_ object: GameObject, _ target: GameObject,
                      level: Level) -> Bool {
@@ -399,7 +392,12 @@ extension GameWorld {
         let targetTeam = aiGetTeam(target)
         if target.ai?.targetHandle == object.handle { return false }
         if team == ObjectAIFrame.teamHostile { return false }
-        if objectsAreRelated(object, target) { return true }
+        // Related objects shouldn't kill each other (AImain.cpp:5637), and
+        // neither do a parent and its child, at any age (:5641).
+        if objectsAreRelated(object, target, level: level) { return true }
+        if object.parent == target.handle || target.parent == object.handle {
+            return true
+        }
         switch team {
         case ObjectAIFrame.teamPTMC:
             return targetTeam == ObjectAIFrame.teamPTMC
@@ -455,7 +453,7 @@ extension GameWorld {
         var avoided = false
         for other in near {
             guard other.type != .powerup, other.handle != handle,
-                  !objectsAreRelated(object, other),
+                  !objectsAreRelated(object, other, level: level),
                   aiObjFriend(object, other, level: level)
             else {
                 continue
@@ -808,7 +806,8 @@ extension GameWorld {
                 object.location = .room(reached.containingRoomSourceIndex)
                 objects[handle] = object
                 ignored.append(hit.handle)
-                collideTwoObjects(handle, hit.handle, level: level)
+                collideTwoObjects(handle, hit.handle, link: hit.link,
+                                  level: level)
                 continue
             }
             object.position = trace.finalPosition

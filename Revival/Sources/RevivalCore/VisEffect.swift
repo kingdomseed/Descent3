@@ -40,6 +40,7 @@ struct VisEffect: Codable, Equatable, Sendable {
     static let coolSparkID: UInt8 = 16
     static let fadingLineID: UInt8 = 19
     static let blueBlastRingID: UInt8 = 22
+    static let particleID: UInt8 = 23
     static let napalmBallID: UInt8 = 25
     static let lightningBoltID: UInt8 = 31
 
@@ -71,7 +72,9 @@ struct VisEffect: Codable, Equatable, Sendable {
     var flags: UInt16
     /// `lighting_color`, a 16-bit RGB color.
     var lightingColor: UInt16 = 0
-    /// `custom_handle`: the weapon whose explosion image this effect shows.
+    /// `custom_handle`: the weapon whose explosion image (a custom
+    /// explosion) or particle texture (a particle) this effect shows. The
+    /// C++ keeps the texture handle; the texture is the weapon page's.
     var customWeapon: Int? = nil
 
     /// The object an attached effect (a lightning bolt) follows, and the
@@ -241,6 +244,52 @@ extension GameWorld {
             spark.lifeLeft = lifetime
             spark.lifetime = lifetime
             visEffects[index] = spark
+        }
+    }
+
+    /// CreateRandomParticles (viseffect.cpp:900): `count` particles of the
+    /// weapon's particle texture. Each that gets a list entry falls with
+    /// gravity and draws its direction, speed, size, and life. The
+    /// direction is normalized with vm_NormalizeVectorFast.
+    mutating func createRandomParticles(
+        _ count: Int,
+        position: Vector3,
+        roomSourceIndex: Int,
+        weapon: Int,
+        size: Float,
+        life: Float,
+        level: Level
+    ) {
+        let tenthLife = life / 10
+        let tenthSize = size / 10
+        for _ in 0..<count {
+            guard let index = visEffectCreate(
+                id: VisEffect.particleID,
+                roomSourceIndex: roomSourceIndex,
+                position: position,
+                level: level
+            ) else {
+                continue
+            }
+            var particle = visEffects[index]
+            particle.usesPhysics = true
+            particle.mass = 100
+            particle.drag = 0.1
+            particle.physicsFlags |= WeaponPhysics.gravityFlag
+                | WeaponPhysics.noCollideFlag
+            let x = Float(psRand() % 100 - 50)
+            let y = Float(psRand() % 100)
+            let z = Float(psRand() % 100 - 50)
+            particle.velocity = osirisNormalizedFast(
+                Vector3(x: x, y: y, z: z)
+            ) * Float(10 + psRand() % 10)
+            particle.size = size + Float(psRand() % 11 - 5) * tenthSize
+            particle.flags |= VisEffect.usesLifeLeftFlag
+            let lifetime = life + Float(psRand() % 11 - 5) * tenthLife
+            particle.lifeLeft = lifetime
+            particle.lifetime = lifetime
+            particle.customWeapon = weapon
+            visEffects[index] = particle
         }
     }
 

@@ -145,6 +145,79 @@ final class GameSaveTests: XCTestCase {
     /// PlayerScoreAdd (Player.cpp:3853) adds to the int score and the
     /// int16_t kill counters (player_external_struct.h:150), which wrap in
     /// the source's integer widths; a saved extreme value cannot trap.
+    /// Generic flares save and continue (M1 step 8d): one flare stuck on
+    /// the shell's wall (MT_NONE) and one that timed out, with its nine
+    /// YellowFlareSparks, their particles, and its FlarePuff, in flight at
+    /// the save.
+    func testSavedWorldAdvancesIdenticallyWithAStuckFlareAndSparks() throws {
+        let level = makeTrainingGuidebotYellowFlareLevel()
+        let flareIndex = try XCTUnwrap(level.weapons?.firstIndex {
+            $0.name == "Yellow flare"
+        })
+        let sparkIndex = try XCTUnwrap(level.weapons?.firstIndex {
+            $0.name == "YellowFlareSparks"
+        })
+        var stuckFlare = ObjectHandle.none
+        try assertSaveContinuation(
+            level: level,
+            prepare: { session in
+                let player = session.world.testPlayerObject
+                guard case let .room(room) = player.location else { return }
+                let forward = player.orientation.forward
+                let toWall = traceIndoorMovement(
+                    in: level,
+                    roomStates: session.world.rooms,
+                    startRoom: room,
+                    start: player.position,
+                    end: player.position + forward * 5_000,
+                    radius: 0.1
+                )
+                guard case let .wallHit(contact) = toWall.outcome else {
+                    return
+                }
+                stuckFlare = session.world.createAndFireWeapon(
+                    position: player.position
+                        + forward * (contact.distance - 15),
+                    direction: forward,
+                    parent: player.handle,
+                    weaponIndex: flareIndex,
+                    level: level
+                ) ?? .none
+                let timed = session.world.createAndFireWeapon(
+                    position: player.position + forward * 20,
+                    direction: forward,
+                    parent: player.handle,
+                    weaponIndex: flareIndex,
+                    level: level
+                )
+                if let timed {
+                    session.world.objects[timed]?.lifeLeft = 0.45
+                }
+            },
+            warmupFrames: 5,
+            followFrames: 12,
+            atSave: { session in
+                let stuck = session.world.objects[stuckFlare]
+                XCTAssertEqual(stuck?.usesPhysics, false)
+                XCTAssertEqual(stuck?.velocity, .zero)
+                XCTAssertEqual(
+                    session.world.objects.filter {
+                        $0.weapon == sparkIndex
+                    }.count,
+                    9
+                )
+                XCTAssertTrue(session.world.visEffects.contains {
+                    $0.id == VisEffect.customExplosionID
+                        && $0.customWeapon == flareIndex
+                })
+                XCTAssertTrue(session.world.visEffects.contains {
+                    $0.id == VisEffect.particleID
+                        && $0.customWeapon == sparkIndex
+                })
+            }
+        )
+    }
+
     func testScoreAndKillCountersWrapInTheirSourceWidths() throws {
         var world = GameWorld(level: makeTrainingRobotGuidebotLevel())
         world.playerScore = Int32.max
@@ -800,21 +873,42 @@ final class GameSaveTests: XCTestCase {
             level: concussionLevel
         )
 
-        var ordinalFreeFlare = concussionWorld
-        ordinalFreeFlare.playerYellowFlareState?.parents = [
-            .init(
-                roomSourceIndex: concussionRoom,
-                position: concussionPlayer.position,
-                orientation: concussionPlayer.orientation,
-                velocity: concussionPlayer.orientation.forward,
-                lifeRemaining: 1,
-                lastParticleDropTime: 0,
-                presentedLightDistance: 0
-            ),
-        ]
+        // The frame's link list and lights never reach a save; a weapon
+        // stuck to an object keeps a proper heading.
+        var pendingLink = concussionWorld
+        pendingLink.physicsLinkList = [concussionPlayer.handle]
         assertRejected(
-            .outOfDomain("playerYellowFlareState.parents.creationOrdinal"),
-            ordinalFreeFlare,
+            .unexpectedState("physicsLinkList"),
+            pendingLink,
+            level: concussionLevel
+        )
+        var pendingLight = concussionWorld
+        pendingLight.objectLights = [.init(
+            roomSourceIndex: concussionRoom,
+            position: concussionPlayer.position,
+            distance: 1,
+            color: .init(x: 1, y: 1, z: 1),
+            direction: nil,
+            directionalDot: 0
+        )]
+        assertRejected(
+            .unexpectedState("objectLights"),
+            pendingLight,
+            level: concussionLevel
+        )
+        var headingFreeLink = hugeVelocity
+        headingFreeLink.objects[bolt.handle]?.velocity = .zero
+        headingFreeLink.objects[bolt.handle]?.usesPhysics = false
+        headingFreeLink.objects[bolt.handle]?.objectLink = .init(
+            parentHandle: concussionPlayer.handle,
+            submodel: 0,
+            position: .zero,
+            forward: .zero,
+            up: .init(x: 0, y: 1, z: 0)
+        )
+        assertRejected(
+            .indexOutOfRange("object \(bolt.handle.slot) objectLink"),
+            headingFreeLink,
             level: concussionLevel
         )
     }

@@ -1370,7 +1370,6 @@ struct RetailShipDefinition: Equatable, Sendable {
     let physics: CanonicalShipPhysics
     /// `static_wb`, all MAX_WBS_PER_OBJ (21), with their fire flags.
     let weaponBatteries: [RetailShipWeaponBattery]?
-    let playerYellowFlare: RetailPlayerYellowFlareBinding?
 }
 
 /// One ship page battery (mng_ReadNewShipPage, manage/shippage.cpp): the
@@ -1386,18 +1385,6 @@ struct RetailShipWeaponBattery: Equatable, Sendable {
     let flags: UInt16
     let fireSoundNames: [String]
     let weaponNames: [String]
-}
-
-struct RetailPlayerYellowFlareBinding: Equatable, Sendable {
-    let batteryIndex: Int
-    let firingMask: UInt8
-    let weaponName: String
-    let fireSoundLogicalName: String
-    let fireWait: Float
-    let energyUsage: Float
-    let ammoUsage: Float
-    let fireFlags: UInt8
-    let weaponFlags: UInt16
 }
 
 struct RetailGenericLightDefinition: Equatable, Sendable {
@@ -1523,8 +1510,7 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                             name: name,
                             presentationSize: presentationSize,
                             physics: physics,
-                            weaponBatteries: playerWeaponBindings?.batteries,
-                            playerYellowFlare: playerWeaponBindings?.yellowFlare
+                            weaponBatteries: playerWeaponBindings
                         ),
                         genericLight: nil,
                         genericAI: nil
@@ -1652,15 +1638,11 @@ private extension RetailPageCursor {
 
     mutating func readPlayerWeaponBindings(
         shipPageVersion: Int
-    ) throws -> (
-        batteries: [RetailShipWeaponBattery],
-        yellowFlare: RetailPlayerYellowFlareBinding
-    ) {
+    ) throws -> [RetailShipWeaponBattery] {
         guard shipPageVersion >= 6 else {
             throw RetailTextureTableError.invalidPageLength
         }
         var batteries: [RetailShipWeaponBattery] = []
-        var yellowFlare: RetailPlayerYellowFlareBinding?
         for batteryIndex in 0..<21 {
             let fireFlags = try readUInt8()
             _ = try readCString(allowEmpty: true)
@@ -1706,25 +1688,9 @@ private extension RetailPageCursor {
                 fireSoundNames: Array(maskSoundNames.prefix(count)),
                 weaponNames: weaponNames
             ))
-            if batteryIndex == 20 {
-                yellowFlare = .init(
-                    batteryIndex: batteryIndex,
-                    firingMask: maskCount == 1 ? firingMasks[0] : 0,
-                    weaponName: weaponNames[0],
-                    fireSoundLogicalName: maskSoundNames[0],
-                    fireWait: firingWaits[0],
-                    energyUsage: energyUsage,
-                    ammoUsage: ammoUsage,
-                    fireFlags: fireFlags,
-                    weaponFlags: weaponFlags
-                )
-            }
         }
         try requireEnd()
-        guard let yellowFlare else {
-            throw RetailTextureTableError.invalidPageLength
-        }
-        return (batteries, yellowFlare)
+        return batteries
     }
 
     mutating func readCanonicalShipPhysics() throws -> CanonicalShipPhysics {

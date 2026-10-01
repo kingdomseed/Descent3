@@ -20,7 +20,6 @@ struct TrainingRobotGuidebotChain: Codable, Equatable, Sendable {
     let deployedGuidebotVoiceSourceName: String
     var releaseSoundSourceName: String? = nil
     var ambientEngineSoundSourceName: String? = nil
-    var yellowFlare: TrainingGuidebotYellowFlareDefinition? = nil
     let guidebot: TrainingGuidebotDefinition
 }
 
@@ -315,79 +314,6 @@ struct TrainingGuidebotDefinition: Codable, Equatable, Sendable {
     let goalForwardDistance: Float
     let goalCircleDistance: Float
 }
-
-struct TrainingGuidebotYellowFlareDefinition:
-    Codable, Equatable, Sendable
-{
-    let source: SourceResource
-    let model: SourceResource
-    let particleTexture: SourceResource
-    let fireSoundSourceName: String
-    let weaponFlags: UInt32
-    let physicsFlags: UInt32
-    let modelPageSize: Float
-    let collisionRadius: Float
-    let speed: Float
-    let lifetime: Float
-    let mass: Float
-    let drag: Float
-    let coefficientOfRestitution: Float
-    let lightDistance: Float
-    let lightPresentation: ObjectLightPresentation
-    let particleCount: Int
-    let particleInterval: Float
-    let particleSize: Float
-    let particleLifetime: Float
-    var timeout: TrainingGuidebotYellowFlareTimeoutDefinition? = nil
-}
-
-struct TrainingGuidebotYellowFlareTimeoutDefinition:
-    Codable, Equatable, Sendable
-{
-    let explosionTexture: SourceResource
-    let explosionLifetime: Float
-    let explosionSize: Float
-    let childSource: SourceResource
-    let childTexture: SourceResource
-    let childCount: Int
-    let childWeaponFlags: UInt32
-    let childPhysicsFlags: UInt32
-    let childCollisionRadius: Float
-    let childSpeed: Float
-    let childLifetime: Float
-    let childMass: Float
-    let childDrag: Float
-    let childCoefficientOfRestitution: Float
-    let childLightDistance: Float
-    let childLightPresentation: ObjectLightPresentation
-    let childParticleCount: Int
-    let childParticleInterval: Float
-    let childParticleSize: Float
-    let childParticleLifetime: Float
-    var childAnimationFrames: [SourceResource]? = nil
-    var childSourceFrameTime: Float? = nil
-
-    var hasCoherentChildAnimationBinding: Bool {
-        childAnimationFrames == nil && childSourceFrameTime == nil
-            || childAnimationFrames
-                == [childTexture]
-                    + Array(
-                        trainingGuidebotYellowFlareAnimationFrames.dropFirst()
-                    )
-                && childSourceFrameTime?.bitPattern
-                    == trainingGuidebotYellowFlareSourceFrameTime.bitPattern
-    }
-}
-
-let trainingGuidebotYellowFlareAnimationFrames: [SourceResource] = [
-    .init(storedIndex: 878, sourceName: "yellowspark"),
-    .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 1"),
-    .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 2"),
-    .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 3"),
-    .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 4"),
-    .init(storedIndex: 878, sourceName: "yellowspark.oaf frame 5"),
-]
-let trainingGuidebotYellowFlareSourceFrameTime: Float = 0.07
 
 extension TrainingGuidebotDefinition {
     static let stockTraining = Self(

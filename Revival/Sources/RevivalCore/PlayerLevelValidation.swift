@@ -87,49 +87,6 @@ extension Level {
                 "default player ship weapon batteries"
             )
         }
-        if let flare = ship.playerYellowFlare {
-            let yellow = trainingRobotGuidebotChain?.yellowFlare
-            let sound = soundClips.first {
-                $0.logicalName == flare.fireSoundLogicalName
-                    && $0.sourceName == flare.fireSoundSourceName
-            }
-            let forwardLength = sqrt(levelDot(
-                flare.gunpointLocalForward,
-                flare.gunpointLocalForward
-            ))
-            guard schemaVersion >= 11,
-                  flare.batteryIndex == 20,
-                  flare.firingMask == 1,
-                  flare.weapon == yellow?.source,
-                  flare.fireSoundLogicalName == "Flare",
-                  flare.fireSoundSourceName == yellow?.fireSoundSourceName,
-                  sound != nil,
-                  flare.fireWait == 1,
-                  flare.energyUsage == 0,
-                  flare.ammoUsage == 0,
-                  flare.fireFlags == 0,
-                  flare.weaponFlags == 0,
-                  flare.gunpointIndex == 0,
-                  flare.gunpointParentSubmodelIndex == 0,
-                  flare.gunpointLocalPosition.x.bitPattern
-                    == Float(0.000_000_444_4).bitPattern,
-                  flare.gunpointLocalPosition.y.bitPattern
-                    == Float(-1.046_244_4).bitPattern,
-                  flare.gunpointLocalPosition.z.bitPattern
-                    == Float(3.179_825_1).bitPattern,
-                  flare.gunpointLocalForward.x.bitPattern
-                    == Float(0.000_007_629_6).bitPattern,
-                  flare.gunpointLocalForward.y.bitPattern
-                    == Float(-0.000_015_258_7).bitPattern,
-                  flare.gunpointLocalForward.z.bitPattern
-                    == Float(1).bitPattern,
-                  forwardLength.isFinite,
-                  abs(forwardLength - 1) < 0.000_1 else {
-                throw LevelValidationError.invalidDependency(
-                    "default player Yellow flare binding"
-                )
-            }
-        }
     }
 
     func validatePlayerPresentationClosure(allowIncomplete: Bool) throws {
@@ -188,17 +145,7 @@ extension Level {
         let requiredModelTextures = referencedModelTextures(in: models)
         let requiredTextures = requiredRoomTextures
             .union(requiredModelTextures)
-            .union(
-                trainingRobotGuidebotChain?.yellowFlare.map {
-                    [$0.particleTexture]
-                        + ($0.timeout.map {
-                            [$0.explosionTexture]
-                                + ($0.childAnimationFrames
-                                    ?? [$0.childTexture])
-                        } ?? [])
-                } ?? []
-            )
-            .union((weapons ?? []).flatMap { $0.explosion?.frames ?? [] })
+            .union((weapons ?? []).flatMap(\.presentationTextures))
         guard Set(presentationMaterials.map(\.texture)) == requiredTextures else {
             throw LevelValidationError.invalidDependency("player-component textures")
         }

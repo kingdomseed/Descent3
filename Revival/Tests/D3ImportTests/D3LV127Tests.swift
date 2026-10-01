@@ -257,13 +257,22 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertEqual(animation.frames[5].width, 1)
         XCTAssertEqual(animation.frames[5].height, 1)
 
-        let admission = try admitTrainingGuidebotYellowFlareAnimation(
-            texture: trainingGuidebotYellowFlareAnimationFrames[0],
+        // An animated texture keeps every frame of its vclip: the texture,
+        // then "<bitmap> frame <n>".
+        let texture = SourceResource(storedIndex: 878, sourceName: "yellowspark")
+        let admission = try admitAnimatedTextureFrames(
+            texture: texture,
+            bitmapSourceName: "yellowspark.oaf",
             animation: animation
         )
         XCTAssertEqual(
             admission.resources,
-            trainingGuidebotYellowFlareAnimationFrames
+            [texture] + (1...5).map {
+                SourceResource(
+                    storedIndex: 878,
+                    sourceName: "yellowspark.oaf frame \($0)"
+                )
+            }
         )
         XCTAssertEqual(admission.images, animation.frames)
         XCTAssertEqual(
@@ -271,26 +280,12 @@ final class D3LV127Tests: XCTestCase {
             Float(0.07).bitPattern
         )
         XCTAssertThrowsError(
-            try admitTrainingGuidebotYellowFlareAnimation(
-                texture: trainingGuidebotYellowFlareAnimationFrames[0],
+            try admitAnimatedTextureFrames(
+                texture: texture,
+                bitmapSourceName: "yellowspark.oaf",
                 animation: .init(
                     version: animation.version,
-                    sourceFrameTime: animation.sourceFrameTime,
-                    frames: Array(animation.frames.dropLast())
-                )
-            )
-        ) {
-            XCTAssertEqual(
-                $0 as? D3ImportOperationError,
-                .missingPresentationAsset("yellowspark.oaf")
-            )
-        }
-        XCTAssertThrowsError(
-            try admitTrainingGuidebotYellowFlareAnimation(
-                texture: trainingGuidebotYellowFlareAnimationFrames[0],
-                animation: .init(
-                    version: animation.version,
-                    sourceFrameTime: 0.071,
+                    sourceFrameTime: 0,
                     frames: animation.frames
                 )
             )

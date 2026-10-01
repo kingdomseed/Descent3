@@ -291,17 +291,18 @@ final class WeaponDamageTests: XCTestCase {
         XCTAssertNotEqual(world.authoritativeRandomState, state)
     }
 
-    /// The explosion frame index is the effect's age over its lifetime,
-    /// clamped to the frames; a tiny lifetime cannot overflow it.
+    /// The explosion frame index is the effect's age at the render's
+    /// Gametime over its lifetime, kept below 1 (DrawVisEffect,
+    /// viseffect.cpp:1868-1876); a tiny lifetime cannot overflow it.
     func testExplosionFrameIndexStaysInRangeForTinyLifetimes() throws {
         let level = try makePlayerConcussionLevel()
         let concussion = try XCTUnwrap(
             level.weapons?.firstIndex { $0.name == "Concussion" }
         )
         let frames = try XCTUnwrap(level.weapons?[concussion].explosion?.frames)
-        for (lifeLeft, lifetime, expected) in [
-            (Float(0), Float(1e-44), frames.count - 1),
-            (Float(1e-20), Float(1e-20), 0),
+        for (gameTime, lifetime, expected) in [
+            (Float(1), Float(1e-44), frames.count - 1),
+            (Float(0), Float(1e-20), 0),
             (Float(0.25), Float(0.5), frames.count / 2),
         ] {
             let effect = VisEffect(
@@ -309,13 +310,17 @@ final class WeaponDamageTests: XCTestCase {
                 roomSourceIndex: 1,
                 position: .zero,
                 size: 10,
-                lifeLeft: lifeLeft,
+                lifeLeft: lifetime,
                 lifetime: lifetime,
                 creationTime: 0,
                 flags: VisEffect.usesLifeLeftFlag,
                 customWeapon: concussion
             )
-            let drawn = visEffectExplosionFrames(level, effects: [effect])
+            let drawn = visEffectBillboardFrames(
+                level,
+                effects: [effect],
+                gameTime: gameTime
+            )
             XCTAssertEqual(drawn.map(\.texture), [frames[expected]])
         }
     }

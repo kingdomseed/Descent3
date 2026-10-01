@@ -148,7 +148,7 @@ final class MetalWorldPlanTests: XCTestCase {
         XCTAssertEqual(actualVertexPositions, expectedVertexPositions)
     }
 
-    /// A flying weapon lights the world with its page light, and the
+    /// A weapon light DoObjectLight cast lights the world, and the
     /// explosion and line-spark visual effects use the prepared quads.
     func testWeaponLightExplosionAndSparkDrawsReachRetainedPlan() throws {
         let level = try makePlayerConcussionLevel()
@@ -179,11 +179,21 @@ final class MetalWorldPlanTests: XCTestCase {
         )
         let missile = try XCTUnwrap(world.objects.first { $0.type == .weapon })
         let position = playerView.camera.position
-        let explosion = VisEffectExplosionFrame(
+        let explosion = BillboardFrame(
             roomSourceIndex: playerView.roomSourceIndex,
             position: position,
             size: 10,
-            texture: frames[0]
+            texture: frames[0],
+            opacity: 1
+        )
+        let lighting = try XCTUnwrap(concussion.lighting)
+        let light = ObjectLightRequest(
+            roomSourceIndex: playerView.roomSourceIndex,
+            position: missile.position,
+            distance: try XCTUnwrap(concussion.lightDistance) * 1.5,
+            color: lighting.primaryColor,
+            direction: nil,
+            directionalDot: 0
         )
         let spark = VisEffectLineSparkFrame(
             roomSourceIndex: playerView.roomSourceIndex,
@@ -196,8 +206,9 @@ final class MetalWorldPlanTests: XCTestCase {
             objects: world.objects,
             roomStates: world.rooms,
             playerView: playerView,
-            visEffectExplosions: [explosion],
-            visEffectLineSparks: [spark]
+            visEffectBillboards: [explosion],
+            visEffectLineSparks: [spark],
+            objectLights: [light]
         )
         // The Concussion's page light is (1, 0.5, 0.25).
         XCTAssertTrue(updated.draws.contains { draw in

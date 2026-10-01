@@ -64,30 +64,6 @@ final class D3ImportOperationTests: XCTestCase {
         )
     }
 
-    func testCanonicalizesStockYellowFlareModelPageSize() {
-        let retail = CanonicalModel(
-            source: .init(storedIndex: 0, sourceName: "FlareYellowBright.OOF"),
-            collisionRadius: Float(bitPattern: 0x405f_3213),
-            submodels: [],
-            bounds: .init(minimum: .zero, maximum: .zero),
-            sourceArchive: "d3.hog",
-            sourceSHA256: "model-sha"
-        )
-
-        let canonical = canonicalTrainingYellowFlareModel(
-            retail,
-            modelPageSize: Float(bitPattern: 0x405f_d5ea)
-        )
-
-        XCTAssertEqual(
-            canonical.collisionRadius.bitPattern,
-            0x405f_d5ea
-        )
-        XCTAssertEqual(canonical.submodels, retail.submodels)
-        XCTAssertEqual(canonical.bounds, retail.bounds)
-        XCTAssertEqual(canonical.sourceSHA256, retail.sourceSHA256)
-    }
-
     func testCanonicalizesStockEnergyTextureName() {
         XCTAssertEqual(
             canonicalPresentationTextureLogicalName("energy.TGA1"),
@@ -114,47 +90,6 @@ final class D3ImportOperationTests: XCTestCase {
             ),
             "GBExpulsionA"
         )
-    }
-
-    func testCanonicalizesStockYellowFlareGunpointPrecision() {
-        let retail = ReachedModelGunpoint(
-            parentSubmodelIndex: 0,
-            localPosition: .init(
-                x: 4.4440458e-7,
-                y: -1.0462444,
-                z: 3.179825
-            ),
-            position: .zero,
-            forward: .init(
-                x: 7.629598e-6,
-                y: -1.5258687e-5,
-                z: 1
-            )
-        )
-
-        let canonical = canonicalTrainingYellowFlareGunpoint(retail)
-
-        XCTAssertEqual(
-            canonical.localPosition.x.bitPattern,
-            Float(0.000_000_444_4).bitPattern
-        )
-        XCTAssertEqual(
-            canonical.localPosition.y.bitPattern,
-            Float(-1.046_244_4).bitPattern
-        )
-        XCTAssertEqual(
-            canonical.localPosition.z.bitPattern,
-            Float(3.179_825_1).bitPattern
-        )
-        XCTAssertEqual(
-            canonical.forward.x.bitPattern,
-            Float(0.000_007_629_6).bitPattern
-        )
-        XCTAssertEqual(
-            canonical.forward.y.bitPattern,
-            Float(-0.000_015_258_7).bitPattern
-        )
-        XCTAssertEqual(canonical.forward.z.bitPattern, Float(1).bitPattern)
     }
 
     func testAdmitsRetailConcussionAnimationUsingWeaponLifetimeCadence() throws {
@@ -212,19 +147,16 @@ final class D3ImportOperationTests: XCTestCase {
         XCTAssertEqual(definition.physics.hitDieDot, -1)
         XCTAssertEqual(definition.physics.maximumTurnrollRate, 8_000)
         XCTAssertEqual(definition.physics.turnrollRatio, 0.13)
+        // The flare battery (FLARE_INDEX) is battery 20 of the 21.
         XCTAssertEqual(
-            definition.playerYellowFlare,
-            .init(
-                batteryIndex: 20,
-                firingMask: 1,
-                weaponName: "Yellow flare",
-                fireSoundLogicalName: "Flare",
-                fireWait: 1,
-                energyUsage: 0,
-                ammoUsage: 0,
-                fireFlags: 0,
-                weaponFlags: 0
-            )
+            definition.weaponBatteries?[20].weaponNames.first,
+            "Yellow flare"
+        )
+        XCTAssertEqual(definition.weaponBatteries?[20].fireMasks, [1])
+        XCTAssertEqual(definition.weaponBatteries?[20].fireWaits, [1])
+        XCTAssertEqual(
+            definition.weaponBatteries?[20].fireSoundNames,
+            ["Flare"]
         )
         // All 21 batteries, each with its first num_masks masks and waits.
         XCTAssertEqual(definition.weaponBatteries?.count, 21)

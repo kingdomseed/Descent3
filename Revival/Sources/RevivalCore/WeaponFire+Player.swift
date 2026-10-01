@@ -23,6 +23,8 @@ struct PlayerWeaponState: Codable, Equatable, Sendable {
     /// LASER_INDEX and CONCUSSION_INDEX (weapon_external.h).
     static let laserIndex = 0
     static let concussionIndex = 10
+    /// FLARE_INDEX (weapon_external.h).
+    static let flareIndex = 20
     /// PW_PRIMARY and PW_SECONDARY.
     static let primary = 0
     static let secondary = 1
@@ -109,5 +111,43 @@ extension GameWorld {
             playerWeaponAmmo[index] -= Int(wb.ammoUsage)
         }
         playerWeapons[weaponType].firingTime += downTime
+    }
+
+    /// FireFlareFromPlayer (WeaponFire.cpp:3023) for player 0: with enough
+    /// energy and a ready flare battery, the ship's FLARE_INDEX battery
+    /// fires from model battery 0 (WBFireBattery), and its energy is used.
+    /// Each flare press is a new burst (3MASTERED dbd611e4, sources.md
+    /// section 2). A flare does not count as a discharge.
+    mutating func fireFlareFromPlayer(_ player: ObjectHandle, level: Level) {
+        let index = PlayerWeaponState.flareIndex
+        guard let binding = level.defaultPlayerBinding,
+              let ship = level.shipDefinitions.first(where: {
+                  $0.source == binding.ship
+              }),
+              let wb = ship.weaponBatteries?.first(where: {
+                  $0.index == index
+              }),
+              objects[player] != nil
+        else {
+            return
+        }
+        if energy < wb.energyUsage {
+            // TXT_WPNFLARENONRG (stringtable.h:277).
+            addHUDMessage("Not enough energy available to fire flare!")
+            return
+        }
+        guard isBatteryReady(player, battery: index, info: wb.battery) else {
+            return
+        }
+        fireBattery(
+            player,
+            battery: index,
+            info: wb.battery,
+            polyBattery: 0,
+            startsBurst: true,
+            level: level
+        )
+        energy -= wb.energyUsage
+        if energy < 0 { energy = 0 }
     }
 }

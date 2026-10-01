@@ -25,12 +25,16 @@ import Foundation
 
 /// A sphere's contact with a face: the sphere center at contact
 /// (`intersection`), the touched point (`contact`), the distance moved to
-/// it, and the wall normal.
+/// it, and the wall normal; and the submodel hit with the sphere center in
+/// that submodel's frame (`hit_subobject` and `hit_subobj_pos`,
+/// newstyle_fi.cpp:208-219).
 struct PolygonHit: Equatable, Sendable {
     let intersection: Vector3
     let contact: Vector3
     let distance: Float
     let normal: Vector3
+    var submodel = 0
+    var submodelIntersection = Vector3.zero
 }
 
 /// PolyCollideObject (newstyle_fi.cpp:354) for one object: the nearest hit
@@ -101,7 +105,9 @@ func polyCollideObject(
                 intersection: toWorld(hit.intersection + offset),
                 contact: toWorld(hit.contact + offset),
                 distance: hit.distance,
-                normal: toWorldDirection(hit.normal)
+                normal: toWorldDirection(hit.normal),
+                submodel: index,
+                submodelIntersection: hit.intersection
             )
         }
     }

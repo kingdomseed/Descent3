@@ -238,6 +238,8 @@ struct CanonicalWeapon: Codable, Equatable, Sendable {
     static let matterWeaponFlag: UInt32 = 1 << 3
     /// WF_IMAGE_VCLIP (weapon.h:223).
     static let imageVClipFlag: UInt32 = 1 << 5
+    /// WF_INVISIBLE (weapon.h:226).
+    static let invisibleFlag: UInt32 = 1 << 8
     /// WF_ELECTRICAL (weapon.h:222).
     static let electricalFlag: UInt32 = 1 << 4
     /// WF_BLAST_RING (weapon.h:229).
@@ -258,6 +260,8 @@ struct CanonicalWeapon: Codable, Equatable, Sendable {
     static let impactWallSound = 1
     /// WSI_IMPACT_ROBOT (weapon.h:265).
     static let impactRobotSound = 3
+    /// WSI_BOUNCE (weapon.h:266).
+    static let bounceSound = 4
 
     let name: String
     /// The WF_ flags.
@@ -290,6 +294,58 @@ struct CanonicalWeapon: Codable, Equatable, Sendable {
     /// `lighting_info`: the light of the flying weapon.
     var lightDistance: Float? = nil
     var lighting: ObjectLightPresentation? = nil
+    /// The fire image of a WF_IMAGE_BITMAP or WF_IMAGE_VCLIP weapon
+    /// (`fire_image_handle`), which DrawWeaponObject draws as a bitmap
+    /// (WeaponFire.cpp:2589). Absent for a weapon with a model.
+    var fireImage: CanonicalWeaponImage? = nil
+    /// `particle_count`, `particle_life`, `particle_size`, and the frames of
+    /// `particle_handle`'s texture: the particles WeaponDoFrame drops
+    /// (WeaponFire.cpp:1706). Absent when the page names no particle.
+    var particles: CanonicalWeaponParticles? = nil
+    /// `spawn_handle`, `spawn_count`, `alternate_spawn_handle`, and
+    /// `alternate_chance` (weapon.h:278-285), as weapon page names. Absent
+    /// when the page spawns nothing.
+    var spawn: CanonicalWeaponSpawn? = nil
+
+    /// Every texture the weapon's presentation draws: the explosion, the
+    /// fire image, and the particle frames.
+    var presentationTextures: [SourceResource] {
+        (explosion?.frames ?? []) + (fireImage?.frames ?? [])
+            + (particles?.frames ?? [])
+    }
+}
+
+/// The fire image of a bitmap or vclip weapon. A bitmap has one frame and
+/// a frame time of 0; a vclip has its frames and `frame_time`, and
+/// GetWeaponFireImage picks `Gametime / frame_time` modulo the frame count
+/// (weapon.cpp:608). The frames are empty when the image is not imported;
+/// the weapon then flies but is not drawn.
+struct CanonicalWeaponImage: Codable, Equatable, Sendable {
+    let frames: [SourceResource]
+    let frameTime: Float
+}
+
+/// The particles of a weapon page. `frames` are the frames of the particle
+/// texture: one for a still texture, the vclip frames of an animated one,
+/// which DrawVisEffect shows over the particle's life (viseffect.cpp:1900).
+/// They are empty when the texture is not imported; the particles are then
+/// made (with their draws) but not drawn.
+struct CanonicalWeaponParticles: Codable, Equatable, Sendable {
+    let count: Int
+    let lifetime: Float
+    let size: Float
+    let frames: [SourceResource]
+}
+
+/// The weapons a weapon page spawns (weapon.h:278-285).
+struct CanonicalWeaponSpawn: Codable, Equatable, Sendable {
+    /// `spawn_handle`'s page name.
+    let weapon: String
+    let count: Int
+    /// `alternate_spawn_handle`'s page name, or empty for -1.
+    let alternateWeapon: String
+    /// `alternate_chance`, 0 to 100.
+    let alternateChance: Int
 }
 
 /// The shockwave values of a weapon page (weapon.h).
@@ -366,6 +422,25 @@ extension Level {
         return models.first { $0.source == presentation.primaryModel }
     }
 
+    /// The numbers DoObjectLight reads are finite, and the ones its flags
+    /// divide by or cast to int are in range (object_lighting.cpp:379-446):
+    /// OLF_TIMEBITS divides by the time interval, and OLF_FLICKER_SLIGHTLY
+    /// casts the flicker distance to an int.
+    static func lightIsInDomain(_ light: ObjectLightPresentation) -> Bool {
+        let values = [
+            light.primaryColor.x, light.primaryColor.y, light.primaryColor.z,
+            light.secondaryColor.x, light.secondaryColor.y,
+            light.secondaryColor.z, light.timeInterval,
+            light.flickerDistance, light.directionalDot,
+        ]
+        return values.allSatisfy(\.isFinite)
+            && light.timeInterval >= 0
+            && (light.flags & ObjectLightFlag.timebits == 0
+                || light.timeInterval > 0)
+            && (light.flags & ObjectLightFlag.flickerSlightly == 0
+                || abs(light.flickerDistance) < 2_147_483_648)
+    }
+
     /// Structural checks for the object and weapon tables. Import already
     /// resolved every name; this rejects a damaged package.
     func validateObjectTables() throws {
@@ -392,7 +467,31 @@ extension Level {
                     }
                     && weapon.model.map { model in
                         models.contains { $0.source == model }
-                    } != false,
+                    } != false
+                    && weapon.fireImage.map {
+                        $0.frameTime.isFinite && $0.frameTime >= 0
+                            && ($0.frames.count <= 1 || $0.frameTime > 0)
+                    } != false
+                    && weapon.particles.map {
+                        (1...255).contains($0.count)
+                            && $0.lifetime.isFinite && $0.size.isFinite
+                    } != false
+                    && weapon.spawn.map {
+                        (1...255).contains($0.count)
+                            && weaponNames.contains($0.weapon.lowercased())
+                            && ($0.alternateWeapon.isEmpty
+                                || weaponNames.contains(
+                                    $0.alternateWeapon.lowercased()
+                                ))
+                            && (0...100).contains($0.alternateChance)
+                    } != false
+                    && (weapon.lightDistance?.isFinite ?? true)
+                    && weapon.lighting.map(Self.lightIsInDomain) != false
+                    && weapon.presentationTextures.allSatisfy { texture in
+                        presentationMaterials.contains {
+                            $0.texture == texture
+                        }
+                    },
                 "weapon \(weapon.name)"
             )
         }

@@ -215,7 +215,7 @@ final class TriggerTests: XCTestCase {
             primaryModel: ship.primaryModel,
             presentationSize: ship.presentationSize,
             physics: bigWiggle,
-            playerYellowFlare: ship.playerYellowFlare
+            weaponBatteries: ship.weaponBatteries
         )])
         let simulation = GameSession(level: level, presentationReadyTimestamp: 0)
         simulation.world.velocity = .zero

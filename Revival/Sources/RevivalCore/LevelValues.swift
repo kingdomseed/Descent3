@@ -695,7 +695,6 @@ struct CanonicalShipDefinition: Codable, Equatable, Sendable {
     let primaryModel: SourceResource
     let presentationSize: Float
     let physics: CanonicalShipPhysics
-    var playerYellowFlare: PlayerYellowFlareBinding? = nil
     /// The ship page's `static_wb` batteries whose weapons the package
     /// carries, with their energy and ammo use (ship.h). Absent in packages
     /// imported before M1 step 7.
@@ -705,30 +704,13 @@ struct CanonicalShipDefinition: Codable, Equatable, Sendable {
 /// One `static_wb` battery of a ship page with its `fire_flags`.
 struct CanonicalShipWeaponBattery: Codable, Equatable, Sendable {
     /// The battery index: 0 to 9 primaries, 10 to 19 secondaries, 20 the
-    /// flare.
+    /// flare (FLARE_INDEX).
     let index: Int
     let battery: CanonicalWeaponBattery
     let energyUsage: Float
     let ammoUsage: Float
     /// The SFF_ flags (ship.h).
     let fireFlags: UInt8
-}
-
-struct PlayerYellowFlareBinding: Codable, Equatable, Sendable {
-    let batteryIndex: Int
-    let firingMask: UInt8
-    let weapon: SourceResource
-    let fireSoundLogicalName: String
-    let fireSoundSourceName: String
-    let fireWait: Float
-    let energyUsage: Float
-    let ammoUsage: Float
-    let fireFlags: UInt8
-    let weaponFlags: UInt16
-    let gunpointIndex: Int
-    let gunpointParentSubmodelIndex: Int
-    let gunpointLocalPosition: Vector3
-    let gunpointLocalForward: Vector3
 }
 
 struct DefaultPlayerBinding: Codable, Equatable, Sendable {

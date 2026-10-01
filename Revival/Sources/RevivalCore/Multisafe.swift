@@ -261,9 +261,7 @@ extension GameWorld {
     }
 
     /// MSAFE_OBJECT_FIRE_WEAPON (multisafe.cpp:1529): FireWeaponFromObject
-    /// for a weapon page the level holds. Until generic flares (M1 step 8d),
-    /// a weapon the level's bespoke flare definition names goes to that
-    /// path (`fireBespokeFlareFromObject`).
+    /// for a weapon page the level holds.
     mutating func objectFireWeapon(
         _ handle: ObjectHandle,
         weapon: Int,
@@ -275,13 +273,6 @@ extension GameWorld {
               let weapons = level.weapons,
               weapons.indices.contains(weapon)
         else {
-            return
-        }
-        if fireBespokeFlareFromObject(
-            handle,
-            weaponName: weapons[weapon].name,
-            level: level
-        ) {
             return
         }
         fireWeaponFromObject(
