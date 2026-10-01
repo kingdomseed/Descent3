@@ -15,18 +15,17 @@ extension GameSession {
         // A dying or dead player has CT_NONE (StartPlayerDeath,
         // Player.cpp:2191), so its controls do nothing.
         let controlsAreSuspended =
-            trainingFinalGoalState?.endLevelWasRequested == true
-                || world.playerDeath != nil
+            world.gameStateRequest != nil || world.playerDeath != nil
         let currentEnabledControls = controlsAreSuspended
             ? PlayerControlMask(rawValue: 0)
             : world.playerControllerBitflags
         let input = controlsAreSuspended
             ? InputSnapshot.zero
             : input.applying(currentEnabledControls)
-        var playerHeadlightFeedback: TrainingOpeningFeedback?
+        var playerHeadlightFeedback: PresentationFeedback?
         if input.togglesHeadlight {
             playerHeadlightIsOn.toggle()
-            playerHeadlightFeedback = TrainingOpeningFeedback(
+            playerHeadlightFeedback = PresentationFeedback(
                 hudMessages: [
                     playerHeadlightIsOn
                         ? "Headlight turned on."
@@ -38,29 +37,10 @@ extension GameSession {
                 soundEventVolume: 1
             )
         }
-        var cameraMonitorWasUsedThisFrame = false
-        if input.usesInventory,
-           var state = trainingCameraMonitorState,
-           state.isHeld,
-           !state.wasUsed,
-           let chain = level.trainingCameraMonitorChain {
-            // Preserve the reached inventory item's typed effect before the
-            // one-use callback removes its backing object.
-            state.isHeld = false
-            state.wasUsed = true
-            state.popupRemaining = chain.popupDuration
-            state.completionTimerRemaining =
-                chain.completionTimerDuration
-            trainingCameraMonitorState = state
-            cameraMonitorWasUsedThisFrame = true
-            // InventoryUseItem sends EVT_USE to the item before it removes
-            // it (Inventory.cpp:819); the level module counts Script 059.
-            world.osirisCallEvent(
-                ObjectHandle(chain.pickupObjectHandle),
-                .use(it: playerHandle),
-                level: level
-            )
-            world.objects.delete(ObjectHandle(chain.pickupObjectHandle))
+        // The use-inventory key of ProcessKeys and the controls
+        // (Controls.cpp:1215): UseInventoryItem (Inventory.cpp:1485).
+        if input.usesInventory {
+            world.useInventoryItem(level: level)
         }
         // ProcessNormalKey (GameLoop.cpp:1493): F4 asks for the buddy menu
         // (Game_interface_mode = GAME_BUDDY_INTERFACE), which RunGameMenu
@@ -171,12 +151,6 @@ extension GameSession {
         // and each move of the sim records the trigger faces it passes
         // (FQ_RECORD, :796, :986) for ObjCheckTriggers.
         var recordedFaces: [IndoorPortalCrossing] = []
-        var trainingKillbotEntryWasCrossedThisFrame = false
-        var trainingFinalRoomEntryWasCrossedThisFrame = false
-        var trainingCameraMonitorWasHitThisFrame = false
-        var trainingInvulnerabilityPickupWasHitThisFrame = false
-        var trainingCloakPickupWasHitThisFrame = false
-        var trainingFinalGoalWasHitThisFrame = false
         if ship.physics.behaviors.contains(.wiggle) {
             if sqrt(dot(force, force)) < 0.1 {
                 wiggleFalloff -= systemsFrameDuration / 2
@@ -195,7 +169,6 @@ extension GameSession {
                         wigglesPerSecond: ship.physics.wigglesPerSecond
                     )
             )
-            let traceStart = position
             let trace = traceIndoorMovement(
                 in: level,
                 roomStates: world.rooms,
@@ -204,67 +177,6 @@ extension GameSession {
                 end: position + linearThrustOrientation.up * wiggle,
                 radius: view.collisionRadius
             )
-            trainingCameraMonitorWasHitThisFrame =
-                trainingCameraMonitorWasHitThisFrame
-                || trainingCameraMonitorPickupWasHit(
-                    in: level,
-                    objects: world.objects,
-                    state: trainingCameraMonitorState,
-                    playerStart: traceStart,
-                    playerEnd: trace.finalPosition,
-                    playerRadius: view.collisionRadius,
-                    visitedRoomSourceIndices:
-                        trace.visitedRoomSourceIndices
-                )
-            trainingInvulnerabilityPickupWasHitThisFrame =
-                trainingInvulnerabilityPickupWasHitThisFrame
-                || trainingInvulnerabilityPickupWasHit(
-                    in: level,
-                    objects: world.objects,
-                    state: trainingInvulnerabilityPickupState,
-                    playerStart: traceStart,
-                    playerEnd: trace.finalPosition,
-                    playerRadius: view.collisionRadius,
-                    visitedRoomSourceIndices:
-                        trace.visitedRoomSourceIndices
-                )
-            trainingCloakPickupWasHitThisFrame =
-                trainingCloakPickupWasHitThisFrame
-                || trainingCloakPickupWasHit(
-                    in: level,
-                    objects: world.objects,
-                    state: trainingCloakPickupState,
-                    playerStart: traceStart,
-                    playerEnd: trace.finalPosition,
-                    playerRadius: view.collisionRadius,
-                    visitedRoomSourceIndices:
-                        trace.visitedRoomSourceIndices
-                )
-            trainingFinalGoalWasHitThisFrame =
-                trainingFinalGoalWasHitThisFrame
-                || trainingFinalGoalWasHit(
-                    in: level,
-                    objects: world.objects,
-                    state: trainingFinalGoalState,
-                    world: world,
-                    playerStart: traceStart,
-                    playerEnd: trace.finalPosition,
-                    playerRadius: view.collisionRadius,
-                    visitedRoomSourceIndices:
-                        trace.visitedRoomSourceIndices
-                )
-            trainingKillbotEntryWasCrossedThisFrame =
-                trainingKillbotEntryWasCrossedThisFrame
-                || trainingKillbotEntryTriggerWasCrossed(
-                    in: level,
-                    passedPortalFaces: trace.passedPortalFaces
-                )
-            trainingFinalRoomEntryWasCrossedThisFrame =
-                trainingFinalRoomEntryWasCrossedThisFrame
-                || trainingFinalRoomEntryTriggerWasCrossed(
-                    in: level,
-                    passedPortalFaces: trace.passedPortalFaces
-                )
             // Only a wiggle that hits nothing moves the ship and keeps its
             // recorded faces (physics.cpp:809); otherwise the main move
             // starts a new record list (FQ_NEW_RECORD_LIST, :986).
@@ -331,68 +243,7 @@ extension GameSession {
                     radius: view.collisionRadius
                 )
             } ?? wallTrace
-            trainingCameraMonitorWasHitThisFrame =
-                trainingCameraMonitorWasHitThisFrame
-                || trainingCameraMonitorPickupWasHit(
-                    in: level,
-                    objects: world.objects,
-                    state: trainingCameraMonitorState,
-                    playerStart: traceStart,
-                    playerEnd: trace.finalPosition,
-                    playerRadius: view.collisionRadius,
-                    visitedRoomSourceIndices:
-                        trace.visitedRoomSourceIndices
-                )
-            trainingInvulnerabilityPickupWasHitThisFrame =
-                trainingInvulnerabilityPickupWasHitThisFrame
-                || trainingInvulnerabilityPickupWasHit(
-                    in: level,
-                    objects: world.objects,
-                    state: trainingInvulnerabilityPickupState,
-                    playerStart: traceStart,
-                    playerEnd: trace.finalPosition,
-                    playerRadius: view.collisionRadius,
-                    visitedRoomSourceIndices:
-                        trace.visitedRoomSourceIndices
-                )
-            trainingCloakPickupWasHitThisFrame =
-                trainingCloakPickupWasHitThisFrame
-                || trainingCloakPickupWasHit(
-                    in: level,
-                    objects: world.objects,
-                    state: trainingCloakPickupState,
-                    playerStart: traceStart,
-                    playerEnd: trace.finalPosition,
-                    playerRadius: view.collisionRadius,
-                    visitedRoomSourceIndices:
-                        trace.visitedRoomSourceIndices
-                )
-            trainingFinalGoalWasHitThisFrame =
-                trainingFinalGoalWasHitThisFrame
-                || trainingFinalGoalWasHit(
-                    in: level,
-                    objects: world.objects,
-                    state: trainingFinalGoalState,
-                    world: world,
-                    playerStart: traceStart,
-                    playerEnd: trace.finalPosition,
-                    playerRadius: view.collisionRadius,
-                    visitedRoomSourceIndices:
-                        trace.visitedRoomSourceIndices
-                )
             recordedFaces += trace.passedPortalFaces
-            trainingKillbotEntryWasCrossedThisFrame =
-                trainingKillbotEntryWasCrossedThisFrame
-                || trainingKillbotEntryTriggerWasCrossed(
-                    in: level,
-                    passedPortalFaces: trace.passedPortalFaces
-                )
-            trainingFinalRoomEntryWasCrossedThisFrame =
-                trainingFinalRoomEntryWasCrossedThisFrame
-                || trainingFinalRoomEntryTriggerWasCrossed(
-                    in: level,
-                    passedPortalFaces: trace.passedPortalFaces
-                )
             // HIT_OBJECT (physics.cpp:1503-1560): the player stops at the
             // hit point, the remaining time shrinks by the distance moved,
             // collide_two_objects runs, and a powerup goes on the ignore list.
@@ -495,6 +346,8 @@ extension GameSession {
             recordedFaces: recordedFaces,
             level: level
         )
+        // ObjDoEffects (object.cpp:2841).
+        world.objDoEffects(playerHandle)
         // The player's EVT_INTERVAL ends its ObjDoFrame (object.cpp:2868).
         world.objectIntervalEvent(playerHandle, level: level)
         // The rest of ObjDoFrameAll's loop, then ObjDeleteDead
@@ -504,211 +357,16 @@ extension GameSession {
             level: level
         )
         world.objDoFrameAllTail(level: level)
+        // DoMatcensFrame arrives with the matcens (M2); then
+        // Level_goals.DoFrame (GameLoop.cpp:2982).
+        world.levelGoalsDoFrame(level: level)
         let playerFastHeadlight = playerHeadlightIsOn
             ? fastPlayerHeadlight(from: world.objects[playerHandle]!)
             : nil
 
-        var trainingOpeningFeedback: [TrainingOpeningFeedback] = []
+        var presentationFeedback: [PresentationFeedback] = []
         if let playerHeadlightFeedback {
-            trainingOpeningFeedback.append(playerHeadlightFeedback)
-        }
-        if trainingFinalGoalWasHitThisFrame,
-           var state = trainingFinalGoalState,
-           !state.endLevelWasRequested {
-            // TrainingMission.cpp Script 057 calls aEndLevel before it
-            // increments ScriptActionCtr_057.
-            state.endLevelWasRequested = true
-            state.scriptActionCounter += 1
-            trainingFinalGoalState = state
-            trainingPostLevelResult = makeTrainingPostLevelResult(
-                elapsedTime: systemsGameTime
-            )
-            trainingSessionOutcome = .awaitingResultAcknowledgement
-        }
-        if trainingInvulnerabilityPickupWasHitThisFrame,
-            var state = trainingInvulnerabilityPickupState,
-            let chain = level.trainingInvulnerabilityPickupChain
-        {
-            if !state.scriptWasTriggered {
-                state.scriptWasTriggered = true
-            }
-            if state.remainingDuration == nil {
-                state.wasConsumed = true
-                state.remainingDuration = chain.duration
-                world.objects.delete(ObjectHandle(chain.pickupObjectHandle))
-                trainingOpeningFeedback.append(
-                    .init(
-                        hudMessages: [chain.activatedMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: true,
-                        soundSourceName:
-                            chain.activatedSoundSourceName
-                    ))
-                trainingOpeningFeedback.append(
-                    .init(
-                        hudMessages: [],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: true,
-                        soundSourceName: chain.pickupSoundSourceName
-                    ))
-            }
-            trainingInvulnerabilityPickupState = state
-        }
-        if trainingCloakPickupWasHitThisFrame,
-            var state = trainingCloakPickupState,
-            let chain = level.trainingCloakPickupChain
-        {
-            if !state.scriptWasTriggered {
-                state.scriptWasTriggered = true
-            }
-            if !state.wasConsumed {
-                state.wasConsumed = true
-                state.phase = .fadingOut
-                state.phaseRemaining = chain.fadeDuration
-                world.objects.delete(ObjectHandle(chain.pickupObjectHandle))
-                trainingOpeningFeedback.append(.init(
-                    hudMessages: [chain.activatedMessage],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: true,
-                    soundSourceName: chain.activatedSoundSourceName
-                ))
-                trainingOpeningFeedback.append(.init(
-                    hudMessages: [],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: true,
-                    soundSourceName: chain.pickupSoundSourceName
-                ))
-            }
-            trainingCloakPickupState = state
-        }
-        if var state = trainingCameraMonitorState,
-           !state.isHeld,
-           !state.wasUsed,
-           let chain = level.trainingCameraMonitorChain,
-           trainingCameraMonitorWasHitThisFrame {
-            state.isHeld = true
-            trainingCameraMonitorState = state
-            completeTrainingCameraMonitorLocateGoal(
-                in: &world,
-                pickupObjectHandle: chain.pickupObjectHandle
-            )
-            world.setObjectRendered(chain.pickupObjectHandle, false)
-            trainingOpeningFeedback.append(.init(
-                hudMessages: [chain.pickupMessage],
-                voiceSourceName: chain.pickupVoiceSourceName,
-                voicePrecedesHUDMessages: true,
-                soundSourceName: chain.pickupSoundSourceName
-            ))
-        }
-        if cameraMonitorWasUsedThisFrame,
-           let chain = level.trainingCameraMonitorChain {
-            trainingOpeningFeedback.append(.init(
-                hudMessages: [chain.useMessage],
-                voiceSourceName: chain.useVoiceSourceName,
-                voicePrecedesHUDMessages: true
-            ))
-        }
-        if var state = trainingKillbotEntryState,
-           !state.wasTriggered,
-           trainingKillbotEntryWasCrossedThisFrame,
-           let returnChain =
-                level.trainingCameraMonitorChain?.returnToShip,
-           let chain = returnChain.killbotEntry {
-            state.wasTriggered = true
-            state.followupTimerRemaining = chain.followupDelay
-            trainingOpeningFeedback.append(.init(
-                hudMessages: [chain.entryMessage],
-                voiceSourceName: chain.entryVoiceSourceName,
-                voicePrecedesHUDMessages: false
-            ))
-            // The bespoke Script 042 (TrainingMission.cpp:2351-2366) until
-            // M1 step 9: aObjSetLightingDist(Object_handles[2], 0).
-            world.setObjectLightDistance(
-                ObjectHandle(returnChain.markerLightObjectHandle),
-                chain.closedMarkerLightDistance
-            )
-            closeTrainingKillbotEntryBarrier(in: &world, level: level)
-            trainingKillbotEntryState = state
-        }
-        if var state = trainingFinalRoomEntryState,
-           !state.wasTriggered,
-           let lastRoom = level.trainingLastRoomChain,
-           trainingBarrierIsOpen(
-               world,
-               level: level,
-               roomSourceIndex: lastRoom.barrierRoomSourceIndex,
-               portalIndices: lastRoom.orderedPortalIndices
-           ),
-           trainingFinalRoomEntryWasCrossedThisFrame,
-           let chain = level.trainingFinalRoomEntryChain
-        {
-            // The bespoke Script 050 (TrainingMission.cpp:2371-2383): the
-            // trigger lies past the portals Script 034 opened.
-            world.setObjectLightDistance(
-                ObjectHandle(lastRoom.markerLightObjectHandle),
-                0
-            )
-            trainingOpeningFeedback.append(.init(
-                hudMessages: [chain.successMessage],
-                voiceSourceName: "",
-                voicePrecedesHUDMessages: true
-            ))
-            closeTrainingLastRoomBarrier(in: &world, level: level)
-            trainingOpeningFeedback.append(.init(
-                hudMessages: [chain.instructionMessage],
-                voiceSourceName: chain.voiceSourceName,
-                voicePrecedesHUDMessages: true
-            ))
-            state.wasTriggered = true
-            trainingFinalRoomEntryState = state
-        }
-        if var state = trainingInvulnerabilityPickupState,
-            var remaining = state.remainingDuration,
-            let chain = level.trainingInvulnerabilityPickupChain
-        {
-            remaining -= systemsFrameDuration
-            if remaining <= 0.000_001 {
-                state.remainingDuration = nil
-                trainingOpeningFeedback.append(
-                    .init(
-                        hudMessages: [chain.expiredMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: true,
-                        soundSourceName: chain.expiredSoundSourceName
-                    ))
-            } else {
-                state.remainingDuration = remaining
-            }
-            trainingInvulnerabilityPickupState = state
-        }
-        if var state = trainingCloakPickupState,
-            let phase = state.phase,
-            var remaining = state.phaseRemaining,
-            let chain = level.trainingCloakPickupChain
-        {
-            remaining -= systemsFrameDuration
-            if remaining <= 0.000_001 {
-                switch phase {
-                case .fadingOut:
-                    state.phase = .cloaked
-                    state.phaseRemaining = chain.cloakDuration
-                case .cloaked:
-                    state.phase = .fadingIn
-                    state.phaseRemaining = chain.fadeDuration
-                    trainingOpeningFeedback.append(.init(
-                        hudMessages: [chain.expiredMessage],
-                        voiceSourceName: "",
-                        voicePrecedesHUDMessages: true,
-                        soundSourceName: chain.expiredSoundSourceName
-                    ))
-                case .fadingIn:
-                    state.phase = nil
-                    state.phaseRemaining = nil
-                }
-            } else {
-                state.phaseRemaining = remaining
-            }
-            trainingCloakPickupState = state
+            presentationFeedback.append(playerHeadlightFeedback)
         }
         // DoPlayerFrame, the level EVT_INTERVAL, then Osiris_ProcessTimers
         // (GameLoop.cpp:2992, :3013-3014), with the previous Frametime and
@@ -725,38 +383,17 @@ extension GameSession {
         // The sound frame stops the linked sounds of gone or ghosted objects
         // (hlsoundlib.cpp:722).
         world.stopSoundsOfGoneObjects()
-        trainingOpeningFeedback.append(
+        presentationFeedback.append(
             contentsOf: takeScriptPresentation()
         )
-        if var state = trainingKillbotEntryState,
-           state.wasTriggered,
-           !state.followupWasPresented,
-           !trainingKillbotEntryWasCrossedThisFrame,
-           let chain = level.trainingCameraMonitorChain?.returnToShip?
-                .killbotEntry,
-           var timer = state.followupTimerRemaining {
-            timer -= systemsFrameDuration
-            if timer <= 0.000_001 {
-                state.followupTimerRemaining = nil
-                state.followupWasPresented = true
-                trainingOpeningFeedback.append(.init(
-                    hudMessages: [chain.followupMessage],
-                    voiceSourceName: chain.followupVoiceSourceName,
-                    voicePrecedesHUDMessages: true
-                ))
-            } else {
-                state.followupTimerRemaining = timer
-            }
-            trainingKillbotEntryState = state
-        }
 
-        let frame = finalizePlayerSimulationFrame(
+        var frame = finalizePlayerSimulationFrame(
             at: timestamp,
             systemsFrameDuration: systemsFrameDuration,
             systemsGameTime: systemsGameTime,
             ship: ship,
             wallContact: wallContact,
-            trainingOpeningFeedback: trainingOpeningFeedback,
+            presentationFeedback: presentationFeedback,
             playerFastHeadlight: playerFastHeadlight
         )
         // GameRenderFrame (GameLoop.cpp:3051) marks the rooms it draws and
@@ -771,11 +408,32 @@ extension GameSession {
             startRoomSourceIndex: frame.playerView.roomSourceIndex,
             excludedObjectHandle: frame.playerView.objectHandle
         )
-        world.aiRenderedList = rendered.aiObjects
+        // DrawSmallViews (SmallViews.cpp:398) after the main view: each
+        // window that shows a view runs GameRenderWorld (:332), whose
+        // objects join AI_RenderedList (renderobject.cpp:1239) again, as
+        // each view marks its rooms' objects OF_SAFE_TO_RENDER
+        // (render.cpp:1126), and whose rooms take the render time; then the
+        // windows' timers count.
+        var aiRenderedList = rendered.aiObjects
+        var renderedRooms = rendered.rooms
+        for view in world.smallViewFrames(level: level) {
+            let smallView = renderedRoomsAndAIObjects(
+                level,
+                objects: world.objects,
+                roomStates: world.rooms,
+                camera: view.camera,
+                startRoomSourceIndex: view.roomSourceIndex,
+                excludedObjectHandle: view.viewerObjectHandle
+            )
+            aiRenderedList += smallView.aiObjects
+            renderedRooms += smallView.rooms
+        }
+        world.aiRenderedList = aiRenderedList
         world.lastRenderCamera = frame.playerView.camera
+        world.smallViewsRenderFrame(frameTime: systemsFrameDuration)
         let advancedGameTime = world.gameTime
         world.gameTime = systemsGameTime
-        for roomSourceIndex in rendered.rooms {
+        for roomSourceIndex in renderedRooms {
             if let room = level.rooms.firstIndex(where: {
                 $0.sourceIndex == roomSourceIndex
             }) {
@@ -784,6 +442,9 @@ extension GameSession {
         }
         world.processNormalEvents(level: level)
         world.gameTime = advancedGameTime
+        // GameSequencer (gamesequence.cpp:1240-1262): a level that a script
+        // ended this frame ends now.
+        frame.levelEnd = sequenceLevelEnd(elapsedTime: systemsGameTime)
         return frame
     }
     private func advanceIndoorPlayerRotation(
@@ -888,7 +549,7 @@ extension GameSession {
         systemsGameTime: Float,
         ship: CanonicalShipDefinition,
         wallContact: IndoorWallContact?,
-        trainingOpeningFeedback: [TrainingOpeningFeedback],
+        presentationFeedback: [PresentationFeedback],
         playerFastHeadlight: PlayerFastHeadlightFrame?
     ) -> PlayerSimulationFrame {
         if afterburnerIsActive {
@@ -904,49 +565,12 @@ extension GameSession {
             aspectRatio: PerspectiveProjection.sourceDefault.aspectRatio
         )
 
-        let cameraMonitorFrame = trainingCameraMonitorFrame(
-            level: level,
-            world: world,
-            state: trainingCameraMonitorState
-        )
-        let finalGoalFrame: TrainingFinalGoalFrame? =
-            trainingFinalGoalState.flatMap { state in
-            guard state.endLevelWasRequested,
-                  let postLevelResult = trainingPostLevelResult else {
-                return nil
-            }
-            return TrainingFinalGoalFrame(
-                endLevelState: .succeeded,
-                scriptActionCounter: state.scriptActionCounter,
-                controlsAreSuspended: true,
-                presentation: .init(
-                    title: "Mission Successful",
-                    levelName: level.metadata.name,
-                    difficulty: .rookie,
-                    showsHUD: false,
-                    playsGameplayAudio: false,
-                    showsCockpit: false,
-                    showsHeadlightIndicator: false
-                ),
-                postLevelResult: postLevelResult
-            )
-        }
-        if var state = trainingCameraMonitorState {
-            if var remaining = state.popupRemaining {
-                remaining -= systemsFrameDuration
-                state.popupRemaining = remaining < 0 ? nil : remaining
-            }
-            if var timer = state.completionTimerRemaining {
-                timer -= systemsFrameDuration
-                if timer <= 0.000_001 {
-                    state.completionTimerRemaining = nil
-                    state.completionTimerWasConsumed = true
-                } else {
-                    state.completionTimerRemaining = timer
-                }
-            }
-            trainingCameraMonitorState = state
-        }
+        let smallViewFrames = world.smallViewFrames(level: level)
+        // A level a script ended this frame shows no more gameplay.
+        let levelIsEnding = world.gameStateRequest != nil
+        let playerObject = world.objects[ObjectHandle(
+            level.defaultPlayerBinding!.objectHandle
+        )]
 
         let objectLights = world.objectLights
         world.objectLights = []
@@ -955,7 +579,7 @@ extension GameSession {
         lastTimestamp = timestamp
         gameTime += frameDuration
         let presentsRearView =
-            finalGoalFrame == nil && playerRearViewState != nil
+            !levelIsEnding && playerRearViewState != nil
         let forwardPlayerView = defaultPlayerView(
             in: level,
             objects: world.objects,
@@ -977,15 +601,14 @@ extension GameSession {
             turnrollFixedAngle: turnrollFixedAngle,
             wallContact: wallContact,
             enabledPlayerControls:
-                finalGoalFrame == nil
-                    ? world.playerControllerBitflags
-                    : PlayerControlMask(rawValue: 0),
+                levelIsEnding
+                    ? PlayerControlMask(rawValue: 0)
+                    : world.playerControllerBitflags,
             showsEnabledPlayerControls:
-                finalGoalFrame == nil
-                    && world.hudShowControls,
-            trainingOpeningFeedback: trainingOpeningFeedback,
+                !levelIsEnding && world.hudShowControls,
+            presentationFeedback: presentationFeedback,
             playerFastHeadlight:
-                finalGoalFrame == nil ? playerFastHeadlight : nil,
+                levelIsEnding ? nil : playerFastHeadlight,
             shields: shields,
             energy: energy,
             afterburnerFuel: afterburnerFuel,
@@ -1014,368 +637,11 @@ extension GameSession {
                     position: object.position
                 )
             },
-            trainingCameraMonitor: cameraMonitorFrame,
-            trainingInvulnerabilityRemaining:
-                trainingInvulnerabilityPickupState?.remainingDuration,
-            trainingCloak: trainingCloakFrame(
-                state: trainingCloakPickupState,
-                chain: level.trainingCloakPickupChain
-            ),
-            trainingFinalGoal: finalGoalFrame
+            popupView: smallViewFrames.first { $0.isPopup },
+            playerInvulnerabilityRemaining: world.playerInvulnerableTime,
+            playerCloak: ObjectCloakFrame(playerObject?.effect),
+            levelEnd: nil
         )
     }
 
-}
-
-private func trainingKillbotEntryTriggerWasCrossed(
-    in level: Level,
-    passedPortalFaces: [IndoorPortalCrossing]
-) -> Bool {
-    guard let entry =
-            level.trainingCameraMonitorChain?.returnToShip?.killbotEntry
-    else {
-        return false
-    }
-    return passedPortalFaces.contains {
-        $0.roomSourceIndex == entry.triggerRoomSourceIndex
-            && $0.faceIndex == entry.triggerFaceIndex
-    }
-}
-
-private func trainingFinalRoomEntryTriggerWasCrossed(
-    in level: Level,
-    passedPortalFaces: [IndoorPortalCrossing]
-) -> Bool {
-    guard let chain = level.trainingFinalRoomEntryChain else {
-        return false
-    }
-    return passedPortalFaces.contains {
-        $0.roomSourceIndex == chain.triggerRoomSourceIndex
-            && $0.faceIndex == chain.triggerFaceIndex
-    }
-}
-private func trainingCameraMonitorPickupWasHit(
-    in level: Level,
-    objects: ObjectTable,
-    state: TrainingCameraMonitorState?,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    guard let state,
-          !state.isHeld,
-          !state.wasUsed,
-          let chain = level.trainingCameraMonitorChain,
-          let pickup = objects[ObjectHandle(chain.pickupObjectHandle)],
-          case let .room(pickupRoomSourceIndex) = pickup.location,
-          visitedRoomSourceIndices.contains(pickupRoomSourceIndex) else {
-        return false
-    }
-    return segmentSphereHitFraction(
-        start: playerStart,
-        end: playerEnd,
-        center: pickup.position,
-        radius: playerRadius + chain.pickupCollisionRadius
-    ) != nil
-}
-
-private func trainingInvulnerabilityPickupWasHit(
-    in level: Level,
-    objects: ObjectTable,
-    state: TrainingInvulnerabilityPickupState?,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    guard let state,
-        !state.wasConsumed,
-        let chain = level.trainingInvulnerabilityPickupChain,
-        let pickup = objects[ObjectHandle(chain.pickupObjectHandle)],
-        pickup.location == .room(chain.pickupRoomSourceIndex),
-        visitedRoomSourceIndices.contains(
-            chain.pickupRoomSourceIndex
-        )
-    else {
-        return false
-    }
-    return segmentSphereHitFraction(
-        start: playerStart,
-        end: playerEnd,
-        center: pickup.position,
-        radius: playerRadius + chain.pickupCollisionRadius
-    ) != nil
-}
-
-private func trainingCloakPickupWasHit(
-    in level: Level,
-    objects: ObjectTable,
-    state: TrainingCloakPickupState?,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    guard let state,
-        !state.wasConsumed,
-        let chain = level.trainingCloakPickupChain,
-        let pickup = objects[ObjectHandle(chain.pickupObjectHandle)],
-        pickup.location == .room(chain.pickupRoomSourceIndex),
-        visitedRoomSourceIndices.contains(chain.pickupRoomSourceIndex)
-    else {
-        return false
-    }
-    return segmentSphereHitFraction(
-        start: playerStart,
-        end: playerEnd,
-        center: pickup.position,
-        radius: playerRadius + chain.pickupCollisionRadius
-    ) != nil
-}
-
-private func trainingFinalGoalWasHit(
-    in level: Level,
-    objects: ObjectTable,
-    state: TrainingFinalGoalState?,
-    world: GameWorld,
-    playerStart: Vector3,
-    playerEnd: Vector3,
-    playerRadius: Float,
-    visitedRoomSourceIndices: [Int]
-) -> Bool {
-    guard let state,
-          !state.endLevelWasRequested,
-          // FinalGoal lies past the portals Script 035 opened.
-          let finalBots = level.trainingFinalBotsCompletionChain,
-          trainingBarrierIsOpen(
-              world,
-              level: level,
-              roomSourceIndex: finalBots.barrierRoomSourceIndex,
-              portalIndices: finalBots.orderedPortalIndices
-          ),
-          let chain = level.trainingFinalGoalChain,
-          let goal = objects[ObjectHandle(chain.goalObjectHandle)],
-          goal.location == .room(chain.goalRoomSourceIndex),
-          visitedRoomSourceIndices.contains(
-              chain.goalRoomSourceIndex
-          )
-    else {
-        return false
-    }
-    return segmentSphereHitFraction(
-        start: playerStart,
-        end: playerEnd,
-        center: goal.position,
-        radius: playerRadius + chain.goalCollisionRadius
-    ) != nil
-}
-
-private func trainingCloakFrame(
-    state: TrainingCloakPickupState?,
-    chain: TrainingCloakPickupChain?
-) -> TrainingCloakFrame? {
-    guard let phase = state?.phase,
-        let remaining = state?.phaseRemaining,
-        let chain
-    else {
-        return nil
-    }
-    return .init(
-        phase: phase,
-        phaseRemaining: remaining,
-        phaseDuration:
-            phase == .cloaked ? chain.cloakDuration : chain.fadeDuration
-    )
-}
-/// Whether every listed portal of the room has PF_RENDER_FACES clear.
-func trainingBarrierIsOpen(
-    _ world: GameWorld,
-    level: Level,
-    roomSourceIndex: Int,
-    portalIndices: [Int]
-) -> Bool {
-    guard let room = level.rooms.firstIndex(where: {
-        $0.sourceIndex == roomSourceIndex
-    }) else {
-        return false
-    }
-    return portalIndices.allSatisfy {
-        world.rooms[room].portalFlags[$0] & LevelPortal.renderFacesFlag == 0
-    }
-}
-
-func setTrainingPortalRenderState(
-    in world: inout GameWorld,
-    level: Level,
-    roomSourceIndex: Int,
-    portalIndices: [Int],
-    rendersFaces: Bool
-) {
-    for portalIndex in portalIndices {
-        world.setPortalRenderFaces(
-            rendersFaces,
-            roomSourceIndex: roomSourceIndex,
-            portalIndex: portalIndex,
-            level: level
-        )
-    }
-}
-
-func openTrainingGalleryBarrier(in world: inout GameWorld, level: Level) {
-    guard let barrier = level.trainingGalleryBarrier else { return }
-    setTrainingPortalRenderState(
-        in: &world,
-        level: level,
-        roomSourceIndex: barrier.barrierRoomSourceIndex,
-        portalIndices: barrier.orderedPortalIndices,
-        rendersFaces: false
-    )
-}
-
-func openTrainingLastRoomBarrier(in world: inout GameWorld, level: Level) {
-    guard let chain = level.trainingLastRoomChain else { return }
-    setTrainingPortalRenderState(
-        in: &world,
-        level: level,
-        roomSourceIndex: chain.barrierRoomSourceIndex,
-        portalIndices: chain.orderedPortalIndices,
-        rendersFaces: false
-    )
-}
-
-func openTrainingFinalBotsBarrier(in world: inout GameWorld, level: Level) {
-    guard let chain = level.trainingFinalBotsCompletionChain else { return }
-    setTrainingPortalRenderState(
-        in: &world,
-        level: level,
-        roomSourceIndex: chain.barrierRoomSourceIndex,
-        portalIndices: chain.orderedPortalIndices,
-        rendersFaces: false
-    )
-}
-
-func closeTrainingLastRoomBarrier(in world: inout GameWorld, level: Level) {
-    guard let chain = level.trainingLastRoomChain else { return }
-    setTrainingPortalRenderState(
-        in: &world,
-        level: level,
-        roomSourceIndex: chain.barrierRoomSourceIndex,
-        portalIndices: chain.orderedPortalIndices,
-        rendersFaces: true
-    )
-}
-
-func closeTrainingKillbotEntryBarrier(
-    in world: inout GameWorld,
-    level: Level
-) {
-    guard let barrier = level.trainingCameraMonitorChain?.returnToShip,
-          let entry = barrier.killbotEntry
-    else {
-        return
-    }
-    setTrainingPortalRenderState(
-        in: &world,
-        level: level,
-        roomSourceIndex: barrier.barrierRoomSourceIndex,
-        portalIndices: entry.orderedPortalIndices,
-        rendersFaces: true
-    )
-}
-
-// The bespoke Camera Monitor presentation (M1 step 9 replaces it with
-// Script 059's actions, Inventory use, and aCreatePopupView): the pickup
-// completes the level's locate goal, and the used monitor shows the
-// security camera's view for the popup's time. It moved here from the
-// deleted TrainingGuidebotSimulation.swift in M1 step 8d unchanged.
-func completeTrainingCameraMonitorLocateGoal(
-    in world: inout GameWorld,
-    pickupObjectHandle: UInt32
-) {
-    guard let goalIndex = world.goals.firstIndex(where: { goal in
-        goal.status & 0x0000_0400 != 0
-            && goal.items.contains {
-                $0.type == 2
-                    && $0.objectHandle == pickupObjectHandle
-            }
-    }) else {
-        return
-    }
-    let goal = world.goals[goalIndex]
-    world.goals[goalIndex] = .init(
-        status: goal.status | 0x0000_0008,
-        priority: goal.priority,
-        list: goal.list,
-        name: goal.name,
-        itemName: goal.itemName,
-        description: goal.description,
-        completionMessage: goal.completionMessage,
-        items: goal.items.map { item in
-            guard item.type == 2,
-                  item.objectHandle == pickupObjectHandle else {
-                return item
-            }
-            return .init(
-                type: item.type,
-                sourceHandle: item.sourceHandle,
-                objectHandle: item.objectHandle,
-                done: true
-            )
-        }
-    )
-}
-
-func trainingCameraMonitorFrame(
-    level: Level,
-    world: GameWorld,
-    state: TrainingCameraMonitorState?
-) -> TrainingCameraMonitorFrame? {
-    guard let chain = level.trainingCameraMonitorChain,
-          let remainingDuration = state?.popupRemaining,
-          let cameraObject =
-              world.objects[ObjectHandle(chain.securityCameraObjectHandle)],
-          case let .room(roomSourceIndex) = cameraObject.location else {
-        return nil
-    }
-    let localPosition = chain.cameraLocalPosition
-    let position = cameraObject.position
-        + cameraObject.orientation.right * localPosition.x
-        + cameraObject.orientation.up * localPosition.y
-        + cameraObject.orientation.forward * localPosition.z
-    let gunpointRoomSourceIndex = traceIndoorMovement(
-        in: level,
-        roomStates: world.rooms,
-        startRoom: roomSourceIndex,
-        start: cameraObject.position,
-        end: position,
-        radius: 0
-    ).containingRoomSourceIndex
-    let localForward = chain.cameraLocalForward
-    let forward = sourceVectorNormalized(
-        cameraObject.orientation.right * localForward.x
-            + cameraObject.orientation.up * localForward.y
-            + cameraObject.orientation.forward * localForward.z
-    )
-    let up: Vector3
-    if forward.x == 0 && forward.z == 0 {
-        up = .init(x: 0, y: 0, z: forward.y < 0 ? 1 : -1)
-    } else {
-        let right = sourceVectorNormalized(.init(
-            x: forward.z,
-            y: 0,
-            z: -forward.x
-        ))
-        up = sourceVectorCross(forward, right)
-    }
-    return .init(
-        camera: .init(
-            position: position,
-            target: position + forward,
-            up: up,
-            projection: .sourceDefault
-        ),
-        roomSourceIndex: gunpointRoomSourceIndex,
-        remainingDuration: remainingDuration
-    )
 }

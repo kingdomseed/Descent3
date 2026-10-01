@@ -2280,15 +2280,6 @@ func replacing(
     objectPresentations: [ObjectPresentationReference]? = nil,
     trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
     trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
-    trainingCameraMonitorChain: TrainingCameraMonitorChain? = nil,
-    trainingInvulnerabilityPickupChain:
-        TrainingInvulnerabilityPickupChain? = nil,
-    trainingCloakPickupChain: TrainingCloakPickupChain? = nil,
-    trainingLastRoomChain: TrainingLastRoomChain? = nil,
-    trainingFinalRoomEntryChain: TrainingFinalRoomEntryChain? = nil,
-    trainingFinalBotsCompletionChain:
-        TrainingFinalBotsCompletionChain? = nil,
-    trainingFinalGoalChain: TrainingFinalGoalChain? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
     soundClips: [CanonicalSoundClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
@@ -2329,34 +2320,11 @@ func replacing(
             trainingGalleryBarrier ?? level.trainingGalleryBarrier,
         trainingRobotGuidebotChain:
             trainingRobotGuidebotChain ?? level.trainingRobotGuidebotChain,
-        trainingCameraMonitorChain:
-            trainingCameraMonitorChain ?? level.trainingCameraMonitorChain,
-        trainingInvulnerabilityPickupChain:
-            trainingInvulnerabilityPickupChain
-            ?? level.trainingInvulnerabilityPickupChain,
-        trainingCloakPickupChain:
-            trainingCloakPickupChain ?? level.trainingCloakPickupChain,
-        trainingLastRoomChain:
-            trainingLastRoomChain ?? level.trainingLastRoomChain,
-        trainingFinalRoomEntryChain:
-            trainingFinalRoomEntryChain
-            ?? level.trainingFinalRoomEntryChain,
-        trainingFinalBotsCompletionChain:
-            trainingFinalBotsCompletionChain
-            ?? level.trainingFinalBotsCompletionChain,
-        trainingFinalGoalChain:
-            trainingFinalGoalChain
-            ?? level.trainingFinalGoalChain,
         voiceClips: voiceClips ?? level.voiceClips,
         soundClips: soundClips ?? level.soundClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
         sourceChunks: sourceChunks ?? level.sourceChunks
     )
-    replaced.trainingFinalBotsCompletionChain =
-        trainingFinalBotsCompletionChain
-        ?? level.trainingFinalBotsCompletionChain
-    replaced.trainingFinalGoalChain =
-        trainingFinalGoalChain ?? level.trainingFinalGoalChain
     replaced.objectInfos = level.objectInfos
     replaced.weapons = level.weapons
     replaced.gameModules = level.gameModules

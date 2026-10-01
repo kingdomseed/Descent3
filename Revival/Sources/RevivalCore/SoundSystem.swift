@@ -92,3 +92,28 @@ extension GameWorld {
         }
     }
 }
+
+/// The sound pages the translated engine plays by name: static sounds of
+/// Static_sound_names (sndlib/soundload.cpp:253) and the pages the engine
+/// finds with FindSoundName. D3Import adds every one to each level, as
+/// PageInAllData pages the static sounds in (gamesequence.cpp:2481).
+enum EngineSound {
+    /// SOUND_POWERUP_PICKUP (sounds.h:116).
+    static let powerupPickup = "Powerup pickup"
+    /// SOUND_GOAL_COMPLETE (sounds.h:146).
+    static let goalComplete = "GoalComplete"
+    /// MakePlayerInvulnerable and MakePlayerVulnerable (Player.cpp:1585,
+    /// :1606).
+    static let invulnerabilityOn = "Invulnerability on"
+    static let invulnerabilityOff = "Invulnerability off"
+    /// MakeObjectInvisible and MakeObjectVisible (object_lighting.cpp:581,
+    /// :609).
+    static let cloakOn = "Cloak on"
+    static let cloakOff = "Cloak off"
+
+    /// Every engine sound, in a fixed order for the import.
+    static let names = [
+        powerupPickup, goalComplete, invulnerabilityOn, invulnerabilityOff,
+        cloakOn, cloakOff,
+    ]
+}

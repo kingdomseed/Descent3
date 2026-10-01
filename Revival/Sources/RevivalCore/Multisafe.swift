@@ -9,7 +9,8 @@
 // MSAFE_OBJECT_LIGHT_DIST (:1821), MSAFE_OBJECT_LIGHT_COLOR (:1832),
 // MSAFE_SOUND_STREAMING (:1939), MSAFE_SOUND_2D (:1955), and
 // MSAFE_MISC_HUD_MESSAGE (:2021), MSAFE_ROOM_PORTAL_RENDER (:1447), and
-// MSAFE_OBJECT_SHIELDS (get :851, set :1563), with ObjGhostObject and
+// MSAFE_OBJECT_SHIELDS (get :851, set :1563), MSAFE_INVEN_ADD_OBJECT
+// (:2153), MSAFE_MISC_END_LEVEL (:2075), with ObjGhostObject and
 // ObjUnGhostObject (Descent3/object.cpp:3463, :3483).
 // MSAFE_OBJECT_NO_RENDER is `GameWorld.setObjectRendered`. Multiplayer
 // routing is dropped: the only player is slot 0.
@@ -24,9 +25,10 @@ enum ScriptPresentationRequest: Codable, Equatable, Sendable {
     /// MSAFE_SOUND_2D for all players: Play2dSound(index, volume). The
     /// index is a `Level.soundClips` index (`Level.findSoundName`).
     case sound2D(index: Int, volume: Float)
-    /// Play3dSound of an engine sound, named by its sound page. RevivalMac
-    /// plays it without 3D placement until the 3D audio port (M2).
-    case sound(name: String)
+    /// Play3dSound of an engine sound, named by its sound page, at a volume
+    /// (MAX_GAME_VOLUME is 1). RevivalMac plays it without 3D placement
+    /// until the 3D audio port (M2).
+    case sound(name: String, volume: Float)
 }
 
 extension GameWorld {
@@ -159,9 +161,9 @@ extension GameWorld {
 
     /// Sound_system.Play3dSound for an engine sound (a weapon fire or
     /// impact sound). An empty name is SOUND_NONE_INDEX and plays nothing.
-    mutating func play3DSound(_ name: String) {
+    mutating func play3DSound(_ name: String, volume: Float = 1) {
         guard !name.isEmpty else { return }
-        presentationRequests.append(.sound(name: name))
+        presentationRequests.append(.sound(name: name, volume: volume))
     }
 
     /// MSAFE_SOUND_2D for all players (multisafe.cpp:1955). An invalid
@@ -233,10 +235,39 @@ extension GameWorld {
     mutating func inventoryAddTypeID(
         _ player: ObjectHandle,
         type: ObjectType,
-        id: Int
+        id: Int,
+        flags: UInt32 = 0,
+        level: Level
     ) {
         guard objects[player]?.type == .player else { return }
-        playerInventory.add(type: type.rawValue, id: id)
+        playerInventory.add(
+            type: type.rawValue,
+            id: id,
+            pageFlags: objectPageFlags(id, level: level),
+            addFlags: flags
+        )
+    }
+
+    /// MSAFE_INVEN_ADD_OBJECT (multisafe.cpp:2153): Inventory::AddObject on
+    /// the player the handle names. `flags` are the INVAF_ add flags.
+    @discardableResult
+    mutating func inventoryAddObject(
+        _ player: ObjectHandle,
+        item: ObjectHandle,
+        flags: UInt32,
+        level: Level
+    ) -> Bool {
+        guard objects[player]?.type == .player, objects[item] != nil else {
+            return false
+        }
+        return inventoryAddObjectItem(item, addFlags: flags, level: level)
+    }
+
+    /// MSAFE_MISC_END_LEVEL (multisafe.cpp:2075) in single player:
+    /// SetGameState(GAMESTATE_LVLEND) on success, GAMESTATE_LVLFAILED
+    /// otherwise. The session's sequencer ends the level after the frame.
+    mutating func endLevel(success: Bool) {
+        gameStateRequest = success ? .levelEnd : .levelFailed
     }
 
     /// MSAFE_INVEN_REMOVE (multisafe.cpp:2191) for a non-weapon type.
@@ -256,7 +287,7 @@ extension GameWorld {
         guard objects[handle] != nil else { return }
         objects[handle]?.flags |= GameObject.deadFlag
         if playSound {
-            play3DSound("Powerup pickup")
+            play3DSound(EngineSound.powerupPickup)
         }
     }
 

@@ -159,8 +159,11 @@ extension GameWorld {
            !playerInventory.checkItem(type: ObjectType.robot.rawValue,
                                       id: guideBotPage),
            objects[buddyHandle].map({ $0.type != .robot }) ?? false {
-            playerInventory.add(type: ObjectType.robot.rawValue,
-                                id: guideBotPage)
+            playerInventory.add(
+                type: ObjectType.robot.rawValue,
+                id: guideBotPage,
+                pageFlags: objectPageFlags(guideBotPage, level: level)
+            )
         }
     }
 
@@ -507,11 +510,29 @@ extension GameWorld {
         return best
     }
 
-    /// AIDetermineObjVisLevel (AImain.cpp:1645). Cloaking and napalm
-    /// effects arrive with object effects, so every target is fully visible.
+    /// AIDetermineObjVisLevel (AImain.cpp:1645): a cloaked target is not
+    /// seen, unless it is a player whose afterburner is on or whose
+    /// headlight points at the looker; each adds one level. The napalm
+    /// effect arrives with the object effects (M2).
     func aiDetermineObjVisLevel(_ object: GameObject,
                                 _ target: GameObject) -> Float {
-        Self.aiVisibilityFull
+        var visibility = Self.aiVisibilityFull
+        if let flags = target.effect?.typeFlags,
+           flags & ObjectEffectInfo.cloakedFlag != 0 {
+            visibility = 0
+            if target.type == .player, afterburnerIsActive {
+                visibility += 1
+            }
+            if target.type == .player, playerHeadlightIsOn {
+                let fromTarget = sourceVectorNormalized(
+                    object.position - target.position
+                )
+                if dot(target.orientation.forward, fromTarget) > 0.965 {
+                    visibility += 1
+                }
+            }
+        }
+        return max(0, min(Self.aiVisibilityFull, visibility))
     }
 
     /// AIDetermineFovVec (AImain.cpp:2814).

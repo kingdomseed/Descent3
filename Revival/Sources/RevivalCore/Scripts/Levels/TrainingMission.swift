@@ -20,8 +20,11 @@
 // :1943), _2008 (037 and 026, :1969), _1011 (028, :2008), _1010 (036,
 // :2031), _081A, _081B, _081D, and _081E (043-046, :2090-2172), _081C
 // and _0819 (047 and 048, :2174-2200), and _101F,
-// _0820, _0821, _0822, and _0823 (051-055, :2204-2307). The other scripts
-// are still the bespoke Training code; M1 steps 8 and 9 move them here.
+// _0820, _0821, _0822, and _0823 (051-055, :2204-2307), _1817 (040 and
+// 059, :2057), _1824 (057, :2309), TriggerScript_0001 and _0002 (042 and
+// 050, :2347-2385), the level interval's Script 038 (:1394), and the level
+// timer's Scripts 041 and 039 (:1585-1600). Every script of the module is
+// translated.
 
 /// The Training module's state: the DALLAS globals of the module
 /// (ScriptActionCtr_nnn and the DallasFuncs variables).
@@ -96,6 +99,16 @@ struct TrainingMissionState: Codable, Equatable, Sendable {
     var script059Count: Int = 0
     var script060Count: Int = 0
     var script058Count: Int = 0
+    /// ScriptActionCtr_040: the Camera Monitor taken; _038 and _041: the
+    /// powerups done; _042: the KillBot room entered; _039: its second
+    /// message; _050: the last room entered; _057: the final goal.
+    var script040Count: Int = 0
+    var script038Count: Int = 0
+    var script041Count: Int = 0
+    var script042Count: Int = 0
+    var script039Count: Int = 0
+    var script050Count: Int = 0
+    var script057Count: Int = 0
     var dallas = DallasState.dfInit()
 
     /// Every action counter, for save validation.
@@ -116,7 +129,9 @@ struct TrainingMissionState: Codable, Equatable, Sendable {
             script054Count, script055Count,
             script047Count, script048Count, script034Count, script049Count,
             script035Count, script056Count, script032Count, script059Count,
-            script060Count, script058Count,
+            script060Count, script058Count, script040Count, script038Count,
+            script041Count, script042Count, script039Count, script050Count,
+            script057Count,
         ]
     }
 }
@@ -279,10 +294,9 @@ enum TrainingMissionScript {
 
     /// The custom object scripts' CallEvent. Each DALLAS-generated handler
     /// returns CONTINUE_CHAIN | CONTINUE_DEFAULT (for example
-    /// TrainingMission.cpp:1657). The handlers of the later lessons are
-    /// still the bespoke Training code, so the events that reach them now
-    /// only take that return. An EVT_DESTROY handler runs only for a dying
-    /// object; a destroy at level end breaks out (for example :2014).
+    /// TrainingMission.cpp:1657). An EVT_DESTROY handler runs only for a
+    /// dying object; a destroy at level end breaks out (for example
+    /// :2014).
     static func callCustomObjectEvent(
         id: Int32,
         event: ScriptEvent,
@@ -326,12 +340,10 @@ enum TrainingMissionScript {
             increment(\.script045Count, world: &world)
         case (0x012, .destroy(isDying: true)):
             increment(\.script046Count, world: &world)
-        // Script 059: Player used camera monitor (:2074-2084). Until M1
-        // step 9 the bespoke Camera Monitor use plays GuideBotD.osf, shows
-        // UseCameraMonitor, and opens the popup view; the handler counts
-        // ScriptActionCtr_059, which Scripts 038 and 058 read.
+        case let (0x00e, .collide(it)):
+            collideCameraMonitor(me: me, it: it, world: &world, level: level)
         case (0x00e, .use):
-            increment(\.script059Count, world: &world)
+            useCameraMonitor(world: &world, level: level)
         // Script 047: InvulnPowerup2 Picked up (:2174-2186).
         case (0x013, .collide):
             if world.trainingMission.script047Count < 1 {
@@ -353,6 +365,10 @@ enum TrainingMissionScript {
             increment(\.script054Count, world: &world)
         case (0x019, .destroy(isDying: true)):
             increment(\.script055Count, world: &world)
+        // Script 057: Finished! (:2309-2321). It has no counter test.
+        case (0x01a, .collide):
+            world.aEndLevel()
+            increment(\.script057Count, world: &world)
         default: break
         }
         return .all
@@ -360,8 +376,6 @@ enum TrainingMissionScript {
 
     /// The trigger scripts' CallEvent. Each returns CONTINUE_CHAIN |
     /// CONTINUE_DEFAULT (for example TrainingMission.cpp:2345).
-    /// TriggerScript_0001 and _0002 (Scripts 042 and 050) are still the
-    /// bespoke Training code (M1 step 9).
     static func callTriggerEvent(
         id: Int32,
         event: ScriptEvent,
@@ -370,6 +384,8 @@ enum TrainingMissionScript {
     ) -> ChainFlags {
         switch (id, event) {
         case (0x01b, .collide): collidePortal2(world: &world, level: level)
+        case (0x01c, .collide): collidePortal3(world: &world, level: level)
+        case (0x01d, .collide): collidePortal4(world: &world, level: level)
         default: break
         }
         return .all
@@ -394,9 +410,8 @@ enum TrainingMissionScript {
         return .all
     }
 
-    /// EVT_INTERVAL (TrainingMission.cpp:1347-1456). Scripts 018, 025, 031,
-    /// 030, 034, 035, 060, and 058 are translated; Script 038 is still
-    /// bespoke (M1 step 9).
+    /// EVT_INTERVAL (TrainingMission.cpp:1347-1456): Scripts 018, 025, 031,
+    /// 030, 038, 034, 035, 060, and 058.
     private static func levelInterval(world: inout GameWorld, level: Level) {
         func object(_ index: Int) -> ObjectHandle {
             objectHandle(index, level: level)
@@ -452,6 +467,16 @@ enum TrainingMissionScript {
             if world.trainingMission.script030Count < maximumActionCounter {
                 world.trainingMission.script030Count += 1
             }
+        }
+
+        // Script 038: Done Powerups Delay
+        if world.trainingMission.script038Count < 1,
+           (world.trainingMission.script059Count > 0) == true,
+           (world.trainingMission.script040Count > 0) == true {
+            world.aSetLevelTimer(2, 13)
+
+            // Increment the script action counter
+            increment(\.script038Count, world: &world)
         }
 
         // Script 034: Ready for last room Delay
@@ -564,9 +589,8 @@ enum TrainingMissionScript {
         }
     }
 
-    /// EVT_TIMER (TrainingMission.cpp:1501-1626). Scripts 002, 023, 024,
-    /// 022, 027, and 029 are translated; the later timer scripts are still
-    /// bespoke.
+    /// EVT_TIMER (TrainingMission.cpp:1501-1626): Scripts 002, 023, 024,
+    /// 022, 027, 029, 041, 039, 049, and 056.
     private static func levelTimer(
         id: Int32,
         world: inout GameWorld,
@@ -671,6 +695,22 @@ enum TrainingMissionScript {
             increment(\.script029Count, world: &world)
         }
 
+        // Script 041: Done Powerups
+        if world.trainingMission.script041Count < 1, id == 13 {
+
+            // Increment the script action counter
+            increment(\.script041Count, world: &world)
+        }
+
+        // Script 039: Killbot Message 2
+        if id == 14 {
+            world.aSoundPlaySteamingText("GuidebotF.osf", 1)
+            world.aShowHUDMessage(message(30, level: level))
+
+            // Increment the script action counter
+            increment(\.script039Count, world: &world)
+        }
+
         // Script 049: Ready for last room
         if world.trainingMission.script049Count < 1, id == 9 {
             world.aShowHUDMessage(message(0, level: level))
@@ -718,6 +758,75 @@ extension TrainingMissionScript {
 
             // Increment the script action counter
             increment(\.script032Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_1817 EVT_COLLIDE, CameraMonitor
+    /// (TrainingMission.cpp:2057-2072).
+    static func collideCameraMonitor(
+        me: ObjectHandle,
+        it: ObjectHandle,
+        world: inout GameWorld,
+        level: Level
+    ) {
+        // Script 040: Got CameraMonitor
+        if world.trainingMission.script040Count < 1,
+           world.qObjIsPlayer(it) == true {
+            world.aSoundPlaySteamingText("GuideBotC.osf", 1)
+            world.aSoundPlayObject(soundIndex(1, level: level), me, 1,
+                                   level: level)
+            world.aAddObjectToInventory(objectHandle(22, level: level), it,
+                                        false, level: level)
+            world.aShowHUDMessage(message(28, level: level))
+
+            // Increment the script action counter
+            increment(\.script040Count, world: &world)
+        }
+    }
+
+    /// CustomObjectScript_1817 EVT_USE, CameraMonitor
+    /// (TrainingMission.cpp:2073-2084).
+    static func useCameraMonitor(world: inout GameWorld, level: Level) {
+        // Script 059: Player used camera monitor
+        world.aSoundPlaySteamingText("GuideBotD.osf", 1)
+        world.aShowHUDMessage(message(34, level: level))
+        world.aCreatePopupView(0, objectHandle(34, level: level), 10, 1)
+
+        // Increment the script action counter
+        increment(\.script059Count, world: &world)
+    }
+
+    /// TriggerScript_0001 EVT_COLLIDE, Portal3
+    /// (TrainingMission.cpp:2347-2366).
+    static func collidePortal3(world: inout GameWorld, level: Level) {
+        // Script 042: Entered KillBot Room
+        if world.trainingMission.script042Count < 1 {
+            world.aSetLevelTimer(13, 14)
+            world.aObjSetLightingDist(objectHandle(2, level: level), 0)
+            world.aShowHUDMessage(message(29, level: level))
+            world.aSoundPlaySteamingText("intro6.osf", 1)
+            world.aPortalRenderSet(1, 1, roomIndex(4, level: level), true, level: level)
+            world.aPortalRenderSet(1, 0, roomIndex(4, level: level), true, level: level)
+
+            // Increment the script action counter
+            increment(\.script042Count, world: &world)
+        }
+    }
+
+    /// TriggerScript_0002 EVT_COLLIDE, Portal4
+    /// (TrainingMission.cpp:2368-2387).
+    static func collidePortal4(world: inout GameWorld, level: Level) {
+        // Script 050: Entered Last Room
+        if world.trainingMission.script050Count < 1 {
+            world.aObjSetLightingDist(objectHandle(3, level: level), 0)
+            world.aShowHUDMessage(message(0, level: level))
+            world.aPortalRenderSet(1, 1, roomIndex(5, level: level), true, level: level)
+            world.aPortalRenderSet(1, 0, roomIndex(5, level: level), true, level: level)
+            world.aSoundPlaySteamingText("intro7.osf", 1)
+            world.aShowHUDMessage(message(32, level: level))
+
+            // Increment the script action counter
+            increment(\.script050Count, world: &world)
         }
     }
 

@@ -17,11 +17,10 @@
 // shockwave, and generic physics; MT_NONE's stuck-on-portal check; and the
 // MT_OBJ_LINKED list that the tail moves with DoPhysLinkedFrame,
 // physics.cpp:87), the object's EVT_INTERVAL, and DoObjectLight
-// (ObjectLighting.swift). The animation and effects arrive with the
-// general object frame (M2). ObjDeleteDead keeps the order of the
-// original; the level goal inform and the inventory removal arrive with
-// level goals and inventory (M1 step 9), and no imported object sets their
-// flags before then.
+// (ObjectLighting.swift), with ObjDoEffects's cloak before the interval.
+// The animation and the other effects arrive with the general object frame
+// (M2). ObjDeleteDead keeps the order of the original: the level goal
+// inform, the inventory removal, the attach, and EVT_DESTROY.
 
 import Foundation
 
@@ -126,6 +125,8 @@ extension GameWorld {
                 }
             }
         }
+        // ObjDoEffects (object.cpp:2841).
+        objDoEffects(handle)
         objectIntervalEvent(handle, level: level)
         doObjectLight(handle, level: level)
     }
@@ -157,7 +158,9 @@ extension GameWorld {
     }
 
     /// ObjDeleteDead (object.cpp:2004), run after the ObjDoFrameAll loop:
-    /// for each dead object in slot order, a ghost is unghosted, an attached
+    /// for each dead object in slot order, the level goals hear of an
+    /// OF_INFORM_DESTROY_TO_LG object, an object in the player's inventory
+    /// leaves it, a ghost is unghosted, an attached
     /// polygon object's attach parent hears EVT_CHILD_DIED, the object's
     /// scripts hear EVT_DESTROY (dying), its scripts are detached, and it is
     /// deleted (the player is not). The dead visual effects go last.
@@ -169,6 +172,19 @@ extension GameWorld {
                 continue
             }
             let handle = object.handle
+            if object.flags & GameObject.informDestroyToLevelGoalsFlag != 0 {
+                levelGoalsInform(
+                    type: LevelGoalItemType.object,
+                    completion: LevelGoalFlag.completeDestroy,
+                    handle: Int32(bitPattern: handle.rawValue),
+                    level: level
+                )
+            }
+            if object.flags & GameObject.inPlayerInventoryFlag != 0 {
+                inventoryRemoveObject(handle)
+            }
+            guard let informed = objects[handle] else { continue }
+            object = informed
             if object.type == .dummy {
                 unghostObject(handle)
                 object = objects[handle]!

@@ -34,7 +34,7 @@ final class TrainingQuicksaveTests: XCTestCase {
             profileID: profileID
         ))
         let save = try JSONDecoder().decode(GameSave.self, from: encoded)
-        XCTAssertEqual(save.schemaVersion, 2)
+        XCTAssertEqual(save.schemaVersion, 3)
         XCTAssertEqual(save.profileID, profileID)
         XCTAssertEqual(save.package, package)
         XCTAssertEqual(save.world, saved)
@@ -101,6 +101,18 @@ final class TrainingQuicksaveTests: XCTestCase {
         }
         assertLoadError(
             .unsupportedSaveSchema(1),
+            saveFile: saveFile,
+            profileID: profileID,
+            package: package,
+            level: level
+        )
+        // A save from before M1 step 9 (schema 2, with no inventory items,
+        // goals, small views, or effects) is unsupported, not corrupt.
+        try writeMutatedJSON(validData, to: saveURL) {
+            $0["schemaVersion"] = 2
+        }
+        assertLoadError(
+            .unsupportedSaveSchema(2),
             saveFile: saveFile,
             profileID: profileID,
             package: package,

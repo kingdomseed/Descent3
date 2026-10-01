@@ -21,9 +21,11 @@ private let maximumSavedTime = maximumSavedMagnitude
 private let maximumSavedCreationOrdinal: UInt64 = 1 << 48
 
 struct GameSave: Codable, Equatable, Sendable {
-    /// Schema 2 replaces player save schema 1, which wrapped continuation
-    /// schema 7.
-    static let currentSchemaVersion = 2
+    /// Schema 2 replaced player save schema 1, which wrapped continuation
+    /// schema 7. Schema 3 (M1 step 9) adds the inventory's object items,
+    /// the level goal state, the small views, the object effects, and the
+    /// game state request.
+    static let currentSchemaVersion = 3
 
     let schemaVersion: Int
     /// The pilot.
@@ -222,43 +224,12 @@ extension GameWorld {
         where !["objects", "rooms", "goals"].contains(child.label) {
             try sweep.visit(child.value, label: child.label ?? "")
         }
-        try validateStateDefinitions(level: level)
         // The object_info and weapon indices are checked before the script
         // bindings resolve pages through them.
         try validateObjectRuntimeState(level: level)
         try validateScriptState(level: level)
         try validateIndicesAndCapacities(level: level)
         try validateNumericDomains(level: level)
-    }
-
-    /// Script and weapon state exists only when the level or ship defines
-    /// it, as `GameWorld(level:)` creates it. The runtime force-unwraps the
-    /// definition of any state it finds.
-    private func validateStateDefinitions(
-        level: Level
-    ) throws(GameWorldValidationError) {
-        let pairs: [(String, Bool, Bool)] = [
-            ("trainingCameraMonitorState",
-             trainingCameraMonitorState != nil,
-             level.trainingCameraMonitorChain != nil),
-            ("trainingKillbotEntryState", trainingKillbotEntryState != nil,
-             level.trainingCameraMonitorChain?.returnToShip?.killbotEntry
-                != nil),
-            ("trainingInvulnerabilityPickupState",
-             trainingInvulnerabilityPickupState != nil,
-             level.trainingInvulnerabilityPickupChain != nil),
-            ("trainingCloakPickupState", trainingCloakPickupState != nil,
-             level.trainingCloakPickupChain != nil),
-            ("trainingFinalRoomEntryState",
-             trainingFinalRoomEntryState != nil,
-             level.trainingFinalRoomEntryChain != nil),
-            ("trainingFinalGoalState", trainingFinalGoalState != nil,
-             level.trainingFinalGoalChain != nil),
-        ]
-        for (name, hasState, hasDefinition) in pairs
-        where hasState && !hasDefinition {
-            throw .unexpectedState(name)
-        }
     }
 
     /// Osiris and object script state: the level module is the one the
@@ -273,6 +244,8 @@ extension GameWorld {
             if !condition { throw .unexpectedState(name) }
         }
         try require(presentationRequests.isEmpty, "presentationRequests")
+        // A level a script ended is over; the session saves no ended level.
+        try require(gameStateRequest == nil, "gameStateRequest")
         // SGSTriggers saves one flags value per level trigger
         // (gamesave.cpp:951).
         try require(
@@ -384,6 +357,27 @@ extension GameWorld {
             if let dying = object.dying {
                 try require(dying.killerPlayer.map { $0 == 0 } ?? true,
                             "\(name) dying")
+            }
+            if let effect = object.effect {
+                // Every time is finite and in the save range, and
+                // fade_max_time is not negative. The flag and timer
+                // combinations are the runtime's: overlapping cloaks leave
+                // both fades on one timer (object.cpp:2464-2486), and the
+                // draw clamps its alpha (ObjectCloakFrame).
+                let known = ObjectEffectInfo.fadingInFlag
+                    | ObjectEffectInfo.fadingOutFlag
+                    | ObjectEffectInfo.cloakedFlag
+                    | ObjectEffectInfo.cloakWithMessageFlag
+                let times = [effect.cloakTime, effect.fadeTime,
+                             effect.fadeMaxTime]
+                try require(
+                    effect.typeFlags & ~known == 0
+                        && times.allSatisfy {
+                            $0.isFinite && abs($0) <= maximumSavedTime
+                        }
+                        && effect.fadeMaxTime >= 0,
+                    "\(name) effect"
+                )
             }
         }
         try require(
@@ -550,11 +544,25 @@ extension GameWorld {
             "playerInventory"
         )
         try require(
-            playerInventory.items.allSatisfy {
-                $0.count > 0
-                    && level.objectInfos?.indices.contains($0.id) == true
-            },
+            playerInventory.isValidSavedState
+                && playerInventory.items.allSatisfy {
+                    level.objectInfos?.indices.contains($0.id) == true
+                        && $0.object.map { objects[$0] != nil } ?? true
+                },
             "playerInventory"
+        )
+        // The small views: three windows and their saved copies, each
+        // with an object handle and the SVF_ flags the runtime sets.
+        try limit(smallViews.count, SmallView.count, "smallViews")
+        try limit(savedSmallViews.count, SmallView.count, "savedSmallViews")
+        try require(
+            smallViews.count == SmallView.count
+                && savedSmallViews.count == SmallView.count
+                && (smallViews + savedSmallViews).allSatisfy {
+                    $0.flags & ~UInt32(0x3f) == 0 && $0.zoom > 0
+                        && $0.gun >= -1
+                },
+            "smallViews"
         )
         try require(playerGuideBotName.count <= 7, "playerGuideBotName")
     }
@@ -829,6 +837,10 @@ extension GameWorld {
 /// references name a level room, and stored object handles are well formed.
 /// Stored handles may name an object that has since been deleted, because
 /// the runtime looks them up optionally.
+/// MAX_ACTION_CTR_VALUE, the cap of every DALLAS ScriptActionCtr (for
+/// example TrainingMission.cpp:251).
+let maximumScriptActionCounter = 100_000
+
 private struct NestedStateSweep {
     let roomSourceIndices: Set<Int>
 
@@ -873,7 +885,7 @@ private struct NestedStateSweep {
         ) != nil:
             // Released scripts cap action counters at MAX_ACTION_CTR_VALUE
             // (TrainingMission.cpp:251).
-            guard (0...trainingScriptActionCounterMaximum).contains(counter)
+            guard (0...maximumScriptActionCounter).contains(counter)
             else {
                 throw .outOfDomain(label)
             }

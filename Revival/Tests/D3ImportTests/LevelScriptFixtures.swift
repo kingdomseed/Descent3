@@ -1,7 +1,7 @@
 import XCTest
 
 /// The Training messages the synthetic fixtures use (retail text of
-/// TrainingMission.msg for the names Scripts 000-026 and 033 show).
+/// TrainingMission.msg for the names the module shows).
 let fixtureTrainingMessages = [
     ("GoodJob", "Excellent!"),
     ("GoBackwards", "Now use the reverse Key to return to where you started!"),
@@ -40,6 +40,11 @@ let fixtureTrainingMessages = [
     ("Movingbotintro", "Now destroy 2 more robots. This time they will be moving."),
     ("ProceedtoLastRoom", "Now proceed through the doorway that just opened to begin the last stage of your training."),
     ("AllDone", "Great Job! Now fly through the opened doorway to end your training. Good job Recruit!"),
+    ("UseCameraMonitor", "Excellent.  You now have the Camera Monitor.  Press the Use Inventory key to activate it!"),
+    ("KillBotIntro", "Now you are on your own in this room. There are 4 robots and 2 powerups. Get the powerups and kill the robots."),
+    ("KillBot2", "Some parts of this area are very dark.  Turn on your headlight or fire flares to see.  Use your guidebot if you need help finding a robot or powerup."),
+    ("FinalSessionIntro", "Now for your final and most difficult task. Locate and destroy the last 5 robots."),
+    ("GBExtra", "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns."),
 ].map { LevelScriptMessage(name: $0.0, text: $0.1) }
 
 /// The level with Training script data (package schema 12), so the world
@@ -98,14 +103,24 @@ func addingTrainingMissionScripting(
         .filter { LevelScripting.scriptableObjectTypes.contains($0.type) }
         .map { object in
             let customOnly = object.type == LevelScripting.customOnlyObjectType
+            // A page that names a module binds it, as D3Import binds the
+            // page's module and name.
+            let page = level.objectInfos?.first {
+                $0.moduleName != nil
+                    && $0.name.caseInsensitiveCompare(
+                        object.definition?.sourceName ?? ""
+                    ) == .orderedSame
+            }
             return ObjectScriptBinding(
                 objectHandle: object.handle,
                 name: object.instanceName,
-                defaultModuleName: customOnly ? nil : "aigame",
-                defaultScriptName: customOnly ? nil : "Fixture"
+                defaultModuleName: customOnly
+                    ? nil : page?.moduleName ?? "aigame",
+                defaultScriptName: customOnly
+                    ? nil : page?.name ?? "Fixture"
             )
         }
-    return level.addingScripting(
+    return withFixtureGameModules(level.addingScripting(
         LevelScripting(
             levelScript: "trainingmission",
             objects: bindings,
@@ -117,7 +132,7 @@ func addingTrainingMissionScripting(
                 LevelScriptAudioReference(name: $0, key: $0)
             }
         )
-    )
+    ))
 }
 
 /// The source SHA-256 that marks a fixture padding clip.
@@ -309,7 +324,7 @@ extension GameSession {
 /// A frame's presentation as `hud:`, `voice:`, and `sound:` entries, in
 /// request order.
 func presentationLog(_ frame: PlayerSimulationFrame) -> [String] {
-    frame.trainingOpeningFeedback.flatMap { feedback -> [String] in
+    frame.presentationFeedback.flatMap { feedback -> [String] in
         var log = feedback.soundSourceName.map { ["sound:\($0)"] } ?? []
         let voice = feedback.voiceSourceName.isEmpty
             ? [] : ["voice:\(feedback.voiceSourceName)"]
@@ -393,17 +408,25 @@ extension GameSession {
                 50
             )
         }
-        openTrainingGalleryBarrier(in: &world, level: level)
+        if let barrier = level.trainingGalleryBarrier {
+            for portal in barrier.orderedPortalIndices {
+                world.setPortalRender(
+                    room: barrier.barrierRoomSourceIndex,
+                    portal: portal,
+                    state: false,
+                    doubleSided: true,
+                    level: level
+                )
+            }
+        }
         world.aToggleAllPlayerControls(1, 0, level: level)
     }
 
     /// FlashLight-3's script light distance (the Guide-Bot return marker,
     /// Object_handles[2]), or 0.
     var returnMarkerLightDistance: Float {
-        level.trainingCameraMonitorChain?.returnToShip.flatMap {
-            world.objects[ObjectHandle($0.markerLightObjectHandle)]?
-                .localLighting?.lightDistance
-        } ?? 0
+        world.objects[level.findObjectName("FlashLight-3")]?
+            .localLighting?.lightDistance ?? 0
     }
 
     /// FlashLight-2's script light distance (the gallery marker), or 0.
@@ -412,5 +435,99 @@ extension GameSession {
             world.objects[ObjectHandle($0.markerLightObjectHandle)]?
                 .localLighting?.lightDistance
         } ?? 0
+    }
+}
+
+/// A fixture page of the generic module (scripts/generic.cpp): a powerup
+/// whose default script is GenericScript.
+func fixtureGenericPowerupInfo(_ name: String) -> CanonicalObjectInfo {
+    var info = CanonicalObjectInfo(
+        name: name,
+        type: 7,
+        flags: 0x6,
+        size: 3,
+        hitPoints: 100,
+        lightDistance: 0,
+        lighting: fixtureNoLight,
+        ai: nil,
+        weaponBatteries: []
+    )
+    info.moduleName = GenericModule.moduleName
+    return info
+}
+
+/// The level with the game module entries its pages and bindings reach,
+/// keeping the ones it has: the generic module has no strings or sounds.
+func withFixtureGameModules(_ level: Level) -> Level {
+    var level = level
+    var modules = level.gameModules ?? []
+    if level.reachedGameModules.contains(GenericModule.moduleName),
+       !modules.contains(where: { $0.module == GenericModule.moduleName }) {
+        modules.append(.init(
+            module: GenericModule.moduleName,
+            strings: [],
+            sounds: []
+        ))
+    }
+    level.gameModules = modules.sorted { $0.module < $1.module }
+    return level
+}
+
+/// The level with more voice and sound clips (the ones it lacks), and their
+/// dependency records.
+func addingFixtureAudio(
+    _ level: Level,
+    voiceClips: [CanonicalVoiceClip] = [],
+    soundClips: [CanonicalSoundClip] = []
+) -> Level {
+    level.addingAudioClips(
+        voiceClips: voiceClips.filter { clip in
+            !level.voiceClips.contains {
+                $0.sourceName.caseInsensitiveCompare(clip.sourceName)
+                    == .orderedSame
+            }
+        },
+        soundClips: soundClips.filter { clip in
+            !level.soundClips.contains { $0.logicalName == clip.logicalName }
+        }
+    )
+}
+
+/// The level with "object-definition" dependency records for these pages,
+/// as D3Import records each placed object's definition.
+func addingFixtureObjectDefinitions(
+    _ level: Level,
+    _ definitions: [SourceResource]
+) -> Level {
+    let added = definitions.filter { source in
+        !level.dependencyManifest.current.contains {
+            $0.category == "object-definition" && $0.source == source
+        }
+    }.map {
+        DependencyRecord(
+            category: "object-definition",
+            source: $0,
+            state: "canonical-object-definition",
+            provenance: "synthetic canonical fixture"
+        )
+    }
+    return replacing(
+        level,
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current + added,
+            historicalEagerBaseline:
+                level.dependencyManifest.historicalEagerBaseline
+        )
+    )
+}
+
+extension GameSession {
+    /// Takes the Camera Monitor (Script 040, TrainingMission.cpp:2062) in
+    /// the frame at `timestamp` and uses it (Script 059, :2075) in the
+    /// next; returns the use frame, which shows the popup view. The level
+    /// needs the Training module.
+    func takeAndUseCameraMonitor(at timestamp: Double) -> PlayerSimulationFrame {
+        _ = touch("CameraMonitor", at: timestamp)
+        return update(at: timestamp + 0.1, input: .init(usesInventory: true))
     }
 }

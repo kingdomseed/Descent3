@@ -167,42 +167,9 @@ extension WorldRenderingTests {
         )
         XCTAssertTrue(rearFrame.rearViewIsActive)
 
-        let finalLevel = makeTrainingFinalGoalLevel()
-        let finalChain = try XCTUnwrap(finalLevel.trainingFinalGoalChain)
-        let goal = try XCTUnwrap(finalLevel.objects.first {
-            $0.handle == finalChain.goalObjectHandle
-        })
-        let initialFinalSimulation = GameSession(
-            level: finalLevel,
-            presentationReadyTimestamp: 0
-        )
-        // The player shot down the ten robots, and the last five opened
-        // the final bots barrier (Scripts 051-055 and 035; this
-        // unscripted fixture takes the state the scripts leave).
-        initialFinalSimulation.killRobotsAsPlayer([
-            4_112, 2_074, 2_075, 2_077, 2_078,
-            4_127, 2_080, 2_081, 2_082, 2_083,
-        ])
-        openTrainingFinalBotsBarrier(in: &initialFinalSimulation.world, level: initialFinalSimulation.level)
-        _ = initialFinalSimulation.update(at: 0.1, input: .zero)
-        var ready = try XCTUnwrap(
-            testWorldObject(initialFinalSimulation.world)
-        )
-        ready["playerLocation"] = [
-            "room": ["_0": finalChain.goalRoomSourceIndex],
-        ]
-        ready["playerPosition"] = [
-            "x": goal.position.x,
-            "y": goal.position.y,
-            "z": goal.position.z,
-        ]
-        let finalSimulation = try GameSession(
-            level: finalLevel,
-            world: (decodeTestWorld(ready)).rebased(onto: finalLevel),
-            resumedAtTimestamp: 0
-        )
-        let finalFrame = finalSimulation.update(at: 0.2, input: .zero)
-        XCTAssertNotNil(finalFrame.trainingFinalGoal)
+        // Script 057 ends the level (TrainingMission.cpp:2309).
+        let finalFrame = try trainingLevelEndFrame().frame
+        XCTAssertNotNil(finalFrame.levelEnd)
 
         let project = try makeProject(importedBase: level)
         let editorSimulation = project.makePlayerPlaySession()

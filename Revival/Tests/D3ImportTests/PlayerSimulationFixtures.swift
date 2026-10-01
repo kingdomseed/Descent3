@@ -361,15 +361,10 @@ extension GameWorld {
             object.orientation = placed.orientation
             world.objects[handle] = object
         }
-        // Goals are level data a test may edit; keep the saved completion.
-        world.goals = level.goals
-        if let camera = trainingCameraMonitorState,
-           camera.isHeld || camera.wasUsed,
-           let chain = level.trainingCameraMonitorChain {
-            completeTrainingCameraMonitorLocateGoal(
-                in: &world,
-                pickupObjectHandle: chain.pickupObjectHandle
-            )
+        // Goals are level data a test may edit; the saved completion stays
+        // when the goals keep their shape.
+        if world.goals.count != level.goals.count {
+            world.goals = level.goals
         }
         return world
     }

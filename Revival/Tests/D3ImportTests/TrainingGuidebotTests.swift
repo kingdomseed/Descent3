@@ -50,8 +50,8 @@ func scriptingTrainingCameraMonitorLevel(
 ) -> Level {
     let scripted = addingGuideBotLessonScripting(
         level,
-        roomSourceIndex: level.trainingCameraMonitorChain!.returnToShip!
-            .barrierRoomSourceIndex,
+        // PortalRoom5 is source room 2 in the Camera Monitor fixture.
+        roomSourceIndex: 2,
         roomName: "PortalRoom5"
     )
     return guideBot ? withTrainingGuideBot(scripted) : scripted

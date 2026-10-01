@@ -62,6 +62,65 @@ final class ObjectFrameTests: XCTestCase {
         )
     }
 
+    /// The small views render after the main view (DrawSmallViews calls
+    /// GameRenderWorld, SmallViews.cpp:332), so their AI objects join
+    /// AI_RenderedList (renderobject.cpp:1239), and the next AIFrameAll tells them the player sees them
+    /// (AImain.cpp:6225). A robot behind the player is seen only through a
+    /// popup view that looks back.
+    func testARobotSeenOnlyThroughThePopupViewHearsThePlayerSeesIt()
+        throws
+    {
+        func session(popup: Bool) throws -> (GameSession, ObjectHandle) {
+            let level = try dodgeLevelWithRoomyPlayerRoom()
+            let session = GameSession(level: level, presentationReadyTimestamp: 0)
+            let turret = level.findObjectName("DodgeTurrett")
+            session.world.aAISetState(1, turret)
+            let player = session.world.testPlayerObject
+            var object = try XCTUnwrap(session.world.objects[turret])
+            object.location = player.location
+            object.position = player.position - player.orientation.forward * 30
+            session.world.objects[turret] = object
+            if popup {
+                let viewer = try XCTUnwrap(session.world.objects.first {
+                    $0.type == .powerup
+                }).handle
+                session.world.objects[viewer]?.location = player.location
+                session.world.objects[viewer]?.position = player.position
+                session.world.objects[viewer]?.orientation = .init(
+                    right: player.orientation.right * -1,
+                    up: player.orientation.up,
+                    forward: player.orientation.forward * -1
+                )
+                session.world.aCreatePopupView(-1, viewer, 10, 1)
+            }
+            return (session, turret)
+        }
+
+        // A robot in both views joins the list for each view: each
+        // GameRenderWorld marks its rooms' objects OF_SAFE_TO_RENDER again
+        // (render.cpp:1126).
+        let (both, bothTurret) = try session(popup: true)
+        let bothPlayer = both.world.testPlayerObject
+        both.world.objects[bothTurret]?.position =
+            bothPlayer.position + bothPlayer.orientation.forward * 30
+        let bothViewer = try XCTUnwrap(both.world.smallViews.first?.viewer)
+        both.world.objects[bothViewer]?.orientation = bothPlayer.orientation
+        _ = both.update(at: 0.1, input: .zero)
+        XCTAssertEqual(both.world.aiRenderedList, [bothTurret, bothTurret])
+
+        let (unseen, unseenTurret) = try session(popup: false)
+        _ = unseen.update(at: 0.1, input: .zero)
+        XCTAssertFalse(unseen.world.aiRenderedList.contains(unseenTurret))
+
+        let (seen, turret) = try session(popup: true)
+        _ = seen.update(at: 0.1, input: .zero)
+        XCTAssertEqual(seen.world.aiRenderedList, [turret])
+        XCTAssertEqual(seen.world.objects[turret]?.ai?.lastRenderTime, -1)
+        let gameTime = seen.world.gameTime
+        _ = seen.update(at: 0.2, input: .zero)
+        XCTAssertEqual(seen.world.objects[turret]?.ai?.lastRenderTime, gameTime)
+    }
+
     // MARK: Player and weapon collision
 
     /// The player's physics move checks runtime objects with their runtime

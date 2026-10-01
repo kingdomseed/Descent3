@@ -49,7 +49,7 @@ final class GuideBotEngineTests: XCTestCase {
     /// MSVC build wraps both.
     func testInventoryAndPowerupCountsWrapAtTheirSourceWidths() throws {
         var inventory = PlayerInventory()
-        inventory.add(type: 2, id: 7)
+        inventory.add(type: 2, id: 7, pageFlags: 0)
         let encoded = try JSONEncoder().encode(inventory)
         var object = try XCTUnwrap(
             JSONSerialization.jsonObject(with: encoded) as? [String: Any]
@@ -61,7 +61,7 @@ final class GuideBotEngineTests: XCTestCase {
             PlayerInventory.self,
             from: JSONSerialization.data(withJSONObject: object)
         )
-        inventory.add(type: 2, id: 7)
+        inventory.add(type: 2, id: 7, pageFlags: 0)
         XCTAssertEqual(inventory.items.first?.count, Int32.min)
         items[0]["count"] = Int(Int32.max) + 1
         object["items"] = items

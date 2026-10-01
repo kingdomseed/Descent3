@@ -1,143 +1,416 @@
 import XCTest
 
+// The Camera Monitor and the Guide-Bot's return in TrainingMission.cpp:
+// Script 040 (CustomObjectScript_1817 EVT_COLLIDE, :2057-2072), Script 059
+// (its EVT_USE, :2073-2084), Scripts 038 and 041 (the level interval
+// :1394-1401 and timer 13 :1585-1591), and Script 058 (:1443-1455), run on
+// the generic inventory (Inventory.cpp), level goals (levelgoal.cpp), and
+// popup view (SmallViews.cpp).
 extension WorldRenderingTests {
-    func testCameraMonitorPickupUseAndTimedViewContinueOnceAcrossReload() throws {
+    /// The Camera Monitor fixture with the Training module and no
+    /// Guide-Bot, so Script 058 follows Script 059 at once.
+    private func cameraMonitorSession() throws -> GameSession {
         let level = scriptingTrainingCameraMonitorLevel(
             makeTrainingCameraMonitorLevel(),
             guideBot: false
         )
         try level.validate()
-        let chain = try XCTUnwrap(level.trainingCameraMonitorChain)
-        let securityCamera = try XCTUnwrap(level.objects.first {
-            $0.handle == chain.securityCameraObjectHandle
-        })
-        let securityCameraRoom = try XCTUnwrap({
-            if case let .room(room) = securityCamera.location { return room }
-            return nil
-        }())
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+        let session = GameSession(level: level, presentationReadyTimestamp: 0)
+        // Script 002's first HUD message has run.
+        session.world.trainingMission.script002Count = 1
+        return session
+    }
+
+    private func restored(_ session: GameSession, at timestamp: Double)
+        throws -> GameSession
+    {
+        try GameSession(
+            level: session.level,
+            world: JSONDecoder().decode(
+                GameWorld.self,
+                from: JSONEncoder().encode(session.world)
+            ),
+            resumedAtTimestamp: timestamp
+        )
+    }
+
+    /// Script 040: the player touches the Camera Monitor. GuideBotC plays,
+    /// PupC1 plays on the monitor, aAddObjectToInventory takes it
+    /// (Inventory::AddObject, Inventory.cpp:393: the level goal hears of
+    /// the OF_INFORM_DESTROY_TO_LG object and completes, and the monitor is
+    /// ghosted in the inventory), and UseCameraMonitor shows. The level
+    /// goals' DoFrame then counts no active primary goal
+    /// (EVT_ALL_LEVEL_GOALS_COMPLETE, levelgoal.cpp:1129-1135).
+    func testCameraMonitorPickupRunsScript040AndCompletesLocateGoal() throws {
+        let simulation = try cameraMonitorSession()
+        let monitor = simulation.level.findObjectName("CameraMonitor")
+        // Level_goals.InitLevel marks the goal's object (levelgoal.cpp:1200).
+        XCTAssertNotEqual(
+            (simulation.world.objects[monitor]?.flags ?? 0)
+                & GameObject.informDestroyToLevelGoalsFlag,
+            0
+        )
+        XCTAssertEqual(simulation.world.goals[0].status, 1_028)
+
+        let frame = simulation.touch("CameraMonitor", at: 0.1)
+
+        XCTAssertEqual(presentationLog(frame), [
+            "voice:guidebotc.osf",
+            "sound:PupC1",
+            "hud:Completed Locate the Camera Monitor",
+            "sound:GoalComplete",
+            "hud:\(trainingText("UseCameraMonitor"))",
+        ])
+        XCTAssertEqual(simulation.world.testTrainingMission?.script040Count, 1)
+        let held = try XCTUnwrap(simulation.world.objects[monitor])
+        XCTAssertEqual(held.type, .dummy)
+        XCTAssertEqual(held.dummyType, .powerup)
+        XCTAssertNotEqual(held.flags & GameObject.inPlayerInventoryFlag, 0)
+        XCTAssertEqual(
+            simulation.world.playerInventory.selectedItem?.object,
+            monitor
+        )
+        XCTAssertEqual(simulation.world.goals[0].status, 1_036)
+        XCTAssertEqual(simulation.world.goals[0].items.map(\.done), [true])
+        XCTAssertNotEqual(
+            simulation.world.levelGoalFlags & LevelGoalsFlag.allPrimariesDone,
+            0
         )
 
-        let pickup = simulation.update(
-            at: 0.1,
-            input: .init(usesInventory: true)
-        )
-        XCTAssertEqual(
-            pickup.trainingOpeningFeedback,
-            [.init(
-                hudMessages: [
-                    "Excellent.  You now have the Camera Monitor.  Press the Use Inventory key to activate it!",
-                ],
-                voiceSourceName: "guidebotc.osf",
-                voicePrecedesHUDMessages: true,
-                soundSourceName: "PupC.wav"
-            )]
-        )
-        XCTAssertNil(pickup.trainingCameraMonitor)
-        XCTAssertFalse(
-            simulation.runtimeLevel.objectPresentations.contains {
-                $0.objectHandle == chain.pickupObjectHandle
-                    && $0.isVisible
-            }
-        )
-        XCTAssertTrue(
-            simulation.runtimeLevel.objects.contains {
-                $0.handle == chain.pickupObjectHandle
-            }
-        )
+        // The held monitor and the completed goal survive a save, and the
+        // pickup does not run again.
+        let resumed = try restored(simulation, at: 100)
+        XCTAssertEqual(resumed.world.playerInventory, simulation.world.playerInventory)
+        XCTAssertEqual(resumed.world.goals, simulation.world.goals)
+        XCTAssertTrue(presentationLog(resumed.update(at: 100.1, input: .zero))
+            .isEmpty)
+    }
 
-        let heldContinuation = try JSONDecoder().decode(
-            GameWorld.self,
-            from: JSONEncoder().encode(simulation.world)
-        )
-        let restored = try GameSession(
-            level: level,
-            world: heldContinuation.rebased(onto: level),
-            resumedAtTimestamp: 100
-        )
-        XCTAssertFalse(
-            restored.runtimeLevel.objectPresentations.contains {
-                $0.objectHandle == chain.pickupObjectHandle
-                    && $0.isVisible
-            }
-        )
+    /// Script 059: the inventory use key uses the selected monitor
+    /// (UseInventoryItem, Inventory.cpp:1485). Its custom script plays
+    /// GuideBotD, shows GBExtra, opens a 10-second popup view from the
+    /// SecurityCamera's gun 0 (aCreatePopupView), and returns
+    /// CONTINUE_DEFAULT, so the item leaves the inventory
+    /// (Inventory.cpp:819-821). The page's OIF_INVEN_NOREMOVE keeps the
+    /// object (a ghost) alive. With no Guide-Bot out, Script 058 runs in
+    /// the same frame's level interval, and Script 038 sets level timer 13,
+    /// whose Script 041 counts 2 seconds later.
+    func testCameraMonitorUseRunsScript059AndTimesThePopupViewAcrossReload()
+        throws
+    {
+        let simulation = try cameraMonitorSession()
+        _ = simulation.touch("CameraMonitor", at: 0.1)
+        let monitor = simulation.level.findObjectName("CameraMonitor")
+        let camera = simulation.level.findObjectName("SecurityCamera")
+        let held = try restored(simulation, at: 10)
 
-        let used = restored.update(
-            at: 100.1,
-            input: .init(usesInventory: true)
-        )
-        // This level has no Guide-Bot (qGetBuddyObj is not a robot), so
-        // Script 058 (TrainingMission.cpp:1444) follows the use (Script
-        // 059's counter) in the same frame's level EVT_INTERVAL.
-        XCTAssertEqual(
-            presentationLog(used),
-            [
-                "voice:guidebotd.osf",
-                "hud:Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
-                "voice:proceed6.osf",
-                "hud:Excellent!",
-            ]
-        )
-        XCTAssertEqual(restored.world.testTrainingMission?.script059Count, 1)
-        XCTAssertEqual(restored.world.testTrainingMission?.script058Count, 1)
-        let popup = try XCTUnwrap(used.trainingCameraMonitor)
-        XCTAssertEqual(popup.remainingDuration, 10, accuracy: 0.000_1)
-        XCTAssertEqual(popup.roomSourceIndex, securityCameraRoom)
-        XCTAssertEqual(
-            popup.camera.position,
-            securityCamera.position
-        )
+        let used = held.update(at: 10.1, input: .init(usesInventory: true))
+
+        XCTAssertEqual(presentationLog(used), [
+            "voice:guidebotd.osf",
+            "hud:\(trainingText("GBExtra"))",
+            "voice:proceed6.osf",
+            "hud:\(trainingText("GoodJob"))",
+        ])
+        let mission = try XCTUnwrap(held.world.testTrainingMission)
+        XCTAssertEqual(mission.script059Count, 1)
+        XCTAssertEqual(mission.script058Count, 1)
+        XCTAssertEqual(mission.script038Count, 1)
+        XCTAssertTrue(held.world.playerInventory.items.isEmpty)
+        XCTAssertNil(held.world.playerInventory.selectedItem)
+        let ghost = try XCTUnwrap(held.world.objects[monitor])
+        XCTAssertEqual(ghost.type, .dummy)
+        XCTAssertEqual(ghost.flags & GameObject.inPlayerInventoryFlag, 0)
+        XCTAssertEqual(ghost.flags & GameObject.deadFlag, 0)
+
+        let cameraObject = try XCTUnwrap(held.world.objects[camera])
+        let popup = try XCTUnwrap(used.popupView)
+        XCTAssertTrue(popup.isPopup)
+        XCTAssertEqual(popup.viewerObjectHandle, camera.rawValue)
+        XCTAssertEqual(popup.remainingDuration, 10)
+        // The fixture camera has no model, so the view is its own.
+        XCTAssertEqual(popup.camera.position, cameraObject.position)
         XCTAssertEqual(
             popup.camera.target,
-            .init(
-                x: securityCamera.position.x
-                    - securityCamera.orientation.forward.x,
-                y: securityCamera.position.y
-                    - securityCamera.orientation.forward.y,
-                z: securityCamera.position.z
-                    - securityCamera.orientation.forward.z
-            )
+            cameraObject.position + cameraObject.orientation.forward
         )
-        XCTAssertFalse(restored.runtimeLevel.objects.contains {
-            $0.handle == chain.pickupObjectHandle
+        // SVF_POPUP | SVF_BIGGER | SVF_TIMED, at D3_DEFAULT_ZOOM / 1; the
+        // render step counted the previous Frametime.
+        XCTAssertEqual(held.world.smallViews[0].flags, 11)
+        XCTAssertEqual(held.world.smallViews[0].zoom, SmallView.defaultZoom)
+        XCTAssertEqual(held.world.smallViews[0].timer, 9.9, accuracy: 0.000_1)
+        XCTAssertNotNil(held.world.osirisTimers.entries.first {
+            $0.isUsed && $0.owner == .level && $0.id == 13
         })
 
-        let usedContinuation = try JSONDecoder().decode(
-            GameWorld.self,
-            from: JSONEncoder().encode(restored.world)
-        )
-        let resumedPopup = try GameSession(
-            level: level,
-            world: usedContinuation.rebased(onto: level),
-            resumedAtTimestamp: 200
-        )
-        let afterReload = resumedPopup.update(at: 200.1, input: .zero)
-        XCTAssertTrue(afterReload.trainingOpeningFeedback.isEmpty)
+        // The popup and the pending timer 13 survive a save.
+        let popupContinuation = try restored(held, at: 200)
+        let afterReload = popupContinuation.update(at: 200.1, input: .zero)
         XCTAssertEqual(
-            try XCTUnwrap(afterReload.trainingCameraMonitor)
-                .remainingDuration,
+            try XCTUnwrap(afterReload.popupView).remainingDuration,
             9.9,
             accuracy: 0.000_1
         )
-
-        var lastFrame = afterReload
-        for frameIndex in 2...99 {
-            lastFrame = resumedPopup.update(
-                at: 200 + Double(frameIndex) * 0.1,
-                input: .zero
-            )
+        var frames = [afterReload]
+        var timestamp = 200.1
+        for _ in 1...105 {
+            timestamp += 0.1
+            frames.append(popupContinuation.update(at: timestamp, input: .zero))
         }
-        XCTAssertNotNil(lastFrame.trainingCameraMonitor)
-        _ = resumedPopup.update(at: 210, input: .zero)
-        let closed = resumedPopup.update(at: 210.1, input: .zero)
-        XCTAssertNil(closed.trainingCameraMonitor)
-        XCTAssertTrue(closed.trainingOpeningFeedback.isEmpty)
-        XCTAssertTrue(
-            resumedPopup.update(at: 212.2, input: .zero)
-                .trainingOpeningFeedback.isEmpty
+        XCTAssertEqual(
+            popupContinuation.world.testTrainingMission?.script041Count,
+            1
         )
+        // The window closes when its timer passes 0 after its last frame,
+        // 10 s of 0.1 s frames after the use (Float time).
+        let lastOpen = try XCTUnwrap(frames.lastIndex { $0.popupView != nil })
+        XCTAssertTrue((98...99).contains(lastOpen))
+        XCTAssertLessThan(
+            try XCTUnwrap(frames[lastOpen].popupView).remainingDuration,
+            0.1 + 0.000_1
+        )
+        XCTAssertFalse(popupContinuation.world.smallViews[0].isActive)
+        XCTAssertTrue(frames.dropFirst().allSatisfy {
+            presentationLog($0).isEmpty
+        })
+    }
+
+    /// aCreatePopupView's gun view (SmallViews.cpp:490-497): the camera is
+    /// the gun point looking along the gun's normal, in the room
+    /// GetGunRoom traces from the viewer to the gun point.
+    func testPopupViewLooksFromTheViewersGunInTheTracedRoom() throws {
+        var level = makeTrainingCameraMonitorLevel()
+        let model = try XCTUnwrap(level.models.first {
+            $0.source.sourceName == "monitor.OOF"
+        }).source
+        level.objectPresentations.append(.init(
+            objectHandle: 6_183,
+            primaryModel: model,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil
+        ))
+        level = level.settingModelGuns(
+            model,
+            gunpoints: [.init(
+                parent: 0,
+                position: .init(x: 0, y: 1, z: 2),
+                normal: .init(x: 0, y: 0, z: 1)
+            )],
+            batteries: []
+        )
+        var world = GameWorld(level: level)
+        let camera = ObjectHandle(6_183)
+        world.aCreatePopupView(0, camera, 10, 2)
+        let object = try XCTUnwrap(world.objects[camera])
+        let gun = world.weaponCalcGun(
+            object,
+            gunpoint: 0,
+            model: try XCTUnwrap(level.placedObjectModel(camera))
+        )
+        guard case let .room(room) = object.location else {
+            return XCTFail("The camera is indoor")
+        }
+
+        let frame = try XCTUnwrap(world.smallViewFrames(level: level).first)
+
+        XCTAssertEqual(world.smallViews[0].zoom, SmallView.defaultZoom / 2)
+        XCTAssertEqual(frame.camera.position, gun.point)
+        XCTAssertEqual(
+            frame.camera.target,
+            gun.point + sourceVectorNormalized(gun.normal)
+        )
+        XCTAssertEqual(
+            frame.roomSourceIndex,
+            traceIndoorMovement(
+                in: level,
+                roomStates: world.rooms,
+                startRoom: room,
+                start: object.position,
+                end: gun.point,
+                radius: 0
+            ).containingRoomSourceIndex
+        )
+        XCTAssertLessThan(
+            frame.camera.projection.horizontalFieldOfViewRadians,
+            PerspectiveProjection.sourceDefault.horizontalFieldOfViewRadians
+        )
+        // A gone viewer shows static for STATIC_TIME, then the window
+        // closes (DrawSmallViews, :427-438).
+        world.objects.delete(camera)
+        world.smallViewsRenderFrame(frameTime: 0.1)
+        XCTAssertNotEqual(
+            world.smallViews[0].flags & SmallView.Flag.staticPicture,
+            0
+        )
+        XCTAssertTrue(world.smallViewFrames(level: level).isEmpty)
+        world.smallViewsRenderFrame(frameTime: 0.1)
+        world.smallViewsRenderFrame(frameTime: 0.1)
+        XCTAssertFalse(world.smallViews[0].isActive)
+    }
+
+    /// do_physics_sim checks objects on each move it makes
+    /// (physics.cpp:986-1080): after a wall contact the rest of the move
+    /// starts at the contact. A pickup that the straight start-to-final
+    /// chord passes, but neither actual move segment does, is not touched;
+    /// one on the first segment is (GenericScript's pickup, generic.cpp:310).
+    func testPickupUsesTheMoveSegmentsAroundAWallContact() throws {
+        func missesSphere(
+            start: Vector3,
+            end: Vector3,
+            center: Vector3,
+            radius: Float
+        ) -> Bool {
+            let movement = Vector3(
+                x: end.x - start.x,
+                y: end.y - start.y,
+                z: end.z - start.z
+            )
+            let toCenter = Vector3(
+                x: center.x - start.x,
+                y: center.y - start.y,
+                z: center.z - start.z
+            )
+            let lengthSquared =
+                movement.x * movement.x
+                + movement.y * movement.y
+                + movement.z * movement.z
+            let fraction = lengthSquared > 0
+                ? max(0, min(
+                    1,
+                    (
+                        toCenter.x * movement.x
+                        + toCenter.y * movement.y
+                        + toCenter.z * movement.z
+                    ) / lengthSquared
+                ))
+                : 0
+            let closest = Vector3(
+                x: start.x + movement.x * fraction,
+                y: start.y + movement.y * fraction,
+                z: start.z + movement.z * fraction
+            )
+            let distance = Vector3(
+                x: center.x - closest.x,
+                y: center.y - closest.y,
+                z: center.z - closest.z
+            )
+            return distance.x * distance.x
+                + distance.y * distance.y
+                + distance.z * distance.z
+                > radius * radius
+        }
+        let contactLevel = makeSliceTenContactLevel(clearance: 20)
+        let baseline = GameSession(
+            level: contactLevel,
+            presentationReadyTimestamp: 0
+        )
+        _ = baseline.update(at: 2, input: .zero)
+        let start = defaultPlayerView(in: baseline.runtimeLevel).camera.position
+        let baselineFrame = baseline.update(
+            at: 4,
+            input: .init(forward: 1, sideways: 1)
+        )
+        let contact = try XCTUnwrap(baselineFrame.wallContact)
+        let final = baselineFrame.playerView.camera.position
+        let contactCenter = Vector3(
+            x:
+                contact.contactPoint.x
+                + contact.normal.x
+                    * baselineFrame.playerView.collisionRadius,
+            y:
+                contact.contactPoint.y
+                + contact.normal.y
+                    * baselineFrame.playerView.collisionRadius,
+            z:
+                contact.contactPoint.z
+                + contact.normal.z
+                    * baselineFrame.playerView.collisionRadius
+        )
+        let pickupRadius =
+            baselineFrame.playerView.collisionRadius + 0.01
+        var falseChordPoint: Vector3?
+        for tenth in 1..<10 {
+            let fraction = Float(tenth) / 10
+            let candidate = Vector3(
+                x: start.x + (final.x - start.x) * fraction,
+                y: start.y + (final.y - start.y) * fraction,
+                z: start.z + (final.z - start.z) * fraction
+            )
+            if missesSphere(
+                start: start,
+                end: contactCenter,
+                center: candidate,
+                radius: pickupRadius
+            ),
+            missesSphere(
+                start: contactCenter,
+                end: final,
+                center: candidate,
+                radius: pickupRadius
+            ) {
+                falseChordPoint = candidate
+                break
+            }
+        }
+        let pickupPosition = try XCTUnwrap(falseChordPoint)
+
+        /// A slice-ten session with one runtime Invulnerability powerup of
+        /// size 0.01 at `position` in the player's room.
+        func session(pickupAt position: Vector3) throws
+            -> (GameSession, ObjectHandle)
+        {
+            var info = fixtureGenericPowerupInfo("Invulnerability")
+            info = CanonicalObjectInfo(
+                name: info.name,
+                type: info.type,
+                flags: info.flags,
+                size: 0.01,
+                hitPoints: info.hitPoints,
+                lightDistance: info.lightDistance,
+                lighting: info.lighting,
+                ai: nil,
+                weaponBatteries: []
+            )
+            var level = contactLevel.addingObjectInfo(info)
+            let last = level.objectInfos!.count - 1
+            level.objectInfos?[last].moduleName = GenericModule.moduleName
+            let session = GameSession(level: level, presentationReadyTimestamp: 0)
+            _ = session.update(at: 2, input: .zero)
+            let pickup = session.world.objCreate(
+                type: .powerup,
+                id: level.objectInfos!.count - 1,
+                room: baselineFrame.playerView.roomSourceIndex,
+                position: position,
+                orientation: nil,
+                parent: .none,
+                level: level
+            )
+            XCTAssertEqual(
+                session.world.objects[pickup]?.scripts?.defaultScript,
+                .genericPowerup
+            )
+            return (session, pickup)
+        }
+
+        let (missed, missedPickup) = try session(pickupAt: pickupPosition)
+        _ = missed.update(at: 4, input: .init(forward: 1, sideways: 1))
+        XCTAssertNil(missed.world.playerInvulnerableTime)
+        XCTAssertNotNil(missed.world.objects[missedPickup])
+        XCTAssertTrue(missed.world.playerInventory.items.isEmpty)
+
+        // On the first segment, near the wall contact, it is touched.
+        let onPath = Vector3(
+            x: (start.x + contactCenter.x) / 2,
+            y: (start.y + contactCenter.y) / 2,
+            z: (start.z + contactCenter.z) / 2
+        )
+        let (touched, touchedPickup) = try session(pickupAt: onPath)
+        _ = touched.update(at: 4, input: .init(forward: 1, sideways: 1))
+        XCTAssertNotNil(touched.world.playerInvulnerableTime)
+        XCTAssertNil(touched.world.objects[touchedPickup])
     }
 
     /// The return command (GBC_RETURN_TO_SHIP, AIGame.cpp:5143) sends the
@@ -151,7 +424,6 @@ extension WorldRenderingTests {
             makeTrainingCameraMonitorLevel()
         )
         try level.validate()
-        let chain = try XCTUnwrap(level.trainingCameraMonitorChain)
         let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
@@ -163,10 +435,12 @@ extension WorldRenderingTests {
             input: .zero
         )
         timestamp += 0.1
+        _ = simulation.touch("CameraMonitor", at: timestamp)
+        timestamp += 0.1
         _ = simulation.update(at: timestamp, input: .init(usesInventory: true))
         // GBM_BIRTH lasts until mode_time > 1.2 s (AIGame.cpp:5893), and the
         // menu offers the return command only in GBM_AMBIENT (:4892).
-        simulation.runFrames(14, from: &timestamp)
+        simulation.runFrames(13, from: &timestamp)
         XCTAssertEqual(
             simulation.world.testGuideBot?.mode,
             GuideBotScript.ambientMode
@@ -193,7 +467,7 @@ extension WorldRenderingTests {
         // the pair's contact (collide_two_objects).
         for _ in 1...100 {
             timestamp += 0.1
-            simulation.update(at: timestamp, input: .zero)
+            _ = simulation.update(at: timestamp, input: .zero)
             if let guideBot = simulation.world.testGuideBotObject,
                guideBot.parent == .none,
                simulation.world.objectDistance(
@@ -214,7 +488,7 @@ extension WorldRenderingTests {
         for _ in 1...300 {
             timestamp += 0.1
             let frame = simulation.update(at: timestamp, input: .zero)
-            if frame.trainingOpeningFeedback.contains(where: {
+            if frame.presentationFeedback.contains(where: {
                 $0.voiceSourceName == "proceed6.osf"
             }) {
                 completed = frame
@@ -235,40 +509,20 @@ extension WorldRenderingTests {
             GuideBotScript.inShipMode
         )
         XCTAssertTrue(script058.objectSoundLoops.isEmpty)
-        XCTAssertEqual(
-            simulation.returnMarkerLightDistance,
-            50
-        )
-        assertTrainingGuidebotReturnBarrier(
-            level: simulation.runtimeLevel,
-            rendersFaces: false
-        )
+        XCTAssertEqual(simulation.returnMarkerLightDistance, 50)
+        assertReturnBarrier(simulation.runtimeLevel, rendersFaces: false)
         let postReturnFrame = simulation.update(
             at: timestamp + 0.1,
             input: .zero
         )
-        XCTAssertTrue(postReturnFrame.trainingOpeningFeedback.isEmpty)
+        XCTAssertTrue(postReturnFrame.presentationFeedback.isEmpty)
 
-        let continuation = try JSONDecoder().decode(
-            GameWorld.self,
-            from: JSONEncoder().encode(simulation.world)
-        )
-        let restored = try GameSession(
-            level: level,
-            world: continuation.rebased(onto: level),
-            resumedAtTimestamp: 100
-        )
+        let restored = try restored(simulation, at: 100)
         let afterReload = restored.update(at: 100.1, input: .zero)
-        XCTAssertTrue(afterReload.trainingOpeningFeedback.isEmpty)
+        XCTAssertTrue(afterReload.presentationFeedback.isEmpty)
         XCTAssertTrue(afterReload.objectSoundLoops.isEmpty)
-        XCTAssertEqual(
-            restored.returnMarkerLightDistance,
-            chain.returnToShip?.openMarkerLightDistance
-        )
-        assertTrainingGuidebotReturnBarrier(
-            level: restored.runtimeLevel,
-            rendersFaces: false
-        )
+        XCTAssertEqual(restored.returnMarkerLightDistance, 50)
+        assertReturnBarrier(restored.runtimeLevel, rendersFaces: false)
     }
 
     func testGuidebotCrossRoomReturnReachesScript058() throws {
@@ -426,12 +680,14 @@ extension WorldRenderingTests {
             at: 0.1,
             input: .zero
         )
-        _ = simulation.update(at: 0.2, input: .init(usesInventory: true))
+        _ = simulation.touch("CameraMonitor", at: 0.2)
+        _ = simulation.update(at: 0.3, input: .init(usesInventory: true))
+        XCTAssertEqual(simulation.world.testTrainingMission?.script059Count, 1)
         // The birth ends after 1.2 s (AIGame.cpp:5893), and the parent link
         // that keeps the Guide-Bot from hitting the player ends 3 s after
         // the birth (:6246).
-        var seedTime = 0.2
-        simulation.runFrames(32, from: &seedTime)
+        var seedTime = 0.3
+        simulation.runFrames(31, from: &seedTime)
         XCTAssertEqual(
             simulation.world.boaRoomRoute(from: 3, to: 1, level: level),
             [3, 2, 1]
@@ -476,7 +732,7 @@ extension WorldRenderingTests {
                 XCTAssertEqual(path.dynamicNodes.last?.roomSourceIndex, 1)
                 XCTAssertGreaterThan(path.dynamicNodes.count, 1)
             }
-            if frame.trainingOpeningFeedback.contains(where: {
+            if frame.presentationFeedback.contains(where: {
                 $0.voiceSourceName == "proceed6.osf"
             }) {
                 completed = frame
@@ -484,338 +740,41 @@ extension WorldRenderingTests {
             }
         }
 
-        let script058 = try XCTUnwrap(completed)
+        XCTAssertNotNil(completed)
         XCTAssertEqual(
             restored.world.objectType(restored.world.buddyHandle),
             .dummy
         )
-        XCTAssertEqual(
-            restored.returnMarkerLightDistance,
-            50
-        )
-        assertTrainingGuidebotReturnBarrier(
-            level: restored.runtimeLevel,
-            rendersFaces: false
-        )
+        XCTAssertEqual(restored.returnMarkerLightDistance, 50)
+        assertReturnBarrier(restored.runtimeLevel, rendersFaces: false)
     }
 
-    func testCameraMonitorPickupCompletesLocateGoalAcrossReload() throws {
-        let level = makeTrainingCameraMonitorLevel()
-        let locateGoal = try XCTUnwrap(level.goals.first {
-            $0.name == "Locate the Camera Monitor"
-        })
-        XCTAssertEqual(locateGoal.status, 1_028)
-        XCTAssertEqual(locateGoal.items, [
-            .init(
-                type: 2,
-                sourceHandle: 6_167,
-                objectHandle: 6_167,
-                done: false
-            ),
-        ])
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-
-        _ = simulation.update(at: 0.1, input: .zero)
-
-        let completedGoal = try XCTUnwrap(simulation.runtimeLevel.goals.first {
-            $0.name == "Locate the Camera Monitor"
-        })
-        XCTAssertEqual(completedGoal.status, 1_036)
-        XCTAssertEqual(completedGoal.items.map(\.done), [true])
-        let restored = try GameSession(
-            level: level,
-            world: simulation.world.rebased(onto: level),
-            resumedAtTimestamp: 100
-        )
-        let restoredGoal = try XCTUnwrap(restored.runtimeLevel.goals.first {
-            $0.name == "Locate the Camera Monitor"
-        })
-        XCTAssertEqual(restoredGoal.status, 1_036)
-        XCTAssertEqual(restoredGoal.items.map(\.done), [true])
-    }
-
-    func testCameraMonitorPopupStartsInTracedGunpointRoom() throws {
-        var level = makeTrainingCameraMonitorLevel()
-        let chain = try XCTUnwrap(level.trainingCameraMonitorChain)
-        let cameraIndex = try XCTUnwrap(level.objects.firstIndex {
-            $0.handle == chain.securityCameraObjectHandle
-        })
-        var reachedPortal: (
-            startRoom: Int,
-            connectedRoom: Int,
-            cameraCenter: Vector3,
-            gunpoint: Vector3
-        )?
-        for candidateRoom in level.rooms {
-            for portal in candidateRoom.portals {
-                let face = candidateRoom.faces[portal.faceIndex]
-                let vertices = face.corners.map {
-                    candidateRoom.vertices[$0.vertexIndex]
-                }
-                var center = Vector3.zero
-                for vertex in vertices {
-                    center = .init(
-                        x: center.x + vertex.x,
-                        y: center.y + vertex.y,
-                        z: center.z + vertex.z
-                    )
-                }
-                let count = Float(vertices.count)
-                center = .init(
-                    x: center.x / count,
-                    y: center.y / count,
-                    z: center.z / count
-                )
-                guard let normal = canonicalFaceNormal(
-                    room: candidateRoom,
-                    face: face
-                ) else {
-                    continue
-                }
-                let positive = Vector3(
-                    x: center.x + normal.x * 0.01,
-                    y: center.y + normal.y * 0.01,
-                    z: center.z + normal.z * 0.01
-                )
-                let negative = Vector3(
-                    x: center.x - normal.x * 0.01,
-                    y: center.y - normal.y * 0.01,
-                    z: center.z - normal.z * 0.01
-                )
-                let positiveIsInside =
-                    containingIndoorRoomSourceIndex(
-                        in: level,
-                        position: positive,
-                        candidates: [candidateRoom.sourceIndex]
-                    ) == candidateRoom.sourceIndex
-                let candidateCenter =
-                    positiveIsInside ? positive : negative
-                let candidateGunpoint =
-                    positiveIsInside ? negative : positive
-                let trace = traceIndoorMovement(
-                    in: level,
-                    startRoom: candidateRoom.sourceIndex,
-                    start: candidateCenter,
-                    end: candidateGunpoint,
-                    radius: 0
-                )
-                if trace.containingRoomSourceIndex
-                    == portal.connectedRoom {
-                    reachedPortal = (
-                        candidateRoom.sourceIndex,
-                        portal.connectedRoom,
-                        candidateCenter,
-                        candidateGunpoint
-                    )
-                    break
-                }
-            }
-            if reachedPortal != nil { break }
+    /// PortalRoom5's two portals (Room_indexes[4], source room 2 in the
+    /// fixture) and their reciprocals.
+    private func assertReturnBarrier(
+        _ level: Level,
+        rendersFaces: Bool,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let room = level.rooms.first { $0.sourceIndex == 2 }!
+        for portalIndex in [0, 1] {
+            let portal = room.portals[portalIndex]
+            XCTAssertEqual(
+                portal.flags & 1 != 0,
+                rendersFaces,
+                file: file,
+                line: line
+            )
+            let connectedRoom = level.rooms.first {
+                $0.sourceIndex == portal.connectedRoom
+            }!
+            XCTAssertEqual(
+                connectedRoom.portals[portal.connectedPortal].flags & 1 != 0,
+                rendersFaces,
+                file: file,
+                line: line
+            )
         }
-        let portalFixture = try XCTUnwrap(reachedPortal)
-        let connectedRoomSourceIndex = portalFixture.connectedRoom
-        let cameraCenter = portalFixture.cameraCenter
-        let gunpoint = portalFixture.gunpoint
-        level.objects[cameraIndex].location =
-            .room(portalFixture.startRoom)
-        level.objects[cameraIndex].position = cameraCenter
-        level.objects[cameraIndex].orientation = .init(
-            right: .init(x: 1, y: 0, z: 0),
-            up: .init(x: 0, y: 1, z: 0),
-            forward: .init(x: 0, y: 0, z: 1)
-        )
-        let movedChain = TrainingCameraMonitorChain(
-            pickupObjectHandle: chain.pickupObjectHandle,
-            securityCameraObjectHandle:
-                chain.securityCameraObjectHandle,
-            pickupCollisionRadius: chain.pickupCollisionRadius,
-            pickupMessage: chain.pickupMessage,
-            pickupVoiceSourceName: chain.pickupVoiceSourceName,
-            pickupSoundSourceName: chain.pickupSoundSourceName,
-            useMessage: chain.useMessage,
-            useVoiceSourceName: chain.useVoiceSourceName,
-            popupDuration: chain.popupDuration,
-            popupZoom: chain.popupZoom,
-            cameraGunpointIndex: chain.cameraGunpointIndex,
-            cameraLocalPosition: .init(
-                x: gunpoint.x - cameraCenter.x,
-                y: gunpoint.y - cameraCenter.y,
-                z: gunpoint.z - cameraCenter.z
-            ),
-            cameraLocalForward: .init(x: 0, y: 1, z: 0),
-            completionTimerDuration: chain.completionTimerDuration
-        )
-        level = replacing(
-            level,
-            objects: level.objects,
-            trainingCameraMonitorChain: movedChain
-        )
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        _ = simulation.update(at: 0.1, input: .zero)
-
-        let used = simulation.update(
-            at: 0.2,
-            input: .init(usesInventory: true)
-        )
-
-        XCTAssertEqual(
-            used.trainingCameraMonitor?.roomSourceIndex,
-            connectedRoomSourceIndex
-        )
-    }
-
-    func testCameraMonitorPickupUsesAcceptedWallResponseSegments() throws {
-        func missesSphere(
-            start: Vector3,
-            end: Vector3,
-            center: Vector3,
-            radius: Float
-        ) -> Bool {
-            let movement = Vector3(
-                x: end.x - start.x,
-                y: end.y - start.y,
-                z: end.z - start.z
-            )
-            let toCenter = Vector3(
-                x: center.x - start.x,
-                y: center.y - start.y,
-                z: center.z - start.z
-            )
-            let lengthSquared =
-                movement.x * movement.x
-                + movement.y * movement.y
-                + movement.z * movement.z
-            let fraction = lengthSquared > 0
-                ? max(0, min(
-                    1,
-                    (
-                        toCenter.x * movement.x
-                        + toCenter.y * movement.y
-                        + toCenter.z * movement.z
-                    ) / lengthSquared
-                ))
-                : 0
-            let closest = Vector3(
-                x: start.x + movement.x * fraction,
-                y: start.y + movement.y * fraction,
-                z: start.z + movement.z * fraction
-            )
-            let distance = Vector3(
-                x: center.x - closest.x,
-                y: center.y - closest.y,
-                z: center.z - closest.z
-            )
-            return distance.x * distance.x
-                + distance.y * distance.y
-                + distance.z * distance.z
-                > radius * radius
-        }
-        let contactLevel = makeSliceTenContactLevel(clearance: 20)
-        let baseline = GameSession(
-            level: contactLevel,
-            presentationReadyTimestamp: 0
-        )
-        _ = baseline.update(at: 2, input: .zero)
-        let start = defaultPlayerView(in: baseline.runtimeLevel).camera.position
-        let baselineFrame = baseline.update(
-            at: 4,
-            input: .init(forward: 1, sideways: 1)
-        )
-        let contact = try XCTUnwrap(baselineFrame.wallContact)
-        let final = baselineFrame.playerView.camera.position
-        let contactCenter = Vector3(
-            x:
-                contact.contactPoint.x
-                + contact.normal.x
-                    * baselineFrame.playerView.collisionRadius,
-            y:
-                contact.contactPoint.y
-                + contact.normal.y
-                    * baselineFrame.playerView.collisionRadius,
-            z:
-                contact.contactPoint.z
-                + contact.normal.z
-                    * baselineFrame.playerView.collisionRadius
-        )
-        let pickupRadius =
-            baselineFrame.playerView.collisionRadius + 0.01
-        var falseChordPoint: Vector3?
-        for tenth in 1..<10 {
-            let fraction = Float(tenth) / 10
-            let candidate = Vector3(
-                x: start.x + (final.x - start.x) * fraction,
-                y: start.y + (final.y - start.y) * fraction,
-                z: start.z + (final.z - start.z) * fraction
-            )
-            if missesSphere(
-                start: start,
-                end: contactCenter,
-                center: candidate,
-                radius: pickupRadius
-            ),
-            missesSphere(
-                start: contactCenter,
-                end: final,
-                center: candidate,
-                radius: pickupRadius
-            ) {
-                falseChordPoint = candidate
-                break
-            }
-        }
-        let pickupPosition = try XCTUnwrap(falseChordPoint)
-        let cameraFixture = makeTrainingCameraMonitorLevel()
-        let sourceChain = try XCTUnwrap(
-            cameraFixture.trainingCameraMonitorChain
-        )
-        var pickup = try XCTUnwrap(cameraFixture.objects.first {
-            $0.handle == sourceChain.pickupObjectHandle
-        })
-        pickup.location = .room(
-            baselineFrame.playerView.roomSourceIndex
-        )
-        pickup.position = pickupPosition
-        let chain = TrainingCameraMonitorChain(
-            pickupObjectHandle: sourceChain.pickupObjectHandle,
-            securityCameraObjectHandle:
-                sourceChain.securityCameraObjectHandle,
-            pickupCollisionRadius: 0.01,
-            pickupMessage: sourceChain.pickupMessage,
-            pickupVoiceSourceName: sourceChain.pickupVoiceSourceName,
-            pickupSoundSourceName: sourceChain.pickupSoundSourceName,
-            useMessage: sourceChain.useMessage,
-            useVoiceSourceName: sourceChain.useVoiceSourceName,
-            popupDuration: sourceChain.popupDuration,
-            popupZoom: sourceChain.popupZoom,
-            cameraGunpointIndex: sourceChain.cameraGunpointIndex,
-            cameraLocalPosition: sourceChain.cameraLocalPosition,
-            cameraLocalForward: sourceChain.cameraLocalForward,
-            completionTimerDuration:
-                sourceChain.completionTimerDuration
-        )
-        let level = replacing(
-            contactLevel,
-            schemaVersion: 10,
-            objects: contactLevel.objects + [pickup],
-            trainingCameraMonitorChain: chain
-        )
-        let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        _ = simulation.update(at: 2, input: .zero)
-
-        let frame = simulation.update(
-            at: 4,
-            input: .init(forward: 1, sideways: 1)
-        )
-
-        XCTAssertTrue(frame.trainingOpeningFeedback.isEmpty)
     }
 }

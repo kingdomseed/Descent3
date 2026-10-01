@@ -769,8 +769,6 @@ private func makeModelDrawItems(
     return opaque + alpha
 }
 
-let trainingScriptActionCounterMaximum = 100_000
-
 /// The draws the renderer prepares for the weapon objects of one weapon
 /// model. More weapon objects of a model than this in one frame are not
 /// drawn. The player's lasers need the most: two every quarter second, each

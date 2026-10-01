@@ -14,7 +14,7 @@ extension WorldRenderingTests {
                 at: galleryTimestamp,
                 input: .init(forward: 1)
             )
-            if frame.trainingOpeningFeedback.contains(where: {
+            if frame.presentationFeedback.contains(where: {
                 $0.voiceSourceName == "guidebota.osf"
             }) {
                 break
@@ -26,7 +26,7 @@ extension WorldRenderingTests {
             input: .zero
         )
         // Script 060 runs once the Guide-Bot is out (TrainingMission.cpp:1431).
-        XCTAssertTrue(deployed.trainingOpeningFeedback.contains {
+        XCTAssertTrue(deployed.presentationFeedback.contains {
             $0.voiceSourceName == "guidebotb.osf"
         })
         XCTAssertEqual(
@@ -76,7 +76,7 @@ extension WorldRenderingTests {
             restored.world.objectType(restored.world.buddyHandle),
             .robot
         )
-        XCTAssertTrue(resumed.trainingOpeningFeedback.isEmpty)
+        XCTAssertTrue(resumed.presentationFeedback.isEmpty)
         XCTAssertEqual(resumed.enabledPlayerControls, .all)
     }
 
@@ -157,7 +157,7 @@ extension WorldRenderingTests {
         )
         XCTAssertEqual(presentedActions, ["voice", "hud"])
 
-        let sameFrameReturn: [TrainingOpeningFeedback] = [
+        let sameFrameReturn: [PresentationFeedback] = [
             .init(
                 hudMessages: ["GB: Returning to ship."],
                 voiceSourceName: "",
@@ -201,7 +201,7 @@ extension WorldRenderingTests {
 
     @MainActor
     func testTrainingFeedbackSequenceAttemptsOnlyFinalStreamingVoice() {
-        let feedback: [TrainingOpeningFeedback] = [
+        let feedback: [PresentationFeedback] = [
             .init(
                 hudMessages: ["first"],
                 voiceSourceName: "return1.osf",

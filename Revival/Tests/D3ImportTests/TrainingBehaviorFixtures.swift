@@ -967,11 +967,12 @@ func script050ReadyContinuation(
     in level: Level,
     timerRemaining: Float = 1.5
 ) throws -> GameWorld {
-    let chain = try XCTUnwrap(level.trainingFinalRoomEntryChain)
+    // Portal4: face 1 of PortalRoom6 (source room 44).
+    let triggerRoomSourceIndex = 44
     let room = try XCTUnwrap(level.rooms.first {
-        $0.sourceIndex == chain.triggerRoomSourceIndex
+        $0.sourceIndex == triggerRoomSourceIndex
     })
-    let face = room.faces[chain.triggerFaceIndex]
+    let face = room.faces[1]
     let centerSum = face.corners.reduce(Vector3.zero) {
         let vertex = room.vertices[$1.vertexIndex]
         return .init(
@@ -1004,14 +1005,6 @@ func script050ReadyContinuation(
             try setTrainingCounter(&object, name, 1)
         }
     }
-    object["trainingInvulnerabilityPickupState"] = [
-        "scriptWasTriggered": true,
-        "wasConsumed": true,
-    ]
-    object["trainingCloakPickupState"] = [
-        "scriptWasTriggered": true,
-        "wasConsumed": true,
-    ]
     // Scripts 047 and 048 counted the pickups.
     if (object["levelModule"] as? [String: Any])?["trainingMission"] != nil {
         for name in ["script047Count", "script048Count", "script034Count"] {
@@ -1019,7 +1012,7 @@ func script050ReadyContinuation(
         }
     }
     object["playerLocation"] = [
-        "room": ["_0": chain.triggerRoomSourceIndex]
+        "room": ["_0": triggerRoomSourceIndex]
     ]
     object["playerPosition"] = [
         "x": center.x + normal.x * (playerRadius + 1),
@@ -1034,47 +1027,21 @@ func script050ReadyContinuation(
     // The world those producer states imply: the four robots and the two
     // pickups are gone, and Script 048 opened the last-room barrier.
     var world = try decodeTestWorld(object)
-    for handle in [
-        2_074, 2_075, 2_077, 2_078,
-        level.trainingInvulnerabilityPickupChain?.pickupObjectHandle,
-        level.trainingCloakPickupChain?.pickupObjectHandle,
-    ] {
-        world.objects.delete(ObjectHandle(try XCTUnwrap(handle)))
+    for handle: UInt32 in [2_074, 2_075, 2_077, 2_078, 2_076, 2_073] {
+        world.objects.delete(ObjectHandle(handle))
     }
-    // Script 034 opened the last-room barrier, lit FlashLight-4, and set
-    // level timer 9 (TrainingMission.cpp:1403-1415).
-    openTrainingLastRoomBarrier(in: &world, level: level)
-    world.setObjectLightDistance(ObjectHandle(chain034Marker(level)), 50)
+    // Script 034 opened the last-room barrier (PortalRoom6, source room
+    // 44), lit FlashLight-4, and set level timer 9
+    // (TrainingMission.cpp:1403-1415).
+    world.setPortalRender(room: 44, portal: 1, state: false,
+                          doubleSided: true, level: level)
+    world.setPortalRender(room: 44, portal: 0, state: false,
+                          doubleSided: true, level: level)
+    world.setObjectLightDistance(ObjectHandle(4_117), 50)
     if world.levelModule != .none {
         world.aSetLevelTimer(timerRemaining, 9)
     }
     return world
-}
-
-/// FlashLight-4, the last-room marker.
-private func chain034Marker(_ level: Level) -> UInt32 {
-    level.trainingLastRoomChain!.markerLightObjectHandle
-}
-
-func assertTrainingGuidebotReturnBarrier(
-    level: Level,
-    rendersFaces: Bool
-) {
-    let chain = level.trainingCameraMonitorChain!.returnToShip!
-    let room = level.rooms.first {
-        $0.sourceIndex == chain.barrierRoomSourceIndex
-    }!
-    for portalIndex in chain.orderedPortalIndices {
-        let portal = room.portals[portalIndex]
-        XCTAssertEqual(portal.flags & 1 != 0, rendersFaces)
-        let connectedRoom = level.rooms.first {
-            $0.sourceIndex == portal.connectedRoom
-        }!
-        XCTAssertEqual(
-            connectedRoom.portals[portal.connectedPortal].flags & 1 != 0,
-            rendersFaces
-        )
-    }
 }
 
 func makeTrainingGuidebotBlockedMovementLevel() -> Level {

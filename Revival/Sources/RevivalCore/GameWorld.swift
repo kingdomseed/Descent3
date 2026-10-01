@@ -41,6 +41,8 @@ struct GameWorld: Codable, Equatable, Sendable {
     var rooms: [RoomState]
     /// Level_goals, indexed like `Level.goals`.
     var goals: [LevelGoal]
+    /// Level_goals' `m_flags` (LevelGoal.swift).
+    var levelGoalFlags: UInt32
     /// `Triggers[].flags` (trigger.h:113), indexed like `Level.triggers`
     /// (Trigger.swift).
     var triggerFlags: [UInt16]
@@ -88,6 +90,8 @@ struct GameWorld: Codable, Equatable, Sendable {
     /// `Players[0].invulnerable_time` while PLAYER_FLAGS_INVULNERABLE is
     /// set; `nil` while it is clear.
     var playerInvulnerableTime: Float?
+    /// PLAYER_FLAGS_PLAYSOUNDMSGFORINVULN (Player.swift).
+    var playerInvulnerabilityAnnounces = false
     /// PLAYER_FLAGS_DYING or PLAYER_FLAGS_DEAD with the death values
     /// StartPlayerDeath keeps; `nil` while the player is alive.
     var playerDeath: PlayerDeathState?
@@ -133,17 +137,16 @@ struct GameWorld: Codable, Equatable, Sendable {
     /// before the update returns, so a saved world has none.
     var presentationRequests: [ScriptPresentationRequest] = []
 
-    // Training script state. These move into the Training level module in
-    // later M1 steps.
-    var trainingCameraMonitorState: TrainingCameraMonitorState?
-    var trainingKillbotEntryState: TrainingKillbotEntryState?
-    var trainingInvulnerabilityPickupState:
-        TrainingInvulnerabilityPickupState?
-    var trainingCloakPickupState: TrainingCloakPickupState?
-    var trainingFinalRoomEntryState: TrainingFinalRoomEntryState?
-    var trainingFinalGoalState: TrainingFinalGoalState?
-    var trainingPostLevelResult: TrainingPostLevelResult?
-    var trainingSessionOutcome: TrainingSessionOutcome?
+    /// Small_views and Small_views_save (SmallViews.swift).
+    var smallViews = Array(repeating: SmallView(), count: SmallView.count)
+    var savedSmallViews = Array(
+        repeating: SmallView(),
+        count: SmallView.count
+    )
+    /// The game state a script asked for with MSAFE_MISC_END_LEVEL
+    /// (SetGameState), which the session's sequencer acts on after the
+    /// frame; `nil` while the level plays (GAMESTATE_LVLPLAYING).
+    var gameStateRequest: GameStateRequest?
 
     /// The world at level start: the placed objects in their stored slots,
     /// the canonical portal flags and goals, the initial ship and script
@@ -156,6 +159,7 @@ struct GameWorld: Codable, Equatable, Sendable {
         objects = ObjectTable(level: level)
         rooms = RoomState.canonical(level)
         goals = level.goals
+        levelGoalFlags = level.goalFlags
         triggerFlags = Self.initialTriggerFlags(level)
         angularVelocity = ship.physics.initialAngularVelocity
         objInitPlacedObjects(level: level, playerSize: ship.presentationSize)
@@ -170,6 +174,9 @@ struct GameWorld: Codable, Equatable, Sendable {
             }
             objects[object.handle]?.flags |= GameObject.bigObjectFlag
         }
+        // StartLevel runs Level_goals.InitLevel (gamesequence.cpp:1566),
+        // then DeleteMultiplayerObjects.
+        levelGoalsInitLevel(level: level)
         // DeleteMultiplayerObjects (Player.cpp:1365), from StartLevel in
         // single player (gamesequence.cpp:1572): every other player object
         // is deleted, in slot order, before the level script and AI start.
@@ -181,7 +188,6 @@ struct GameWorld: Codable, Equatable, Sendable {
             }
             objects.delete(object.handle)
         }
-        initializeTrainingState(level: level)
         // StartLevel runs AIInitAll before the level script starts
         // (gamesequence.cpp:1482, :1584).
         aiInitAll(level: level)
@@ -276,4 +282,13 @@ struct GameWorld: Codable, Equatable, Sendable {
         )
     }
 
+}
+
+/// The game states SetGameState can ask for from a script
+/// (multisafe.cpp:2079).
+enum GameStateRequest: String, Codable, Equatable, Sendable {
+    /// GAMESTATE_LVLEND: the level ends in success.
+    case levelEnd
+    /// GAMESTATE_LVLFAILED: the level ends in failure and restarts.
+    case levelFailed
 }

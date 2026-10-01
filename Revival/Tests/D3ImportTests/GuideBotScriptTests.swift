@@ -72,9 +72,18 @@ final class GuideBotScriptTests: XCTestCase {
                        ObjectAIFrame.teamRebel)
         XCTAssertNotEqual(ai.flags & ObjectAIFrame.dodgeFlag, 0)
         let page = world.objectFindID("GuideBot", level: level)
+        // The GuideBot page (0x110f) has OIF_INVEN_SELECTABLE, so the item
+        // is selectable and usable and becomes the selected one
+        // (AddObjectItem, Inventory.cpp:640-660).
         XCTAssertEqual(world.playerInventory.items, [
-            .init(type: ObjectType.robot.rawValue, id: page, count: 1),
+            .init(
+                type: ObjectType.robot.rawValue,
+                id: page,
+                count: 1,
+                itemFlags: PlayerInventory.ItemFlag.selectable
+            ),
         ])
+        XCTAssertEqual(world.playerInventory.position, 0)
 
         let memory = try XCTUnwrap(world.testGuideBot)
         XCTAssertEqual(memory.mode, GuideBotScript.inShipMode)
@@ -638,8 +647,15 @@ final class GuideBotScriptTests: XCTestCase {
             throw XCTSkip("set REVIVAL_TRAINING_PACKAGE to a training.revival")
         }
         let level = try loadCanonicalLevel(from: URL(fileURLWithPath: path))
-        let module = try XCTUnwrap(level.gameModules?.only)
-        XCTAssertEqual(module.module, AIGame.moduleName)
+        // The Guide-Bot binds AIGame; the two pickups bind the generic
+        // module.
+        XCTAssertEqual(
+            level.gameModules?.map(\.module),
+            [AIGame.moduleName, GenericModule.moduleName]
+        )
+        let module = try XCTUnwrap(level.gameModules?.first {
+            $0.module == AIGame.moduleName
+        })
         XCTAssertGreaterThanOrEqual(module.strings.count, 146)
         XCTAssertEqual(
             module.sounds.map(\.name),

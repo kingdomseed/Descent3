@@ -1302,14 +1302,6 @@ func editorIdleStatusMessage(
     let sourceDiagnostics = [
         project.trainingGalleryBarrierSourceDiagnostic,
         project.trainingRobotGuidebotSourceDiagnostic,
-        project.trainingGuidebotReturnSourceDiagnostic,
-        project.trainingKillbotEntrySourceDiagnostic,
-        project.trainingInvulnerabilityPickupSourceDiagnostic,
-        project.trainingCloakPickupSourceDiagnostic,
-        project.trainingLastRoomSourceDiagnostic,
-        project.trainingFinalRoomEntrySourceDiagnostic,
-        project.trainingFinalBotsCompletionSourceDiagnostic,
-        project.trainingFinalGoalSourceDiagnostic,
     ].compactMap { $0 }
     guard !sourceDiagnostics.isEmpty else { return status }
     return "\(status)\nSource: \(sourceDiagnostics.joined(separator: "; "))"

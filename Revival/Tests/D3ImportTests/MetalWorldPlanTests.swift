@@ -37,17 +37,16 @@ final class MetalWorldPlanTests: XCTestCase {
             }
         )
 
-        let monitorLevel = makeTrainingCameraMonitorLevel()
+        let monitorLevel = scriptingTrainingCameraMonitorLevel(
+            makeTrainingCameraMonitorLevel(),
+            guideBot: false
+        )
         let monitorSimulation = GameSession(
             level: monitorLevel,
             presentationReadyTimestamp: 0
         )
-        _ = monitorSimulation.update(at: 0.1, input: .zero)
-        let used = monitorSimulation.update(
-            at: 0.2,
-            input: .init(usesInventory: true)
-        )
-        let monitor = try XCTUnwrap(used.trainingCameraMonitor)
+        let used = monitorSimulation.takeAndUseCameraMonitor(at: 0.1)
+        let monitor = try XCTUnwrap(used.popupView)
         let monitorInitial = try makeMetalWorldPlan(
             level: monitorLevel,
             playerView: used.playerView
@@ -58,7 +57,7 @@ final class MetalWorldPlanTests: XCTestCase {
             objects: ObjectTable(level: monitorLevel),
             roomStates: RoomState.canonical(monitorLevel),
             playerView: used.playerView,
-            trainingCameraMonitor: monitor
+            popupView: monitor
         )
         let auxiliaryOnlyIndex = try XCTUnwrap(
             monitorBaseline.auxiliaryActiveDrawIndices.first {
@@ -76,7 +75,7 @@ final class MetalWorldPlanTests: XCTestCase {
             objects: ObjectTable(level: monitorLevel),
             roomStates: RoomState.canonical(monitorLevel),
             playerView: used.playerView,
-            trainingCameraMonitor: monitor,
+            popupView: monitor,
             playerFastHeadlight: .init(
                 roomSourceIndex: monitor.roomSourceIndex,
                 position: .init(
@@ -379,17 +378,16 @@ final class MetalWorldPlanTests: XCTestCase {
     }
 
     func testCloakAlphaReachesAuxiliaryCameraPlayerDraws() throws {
-        let level = makeTrainingCloakPickupLevel()
+        let level = scriptingTrainingCameraMonitorLevel(
+            makeTrainingCloakPickupLevel(),
+            guideBot: false
+        )
         let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
-        _ = simulation.update(at: 0.1, input: .zero)
-        let used = simulation.update(
-            at: 0.2,
-            input: .init(usesInventory: true)
-        )
-        let monitor = try XCTUnwrap(used.trainingCameraMonitor)
+        let used = simulation.takeAndUseCameraMonitor(at: 0.1)
+        let monitor = try XCTUnwrap(used.popupView)
         let initial = try makeMetalWorldPlan(
             level: level,
             playerView: used.playerView
@@ -401,8 +399,8 @@ final class MetalWorldPlanTests: XCTestCase {
             objects: ObjectTable(level: level),
             roomStates: RoomState.canonical(level),
             playerView: used.playerView,
-            trainingCameraMonitor: monitor,
-            trainingCloak: .init(
+            popupView: monitor,
+            playerCloak: .init(
                 phase: .fadingOut,
                 phaseRemaining: 0.5,
                 phaseDuration: 1
@@ -427,7 +425,7 @@ final class MetalWorldPlanTests: XCTestCase {
             }
         }
 
-        let cloakFrame = TrainingCloakFrame(
+        let cloakFrame = ObjectCloakFrame(
             phase: .cloaked,
             phaseRemaining: 20,
             phaseDuration: 30
@@ -439,7 +437,7 @@ final class MetalWorldPlanTests: XCTestCase {
             objects: ObjectTable(level: level),
             roomStates: RoomState.canonical(level),
             playerView: used.playerView,
-            trainingCameraMonitor: monitor
+            popupView: monitor
         )
         let cloaked = try updateMetalWorldPlan(
             initial,
@@ -451,8 +449,8 @@ final class MetalWorldPlanTests: XCTestCase {
                 systemsFrameDuration: 0.1,
                 systemsGameTime: 1
             ),
-            trainingCameraMonitor: monitor,
-            trainingCloak: cloakFrame
+            popupView: monitor,
+            playerCloak: cloakFrame
         )
         let baselinePlayerDraw = try XCTUnwrap(
             baseline.auxiliaryDraws.first {
@@ -520,16 +518,15 @@ final class MetalWorldPlanTests: XCTestCase {
     }
 
     func testCameraMonitorUsesRetainedWorldPlanForItsSecurityCamera() throws {
-        let level = makeTrainingCameraMonitorLevel()
+        let level = scriptingTrainingCameraMonitorLevel(
+            makeTrainingCameraMonitorLevel(),
+            guideBot: false
+        )
         let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
         )
-        _ = simulation.update(at: 0.1, input: .zero)
-        let used = simulation.update(
-            at: 0.2,
-            input: .init(usesInventory: true)
-        )
+        let used = simulation.takeAndUseCameraMonitor(at: 0.1)
         let initial = try makeMetalWorldPlan(
             level: level,
             playerView: defaultPlayerView(in: level)
@@ -541,16 +538,16 @@ final class MetalWorldPlanTests: XCTestCase {
             objects: simulation.world.objects,
             roomStates: simulation.world.rooms,
             playerView: used.playerView,
-            trainingCameraMonitor: used.trainingCameraMonitor
+            popupView: used.popupView
         )
 
         XCTAssertEqual(
             updated.auxiliaryCamera,
-            used.trainingCameraMonitor?.camera
+            used.popupView?.camera
         )
         XCTAssertEqual(
             updated.auxiliaryStartRoomSourceIndex,
-            used.trainingCameraMonitor?.roomSourceIndex
+            used.popupView?.roomSourceIndex
         )
         XCTAssertFalse(updated.auxiliaryDraws.isEmpty)
         XCTAssertEqual(
@@ -571,7 +568,8 @@ final class MetalWorldPlanTests: XCTestCase {
             level: level,
             playerView: playerView
         )
-        let monitor = TrainingCameraMonitorFrame(
+        let monitor = SmallViewFrame(
+            window: 0,
             camera: RoomCamera(
                 position: .init(
                     x:
@@ -588,7 +586,9 @@ final class MetalWorldPlanTests: XCTestCase {
                 up: player.orientation.up
             ),
             roomSourceIndex: playerView.roomSourceIndex,
-            remainingDuration: 10
+            viewerObjectHandle: 6_183,
+            remainingDuration: 10,
+            isPopup: true
         )
 
         let updated = try updateMetalWorldPlan(
@@ -597,7 +597,7 @@ final class MetalWorldPlanTests: XCTestCase {
             objects: ObjectTable(level: level),
             roomStates: RoomState.canonical(level),
             playerView: playerView,
-            trainingCameraMonitor: monitor
+            popupView: monitor
         )
 
         XCTAssertFalse(updated.draws.contains {
@@ -631,7 +631,8 @@ final class MetalWorldPlanTests: XCTestCase {
         )
         let movedPlayerView = defaultPlayerView(in: level)
         let movedPlayer = level.objects[playerIndex]
-        let monitor = TrainingCameraMonitorFrame(
+        let monitor = SmallViewFrame(
+            window: 0,
             camera: RoomCamera(
                 position: .init(
                     x:
@@ -648,7 +649,9 @@ final class MetalWorldPlanTests: XCTestCase {
                 up: movedPlayer.orientation.up
             ),
             roomSourceIndex: movedPlayerView.roomSourceIndex,
-            remainingDuration: 10
+            viewerObjectHandle: 6_183,
+            remainingDuration: 10,
+            isPopup: true
         )
 
         let updated = try updateMetalWorldPlan(
@@ -657,7 +660,7 @@ final class MetalWorldPlanTests: XCTestCase {
             objects: ObjectTable(level: level),
             roomStates: RoomState.canonical(level),
             playerView: movedPlayerView,
-            trainingCameraMonitor: monitor
+            popupView: monitor
         )
         let auxiliaryPlayerDraw = try XCTUnwrap(
             updated.auxiliaryDraws.first {
@@ -683,7 +686,8 @@ final class MetalWorldPlanTests: XCTestCase {
         let player = try XCTUnwrap(level.objects.first {
             $0.handle == playerView.objectHandle
         })
-        let monitor = TrainingCameraMonitorFrame(
+        let monitor = SmallViewFrame(
+            window: 0,
             camera: RoomCamera(
                 position: .init(
                     x: player.position.x + player.orientation.right.x * 20,
@@ -694,7 +698,9 @@ final class MetalWorldPlanTests: XCTestCase {
                 up: player.orientation.up
             ),
             roomSourceIndex: playerView.roomSourceIndex,
-            remainingDuration: 10
+            viewerObjectHandle: 6_183,
+            remainingDuration: 10,
+            isPopup: true
         )
         let initial = try makeMetalWorldPlan(
             level: level,
@@ -707,7 +713,7 @@ final class MetalWorldPlanTests: XCTestCase {
             objects: ObjectTable(level: level),
             roomStates: RoomState.canonical(level),
             playerView: playerView,
-            trainingCameraMonitor: monitor
+            popupView: monitor
         )
         let auxiliaryFacingHandles = Set(
             updated.auxiliaryDraws

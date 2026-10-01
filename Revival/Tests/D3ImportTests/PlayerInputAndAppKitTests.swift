@@ -415,12 +415,15 @@ extension WorldRenderingTests {
             .room(movedRear.playerView.roomSourceIndex)
         )
 
-        let cameraMonitorLevel = makeTrainingCameraMonitorLevel()
+        let cameraMonitorLevel = scriptingTrainingCameraMonitorLevel(
+            makeTrainingCameraMonitorLevel(),
+            guideBot: false
+        )
         let cameraMonitor = GameSession(
             level: cameraMonitorLevel,
             presentationReadyTimestamp: 0
         )
-        _ = cameraMonitor.update(at: 0.1, input: .init(usesInventory: true))
+        _ = cameraMonitor.touch("CameraMonitor", at: 0.1)
         let rearWithMonitor = cameraMonitor.update(
             at: 0.2,
             input: .init(
@@ -431,7 +434,7 @@ extension WorldRenderingTests {
         )
         XCTAssertTrue(rearWithMonitor.rearViewIsActive)
         XCTAssertNotNil(
-            rearWithMonitor.trainingCameraMonitor,
+            rearWithMonitor.popupView,
             "the independent auxiliary camera stays live and unflipped"
         )
 
@@ -729,7 +732,7 @@ extension WorldRenderingTests {
             input: .init(sideways: 1, togglesHeadlight: true)
         )
         XCTAssertEqual(
-            onFrame.trainingOpeningFeedback,
+            onFrame.presentationFeedback,
             [
                 .init(
                     hudMessages: ["Headlight turned on."],
@@ -742,7 +745,7 @@ extension WorldRenderingTests {
         )
         var presentationOrder: [String] = []
         RevivalGameplayView.presentTrainingFeedbackSequence(
-            onFrame.trainingOpeningFeedback,
+            onFrame.presentationFeedback,
             attemptVoice: { _ in
                 XCTFail("Headlight feedback has no voice")
             },
@@ -811,7 +814,7 @@ extension WorldRenderingTests {
             resumedAtTimestamp: 0.1
         ).update(at: 0.2, input: .zero)
         XCTAssertNotNil(restored.playerFastHeadlight)
-        XCTAssertTrue(restored.trainingOpeningFeedback.isEmpty)
+        XCTAssertTrue(restored.presentationFeedback.isEmpty)
 
         continuationObject["playerHeadlightIsOn"] = false
         let oldRestore = try GameSession(
@@ -820,7 +823,7 @@ extension WorldRenderingTests {
             resumedAtTimestamp: 0.1
         ).update(at: 0.2, input: .zero)
         XCTAssertNil(oldRestore.playerFastHeadlight)
-        XCTAssertTrue(oldRestore.trainingOpeningFeedback.isEmpty)
+        XCTAssertTrue(oldRestore.presentationFeedback.isEmpty)
 
         let schemaSevenLevel = makeTrainingRASBot1DeathLevel()
         let schemaSevenInitial = GameSession(
@@ -843,7 +846,7 @@ extension WorldRenderingTests {
             input: .zero
         )
         XCTAssertNotNil(schemaSevenOnFrame.playerFastHeadlight)
-        XCTAssertFalse(schemaSevenOnFrame.trainingOpeningFeedback.contains {
+        XCTAssertFalse(schemaSevenOnFrame.presentationFeedback.contains {
             $0.soundSourceName == "Headlight1"
                 || $0.hudMessages.contains {
                     $0.hasPrefix("Headlight turned ")
@@ -867,7 +870,7 @@ extension WorldRenderingTests {
             input: .zero
         )
         XCTAssertNil(schemaSevenOldFrame.playerFastHeadlight)
-        XCTAssertFalse(schemaSevenOldFrame.trainingOpeningFeedback.contains {
+        XCTAssertFalse(schemaSevenOldFrame.presentationFeedback.contains {
             $0.soundSourceName == "Headlight1"
                 || $0.hudMessages.contains {
                     $0.hasPrefix("Headlight turned ")
@@ -887,7 +890,7 @@ extension WorldRenderingTests {
         )
         XCTAssertNil(offFrame.playerFastHeadlight)
         XCTAssertEqual(
-            offFrame.trainingOpeningFeedback,
+            offFrame.presentationFeedback,
             [
                 .init(
                     hudMessages: ["Headlight turned off."],

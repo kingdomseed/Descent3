@@ -12,9 +12,8 @@ extension WorldRenderingTests {
             makeTrainingFinalBotsCompletionLevel()
         )
         try level.validate()
-        let chain = try XCTUnwrap(
-            level.trainingFinalBotsCompletionChain
-        )
+        // PortalRoom7 (source room 16 here) and its marker, FlashLight-5.
+        let barrierRoomSourceIndex = 16
         let simulation = GameSession(
             level: level,
             presentationReadyTimestamp: 0
@@ -33,9 +32,9 @@ extension WorldRenderingTests {
 
         func assertBarrierIsOpen(in level: Level) throws {
             let barrier = try XCTUnwrap(level.rooms.first {
-                $0.sourceIndex == chain.barrierRoomSourceIndex
+                $0.sourceIndex == barrierRoomSourceIndex
             })
-            for portalIndex in chain.orderedPortalIndices {
+            for portalIndex in [0, 1] {
                 let portal = barrier.portals[portalIndex]
                 XCTAssertEqual(portal.flags & 1, 0)
                 let connected = try XCTUnwrap(level.rooms.first {
@@ -50,13 +49,13 @@ extension WorldRenderingTests {
 
         try assertBarrierIsOpen(in: simulation.runtimeLevel)
         XCTAssertEqual(simulation.world.testTrainingMission?.script035Count, 1)
-        let marker = ObjectHandle(chain.markerLightObjectHandle)
+        let marker = ObjectHandle(4_118)
         XCTAssertEqual(level.findObjectName("FlashLight-5"), marker)
         XCTAssertEqual(
             simulation.world.objects[marker]?.localLighting?.lightDistance,
             50
         )
-        XCTAssertFalse(frame.trainingOpeningFeedback.contains {
+        XCTAssertFalse(frame.presentationFeedback.contains {
             $0.voiceSourceName == "done.osf"
         })
         let timer = try XCTUnwrap(simulation.world.osirisTimers.entries.first {
@@ -91,7 +90,7 @@ extension WorldRenderingTests {
             restored.update(
                 at: 102.1,
                 input: .zero
-            ).trainingOpeningFeedback.isEmpty
+            ).presentationFeedback.isEmpty
         )
 
         let completed = try GameSession(
@@ -107,61 +106,30 @@ extension WorldRenderingTests {
             completed.update(
                 at: 200.1,
                 input: .zero
-            ).trainingOpeningFeedback.isEmpty
+            ).presentationFeedback.isEmpty
         )
     }
 
+    /// Script 057 (FinalGoal's EVT_COLLIDE, TrainingMission.cpp:2309-2321)
+    /// calls aEndLevel (DallasFuncs.cpp:2535), whose MSAFE_MISC_END_LEVEL
+    /// sets GAMESTATE_LVLEND (multisafe.cpp:2079). After the frame the
+    /// sequencer suspends the controls and runs EndLevel's results
+    /// (gamesequence.cpp:1240-1243, :1891).
     @MainActor
-    func testScript057FinalGoalEndsTrainingInSourceOrderAndSurvivesReload()
+    func testScript057FinalGoalEndsTrainingThroughAEndLevel()
         throws
     {
-        let level = makeTrainingFinalGoalLevel()
-        try level.validate()
-        let chain = try XCTUnwrap(level.trainingFinalGoalChain)
-        let goal = try XCTUnwrap(level.objects.first {
-            $0.handle == chain.goalObjectHandle
-        })
-        let initial = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+        let (simulation, frame) = try trainingLevelEndFrame(
+            headlightIsOn: true
         )
-        // The player shot down the ten robots (each scores its page's 200,
-        // PlayerScoreAdd), and the last five opened the final bots barrier
-        // (Scripts 051-055 and 035; this unscripted fixture takes the
-        // state the scripts leave).
-        initial.killRobotsAsPlayer([
-            4_112, 2_074, 2_075, 2_077, 2_078,
-            4_127, 2_080, 2_081, 2_082, 2_083,
-        ])
-        openTrainingFinalBotsBarrier(in: &initial.world, level: level)
-        _ = initial.update(at: 0.1, input: .zero)
-        var ready = try XCTUnwrap(
-            testWorldObject(initial.world)
-        )
-        ready["playerLocation"] = [
-            "room": ["_0": chain.goalRoomSourceIndex]
-        ]
-        ready["playerPosition"] = [
-            "x": goal.position.x,
-            "y": goal.position.y,
-            "z": goal.position.z,
-        ]
-        ready["playerHeadlightIsOn"] = true
-        let simulation = try GameSession(
-            level: level,
-            world: (decodeTestWorld(ready)).rebased(onto: level),
-            resumedAtTimestamp: 0
-        )
-
-        let frame = simulation.update(at: 0.2, input: .zero)
-
-        let finalGoal = try XCTUnwrap(frame.trainingFinalGoal)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script057Count, 1)
+        XCTAssertEqual(simulation.world.gameStateRequest, .levelEnd)
+        let finalGoal = try XCTUnwrap(frame.levelEnd)
         XCTAssertNil(
             frame.playerFastHeadlight,
             "the final result suppresses an otherwise-on headlight"
         )
         XCTAssertEqual(finalGoal.endLevelState, .succeeded)
-        XCTAssertEqual(finalGoal.scriptActionCounter, 1)
         XCTAssertTrue(finalGoal.controlsAreSuspended)
         XCTAssertEqual(
             finalGoal.postLevelResult,
@@ -169,11 +137,13 @@ extension WorldRenderingTests {
                 title: "Mission Successful",
                 levelName: "Training Mission",
                 difficulty: .rookie,
-                score: 2_000,
+                // Script 000 ghosts DestroyBot2 (TrainingMission.cpp:1488),
+                // so nine robots die.
+                score: 1_800,
                 elapsedTime: 0.1,
-                enemyKills: 10,
-                shields: 100,
-                energy: 100,
+                enemyKills: 9,
+                shields: simulation.shields,
+                energy: simulation.energy,
                 deaths: 0,
                 restores: 0,
                 objectives: []
@@ -217,9 +187,9 @@ extension WorldRenderingTests {
             Mission Successful
             Training Mission
             Difficulty: Rookie
-            Score: 2000
+            Score: 1800
             Time: 0:00
-            Enemies Killed: 10
+            Enemies Killed: 9
             Shields: 100
             Energy: 100
             Deaths: 0
@@ -298,56 +268,20 @@ extension WorldRenderingTests {
             )
         )
         XCTAssertEqual(
-            simulation.trainingSessionOutcome,
+            simulation.levelOutcome,
             .awaitingResultAcknowledgement
         )
-        XCTAssertEqual(
-            simulation.acknowledgeTrainingResult(),
-            .completed
-        )
-        XCTAssertEqual(simulation.trainingSessionOutcome, .completed)
-        XCTAssertEqual(
-            simulation.acknowledgeTrainingResult(),
-            .completed
-        )
+        XCTAssertEqual(simulation.acknowledgeLevelResult(), .completed)
+        XCTAssertEqual(simulation.levelOutcome, .completed)
+        XCTAssertEqual(simulation.acknowledgeLevelResult(), .completed)
 
-        let continuationData = try JSONEncoder().encode(
-            simulation.world
-        )
-        let continuationObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: continuationData)
-                as? [String: Any]
-        )
-        let finalGoalState = try XCTUnwrap(
-            continuationObject["trainingFinalGoalState"]
-                as? [String: Any]
-        )
-        XCTAssertEqual(
-            finalGoalState["endLevelWasRequested"] as? Bool,
-            true
-        )
-        XCTAssertEqual(
-            finalGoalState["scriptActionCounter"] as? Int,
-            1
-        )
-
-        let restored = try GameSession(
-            level: level,
-            world: (JSONDecoder().decode(
-                GameWorld.self,
-                from: continuationData
-            )).rebased(onto: level),
+        // An ended level is not saved: the world still asks for the level
+        // end, which a save refuses.
+        XCTAssertThrowsError(try GameSession(
+            level: simulation.level,
+            world: simulation.world,
             resumedAtTimestamp: 100
-        )
-        let restoredFrame = restored.update(at: 100.1, input: .zero)
-        XCTAssertEqual(
-            restoredFrame.trainingFinalGoal?.endLevelState,
-            .succeeded
-        )
-        XCTAssertEqual(
-            restoredFrame.trainingFinalGoal?.scriptActionCounter,
-            1
-        )
+        ))
     }
 
     @MainActor
@@ -446,49 +380,13 @@ extension WorldRenderingTests {
         let profileID = try XCTUnwrap(created.profiles.first?.id)
         _ = try library.confirmProfile(profileID)
 
-        let level = makeTrainingFinalGoalLevel()
-        let chain = try XCTUnwrap(level.trainingFinalGoalChain)
-        let goal = try XCTUnwrap(level.objects.first {
-            $0.handle == chain.goalObjectHandle
-        })
-        let initial = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
-        )
-        // The player shot down the ten robots (each scores its page's 200,
-        // PlayerScoreAdd), and the last five opened the final bots barrier
-        // (Scripts 051-055 and 035; this unscripted fixture takes the
-        // state the scripts leave).
-        initial.killRobotsAsPlayer([
-            4_112, 2_074, 2_075, 2_077, 2_078,
-            4_127, 2_080, 2_081, 2_082, 2_083,
-        ])
-        openTrainingFinalBotsBarrier(in: &initial.world, level: level)
-        _ = initial.update(at: 0.1, input: .zero)
-        var ready = try XCTUnwrap(
-            testWorldObject(initial.world)
-        )
-        ready["playerLocation"] = [
-            "room": ["_0": chain.goalRoomSourceIndex]
-        ]
-        ready["playerPosition"] = [
-            "x": goal.position.x,
-            "y": goal.position.y,
-            "z": goal.position.z,
-        ]
-        let simulation = try GameSession(
-            level: level,
-            world: (decodeTestWorld(ready)).rebased(onto: level),
-            resumedAtTimestamp: 0
-        )
-
-        let completionFrame = simulation.update(at: 0.2, input: .zero)
+        let (simulation, completionFrame) = try trainingLevelEndFrame()
         XCTAssertEqual(
-            completionFrame.trainingFinalGoal?.endLevelState,
+            completionFrame.levelEnd?.endLevelState,
             .succeeded
         )
         XCTAssertEqual(
-            simulation.trainingSessionOutcome,
+            simulation.levelOutcome,
             .awaitingResultAcknowledgement
         )
 
@@ -516,12 +414,12 @@ extension WorldRenderingTests {
             [progress]
         )
         XCTAssertEqual(
-            simulation.trainingSessionOutcome,
+            simulation.levelOutcome,
             .awaitingResultAcknowledgement,
             "Released EndLevel writes mission progress before result acknowledgement"
         )
 
-        XCTAssertEqual(simulation.acknowledgeTrainingResult(), .completed)
+        XCTAssertEqual(simulation.acknowledgeLevelResult(), .completed)
     }
 
     func testPilotProfileBoundaryRejectsMalformedAndUnsupportedRecords()

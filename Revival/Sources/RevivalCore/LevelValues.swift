@@ -444,18 +444,18 @@ struct LevelGoalItem: Codable, Equatable, Sendable {
     let type: UInt8
     let sourceHandle: UInt32
     let objectHandle: UInt32?
-    let done: Bool
+    var done: Bool
 }
 
 struct LevelGoal: Codable, Equatable, Sendable {
-    let status: UInt32
+    var status: UInt32
     let priority: Int32
     let list: Int8
     let name: String
     let itemName: String
     let description: String
     let completionMessage: String
-    let items: [LevelGoalItem]
+    var items: [LevelGoalItem]
 }
 
 struct LevelTrigger: Codable, Equatable, Sendable {

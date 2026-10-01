@@ -118,8 +118,15 @@ extension GameWorld {
         if triggerFlags[trigger] & TriggerFlag.oneShot != 0 {
             triggerFlags[trigger] |= TriggerFlag.dead
         }
-        // TF_INFORM_ACTIVATE_TO_LG (Level_goals.Inform) arrives with the
-        // level goals in M1 step 9.
+        if triggerFlags[trigger] & TriggerFlag.informActivateToLevelGoals
+            != 0 {
+            levelGoalsInform(
+                type: LevelGoalItemType.trigger,
+                completion: LevelGoalFlag.completeActivate,
+                handle: Int32(trigger),
+                level: level
+            )
+        }
     }
 
     /// ObjCheckTriggers (object.cpp:2584): after an object's move, each face

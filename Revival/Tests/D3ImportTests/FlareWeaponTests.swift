@@ -122,7 +122,7 @@ final class FlareWeaponTests: XCTestCase {
         XCTAssertEqual(flare.position.z, expected.z, accuracy: 1e-3)
         XCTAssertEqual(flare.lastDropTime, 0)
         XCTAssertEqual(
-            frame.trainingOpeningFeedback.filter {
+            frame.presentationFeedback.filter {
                 $0.soundSourceName == "Flare"
             }.count,
             1

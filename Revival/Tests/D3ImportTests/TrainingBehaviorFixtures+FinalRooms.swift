@@ -403,23 +403,18 @@ func makeTrainingInvulnerabilityPickupLevel() -> Level {
         sourceSHA256: template.sourceSHA256,
         importVolume: 0.5
     )
-    return rescriptedTrainingLevel(
-        level.addingTrainingInvulnerabilityPickupChain(
-            .init(
-                pickupObjectHandle: 2_076,
-                pickupRoomSourceIndex: 12,
-                pickupObjectFlags: 5_120,
-                pickupCollisionRadius: model.collisionRadius,
-                duration: 30,
-                activatedMessage: "Invulnerability On",
-                expiredMessage: "Invulnerability Off",
-                pickupSoundSourceName: "Power03.wav",
-                activatedSoundSourceName: "Invon.wav",
-                expiredSoundSourceName: "Invoff.wav"
-            ),
-            soundClips: [pickup, activated, expired]
-        )
+    // InvulnPowerup2's page names the generic module, whose GenericScript
+    // picks it up through msafe_DoPowerup (multisafe.cpp:2467).
+    level = addingFixtureObjectDefinitions(
+        level.addingObjectInfo(fixtureGenericPowerupInfo("Invulnerability")),
+        [.init(storedIndex: 3, sourceName: "Invulnerability")]
     )
+    // Package schema 11 carried the pickups (the generic module's data
+    // with it).
+    return withFixtureGameModules(rescriptedTrainingLevel(replacing(
+        addingFixtureAudio(level, soundClips: [pickup, activated, expired]),
+        schemaVersion: 11
+    )))
 }
 
 func makeTrainingCloakPickupLevel() -> Level {
@@ -610,19 +605,10 @@ func makeTrainingCloakPickupLevel() -> Level {
             "29c9bb2fe254a9c2e75b8ae0f13b60627088294f075fbd74eae449e76c767154",
         importVolume: 0.5
     )
-    let cloakLevel = level.addingTrainingCloakPickupChain(
-        .init(
-            pickupObjectHandle: 2_073,
-            pickupRoomSourceIndex: 11,
-            pickupObjectFlags: 5_120,
-            pickupCollisionRadius: cloakModels[0].collisionRadius,
-            fadeDuration: 1,
-            cloakDuration: 30,
-            activatedMessage: "Cloak On",
-            expiredMessage: "Cloak Off",
-            pickupSoundSourceName: "Power03.wav",
-            activatedSoundSourceName: "ShpCloakOn.wav",
-            expiredSoundSourceName: "ShpCloakOffBeep.wav"
+    let cloakLevel = addingFixtureAudio(
+        addingFixtureObjectDefinitions(
+            level.addingObjectInfo(fixtureGenericPowerupInfo("Cloak")),
+            [.init(storedIndex: 4, sourceName: "Cloak")]
         ),
         soundClips: [cloakOn, cloakOff]
     )
@@ -824,60 +810,45 @@ func makeTrainingCloakPickupLevel() -> Level {
         inertModuleName: nil,
         lightmapSubmodels: []
     ))
-    return rescriptedTrainingLevel(
-        lastRoomLevel.addingTrainingLastRoomChain(.init(
-            barrierRoomSourceIndex: 44,
-            orderedPortalIndices: [1, 0],
-            markerLightObjectHandle: 4_117,
-            markerLightPresentation: .init(
-                primaryColor: .init(x: 1, y: 0.25, z: 0),
-                secondaryColor: .zero,
-                timeInterval: 0.5,
-                flickerDistance: 0.2,
-                directionalDot: 0,
-                flags: 4,
-                timebits: .max,
-                angle: 0,
-                lightingRenderType: 2
-            ),
-            openMarkerLightDistance: 50,
-            timerDuration: 2,
-            completionMessages: [
-                "Excellent!",
-                "Now proceed through the doorway that just opened to begin the last stage of your training.",
-            ],
-            completionVoiceSourceName: "proceed5.osf"
-        ))
-    )
+    return rescriptedTrainingLevel(lastRoomLevel)
 }
 
 func makeTrainingFinalRoomEntryLevel() -> Level {
     let level = makeTrainingCloakPickupLevel()
-    let chain = TrainingFinalRoomEntryChain(
-        triggerName: "Portal4",
-        triggerRoomSourceIndex: 44,
-        triggerFaceIndex: 1,
-        successMessage: "Excellent!",
-        instructionMessage:
-            "Now for your final and most difficult task. Locate and destroy the last 5 robots.",
-        voiceSourceName: "intro7.osf"
-    )
+    // Portal4 on face 1 of PortalRoom6 (source room 44), whose
+    // TriggerScript_0002 runs Script 050 (TrainingMission.cpp:2368).
     let trigger = LevelTrigger(
-        name: chain.triggerName,
-        roomIndex: chain.triggerRoomSourceIndex,
-        faceIndex: chain.triggerFaceIndex,
+        name: "Portal4",
+        roomIndex: 44,
+        faceIndex: 1,
         flags: 8,
         activator: 1
     )
+    // The trigger face has FF_HAS_TRIGGER (CheckTrigger, trigger.cpp:196).
+    var rooms = level.rooms
+    let roomIndex = rooms.firstIndex { $0.sourceIndex == 44 }!
+    let face = rooms[roomIndex].faces[1]
+    rooms[roomIndex].faces[1] = .init(
+        corners: face.corners,
+        flags: face.flags | LevelFace.hasTriggerFlag,
+        portalIndex: face.portalIndex,
+        texture: face.texture,
+        lightmapInfoIndex: face.lightmapInfoIndex,
+        allowsLightCorona: face.allowsLightCorona,
+        lightMultiple: face.lightMultiple,
+        special: face.special
+    )
     let pcm = Data(repeating: 0, count: 2)
     return rescriptedTrainingLevel(
-        replacing(
-            level,
-            triggers: level.triggers + [trigger]
-        ).addingTrainingFinalRoomEntryChain(
-            chain,
-            voiceClip: .init(
-                sourceName: chain.voiceSourceName,
+        addingFixtureAudio(
+            replacing(
+                level,
+                rooms: rooms,
+                triggers: level.triggers + [trigger],
+                surfacePhysics: level.surfacePhysics
+            ),
+            voiceClips: [.init(
+                sourceName: "intro7.osf",
                 sourceEntryIndex: 16,
                 sampleRate: 22_050,
                 channelCount: 1,
@@ -887,7 +858,7 @@ func makeTrainingFinalRoomEntryLevel() -> Level {
                 sourceArchive: "missions/training.mn3",
                 sourceSHA256:
                     "7348ded9ee2c6735ea712b52647f0bfa7478a508c03c10af5f837741a836c67f"
-            )
+            )]
         )
     )
 }
@@ -1396,33 +1367,12 @@ func makeTrainingFinalBotsCompletionLevel() -> Level {
         inertModuleName: nil,
         lightmapSubmodels: []
     ))
-    let chain = TrainingFinalBotsCompletionChain(
-        barrierRoomSourceIndex: 16,
-        orderedPortalIndices: [0, 1],
-        markerLightObjectHandle: 4_118,
-        markerLightPresentation: .init(
-            primaryColor: .init(x: 1, y: 0.25, z: 0),
-            secondaryColor: .zero,
-            timeInterval: 0.5,
-            flickerDistance: 0.2,
-            directionalDot: 0,
-            flags: 4,
-            timebits: .max,
-            angle: 0,
-            lightingRenderType: 2
-        ),
-        openMarkerLightDistance: 50,
-        timerDuration: 2,
-        completionMessage:
-            "Great Job! Now fly through the opened doorway to end your training. Good job Recruit!",
-        completionVoiceSourceName: "done.osf"
-    )
     let pcm = Data(repeating: 0, count: 2)
     return rescriptedTrainingLevel(
-        level.addingTrainingFinalBotsCompletionChain(
-            chain,
-            voiceClip: .init(
-                sourceName: chain.completionVoiceSourceName,
+        addingFixtureAudio(
+            level,
+            voiceClips: [.init(
+                sourceName: "done.osf",
                 sourceEntryIndex: 9,
                 sampleRate: 22_050,
                 channelCount: 1,
@@ -1431,7 +1381,7 @@ func makeTrainingFinalBotsCompletionLevel() -> Level {
                 pcmSHA256: canonicalSHA256(pcm),
                 sourceArchive: "missions/training.mn3",
                 sourceSHA256: canonicalSHA256(pcm)
-            )
+            )]
         )
     )
 }
@@ -1519,12 +1469,26 @@ func makeTrainingFinalGoalLevel() -> Level {
         ),
         models: models
     )
-    return rescriptedTrainingLevel(
-        level.addingTrainingFinalGoalChain(.init(
-            goalObjectHandle: goal.handle,
-            goalRoomSourceIndex: 17,
-            goalObjectFlags: goal.flags,
-            goalCollisionRadius: Float(bitPattern: 0x40a0_84bf)
-        ))
-    )
+    return rescriptedTrainingLevel(level)
+}
+
+/// The frame in which Script 057 (FinalGoal's EVT_COLLIDE,
+/// TrainingMission.cpp:2309) ended Training through aEndLevel: the player
+/// shot down the ten robots (each scores its page's 200, PlayerScoreAdd),
+/// the last five ran Scripts 051-055 and 035, and then the player flew into
+/// FinalGoal. The session's sequencer made the level end frame.
+func trainingLevelEndFrame(
+    headlightIsOn: Bool = false
+) throws -> (session: GameSession, frame: PlayerSimulationFrame) {
+    let level = addingTrainingMissionScripting(makeTrainingFinalGoalLevel())
+    try level.validate()
+    let session = GameSession(level: level, presentationReadyTimestamp: 0)
+    session.killRobotsAsPlayer([
+        4_112, 2_074, 2_075, 2_077, 2_078,
+        4_127, 2_080, 2_081, 2_082, 2_083,
+    ])
+    _ = session.update(at: 0.1, input: .zero)
+    session.world.playerHeadlightIsOn = headlightIsOn
+    let frame = session.touch("FinalGoal", at: 0.2)
+    return (session, frame)
 }

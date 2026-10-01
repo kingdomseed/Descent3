@@ -24,8 +24,6 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
     case combinedPortalRenderingEditDeferred(roomSourceIndex: Int, portalIndex: Int)
     case trainingGalleryBarrierUnavailable
     case trainingGalleryBarrierEditRejected
-    case trainingGuidebotReturnBarrierUnavailable
-    case trainingGuidebotReturnBarrierEditRejected
     case invalidObjectTransformEdit(UInt32)
     case invalidPlayerStartTransformEdit(playerID: Int, handle: UInt32)
     case faceEditRejected(roomSourceIndex: Int, faceIndex: Int)
@@ -86,10 +84,6 @@ enum RevivalProjectError: Error, Equatable, LocalizedError {
             "TrainingMission.cpp Script 032 / Portal2 is not bound to this canonical level."
         case .trainingGalleryBarrierEditRejected:
             "TrainingMission.cpp Script 032 / Portal2 could not update its two-sided barrier without breaking the canonical trigger, portal, collision, or presentation contract."
-        case .trainingGuidebotReturnBarrierUnavailable:
-            "TrainingMission.cpp Script 058 / PortalRoom5 is not bound to this canonical level."
-        case .trainingGuidebotReturnBarrierEditRejected:
-            "TrainingMission.cpp Script 058 / PortalRoom5 could not update its two-sided barrier without breaking the canonical portal, collision, or presentation contract."
         case let .invalidObjectTransformEdit(handle):
             "The project contains an invalid or redundant transform edit for object handle \(handle)."
         case let .invalidPlayerStartTransformEdit(playerID, handle):
@@ -498,107 +492,8 @@ struct RevivalProject: Equatable, Sendable {
             return "TrainingMission.cpp Script 060 / Guidebot / NODE/BOA route radius \(radius), \(navigation)"
         }
     }
-    var trainingGuidebotReturnSourceDiagnostic: String? {
-        guard let chain = level.trainingCameraMonitorChain?.returnToShip,
-              let marker = level.objects.first(where: {
-                  $0.handle == chain.markerLightObjectHandle
-              }),
-              let room = level.rooms.first(where: {
-                  $0.sourceIndex == chain.barrierRoomSourceIndex
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 058 / \(marker.instanceName ?? "FlashLight-3") + \(room.name ?? "PortalRoom5")"
-    }
-    var trainingKillbotEntrySourceDiagnostic: String? {
-        guard let returnChain =
-                level.trainingCameraMonitorChain?.returnToShip,
-              let entry = returnChain.killbotEntry,
-              let room = level.rooms.first(where: {
-                  $0.sourceIndex == returnChain.barrierRoomSourceIndex
-              }) else {
-            return nil
-        }
-        return "TrainingMission.cpp Scripts 042 + 039 / \(entry.triggerName) + \(room.name ?? "PortalRoom5")"
-    }
-    var trainingInvulnerabilityPickupSourceDiagnostic: String? {
-        guard let chain = level.trainingInvulnerabilityPickupChain,
-            let pickup = level.objects.first(where: {
-                $0.handle == chain.pickupObjectHandle
-            })
-        else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 047 / \(pickup.instanceName ?? "InvulnPowerup2") pickup"
-    }
-    var trainingCloakPickupSourceDiagnostic: String? {
-        guard let chain = level.trainingCloakPickupChain,
-            let pickup = level.objects.first(where: {
-                $0.handle == chain.pickupObjectHandle
-            })
-        else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 048 / \(pickup.instanceName ?? "CloakPowerup2") pickup"
-    }
-    var trainingLastRoomSourceDiagnostic: String? {
-        guard let chain = level.trainingLastRoomChain,
-            level.rooms.contains(where: {
-                $0.sourceIndex == chain.barrierRoomSourceIndex
-            })
-        else {
-            return nil
-        }
-        return "TrainingMission.cpp Scripts 034/049 / PortalRoom6 completion"
-    }
-    var trainingFinalRoomEntrySourceDiagnostic: String? {
-        guard let chain = level.trainingFinalRoomEntryChain,
-            level.triggers.contains(where: {
-                $0.name == chain.triggerName
-                    && $0.roomIndex == chain.triggerRoomSourceIndex
-                    && $0.faceIndex == chain.triggerFaceIndex
-            })
-        else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 050 / Portal4 final combat entry"
-    }
-    var trainingFinalBotsCompletionSourceDiagnostic: String? {
-        guard let chain = level.trainingFinalBotsCompletionChain,
-              level.rooms.contains(where: {
-                  $0.sourceIndex == chain.barrierRoomSourceIndex
-              }),
-              level.objects.contains(where: {
-                  $0.handle == chain.markerLightObjectHandle
-              })
-        else {
-            return nil
-        }
-        return "TrainingMission.cpp Scripts 035/056 / PortalRoom7 completion"
-    }
-    var trainingFinalGoalSourceDiagnostic: String? {
-        guard let chain = level.trainingFinalGoalChain,
-              let goal = level.objects.first(where: {
-                  $0.handle == chain.goalObjectHandle
-              })
-        else {
-            return nil
-        }
-        return "TrainingMission.cpp Script 057 / \(goal.instanceName ?? "FinalGoal") collision and successful level end"
-    }
     var trainingGalleryBarrierIsOpen: Bool {
         guard let barrier = level.trainingGalleryBarrier,
-              let room = level.rooms.first(where: {
-                  $0.sourceIndex == barrier.barrierRoomSourceIndex
-              }),
-              let portalIndex = barrier.orderedPortalIndices.first else {
-            return false
-        }
-        return room.portals[portalIndex].flags & 1 == 0
-    }
-    var trainingGuidebotReturnBarrierIsOpen: Bool {
-        guard let barrier =
-                level.trainingCameraMonitorChain?.returnToShip,
               let room = level.rooms.first(where: {
                   $0.sourceIndex == barrier.barrierRoomSourceIndex
               }),
@@ -1031,31 +926,6 @@ struct RevivalProject: Equatable, Sendable {
         return false
     }
 
-    func isTrainingGuidebotReturnBarrierPortal(
-        roomSourceIndex: Int,
-        portalIndex: Int
-    ) -> Bool {
-        guard let barrier =
-                level.trainingCameraMonitorChain?.returnToShip,
-              let room = level.rooms.first(where: {
-                  $0.sourceIndex == barrier.barrierRoomSourceIndex
-              }) else {
-            return false
-        }
-        for barrierPortalIndex in barrier.orderedPortalIndices {
-            if roomSourceIndex == room.sourceIndex,
-               portalIndex == barrierPortalIndex {
-                return true
-            }
-            let portal = room.portals[barrierPortalIndex]
-            if roomSourceIndex == portal.connectedRoom,
-               portalIndex == portal.connectedPortal {
-                return true
-            }
-        }
-        return false
-    }
-
     @discardableResult
     mutating func setTrainingGalleryBarrierOpen(
         _ isOpen: Bool
@@ -1112,63 +982,7 @@ struct RevivalProject: Equatable, Sendable {
         return previous
     }
 
-    @discardableResult
-    mutating func setTrainingGuidebotReturnBarrierOpen(
-        _ isOpen: Bool
-    ) throws -> Bool {
-        guard let barrier =
-                level.trainingCameraMonitorChain?.returnToShip,
-              let barrierRoomIndex = level.rooms.firstIndex(where: {
-                  $0.sourceIndex == barrier.barrierRoomSourceIndex
-              }) else {
-            throw RevivalProjectError
-                .trainingGuidebotReturnBarrierUnavailable
-        }
-        let previous = trainingGuidebotReturnBarrierIsOpen
-        guard previous != isOpen else {
-            throw RevivalProjectError.unchangedProperty
-        }
-        var candidate = level
-        var editedPortals: [(Int, Int)] = []
-        for portalIndex in barrier.orderedPortalIndices {
-            let portal =
-                candidate.rooms[barrierRoomIndex].portals[portalIndex]
-            candidate.rooms[barrierRoomIndex].portals[portalIndex].flags =
-                portalFlags(portal.flags, rendersFace: !isOpen)
-            editedPortals.append((
-                barrier.barrierRoomSourceIndex,
-                portalIndex
-            ))
-            let connectedRoomIndex = candidate.rooms.firstIndex {
-                $0.sourceIndex == portal.connectedRoom
-            }!
-            let reciprocal = candidate.rooms[connectedRoomIndex]
-                .portals[portal.connectedPortal]
-            candidate.rooms[connectedRoomIndex]
-                .portals[portal.connectedPortal].flags = portalFlags(
-                    reciprocal.flags,
-                    rendersFace: !isOpen
-                )
-            editedPortals.append((
-                portal.connectedRoom,
-                portal.connectedPortal
-            ))
-        }
-        do {
-            try candidate.validateForAuthoring()
-        } catch {
-            throw RevivalProjectError
-                .trainingGuidebotReturnBarrierEditRejected
-        }
-        level = candidate
-        for portal in editedPortals {
-            updatePortalRenderingEdit(
-                roomSourceIndex: portal.0,
-                portalIndex: portal.1
-            )
-        }
-        return previous
-    }
+
 
     @discardableResult
     mutating func setRoomVertex(
@@ -1759,11 +1573,6 @@ struct RevivalProject: Equatable, Sendable {
         let diagnostic: String?
         if case let .wallHit(contact) = trace.outcome {
             diagnostic = "\(owner) stopped at source room \(contact.roomSourceIndex) face \(contact.faceIndex) and remains owned by source room \(containingRoom)."
-        } else if object.handle
-                    == level.trainingCameraMonitorChain?
-                        .securityCameraObjectHandle {
-            diagnostic =
-                "Moved TrainingMission.cpp Script 059 SecurityCamera handle \(object.handle) for the Camera Monitor popup. Undo action: Move Object."
         } else {
             diagnostic = nil
         }

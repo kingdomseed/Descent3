@@ -203,8 +203,8 @@ func updateMetalWorldPlan(
     roomStates: [RoomState],
     playerView: PlayerView,
     presentationFrame: MetalPresentationFrame? = nil,
-    trainingCameraMonitor: TrainingCameraMonitorFrame? = nil,
-    trainingCloak: TrainingCloakFrame? = nil,
+    popupView: SmallViewFrame? = nil,
+    playerCloak: ObjectCloakFrame? = nil,
     visEffectBillboards: [BillboardFrame] = [],
     visEffectLineSparks: [VisEffectLineSparkFrame] = [],
     weaponBillboards: [BillboardFrame] = [],
@@ -220,8 +220,8 @@ func updateMetalWorldPlan(
         startRoomSourceIndex: playerView.roomSourceIndex,
         excludedObjectHandle: playerView.objectHandle,
         presentationFrame: presentationFrame,
-        trainingCameraMonitor: trainingCameraMonitor,
-        trainingCloak: trainingCloak,
+        popupView: popupView,
+        playerCloak: playerCloak,
         visEffectBillboards: visEffectBillboards,
         visEffectLineSparks: visEffectLineSparks,
         weaponBillboards: weaponBillboards,
@@ -263,8 +263,8 @@ func updateMetalWorldPlan(
             systemsFrameDuration: frame.systemsFrameDuration,
             systemsGameTime: frame.systemsGameTime
         ),
-        trainingCameraMonitor: frame.trainingCameraMonitor,
-        trainingCloak: frame.trainingCloak,
+        popupView: frame.popupView,
+        playerCloak: frame.playerCloak,
         visEffectBillboards: frame.visEffectBillboards,
         visEffectLineSparks: frame.visEffectLineSparks,
         weaponBillboards: frame.weaponBillboards,
@@ -287,8 +287,8 @@ func updateMetalWorldPlan(
         startRoomSourceIndex: prepared.startRoomSourceIndex,
         excludedObjectHandle: prepared.excludedObjectHandle,
         presentationFrame: presentationFrame,
-        trainingCameraMonitor: nil,
-        trainingCloak: nil,
+        popupView: nil,
+        playerCloak: nil,
         visEffectBillboards: [],
         visEffectLineSparks: [],
         weaponBillboards: [],
@@ -306,8 +306,8 @@ private func updateMetalWorldPlan(
     startRoomSourceIndex: Int,
     excludedObjectHandle: UInt32?,
     presentationFrame: MetalPresentationFrame?,
-    trainingCameraMonitor: TrainingCameraMonitorFrame?,
-    trainingCloak: TrainingCloakFrame?,
+    popupView: SmallViewFrame?,
+    playerCloak: ObjectCloakFrame?,
     visEffectBillboards: [BillboardFrame],
     visEffectLineSparks: [VisEffectLineSparkFrame],
     weaponBillboards: [BillboardFrame],
@@ -389,16 +389,14 @@ private func updateMetalWorldPlan(
         + lineSparkIndices
         + weaponBillboardIndices
         + translucentIndices
-    let auxiliaryExtraction = try trainingCameraMonitor.map {
+    let auxiliaryExtraction = try popupView.map {
         try extractWorldForRendering(
             level,
             objects: objects,
             roomStates: roomStates,
             camera: $0.camera,
             startRoomSourceIndex: $0.roomSourceIndex,
-            excludedObjectHandle:
-                level.trainingCameraMonitorChain?
-                    .securityCameraObjectHandle,
+            excludedObjectHandle: $0.viewerObjectHandle,
             presentationGameTime:
                 presentationFrame?.systemsGameTime ?? 0
         )
@@ -410,7 +408,7 @@ private func updateMetalWorldPlan(
         .map(makeMetalWorldDraw)
         .map { draw in
             guard draw.objectHandle == excludedObjectHandle,
-                let trainingCloak,
+                let playerCloak,
                 let excludedObjectHandle,
                 let player = objects[ObjectHandle(excludedObjectHandle)]
             else {
@@ -418,9 +416,9 @@ private func updateMetalWorldPlan(
             }
             return applyingObjectCloak(
                 to: draw,
-                alpha: trainingCloak.objectAlpha,
+                alpha: playerCloak.objectAlpha,
                 deformationRange:
-                    trainingCloak.objectDeformationRange,
+                    playerCloak.objectDeformationRange,
                 center: player.position,
                 visualTick:
                     presentationFrame?.visualTick ?? 0
@@ -576,9 +574,9 @@ private func updateMetalWorldPlan(
         preparedDraws: updatedPreparedDraws,
         activeDrawIndices: activeDrawIndices,
         draws: activeDrawIndices.map { updatedPreparedDraws[$0] },
-        auxiliaryCamera: trainingCameraMonitor?.camera,
+        auxiliaryCamera: popupView?.camera,
         auxiliaryStartRoomSourceIndex:
-            trainingCameraMonitor?.roomSourceIndex,
+            popupView?.roomSourceIndex,
         auxiliaryActiveDrawIndices: auxiliaryActiveDrawIndices,
         auxiliaryDraws: auxiliaryActiveDrawIndices.map {
             updatedPreparedDraws[$0]

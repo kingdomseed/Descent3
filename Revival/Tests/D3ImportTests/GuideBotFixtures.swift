@@ -249,7 +249,9 @@ func withTrainingGuideBot(
         )
     }
     level = level.appendingSoundClips(missing)
-    level.gameModules = [
+    level.gameModules = (level.gameModules ?? []).filter {
+        $0.module != "aigame"
+    } + [
         .init(
             module: "aigame",
             strings: fixtureAIGameStrings,
@@ -262,6 +264,7 @@ func withTrainingGuideBot(
             }
         ),
     ]
+    level = withFixtureGameModules(level)
     guard let scripting = level.scripting else { return level }
     return level.addingScripting(LevelScripting(
         levelScript: scripting.levelScript,
@@ -414,13 +417,13 @@ extension GameSession {
 
 /// Every HUD message of the frames, in order.
 func hudMessages(_ frames: [PlayerSimulationFrame]) -> [String] {
-    frames.flatMap { $0.trainingOpeningFeedback.flatMap(\.hudMessages) }
+    frames.flatMap { $0.presentationFeedback.flatMap(\.hudMessages) }
 }
 
 /// Every sound of the frames, in order.
 func soundNames(_ frames: [PlayerSimulationFrame]) -> [String] {
     frames.flatMap {
-        $0.trainingOpeningFeedback.compactMap(\.soundSourceName)
+        $0.presentationFeedback.compactMap(\.soundSourceName)
     }
 }
 

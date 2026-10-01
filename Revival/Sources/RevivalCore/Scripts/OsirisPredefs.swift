@@ -31,24 +31,6 @@
 
 import Foundation
 
-/// LIT_ goal item types (Descent3/levelgoal_external.h:26-30).
-enum LevelGoalItemType {
-    static let terrainCell: UInt8 = 0
-    static let internalRoom: UInt8 = 1
-    static let object: UInt8 = 2
-    static let trigger: UInt8 = 3
-}
-
-/// LGF_ goal flags (Descent3/levelgoal_external.h:38-51).
-enum LevelGoalFlag {
-    static let secondaryGoal: UInt32 = 0x0000_0002
-    static let enabled: UInt32 = 0x0000_0004
-    static let completed: UInt32 = 0x0000_0008
-    static let guideBotDoesNotKnowLocation: UInt32 = 0x0000_0020
-    static let notLocationBased: UInt32 = 0x0000_0040
-    static let failed: UInt32 = 0x0000_0080
-}
-
 extension GameWorld {
     /// The identity matrix, as an object with a NULL orientation gets.
     static let identityOrientation = Matrix3(
@@ -808,17 +790,5 @@ extension GameWorld {
             }
         }
         return active
-    }
-
-    /// LGSSV_I_ITEM_HANDLE of goal item: an object item's object handle, or
-    /// the room or trigger number the item names.
-    func levelGoalItemHandle(_ goal: Int, item: Int) -> Int32 {
-        guard goals.indices.contains(goal),
-              goals[goal].items.indices.contains(item)
-        else {
-            return -1
-        }
-        let entry = goals[goal].items[item]
-        return Int32(bitPattern: entry.objectHandle ?? entry.sourceHandle)
     }
 }

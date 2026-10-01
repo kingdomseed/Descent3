@@ -2,8 +2,10 @@
 //
 // Translated from Descent3/object_lighting.cpp (Descent 3, Copyright (C)
 // 2024 Parallax Software, GPL-3.0-or-later): DoObjectLight (:171) for a
-// weapon, with IsLightPointVisible (:126); and from Descent3/renderobject.cpp,
-// IsPointVisible (:1779).
+// weapon, with IsLightPointVisible (:126), and MakeObjectInvisible (:572)
+// and MakeObjectVisible (:598); and from Descent3/renderobject.cpp,
+// IsPointVisible (:1779) and the cloak fade of the polygon object draw
+// (:1499-1512).
 //
 // DoObjectLight runs at the end of each object's ObjDoFrame. A weapon casts
 // its page light (lighting_info) when its light sphere is in the last
@@ -195,4 +197,148 @@ func isPointVisible(_ position: Vector3, size: Float,
     if offTop, dot(topNormal, view) > size { return false }
     if offBottom, dot(bottomNormal, view) > size { return false }
     return true
+}
+
+extension GameWorld {
+    /// MakeObjectInvisible (object_lighting.cpp:572): the object fades out
+    /// over `fadeTime` and then stays cloaked for `time`. A player hears
+    /// "Cloak on" at half volume and sees TXT_CLOAKON, unless
+    /// `noHUDMessage`, and its cloak ends with a message.
+    mutating func makeObjectInvisible(
+        _ handle: ObjectHandle,
+        time: Float,
+        fadeTime: Float = 1,
+        noHUDMessage: Bool = false
+    ) {
+        guard var object = objects[handle] else { return }
+        var effect = object.effect ?? ObjectEffectInfo()
+        effect.cloakTime = time
+        effect.typeFlags |= ObjectEffectInfo.fadingOutFlag
+        effect.fadeTime = fadeTime
+        effect.fadeMaxTime = fadeTime
+        object.effect = effect
+        objects[handle] = object
+        if object.type == .player, !noHUDMessage {
+            play3DSound(EngineSound.cloakOn, volume: 0.5)
+            addHUDMessage(EngineText.cloakOn)
+            objects[handle]?.effect?.typeFlags |=
+                ObjectEffectInfo.cloakWithMessageFlag
+        }
+    }
+
+    /// MakeObjectVisible (object_lighting.cpp:598): the object fades back
+    /// in. A player cloaked with a message hears "Cloak off" at half volume
+    /// and sees TXT_MSG_CLOAKOFF.
+    mutating func makeObjectVisible(_ handle: ObjectHandle) {
+        guard let object = objects[handle] else { return }
+        if var effect = object.effect {
+            effect.typeFlags &= ~ObjectEffectInfo.cloakedFlag
+            effect.typeFlags |= ObjectEffectInfo.fadingInFlag
+            effect.fadeTime = effect.fadeMaxTime
+            effect.cloakTime = 0
+            objects[handle]?.effect = effect
+        }
+        if object.type == .player,
+           let flags = object.effect?.typeFlags,
+           flags & ObjectEffectInfo.cloakWithMessageFlag != 0 {
+            play3DSound(EngineSound.cloakOff, volume: 0.5)
+            addHUDMessage(EngineText.cloakOff)
+        }
+    }
+
+    /// The cloak part of ObjDoEffects (object.cpp:2447): a fade in ends, a
+    /// cloak counts down and ends with MakeObjectVisible, and a fade out
+    /// ends cloaked, in that order, with the frame's Frametime.
+    mutating func objDoEffects(_ handle: ObjectHandle) {
+        guard objects[handle]?.effect != nil else { return }
+        if var effect = objects[handle]?.effect,
+           effect.typeFlags & ObjectEffectInfo.fadingInFlag != 0 {
+            effect.fadeTime -= frameDuration
+            if effect.fadeTime <= 0 {
+                effect.typeFlags &= ~ObjectEffectInfo.fadingInFlag
+            }
+            objects[handle]?.effect = effect
+        }
+        if var effect = objects[handle]?.effect,
+           effect.typeFlags & ObjectEffectInfo.cloakedFlag != 0 {
+            effect.cloakTime -= frameDuration
+            objects[handle]?.effect = effect
+            if effect.cloakTime <= 0 {
+                makeObjectVisible(handle)
+            }
+        }
+        if var effect = objects[handle]?.effect,
+           effect.typeFlags & ObjectEffectInfo.fadingOutFlag != 0 {
+            effect.fadeTime -= frameDuration
+            if effect.fadeTime <= 0 {
+                effect.typeFlags &= ~ObjectEffectInfo.fadingOutFlag
+                effect.typeFlags |= ObjectEffectInfo.cloakedFlag
+            }
+            objects[handle]?.effect = effect
+        }
+    }
+}
+
+/// The cloak a polygon object draws with (renderobject.cpp:1499-1512): the
+/// alpha of a fade, and the deform range of a cloaked object.
+struct ObjectCloakFrame: Equatable, Sendable {
+    enum Phase: String, Equatable, Sendable {
+        case fadingOut
+        case cloaked
+        case fadingIn
+    }
+
+    let phase: Phase
+    /// The fade time left, or the cloak time left while cloaked.
+    let phaseRemaining: Float
+    /// `fade_max_time` (the cloak frame does not read it).
+    let phaseDuration: Float
+
+    /// The frame of an object's effect, or `nil` when it draws normally.
+    init?(_ effect: ObjectEffectInfo?) {
+        guard let effect else { return nil }
+        // The draw sets the fade out, then the fade in, then the cloak, so
+        // the last one set wins.
+        if effect.typeFlags & ObjectEffectInfo.cloakedFlag != 0 {
+            phase = .cloaked
+            phaseRemaining = effect.cloakTime
+        } else if effect.typeFlags & ObjectEffectInfo.fadingInFlag != 0 {
+            phase = .fadingIn
+            phaseRemaining = effect.fadeTime
+        } else if effect.typeFlags & ObjectEffectInfo.fadingOutFlag != 0 {
+            phase = .fadingOut
+            phaseRemaining = effect.fadeTime
+        } else {
+            return nil
+        }
+        phaseDuration = effect.fadeMaxTime
+    }
+
+    init(phase: Phase, phaseRemaining: Float, phaseDuration: Float) {
+        self.phase = phase
+        self.phaseRemaining = phaseRemaining
+        self.phaseDuration = phaseDuration
+    }
+
+    /// The draw's alpha (renderobject.cpp:1499-1512). The source divides
+    /// by fade_max_time even when it is 0; Revival takes that ratio as 0.
+    /// Overlapping fades can leave the time outside 0...fade_max_time, so
+    /// the alpha is clamped to 0...1 (architecture.md section 9).
+    var objectAlpha: Float {
+        let ratio = phaseDuration > 0 ? phaseRemaining / phaseDuration : 0
+        let alpha: Float
+        switch phase {
+        case .fadingOut:
+            alpha = 0.08 + 0.92 * ratio
+        case .cloaked:
+            alpha = 0.13
+        case .fadingIn:
+            alpha = 0.08 + 0.92 * (1 - ratio)
+        }
+        return min(1, max(0, alpha))
+    }
+
+    var objectDeformationRange: Float {
+        phase == .cloaked ? 0.1 : 0
+    }
 }

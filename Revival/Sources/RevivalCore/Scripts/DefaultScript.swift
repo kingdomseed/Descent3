@@ -16,27 +16,38 @@ enum DefaultScript: Codable, Equatable, Sendable {
     case guideBot(GuideBotState)
     /// AIGame `GBPowerup` (AIGame.cpp:1280).
     case gbPowerup(GBPowerupState)
+    /// generic `GenericScript` (generic.cpp:87), the default powerup
+    /// script. It has no state.
+    case genericPowerup
 
     /// The script identity, without its state.
     enum ID: Equatable, Sendable {
         case guideBot
         case gbPowerup
+        case genericPowerup
     }
 
     var id: ID {
         switch self {
         case .guideBot: .guideBot
         case .gbPowerup: .gbPowerup
+        case .genericPowerup: .genericPowerup
         }
     }
 
     /// The module's GetGOScriptID for a page name. `module` is the canonical
     /// module name (`ObjectScriptBinding.defaultModuleName`). A module that
     /// is not compiled in gives no script.
-    static func scriptID(module: String, pageName: String) -> ID? {
+    static func scriptID(
+        module: String,
+        pageName: String,
+        isDoor: Bool = false
+    ) -> ID? {
         switch module {
         case AIGame.moduleName:
             AIGame.getGOScriptID(pageName)
+        case GenericModule.moduleName:
+            GenericModule.getGOScriptID(pageName, isDoor: isDoor)
         default:
             nil
         }
@@ -47,6 +58,7 @@ enum DefaultScript: Codable, Equatable, Sendable {
         switch id {
         case .guideBot: self = .guideBot(GuideBotState())
         case .gbPowerup: self = .gbPowerup(GBPowerupState())
+        case .genericPowerup: self = .genericPowerup
         }
     }
 
@@ -54,6 +66,7 @@ enum DefaultScript: Codable, Equatable, Sendable {
     static func module(of id: ID) -> String {
         switch id {
         case .guideBot, .gbPowerup: AIGame.moduleName
+        case .genericPowerup: GenericModule.moduleName
         }
     }
 
@@ -62,6 +75,7 @@ enum DefaultScript: Codable, Equatable, Sendable {
     static func references(module: String) -> GameModuleReferences? {
         switch module {
         case AIGame.moduleName: AIGame.references
+        case GenericModule.moduleName: GenericModule.references
         default: nil
         }
     }
@@ -71,6 +85,7 @@ enum DefaultScript: Codable, Equatable, Sendable {
         switch self {
         case let .guideBot(state): GuideBotScript.isValidSavedState(state)
         case let .gbPowerup(state): GBPowerupScript.isValidSavedState(state)
+        case .genericPowerup: true
         }
     }
 
@@ -87,6 +102,13 @@ enum DefaultScript: Codable, Equatable, Sendable {
             GuideBotScript.callEvent(event, me: me, world: &world, level: level)
         case .gbPowerup:
             GBPowerupScript.callEvent(
+                event,
+                me: me,
+                world: &world,
+                level: level
+            )
+        case .genericPowerup:
+            GenericPowerupScript.callEvent(
                 event,
                 me: me,
                 world: &world,

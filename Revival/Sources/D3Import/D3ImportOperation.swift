@@ -449,13 +449,6 @@ func runD3Import(
         overlay: overlayData,
         name: "new wall cam"
     )
-    let returnMarkerLightPage = try resolveRetailGenericModelPage(
-        table: tableData,
-        overlay: overlayData,
-        name: "Blinking Red Light-DM"
-    )
-    let returnMarkerLightPresentation =
-        returnMarkerLightPage.genericLight!
     let dodgeTurretPage = try resolveRetailGenericModelPage(
         table: tableData,
         overlay: overlayData,
@@ -646,6 +639,9 @@ func runD3Import(
         cloakPage.primaryModelName,
         cloakPage.mediumModelName,
         cloakPage.lowModelName,
+        securityCameraPage.primaryModelName,
+        securityCameraPage.mediumModelName,
+        securityCameraPage.lowModelName,
             dodgeTurretPage.primaryModelName,
             dodgeTurretPage.mediumModelName,
             dodgeTurretPage.lowModelName,
@@ -803,11 +799,6 @@ func runD3Import(
     let pyroModel = reachedModels.first {
         $0.source.sourceName.caseInsensitiveCompare("PyroGL.OOF") == .orderedSame
     }!
-    let invisiblePowerupModel = reachedModels.first {
-        $0.source.sourceName.caseInsensitiveCompare(
-            "invisiblepowerup.OOF"
-        ) == .orderedSame
-    }!
     precondition(
         pyroModel.sourceSHA256
             == "0b004302ffe60a50e39b8f8261a3c11ca0044f11000ef6e039527e4c1ebff75b"
@@ -874,6 +865,14 @@ func runD3Import(
             ) == .orderedSame
         {
             page = cloakPage
+        } else if object.handle == 6_183,
+            object.definition?.sourceName.caseInsensitiveCompare(
+                securityCameraPage.name
+            ) == .orderedSame
+        {
+            // The popup view of Script 059 looks from its gun point
+            // (aCreatePopupView, SmallViews.swift).
+            page = securityCameraPage
         } else  if object.handle == 8_199,
             object.definition?.sourceName.caseInsensitiveCompare(
                 dodgeTurretPage.name
@@ -896,13 +895,13 @@ func runD3Import(
                 && object.handle != 12_302
         )
     }
-    precondition(reachedObjectPresentations.count == 27)
+    precondition(reachedObjectPresentations.count == 28)
     let presentedHandles = Set(reachedObjectPresentations.map(\.objectHandle))
     let deferredRoomObjects = topologyLevel.objects.filter {
         guard case .room = $0.location else { return false }
         return $0.handle != playerObject.handle && !presentedHandles.contains($0.handle)
     }
-    precondition(deferredRoomObjects.count == 12)
+    precondition(deferredRoomObjects.count == 11)
     let objectPresentationLevel = roomPresentationLevel.addingObjectPresentation(
         models: reachedModels,
         objectPresentations: reachedObjectPresentations,
@@ -1288,634 +1287,19 @@ func runD3Import(
             guidebotFlareSoundClip,
         ]
     )
-    let cameraMonitor = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("CameraMonitor")
-            == .orderedSame
-    }!
-    let securityCamera = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("SecurityCamera")
-            == .orderedSame
-    }!
-    let returnMarkerLight = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("FlashLight-3")
-            == .orderedSame
-    }!
-    let returnBarrierRoom = robotGuidebotLevel.rooms.first {
-        $0.name?.caseInsensitiveCompare("PortalRoom5") == .orderedSame
-    }!
-    let killbotEntryTrigger = robotGuidebotLevel.triggers.first {
-        $0.name.caseInsensitiveCompare("Portal3") == .orderedSame
-    }!
-    let finalRoomEntryTrigger = robotGuidebotLevel.triggers.first {
-        $0.name.caseInsensitiveCompare("Portal4") == .orderedSame
-    }!
-    let invulnerabilityPickup = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("InvulnPowerup2")
-            == .orderedSame
-    }!
-    let lastRoomMarker = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("FlashLight-4")
-            == .orderedSame
-    }!
-    let lastRoomBarrier = robotGuidebotLevel.rooms.first {
-        $0.name?.caseInsensitiveCompare("PortalRoom6")
-            == .orderedSame
-    }!
-    let finalBotsMarker = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("FlashLight-5")
-            == .orderedSame
-    }!
-    let finalBotsBarrier = robotGuidebotLevel.rooms.first {
-        $0.name?.caseInsensitiveCompare("PortalRoom7")
-            == .orderedSame
-    }!
-    let cloakPickup = robotGuidebotLevel.objects.first {
-        $0.instanceName?.caseInsensitiveCompare("CloakPowerup2")
-            == .orderedSame
-    }!
-    let cameraMonitorModel = reachedModels.first {
-        $0.source.sourceName.caseInsensitiveCompare(
-            cameraMonitorPage.primaryModelName
-        ) == .orderedSame
-    }!
-    let invulnerabilityModel = reachedModels.first {
-        $0.source.sourceName.caseInsensitiveCompare(
-            invulnerabilityPage.primaryModelName
-        ) == .orderedSame
-    }!
-    let cloakModel = reachedModels.first {
-        $0.source.sourceName.caseInsensitiveCompare(
-            cloakPage.primaryModelName
-        ) == .orderedSame
-    }!
-    guard
-        let securityCameraArchive = presentationArchives.first(
-            where: {
-            $0.archive.entry(
-                named: securityCameraPage.primaryModelName
-            ) != nil
-        }
-        ),
-        let securityCameraEntry = securityCameraArchive.archive.entry(
-            named: securityCameraPage.primaryModelName
-        )
-    else {
-        throw D3ImportOperationError.missingPresentationAsset(
-            securityCameraPage.primaryModelName
-        )
-    }
-    let securityCameraPayload =
-        securityCameraArchive.validated.data.subdata(
-            in: securityCameraEntry.payloadRange
-        )
-    let securityCameraGunpoint = try reachedOutrageModelGunpoint(
-        securityCameraPayload,
-        index: 0
-    )
-    let pickupSoundPage = try resolveRetailSoundPage(
-        table: tableData,
-        overlay: overlayData,
-        named: "PupC1"
-    )
-    let pickupSoundEntry = d3Archive.uniqueEntry(
-        named: pickupSoundPage.sourceName
-    )
-    let pickupSoundPayload = d3.data.subdata(
-        in: pickupSoundEntry.payloadRange
-    )
-    let pickupSound = try decodeReachedPCM16WAV(pickupSoundPayload)
-    let invulnerabilityPickupSoundPage = try resolveRetailSoundPage(
-        table: tableData,
-        overlay: overlayData,
-        named: "Powerup pickup"
-    )
-    let invulnerabilityPickupSoundEntry = d3Archive.uniqueEntry(
-        named: invulnerabilityPickupSoundPage.sourceName
-    )
-    let invulnerabilityPickupSoundEntryIndex =
-        d3Archive.entries.firstIndex(
-            of: invulnerabilityPickupSoundEntry
-        )!
-    let invulnerabilityPickupSoundPayload = d3.data.subdata(
-        in: invulnerabilityPickupSoundEntry.payloadRange
-    )
-    let invulnerabilityPickupSound = try decodeReachedPCM16WAV(
-        invulnerabilityPickupSoundPayload
-    )
-    let returnSoundPage = try resolveRetailSoundPage(
-        table: tableData,
-        overlay: overlayData,
-        named: "GBotAcceptOrder1"
-    )
-    let returnSoundEntry = d3Archive.uniqueEntry(
-        named: returnSoundPage.sourceName
-    )
-    let returnSoundEntryIndex =
-        d3Archive.entries.firstIndex(of: returnSoundEntry)!
-    let returnSoundPayload = d3.data.subdata(
-        in: returnSoundEntry.payloadRange
-    )
-    let returnSound = try decodeReachedPCM16WAV(returnSoundPayload)
-    let greetingSoundPage = try resolveRetailSoundPage(
-        table: tableData,
-        overlay: overlayData,
-        named: "GBotGreetB1"
-    )
-    let greetingSoundEntry = d3Archive.uniqueEntry(
-        named: greetingSoundPage.sourceName
-    )
-    let greetingSoundEntryIndex =
-        d3Archive.entries.firstIndex(of: greetingSoundEntry)!
-    let greetingSoundPayload = d3.data.subdata(
-        in: greetingSoundEntry.payloadRange
-    )
-    let greetingSound = try decodeReachedPCM16WAV(
-        greetingSoundPayload
-    )
-    let invulnerabilityOnSoundPage = try resolveRetailSoundPage(
-        table: tableData,
-        overlay: overlayData,
-        named: "Invulnerability on"
-    )
-    let invulnerabilityOnSoundEntry = d3Archive.uniqueEntry(
-        named: invulnerabilityOnSoundPage.sourceName
-    )
-    let invulnerabilityOnSoundEntryIndex =
-        d3Archive.entries.firstIndex(of: invulnerabilityOnSoundEntry)!
-    let invulnerabilityOnSoundPayload = d3.data.subdata(
-        in: invulnerabilityOnSoundEntry.payloadRange
-    )
-    let invulnerabilityOnSound = try decodeReachedPCM16WAV(
-        invulnerabilityOnSoundPayload
-    )
-    let invulnerabilityOffSoundPage = try resolveRetailSoundPage(
-        table: tableData,
-        overlay: overlayData,
-        named: "Invulnerability off"
-    )
-    let invulnerabilityOffSoundEntry = d3Archive.uniqueEntry(
-        named: invulnerabilityOffSoundPage.sourceName
-    )
-    let invulnerabilityOffSoundEntryIndex =
-        d3Archive.entries.firstIndex(of: invulnerabilityOffSoundEntry)!
-    let invulnerabilityOffSoundPayload = d3.data.subdata(
-        in: invulnerabilityOffSoundEntry.payloadRange
-    )
-    let invulnerabilityOffSound = try decodeReachedPCM16WAV(
-        invulnerabilityOffSoundPayload
-    )
-    let cloakOnSoundPage = try resolveRetailSoundPage(
-        table: tableData,
-        overlay: overlayData,
-        named: "Cloak on"
-    )
-    let cloakOnSoundEntry = d3Archive.uniqueEntry(
-        named: cloakOnSoundPage.sourceName
-    )
-    let cloakOnSoundEntryIndex =
-        d3Archive.entries.firstIndex(of: cloakOnSoundEntry)!
-    let cloakOnSoundPayload = d3.data.subdata(
-        in: cloakOnSoundEntry.payloadRange
-    )
-    let cloakOnSound = try decodeReachedPCM16WAV(cloakOnSoundPayload)
-    let cloakOffSoundPage = try resolveRetailSoundPage(
-        table: tableData,
-        overlay: overlayData,
-        named: "Cloak off"
-    )
-    let cloakOffSoundEntry = d3Archive.uniqueEntry(
-        named: cloakOffSoundPage.sourceName
-    )
-    let cloakOffSoundEntryIndex =
-        d3Archive.entries.firstIndex(of: cloakOffSoundEntry)!
-    let cloakOffSoundPayload = d3.data.subdata(
-        in: cloakOffSoundEntry.payloadRange
-    )
-    let cloakOffSound = try decodeReachedPCM16WAV(cloakOffSoundPayload)
-    let cameraMonitorLevel =
-        robotGuidebotLevel
-        .addingTrainingCameraMonitorChain(
-        .init(
-            pickupObjectHandle: cameraMonitor.handle,
-            securityCameraObjectHandle: securityCamera.handle,
-            pickupCollisionRadius: cameraMonitorModel.collisionRadius,
-            pickupMessage: messages["UseCameraMonitor"]!,
-            pickupVoiceSourceName: "guidebotc.osf",
-            pickupSoundSourceName: pickupSoundPage.sourceName,
-            useMessage: messages["GBExtra"]!,
-            useVoiceSourceName: "guidebotd.osf",
-            popupDuration: 10,
-            popupZoom: 1,
-            cameraGunpointIndex: 0,
-            cameraLocalPosition: securityCameraGunpoint.position,
-            cameraLocalForward: securityCameraGunpoint.forward,
-            completionTimerDuration: 2,
-            returnToShip: .init(
-                markerLightObjectHandle: returnMarkerLight.handle,
-                markerLightPresentation: .init(
-                    primaryColor:
-                        returnMarkerLightPresentation.primaryColor,
-                    secondaryColor:
-                        returnMarkerLightPresentation.secondaryColor,
-                    timeInterval:
-                        returnMarkerLightPresentation.timeInterval,
-                    flickerDistance:
-                        returnMarkerLightPresentation.flickerDistance,
-                    directionalDot:
-                        returnMarkerLightPresentation.directionalDot,
-                    flags: returnMarkerLightPresentation.flags,
-                    timebits: returnMarkerLightPresentation.timebits,
-                    angle: returnMarkerLightPresentation.angle,
-                    lightingRenderType:
-                        returnMarkerLightPresentation.lightingRenderType
-                ),
-                barrierRoomSourceIndex: returnBarrierRoom.sourceIndex,
-                orderedPortalIndices: [0, 1],
-                openMarkerLightDistance: 50,
-                returnMessage: "GB: Returning to ship.",
-                returnSoundSourceName: returnSoundPage.sourceName,
-                greetingSoundSourceName:
-                    greetingSoundPage.sourceName,
-                arrivalMessage: "GB: Entering ship!",
-                successMessage: messages["GoodJob"]!,
-                successVoiceSourceName: "proceed6.osf",
-                killbotEntry: .init(
-                    triggerName: killbotEntryTrigger.name,
-                    triggerRoomSourceIndex:
-                        killbotEntryTrigger.roomIndex,
-                    triggerFaceIndex: killbotEntryTrigger.faceIndex,
-                    orderedPortalIndices: [1, 0],
-                    closedMarkerLightDistance: 0,
-                    entryMessage: messages["KillBotIntro"]!,
-                    entryVoiceSourceName: "intro6.osf",
-                    followupDelay: 13,
-                    followupMessage: messages["KillBot2"]!,
-                    followupVoiceSourceName: "guidebotf.osf"
-                )
-            )
-        ),
-        voiceClips: Array(voiceClips[5...9]),
+    // The streams and sounds the later Training scripts play: Scripts
+    // 040, 059, 058, 042, 039, 050, and 056 (TrainingMission.cpp
+    // :1394-1456, :1585-1622, :2057-2387) and the Guide-Bot's return.
+    // The engine sounds the generic pickup, cloak, invulnerability, and
+    // level goal code plays are added with the object tables below.
+    var level = robotGuidebotLevel.addingAudioClips(
+        voiceClips: Array(voiceClips[5...11]),
         soundClips: [
-            .init(
-                logicalName: pickupSoundPage.logicalName,
-                sourceName: pickupSoundPage.sourceName,
-                sourceEntryIndex: pickupSoundPage.storedIndex,
-                sampleRate: pickupSound.sampleRate,
-                channelCount: pickupSound.channelCount,
-                frameCount: pickupSound.frameCount,
-                pcm16LittleEndian: pickupSound.pcm16LittleEndian,
-                pcmSHA256: canonicalSHA256(
-                    pickupSound.pcm16LittleEndian
-                ),
-                sourceArchive: d3File.relativePath,
-                sourceSHA256: canonicalSHA256(pickupSoundPayload),
-                importVolume: pickupSoundPage.importVolume
-            ),
-            .init(
-                logicalName: returnSoundPage.logicalName,
-                sourceName: returnSoundPage.sourceName,
-                sourceEntryIndex: returnSoundEntryIndex,
-                sampleRate: returnSound.sampleRate,
-                channelCount: returnSound.channelCount,
-                frameCount: returnSound.frameCount,
-                pcm16LittleEndian: returnSound.pcm16LittleEndian,
-                pcmSHA256: canonicalSHA256(
-                    returnSound.pcm16LittleEndian
-                ),
-                sourceArchive: d3File.relativePath,
-                sourceSHA256: canonicalSHA256(returnSoundPayload),
-                importVolume: returnSoundPage.importVolume
-            ),
-            .init(
-                logicalName: greetingSoundPage.logicalName,
-                sourceName: greetingSoundPage.sourceName,
-                sourceEntryIndex: greetingSoundEntryIndex,
-                sampleRate: greetingSound.sampleRate,
-                channelCount: greetingSound.channelCount,
-                frameCount: greetingSound.frameCount,
-                pcm16LittleEndian: greetingSound.pcm16LittleEndian,
-                pcmSHA256: canonicalSHA256(
-                    greetingSound.pcm16LittleEndian
-                ),
-                sourceArchive: d3File.relativePath,
-                sourceSHA256: canonicalSHA256(greetingSoundPayload),
-                importVolume: greetingSoundPage.importVolume
-            ),
+            try reachedSoundClip(named: "PupC1"),
+            try reachedSoundClip(named: "GBotAcceptOrder1"),
+            try reachedSoundClip(named: "GBotGreetB1"),
         ]
-        )
-    precondition(
-        cameraMonitor.handle == 6_167
-            && cameraMonitor.type == 7
-            && cameraMonitor.storedID == 91
-            && cameraMonitor.flags == 4_096
-            && securityCamera.handle == 6_183
-            && securityCamera.type == 2
-            && securityCamera.storedID == 114
-            && securityCamera.flags == 5_120
-            && returnMarkerLight.handle == 10_245
-            && returnMarkerLight.type == 11
-            && returnMarkerLight.storedID == 205
-            && returnMarkerLight.location == .room(40)
-            && returnBarrierRoom.sourceIndex == 40
-            && returnBarrierRoom.portals.count == 2
-            && killbotEntryTrigger.roomIndex
-                == returnBarrierRoom.sourceIndex
-            && killbotEntryTrigger.faceIndex == 1
-            && killbotEntryTrigger.flags == 8
-            && killbotEntryTrigger.activator == 1
     )
-    let finalGoal = topologyLevel.objects.first {
-        $0.handle == 6_180
-    }!
-    precondition(
-        finalGoal.type == 7
-            && finalGoal.storedID == 67
-            && finalGoal.definition?.storedIndex == 67
-            && finalGoal.definition?.sourceName == "Invisiblepowerup"
-            && finalGoal.definition?.referenceRuntimeIndex == 68
-            && finalGoal.instanceName == "FinalGoal"
-            && finalGoal.flags == 4_096
-            && finalGoal.location == .room(17)
-            && finalGoal.position == .init(
-                x: 2_061.773_4,
-                y: -756.230_65,
-                z: 3_681.408_2
-            )
-            && finalGoal.orientation == .init(
-                right: .init(x: -1, y: 0, z: 0),
-                up: .init(x: 0, y: 1, z: 0),
-                forward: .init(x: 0, y: 0, z: -1)
-            )
-            && finalGoal.containsType == 255
-            && finalGoal.containsID == 0
-            && finalGoal.containsCount == 0
-            && invisiblePowerupModel.collisionRadius.bitPattern
-                == 0x40a0_84bf
-    )
-    precondition(
-        invulnerabilityPickup.handle == 2_076
-            && invulnerabilityPickup.type == 7
-            && invulnerabilityPickup.storedID == 3
-            && invulnerabilityPickup.definition
-                == .init(
-                    storedIndex: 3,
-                    sourceName: "Invulnerability"
-                )
-            && invulnerabilityPickup.flags == 5_120
-            && invulnerabilityPickup.location == .room(12)
-    )
-    precondition(
-        cloakPickup.handle == 2_073
-            && cloakPickup.type == 7
-            && cloakPickup.storedID == 4
-            && cloakPickup.definition
-                == .init(storedIndex: 4, sourceName: "Cloak")
-            && cloakPickup.flags == 5_120
-            && cloakPickup.location == .room(11)
-    )
-    let invulnerabilityLevel =
-        cameraMonitorLevel.addingTrainingInvulnerabilityPickupChain(
-        .init(
-            pickupObjectHandle: invulnerabilityPickup.handle,
-            pickupRoomSourceIndex: 12,
-            pickupObjectFlags: invulnerabilityPickup.flags,
-            pickupCollisionRadius:
-                invulnerabilityModel.collisionRadius,
-            duration: 30,
-            activatedMessage: "Invulnerability On",
-            expiredMessage: "Invulnerability Off",
-            pickupSoundSourceName:
-                invulnerabilityPickupSoundPage.sourceName,
-            activatedSoundSourceName:
-                invulnerabilityOnSoundPage.sourceName,
-            expiredSoundSourceName:
-                invulnerabilityOffSoundPage.sourceName
-        ),
-        soundClips: [
-            .init(
-                logicalName:
-                    invulnerabilityPickupSoundPage.logicalName,
-                sourceName:
-                    invulnerabilityPickupSoundPage.sourceName,
-                sourceEntryIndex:
-                    invulnerabilityPickupSoundEntryIndex,
-                sampleRate: invulnerabilityPickupSound.sampleRate,
-                channelCount:
-                    invulnerabilityPickupSound.channelCount,
-                frameCount: invulnerabilityPickupSound.frameCount,
-                pcm16LittleEndian:
-                    invulnerabilityPickupSound.pcm16LittleEndian,
-                pcmSHA256: canonicalSHA256(
-                    invulnerabilityPickupSound.pcm16LittleEndian
-                ),
-                sourceArchive: d3File.relativePath,
-                sourceSHA256: canonicalSHA256(
-                    invulnerabilityPickupSoundPayload
-                ),
-                importVolume:
-                    invulnerabilityPickupSoundPage.importVolume
-            ),
-            .init(
-                logicalName:
-                    invulnerabilityOnSoundPage.logicalName,
-                sourceName:
-                    invulnerabilityOnSoundPage.sourceName,
-                sourceEntryIndex:
-                    invulnerabilityOnSoundEntryIndex,
-                sampleRate: invulnerabilityOnSound.sampleRate,
-                channelCount: invulnerabilityOnSound.channelCount,
-                frameCount: invulnerabilityOnSound.frameCount,
-                pcm16LittleEndian:
-                    invulnerabilityOnSound.pcm16LittleEndian,
-                pcmSHA256: canonicalSHA256(
-                    invulnerabilityOnSound.pcm16LittleEndian
-                ),
-                sourceArchive: d3File.relativePath,
-                sourceSHA256: canonicalSHA256(
-                    invulnerabilityOnSoundPayload
-                ),
-                importVolume:
-                    invulnerabilityOnSoundPage.importVolume * 0.5
-            ),
-            .init(
-                logicalName:
-                    invulnerabilityOffSoundPage.logicalName,
-                sourceName:
-                    invulnerabilityOffSoundPage.sourceName,
-                sourceEntryIndex:
-                    invulnerabilityOffSoundEntryIndex,
-                sampleRate: invulnerabilityOffSound.sampleRate,
-                channelCount: invulnerabilityOffSound.channelCount,
-                frameCount: invulnerabilityOffSound.frameCount,
-                pcm16LittleEndian:
-                    invulnerabilityOffSound.pcm16LittleEndian,
-                pcmSHA256: canonicalSHA256(
-                    invulnerabilityOffSound.pcm16LittleEndian
-                ),
-                sourceArchive: d3File.relativePath,
-                sourceSHA256: canonicalSHA256(
-                    invulnerabilityOffSoundPayload
-                ),
-                importVolume:
-                    invulnerabilityOffSoundPage.importVolume * 0.5
-            ),
-        ]
-        )
-    let cloakLevel =
-        invulnerabilityLevel.addingTrainingCloakPickupChain(
-        .init(
-            pickupObjectHandle: cloakPickup.handle,
-            pickupRoomSourceIndex: 11,
-            pickupObjectFlags: cloakPickup.flags,
-            pickupCollisionRadius: cloakModel.collisionRadius,
-            fadeDuration: 1,
-            cloakDuration: 30,
-            activatedMessage: "Cloak On",
-            expiredMessage: "Cloak Off",
-            pickupSoundSourceName:
-                invulnerabilityPickupSoundPage.sourceName,
-            activatedSoundSourceName: cloakOnSoundPage.sourceName,
-            expiredSoundSourceName: cloakOffSoundPage.sourceName
-        ),
-        soundClips: [
-            .init(
-                logicalName: cloakOnSoundPage.logicalName,
-                sourceName: cloakOnSoundPage.sourceName,
-                sourceEntryIndex: cloakOnSoundEntryIndex,
-                sampleRate: cloakOnSound.sampleRate,
-                channelCount: cloakOnSound.channelCount,
-                frameCount: cloakOnSound.frameCount,
-                pcm16LittleEndian: cloakOnSound.pcm16LittleEndian,
-                pcmSHA256: canonicalSHA256(
-                    cloakOnSound.pcm16LittleEndian
-                ),
-                sourceArchive: d3File.relativePath,
-                sourceSHA256: canonicalSHA256(cloakOnSoundPayload),
-                importVolume: cloakOnSoundPage.importVolume * 0.5
-            ),
-            .init(
-                logicalName: cloakOffSoundPage.logicalName,
-                sourceName: cloakOffSoundPage.sourceName,
-                sourceEntryIndex: cloakOffSoundEntryIndex,
-                sampleRate: cloakOffSound.sampleRate,
-                channelCount: cloakOffSound.channelCount,
-                frameCount: cloakOffSound.frameCount,
-                pcm16LittleEndian: cloakOffSound.pcm16LittleEndian,
-                pcmSHA256: canonicalSHA256(
-                    cloakOffSound.pcm16LittleEndian
-                ),
-                sourceArchive: d3File.relativePath,
-                sourceSHA256: canonicalSHA256(cloakOffSoundPayload),
-                importVolume: cloakOffSoundPage.importVolume * 0.5
-            ),
-        ]
-        )
-    precondition(
-        lastRoomBarrier.sourceIndex == 44
-            && lastRoomBarrier.portals.count == 2
-            && lastRoomBarrier.portals[0].flags & 1 != 0
-            && lastRoomBarrier.portals[1].flags & 1 != 0
-            && lastRoomMarker.handle == 4_117
-            && lastRoomMarker.type == 11
-            && lastRoomMarker.storedID == 205
-            && lastRoomMarker.definition
-                == .init(
-                    storedIndex: 205,
-                    sourceName: "Blinking Red Light-DM"
-                )
-            && lastRoomMarker.flags == 4_096
-            && lastRoomMarker.location == .room(44)
-    )
-    let lastRoomLevel = cloakLevel.addingTrainingLastRoomChain(.init(
-        barrierRoomSourceIndex: 44,
-        orderedPortalIndices: [1, 0],
-        markerLightObjectHandle: lastRoomMarker.handle,
-        markerLightPresentation: .init(
-            primaryColor:
-                returnMarkerLightPresentation.primaryColor,
-            secondaryColor:
-                returnMarkerLightPresentation.secondaryColor,
-            timeInterval:
-                returnMarkerLightPresentation.timeInterval,
-            flickerDistance:
-                returnMarkerLightPresentation.flickerDistance,
-            directionalDot:
-                returnMarkerLightPresentation.directionalDot,
-            flags: returnMarkerLightPresentation.flags,
-            timebits: returnMarkerLightPresentation.timebits,
-            angle: returnMarkerLightPresentation.angle,
-            lightingRenderType:
-                returnMarkerLightPresentation.lightingRenderType
-        ),
-        openMarkerLightDistance: 50,
-        timerDuration: 2,
-        completionMessages: [
-            "Excellent!",
-            "Now proceed through the doorway that just opened to begin the last stage of your training.",
-        ],
-        completionVoiceSourceName: "proceed5.osf"
-    ))
-    precondition(
-        finalRoomEntryTrigger.roomIndex == 44
-            && finalRoomEntryTrigger.faceIndex == 1
-            && finalRoomEntryTrigger.flags == 8
-            && finalRoomEntryTrigger.activator == 1
-    )
-    let finalRoomEntryLevel =
-        lastRoomLevel.addingTrainingFinalRoomEntryChain(
-            .init(
-                triggerName: finalRoomEntryTrigger.name,
-                triggerRoomSourceIndex:
-                    finalRoomEntryTrigger.roomIndex,
-                triggerFaceIndex: finalRoomEntryTrigger.faceIndex,
-                successMessage: messages["GoodJob"]!,
-                instructionMessage: messages["FinalSessionIntro"]!,
-                voiceSourceName: "intro7.osf"
-            ),
-            voiceClip: voiceClips[10]
-        )
-    precondition(
-        finalBotsMarker.handle == 4_118
-            && finalBotsMarker.type == 11
-            && finalBotsMarker.storedID == 205
-            && finalBotsMarker.flags == 4_096
-            && finalBotsMarker.location == .room(16)
-            && finalBotsBarrier.sourceIndex == 16
-            && finalBotsBarrier.portals.count == 2
-            && finalBotsBarrier.portals.allSatisfy {
-                $0.flags & 1 != 0
-            }
-    )
-    let finalBotsLevel =
-        finalRoomEntryLevel.addingTrainingFinalBotsCompletionChain(
-        .init(
-            barrierRoomSourceIndex: finalBotsBarrier.sourceIndex,
-            orderedPortalIndices: [0, 1],
-            markerLightObjectHandle: finalBotsMarker.handle,
-            markerLightPresentation: .init(
-                primaryColor: .init(x: 1, y: 0.25, z: 0),
-                secondaryColor: .zero,
-                timeInterval: 0.5,
-                flickerDistance: 0.2,
-                directionalDot: 0,
-                flags: 4,
-                timebits: .max,
-                angle: 0,
-                lightingRenderType: 2
-            ),
-            openMarkerLightDistance: 50,
-            timerDuration: 2,
-            completionMessage: messages["AllDone"]!,
-            completionVoiceSourceName: "done.osf"
-        ),
-        voiceClip: voiceClips[11]
-    )
-    var level = finalBotsLevel.addingTrainingFinalGoalChain(.init(
-        goalObjectHandle: finalGoal.handle,
-        goalRoomSourceIndex: 17,
-        goalObjectFlags: finalGoal.flags,
-        goalCollisionRadius: invisiblePowerupModel.collisionRadius
-        ))
     let followBot = level.objects.first {
         $0.handle == 8_200
     }!
@@ -2022,6 +1406,17 @@ func runD3Import(
             return clip.logicalName
         }
     )
+    // The engine sounds (EngineSound): the static and named sounds the
+    // translated engine plays, which PageInAllData pages in
+    // (gamesequence.cpp:2481).
+    for name in EngineSound.names {
+        let clip = try reachedSoundClip(named: name)
+        if !(level.soundClips + addedSoundClips).contains(where: {
+            $0.logicalName == clip.logicalName
+        }) {
+            addedSoundClips.append(clip)
+        }
+    }
     level = level.appendingSoundClips(addedSoundClips)
     // Package schema 12 (LevelScriptImport.swift). Archives in cfile search
     // order: the mission, then the base archives in reverse opening order.

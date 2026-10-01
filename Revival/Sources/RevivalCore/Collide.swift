@@ -75,11 +75,10 @@ func collideScriptEvents(
 }
 
 extension GameWorld {
-    /// collide_two_objects (collide.cpp:2393) in single player. The level
-    /// goal informs (check_lg_inform, :2410) need object flags that no
-    /// imported object sets yet. The dying or dead player check (:2476)
-    /// arrives with player death (M2). Each object's script chain gets
-    /// EVT_COLLIDE, and then the pair's response runs.
+    /// collide_two_objects (collide.cpp:2393) in single player: the level
+    /// goal informs (check_lg_inform, :2410), then each object's script
+    /// chain gets EVT_COLLIDE, and then the pair's response runs. The dying
+    /// or dead player check (:2476) arrives with player death (M2).
     /// `link` is the submodel frame of a weapon's polygon hit
     /// (`hit_info`), which a sticking weapon keeps; without it a sticking
     /// weapon dies like any other.
@@ -89,6 +88,8 @@ extension GameWorld {
         link: ObjectLinkInfo? = nil,
         level: Level
     ) {
+        checkLevelGoalInform(a, b, level: level)
+        checkLevelGoalInform(b, a, level: level)
         for call in collideScriptEvents(a, b) {
             osirisCallEvent(call.me, call.event, level: level)
         }

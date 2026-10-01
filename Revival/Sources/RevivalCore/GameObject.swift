@@ -173,6 +173,31 @@ struct GameObject: Codable, Equatable, Sendable {
     /// `mtype.phys_info.stuck_room` and `stuck_portal` while
     /// OF_STUCK_ON_PORTAL is set (physics.cpp:1306-1311).
     var stuckPortal: StuckPortal? = nil
+    /// The cloak part of `effect_info` (object_external_struct.h): `nil`
+    /// until an effect starts (ObjectLighting.swift).
+    var effect: ObjectEffectInfo? = nil
+}
+
+/// The cloak fields of `effect_info` (object_external_struct.h) and their
+/// EF_ flags (object_external.h:197-213). The other effects arrive with
+/// the full object effects (M2).
+struct ObjectEffectInfo: Codable, Equatable, Sendable {
+    /// EF_CLOAKED.
+    static let cloakedFlag: UInt32 = 1
+    /// EF_FADING_IN.
+    static let fadingInFlag: UInt32 = 512
+    /// EF_FADING_OUT.
+    static let fadingOutFlag: UInt32 = 1024
+    /// EF_CLOAK_WITH_MSG: a player shows a message when the cloak ends.
+    static let cloakWithMessageFlag: UInt32 = 4096
+
+    /// `type_flags`.
+    var typeFlags: UInt32 = 0
+    /// `cloak_time`.
+    var cloakTime: Float = 0
+    /// `fade_time` and `fade_max_time`.
+    var fadeTime: Float = 0
+    var fadeMaxTime: Float = 0
 }
 
 /// `mtype.obj_link_info` (object_external_struct.h): the object a linked

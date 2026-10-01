@@ -72,7 +72,7 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     let wallContact: IndoorWallContact?
     let enabledPlayerControls: PlayerControlMask
     let showsEnabledPlayerControls: Bool
-    let trainingOpeningFeedback: [TrainingOpeningFeedback]
+    let presentationFeedback: [PresentationFeedback]
     let playerFastHeadlight: PlayerFastHeadlightFrame?
     let shields: Float
     let energy: Float
@@ -89,10 +89,14 @@ struct PlayerSimulationFrame: Equatable, Sendable {
     /// The playing looping sounds linked to an object (SoundSystem.swift),
     /// at the object's place this frame.
     let objectSoundLoops: [ObjectSoundLoopFrame]
-    let trainingCameraMonitor: TrainingCameraMonitorFrame?
-    let trainingInvulnerabilityRemaining: Float?
-    let trainingCloak: TrainingCloakFrame?
-    let trainingFinalGoal: TrainingFinalGoalFrame?
+    /// The popup small view (SmallViews.swift), if one is up.
+    let popupView: SmallViewFrame?
+    /// `invulnerable_time` while the player is invulnerable.
+    let playerInvulnerabilityRemaining: Float?
+    /// The player ship's cloak (ObjectLighting.swift).
+    let playerCloak: ObjectCloakFrame?
+    /// The end of the level the session's sequencer ran after this frame.
+    var levelEnd: LevelEndFrame?
 }
 
 struct PlayerFastHeadlightFrame: Equatable, Sendable {
@@ -121,28 +125,31 @@ struct VisEffectLineSparkFrame: Equatable, Sendable {
     let end: Vector3
 }
 
-enum TrainingEndLevelState: String, Codable, Equatable, Sendable {
+/// How EndLevel ended the level (gamesequence.cpp:1844).
+enum LevelEndState: String, Codable, Equatable, Sendable {
     case succeeded
+    case failed
 }
 
-enum TrainingDifficulty: String, Codable, Equatable, Sendable {
+enum LevelDifficultyName: String, Codable, Equatable, Sendable {
     case rookie = "Rookie"
 }
 
-struct TrainingEndLevelPresentation: Equatable, Sendable {
+struct LevelEndPresentation: Equatable, Sendable {
     let title: String
     let levelName: String
-    let difficulty: TrainingDifficulty
+    let difficulty: LevelDifficultyName
     let showsHUD: Bool
     let playsGameplayAudio: Bool
     let showsCockpit: Bool
     let showsHeadlightIndicator: Bool
 }
 
-struct TrainingPostLevelResult: Codable, Equatable, Sendable {
+/// The PostLevelResults screen's values (gamesequence.cpp:1891).
+struct PostLevelResult: Codable, Equatable, Sendable {
     let title: String
     let levelName: String
-    let difficulty: TrainingDifficulty
+    let difficulty: LevelDifficultyName
     let score: Int
     let elapsedTime: Float
     let enemyKills: Int
@@ -153,47 +160,30 @@ struct TrainingPostLevelResult: Codable, Equatable, Sendable {
     let objectives: [String]
 }
 
-enum TrainingSessionOutcome: Codable, Equatable, Sendable {
+/// The session after a level ended: waiting for the player to close the
+/// results, then done.
+enum LevelSessionOutcome: Codable, Equatable, Sendable {
     case awaitingResultAcknowledgement
     case completed
 }
 
-struct TrainingFinalGoalFrame: Equatable, Sendable {
-    let endLevelState: TrainingEndLevelState
-    let scriptActionCounter: Int
+/// The frame EndLevel shows (SuspendControls and PostLevelResults,
+/// gamesequence.cpp:1240-1243, :1891).
+struct LevelEndFrame: Equatable, Sendable {
+    let endLevelState: LevelEndState
     let controlsAreSuspended: Bool
-    let presentation: TrainingEndLevelPresentation
-    let postLevelResult: TrainingPostLevelResult
+    let presentation: LevelEndPresentation
+    let postLevelResult: PostLevelResult
+
+    /// Whether the end records the mission progress: only EndLevel(1)
+    /// after GAMESTATE_LVLEND (gamesequence.cpp:1240). EndLevel(0) also
+    /// updates the pilot's mission data (pilot.cpp:1463), but its level
+    /// restarts; Revival records a failed level as not finished
+    /// (architecture.md section 9).
+    var recordsMissionProgress: Bool { endLevelState == .succeeded }
 }
 
-enum TrainingCloakPhase: String, Codable, Equatable, Sendable {
-    case fadingOut
-    case cloaked
-    case fadingIn
-}
-
-struct TrainingCloakFrame: Equatable, Sendable {
-    let phase: TrainingCloakPhase
-    let phaseRemaining: Float
-    let phaseDuration: Float
-
-    var objectAlpha: Float {
-        switch phase {
-        case .fadingOut:
-            0.08 + 0.92 * phaseRemaining / phaseDuration
-        case .cloaked:
-            0.13
-        case .fadingIn:
-            0.08 + 0.92 * (1 - phaseRemaining / phaseDuration)
-        }
-    }
-
-    var objectDeformationRange: Float {
-        phase == .cloaked ? 0.1 : 0
-    }
-}
-
-struct TrainingOpeningFeedback: Equatable, Sendable {
+struct PresentationFeedback: Equatable, Sendable {
     let hudMessages: [String]
     let voiceSourceName: String
     let voicePrecedesHUDMessages: Bool
@@ -216,12 +206,6 @@ struct TrainingOpeningFeedback: Equatable, Sendable {
         self.soundSourceName = soundSourceName
         self.soundEventVolume = soundEventVolume
     }
-}
-
-struct TrainingCameraMonitorFrame: Equatable, Sendable {
-    let camera: RoomCamera
-    let roomSourceIndex: Int
-    let remainingDuration: Float
 }
 
 /// A looping object sound for the app to play at the object's place.

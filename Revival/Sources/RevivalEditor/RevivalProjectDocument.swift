@@ -270,13 +270,6 @@ final class RevivalProjectDocument: NSDocument {
         guard let selection = editorSelection.portal else {
             preconditionFailure("A portal must be selected before editing its rendering state")
         }
-        if project.isTrainingGuidebotReturnBarrierPortal(
-            roomSourceIndex: selection.roomSourceIndex,
-            portalIndex: selection.portalIndex
-        ) {
-            try setTrainingGuidebotReturnBarrierOpen(!rendersFace)
-            return
-        }
         if project.isTrainingGalleryBarrierPortal(
             roomSourceIndex: selection.roomSourceIndex,
             portalIndex: selection.portalIndex
@@ -312,26 +305,6 @@ final class RevivalProjectDocument: NSDocument {
         }
         registerTrainingGalleryBarrierUndo(isOpen: previous)
         undoManager?.setActionName("Set Training Gallery Barrier")
-        refreshWindowControllers()
-    }
-
-    func setTrainingGuidebotReturnBarrierOpen(_ isOpen: Bool) throws {
-        var previous = false
-        try projectStorage.withLock { storedProject in
-            guard var project = storedProject else {
-                throw RevivalProjectDocumentError.projectNotLoaded
-            }
-            previous =
-                try project.setTrainingGuidebotReturnBarrierOpen(isOpen)
-            storedProject = project
-        }
-        registerTrainingGuidebotReturnBarrierUndo(isOpen: previous)
-        undoManager?.setActionName(
-            project.level.trainingCameraMonitorChain?.returnToShip?
-                .killbotEntry == nil
-                ? "Set Training Guidebot Return Barrier"
-                : "Set Training Killbot Entry Barrier"
-        )
         refreshWindowControllers()
     }
 
@@ -637,7 +610,7 @@ final class RevivalProjectDocument: NSDocument {
         _ frame: PlayerSimulationFrame,
         renderingWorld: Bool = true
     ) -> Bool {
-        guard frame.trainingFinalGoal?.endLevelState == .succeeded,
+        guard frame.levelEnd?.endLevelState == .succeeded,
               playSession != nil else {
             return false
         }
@@ -714,21 +687,6 @@ final class RevivalProjectDocument: NSDocument {
             } catch {
                 preconditionFailure(
                     "Training-gallery barrier undo invariant failed: \(error)"
-                )
-            }
-        }
-    }
-
-    private func registerTrainingGuidebotReturnBarrierUndo(
-        isOpen: Bool
-    ) {
-        undoManager?.registerUndo(withTarget: self) { document in
-            do {
-                try document
-                    .setTrainingGuidebotReturnBarrierOpen(isOpen)
-            } catch {
-                preconditionFailure(
-                    "Training Guidebot return-barrier undo invariant failed: \(error)"
                 )
             }
         }

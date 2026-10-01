@@ -417,7 +417,8 @@ enum GuideBotScript {
             world.inventoryAddTypeID(
                 player,
                 type: .robot,
-                id: world.objectFindID(pageName, level: level)
+                id: world.objectFindID(pageName, level: level),
+                level: level
             )
             world.objGhost(me, true)
             mode = inShipMode

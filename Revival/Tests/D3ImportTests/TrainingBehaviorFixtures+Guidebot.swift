@@ -919,48 +919,24 @@ func makeTrainingCameraMonitorLevel() -> Level {
             ),
         ]
     )
+    // The Camera Monitor's page: OIF_INVEN_SELECTABLE and
+    // OIF_INVEN_NOREMOVE, as the retail page.
+    level = level.addingObjectInfo(CanonicalObjectInfo(
+        name: "Camera Monitor",
+        type: 7,
+        flags: 0x4a,
+        size: 2,
+        hitPoints: 100,
+        lightDistance: 0,
+        lighting: fixtureNoLight,
+        ai: nil,
+        weaponBatteries: []
+    ))
+    // Package schema 10 carried the Camera Monitor's streams and sounds.
+    level = replacing(level, schemaVersion: 10)
     return rescriptedTrainingLevel(
-        level.addingTrainingCameraMonitorChain(
-            .init(
-                pickupObjectHandle: 6_167,
-                securityCameraObjectHandle: 6_183,
-                pickupCollisionRadius: 2,
-                pickupMessage:
-                    "Excellent.  You now have the Camera Monitor.  Press the Use Inventory key to activate it!",
-                pickupVoiceSourceName: "guidebotc.osf",
-                pickupSoundSourceName: "PupC.wav",
-                useMessage:
-                    "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns.",
-                useVoiceSourceName: "guidebotd.osf",
-                popupDuration: 10,
-                popupZoom: 1,
-                cameraGunpointIndex: 0,
-                cameraLocalPosition: .zero,
-                cameraLocalForward: .init(x: 0, y: 0, z: -1),
-                completionTimerDuration: 2,
-                returnToShip: .init(
-                    markerLightObjectHandle: 10_245,
-                    markerLightPresentation: .init(
-                        primaryColor: .init(x: 1, y: 0.25, z: 0),
-                        secondaryColor: .zero,
-                        timeInterval: 0.5,
-                        flickerDistance: 0.2,
-                        directionalDot: 0,
-                        flags: 4,
-                        timebits: .max,
-                        angle: 0,
-                        lightingRenderType: 2
-                    ),
-                    barrierRoomSourceIndex: 2,
-                    orderedPortalIndices: [0, 1],
-                    openMarkerLightDistance: 50,
-                    returnMessage: "GB: Returning to ship.",
-                    returnSoundSourceName: "GBotAcceptOrder.wav",
-                    arrivalMessage: "GB: Entering ship!",
-                    successMessage: "Excellent!",
-                    successVoiceSourceName: "proceed6.osf"
-                )
-            ),
+        addingFixtureAudio(
+            level,
             voiceClips: [
                 syntheticVoiceClip(
                     name: "guidebotc.osf",
@@ -1010,12 +986,13 @@ func makeTrainingCameraMonitorLevel() -> Level {
     )
 }
 
-func makeTrainingKillbotEntryLevel(
-    followupDelay: Float = 13
-) -> Level {
+/// The Camera Monitor level with the KillBot room entry: the Portal3
+/// trigger on face 1 of PortalRoom5 (source room 2 here), whose
+/// TriggerScript_0001 runs Script 042 (TrainingMission.cpp:2347), and the
+/// streams of Scripts 042 and 039. Portal2 moves to face 0 of its room.
+func makeTrainingKillbotEntryLevel() -> Level {
     let level = makeTrainingCameraMonitorLevel()
-    let camera = level.trainingCameraMonitorChain!
-    let returnChain = camera.returnToShip!
+    let barrierRoomSourceIndex = 2
     let addedVoices = [
         syntheticVoiceClip(
             name: "intro6.osf",
@@ -1028,62 +1005,18 @@ func makeTrainingKillbotEntryLevel(
             sourceHash: "7"
         ),
     ]
-    let killbotEntry = TrainingKillbotEntryChain(
-        triggerName: "Portal3",
-        triggerRoomSourceIndex: returnChain.barrierRoomSourceIndex,
-        triggerFaceIndex: 1,
-        orderedPortalIndices: [1, 0],
-        closedMarkerLightDistance: 0,
-        entryMessage:
-            "Now you are on your own in this room. There are 4 robots and 2 powerups. Get the powerups and kill the robots.",
-        entryVoiceSourceName: "intro6.osf",
-        followupDelay: followupDelay,
-        followupMessage:
-            "Some parts of this area are very dark.  Turn on your headlight or fire flares to see.  Use your guidebot if you need help finding a robot or powerup.",
-        followupVoiceSourceName: "guidebotf.osf"
-    )
-    let updatedReturn = TrainingGuidebotReturnChain(
-        markerLightObjectHandle: returnChain.markerLightObjectHandle,
-        markerLightPresentation: returnChain.markerLightPresentation,
-        barrierRoomSourceIndex: returnChain.barrierRoomSourceIndex,
-        orderedPortalIndices: returnChain.orderedPortalIndices,
-        openMarkerLightDistance: returnChain.openMarkerLightDistance,
-        returnMessage: returnChain.returnMessage,
-        returnSoundSourceName: returnChain.returnSoundSourceName,
-        arrivalMessage: returnChain.arrivalMessage,
-        successMessage: returnChain.successMessage,
-        successVoiceSourceName: returnChain.successVoiceSourceName,
-        killbotEntry: killbotEntry
-    )
-    let updatedCamera = TrainingCameraMonitorChain(
-        pickupObjectHandle: camera.pickupObjectHandle,
-        securityCameraObjectHandle: camera.securityCameraObjectHandle,
-        pickupCollisionRadius: camera.pickupCollisionRadius,
-        pickupMessage: camera.pickupMessage,
-        pickupVoiceSourceName: camera.pickupVoiceSourceName,
-        pickupSoundSourceName: camera.pickupSoundSourceName,
-        useMessage: camera.useMessage,
-        useVoiceSourceName: camera.useVoiceSourceName,
-        popupDuration: camera.popupDuration,
-        popupZoom: camera.popupZoom,
-        cameraGunpointIndex: camera.cameraGunpointIndex,
-        cameraLocalPosition: camera.cameraLocalPosition,
-        cameraLocalForward: camera.cameraLocalForward,
-        completionTimerDuration: camera.completionTimerDuration,
-        returnToShip: updatedReturn
-    )
     let trigger = LevelTrigger(
-        name: killbotEntry.triggerName,
-        roomIndex: killbotEntry.triggerRoomSourceIndex,
-        faceIndex: killbotEntry.triggerFaceIndex,
+        name: "Portal3",
+        roomIndex: barrierRoomSourceIndex,
+        faceIndex: 1,
         flags: 8,
         activator: 1
     )
     var rooms = level.rooms
     let triggerRoomIndex = rooms.firstIndex {
-        $0.sourceIndex == killbotEntry.triggerRoomSourceIndex
+        $0.sourceIndex == barrierRoomSourceIndex
     }!
-    for faceIndex in [0, killbotEntry.triggerFaceIndex] {
+    for faceIndex in [0, trigger.faceIndex] {
         let triggerFace = rooms[triggerRoomIndex].faces[faceIndex]
         rooms[triggerRoomIndex].faces[faceIndex] = .init(
             corners: triggerFace.corners,
@@ -1121,31 +1054,15 @@ func makeTrainingKillbotEntryLevel(
             : candidate
     } + [trigger]
     return rescriptedTrainingLevel(
-        replacing(
-            level,
-            rooms: rooms,
-            triggers: triggers,
-            surfacePhysics: level.surfacePhysics,
-            trainingGalleryBarrier: syntheticGallery,
-            trainingCameraMonitorChain: updatedCamera,
-            voiceClips: level.voiceClips + addedVoices,
-            dependencyManifest: .init(
-                current: level.dependencyManifest.current
-                    + addedVoices.map {
-                        .init(
-                            category: "voice",
-                            source: .init(
-                                storedIndex: $0.sourceEntryIndex,
-                                sourceName: $0.sourceName
-                            ),
-                            state: "canonical-pcm-imported",
-                            provenance:
-                                "\($0.sourceArchive) \($0.sourceSHA256)"
-                        )
-                    },
-                historicalEagerBaseline:
-                    level.dependencyManifest.historicalEagerBaseline
-            )
+        addingFixtureAudio(
+            replacing(
+                level,
+                rooms: rooms,
+                triggers: triggers,
+                surfacePhysics: level.surfacePhysics,
+                trainingGalleryBarrier: syntheticGallery
+            ),
+            voiceClips: addedVoices
         )
     )
 }

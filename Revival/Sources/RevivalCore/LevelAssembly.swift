@@ -84,7 +84,6 @@ extension Level {
             objectPresentations: objectPresentations,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -170,7 +169,6 @@ extension Level {
             objectPresentations: newObjectPresentations,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -213,7 +211,6 @@ extension Level {
             objectPresentations: objectPresentations,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
@@ -265,7 +262,6 @@ extension Level {
             objectPresentations: objectPresentations,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -335,7 +331,6 @@ extension Level {
             objectPresentations: objectPresentations,
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips + addedVoiceClips,
             soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
@@ -387,7 +382,6 @@ extension Level {
             objectPresentations: objectPresentations,
             trainingGalleryBarrier: barrier,
             trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips + [voiceClip],
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -507,7 +501,6 @@ extension Level {
                 objectPresentations + [guidebotPresentation],
             trainingGalleryBarrier: trainingGalleryBarrier,
             trainingRobotGuidebotChain: chain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
             voiceClips: voiceClips + addedVoiceClips,
             soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
@@ -519,402 +512,4 @@ extension Level {
         ).preservingScripting(of: self)
     }
 
-    func addingTrainingCameraMonitorChain(
-        _ chain: TrainingCameraMonitorChain,
-        voiceClips addedVoiceClips: [CanonicalVoiceClip],
-        soundClips addedSoundClips: [CanonicalSoundClip]
-    ) -> Level {
-        var dependencies = dependencyManifest.current
-        let reachedDependencies = addedVoiceClips.map { clip in
-            DependencyRecord(
-                category: "voice",
-                source: .init(
-                    storedIndex: clip.sourceEntryIndex,
-                    sourceName: clip.sourceName
-                ),
-                state: "canonical-pcm-imported",
-                provenance:
-                    "\(clip.sourceArchive) \(clip.sourceSHA256)"
-            )
-        } + addedSoundClips.map { soundClip in DependencyRecord(
-            category: "sound",
-            source: .init(
-                storedIndex: soundClip.sourceEntryIndex,
-                sourceName: soundClip.sourceName
-            ),
-            state: "canonical-pcm-imported",
-            provenance:
-                "\(soundClip.sourceArchive) \(soundClip.sourceSHA256)"
-        )}
-        for reached in reachedDependencies {
-            if let index = dependencies.firstIndex(where: {
-                $0.category == reached.category
-                    && $0.source == reached.source
-            }) {
-                dependencies[index] = reached
-            } else {
-                dependencies.append(reached)
-            }
-        }
-        return Level(
-            schemaVersion: 10,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: chain,
-            voiceClips: voiceClips + addedVoiceClips,
-            soundClips: soundClips + addedSoundClips,
-            dependencyManifest: .init(
-                current: dependencies,
-                historicalEagerBaseline:
-                    dependencyManifest.historicalEagerBaseline
-            ),
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
-    func addingTrainingFinalBotsCompletionChain(
-        _ chain: TrainingFinalBotsCompletionChain,
-        voiceClip: CanonicalVoiceClip
-    ) -> Level {
-        let dependency = DependencyRecord(
-            category: "voice",
-            source: .init(
-                storedIndex: voiceClip.sourceEntryIndex,
-                sourceName: voiceClip.sourceName
-            ),
-            state: "canonical-pcm-imported",
-            provenance:
-                "\(voiceClip.sourceArchive) \(voiceClip.sourceSHA256)"
-        )
-        var level = Level(
-            schemaVersion: 11,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingInvulnerabilityPickupChain:
-                trainingInvulnerabilityPickupChain,
-            trainingCloakPickupChain: trainingCloakPickupChain,
-            trainingLastRoomChain: trainingLastRoomChain,
-            trainingFinalRoomEntryChain: trainingFinalRoomEntryChain,
-            trainingFinalBotsCompletionChain: chain,
-            voiceClips: voiceClips + [voiceClip],
-            soundClips: soundClips,
-            dependencyManifest: .init(
-                current: dependencyManifest.current + [dependency],
-                historicalEagerBaseline:
-                    dependencyManifest.historicalEagerBaseline
-            ),
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-        return level
-    }
-
-    func addingTrainingFinalGoalChain(
-        _ chain: TrainingFinalGoalChain
-    ) -> Level {
-        var level = self
-        level.trainingFinalGoalChain = chain
-        return level
-    }
-
-    func addingTrainingInvulnerabilityPickupChain(
-        _ chain: TrainingInvulnerabilityPickupChain,
-        soundClips addedSoundClips: [CanonicalSoundClip]
-    ) -> Level {
-        var dependencies = dependencyManifest.current
-        let objectDefinition = DependencyRecord(
-            category: "object-definition",
-            source: .init(
-                storedIndex: 3,
-                sourceName: "Invulnerability"
-            ),
-            state: "canonical-object-definition",
-            provenance:
-                "training.mn3/TrainingMission.d3l handle 2076"
-        )
-        if !dependencies.contains(where: {
-            $0.category == objectDefinition.category
-                && $0.source == objectDefinition.source
-        }) {
-            dependencies.append(objectDefinition)
-        }
-        for clip in addedSoundClips {
-            let reached = DependencyRecord(
-                category: "sound",
-                source: .init(
-                    storedIndex: clip.sourceEntryIndex,
-                    sourceName: clip.sourceName
-                ),
-                state: "canonical-pcm-imported",
-                provenance:
-                    "\(clip.sourceArchive) \(clip.sourceSHA256)"
-            )
-            if let index = dependencies.firstIndex(where: {
-                $0.category == reached.category
-                    && $0.source == reached.source
-            }) {
-                dependencies[index] = reached
-            } else {
-                dependencies.append(reached)
-            }
-        }
-        return Level(
-            schemaVersion: 11,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingInvulnerabilityPickupChain: chain,
-            voiceClips: voiceClips,
-            soundClips: soundClips + addedSoundClips,
-            dependencyManifest: .init(
-                current: dependencies,
-                historicalEagerBaseline:
-                    dependencyManifest.historicalEagerBaseline
-            ),
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
-    func addingTrainingCloakPickupChain(
-        _ chain: TrainingCloakPickupChain,
-        soundClips addedSoundClips: [CanonicalSoundClip]
-    ) -> Level {
-        var dependencies = dependencyManifest.current
-        let objectDefinition = DependencyRecord(
-            category: "object-definition",
-            source: .init(storedIndex: 4, sourceName: "Cloak"),
-            state: "canonical-object-definition",
-            provenance:
-                "training.mn3/TrainingMission.d3l handle 2073"
-        )
-        if !dependencies.contains(where: {
-            $0.category == objectDefinition.category
-                && $0.source == objectDefinition.source
-        }) {
-            dependencies.append(objectDefinition)
-        }
-        for clip in addedSoundClips {
-            let reached = DependencyRecord(
-                category: "sound",
-                source: .init(
-                    storedIndex: clip.sourceEntryIndex,
-                    sourceName: clip.sourceName
-                ),
-                state: "canonical-pcm-imported",
-                provenance:
-                    "\(clip.sourceArchive) \(clip.sourceSHA256)"
-            )
-            if let index = dependencies.firstIndex(where: {
-                $0.category == reached.category
-                    && $0.source == reached.source
-            }) {
-                dependencies[index] = reached
-            } else {
-                dependencies.append(reached)
-            }
-        }
-        return Level(
-            schemaVersion: 11,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingInvulnerabilityPickupChain:
-                trainingInvulnerabilityPickupChain,
-            trainingCloakPickupChain: chain,
-            voiceClips: voiceClips,
-            soundClips: soundClips + addedSoundClips,
-            dependencyManifest: .init(
-                current: dependencies,
-                historicalEagerBaseline:
-                    dependencyManifest.historicalEagerBaseline
-            ),
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
-    func addingTrainingLastRoomChain(
-        _ chain: TrainingLastRoomChain
-    ) -> Level {
-        Level(
-            schemaVersion: 11,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingInvulnerabilityPickupChain:
-                trainingInvulnerabilityPickupChain,
-            trainingCloakPickupChain: trainingCloakPickupChain,
-            trainingLastRoomChain: chain,
-            voiceClips: voiceClips,
-            soundClips: soundClips,
-            dependencyManifest: dependencyManifest,
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
-    func addingTrainingFinalRoomEntryChain(
-        _ chain: TrainingFinalRoomEntryChain,
-        voiceClip: CanonicalVoiceClip
-    ) -> Level {
-        let dependency = DependencyRecord(
-            category: "voice",
-            source: .init(
-                storedIndex: voiceClip.sourceEntryIndex,
-                sourceName: voiceClip.sourceName
-            ),
-            state: "canonical-pcm-imported",
-            provenance:
-                "\(voiceClip.sourceArchive) \(voiceClip.sourceSHA256)"
-        )
-        return Level(
-            schemaVersion: 11,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            trainingCameraMonitorChain: trainingCameraMonitorChain,
-            trainingInvulnerabilityPickupChain:
-                trainingInvulnerabilityPickupChain,
-            trainingCloakPickupChain: trainingCloakPickupChain,
-            trainingLastRoomChain: trainingLastRoomChain,
-            trainingFinalRoomEntryChain: chain,
-            voiceClips: voiceClips + [voiceClip],
-            soundClips: soundClips,
-            dependencyManifest: .init(
-                current: dependencyManifest.current + [dependency],
-                historicalEagerBaseline:
-                    dependencyManifest.historicalEagerBaseline
-            ),
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
 }

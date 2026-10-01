@@ -15,6 +15,9 @@
 		8E11FDA916308E5D87FDE173 /* StringTableImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */; };
 		C92AD00AAA0B4B237E1B1B17 /* GuideBotScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */; };
 		75501B9C341D45FBD07768EC /* TriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB2B52F636938E83E7CDA8 /* TriggerTests.swift */; };
+		B905C73663FA1F3B5FFA1B92 /* PowerupEffectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D51A057178FB7860E08B6F0 /* PowerupEffectTests.swift */; };
+		F0CFB308BDEA0CAABAADC648 /* InventoryLevelGoalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3051C17126DE0505BC800DFD /* InventoryLevelGoalTests.swift */; };
+		9DB17E9B9765D8279D24E7E1 /* TrainingLateLessonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E34E39746B5C2C17BA1962 /* TrainingLateLessonTests.swift */; };
 		7A0E47CDEFFE44C430D1F008 /* BuddyMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC90A27E30D55B716BD00FD /* BuddyMenuTests.swift */; };
 		01D46C5909D21CDAD71F06D4 /* GuideBotFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */; };
 		5E6100000000000000000001 /* TrainingDodgeManeuverScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */; };
@@ -38,6 +41,8 @@
 		277E4B14EC977227B119FD5B /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
 		0BC1F1B72D7F98FF481FE1FD /* BuddyMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */; };
 		B4BE9BD4A06A458CE78008BE /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCA77662893599B5A18A34 /* Trigger.swift */; };
+		81182FE8821F8E7E4EEEF941 /* SmallViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E943EE506F7272927B271705 /* SmallViews.swift */; };
+		41AC544707EF508F979E9F59 /* LevelGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B3019727D3058C650905E8C /* LevelGoal.swift */; };
 		BC4086E23B0AF6269CB4646A /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000001 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000001 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
@@ -65,6 +70,8 @@
 		F9EDBFA52B0F45AF122669A2 /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
 		9FE6D9DAB0B2A5304DB12BE6 /* BuddyMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */; };
 		131AF633C283823F3C33502B /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCA77662893599B5A18A34 /* Trigger.swift */; };
+		988CA94DD19ED12F044B962E /* SmallViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E943EE506F7272927B271705 /* SmallViews.swift */; };
+		44B291C8F09DF32011B27E37 /* LevelGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B3019727D3058C650905E8C /* LevelGoal.swift */; };
 		1A0686866FB1A49F2173FEA0 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000002 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000002 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
@@ -92,6 +99,8 @@
 		EE1A006B94A9BEAC16C971EE /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
 		67FE0E824A3AB386EDCC4766 /* BuddyMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */; };
 		E376FA2B0EB852E19D1FCD55 /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCA77662893599B5A18A34 /* Trigger.swift */; };
+		A0A3890AD52D1392CD324CCD /* SmallViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E943EE506F7272927B271705 /* SmallViews.swift */; };
+		DC5C263D11950431F869A461 /* LevelGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B3019727D3058C650905E8C /* LevelGoal.swift */; };
 		F80F28AAF958FB3C031517B3 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000003 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000003 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
@@ -119,6 +128,8 @@
 		F9F9682215DFE5A1E694FA4D /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
 		3F09FAC5E3071C44E3E99E8A /* BuddyMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */; };
 		6316562FA5E34EE550A6ED9D /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCA77662893599B5A18A34 /* Trigger.swift */; };
+		2D29C2286F27F86E24E06CE1 /* SmallViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E943EE506F7272927B271705 /* SmallViews.swift */; };
+		6F5F8DF3C779A58D95DC8EE0 /* LevelGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B3019727D3058C650905E8C /* LevelGoal.swift */; };
 		24782A6620743FCEDFF1E740 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000004 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000004 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
@@ -146,6 +157,8 @@
 		4A337FCE55F9DB14F7C12D40 /* Inventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B4F47EF50402AFB79757C /* Inventory.swift */; };
 		B69276682B25338200C98632 /* BuddyMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */; };
 		4F06729EC83600415B8707AE /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCA77662893599B5A18A34 /* Trigger.swift */; };
+		F0C45894201087958B19ABFF /* SmallViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E943EE506F7272927B271705 /* SmallViews.swift */; };
+		D9986B3C7E4AD9464950BD24 /* LevelGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B3019727D3058C650905E8C /* LevelGoal.swift */; };
 		87D8923A66AEB76E9E3B7EA8 /* SoundSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB55F716A78C2203311F4FA /* SoundSystem.swift */; };
 		7B0600000000000000000005 /* Damage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B06000000000000000000F0 /* Damage.swift */; };
 		7B0500000000000000000005 /* WeaponFire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B05000000000000000000F0 /* WeaponFire.swift */; };
@@ -166,34 +179,44 @@
 		7A1000000000000000000002 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A10000000000000000000F0 /* Player.swift */; };
 		7A1000000000000000000001 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A10000000000000000000F0 /* Player.swift */; };
 		7A0F00000000000000000005 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		6918ED182D1C7E33DD3289B3 /* Multisafe+Powerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A6FAB691EBC969A19EE374 /* Multisafe+Powerup.swift */; };
 		7A2000000000000000000001 /* Collide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A20000000000000000000F0 /* Collide.swift */; };
 		5E6400000000000000000001 /* PolyCollide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E64000000000000000000F0 /* PolyCollide.swift */; };
 		7A0F00000000000000000004 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		09B337DE0FE81B4BB2B88701 /* Multisafe+Powerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A6FAB691EBC969A19EE374 /* Multisafe+Powerup.swift */; };
 		7A2000000000000000000002 /* Collide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A20000000000000000000F0 /* Collide.swift */; };
 		5E6400000000000000000002 /* PolyCollide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E64000000000000000000F0 /* PolyCollide.swift */; };
 		7A0F00000000000000000003 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		D1581E2BD4B2FAB91AFDAB46 /* Multisafe+Powerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A6FAB691EBC969A19EE374 /* Multisafe+Powerup.swift */; };
 		7A2000000000000000000003 /* Collide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A20000000000000000000F0 /* Collide.swift */; };
 		5E6400000000000000000003 /* PolyCollide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E64000000000000000000F0 /* PolyCollide.swift */; };
 		7A0F00000000000000000002 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		99F9347160D9A73A36B71765 /* Multisafe+Powerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A6FAB691EBC969A19EE374 /* Multisafe+Powerup.swift */; };
 		7A2000000000000000000004 /* Collide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A20000000000000000000F0 /* Collide.swift */; };
 		5E6400000000000000000004 /* PolyCollide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E64000000000000000000F0 /* PolyCollide.swift */; };
 		7A0F00000000000000000001 /* Multisafe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000000000000000000F0 /* Multisafe.swift */; };
+		D99D7F6D362BC442A59831E5 /* Multisafe+Powerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A6FAB691EBC969A19EE374 /* Multisafe+Powerup.swift */; };
 		7A2000000000000000000005 /* Collide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A20000000000000000000F0 /* Collide.swift */; };
 		5E6400000000000000000005 /* PolyCollide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E64000000000000000000F0 /* PolyCollide.swift */; };
 		7A0E00000000000000000005 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
 		7B1300000000000000000001 /* DallasFuncs+AI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B13000000000000000000F0 /* DallasFuncs+AI.swift */; };
+		18341AF1EE14415A1F5C6812 /* DallasFuncs+Misc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEA80C7E2568FD9AA5D3E01 /* DallasFuncs+Misc.swift */; };
 		7B1200000000000000000001 /* OsirisVector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B12000000000000000000F0 /* OsirisVector.swift */; };
 		7A0E00000000000000000004 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
 		7B1300000000000000000002 /* DallasFuncs+AI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B13000000000000000000F0 /* DallasFuncs+AI.swift */; };
+		A23EEBC3885498A53CB67071 /* DallasFuncs+Misc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEA80C7E2568FD9AA5D3E01 /* DallasFuncs+Misc.swift */; };
 		7B1200000000000000000002 /* OsirisVector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B12000000000000000000F0 /* OsirisVector.swift */; };
 		7A0E00000000000000000003 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
 		7B1300000000000000000003 /* DallasFuncs+AI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B13000000000000000000F0 /* DallasFuncs+AI.swift */; };
+		E0DD91928EA9F392D8B92D3A /* DallasFuncs+Misc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEA80C7E2568FD9AA5D3E01 /* DallasFuncs+Misc.swift */; };
 		7B1200000000000000000003 /* OsirisVector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B12000000000000000000F0 /* OsirisVector.swift */; };
 		7A0E00000000000000000002 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
 		7B1300000000000000000004 /* DallasFuncs+AI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B13000000000000000000F0 /* DallasFuncs+AI.swift */; };
+		5228559C53013A9767E84F4D /* DallasFuncs+Misc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEA80C7E2568FD9AA5D3E01 /* DallasFuncs+Misc.swift */; };
 		7B1200000000000000000004 /* OsirisVector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B12000000000000000000F0 /* OsirisVector.swift */; };
 		7A0E00000000000000000001 /* DallasFuncs+Objects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */; };
 		7B1300000000000000000005 /* DallasFuncs+AI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B13000000000000000000F0 /* DallasFuncs+AI.swift */; };
+		AC0A31FCA326EA44F42B4CBA /* DallasFuncs+Misc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEA80C7E2568FD9AA5D3E01 /* DallasFuncs+Misc.swift */; };
 		7B1200000000000000000005 /* OsirisVector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B12000000000000000000F0 /* OsirisVector.swift */; };
 		7A0D00000000000000000005 /* DallasFuncs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0D000000000000000000F0 /* DallasFuncs.swift */; };
 		7A0D00000000000000000004 /* DallasFuncs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0D000000000000000000F0 /* DallasFuncs.swift */; };
@@ -220,30 +243,35 @@
 		C46B431E6F962C496D602B85 /* AIGame+GBPowerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A148F643B57957349918A026 /* AIGame+GBPowerup.swift */; };
 		9075A774E3B05096B03C149C /* AIGame+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */; };
 		E222AE502EAA48D7B79C3B36 /* AIGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B79283ACE3056A69CEA5AF0 /* AIGame.swift */; };
+		9F4D1FA7B034D8D07937ED01 /* Generic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61F0FC206BB9D0E014FD638 /* Generic.swift */; };
 		8B0EF5A72B550E66A7376B72 /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0900000000000000000004 /* LevelModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09000000000000000000F0 /* LevelModule.swift */; };
 		242120FF97188232EF032EE6 /* OsirisPredefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE699562117C75CD48C00417 /* OsirisPredefs.swift */; };
 		CC31395EB7F994D29F9ADED6 /* AIGame+GBPowerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A148F643B57957349918A026 /* AIGame+GBPowerup.swift */; };
 		3B0E7BA306232E2CC1163FB7 /* AIGame+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */; };
 		973C228477D3B96129FA7C7A /* AIGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B79283ACE3056A69CEA5AF0 /* AIGame.swift */; };
+		75F0E8378ABDCB541202E0A8 /* Generic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61F0FC206BB9D0E014FD638 /* Generic.swift */; };
 		3F060492A182DCCB6B37F0DF /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0900000000000000000003 /* LevelModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09000000000000000000F0 /* LevelModule.swift */; };
 		976ED317393306E77A51C991 /* OsirisPredefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE699562117C75CD48C00417 /* OsirisPredefs.swift */; };
 		A94BA0A9B9CC632434CC19B2 /* AIGame+GBPowerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A148F643B57957349918A026 /* AIGame+GBPowerup.swift */; };
 		A5440AF8FBE88508F605CD8A /* AIGame+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */; };
 		4F5C2E24454CF82A4DD50987 /* AIGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B79283ACE3056A69CEA5AF0 /* AIGame.swift */; };
+		4BFBDCF6FA6B4A9D2D2C4DDB /* Generic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61F0FC206BB9D0E014FD638 /* Generic.swift */; };
 		521934572A000AC6D5DDD818 /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0900000000000000000002 /* LevelModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09000000000000000000F0 /* LevelModule.swift */; };
 		22FC7689741B7B36EFE5B299 /* OsirisPredefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE699562117C75CD48C00417 /* OsirisPredefs.swift */; };
 		B815FE59BD4FEB29E2B9C340 /* AIGame+GBPowerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A148F643B57957349918A026 /* AIGame+GBPowerup.swift */; };
 		179EEB4A4C9FFC5057935DF1 /* AIGame+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */; };
 		59BBC8C098A61FA44B630106 /* AIGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B79283ACE3056A69CEA5AF0 /* AIGame.swift */; };
+		E1B488388B8C2CDBC0B1D788 /* Generic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61F0FC206BB9D0E014FD638 /* Generic.swift */; };
 		7F12FFB98AC34E3B9E04284E /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0900000000000000000001 /* LevelModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09000000000000000000F0 /* LevelModule.swift */; };
 		89D67506D812C45FDAA22386 /* OsirisPredefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE699562117C75CD48C00417 /* OsirisPredefs.swift */; };
 		3F9D1B2549A1890728544CB6 /* AIGame+GBPowerup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A148F643B57957349918A026 /* AIGame+GBPowerup.swift */; };
 		60B21874B03E064AA548758C /* AIGame+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */; };
 		8BD6DFDD8387B4159870AC55 /* AIGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B79283ACE3056A69CEA5AF0 /* AIGame.swift */; };
+		1355B38385F99B464304733B /* Generic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61F0FC206BB9D0E014FD638 /* Generic.swift */; };
 		CCB7844466FF45C894A13826 /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0700000000000000000002 /* LevelScriptImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A07000000000000000000F0 /* LevelScriptImport.swift */; };
 		57E59D7F305BF23842DBBFAE /* GameModuleImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */; };
@@ -418,7 +446,6 @@
 		DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000003 /* TrainingGuidebotTests.swift */; };
 		DC0000000000000000000016 /* TrainingGuidebotTests+Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */; };
 		DC0000000000000000000004 /* TrainingCameraAndReturnTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */; };
-		DC0000000000000000000005 /* TrainingCombatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000005 /* TrainingCombatTests.swift */; };
 		DC0000000000000000000006 /* TrainingMissionCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */; };
 		DC0000000000000000000007 /* PlayerInputAndAppKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */; };
 		DC0000000000000000000008 /* PlayerWeaponTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000008 /* PlayerWeaponTests.swift */; };
@@ -464,6 +491,9 @@
 		51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringTableImportTests.swift; sourceTree = "<group>"; };
 		A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotScriptTests.swift; sourceTree = "<group>"; };
 		7ACB2B52F636938E83E7CDA8 /* TriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerTests.swift; sourceTree = "<group>"; };
+		9D51A057178FB7860E08B6F0 /* PowerupEffectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerupEffectTests.swift; sourceTree = "<group>"; };
+		3051C17126DE0505BC800DFD /* InventoryLevelGoalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryLevelGoalTests.swift; sourceTree = "<group>"; };
+		65E34E39746B5C2C17BA1962 /* TrainingLateLessonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLateLessonTests.swift; sourceTree = "<group>"; };
 		2DC90A27E30D55B716BD00FD /* BuddyMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyMenuTests.swift; sourceTree = "<group>"; };
 		F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotFixtures.swift; sourceTree = "<group>"; };
 		5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDodgeManeuverScriptTests.swift; sourceTree = "<group>"; };
@@ -487,6 +517,8 @@
 		655B4F47EF50402AFB79757C /* Inventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Inventory.swift; sourceTree = "<group>"; };
 		EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyMenu.swift; sourceTree = "<group>"; };
 		80DCA77662893599B5A18A34 /* Trigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trigger.swift; sourceTree = "<group>"; };
+		E943EE506F7272927B271705 /* SmallViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmallViews.swift; sourceTree = "<group>"; };
+		1B3019727D3058C650905E8C /* LevelGoal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelGoal.swift; sourceTree = "<group>"; };
 		EBB55F716A78C2203311F4FA /* SoundSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundSystem.swift; sourceTree = "<group>"; };
 		7B06000000000000000000F0 /* Damage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Damage.swift; sourceTree = "<group>"; };
 		7B05000000000000000000F0 /* WeaponFire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeaponFire.swift; sourceTree = "<group>"; };
@@ -503,10 +535,12 @@
 		7B01000000000000000000F0 /* ObjectInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectInfo.swift; sourceTree = "<group>"; };
 		7A10000000000000000000F0 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		7A0F000000000000000000F0 /* Multisafe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Multisafe.swift; sourceTree = "<group>"; };
+		A3A6FAB691EBC969A19EE374 /* Multisafe+Powerup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Multisafe+Powerup.swift"; sourceTree = "<group>"; };
 		7A20000000000000000000F0 /* Collide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Collide.swift; sourceTree = "<group>"; };
 		5E64000000000000000000F0 /* PolyCollide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolyCollide.swift; sourceTree = "<group>"; };
 		7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DallasFuncs+Objects.swift"; sourceTree = "<group>"; };
 		7B13000000000000000000F0 /* DallasFuncs+AI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DallasFuncs+AI.swift"; sourceTree = "<group>"; };
+		4EEA80C7E2568FD9AA5D3E01 /* DallasFuncs+Misc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DallasFuncs+Misc.swift"; sourceTree = "<group>"; };
 		7B12000000000000000000F0 /* OsirisVector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsirisVector.swift; sourceTree = "<group>"; };
 		7A0D000000000000000000F0 /* DallasFuncs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DallasFuncs.swift; sourceTree = "<group>"; };
 		7A0C000000000000000000F0 /* OsirisLoadandBind+Timers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OsirisLoadandBind+Timers.swift"; sourceTree = "<group>"; };
@@ -517,6 +551,7 @@
 		A148F643B57957349918A026 /* AIGame+GBPowerup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIGame+GBPowerup.swift"; sourceTree = "<group>"; };
 		A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIGame+GuideBot.swift"; sourceTree = "<group>"; };
 		6B79283ACE3056A69CEA5AF0 /* AIGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIGame.swift; sourceTree = "<group>"; };
+		C61F0FC206BB9D0E014FD638 /* Generic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Generic.swift; sourceTree = "<group>"; };
 		3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultScript.swift; sourceTree = "<group>"; };
 		7A07000000000000000000F0 /* LevelScriptImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScriptImport.swift; sourceTree = "<group>"; };
 		6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameModuleImport.swift; sourceTree = "<group>"; };
@@ -585,7 +620,6 @@
 		DA0000000000000000000003 /* TrainingGuidebotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingGuidebotTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingGuidebotTests+Route.swift"; sourceTree = "<group>"; };
 		DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingCameraAndReturnTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000005 /* TrainingCombatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingCombatTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingMissionCompletionTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerInputAndAppKitTests.swift; sourceTree = "<group>"; };
 		DA0000000000000000000008 /* PlayerWeaponTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerWeaponTests.swift; sourceTree = "<group>"; };
@@ -665,9 +699,11 @@
 				A148F643B57957349918A026 /* AIGame+GBPowerup.swift */,
 				A64C25B0C47A0420702426A6 /* AIGame+GuideBot.swift */,
 				6B79283ACE3056A69CEA5AF0 /* AIGame.swift */,
+				C61F0FC206BB9D0E014FD638 /* Generic.swift */,
 				3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */,
 				7A0E000000000000000000F0 /* DallasFuncs+Objects.swift */,
 				7B13000000000000000000F0 /* DallasFuncs+AI.swift */,
+				4EEA80C7E2568FD9AA5D3E01 /* DallasFuncs+Misc.swift */,
 				7B12000000000000000000F0 /* OsirisVector.swift */,
 				7A0D000000000000000000F0 /* DallasFuncs.swift */,
 				7A0C000000000000000000F0 /* OsirisLoadandBind+Timers.swift */,
@@ -777,6 +813,8 @@
 				655B4F47EF50402AFB79757C /* Inventory.swift */,
 				EEED0ABD86A431E2A9819FF5 /* BuddyMenu.swift */,
 				80DCA77662893599B5A18A34 /* Trigger.swift */,
+				E943EE506F7272927B271705 /* SmallViews.swift */,
+				1B3019727D3058C650905E8C /* LevelGoal.swift */,
 				EBB55F716A78C2203311F4FA /* SoundSystem.swift */,
 				7B06000000000000000000F0 /* Damage.swift */,
 				7B05000000000000000000F0 /* WeaponFire.swift */,
@@ -793,6 +831,7 @@
 				7B01000000000000000000F0 /* ObjectInfo.swift */,
 				7A10000000000000000000F0 /* Player.swift */,
 				7A0F000000000000000000F0 /* Multisafe.swift */,
+				A3A6FAB691EBC969A19EE374 /* Multisafe+Powerup.swift */,
 				7A20000000000000000000F0 /* Collide.swift */,
 				5E64000000000000000000F0 /* PolyCollide.swift */,
 				H20000000000000000000001 /* PilotProfile.swift */,
@@ -872,6 +911,9 @@
 				51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */,
 				A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */,
 				7ACB2B52F636938E83E7CDA8 /* TriggerTests.swift */,
+				9D51A057178FB7860E08B6F0 /* PowerupEffectTests.swift */,
+				3051C17126DE0505BC800DFD /* InventoryLevelGoalTests.swift */,
+				65E34E39746B5C2C17BA1962 /* TrainingLateLessonTests.swift */,
 				2DC90A27E30D55B716BD00FD /* BuddyMenuTests.swift */,
 				F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */,
 				5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */,
@@ -890,7 +932,6 @@
 				DA0000000000000000000003 /* TrainingGuidebotTests.swift */,
 				DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */,
 				DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */,
-				DA0000000000000000000005 /* TrainingCombatTests.swift */,
 				DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */,
 				DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */,
 				DA0000000000000000000008 /* PlayerWeaponTests.swift */,
@@ -1117,6 +1158,7 @@
 				3F9D1B2549A1890728544CB6 /* AIGame+GBPowerup.swift in Sources */,
 				60B21874B03E064AA548758C /* AIGame+GuideBot.swift in Sources */,
 				8BD6DFDD8387B4159870AC55 /* AIGame.swift in Sources */,
+				1355B38385F99B464304733B /* Generic.swift in Sources */,
 				CCB7844466FF45C894A13826 /* DefaultScript.swift in Sources */,
 				7A0700000000000000000001 /* LevelScriptImport.swift in Sources */,
 				DFE07CD4F288FB838FD3AC2E /* GameModuleImport.swift in Sources */,
@@ -1136,6 +1178,8 @@
 				4A337FCE55F9DB14F7C12D40 /* Inventory.swift in Sources */,
 				B69276682B25338200C98632 /* BuddyMenu.swift in Sources */,
 				4F06729EC83600415B8707AE /* Trigger.swift in Sources */,
+				F0C45894201087958B19ABFF /* SmallViews.swift in Sources */,
+				D9986B3C7E4AD9464950BD24 /* LevelGoal.swift in Sources */,
 				87D8923A66AEB76E9E3B7EA8 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000005 /* Damage.swift in Sources */,
 				7B0500000000000000000005 /* WeaponFire.swift in Sources */,
@@ -1152,10 +1196,12 @@
 				7B0100000000000000000005 /* ObjectInfo.swift in Sources */,
 				7A1000000000000000000001 /* Player.swift in Sources */,
 				7A0F00000000000000000001 /* Multisafe.swift in Sources */,
+				D99D7F6D362BC442A59831E5 /* Multisafe+Powerup.swift in Sources */,
 				7A2000000000000000000005 /* Collide.swift in Sources */,
 				5E6400000000000000000005 /* PolyCollide.swift in Sources */,
 				7A0E00000000000000000001 /* DallasFuncs+Objects.swift in Sources */,
 				7B1300000000000000000005 /* DallasFuncs+AI.swift in Sources */,
+				AC0A31FCA326EA44F42B4CBA /* DallasFuncs+Misc.swift in Sources */,
 				7B1200000000000000000005 /* OsirisVector.swift in Sources */,
 				7A0D00000000000000000001 /* DallasFuncs.swift in Sources */,
 				7A0C00000000000000000001 /* OsirisLoadandBind+Timers.swift in Sources */,
@@ -1204,6 +1250,7 @@
 				B815FE59BD4FEB29E2B9C340 /* AIGame+GBPowerup.swift in Sources */,
 				179EEB4A4C9FFC5057935DF1 /* AIGame+GuideBot.swift in Sources */,
 				59BBC8C098A61FA44B630106 /* AIGame.swift in Sources */,
+				E1B488388B8C2CDBC0B1D788 /* Generic.swift in Sources */,
 				7F12FFB98AC34E3B9E04284E /* DefaultScript.swift in Sources */,
 				7A0600000000000000000002 /* LevelScripting.swift in Sources */,
 				7A1100000000000000000002 /* AIMain.swift in Sources */,
@@ -1219,6 +1266,8 @@
 				F9F9682215DFE5A1E694FA4D /* Inventory.swift in Sources */,
 				3F09FAC5E3071C44E3E99E8A /* BuddyMenu.swift in Sources */,
 				6316562FA5E34EE550A6ED9D /* Trigger.swift in Sources */,
+				2D29C2286F27F86E24E06CE1 /* SmallViews.swift in Sources */,
+				6F5F8DF3C779A58D95DC8EE0 /* LevelGoal.swift in Sources */,
 				24782A6620743FCEDFF1E740 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000004 /* Damage.swift in Sources */,
 				7B0500000000000000000004 /* WeaponFire.swift in Sources */,
@@ -1235,10 +1284,12 @@
 				7B0100000000000000000004 /* ObjectInfo.swift in Sources */,
 				7A1000000000000000000002 /* Player.swift in Sources */,
 				7A0F00000000000000000002 /* Multisafe.swift in Sources */,
+				99F9347160D9A73A36B71765 /* Multisafe+Powerup.swift in Sources */,
 				7A2000000000000000000004 /* Collide.swift in Sources */,
 				5E6400000000000000000004 /* PolyCollide.swift in Sources */,
 				7A0E00000000000000000002 /* DallasFuncs+Objects.swift in Sources */,
 				7B1300000000000000000004 /* DallasFuncs+AI.swift in Sources */,
+				5228559C53013A9767E84F4D /* DallasFuncs+Misc.swift in Sources */,
 				7B1200000000000000000004 /* OsirisVector.swift in Sources */,
 				7A0D00000000000000000002 /* DallasFuncs.swift in Sources */,
 				7A0C00000000000000000002 /* OsirisLoadandBind+Timers.swift in Sources */,
@@ -1285,6 +1336,7 @@
 				A94BA0A9B9CC632434CC19B2 /* AIGame+GBPowerup.swift in Sources */,
 				A5440AF8FBE88508F605CD8A /* AIGame+GuideBot.swift in Sources */,
 				4F5C2E24454CF82A4DD50987 /* AIGame.swift in Sources */,
+				4BFBDCF6FA6B4A9D2D2C4DDB /* Generic.swift in Sources */,
 				521934572A000AC6D5DDD818 /* DefaultScript.swift in Sources */,
 				7A0600000000000000000003 /* LevelScripting.swift in Sources */,
 				7A1100000000000000000003 /* AIMain.swift in Sources */,
@@ -1300,6 +1352,8 @@
 				EE1A006B94A9BEAC16C971EE /* Inventory.swift in Sources */,
 				67FE0E824A3AB386EDCC4766 /* BuddyMenu.swift in Sources */,
 				E376FA2B0EB852E19D1FCD55 /* Trigger.swift in Sources */,
+				A0A3890AD52D1392CD324CCD /* SmallViews.swift in Sources */,
+				DC5C263D11950431F869A461 /* LevelGoal.swift in Sources */,
 				F80F28AAF958FB3C031517B3 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000003 /* Damage.swift in Sources */,
 				7B0500000000000000000003 /* WeaponFire.swift in Sources */,
@@ -1316,10 +1370,12 @@
 				7B0100000000000000000003 /* ObjectInfo.swift in Sources */,
 				7A1000000000000000000003 /* Player.swift in Sources */,
 				7A0F00000000000000000003 /* Multisafe.swift in Sources */,
+				D1581E2BD4B2FAB91AFDAB46 /* Multisafe+Powerup.swift in Sources */,
 				7A2000000000000000000003 /* Collide.swift in Sources */,
 				5E6400000000000000000003 /* PolyCollide.swift in Sources */,
 				7A0E00000000000000000003 /* DallasFuncs+Objects.swift in Sources */,
 				7B1300000000000000000003 /* DallasFuncs+AI.swift in Sources */,
+				E0DD91928EA9F392D8B92D3A /* DallasFuncs+Misc.swift in Sources */,
 				7B1200000000000000000003 /* OsirisVector.swift in Sources */,
 				7A0D00000000000000000003 /* DallasFuncs.swift in Sources */,
 				7A0C00000000000000000003 /* OsirisLoadandBind+Timers.swift in Sources */,
@@ -1368,6 +1424,7 @@
 				CC31395EB7F994D29F9ADED6 /* AIGame+GBPowerup.swift in Sources */,
 				3B0E7BA306232E2CC1163FB7 /* AIGame+GuideBot.swift in Sources */,
 				973C228477D3B96129FA7C7A /* AIGame.swift in Sources */,
+				75F0E8378ABDCB541202E0A8 /* Generic.swift in Sources */,
 				3F060492A182DCCB6B37F0DF /* DefaultScript.swift in Sources */,
 				7A0700000000000000000002 /* LevelScriptImport.swift in Sources */,
 				57E59D7F305BF23842DBBFAE /* GameModuleImport.swift in Sources */,
@@ -1387,6 +1444,8 @@
 				F9EDBFA52B0F45AF122669A2 /* Inventory.swift in Sources */,
 				9FE6D9DAB0B2A5304DB12BE6 /* BuddyMenu.swift in Sources */,
 				131AF633C283823F3C33502B /* Trigger.swift in Sources */,
+				988CA94DD19ED12F044B962E /* SmallViews.swift in Sources */,
+				44B291C8F09DF32011B27E37 /* LevelGoal.swift in Sources */,
 				1A0686866FB1A49F2173FEA0 /* SoundSystem.swift in Sources */,
 				7B0600000000000000000002 /* Damage.swift in Sources */,
 				7B0500000000000000000002 /* WeaponFire.swift in Sources */,
@@ -1403,10 +1462,12 @@
 				7B0100000000000000000002 /* ObjectInfo.swift in Sources */,
 				7A1000000000000000000004 /* Player.swift in Sources */,
 				7A0F00000000000000000004 /* Multisafe.swift in Sources */,
+				09B337DE0FE81B4BB2B88701 /* Multisafe+Powerup.swift in Sources */,
 				7A2000000000000000000002 /* Collide.swift in Sources */,
 				5E6400000000000000000002 /* PolyCollide.swift in Sources */,
 				7A0E00000000000000000004 /* DallasFuncs+Objects.swift in Sources */,
 				7B1300000000000000000002 /* DallasFuncs+AI.swift in Sources */,
+				A23EEBC3885498A53CB67071 /* DallasFuncs+Misc.swift in Sources */,
 				7B1200000000000000000002 /* OsirisVector.swift in Sources */,
 				7A0D00000000000000000004 /* DallasFuncs.swift in Sources */,
 				7A0C00000000000000000004 /* OsirisLoadandBind+Timers.swift in Sources */,
@@ -1422,6 +1483,9 @@
 				8E11FDA916308E5D87FDE173 /* StringTableImportTests.swift in Sources */,
 				C92AD00AAA0B4B237E1B1B17 /* GuideBotScriptTests.swift in Sources */,
 				75501B9C341D45FBD07768EC /* TriggerTests.swift in Sources */,
+				B905C73663FA1F3B5FFA1B92 /* PowerupEffectTests.swift in Sources */,
+				F0CFB308BDEA0CAABAADC648 /* InventoryLevelGoalTests.swift in Sources */,
+				9DB17E9B9765D8279D24E7E1 /* TrainingLateLessonTests.swift in Sources */,
 				7A0E47CDEFFE44C430D1F008 /* BuddyMenuTests.swift in Sources */,
 				01D46C5909D21CDAD71F06D4 /* GuideBotFixtures.swift in Sources */,
 				5E6100000000000000000001 /* TrainingDodgeManeuverScriptTests.swift in Sources */,
@@ -1451,7 +1515,6 @@
 				DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */,
 				DC0000000000000000000016 /* TrainingGuidebotTests+Route.swift in Sources */,
 				DC0000000000000000000004 /* TrainingCameraAndReturnTests.swift in Sources */,
-				DC0000000000000000000005 /* TrainingCombatTests.swift in Sources */,
 				DC0000000000000000000006 /* TrainingMissionCompletionTests.swift in Sources */,
 				DC0000000000000000000007 /* PlayerInputAndAppKitTests.swift in Sources */,
 				DC0000000000000000000008 /* PlayerWeaponTests.swift in Sources */,
@@ -1516,6 +1579,7 @@
 				C46B431E6F962C496D602B85 /* AIGame+GBPowerup.swift in Sources */,
 				9075A774E3B05096B03C149C /* AIGame+GuideBot.swift in Sources */,
 				E222AE502EAA48D7B79C3B36 /* AIGame.swift in Sources */,
+				9F4D1FA7B034D8D07937ED01 /* Generic.swift in Sources */,
 				8B0EF5A72B550E66A7376B72 /* DefaultScript.swift in Sources */,
 				7A0600000000000000000005 /* LevelScripting.swift in Sources */,
 				7A1100000000000000000005 /* AIMain.swift in Sources */,
@@ -1531,6 +1595,8 @@
 				277E4B14EC977227B119FD5B /* Inventory.swift in Sources */,
 				0BC1F1B72D7F98FF481FE1FD /* BuddyMenu.swift in Sources */,
 				B4BE9BD4A06A458CE78008BE /* Trigger.swift in Sources */,
+				81182FE8821F8E7E4EEEF941 /* SmallViews.swift in Sources */,
+				41AC544707EF508F979E9F59 /* LevelGoal.swift in Sources */,
 				BC4086E23B0AF6269CB4646A /* SoundSystem.swift in Sources */,
 				7B0600000000000000000001 /* Damage.swift in Sources */,
 				7B0500000000000000000001 /* WeaponFire.swift in Sources */,
@@ -1547,10 +1613,12 @@
 				7B0100000000000000000001 /* ObjectInfo.swift in Sources */,
 				7A1000000000000000000005 /* Player.swift in Sources */,
 				7A0F00000000000000000005 /* Multisafe.swift in Sources */,
+				6918ED182D1C7E33DD3289B3 /* Multisafe+Powerup.swift in Sources */,
 				7A2000000000000000000001 /* Collide.swift in Sources */,
 				5E6400000000000000000001 /* PolyCollide.swift in Sources */,
 				7A0E00000000000000000005 /* DallasFuncs+Objects.swift in Sources */,
 				7B1300000000000000000001 /* DallasFuncs+AI.swift in Sources */,
+				18341AF1EE14415A1F5C6812 /* DallasFuncs+Misc.swift in Sources */,
 				7B1200000000000000000001 /* OsirisVector.swift in Sources */,
 				7A0D00000000000000000005 /* DallasFuncs.swift in Sources */,
 				7A0C00000000000000000005 /* OsirisLoadandBind+Timers.swift in Sources */,

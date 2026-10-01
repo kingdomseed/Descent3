@@ -487,7 +487,7 @@ final class RevivalGameplayView: MTKView {
         soundClips: [CanonicalSoundClip] = [],
         rooms: [LevelRoom] = []
     ) throws {
-        if let finalGoal = frame.trainingFinalGoal {
+        if let finalGoal = frame.levelEnd {
             clearInput()
             trainingMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
@@ -547,7 +547,7 @@ final class RevivalGameplayView: MTKView {
         shieldsLabel.isHidden = !showsOrdinaryGameplayOverlays
         invulnerabilityStatusLabel.isHidden = !showsOrdinaryGameplayOverlays
         cloakStatusLabel.isHidden = !showsOrdinaryGameplayOverlays
-        cameraMonitorBorder.isHidden = frame.trainingCameraMonitor == nil
+        cameraMonitorBorder.isHidden = frame.popupView == nil
         let energyIsLow = frame.energy <= 20
         energyLabel.stringValue = String(
             format: "Energy: %03d",
@@ -593,10 +593,10 @@ final class RevivalGameplayView: MTKView {
         )
         invulnerabilityStatusLabel.stringValue =
             Self.invulnerabilityStatusText(
-                remaining: frame.trainingInvulnerabilityRemaining
+                remaining: frame.playerInvulnerabilityRemaining
             )
         let cloakStatus = Self.cloakStatusPresentation(
-            frame.trainingCloak
+            frame.playerCloak
         )
         cloakShipMonitor.isHidden = !showsOrdinaryGameplayOverlays
         cloakShipMonitor.alphaValue = cloakStatus.shipOpacity
@@ -604,7 +604,7 @@ final class RevivalGameplayView: MTKView {
         cloakStatusLabel.alphaValue = cloakStatus.cloakOpacity
         if showsOrdinaryGameplayOverlays,
            let pulse = Self.invulnerabilityMonitorPulse(
-            remaining: frame.trainingInvulnerabilityRemaining,
+            remaining: frame.playerInvulnerabilityRemaining,
             gameTime: frame.gameTime,
             drawableWidth: bounds.width,
             drawableHeight: bounds.height
@@ -634,7 +634,7 @@ final class RevivalGameplayView: MTKView {
             frame.showsEnabledPlayerControls
                 ? Self.controlSummary(frame.enabledPlayerControls)
                 : ""
-        guard !frame.trainingOpeningFeedback.isEmpty else {
+        guard !frame.presentationFeedback.isEmpty else {
             if let expiry = trainingMessageExpiresAt,
                frame.gameTime >= expiry {
                 trainingMessageLabel.stringValue = ""
@@ -644,7 +644,7 @@ final class RevivalGameplayView: MTKView {
         }
         var presentedHUDMessages: [String] = []
         Self.presentTrainingFeedbackSequence(
-            frame.trainingOpeningFeedback,
+            frame.presentationFeedback,
             attemptVoice: {
                 try self.playTrainingVoice(named: $0, from: voiceClips)
             },
@@ -659,7 +659,7 @@ final class RevivalGameplayView: MTKView {
                 presentedHUDMessages.append(contentsOf: messages)
                 self.trainingMessageLabel.maximumNumberOfLines =
                     Self.trainingMessageLineCount(
-                        for: frame.trainingOpeningFeedback
+                        for: frame.presentationFeedback
                     )
                 self.needsLayout = true
                 self.trainingMessageLabel.stringValue =
@@ -686,7 +686,7 @@ final class RevivalGameplayView: MTKView {
     }
 
     static func presentTrainingFeedbackSequence(
-        _ feedback: [TrainingOpeningFeedback],
+        _ feedback: [PresentationFeedback],
         attemptVoice: (String) throws -> Void,
         attemptSound: (String, Float?) throws -> Void,
         presentHUDMessages: ([String]) -> Void
@@ -1301,7 +1301,10 @@ final class RevivalGameplayView: MTKView {
         return String(field.stringValue.prefix(BuddyMenu.maximumAnswerLength))
     }
 
-    func presentTrainingContentReadyState(completedLevelName: String) {
+    func presentTrainingContentReadyState(
+        completedLevelName: String,
+        succeeded: Bool = true
+    ) {
         NSObject.cancelPreviousPerformRequests(
             withTarget: self,
             selector: #selector(trainingResultAdmissionDidOpen),
@@ -1311,7 +1314,7 @@ final class RevivalGameplayView: MTKView {
         trainingResultPresentedAt = nil
         pendingTrainingResultKeyAcknowledgement = false
         trainingEndLevelLabel.stringValue = """
-        \(completedLevelName) completed.
+        \(completedLevelName) \(succeeded ? "completed" : "failed").
 
         Play Training Again, open canonical content, or quit.
         """
@@ -1536,7 +1539,7 @@ final class RevivalGameplayView: MTKView {
     }
 
     nonisolated static func cloakStatusPresentation(
-        _ cloak: TrainingCloakFrame?
+        _ cloak: ObjectCloakFrame?
     ) -> (
         cloakText: String,
         shipOpacity: CGFloat,
@@ -1799,7 +1802,7 @@ final class RevivalGameplayView: MTKView {
     }
 
     nonisolated static func trainingEndLevelText(
-        _ presentation: TrainingEndLevelPresentation
+        _ presentation: LevelEndPresentation
     ) -> String {
         [
             presentation.title,
@@ -1809,7 +1812,7 @@ final class RevivalGameplayView: MTKView {
     }
 
     nonisolated static func trainingPostLevelResultText(
-        _ result: TrainingPostLevelResult
+        _ result: PostLevelResult
     ) -> String {
         let elapsedSeconds = max(0, Int(result.elapsedTime))
         var lines = [
@@ -1894,7 +1897,7 @@ final class RevivalGameplayView: MTKView {
     }
 
     nonisolated static func trainingMessageLineCount(
-        for feedback: [TrainingOpeningFeedback]
+        for feedback: [PresentationFeedback]
     ) -> Int {
         min(4, max(2, feedback.reduce(0) {
             $0 + $1.hudMessages.count + $1.trailingHUDMessages.count

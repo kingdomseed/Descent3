@@ -22,7 +22,7 @@ final class TrainingMissionScriptTests: XCTestCase {
                 input: .zero
             )
             XCTAssertTrue(
-                frame.trainingOpeningFeedback.isEmpty,
+                frame.presentationFeedback.isEmpty,
                 "frame \(frameIndex)"
             )
             XCTAssertEqual(frame.enabledPlayerControls, [.forward])
@@ -33,7 +33,7 @@ final class TrainingMissionScriptTests: XCTestCase {
         let eleventh = session.update(at: 1.1, input: .zero)
         XCTAssertEqual(eleventh.systemsGameTime, 1, accuracy: 1e-6)
         XCTAssertEqual(
-            eleventh.trainingOpeningFeedback,
+            eleventh.presentationFeedback,
             [
                 .init(
                     hudMessages: ["Welcome to the Descent 3 Training session."],
@@ -60,7 +60,7 @@ final class TrainingMissionScriptTests: XCTestCase {
         for frameIndex in 12...20 {
             XCTAssertTrue(
                 session.update(at: Double(frameIndex) * 0.1, input: .zero)
-                    .trainingOpeningFeedback.isEmpty
+                    .presentationFeedback.isEmpty
             )
         }
     }
@@ -161,21 +161,21 @@ final class TrainingMissionScriptTests: XCTestCase {
                 name
             )
         }
-        var feedback: [TrainingOpeningFeedback] = []
+        var feedback: [PresentationFeedback] = []
         for frameIndex in 1...10 {
             feedback += session.update(
                 at: Double(frameIndex) * 0.1,
                 input: .zero
-            ).trainingOpeningFeedback
+            ).presentationFeedback
         }
         XCTAssertTrue(feedback.isEmpty)
         let eleventh = session.update(at: 1.1, input: .zero)
         XCTAssertEqual(
-            eleventh.trainingOpeningFeedback.map(\.hudMessages),
+            eleventh.presentationFeedback.map(\.hudMessages),
             [[welcome], [], [goForward]]
         )
         XCTAssertEqual(
-            eleventh.trainingOpeningFeedback.map(\.voiceSourceName),
+            eleventh.presentationFeedback.map(\.voiceSourceName),
             ["", "welcome.osf", ""]
         )
 
@@ -226,12 +226,12 @@ final class TrainingMissionScriptTests: XCTestCase {
             ),
             presentationReadyTimestamp: 0
         )
-        var feedback: [TrainingOpeningFeedback] = []
+        var feedback: [PresentationFeedback] = []
         for frameIndex in 1...11 {
             feedback += session.update(
                 at: Double(frameIndex) * 0.1,
                 input: .zero
-            ).trainingOpeningFeedback
+            ).presentationFeedback
         }
         XCTAssertEqual(
             feedback.map(\.hudMessages),

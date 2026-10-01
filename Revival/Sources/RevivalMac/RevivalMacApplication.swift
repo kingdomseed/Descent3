@@ -288,7 +288,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             )
             let frame = simulation.update(at: timestamp, input: input)
             var completionStatus: (message: String, isError: Bool)?
-            if frame.trainingFinalGoal != nil {
+            if frame.levelEnd?.recordsMissionProgress == true {
                 do {
                     try self.persistTrainingProgress(
                         package: activePackage.reference
@@ -318,7 +318,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                     world: simulation.world,
                     frame: frame
                 )
-                if frame.trainingFinalGoal != nil {
+                if frame.levelEnd != nil {
                     renderer.setFrameUpdate(nil)
                     if let completionStatus {
                         self.setStatus(
@@ -462,7 +462,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
         let active =
             NSApplication.shared.isActive
             && window?.isKeyWindow == true
-            && simulation?.trainingSessionOutcome != .completed
+            && simulation?.levelOutcome != .completed
         playerInput.setGameplayActive(
             active,
             simulation: simulation,
@@ -534,7 +534,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
 
     private func requestPlayerSaveAction(_ action: TrainingPlayerSaveAction) {
         guard let simulation,
-              simulation.trainingSessionOutcome == nil,
+              simulation.levelOutcome == nil,
               let activePackage,
               let activeProfileID,
               let gameplayView,
@@ -640,7 +640,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             }
         }
         guard
-              simulation.acknowledgeTrainingResult() == .completed else {
+              simulation.acknowledgeLevelResult() == .completed else {
             return
         }
         let timestamp = ProcessInfo.processInfo.systemUptime
@@ -651,13 +651,17 @@ private final class RevivalMacApplicationDelegate: NSObject,
         )
         gameplayView?.setGameplayActive(false)
         let completedLevelName = simulation.level.metadata.name
+        let succeeded = simulation.world.gameStateRequest == .levelEnd
         renderer?.unload()
         self.simulation = nil
         gameplayView?.presentTrainingContentReadyState(
-            completedLevelName: completedLevelName
+            completedLevelName: completedLevelName,
+            succeeded: succeeded
         )
         setStatus(
-            "Training completed. Play again, open canonical content, or quit.",
+            succeeded
+                ? "Training completed. Play again, open canonical content, or quit."
+                : "Training failed. Play again, open canonical content, or quit.",
             isError: false
         )
     }

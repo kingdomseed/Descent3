@@ -288,7 +288,8 @@ extension GameWorld {
             if let module = defaults.module,
                let id = DefaultScript.scriptID(
                    module: module,
-                   pageName: pageName
+                   pageName: pageName,
+                   isDoor: realType == .door
                ) {
                 scripts.defaultScript = DefaultScript(id)
             }

@@ -26,6 +26,9 @@ final class GameSession {
     /// Presentation the Guide-Bot asked for while the game was paused for
     /// the buddy menu. The next frame presents it first.
     var pendingMenuPresentation: [ScriptPresentationRequest] = []
+    /// The results of the level after a script ended it.
+    var postLevelResult: PostLevelResult?
+    var levelOutcome: LevelSessionOutcome?
 
     init(
         level: Level,
@@ -62,7 +65,7 @@ final class GameSession {
         lastTimestamp = resumedAtTimestamp
     }
 
-    // Forwarding accessors. The Training extension code reads and writes
+    // Forwarding accessors. The session's player frame reads and writes
     // these names directly; the storage is `world`. Later M1 steps move that
     // code onto `GameWorld` methods and delete these.
     var frameDuration: Float {
@@ -129,39 +132,6 @@ final class GameSession {
         get { world.playerRearViewState }
         set { world.playerRearViewState = newValue }
     }
-    var trainingCameraMonitorState: TrainingCameraMonitorState? {
-        get { world.trainingCameraMonitorState }
-        set { world.trainingCameraMonitorState = newValue }
-    }
-    var trainingKillbotEntryState: TrainingKillbotEntryState? {
-        get { world.trainingKillbotEntryState }
-        set { world.trainingKillbotEntryState = newValue }
-    }
-    var trainingInvulnerabilityPickupState: TrainingInvulnerabilityPickupState? {
-        get { world.trainingInvulnerabilityPickupState }
-        set { world.trainingInvulnerabilityPickupState = newValue }
-    }
-    var trainingCloakPickupState: TrainingCloakPickupState? {
-        get { world.trainingCloakPickupState }
-        set { world.trainingCloakPickupState = newValue }
-    }
-    var trainingFinalRoomEntryState: TrainingFinalRoomEntryState? {
-        get { world.trainingFinalRoomEntryState }
-        set { world.trainingFinalRoomEntryState = newValue }
-    }
-    var trainingFinalGoalState: TrainingFinalGoalState? {
-        get { world.trainingFinalGoalState }
-        set { world.trainingFinalGoalState = newValue }
-    }
-    var trainingPostLevelResult: TrainingPostLevelResult? {
-        get { world.trainingPostLevelResult }
-        set { world.trainingPostLevelResult = newValue }
-    }
-    var trainingSessionOutcome: TrainingSessionOutcome? {
-        get { world.trainingSessionOutcome }
-        set { world.trainingSessionOutcome = newValue }
-    }
-
     func fastPlayerHeadlight(
         from player: GameObject
     ) -> PlayerFastHeadlightFrame {
@@ -250,17 +220,55 @@ final class GameSession {
             playerRearViewState = state
         }
     }
-    func acknowledgeTrainingResult() -> TrainingSessionOutcome? {
-        guard trainingPostLevelResult != nil else { return nil }
-        trainingSessionOutcome = .completed
-        return trainingSessionOutcome
+    /// The player closed the results of the ended level.
+    func acknowledgeLevelResult() -> LevelSessionOutcome? {
+        guard postLevelResult != nil else { return nil }
+        levelOutcome = .completed
+        return levelOutcome
     }
 
-    func makeTrainingPostLevelResult(
+    /// GameSequencer's GAMESTATE_LVLEND and GAMESTATE_LVLFAILED
+    /// (gamesequence.cpp:1240-1262), after the frame in which a script
+    /// asked for them: SuspendControls, then EndLevel (:1844): the results
+    /// (PostLevelResults, :1891), and FreeThisLevel's FreeLevelScript,
+    /// which sends the level EVT_LEVELEND (Mission.cpp:1706). The next
+    /// level, or the restart of a failed one, belongs to the mission flow
+    /// (M3); the session stops at the results (architecture.md section 9).
+    func sequenceLevelEnd(elapsedTime: Float) -> LevelEndFrame? {
+        guard let request = world.gameStateRequest else { return nil }
+        if postLevelResult == nil {
+            postLevelResult = makePostLevelResult(
+                succeeded: request == .levelEnd,
+                elapsedTime: elapsedTime
+            )
+            levelOutcome = .awaitingResultAcknowledgement
+            world.osirisCallLevelEvent(.levelEnd, level: level)
+            // The level's script requests end with the level.
+            world.presentationRequests = []
+        }
+        guard let postLevelResult else { return nil }
+        return LevelEndFrame(
+            endLevelState: request == .levelEnd ? .succeeded : .failed,
+            controlsAreSuspended: true,
+            presentation: .init(
+                title: postLevelResult.title,
+                levelName: level.metadata.name,
+                difficulty: .rookie,
+                showsHUD: false,
+                playsGameplayAudio: false,
+                showsCockpit: false,
+                showsHeadlightIndicator: false
+            ),
+            postLevelResult: postLevelResult
+        )
+    }
+
+    func makePostLevelResult(
+        succeeded: Bool,
         elapsedTime: Float
-    ) -> TrainingPostLevelResult {
-        TrainingPostLevelResult(
-            title: "Mission Successful",
+    ) -> PostLevelResult {
+        PostLevelResult(
+            title: succeeded ? "Mission Successful" : "Mission Failed",
             levelName: level.metadata.name,
             difficulty: .rookie,
             // Players[0].score and num_kills_level (PlayerScoreAdd,
@@ -268,15 +276,14 @@ final class GameSession {
             score: Int(world.playerScore),
             elapsedTime: elapsedTime,
             enemyKills: Int(world.playerKillsLevel),
-            // Player damage, death, and restore ownership are later Phase 5
-            // islands. The current normal Training path retains its source
-            // initial ratings and has no admitted death or restore transition.
+            // The deaths and restores arrive with player death and respawn
+            // (M2) and save counts (M4).
             shields: shields,
             energy: energy,
             deaths: 0,
             restores: 0,
-            // Training's two camera goals do not carry LGF_TELCOM_LISTS, so
-            // SinglePlayerPostLevelResults presents no objective rows.
+            // The objective rows list the goals with LGF_TELCOM_LISTS
+            // (SinglePlayerPostLevelResults), which arrive with TelCom (M4).
             objectives: []
         )
     }
@@ -288,39 +295,40 @@ final class GameSession {
     /// voice path plays each clip at its imported volume, and every
     /// translated call passes volume 1. A 2D sound plays its sound clip at
     /// the clip's import volume times the requested volume.
-    func takeScriptPresentation() -> [TrainingOpeningFeedback] {
+    func takeScriptPresentation() -> [PresentationFeedback] {
         let requests = pendingMenuPresentation + world.presentationRequests
         pendingMenuPresentation = []
         world.presentationRequests = []
         return requests.map { request in
             switch request {
             case let .hudMessage(message):
-                TrainingOpeningFeedback(
+                PresentationFeedback(
                     hudMessages: [message],
                     voiceSourceName: "",
                     voicePrecedesHUDMessages: false
                 )
             case let .streamedAudio(name, _):
-                TrainingOpeningFeedback(
+                PresentationFeedback(
                     hudMessages: [],
                     voiceSourceName: level.scripting?.streamedAudio
                         .first { $0.name == name }?.key ?? name,
                     voicePrecedesHUDMessages: false
                 )
             case let .sound2D(index, volume):
-                TrainingOpeningFeedback(
+                PresentationFeedback(
                     hudMessages: [],
                     voiceSourceName: "",
                     voicePrecedesHUDMessages: false,
                     soundSourceName: level.soundClips[index].logicalName,
                     soundEventVolume: volume
                 )
-            case let .sound(name):
-                TrainingOpeningFeedback(
+            case let .sound(name, volume):
+                PresentationFeedback(
                     hudMessages: [],
                     voiceSourceName: "",
                     voicePrecedesHUDMessages: false,
-                    soundSourceName: name
+                    soundSourceName: name,
+                    soundEventVolume: volume == 1 ? nil : volume
                 )
             }
         }
