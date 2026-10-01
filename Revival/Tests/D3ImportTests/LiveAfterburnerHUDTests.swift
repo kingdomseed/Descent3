@@ -193,7 +193,7 @@ extension WorldRenderingTests {
             accuracy: 0.000_001
         )
 
-        try view.presentTrainingOpening(frame: freshFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: freshFrame, voiceClips: [])
         view.layoutSubtreeIfNeeded()
         let item = try afterburnerItem(in: view)
         XCTAssertEqual(item.stringValue, "Afterburner: 100%")
@@ -203,17 +203,17 @@ extension WorldRenderingTests {
         XCTAssertLessThanOrEqual(item.frame.maxX, 1_120 - 24)
 
         XCTAssertEqual(try frameFuel(shiftedFrame), 4.9, accuracy: 0.000_001)
-        try view.presentTrainingOpening(frame: shiftedFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: shiftedFrame, voiceClips: [])
         XCTAssertEqual(item.stringValue, "Afterburner: 98%")
         XCTAssertEqual(item.accessibilityLabel(), "Afterburner")
 
-        try view.presentTrainingOpening(frame: rechargedFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: rechargedFrame, voiceClips: [])
         XCTAssertEqual(item.stringValue, "Afterburner: 100%")
 
-        try view.presentTrainingOpening(frame: truncationFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: truncationFrame, voiceClips: [])
         XCTAssertEqual(item.stringValue, "Afterburner: 98%")
 
-        try view.presentTrainingOpening(frame: warningFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: warningFrame, voiceClips: [])
         XCTAssertEqual(item.stringValue, "Afterburner: 30%")
         XCTAssertEqual(
             item.accessibilityLabel(),
@@ -225,15 +225,15 @@ extension WorldRenderingTests {
             .monospacedDigitSystemFont(ofSize: 18, weight: .bold)
         )
 
-        try view.presentTrainingOpening(frame: rearFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: rearFrame, voiceClips: [])
         XCTAssertTrue(item.isHidden)
 
-        try view.presentTrainingOpening(frame: warningFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: warningFrame, voiceClips: [])
         XCTAssertFalse(item.isHidden)
-        try view.presentTrainingOpening(frame: finalFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: finalFrame, voiceClips: [])
         XCTAssertTrue(item.isHidden)
 
-        try editorView.presentTrainingOpening(
+        try editorView.presentGameplayFrame(
             frame: editorFrame,
             voiceClips: []
         )
@@ -333,17 +333,6 @@ extension WorldRenderingTests {
         let destroyBot1: UInt32 = 4_113
         let destroyBot2: UInt32 = 4_112
         var level = makeTrainingMovingTargetHandoffLevel()
-        level = replacing(
-            level,
-            trainingRobotGuidebotChain: .init(
-                guidebotObjectHandle: 12_288,
-                deployedGuidebotObjectType: 2,
-                deployedGuidebotMessage: "",
-                deployedGuidebotVoiceSourceName: "",
-                guidebot: .stockTraining
-            )
-        )
-
         let playerIndex = try XCTUnwrap(level.objects.firstIndex {
             $0.handle == level.defaultPlayerBinding?.objectHandle
         })
@@ -409,22 +398,6 @@ extension WorldRenderingTests {
             level.rooms[reciprocalRoomIndex]
                 .portals[portal.connectedPortal].flags |= 1
         }
-        level = replacing(
-            level,
-            trainingGalleryBarrier: .init(
-                triggerName: "Portal2",
-                triggerRoomSourceIndex: 37,
-                triggerFaceIndex: 0,
-                barrierRoomSourceIndex: 2,
-                orderedPortalIndices: [1, 0],
-                markerLightObjectHandle: 6_163,
-                openMarkerLightDistance: 50,
-                successMessage: "Excellent!",
-                guidebotInstruction: "",
-                voiceSourceName: ""
-            )
-        )
-
         let seed = GameSession(
             level: level,
             presentationReadyTimestamp: 0,
@@ -646,7 +619,7 @@ extension WorldRenderingTests {
         )
         view.heldInputChanged = { playerInput.setHeld($0) }
         view.setGameplayActive(true)
-        try view.presentTrainingOpening(
+        try view.presentGameplayFrame(
             frame: script036Frame,
             voiceClips: simulation.level.voiceClips
         )
@@ -655,7 +628,7 @@ extension WorldRenderingTests {
             in: view
         )
         let controlSummary = try textField(
-            accessibilityLabel: "Enabled Training controls",
+            accessibilityLabel: "Enabled controls",
             in: view
         )
         XCTAssertEqual(
@@ -704,7 +677,7 @@ extension WorldRenderingTests {
             accuracy: 0.000_001,
             "the first normal update after Script 036 must drain authoritative fuel 5.0 to 4.9"
         )
-        try view.presentTrainingOpening(
+        try view.presentGameplayFrame(
             frame: drainFrame,
             voiceClips: simulation.level.voiceClips
         )
@@ -733,7 +706,7 @@ extension WorldRenderingTests {
             accuracy: 0.000_001,
             "releasing AppKit Shift must recharge authoritative fuel"
         )
-        try view.presentTrainingOpening(
+        try view.presentGameplayFrame(
             frame: rechargeFrame,
             voiceClips: simulation.level.voiceClips
         )

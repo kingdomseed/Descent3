@@ -96,9 +96,7 @@ func extractPreparedModelDrawItems(
         rooms: level.rooms,
         startRoomSourceIndex: startRoomSourceIndex
     )
-    let presentationByHandle = Dictionary(
-        uniqueKeysWithValues: level.objectPresentations.map { ($0.objectHandle, $0) }
-    )
+    let presentations = ObjectPresentationLookup(level)
     let modelBySource = Dictionary(
         uniqueKeysWithValues: level.models.map { ($0.source, $0) }
     )
@@ -106,13 +104,22 @@ func extractPreparedModelDrawItems(
         uniqueKeysWithValues: level.presentationMaterials.map { ($0.texture, $0) }
     )
     var items: [ModelDrawItem] = []
-    // GPU preparation covers the level's initial placement, the eager
-    // working set loaded with the level.
-    for object in ObjectTable(level: level) {
+    // GPU preparation covers the objects of the started level: the initial
+    // placement, the eager working set loaded with the level, and the
+    // objects level start makes (AIInitAll's Guide-Bot). An object made
+    // later has no prepared draws and is not drawn.
+    // A level without a player start (a valid non-player scene) has no
+    // level start; its placed objects are prepared.
+    let startObjects = level.defaultPlayerBinding == nil
+        || level.objectPresentations.isEmpty
+            && (level.objectInfos ?? []).allSatisfy { $0.presentation == nil }
+        ? ObjectTable(level: level)
+        : GameWorld(level: level).objects
+    for object in startObjects {
         guard object.handle.rawValue != excludedObjectHandle,
               case let .room(roomSourceIndex) = object.location,
               component.contains(roomSourceIndex),
-              let presentation = presentationByHandle[object.handle.rawValue]
+              let presentation = presentations.presentation(of: object)
         else {
             continue
         }
@@ -126,7 +133,7 @@ func extractPreparedModelDrawItems(
                 object: object,
                 model: modelBySource[source]!,
                 materialByTexture: materialByTexture,
-                camera: .trainingRoom3,
+                camera: .preparationPlaceholder,
                 cullBackfaces: false
             )
         }
@@ -300,10 +307,7 @@ private func admittedRenderObjects(
     visibility: SourceVisibleWorld,
     excludedObjectHandle: UInt32?
 ) -> [(object: GameObject, model: CanonicalModel)] {
-    guard !level.objectPresentations.isEmpty else { return [] }
-    let presentationByHandle = Dictionary(
-        uniqueKeysWithValues: level.objectPresentations.map { ($0.objectHandle, $0) }
-    )
+    let presentations = ObjectPresentationLookup(level)
     let modelBySource = Dictionary(
         uniqueKeysWithValues: level.models.map { ($0.source, $0) }
     )
@@ -316,7 +320,7 @@ private func admittedRenderObjects(
         // (renderobject.cpp:1214).
         guard object.handle.rawValue != excludedObjectHandle,
               object.type != .dummy,
-              let presentation = presentationByHandle[object.handle.rawValue],
+              let presentation = presentations.presentation(of: object),
               object.renderType == .polyobj,
               case let .room(roomSourceIndex) = object.location,
               visibleRooms.contains(roomSourceIndex),
@@ -813,7 +817,7 @@ func extractPreparedWeaponObjectDrawItems(_ level: Level) -> [ModelDrawItem] {
                     forward: .init(x: 0, y: 0, z: 1)
                 ),
                 roomSourceIndex: room.sourceIndex,
-                camera: .trainingRoom3
+                camera: .preparationPlaceholder
             )
         }
     }
@@ -1135,9 +1139,7 @@ private func sourceCoronaRayIsOccluded(
     ).outcome, contact.distance < distance - 0.000_1 {
         return true
     }
-    let presentationByHandle = Dictionary(
-        uniqueKeysWithValues: level.objectPresentations.map { ($0.objectHandle, $0) }
-    )
+    let presentations = ObjectPresentationLookup(level)
     let modelBySource = Dictionary(
         uniqueKeysWithValues: level.models.map { ($0.source, $0) }
     )
@@ -1146,7 +1148,7 @@ private func sourceCoronaRayIsOccluded(
               object.type == .robot || object.type == .player,
               case let .room(roomSourceIndex) = object.location,
               visibleRooms.contains(roomSourceIndex),
-              let presentation = presentationByHandle[object.handle.rawValue],
+              let presentation = presentations.presentation(of: object),
               object.renderType == .polyobj,
               let model = modelBySource[presentation.primaryModel] else {
             continue

@@ -24,7 +24,7 @@ extension WorldRenderingTests {
             device: nil
         )
         let initialFrame = simulation.update(at: 0.01, input: .zero)
-        try view.presentTrainingOpening(
+        try view.presentGameplayFrame(
             frame: initialFrame,
             voiceClips: []
         )
@@ -42,14 +42,14 @@ extension WorldRenderingTests {
             input: .init(firesPrimaryWeapon: true)
         )
         XCTAssertEqual(simulation.energy, 99.85, accuracy: 0.000_01)
-        try view.presentTrainingOpening(frame: firedFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: firedFrame, voiceClips: [])
         XCTAssertEqual(item.stringValue, "Energy: 099")
         XCTAssertEqual(item.accessibilityLabel(), "Energy")
 
         simulation.energy = 20
         let warningFrame = simulation.update(at: 0.03, input: .zero)
         XCTAssertEqual(simulation.energy, 20)
-        try view.presentTrainingOpening(frame: warningFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: warningFrame, voiceClips: [])
         XCTAssertEqual(
             item.stringValue,
             String(format: "Energy: %03d", Int(simulation.energy))
@@ -65,16 +65,16 @@ extension WorldRenderingTests {
             input: .init(rearViewPressed: true, rearViewHeld: true)
         )
         XCTAssertTrue(rearFrame.rearViewIsActive)
-        try view.presentTrainingOpening(frame: rearFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: rearFrame, voiceClips: [])
         XCTAssertTrue(item.isHidden)
 
-        try view.presentTrainingOpening(frame: warningFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: warningFrame, voiceClips: [])
         XCTAssertFalse(item.isHidden)
 
         // Script 057 ends the level (TrainingMission.cpp:2309).
         let finalFrame = try trainingLevelEndFrame().frame
         XCTAssertNotNil(finalFrame.levelEnd)
-        try view.presentTrainingOpening(frame: finalFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: finalFrame, voiceClips: [])
         XCTAssertTrue(item.isHidden)
 
         let project = try makeProject(
@@ -90,7 +90,7 @@ extension WorldRenderingTests {
             input: .init(firesPrimaryWeapon: true)
         )
         let editorView = RevivalGameplayView(frame: view.frame, device: nil)
-        try editorView.presentTrainingOpening(
+        try editorView.presentGameplayFrame(
             frame: editorFrame,
             voiceClips: []
         )

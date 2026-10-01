@@ -174,12 +174,15 @@ struct GameWorld: Codable, Equatable, Sendable {
             }
             objects[object.handle]?.flags |= GameObject.bigObjectFlag
         }
-        // StartLevel runs Level_goals.InitLevel (gamesequence.cpp:1566),
-        // then DeleteMultiplayerObjects.
+        // StartLevel runs AIInitAll, which makes the Guide-Bot in the lowest
+        // free slot (gamesequence.cpp:1482), then Level_goals.InitLevel
+        // (:1566), then DeleteMultiplayerObjects (:1572), before the level
+        // script starts (:1584).
+        aiInitAll(level: level)
         levelGoalsInitLevel(level: level)
         // DeleteMultiplayerObjects (Player.cpp:1365), from StartLevel in
         // single player (gamesequence.cpp:1572): every other player object
-        // is deleted, in slot order, before the level script and AI start.
+        // is deleted, in slot order, before the level script starts.
         for slot in 0..<ObjectTable.capacity {
             guard let object = objects.slots[slot], object.type == .player,
                   object.handle.rawValue != binding.objectHandle
@@ -188,9 +191,6 @@ struct GameWorld: Codable, Equatable, Sendable {
             }
             objects.delete(object.handle)
         }
-        // StartLevel runs AIInitAll before the level script starts
-        // (gamesequence.cpp:1482, :1584).
-        aiInitAll(level: level)
         startLevelScripts(level: level)
     }
 

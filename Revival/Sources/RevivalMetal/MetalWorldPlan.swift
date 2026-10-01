@@ -156,11 +156,14 @@ private func makeMetalWorldPlan(
     let objectOffset = preparedRoomDraws.count
     let activeDrawIndices =
         Array(initialRoomIndices.prefix(opaqueRoomDraws.count))
-        + objectDraws.map {
-            objectOffset + preparedObjectIndexByIdentity[MetalModelDrawIdentity($0)]!
+        // An object with no prepared draws (one made after level start) is
+        // not drawn.
+        + objectDraws.compactMap {
+            preparedObjectIndexByIdentity[MetalModelDrawIdentity($0)]
+                .map { objectOffset + $0 }
         }
         + Array(initialRoomIndices.dropFirst(opaqueRoomDraws.count))
-    let preparedDraws =
+    var preparedDraws =
         preparedRoomDraws
         + preparedObjectDraws
         + preparedObjectDraws
@@ -168,6 +171,13 @@ private func makeMetalWorldPlan(
         + preparedVisEffectBillboardDraws
         + preparedLineSparkDraws
         + preparedWeaponBillboardDraws
+    // The first frame shows each object as this view sees it, as each update
+    // does (a facing submodel turns to the camera).
+    for draw in objectDraws {
+        if let index = preparedObjectIndexByIdentity[MetalModelDrawIdentity(draw)] {
+            preparedDraws[objectOffset + index] = draw
+        }
+    }
     let draws = activeDrawIndices.map { preparedDraws[$0] }
     let lightCoronaStates = extraction.lightCoronas.map {
         MetalLightCoronaState(corona: $0, scalar: 0)
@@ -364,9 +374,13 @@ private func updateMetalWorldPlan(
     let opaqueIndices = opaqueRoomDraws.map {
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
-    let objectIndices = objectDraws.map {
-        objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
+    // An object with no prepared draws (one made after level start) is not
+    // drawn.
+    let preparedObjectDraws = objectDraws.compactMap { draw in
+        objectIndicesByIdentity[MetalModelDrawIdentity(draw)]?.first
+            .map { (index: $0.offset, draw: draw) }
     }
+    let objectIndices = preparedObjectDraws.map(\.index)
     let weaponObjectIndices = weaponObjectDraws.map {
         objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
     }
@@ -427,9 +441,11 @@ private func updateMetalWorldPlan(
     let auxiliaryTranslucent =
         auxiliaryExtraction?.translucentDrawItems
             .map(makeMetalWorldDraw) ?? []
-    let auxiliaryObjectIndices = auxiliaryObjects.map {
-        objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.last!.offset
+    let preparedAuxiliaryObjects = auxiliaryObjects.compactMap { draw in
+        objectIndicesByIdentity[MetalModelDrawIdentity(draw)]?.last
+            .map { (index: $0.offset, draw: draw) }
     }
+    let auxiliaryObjectIndices = preparedAuxiliaryObjects.map(\.index)
     let auxiliaryOpaqueIndices = auxiliaryOpaque.map {
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
@@ -440,7 +456,7 @@ private func updateMetalWorldPlan(
         auxiliaryOpaqueIndices
         + auxiliaryObjectIndices
         + auxiliaryTranslucentIndices
-    for (index, draw) in zip(objectIndices, objectDraws) {
+    for (index, draw) in preparedObjectDraws {
         updatedPreparedDraws[index] = draw
     }
     for (index, draw) in zip(opaqueIndices, opaqueRoomDraws) {
@@ -467,7 +483,7 @@ private func updateMetalWorldPlan(
     for (index, draw) in zip(lineSparkIndices, lineSparkDraws) {
         updatedPreparedDraws[index] = draw
     }
-    for (index, draw) in zip(auxiliaryObjectIndices, auxiliaryObjects) {
+    for (index, draw) in preparedAuxiliaryObjects {
         updatedPreparedDraws[index] = draw
     }
     for (index, draw) in zip(auxiliaryOpaqueIndices, auxiliaryOpaque) {
@@ -1118,7 +1134,7 @@ private func makePreparedBillboardDraws(
                 texture: texture,
                 opacity: 1
             ) },
-            camera: .trainingRoom3,
+            camera: .preparationPlaceholder,
             capacity: capacity,
             handleBase: handleBase
         )
@@ -1141,7 +1157,7 @@ private func makePreparedVisEffectLineSparkDraws(
             start: player.position,
             end: added(player.position, player.orientation.right)
         ) },
-        camera: .trainingRoom3
+        camera: .preparationPlaceholder
     )
 }
 

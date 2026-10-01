@@ -76,7 +76,7 @@ final class LevelScriptImportTests: XCTestCase {
         XCTAssertEqual(scripting.sounds, [.init(name: "beep", key: "Beep")])
 
         let scripted = level.addingScripting(scripting)
-        XCTAssertEqual(scripted.schemaVersion, 12)
+        XCTAssertEqual(scripted.schemaVersion, Level.scriptedSchemaVersion)
         XCTAssertEqual(scripted.scripting, scripting)
     }
 
@@ -167,6 +167,214 @@ final class LevelScriptImportTests: XCTestCase {
         }
     }
 
+    /// The sounds the level script names and the engine sounds reach the
+    /// package from their sound pages, each WAV from the first library in
+    /// cfile search order (cfile.cpp:264), keyed by the page name.
+    func testScriptAndEngineSoundsReachThePackage() throws {
+        func wav(_ sample: Int16) -> Data {
+            var data = Data("RIFF".utf8)
+            data.appendLevelScriptUInt32(38)
+            data.append(Data("WAVEfmt ".utf8))
+            data.appendLevelScriptUInt32(16)
+            data.appendLevelScriptUInt16(1)
+            data.appendLevelScriptUInt16(1)
+            data.appendLevelScriptUInt32(22_050)
+            data.appendLevelScriptUInt32(44_100)
+            data.appendLevelScriptUInt16(2)
+            data.appendLevelScriptUInt16(16)
+            data.append(Data("data".utf8))
+            data.appendLevelScriptUInt32(2)
+            data.append(UInt8(truncatingIfNeeded: sample))
+            data.append(UInt8(truncatingIfNeeded: sample >> 8))
+            return data
+        }
+        let mission = makeLevelScriptArchive(
+            relativePath: "missions/synthetic.mn3",
+            entries: [("Shared.wav", wav(1))]
+        )
+        let base = makeLevelScriptArchive(
+            relativePath: "base.hog",
+            entries: [("Shared.wav", wav(2)), ("Beep.wav", wav(3))]
+                + EngineSound.names.map { ("\($0).wav", wav(4)) }
+        )
+        func library(_ archive: LevelScriptArchive) -> PreparedLibrary {
+            .init(
+                file: .init(
+                    relativePath: archive.relativePath,
+                    byteCount: archive.data.count,
+                    sha256: canonicalSHA256(archive.data)
+                ),
+                data: archive.data,
+                archive: archive.archive
+            )
+        }
+        let table = makeRetailPage(type: 7, body: makeSoundPageBody("Beep", "Beep.wav"))
+            + makeRetailPage(type: 7, body: makeSoundPageBody("Shared Page", "Shared.wav"))
+            + EngineSound.names.map {
+                makeRetailPage(type: 7, body: makeSoundPageBody($0, "\($0).wav"))
+            }.reduce(Data(), +)
+        let sources = ImportSources(
+            profile: .training,
+            inventories: [],
+            searchOrder: [library(mission), library(base)],
+            table: table,
+            overlay: Data(),
+            mission: PreparedRetailProfile.training.missions[0],
+            descriptor: .init(name: "Synthetic", levels: []),
+            level: PreparedRetailProfile.training.missions[0].levels[0],
+            levelFileName: "Synthetic.D3L",
+            levelEntry: mission.archive.entries[0],
+            levelData: Data()
+        )
+        var sounds = SoundImportCache(sources: sources)
+        let level = try makeLevelScriptImportLevel()
+            .addingLevelScriptAudio(
+                references: .init(
+                    soundNames: ["beep", "Shared Page", "Beep"],
+                    streamedAudioNames: []
+                ),
+                sources: sources,
+                sounds: &sounds
+            )
+            .addingEngineSounds(sounds: &sounds)
+
+        XCTAssertEqual(
+            level.soundClips.map(\.logicalName),
+            ["Beep", "Shared Page"] + EngineSound.names
+        )
+        let shared = try XCTUnwrap(level.soundClips.first {
+            $0.logicalName == "Shared Page"
+        })
+        // The mission library's copy hides the base library's.
+        XCTAssertEqual(shared.sourceArchive, "missions/synthetic.mn3")
+        XCTAssertEqual(shared.pcm16LittleEndian, Data([1, 0]))
+        XCTAssertTrue(level.dependencyManifest.current.contains {
+            $0.category == "sound"
+                && $0.source == .init(storedIndex: 0, sourceName: "Shared.wav")
+        })
+        XCTAssertThrowsError(
+            try makeLevelScriptImportLevel().addingLevelScriptAudio(
+                references: .init(soundNames: ["Missing"], streamedAudioNames: []),
+                sources: sources,
+                sounds: &sounds
+            )
+        )
+    }
+
+    /// LoadWeaponFireImage (weapon.cpp:627-654): a vclip fire image is
+    /// loaded from the file the weapon names, with every frame, stepped at
+    /// DEFAULT_FRAMETIME (vclip.cpp:176), saturated for WF_SATURATE; a
+    /// bitmap has one frame; a missing file is an import error.
+    func testWeaponFireImageLoadsTheNamedFileDirectly() throws {
+        func ogf(_ name: String, _ pixel: UInt16) -> Data {
+            var data = Data([0, 0, 122])
+            data.append(Data(name.utf8))
+            data.append(0)
+            data.append(1)
+            data.append(Data(repeating: 0, count: 9))
+            data.appendLevelScriptUInt16(1)
+            data.appendLevelScriptUInt16(1)
+            data.append(32)
+            data.append(40)
+            data.append(0)
+            data.appendLevelScriptUInt16(pixel)
+            return data
+        }
+        var oaf = Data([127, 1, 2])
+        oaf.appendLevelScriptUInt32(Float(0.3).bitPattern)
+        oaf.append(ogf("spark000.ogf", 0xfc00))
+        oaf.append(ogf("spark001.ogf", 0x83e0))
+        let archive = makeLevelScriptArchive(
+            relativePath: "base.hog",
+            entries: [("Spark.oaf", oaf), ("Dot.ogf", ogf("dot.ogf", 0x801f))]
+        )
+        let library = PreparedLibrary(
+            file: .init(
+                relativePath: archive.relativePath,
+                byteCount: archive.data.count,
+                sha256: canonicalSHA256(archive.data)
+            ),
+            data: archive.data,
+            archive: archive.archive
+        )
+        let sources = ImportSources(
+            profile: .training,
+            inventories: [],
+            searchOrder: [library],
+            table: Data(),
+            overlay: Data(),
+            mission: PreparedRetailProfile.training.missions[0],
+            descriptor: .init(name: "Synthetic", levels: []),
+            level: PreparedRetailProfile.training.missions[0].levels[0],
+            levelFileName: "Synthetic.D3L",
+            levelEntry: archive.archive.entries[0],
+            levelData: Data()
+        )
+        func weapon(_ fireImage: String, flags: UInt32) -> RetailWeaponPresentationSelection {
+            .init(
+                storedIndex: 54, name: "Sparks", hudImageName: "",
+                fireImageName: fireImage, particleName: "", particleCount: 0,
+                particleLifetime: 0, particleSize: 0, weaponFlags: flags,
+                timeoutSpawnName: "", timeoutSpawnCount: 0,
+                alternateSpawnName: "", alternateSpawnChance: 0,
+                customSize: 0, modelPageSize: 0, mass: 0, drag: 0,
+                physicsFlags: 0, coefficientOfRestitution: 0, speed: 0,
+                rotationalVelocity: .zero, lifetime: 0,
+                explosionTextureName: "", explosionLifetime: 0,
+                explosionSize: 0, playerDamage: 0, genericDamage: 0,
+                impactSize: 0, impactTime: 0, impactPlayerDamage: 0,
+                impactGenericDamage: 0, impactForce: 0, lightDistance: 0,
+                lightPresentation: .init(
+                    primaryColor: .zero, secondaryColor: .zero,
+                    timeInterval: 0, flickerDistance: 0, directionalDot: 0,
+                    flags: 0, timebits: 0, angle: 0, lightingRenderType: 0
+                ),
+                soundLogicalNames: []
+            )
+        }
+
+        let slot = SourceResource(storedIndex: 3_000, sourceName: "spark.OAF")
+        let vclip = try importWeaponFireImage(
+            weapon("spark.OAF", flags: 1 << 5 | 1 << 10),
+            texture: slot,
+            sources: sources
+        )
+        XCTAssertEqual(
+            vclip.image.frames,
+            [slot, .init(storedIndex: 3_000, sourceName: "spark.OAF frame 1")]
+        )
+        XCTAssertEqual(vclip.image.frameTime, 0.07)
+        XCTAssertEqual(vclip.materials.map(\.texture), vclip.image.frames)
+        XCTAssertEqual(
+            vclip.materials.map(\.image.rgba8),
+            [Data([255, 0, 0, 255]), Data([0, 255, 0, 255])]
+        )
+        XCTAssertEqual(vclip.materials[0].blend, .additiveSourceAlpha(opacity: 255))
+        XCTAssertEqual(vclip.materials[0].sourceArchive, "base.hog")
+
+        let bitmap = try importWeaponFireImage(
+            weapon("Dot.ogf", flags: 1 << 1),
+            texture: .init(storedIndex: 3_001, sourceName: "Dot.ogf"),
+            sources: sources
+        )
+        XCTAssertEqual(bitmap.image.frames.count, 1)
+        XCTAssertEqual(bitmap.image.frameTime, 0)
+        XCTAssertEqual(bitmap.materials[0].blend, .sourceAlpha(opacity: 255))
+
+        XCTAssertThrowsError(
+            try importWeaponFireImage(
+                weapon("gone.oaf", flags: 1 << 5),
+                texture: .init(storedIndex: 3_002, sourceName: "gone.oaf"),
+                sources: sources
+            )
+        ) {
+            XCTAssertEqual(
+                $0 as? D3ImportOperationError,
+                .missingPresentationAsset("gone.oaf")
+            )
+        }
+    }
+
     func testMessageFileFollowsLegacyReaderRules() throws {
         // cfgetc (cfile.cpp:627) turns CR, CRLF, and LF into one newline.
         // cf_ReadString (cfile.cpp:783) keeps at most 1,023 bytes of a line
@@ -235,8 +443,8 @@ final class LevelScriptImportTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory
             .appending(path: "revival-scripting-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
-        try writeCanonicalPackage(level, to: root)
-        XCTAssertEqual(try loadCanonicalLevel(from: root), level)
+        try writeCanonicalPackage(level, to: root, schemaPolicy: .includingScriptFreeTestSchemas)
+        XCTAssertEqual(try loadCanonicalLevel(from: root, schemaPolicy: .includingScriptFreeTestSchemas), level)
     }
 
     func testSchemaElevenLoadsWithoutScriptData() throws {

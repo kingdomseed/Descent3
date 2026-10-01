@@ -174,13 +174,13 @@ extension WorldRenderingTests {
             )
         )
         XCTAssertEqual(
-            RevivalGameplayView.trainingEndLevelText(
+            RevivalGameplayView.levelEndText(
                 finalGoal.presentation
             ),
             "Mission Successful\nTraining Mission\nDifficulty: Rookie"
         )
         XCTAssertEqual(
-            RevivalGameplayView.trainingPostLevelResultText(
+            RevivalGameplayView.postLevelResultText(
                 finalGoal.postLevelResult
             ),
             """
@@ -197,42 +197,42 @@ extension WorldRenderingTests {
             """
         )
         XCTAssertTrue(
-            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+            RevivalGameplayView.requestsLevelResultAcknowledgement(
                 keyCode: 36,
                 resultIsPresented: true,
                 presentationElapsedTime: 2
             )
         )
         XCTAssertFalse(
-            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+            RevivalGameplayView.requestsLevelResultAcknowledgement(
                 keyCode: 36,
                 resultIsPresented: true,
                 presentationElapsedTime: 1.999
             )
         )
         XCTAssertFalse(
-            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+            RevivalGameplayView.requestsLevelResultAcknowledgement(
                 keyCode: 36,
                 resultIsPresented: false,
                 presentationElapsedTime: 2
             )
         )
         XCTAssertTrue(
-            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+            RevivalGameplayView.requestsLevelResultAcknowledgement(
                 keyCode: 49,
                 resultIsPresented: true,
                 presentationElapsedTime: 2
             )
         )
         XCTAssertTrue(
-            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+            RevivalGameplayView.requestsLevelResultAcknowledgement(
                 keyCode: 53,
                 resultIsPresented: true,
                 presentationElapsedTime: 2
             )
         )
         XCTAssertFalse(
-            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+            RevivalGameplayView.requestsLevelResultAcknowledgement(
                 resultIsPresented: true,
                 presentationElapsedTime: 1.999,
                 queuedKey: false,
@@ -241,7 +241,7 @@ extension WorldRenderingTests {
             )
         )
         XCTAssertTrue(
-            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+            RevivalGameplayView.requestsLevelResultAcknowledgement(
                 resultIsPresented: true,
                 presentationElapsedTime: 2,
                 queuedKey: true,
@@ -250,7 +250,7 @@ extension WorldRenderingTests {
             )
         )
         XCTAssertTrue(
-            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+            RevivalGameplayView.requestsLevelResultAcknowledgement(
                 resultIsPresented: true,
                 presentationElapsedTime: 2,
                 queuedKey: false,
@@ -259,7 +259,7 @@ extension WorldRenderingTests {
             )
         )
         XCTAssertTrue(
-            RevivalGameplayView.requestsTrainingResultAcknowledgement(
+            RevivalGameplayView.requestsLevelResultAcknowledgement(
                 resultIsPresented: true,
                 presentationElapsedTime: 2,
                 queuedKey: false,
@@ -288,11 +288,11 @@ extension WorldRenderingTests {
     func testCompletedTrainingSessionOffersOneDirectRestartAction() throws {
         let view = RevivalGameplayView(frame: .zero, device: nil)
         var restartRequests = 0
-        view.trainingRestartRequested = {
+        view.playAgainRequested = {
             restartRequests += 1
         }
 
-        view.presentTrainingContentReadyState(
+        view.presentContentReadyState(
             completedLevelName: "Training Mission"
         )
 
@@ -303,7 +303,7 @@ extension WorldRenderingTests {
         )
         let restartButton = try XCTUnwrap(
             view.subviews.compactMap { $0 as? NSButton }.first {
-                $0.title == "Play Training Again"
+                $0.title == "Play Again"
             }
         )
         XCTAssertFalse(restartButton.isHidden)
@@ -313,23 +313,23 @@ extension WorldRenderingTests {
             """
             Training Mission completed.
 
-            Play Training Again, open canonical content, or quit.
+            Play again, open canonical content, or quit.
             """
         )
-        view.requestTrainingRestart()
+        view.requestPlayAgain()
         XCTAssertEqual(restartRequests, 1)
 
-        view.setTrainingRestartAvailable(false)
+        view.setPlayAgainAvailable(false)
         XCTAssertFalse(restartButton.isEnabled)
-        view.requestTrainingRestart()
+        view.requestPlayAgain()
         XCTAssertEqual(restartRequests, 1)
 
-        view.setTrainingRestartAvailable(true)
+        view.setPlayAgainAvailable(true)
         XCTAssertTrue(restartButton.isEnabled)
-        view.requestTrainingRestart()
+        view.requestPlayAgain()
         XCTAssertEqual(restartRequests, 2)
 
-        view.prepareForTrainingSession()
+        view.prepareForLevelSession()
         XCTAssertTrue(restartButton.isHidden)
         XCTAssertFalse(restartButton.isEnabled)
     }
@@ -395,9 +395,10 @@ extension WorldRenderingTests {
             missionKey: "descent3.mission.pilot-training",
             levelKey: "descent3.level.training-mission"
         )
-        let completed = try library.recordTrainingCompletion(
+        let completed = try library.recordMissionCompletion(
             profileID: profileID,
-            package: package
+            package: package,
+            missionName: "Pilot Training"
         )
         let progress = try XCTUnwrap(
             completed.profiles.first?.missionProgress.first
@@ -420,6 +421,71 @@ extension WorldRenderingTests {
         )
 
         XCTAssertEqual(simulation.acknowledgeLevelResult(), .completed)
+    }
+
+    /// CurrentPilotUpdateMissionStatus (pilot.cpp:1463): a pilot keeps one
+    /// progress record per mission, keyed by the package's mission key.
+    func testMissionCompletionIsKeyedByMissionKey() throws {
+        let rootURL = FileManager.default.temporaryDirectory.appending(
+            path: "revival-mission-progress-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        let library = PilotProfileLibrary(rootURL: rootURL)
+        let profileID = try XCTUnwrap(
+            library.createProfile(named: "Alice").profiles.first?.id
+        )
+        func package(_ mission: String, _ digit: Character) -> CanonicalPackageReference {
+            .init(
+                identitySHA256: String(repeating: digit, count: 64),
+                missionKey: mission,
+                levelKey: mission + ".level-1"
+            )
+        }
+        _ = try library.recordMissionCompletion(
+            profileID: profileID,
+            package: package("descent3.mission.first", "a"),
+            missionName: "First"
+        )
+        _ = try library.recordMissionCompletion(
+            profileID: profileID,
+            package: package("descent3.mission.second", "b"),
+            missionName: "Second"
+        )
+        // A new package of the first mission replaces its record, even when
+        // the mission's NAME changed.
+        let replaced = try library.recordMissionCompletion(
+            profileID: profileID,
+            package: package("descent3.mission.first", "c"),
+            missionName: "First Renamed"
+        )
+        let progress = try XCTUnwrap(replaced.profiles.first?.missionProgress)
+        XCTAssertEqual(
+            progress.map(\.package.missionKey),
+            ["descent3.mission.second", "descent3.mission.first"]
+        )
+        XCTAssertEqual(progress.map(\.missionName), ["Second", "First Renamed"])
+        XCTAssertEqual(
+            progress.last?.package.identitySHA256,
+            String(repeating: "c", count: 64)
+        )
+        // Two missions with the same NAME keep separate records.
+        let sameName = try library.recordMissionCompletion(
+            profileID: profileID,
+            package: package("descent3.mission.third", "d"),
+            missionName: "Second"
+        )
+        XCTAssertEqual(
+            sameName.profiles.first?.missionProgress.map(\.package.missionKey),
+            ["descent3.mission.second", "descent3.mission.first",
+             "descent3.mission.third"]
+        )
+        XCTAssertEqual(try library.load(), sameName)
+        XCTAssertThrowsError(try library.recordMissionCompletion(
+            profileID: profileID,
+            package: package("descent3.mission.fourth", "e"),
+            missionName: ""
+        ))
     }
 
     func testPilotProfileBoundaryRejectsMalformedAndUnsupportedRecords()

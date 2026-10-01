@@ -83,11 +83,74 @@ struct CanonicalObjectInfo: Codable, Equatable, Sendable {
     /// `script_name_override` (version 19), nil when empty: the name
     /// GetGOScriptID reads instead of the page name.
     var scriptNameOverride: String? = nil
+    /// The page's polymodels, which ObjInit gives every object made from
+    /// the page (PageInPolymodel, ObjInit.cpp:788). Absent before package
+    /// schema 13, or for a page with no model.
+    var presentation: ObjectPagePresentation? = nil
 
     /// The page name Osiris_BindScriptsToObject gives GetGOScriptID
     /// (OsirisLoadandBind.cpp:1476-1482).
     var defaultScriptName: String {
         scriptNameOverride ?? name
+    }
+}
+
+/// The polymodels of an object page (object_info `render_handle`,
+/// `med_render_handle`, `lo_render_handle`, their `med_lod_distance` and
+/// `lo_lod_distance`, and the dying model, objinfo.h).
+struct ObjectPagePresentation: Codable, Equatable, Sendable {
+    let primaryModel: SourceResource
+    let mediumModel: SourceResource?
+    let lowModel: SourceResource?
+    let dyingModel: SourceResource?
+    let mediumDistance: Float?
+    let lowDistance: Float?
+
+    /// Every model the page names.
+    var models: [SourceResource] {
+        [primaryModel, mediumModel, lowModel, dyingModel].compactMap { $0 }
+    }
+
+    /// The presentation of one object made from the page.
+    func reference(objectHandle: UInt32) -> ObjectPresentationReference {
+        .init(
+            objectHandle: objectHandle,
+            primaryModel: primaryModel,
+            mediumModel: mediumModel,
+            lowModel: lowModel,
+            dyingModel: dyingModel,
+            mediumDistance: mediumDistance,
+            lowDistance: lowDistance
+        )
+    }
+}
+
+/// The models each object draws and collides with: a placed object's
+/// presentation, or, for an object made at run time, the models of its
+/// object page (ObjInit, ObjInit.cpp:788).
+struct ObjectPresentationLookup {
+    private let byHandle: [UInt32: ObjectPresentationReference]
+    private let pages: [CanonicalObjectInfo]
+
+    init(_ level: Level) {
+        byHandle = Dictionary(
+            uniqueKeysWithValues: level.objectPresentations.map {
+                ($0.objectHandle, $0)
+            }
+        )
+        pages = level.objectInfos ?? []
+    }
+
+    func presentation(of object: GameObject) -> ObjectPresentationReference? {
+        if let placed = byHandle[object.handle.rawValue] {
+            return placed
+        }
+        guard let info = object.info, pages.indices.contains(info) else {
+            return nil
+        }
+        return pages[info].presentation?.reference(
+            objectHandle: object.handle.rawValue
+        )
     }
 }
 
@@ -412,6 +475,11 @@ extension Level {
         }
     }
 
+    /// The presentation of an object (`ObjectPresentationLookup`).
+    func objectPresentation(of object: GameObject) -> ObjectPresentationReference? {
+        ObjectPresentationLookup(self).presentation(of: object)
+    }
+
     /// The primary model of a placed object.
     func placedObjectModel(_ handle: ObjectHandle) -> CanonicalModel? {
         guard let presentation = objectPresentations.first(where: {
@@ -502,6 +570,18 @@ extension Level {
         )
         for info in objectInfos ?? [] {
             try require(
+                info.presentation.map { page in
+                    (page.mediumModel != nil) == (page.mediumDistance != nil)
+                        && (page.lowModel != nil) == (page.lowDistance != nil)
+                        && page.mediumDistance.map { $0.isFinite && $0 > 0 }
+                            != false
+                        && page.lowDistance.map {
+                            $0.isFinite && $0 > (page.mediumDistance ?? 0)
+                        } != false
+                } != false,
+                "object info \(info.name) models"
+            )
+            try require(
                 info.size.isFinite && info.size >= 0
                     && (info.ai == nil) == (info.flags
                         & CanonicalObjectInfo.controlAIFlag == 0)
@@ -553,22 +633,20 @@ extension Level {
                 )
             }
         }
-        // Each placed AI object's page against its model, as WBFireBattery
+        // Each AI page against the model it fires from, as WBFireBattery
         // (robotfire.cpp:111) reads them: one page battery per model
         // battery (ObjInit.cpp:815), a weapon entry per gun point, and a
-        // weapon for every gun point a firing mask sets.
-        for placed in objects where [2, 7, 11, 16].contains(placed.type) {
-            guard let name = placed.definition?.sourceName,
-                  let info = objectInfos?.first(where: {
-                      $0.name.caseInsensitiveCompare(name) == .orderedSame
-                  }),
-                  info.ai != nil
-            else {
-                continue
-            }
-            let modelBatteries = placedObjectModel(
-                ObjectHandle(placed.handle)
-            )?.weaponBatteries ?? []
+        // weapon for every gun point a firing mask sets. The model is a
+        // placed object's or, for an object made at run time (the
+        // Guide-Bot), its page's.
+        func requireGuns(
+            _ info: CanonicalObjectInfo,
+            model: SourceResource?,
+            _ what: String
+        ) throws {
+            let modelBatteries = model.flatMap { source in
+                models.first { $0.source == source }?.weaponBatteries
+            } ?? []
             try require(
                 info.weaponBatteries.count == modelBatteries.count
                     && zip(info.weaponBatteries, modelBatteries).allSatisfy {
@@ -584,7 +662,32 @@ extension Level {
                                 }
                             }
                     },
+                what
+            )
+        }
+        for placed in objects where [2, 7, 11, 16].contains(placed.type) {
+            guard let name = placed.definition?.sourceName,
+                  let info = objectInfos?.first(where: {
+                      $0.name.caseInsensitiveCompare(name) == .orderedSame
+                  }),
+                  info.ai != nil
+            else {
+                continue
+            }
+            try requireGuns(
+                info,
+                model: objectPresentations.first {
+                    $0.objectHandle == placed.handle
+                }?.primaryModel,
                 "object \(placed.handle) guns"
+            )
+        }
+        for info in objectInfos ?? [] {
+            guard info.ai != nil, let page = info.presentation else { continue }
+            try requireGuns(
+                info,
+                model: page.primaryModel,
+                "object info \(info.name) guns"
             )
         }
         for model in models {

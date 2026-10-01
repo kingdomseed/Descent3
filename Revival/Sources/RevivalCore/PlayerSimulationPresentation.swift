@@ -44,10 +44,12 @@ struct RoomCamera: Codable, Equatable, Sendable {
         self.projection = projection
     }
 
-    static let trainingRoom3 = RoomCamera(
-        position: .init(x: 2_061.7124, y: -220.75536, z: 2_206.3005),
-        target: .init(x: 2_061.7124, y: -200, z: 2_206.3005),
-        up: .init(x: 0, y: 0, z: 1)
+    /// The camera of the draws the renderer prepares before an object is
+    /// seen (a placeholder; each frame replaces the draws it shows).
+    static let preparationPlaceholder = RoomCamera(
+        position: .zero,
+        target: .init(x: 0, y: 0, z: 1),
+        up: .init(x: 0, y: 1, z: 0)
     )
 }
 

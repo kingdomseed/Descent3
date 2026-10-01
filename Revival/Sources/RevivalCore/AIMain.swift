@@ -111,46 +111,35 @@ extension GameWorld {
     /// AIInitAll (AImain.cpp:3810), run by StartLevel before the level
     /// script starts (gamesequence.cpp:1482): AIInit for every AI object in
     /// slot order, then, in single player, the Guide-Bot: ObjCreate of
-    /// ROBOT_GUIDEBOT at the player with the player as parent, ghosted, as
-    /// Buddy_handle (:3833-3839). Then ResetPlayerObject gives the player
-    /// the Guide-Bot in the inventory while it is not out (Player.cpp:1451).
-    /// The random draws of level load come before the seed.
-    ///
-    /// Until objects are created at level start (M1 step 10), the level's
-    /// imported object with the Guide-Bot page stands in for the one
-    /// ObjCreate makes: it keeps its slot and handle.
+    /// ROBOT_GUIDEBOT at the player's room and position with the player as
+    /// parent (ObjInitGeneric's draw, ObjInit.cpp:728, and its AIInit),
+    /// ghosted, as Buddy_handle (:3833-3839). Then ResetPlayerObject gives
+    /// the player the Guide-Bot in the inventory while it is not out
+    /// (Player.cpp:1451). The random draws of level load come before the
+    /// seed.
     mutating func aiInitAll(level: Level) {
         buddyHandle = .none
-        let guideBotPage = objectFindID(
-            CanonicalObjectInfo.guideBotPageName, level: level
-        )
-        let buddy = objects.first {
-            guideBotPage >= 0 && $0.info == guideBotPage && $0.ai != nil
-        }?.handle
         for slot in 0..<ObjectTable.capacity {
-            guard let object = objects.slots[slot], object.ai != nil,
-                  object.handle != buddy
-            else {
+            guard let object = objects.slots[slot], object.ai != nil else {
                 continue
             }
             aiInit(object.handle, level: level)
         }
+        let guideBotPage = objectFindID(
+            CanonicalObjectInfo.guideBotPageName, level: level
+        )
         let player = playerObjectHandle(slot: 0, level: level)
-        if let buddy, let playerObject = objects[player],
-           var object = objects[buddy] {
-            // ObjCreate(OBJ_ROBOT, ROBOT_GUIDEBOT, player room, player
-            // position, NULL, player handle): identity orientation, the
-            // polygon render type, the creation time, and ObjInitGeneric's
-            // draw (ObjInit.cpp:728) before its AIInit.
-            object.location = playerObject.location
-            object.position = playerObject.position
-            object.orientation = Self.identityOrientation
-            object.renderType = .polyobj
-            object.parent = player
-            object.creationTime = gameTime
-            object.velocity = .zero
-            objects[buddy] = object
-            _ = psRand()
+        if guideBotPage >= 0, let playerObject = objects[player],
+           case let .room(room) = playerObject.location,
+           let buddy = createGenericObject(
+               infoIndex: guideBotPage,
+               info: level.objectInfos![guideBotPage],
+               roomSourceIndex: room,
+               position: playerObject.position,
+               orientation: Self.identityOrientation,
+               level: level
+           ) {
+            objects[buddy]?.parent = player
             aiInit(buddy, level: level)
             buddyHandle = buddy
             ghostObject(buddy)
@@ -291,7 +280,7 @@ extension GameWorld {
             return true
         }
         if target.ai != nil, !target.usesPhysics,
-           (level.placedObjectModel(target.handle)?.weaponBatteries?.count
+           (level.polygonModel(of: target)?.weaponBatteries?.count
                 ?? 0) == 0 {
             return false
         }
@@ -539,7 +528,7 @@ extension GameWorld {
     func aiDetermineFovVec(_ object: GameObject, level: Level) -> Vector3 {
         guard let ai = object.ai else { return object.orientation.forward }
         if ai.flags & ObjectAIFrame.aimPointFOVFlag != 0,
-           let model = level.placedObjectModel(object.handle),
+           let model = level.polygonModel(of: object),
            let battery = model.weaponBatteries?.first,
            let info = object.info.flatMap({ level.objectInfos?[$0] }),
            let wb = info.weaponBatteries.first,

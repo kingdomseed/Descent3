@@ -355,6 +355,8 @@ extension GameWorld {
 
     /// ObjCreate of a generic object at run time: ObjInitGeneric
     /// (ObjInit.cpp:718) draws first (:728), then sets the page's values.
+    /// A page with a polymodel makes a polygon object of the model's size
+    /// (ObjSetRenderPolyobj and PageInPolymodel, :779-789).
     mutating func createGenericObject(
         infoIndex: Int,
         info: CanonicalObjectInfo,
@@ -377,11 +379,17 @@ extension GameWorld {
         _ = psRand()
         guard var object = objects[created] else { return nil }
         object.creationTime = gameTime
+        let model = info.presentation.flatMap { page in
+            level.models.first { $0.source == page.primaryModel }
+        }
+        if model != nil {
+            object.renderType = .polyobj
+        }
         object = Self.initialGenericObject(
             object,
             info: info,
             infoIndex: infoIndex,
-            model: nil
+            model: model
         )
         if let physics = info.physics,
            info.flags & CanonicalObjectInfo.usesPhysicsFlag != 0 {

@@ -132,10 +132,6 @@ final class ObjectTableTests: XCTestCase {
             world.testPlayerObject.flags,
             GameObject.polygonObjectFlag | GameObject.destroyableFlag
         )
-        // The Guide-Bot stand-in's stored 0x110f carries OF_DEAD; it lives.
-        let guidebot = try XCTUnwrap(world.objects[ObjectHandle(6_164)])
-        XCTAssertEqual(guidebot.flags & GameObject.deadFlag, 0)
-        XCTAssertEqual(guidebot.flags & 0x10c, 0)
     }
 
     func testStaleHandleIsRejectedAfterFreeAndReuse() throws {

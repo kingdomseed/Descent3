@@ -36,7 +36,19 @@ private enum D3LV127SourceLimit {
     static let terrainSatellites = 5
 }
 
-func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
+/// The package identity of a decoded level: its mission and level keys, and
+/// the eager working set measured for the exact level, if any.
+struct D3LevelIdentity: Equatable, Sendable {
+    let missionKey: String
+    let levelKey: String
+    let historicalEagerBaseline: EagerDependencyBaseline?
+}
+
+func parseD3LV127(
+    _ data: Data,
+    source: LevelSource,
+    identity: D3LevelIdentity
+) throws -> Level {
     let chunks = try walkD3LV127Chunks(data)
     let expected = [
         "PATH", "TSND", "NLMP", "PSTR", "TXNM", "GNNM", "DRNM", "ROOM", "TERR", "OHND",
@@ -107,7 +119,7 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
         terrain: terrain,
         objects: objects,
         lightmaps: lightmaps,
-        exactTraining: source.levelSHA256 == "915a561cd3bd720d88bffed72fe41b4ff711c287711f060ecd9696e2cd5f7d41"
+        historicalEagerBaseline: identity.historicalEagerBaseline
     )
     let boaTables = try parseBOATables(
         payloads["CBOA"]!,
@@ -115,8 +127,8 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
         terrain: terrain
     )
     var level = Level(
-        missionKey: "descent3.mission.pilot-training",
-        levelKey: "descent3.level.training-mission",
+        missionKey: identity.missionKey,
+        levelKey: identity.levelKey,
         source: source,
         metadata: metadata,
         rooms: rooms,
@@ -1208,7 +1220,7 @@ private func makeDependencyManifest(
     terrain: LevelTerrain,
     objects: [PlacedObject],
     lightmaps: LightmapCatalog,
-    exactTraining: Bool
+    historicalEagerBaseline: EagerDependencyBaseline?
 ) -> DependencyManifest {
     var records: [DependencyRecord] = []
     var seen = Set<String>()
@@ -1256,9 +1268,7 @@ private func makeDependencyManifest(
     }
     return DependencyManifest(
         current: records,
-        historicalEagerBaseline: exactTraining
-            ? .init(textureCount: 232, soundCount: 115, modelCount: 88, lightmapInfoCount: 2_531)
-            : nil
+        historicalEagerBaseline: historicalEagerBaseline
     )
 }
 

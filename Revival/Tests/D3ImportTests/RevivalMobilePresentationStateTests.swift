@@ -26,7 +26,7 @@ final class RevivalMobilePresentationStateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: rootURL) }
 
         let coordinator = RevivalMobileContentCoordinator(
-            library: CanonicalPackageLibrary(rootURL: rootURL)
+            library: CanonicalPackageLibrary(rootURL: rootURL, schemaPolicy: .includingScriptFreeTestSchemas)
         )
         try coordinator.prepareForUse()
 

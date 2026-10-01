@@ -350,7 +350,7 @@ extension GameWorld {
         var world = self
         let moving = Set([
             level.defaultPlayerBinding?.objectHandle,
-            level.trainingRobotGuidebotChain?.guidebotObjectHandle,
+            world.buddyHandle == .none ? nil : world.buddyHandle.rawValue,
         ].compactMap { $0 })
         for placed in level.objects where !moving.contains(placed.handle) {
             let handle = ObjectHandle(placed.handle)

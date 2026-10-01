@@ -71,21 +71,8 @@ func makeTrainingGalleryBarrierLevel() -> Level {
     )
     level = replacing(level, triggers: [trigger])
     return rescriptedTrainingLevel(
-        level.addingTrainingGalleryBarrier(
+        level.addingAudioClips(voiceClips: [
             .init(
-                triggerName: trigger.name,
-                triggerRoomSourceIndex: trigger.roomIndex,
-                triggerFaceIndex: trigger.faceIndex,
-                barrierRoomSourceIndex: 2,
-                orderedPortalIndices: [1, 0],
-                markerLightObjectHandle: 6_163,
-                openMarkerLightDistance: 50,
-                successMessage: "Excellent!",
-                guidebotInstruction:
-                    "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
-                voiceSourceName: "guidebota.osf"
-            ),
-            voiceClip: .init(
                 sourceName: "guidebota.osf",
                 sourceEntryIndex: 0,
                 sampleRate: 22_050,
@@ -95,8 +82,8 @@ func makeTrainingGalleryBarrierLevel() -> Level {
                 pcmSHA256: canonicalSHA256(Data(repeating: 0, count: 2)),
                 sourceArchive: "missions/training.mn3",
                 sourceSHA256: String(repeating: "a", count: 64)
-            )
-        )
+            ),
+        ])
     )
 }
 
@@ -1047,29 +1034,6 @@ func script050ReadyContinuation(
 func makeTrainingGuidebotBlockedMovementLevel() -> Level {
     var level = makeTrainingRobotGuidebotLevel()
     let player = level.objects.first { $0.handle == 2_048 }!
-    let chain = level.trainingRobotGuidebotChain!
-    level = replacing(
-        level,
-        trainingRobotGuidebotChain: .init(
-            guidebotObjectHandle: chain.guidebotObjectHandle,
-            deployedGuidebotObjectType:
-                chain.deployedGuidebotObjectType,
-            deployedGuidebotMessage: chain.deployedGuidebotMessage,
-            deployedGuidebotVoiceSourceName:
-                chain.deployedGuidebotVoiceSourceName,
-            guidebot: .init(
-                collisionRadius: chain.guidebot.collisionRadius,
-                maximumVelocity: chain.guidebot.maximumVelocity,
-                maximumDeltaVelocity:
-                    chain.guidebot.maximumDeltaVelocity,
-                birthForwardVelocity:
-                    chain.guidebot.birthForwardVelocity,
-                goalForwardDistance: 40,
-                goalCircleDistance:
-                    chain.guidebot.goalCircleDistance
-            )
-        )
-    )
     guard case let .room(roomSourceIndex) = player.location else {
         preconditionFailure("expected indoor player")
     }

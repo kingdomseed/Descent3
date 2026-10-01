@@ -395,6 +395,41 @@ extension GameSession {
     }
 }
 
+/// The gallery barrier that Scripts 032 and 036 open and close in a
+/// Training level (TrainingMission.cpp:2040-2046, :2325-2340): the room of
+/// the Portal2 trigger, its portals 1 and 0 in script order, and
+/// FlashLight-2, the marker light. Test data derived from the level.
+struct TrainingGalleryBarrierFixture: Equatable {
+    let triggerName: String
+    let triggerRoomSourceIndex: Int
+    let triggerFaceIndex: Int
+    let barrierRoomSourceIndex: Int
+    let orderedPortalIndices: [Int]
+    let markerLightObjectHandle: UInt32
+}
+
+extension Level {
+    /// The level's Training gallery barrier, if it has the Portal2 trigger
+    /// and FlashLight-2.
+    var trainingGalleryBarrier: TrainingGalleryBarrierFixture? {
+        guard let trigger = triggers.first(where: { $0.name == "Portal2" }),
+              let marker = objects.first(where: {
+                  $0.instanceName == "FlashLight-2"
+              })
+        else {
+            return nil
+        }
+        return .init(
+            triggerName: trigger.name,
+            triggerRoomSourceIndex: trigger.roomIndex,
+            triggerFaceIndex: trigger.faceIndex,
+            barrierRoomSourceIndex: trigger.roomIndex,
+            orderedPortalIndices: [1, 0],
+            markerLightObjectHandle: marker.handle
+        )
+    }
+}
+
 extension GameSession {
     /// The world Script 036 leaves when DestroyBot2 dies
     /// (TrainingMission.cpp:2040-2046), for an unscripted fixture: the robot

@@ -39,7 +39,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
     private var activePackage: ActivatedCanonicalPackage?
     private var profileRecord: PilotProfileLibraryRecord?
     private var activeProfileID: UUID?
-    private var pendingTrainingProgressPackage: CanonicalPackageReference?
+    private var pendingMissionProgressPackage: CanonicalPackageReference?
     private var playerInput = PlayerInputState()
     private var statusLabel: NSTextField?
     private var contentRequests = CanonicalPackageRequestQueue<ContentRequest>()
@@ -87,8 +87,8 @@ private final class RevivalMacApplicationDelegate: NSObject,
             )
             setStatus(
                 record.profiles.isEmpty
-                    ? "Create and confirm a named pilot before Training."
-                    : "Confirm a pilot for this Training session.",
+                    ? "Create and confirm a named pilot before you play."
+                    : "Confirm a pilot for this session.",
                 isError: false
             )
         } catch {
@@ -194,7 +194,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
         case let .install(packageURL):
             setStatus("Installing \(packageURL.lastPathComponent)…", isError: false)
         }
-        gameplayView?.setTrainingRestartAvailable(false)
+        gameplayView?.setPlayAgainAvailable(false)
 
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -225,7 +225,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                             isError: false
                         )
                     }
-                    self.gameplayView?.setTrainingRestartAvailable(true)
+                    self.gameplayView?.setPlayAgainAvailable(true)
                     return
                 }
                 try self.present(activation, with: renderer)
@@ -241,7 +241,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                     "Could not \(operation): \(error.localizedDescription)",
                     isError: true
                 )
-                self.gameplayView?.setTrainingRestartAvailable(true)
+                self.gameplayView?.setPlayAgainAvailable(true)
             }
         }
     }
@@ -259,7 +259,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             level: activation.level,
             presentationReadyTimestamp: presentationReadyTimestamp
         )
-        gameplayView?.prepareForTrainingSession()
+        gameplayView?.prepareForLevelSession()
         activePackage = activation
         self.simulation = simulation
         playerInput = PlayerInputState()
@@ -290,24 +290,24 @@ private final class RevivalMacApplicationDelegate: NSObject,
             var completionStatus: (message: String, isError: Bool)?
             if frame.levelEnd?.recordsMissionProgress == true {
                 do {
-                    try self.persistTrainingProgress(
+                    try self.persistMissionProgress(
                         package: activePackage.reference
                     )
                     completionStatus = (
-                        "Training progress saved. Acknowledge the result to complete the session.",
+                        "\(self.missionDisplayName) progress saved. Acknowledge the result to complete the session.",
                         false
                     )
                 } catch {
-                    self.pendingTrainingProgressPackage =
+                    self.pendingMissionProgressPackage =
                         activePackage.reference
                     completionStatus = (
-                        "Training completed, but progress was not saved: \(error.localizedDescription) Fix storage access, then acknowledge again to retry.",
+                        "\(self.missionDisplayName) completed, but progress was not saved: \(error.localizedDescription) Fix storage access, then acknowledge again to retry.",
                         true
                     )
                 }
             }
             do {
-                try self.gameplayView?.presentTrainingOpening(
+                try self.gameplayView?.presentGameplayFrame(
                     frame: frame,
                     voiceClips: simulation.level.voiceClips,
                     soundClips: simulation.level.soundClips,
@@ -433,11 +433,11 @@ private final class RevivalMacApplicationDelegate: NSObject,
             gameplayView.playerSaveActionRequested = {
                 [weak self] in self?.requestPlayerSaveAction($0)
             }
-            gameplayView.trainingResultAcknowledgementRequested = {
-                [weak self] in self?.acknowledgeTrainingResult()
+            gameplayView.levelResultAcknowledgementRequested = {
+                [weak self] in self?.acknowledgePresentedLevelResult()
             }
-            gameplayView.trainingRestartRequested = {
-                [weak self] in self?.restartTrainingSession()
+            gameplayView.playAgainRequested = {
+                [weak self] in self?.restartLevelSession()
             }
             gameplayView.pilotProfileCreationRequested = {
                 [weak self] in self?.createPilotProfile(named: $0)
@@ -511,7 +511,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             simulation: simulation,
             at: ProcessInfo.processInfo.systemUptime
         )
-        gameplayView?.resumePausedTrainingAudio()
+        gameplayView?.resumePausedAudio()
         if let gameplayView {
             window?.makeFirstResponder(gameplayView)
         }
@@ -532,7 +532,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
         }
     }
 
-    private func requestPlayerSaveAction(_ action: TrainingPlayerSaveAction) {
+    private func requestPlayerSaveAction(_ action: PlayerSaveAction) {
         guard let simulation,
               simulation.levelOutcome == nil,
               let activePackage,
@@ -541,14 +541,14 @@ private final class RevivalMacApplicationDelegate: NSObject,
               let renderer,
               playerInput.gameplayIsActive else {
             setStatus(
-                "Training quicksave and quickload are unavailable now.",
+                "Quicksave and quickload are unavailable now.",
                 isError: true
             )
             return
         }
         let timestamp = ProcessInfo.processInfo.systemUptime
         gameplayView.clearInput()
-        gameplayView.pauseCurrentTrainingAudio()
+        gameplayView.pauseCurrentAudio()
         playerInput.setGameplayActive(
             false,
             simulation: simulation,
@@ -566,7 +566,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                 )
                 resumeAfterPlayerSave(simulation, gameplayView: gameplayView)
                 setStatus(
-                    "Training quicksave saved for the selected pilot.",
+                    "Quicksave saved for the selected pilot.",
                     isError: false
                 )
             case .quickload:
@@ -593,7 +593,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                 window?.makeFirstResponder(gameplayView)
                 renderer.drawNow()
                 setStatus(
-                    "Training quicksave loaded for the selected pilot.",
+                    "Quicksave loaded for the selected pilot.",
                     isError: false
                 )
             }
@@ -601,7 +601,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
             resumeAfterPlayerSave(simulation, gameplayView: gameplayView)
             let operation = action == .quicksave ? "save" : "load"
             setStatus(
-                "Could not \(operation) the Training quicksave: \(error.localizedDescription)",
+                "Could not \(operation) the quicksave: \(error.localizedDescription)",
                 isError: true
             )
         }
@@ -616,24 +616,24 @@ private final class RevivalMacApplicationDelegate: NSObject,
             simulation: simulation,
             at: ProcessInfo.processInfo.systemUptime
         )
-        gameplayView.resumePausedTrainingAudio()
+        gameplayView.resumePausedAudio()
         window?.makeFirstResponder(gameplayView)
     }
 
-    private func acknowledgeTrainingResult() {
+    private func acknowledgePresentedLevelResult() {
         guard let simulation else { return }
-        if let pendingTrainingProgressPackage {
+        if let pendingMissionProgressPackage {
             do {
-                try persistTrainingProgress(
-                    package: pendingTrainingProgressPackage
+                try persistMissionProgress(
+                    package: pendingMissionProgressPackage
                 )
                 setStatus(
-                    "Training progress saved. Completing the session.",
+                    "\(missionDisplayName) progress saved. Completing the session.",
                     isError: false
                 )
             } catch {
                 setStatus(
-                    "Training progress is still unsaved: \(error.localizedDescription) Fix storage access, then acknowledge again to retry.",
+                    "\(missionDisplayName) progress is still unsaved: \(error.localizedDescription) Fix storage access, then acknowledge again to retry.",
                     isError: true
                 )
                 return
@@ -651,22 +651,23 @@ private final class RevivalMacApplicationDelegate: NSObject,
         )
         gameplayView?.setGameplayActive(false)
         let completedLevelName = simulation.level.metadata.name
+        let missionName = missionDisplayName
         let succeeded = simulation.world.gameStateRequest == .levelEnd
         renderer?.unload()
         self.simulation = nil
-        gameplayView?.presentTrainingContentReadyState(
+        gameplayView?.presentContentReadyState(
             completedLevelName: completedLevelName,
             succeeded: succeeded
         )
         setStatus(
             succeeded
-                ? "Training completed. Play again, open canonical content, or quit."
-                : "Training failed. Play again, open canonical content, or quit.",
+                ? "\(missionName) completed. Play again, open canonical content, or quit."
+                : "\(missionName) failed. Play again, open canonical content, or quit.",
             isError: false
         )
     }
 
-    private func restartTrainingSession() {
+    private func restartLevelSession() {
         guard simulation == nil else { return }
         enqueue(.loadActive)
     }
@@ -682,7 +683,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                 selectedProfileID: createdID
             )
             setStatus(
-                "Pilot created. Confirm the selected pilot to begin Training.",
+                "Pilot created. Confirm the selected pilot to begin.",
                 isError: false
             )
         } catch {
@@ -708,7 +709,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
                   $0.id == defaultProfileID
               }) else {
             setStatus(
-                "Create and confirm a named pilot before Training.",
+                "Create and confirm a named pilot before you play.",
                 isError: true
             )
             return
@@ -719,7 +720,7 @@ private final class RevivalMacApplicationDelegate: NSObject,
 
     private func finishPilotProfileSelection() {
         gameplayView?.hidePilotProfileSelection()
-        setStatus("Loading Training for the selected pilot…", isError: false)
+        setStatus("Loading the active content for the selected pilot…", isError: false)
         if contentRequests.isEmpty {
             enqueue(.loadActive)
         } else if libraryPreparationError == nil {
@@ -729,17 +730,24 @@ private final class RevivalMacApplicationDelegate: NSObject,
         }
     }
 
-    private func persistTrainingProgress(
+    private func persistMissionProgress(
         package: CanonicalPackageReference
     ) throws {
         guard let activeProfileID else {
             throw PilotProfileLibraryError.unknownProfile
         }
-        profileRecord = try profileLibrary.recordTrainingCompletion(
+        profileRecord = try profileLibrary.recordMissionCompletion(
             profileID: activeProfileID,
-            package: package
+            package: package,
+            missionName: simulation?.level.missionName ?? package.missionKey
         )
-        pendingTrainingProgressPackage = nil
+        pendingMissionProgressPackage = nil
+    }
+
+    /// The loaded mission's NAME (its .msn descriptor), or its level's name.
+    private var missionDisplayName: String {
+        simulation.map { $0.level.missionName ?? $0.level.metadata.name }
+            ?? "The mission"
     }
 
     private func setStatus(_ message: String, isError: Bool) {

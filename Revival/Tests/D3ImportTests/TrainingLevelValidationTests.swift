@@ -1,82 +1,6 @@
 import XCTest
 
 extension CanonicalLevelTests {
-    func testPresentHeadlightSoundBindingRejectsNonretailClip() throws {
-        let level = makeTrainingFinalGoalLevel()
-        XCTAssertFalse(level.soundClips.contains {
-            $0.logicalName == "Headlight1"
-        })
-        XCTAssertNoThrow(
-            try level.validate(),
-            "older schema-11 packages remain valid without Headlight1"
-        )
-        let existing = try XCTUnwrap(level.soundClips.first)
-        let impostor = CanonicalSoundClip(
-            logicalName: "Headlight1",
-            sourceName: existing.sourceName,
-            sourceEntryIndex: existing.sourceEntryIndex,
-            sampleRate: existing.sampleRate,
-            channelCount: existing.channelCount,
-            frameCount: existing.frameCount,
-            pcm16LittleEndian: existing.pcm16LittleEndian,
-            pcmSHA256: existing.pcmSHA256,
-            sourceArchive: existing.sourceArchive,
-            sourceSHA256: existing.sourceSHA256,
-            importVolume: existing.importVolume
-        )
-        let hostile = replacing(
-            level,
-            soundClips: [impostor] + level.soundClips.dropFirst()
-        )
-        XCTAssertThrowsError(try hostile.validate()) {
-            XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .invalidDependency("Headlight1 canonical sound binding")
-            )
-        }
-
-        let relabeledSource = SourceResource(
-            storedIndex: 1_407,
-            sourceName: "Headlight.wav"
-        )
-        let relabeled = CanonicalSoundClip(
-            logicalName: "RenamedHeadlight",
-            sourceName: relabeledSource.sourceName,
-            sourceEntryIndex: relabeledSource.storedIndex,
-            sampleRate: existing.sampleRate,
-            channelCount: existing.channelCount,
-            frameCount: existing.frameCount,
-            pcm16LittleEndian: existing.pcm16LittleEndian,
-            pcmSHA256: existing.pcmSHA256,
-            sourceArchive: existing.sourceArchive,
-            sourceSHA256: existing.sourceSHA256,
-            importVolume: existing.importVolume
-        )
-        let relabeledManifest = DependencyManifest(
-            current: level.dependencyManifest.current + [
-                DependencyRecord(
-                    category: "sound",
-                    source: relabeledSource,
-                    state: "production",
-                    provenance: "hostile renamed Headlight fixture"
-                ),
-            ],
-            historicalEagerBaseline:
-                level.dependencyManifest.historicalEagerBaseline
-        )
-        let renamedIdentity = replacing(
-            level,
-            soundClips: level.soundClips + [relabeled],
-            dependencyManifest: relabeledManifest
-        )
-        XCTAssertThrowsError(try renamedIdentity.validate()) {
-            XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .invalidDependency("Headlight1 canonical sound binding")
-            )
-        }
-    }
-
     func testManeuverFixtureCarriesStockPathsAndFlyerAI() throws {
         let level = makeTrainingManeuverFollowLevel()
         XCTAssertEqual(level.paths[0].name, "FollowLoop1")
@@ -226,5 +150,60 @@ extension CanonicalLevelTests {
                 object["models"] = models
             }
         )
+    }
+
+    func testCanonicalVoiceClipRejectsSameLengthPCMMutation() throws {
+        let level = makeTrainingGalleryBarrierLevel()
+        try level.validate()
+        var clips = level.voiceClips
+        let clip = try XCTUnwrap(clips.last)
+        clips[clips.count - 1] = CanonicalVoiceClip(
+            sourceName: clip.sourceName,
+            sourceEntryIndex: clip.sourceEntryIndex,
+            sampleRate: clip.sampleRate,
+            channelCount: clip.channelCount,
+            frameCount: clip.frameCount,
+            pcm16LittleEndian: Data([1, 0]),
+            pcmSHA256: clip.pcmSHA256,
+            sourceArchive: clip.sourceArchive,
+            sourceSHA256: clip.sourceSHA256
+        )
+
+        assertValidationError(
+            .invalidDependency("Canonical voice clip"),
+            replacing(level, voiceClips: clips)
+        )
+    }
+
+    /// An AI page whose objects are made at run time (the Guide-Bot,
+    /// AIInitAll's ObjCreate) is checked against its page model's
+    /// batteries, as a placed AI object is against its own model
+    /// (WBFireBattery, robotfire.cpp:111).
+    func testObjectTablesCheckRuntimeAIPageBatteriesAgainstThePageModel() throws {
+        let level = withTrainingGuideBot(makeTrainingRobotGuidebotLevel())
+        let index = try XCTUnwrap(level.objectInfos?.firstIndex {
+            $0.name == CanonicalObjectInfo.guideBotPageName
+        })
+        let page = try XCTUnwrap(level.objectInfos?[index])
+        XCTAssertNotNil(page.ai)
+        XCTAssertNotNil(page.presentation)
+        XCTAssertFalse(level.objects.contains {
+            $0.definition?.sourceName == CanonicalObjectInfo.guideBotPageName
+        })
+        try level.validateObjectTables()
+
+        // A model battery the page has no battery for: the page's batteries
+        // no longer match the model it fires from.
+        let hostile = level.settingModelGuns(
+            try XCTUnwrap(page.presentation?.primaryModel),
+            gunpoints: [.init(parent: 0, position: .zero, normal: .init(x: 0, y: 0, z: 1))],
+            batteries: [.init(gunpoints: [0], turrets: [])]
+        )
+        XCTAssertThrowsError(try hostile.validateObjectTables()) {
+            XCTAssertEqual(
+                $0 as? LevelValidationError,
+                .invalidObjectTables("object info GuideBot guns")
+            )
+        }
     }
 }

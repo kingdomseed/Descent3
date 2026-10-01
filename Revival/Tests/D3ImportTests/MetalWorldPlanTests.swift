@@ -1054,7 +1054,9 @@ final class MetalWorldPlanTests: XCTestCase {
             level: level,
             playerView: playerView
         )
-        let guidebotHandle: UInt32 = 6_164
+        // The Guide-Bot AIInitAll makes at level start has prepared draws.
+        let guidebotHandle = GameWorld(level: level).buddyHandle.rawValue
+        XCTAssertNotEqual(guidebotHandle, ObjectHandle.none.rawValue)
         XCTAssertTrue(initial.preparedDraws.contains {
             $0.objectHandle == guidebotHandle
         })

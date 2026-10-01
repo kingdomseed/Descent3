@@ -211,17 +211,54 @@ let fixtureGuideBotSoundFlags: [String: Int32] = [
 
 /// The level with the translated Guide-Bot: the GuideBot page naming the
 /// AIGame module (so AIInitAll's Guide-Bot binds the GuideBot script, as
-/// the page binds an object made at run time), the Invisiblepowerup page,
-/// the module's strings and sound references, a silent clip for each
-/// Guide-Bot sound the level lacks, and, when the level has script data, the
-/// Guide-Bot object's binding.
-func withTrainingGuideBot(
-    _ source: Level,
-    guideBotHandle: UInt32 = 6_164
-) -> Level {
+/// the page binds an object made at run time), with a flat Buddybot model
+/// copied from the level's first model when it has one, the Invisiblepowerup
+/// page, the module's strings and sound references, and a silent clip for
+/// each Guide-Bot sound the level lacks.
+func withTrainingGuideBot(_ source: Level) -> Level {
     var guideBotInfo = fixtureGuideBotInfo
     guideBotInfo.moduleName = "aigame"
     var level = source
+    if let template = level.models.first {
+        let buddySource = SourceResource(
+            storedIndex: 200,
+            sourceName: "Buddybot.oof"
+        )
+        if !level.models.contains(where: { $0.source == buddySource }) {
+            level.models.append(.init(
+                source: buddySource,
+                collisionRadius: 5.659_440_5,
+                submodels: template.submodels,
+                bounds: template.bounds,
+                sourceArchive: template.sourceArchive,
+                sourceSHA256: String(repeating: "d", count: 64)
+            ))
+            level = replacing(
+                level,
+                dependencyManifest: .init(
+                    current: level.dependencyManifest.current + [
+                        .init(
+                            category: "model",
+                            source: buddySource,
+                            state: "presentation-payload-imported",
+                            provenance: "synthetic canonical fixture"
+                        ),
+                    ],
+                    historicalEagerBaseline:
+                        level.dependencyManifest.historicalEagerBaseline
+                )
+            )
+        }
+        guideBotInfo.presentation = .init(
+            primaryModel: buddySource,
+            mediumModel: nil,
+            lowModel: nil,
+            dyingModel: nil,
+            mediumDistance: nil,
+            lowDistance: nil
+        )
+    }
+    level = level
         .addingObjectInfo(guideBotInfo)
         .addingObjectInfo(fixtureInvisiblePowerupInfo)
     let pcm = Data(repeating: 0, count: 2)
@@ -264,23 +301,7 @@ func withTrainingGuideBot(
             }
         ),
     ]
-    level = withFixtureGameModules(level)
-    guard let scripting = level.scripting else { return level }
-    return level.addingScripting(LevelScripting(
-        levelScript: scripting.levelScript,
-        objects: scripting.objects.map { binding in
-            guard binding.objectHandle == guideBotHandle else { return binding }
-            return ObjectScriptBinding(
-                objectHandle: binding.objectHandle,
-                name: binding.name,
-                defaultModuleName: "aigame",
-                defaultScriptName: "GuideBot"
-            )
-        },
-        messages: scripting.messages,
-        streamedAudio: scripting.streamedAudio,
-        sounds: scripting.sounds
-    ))
+    return withFixtureGameModules(level)
 }
 
 extension GameWorld {

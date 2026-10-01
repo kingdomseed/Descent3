@@ -14,6 +14,10 @@ private func canonicalPCM16ByteCount(
 struct Level: Codable, Equatable, Sendable {
     private(set) var schemaVersion: Int
     let missionKey: String
+    /// The mission's NAME from its .msn descriptor (Mission.cpp), which the
+    /// pilot's mission progress records (pilot.cpp:1463). Absent before
+    /// schema 13.
+    var missionName: String? = nil
     let levelKey: String
     let source: LevelSource
     let metadata: LevelMetadata
@@ -35,8 +39,6 @@ struct Level: Codable, Equatable, Sendable {
     var shipDefinitions: [CanonicalShipDefinition]
     let defaultPlayerBinding: DefaultPlayerBinding?
     var objectPresentations: [ObjectPresentationReference]
-    let trainingGalleryBarrier: TrainingGalleryBarrier?
-    let trainingRobotGuidebotChain: TrainingRobotGuidebotChain?
     let voiceClips: [CanonicalVoiceClip]
     @SchemaCompatibleSoundClips
     private(set) var soundClips: [CanonicalSoundClip]
@@ -83,8 +85,6 @@ struct Level: Codable, Equatable, Sendable {
         shipDefinitions: [CanonicalShipDefinition] = [],
         defaultPlayerBinding: DefaultPlayerBinding? = nil,
         objectPresentations: [ObjectPresentationReference] = [],
-        trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
-        trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
         voiceClips: [CanonicalVoiceClip] = [],
         soundClips: [CanonicalSoundClip] = [],
         dependencyManifest: DependencyManifest,
@@ -113,54 +113,67 @@ struct Level: Codable, Equatable, Sendable {
         self.shipDefinitions = shipDefinitions
         self.defaultPlayerBinding = defaultPlayerBinding
         self.objectPresentations = objectPresentations
-        self.trainingGalleryBarrier = trainingGalleryBarrier
-        self.trainingRobotGuidebotChain = trainingRobotGuidebotChain
         self.voiceClips = voiceClips
         self.soundClips = soundClips
         self.dependencyManifest = dependencyManifest
         self.sourceChunks = sourceChunks
     }
 
-    /// Package schema 12: adds the generic level script data.
+    /// Package schema 13: the generic level script data, with no
+    /// level-specific fields. Schema 12 packages held the Training-specific
+    /// fields and a Guide-Bot placed by the importer; they are refused and
+    /// must be imported again.
+    static let scriptedSchemaVersion = 13
+
+    /// The current package schema with the generic level script data.
     func addingScripting(_ scripting: LevelScripting) -> Level {
         var level = self
-        level.schemaVersion = 12
+        level.schemaVersion = Self.scriptedSchemaVersion
         level.scripting = scripting
         return level
     }
 
     func validate() throws {
-        try validate(
-            allowImportStagingPresentation: false,
-            enforceStockSourceInvariants: true
-        )
+        try validate(allowImportStagingPresentation: false)
+    }
+
+    /// The package boundary (writeCanonicalPackage and the package loader):
+    /// a released package holds only the current schema, whose level carries
+    /// its script data. Only the synthetic test levels' explicit policy also
+    /// accepts the script-free schemas 9-11.
+    func validateForPackage(
+        _ policy: CanonicalPackageSchemaPolicy = .current
+    ) throws {
+        guard policy == .includingScriptFreeTestSchemas
+            || schemaVersion == Self.scriptedSchemaVersion
+        else {
+            throw LevelValidationError.invalidIdentity
+        }
+        try validate()
     }
 
     func validateForAuthoring() throws {
-        try validate(
-            allowImportStagingPresentation: false,
-            enforceStockSourceInvariants: false
-        )
+        try validate(allowImportStagingPresentation: false)
     }
 
     func validateForImportStaging() throws {
-        try validate(
-            allowImportStagingPresentation: true,
-            enforceStockSourceInvariants: true
-        )
+        try validate(allowImportStagingPresentation: true)
     }
 
-    private func validate(
-        allowImportStagingPresentation: Bool,
-        enforceStockSourceInvariants: Bool
-    ) throws {
+    private func validate(allowImportStagingPresentation: Bool) throws {
+        // Schemas 9-11 have no script data. Schema 12 is refused (reimport).
         guard (
             schemaVersion == 9
-            || (10...12).contains(schemaVersion) && _soundClips.wasPresent
+            || (
+                (10...11).contains(schemaVersion)
+                    || schemaVersion == Self.scriptedSchemaVersion
+            ) && _soundClips.wasPresent
         ),
-              (scripting != nil) == (schemaVersion == 12),
+              (scripting != nil)
+                == (schemaVersion == Self.scriptedSchemaVersion),
               source.d3lvVersion == 127,
-              !missionKey.isEmpty, !levelKey.isEmpty else {
+              !missionKey.isEmpty, !levelKey.isEmpty,
+              missionName.map(isNonempty) != false else {
             throw LevelValidationError.invalidIdentity
         }
         try validateSource(source)
@@ -176,11 +189,9 @@ struct Level: Codable, Equatable, Sendable {
             materials: presentationMaterials,
             objects: objects,
             source: source,
-            dynamicallyPresentedModelNames: (
-                trainingRobotGuidebotChain == nil
-                    ? []
-                    : ["Buddybot.oof"])
-                + (weapons ?? []).compactMap(\.model?.sourceName)
+            dynamicallyPresentedModels:
+                (objectInfos ?? []).flatMap { $0.presentation?.models ?? [] }
+                + (weapons ?? []).compactMap(\.model)
         )
         guard rooms.count <= 400,
               rooms.allSatisfy({ (0..<400).contains($0.sourceIndex) }) else {
@@ -419,152 +430,6 @@ struct Level: Codable, Equatable, Sendable {
                 }
             }
         }
-        if let barrier = trainingGalleryBarrier {
-            let oneShotFlag: UInt16 = 8
-            let playerActivator: UInt16 = 1
-            let rendersFaces: UInt32 = 1
-            let clipNames = Set(voiceClips.map {
-                $0.sourceName.lowercased()
-            })
-            guard isNonempty(barrier.triggerName),
-                  isNonempty(barrier.successMessage),
-                  isNonempty(barrier.guidebotInstruction),
-                  isNonempty(barrier.voiceSourceName),
-                  barrier.openMarkerLightDistance.isFinite,
-                  barrier.openMarkerLightDistance > 0,
-                  barrier.orderedPortalIndices.count == 2,
-                  Set(barrier.orderedPortalIndices).count == 2,
-                  let markerLight = objects.first(where: {
-                      $0.handle == barrier.markerLightObjectHandle
-                  }),
-                  markerLight.type == 11,
-                  markerLight.instanceName == "FlashLight-2",
-                  clipNames.contains(barrier.voiceSourceName.lowercased()),
-                  triggers.contains(where: {
-                      $0.name == barrier.triggerName
-                          && $0.roomIndex
-                              == barrier.triggerRoomSourceIndex
-                          && $0.faceIndex == barrier.triggerFaceIndex
-                          && $0.flags == oneShotFlag
-                          && $0.activator == playerActivator
-                  }),
-                  let triggerRoom =
-                    roomMap[barrier.triggerRoomSourceIndex],
-                  triggerRoom.faces.indices.contains(
-                      barrier.triggerFaceIndex
-                  ),
-                  let barrierRoom =
-                    roomMap[barrier.barrierRoomSourceIndex]
-            else {
-                throw LevelValidationError.invalidDependency(
-                    "Training gallery barrier"
-                )
-            }
-            var portalRenderingStates: [Bool] = []
-            for portalIndex in barrier.orderedPortalIndices {
-                guard barrierRoom.portals.indices.contains(portalIndex)
-                else {
-                    throw LevelValidationError.invalidDependency(
-                        "Training gallery barrier"
-                    )
-                }
-                let portal = barrierRoom.portals[portalIndex]
-                guard barrierRoom.faces.indices.contains(portal.faceIndex),
-                      barrierRoom.faces[portal.faceIndex].portalIndex
-                          == portalIndex,
-                      let physics = surfacePhysics.first(where: {
-                          $0.texture
-                              == barrierRoom.faces[portal.faceIndex].texture
-                      }),
-                      physics.behavior == .forceField,
-                      presentationMaterials.contains(where: {
-                          $0.texture
-                              == barrierRoom.faces[portal.faceIndex].texture
-                              && $0.waterProcedural != nil
-                      }),
-                      let connectedRoom = roomMap[portal.connectedRoom],
-                      connectedRoom.portals.indices.contains(
-                          portal.connectedPortal
-                      )
-                else {
-                    throw LevelValidationError.invalidDependency(
-                        "Training gallery barrier"
-                    )
-                }
-                let reciprocal =
-                    connectedRoom.portals[portal.connectedPortal]
-                guard reciprocal.connectedRoom
-                        == barrier.barrierRoomSourceIndex,
-                      reciprocal.connectedPortal == portalIndex,
-                      connectedRoom.faces.indices.contains(
-                          reciprocal.faceIndex
-                      ),
-                      connectedRoom.faces[reciprocal.faceIndex].portalIndex
-                          == portal.connectedPortal,
-                      let reciprocalPhysics =
-                        surfacePhysics.first(where: {
-                            $0.texture
-                                == connectedRoom.faces[
-                                    reciprocal.faceIndex
-                                ].texture
-                        }),
-                      reciprocalPhysics.behavior == .forceField,
-                      presentationMaterials.contains(where: {
-                          $0.texture
-                              == connectedRoom.faces[
-                                  reciprocal.faceIndex
-                              ].texture
-                              && $0.waterProcedural != nil
-                      })
-                else {
-                    throw LevelValidationError.invalidDependency(
-                        "Training gallery barrier"
-                    )
-                }
-                portalRenderingStates.append(
-                    barrierRoom.portals[portalIndex].flags
-                        & rendersFaces != 0
-                )
-                portalRenderingStates.append(
-                    reciprocal.flags & rendersFaces != 0
-                )
-            }
-            guard Set(portalRenderingStates).count == 1 else {
-                throw LevelValidationError.invalidDependency(
-                    "Training gallery barrier"
-                )
-            }
-        }
-        if let chain = trainingRobotGuidebotChain {
-            let clipNames = Set(voiceClips.map {
-                $0.sourceName.lowercased()
-            })
-            let soundNames = Set(soundClips.flatMap {
-                [$0.logicalName.lowercased(), $0.sourceName.lowercased()]
-            })
-            let releaseSoundIsResolved =
-                chain.releaseSoundSourceName.map {
-                    soundNames.contains($0.lowercased())
-                } ?? true
-            let ambientEngineSoundIsResolved =
-                chain.ambientEngineSoundSourceName.map {
-                    soundNames.contains($0.lowercased())
-                } ?? true
-            guard trainingGalleryBarrier != nil,
-                  isNonempty(chain.deployedGuidebotMessage),
-                  isNonempty(chain.deployedGuidebotVoiceSourceName),
-                  chain.deployedGuidebotObjectType == 2,
-                  chain.guidebot == .stockTraining,
-                  clipNames.contains(
-                    chain.deployedGuidebotVoiceSourceName.lowercased()
-                  ),
-                  releaseSoundIsResolved,
-                  ambientEngineSoundIsResolved else {
-                throw LevelValidationError.invalidDependency(
-                    "Training robot Guidebot chain"
-                )
-            }
-        }
         var voiceNames = Set<String>()
         for clip in voiceClips {
             let voiceSource = SourceResource(
@@ -635,146 +500,6 @@ struct Level: Codable, Equatable, Sendable {
                     "Canonical sound clip"
                 )
             }
-            if clip.logicalName.caseInsensitiveCompare("Headlight1")
-                == .orderedSame
-                || clip.sourceName.caseInsensitiveCompare("Headlight.wav")
-                    == .orderedSame
-            {
-                guard clip.logicalName == "Headlight1",
-                      clip.sourceName == "Headlight.wav",
-                      clip.sourceEntryIndex == 1_407,
-                      clip.sampleRate == 22_050,
-                      clip.channelCount == 1,
-                      clip.frameCount == 10_623,
-                      clip.pcm16LittleEndian.count == 21_246,
-                      clip.pcmSHA256
-                        == "7886b286bf1897c59c04bc5b80460d975ee5979ba21dae8e8f3596c5f0b23417",
-                      clip.sourceArchive == "d3.hog",
-                      clip.sourceSHA256
-                        == "cc05bbed03cf33ef705613d5a237d5c1879c83df49dc03bca01960cf5a20384a",
-                      clip.importVolume == 1
-                else {
-                    throw LevelValidationError.invalidDependency(
-                        "Headlight1 canonical sound binding"
-                    )
-                }
-            }
-        }
-        let hasStockTrainingSource =
-            source.archiveSHA256
-                == "fc1d81921cc4b2618e441b7b9d08c4bcb5cff90731be1bfa6f3a7b054fc0cb54"
-            && source.levelSHA256
-                == "915a561cd3bd720d88bffed72fe41b4ff711c287711f060ecd9696e2cd5f7d41"
-        if enforceStockSourceInvariants,
-           hasStockTrainingSource,
-           !allowImportStagingPresentation {
-            let welcome = voiceClips.first {
-                $0.sourceName.caseInsensitiveCompare("welcome.osf")
-                    == .orderedSame
-            }
-            let return1 = voiceClips.first {
-                $0.sourceName.caseInsensitiveCompare("return1.osf")
-                    == .orderedSame
-            }
-            let guidebotA = voiceClips.first {
-                $0.sourceName.caseInsensitiveCompare("guidebota.osf")
-                    == .orderedSame
-            }
-            let guidebotB = voiceClips.first {
-                $0.sourceName.caseInsensitiveCompare("guidebotb.osf")
-                    == .orderedSame
-            }
-            let proceed5 = voiceClips.first {
-                $0.sourceName.caseInsensitiveCompare("proceed5.osf")
-                    == .orderedSame
-            }
-            guard missionKey == "descent3.mission.pilot-training",
-                  levelKey == "descent3.level.training-mission",
-                  welcome?.sourceEntryIndex == 38,
-                  welcome?.sampleRate == 22_050,
-                  welcome?.channelCount == 1,
-                  welcome?.frameCount == 417_957,
-                  welcome?.pcmSHA256
-                    == "116eda34ab4af47c9a59e514af6ba111ef41e344fadeadb8120ad76728b81fe9",
-                  welcome?.sourceArchive == "missions/training.mn3",
-                  welcome?.sourceSHA256
-                    == "35e31517adb824f3637b877d500e12625b99d1a7044a2ce743087505c88ece36",
-                  return1?.sourceEntryIndex == 28,
-                  return1?.sampleRate == 22_050,
-                  return1?.channelCount == 1,
-                  return1?.frameCount == 83_929,
-                  return1?.pcmSHA256
-                    == "95ffd4396b10462438ed10fb9ed9f7e5ff01a37ff1ad93481c989b047dae9dc3",
-                  return1?.sourceArchive == "missions/training.mn3",
-                  return1?.sourceSHA256
-                    == "048067398846141f61a2d503f6ec582f0dbbc5f3bf3feead48047eab808e540f"
-            else {
-                throw LevelValidationError.invalidDependency(
-                    "Training opening package"
-                )
-            }
-            // The opening and return lesson streams of Scripts 003-015
-            // (left1, return2, up1, return3, repeat, lright, udown,
-            // proceed1, Intro1, and proceed2).
-            let openingVoiceCount = 10
-            // The dodge, maneuver, and follow-bot lesson streams of Scripts
-            // 033-026 and 027 that the package holds.
-            let dodgeVoiceCount = [
-                "intro2.osf", "almost.osf", "proceed3.osf", "proceed4.osf",
-                "intro3.osf", "pitch.osf", "bank.osf", "follow.osf",
-                "intro4.osf", "kill1.osf",
-            ].filter { name in
-                voiceClips.contains {
-                    $0.sourceName.caseInsensitiveCompare(name) == .orderedSame
-                }
-            }.count
-            guard let barrier = trainingGalleryBarrier,
-                  barrier.triggerName == "Portal2",
-                  barrier.triggerRoomSourceIndex == 38,
-                  barrier.triggerFaceIndex == 1,
-                  barrier.barrierRoomSourceIndex == 38,
-                  barrier.orderedPortalIndices == [1, 0],
-                  barrier.markerLightObjectHandle == 6_163,
-                  barrier.openMarkerLightDistance == 50,
-                  barrier.successMessage == "Excellent!",
-                  barrier.guidebotInstruction
-                    == "Your ship is equipped with a utility robot called a Guidebot.  Release him now with F4.",
-                  barrier.voiceSourceName == "guidebota.osf",
-                  // Schema 9 has the gallery and Guide-Bot streams; the
-                  // later schemas have every Training stream.
-                  voiceClips.count == (schemaVersion == 9 ? 5 : 12)
-                    + openingVoiceCount + dodgeVoiceCount,
-                  guidebotA?.sourceEntryIndex == 4,
-                  guidebotA?.sampleRate == 22_050,
-                  guidebotA?.channelCount == 1,
-                  guidebotA?.frameCount == 354_793,
-                  guidebotA?.pcmSHA256
-                    == "c806147adb0ceb7c2bd8eac0853ba107da49012f5de8685f915d3e3a80f51b4f",
-                  guidebotA?.sourceArchive == "missions/training.mn3",
-                  guidebotA?.sourceSHA256
-                    == "dde58be4bd488cc7a009068afd15ddb18f8cf64dd1ff44fd5a3f8ae816277cad"
-            else {
-                throw LevelValidationError.invalidDependency(
-                    "Training gallery package"
-                )
-            }
-            try validateStockTrainingRobotGuidebotPackage(
-                chain: trainingRobotGuidebotChain,
-                guidebotB: guidebotB,
-                proceed5: proceed5,
-                releaseSound: soundClips.first {
-                    $0.logicalName == "GBExpulsionA"
-                },
-                ambientEngineSound: soundClips.first {
-                    $0.logicalName == "GBotEngineB1"
-                }
-            )
-            try validateStockTrainingRobotGuidebotPresentation(
-                chain: trainingRobotGuidebotChain!,
-                modelSources: models.map(\.source),
-                objects: objects,
-                objectPresentations: objectPresentations
-            )
         }
         var retiredSlots = Set<Int>()
         for handle in retiredObjectHandles {
@@ -1302,7 +1027,7 @@ private func validateModels(
     materials: [PresentationMaterial],
     objects: [PlacedObject],
     source: LevelSource,
-    dynamicallyPresentedModelNames: [String]
+    dynamicallyPresentedModels: [SourceResource]
 ) throws {
     let acceptedSourcePaths = Set(source.profileFiles.map(\.relativePath))
     guard models.count <= 256,
@@ -1484,13 +1209,15 @@ private func validateModels(
             }
         }
     }
-    for name in dynamicallyPresentedModelNames {
-        if let source = models.first(where: {
-            $0.source.sourceName.caseInsensitiveCompare(name)
-                == .orderedSame
-        })?.source {
-            referencedModels.insert(source)
+    // The models of the objects made at run time (their object pages) and
+    // of the weapons.
+    for source in dynamicallyPresentedModels {
+        guard modelBySource[source] != nil else {
+            throw LevelValidationError.invalidDependency(
+                "missing model:\(source.sourceName)"
+            )
         }
+        referencedModels.insert(source)
     }
     guard referencedModels == Set(models.map(\.source)) else {
         throw LevelValidationError.invalidDependency("orphan model")

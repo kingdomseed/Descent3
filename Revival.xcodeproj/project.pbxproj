@@ -275,10 +275,18 @@
 		CCB7844466FF45C894A13826 /* DefaultScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */; };
 		7A0700000000000000000002 /* LevelScriptImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A07000000000000000000F0 /* LevelScriptImport.swift */; };
 		57E59D7F305BF23842DBBFAE /* GameModuleImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */; };
+		3B4870A9CEA55D5B7429E34D /* ObjectPresentationImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D25E689CAA2F2DD085E6C3 /* ObjectPresentationImport.swift */; };
+		B832FD6AAB4A9BF30ADB3563 /* RoomPresentationImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B87CAE48AD31AEBF482ABA /* RoomPresentationImport.swift */; };
+		6676A2A04063A9C462BAEA80 /* AudioImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77FC05E6CD8B2C4B5BBF1016 /* AudioImport.swift */; };
+		1EA64A0C9178EECAF40BCE2F /* ImportSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2241C85122ED30DE45F0552 /* ImportSources.swift */; };
 		178E0A29105B54E9E2F53A02 /* StringTableImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */; };
 		7B1400000000000000000001 /* GenericPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B14000000000000000000F0 /* GenericPage.swift */; };
 		7A0700000000000000000001 /* LevelScriptImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A07000000000000000000F0 /* LevelScriptImport.swift */; };
 		DFE07CD4F288FB838FD3AC2E /* GameModuleImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */; };
+		946035E764B199D768657E7E /* ObjectPresentationImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D25E689CAA2F2DD085E6C3 /* ObjectPresentationImport.swift */; };
+		B0701B15A09F721A877AE5D9 /* RoomPresentationImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B87CAE48AD31AEBF482ABA /* RoomPresentationImport.swift */; };
+		52725F04DBB577B79557A835 /* AudioImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77FC05E6CD8B2C4B5BBF1016 /* AudioImport.swift */; };
+		B60EAAC0B16E2AD92C0B1AE9 /* ImportSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2241C85122ED30DE45F0552 /* ImportSources.swift */; };
 		832676DCE450A4DD63378622 /* StringTableImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */; };
 		7B1400000000000000000002 /* GenericPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B14000000000000000000F0 /* GenericPage.swift */; };
 		7A0600000000000000000005 /* LevelScripting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A06000000000000000000F0 /* LevelScripting.swift */; };
@@ -313,32 +321,26 @@
 		BC1000000000000000000004 /* PlayerLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0000000000000000000001 /* PlayerLevelValidation.swift */; };
 		BC1000000000000000000005 /* PlayerLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0000000000000000000001 /* PlayerLevelValidation.swift */; };
 		BB0000000000000000000001 /* LevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* LevelValues.swift */; };
-		BB0000000000000000000002 /* TrainingLevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* TrainingLevelValues.swift */; };
-		BB0000000000000000000003 /* TrainingLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* TrainingLevelValidation.swift */; };
+		BB0000000000000000000002 /* CanonicalAudioClips.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* CanonicalAudioClips.swift */; };
 		BB0000000000000000000004 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
 		BB0000000000000000000005 /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
 		BB0000000000000000000006 /* LevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* LevelValues.swift */; };
-		BB0000000000000000000007 /* TrainingLevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* TrainingLevelValues.swift */; };
-		BB0000000000000000000008 /* TrainingLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* TrainingLevelValidation.swift */; };
+		BB0000000000000000000007 /* CanonicalAudioClips.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* CanonicalAudioClips.swift */; };
 		BB0000000000000000000009 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
 		BB000000000000000000000A /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
 		BB000000000000000000000B /* LevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* LevelValues.swift */; };
-		BB000000000000000000000C /* TrainingLevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* TrainingLevelValues.swift */; };
-		BB000000000000000000000D /* TrainingLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* TrainingLevelValidation.swift */; };
+		BB000000000000000000000C /* CanonicalAudioClips.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* CanonicalAudioClips.swift */; };
 		BB000000000000000000000E /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
 		BB000000000000000000000F /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
 		BB0000000000000000000010 /* LevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* LevelValues.swift */; };
-		BB0000000000000000000011 /* TrainingLevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* TrainingLevelValues.swift */; };
-		BB0000000000000000000012 /* TrainingLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* TrainingLevelValidation.swift */; };
+		BB0000000000000000000011 /* CanonicalAudioClips.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* CanonicalAudioClips.swift */; };
 		BB0000000000000000000013 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
 		BB0000000000000000000014 /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
 		BB0000000000000000000015 /* LevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* LevelValues.swift */; };
-		BB0000000000000000000016 /* TrainingLevelValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* TrainingLevelValues.swift */; };
-		BB0000000000000000000017 /* TrainingLevelValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* TrainingLevelValidation.swift */; };
+		BB0000000000000000000016 /* CanonicalAudioClips.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* CanonicalAudioClips.swift */; };
 		BB0000000000000000000018 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
 		BB0000000000000000000019 /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
 		BB000000000000000000001A /* TrainingLevelValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000006 /* TrainingLevelValidationTests.swift */; };
-		DC0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift */; };
 		BB000000000000000000001B /* IndoorMovementTraceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000007 /* IndoorMovementTraceTests.swift */; };
 		B1000000000000000000000E /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
 		B1000000000000000000000F /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
@@ -555,6 +557,10 @@
 		3BCF1077C25C6CCE965F6829 /* DefaultScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultScript.swift; sourceTree = "<group>"; };
 		7A07000000000000000000F0 /* LevelScriptImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScriptImport.swift; sourceTree = "<group>"; };
 		6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameModuleImport.swift; sourceTree = "<group>"; };
+		D9D25E689CAA2F2DD085E6C3 /* ObjectPresentationImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectPresentationImport.swift; sourceTree = "<group>"; };
+		58B87CAE48AD31AEBF482ABA /* RoomPresentationImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomPresentationImport.swift; sourceTree = "<group>"; };
+		77FC05E6CD8B2C4B5BBF1016 /* AudioImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioImport.swift; sourceTree = "<group>"; };
+		C2241C85122ED30DE45F0552 /* ImportSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportSources.swift; sourceTree = "<group>"; };
 		D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringTableImport.swift; sourceTree = "<group>"; };
 		7B14000000000000000000F0 /* GenericPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenericPage.swift; sourceTree = "<group>"; };
 		7A06000000000000000000F0 /* LevelScripting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScripting.swift; sourceTree = "<group>"; };
@@ -578,12 +584,10 @@
 		B20000000000000000000007 /* Level.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Level.swift; sourceTree = "<group>"; };
 		BC0000000000000000000001 /* PlayerLevelValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerLevelValidation.swift; sourceTree = "<group>"; };
 		BA0000000000000000000001 /* LevelValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelValues.swift; sourceTree = "<group>"; };
-		BA0000000000000000000002 /* TrainingLevelValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLevelValues.swift; sourceTree = "<group>"; };
-		BA0000000000000000000003 /* TrainingLevelValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLevelValidation.swift; sourceTree = "<group>"; };
+		BA0000000000000000000002 /* CanonicalAudioClips.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalAudioClips.swift; sourceTree = "<group>"; };
 		BA0000000000000000000004 /* LevelAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelAssembly.swift; sourceTree = "<group>"; };
 		BA0000000000000000000005 /* IndoorMovementTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorMovementTrace.swift; sourceTree = "<group>"; };
 		BA0000000000000000000006 /* TrainingLevelValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLevelValidationTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLevelValidationTests+LaterLessons.swift"; sourceTree = "<group>"; };
 		BA0000000000000000000007 /* IndoorMovementTraceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorMovementTraceTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000008 /* D3LV127Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127Decoder.swift; sourceTree = "<group>"; };
 		B20000000000000000000009 /* CanonicalPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalPackage.swift; sourceTree = "<group>"; };
@@ -762,6 +766,10 @@
 			children = (
 				7A07000000000000000000F0 /* LevelScriptImport.swift */,
 				6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */,
+				D9D25E689CAA2F2DD085E6C3 /* ObjectPresentationImport.swift */,
+				58B87CAE48AD31AEBF482ABA /* RoomPresentationImport.swift */,
+				77FC05E6CD8B2C4B5BBF1016 /* AudioImport.swift */,
+				C2241C85122ED30DE45F0552 /* ImportSources.swift */,
 				D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */,
 				7B14000000000000000000F0 /* GenericPage.swift */,
 				B2000000000000000000000B /* D3ImportOperation.swift */,
@@ -852,8 +860,7 @@
 				C70000000000000000000001 /* WorldRenderExtractionValues.swift */,
 				B20000000000000000000009 /* CanonicalPackage.swift */,
 				BA0000000000000000000001 /* LevelValues.swift */,
-				BA0000000000000000000002 /* TrainingLevelValues.swift */,
-				BA0000000000000000000003 /* TrainingLevelValidation.swift */,
+				BA0000000000000000000002 /* CanonicalAudioClips.swift */,
 				B20000000000000000000007 /* Level.swift */,
 				BC0000000000000000000001 /* PlayerLevelValidation.swift */,
 				BA0000000000000000000004 /* LevelAssembly.swift */,
@@ -949,7 +956,6 @@
 				DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */,
 				DA0000000000000000000011 /* LiveShieldsHUDTests.swift */,
 				BA0000000000000000000006 /* TrainingLevelValidationTests.swift */,
-				DA0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift */,
 				BA0000000000000000000007 /* IndoorMovementTraceTests.swift */,
 				B20000000000000000000006 /* CanonicalLevelTests.swift */,
 				B2000000000000000000000A /* D3ImportOperationTests.swift */,
@@ -1162,6 +1168,10 @@
 				CCB7844466FF45C894A13826 /* DefaultScript.swift in Sources */,
 				7A0700000000000000000001 /* LevelScriptImport.swift in Sources */,
 				DFE07CD4F288FB838FD3AC2E /* GameModuleImport.swift in Sources */,
+				946035E764B199D768657E7E /* ObjectPresentationImport.swift in Sources */,
+				B0701B15A09F721A877AE5D9 /* RoomPresentationImport.swift in Sources */,
+				52725F04DBB577B79557A835 /* AudioImport.swift in Sources */,
+				B60EAAC0B16E2AD92C0B1AE9 /* ImportSources.swift in Sources */,
 				832676DCE450A4DD63378622 /* StringTableImport.swift in Sources */,
 				7B1400000000000000000002 /* GenericPage.swift in Sources */,
 				7A0600000000000000000001 /* LevelScripting.swift in Sources */,
@@ -1225,8 +1235,7 @@
 				B10000000000000000000015 /* D3ImportOperation.swift in Sources */,
 				B10000000000000000000010 /* CanonicalPackage.swift in Sources */,
 				BB0000000000000000000001 /* LevelValues.swift in Sources */,
-				BB0000000000000000000002 /* TrainingLevelValues.swift in Sources */,
-				BB0000000000000000000003 /* TrainingLevelValidation.swift in Sources */,
+				BB0000000000000000000002 /* CanonicalAudioClips.swift in Sources */,
 				B1000000000000000000000A /* Level.swift in Sources */,
 				BC1000000000000000000001 /* PlayerLevelValidation.swift in Sources */,
 				BB0000000000000000000004 /* LevelAssembly.swift in Sources */,
@@ -1314,8 +1323,7 @@
 				C70000000000000000000003 /* WorldRenderExtractionValues.swift in Sources */,
 				B10000000000000000000011 /* CanonicalPackage.swift in Sources */,
 				BB0000000000000000000006 /* LevelValues.swift in Sources */,
-				BB0000000000000000000007 /* TrainingLevelValues.swift in Sources */,
-				BB0000000000000000000008 /* TrainingLevelValidation.swift in Sources */,
+				BB0000000000000000000007 /* CanonicalAudioClips.swift in Sources */,
 				B1000000000000000000000B /* Level.swift in Sources */,
 				BC1000000000000000000002 /* PlayerLevelValidation.swift in Sources */,
 				BB0000000000000000000009 /* LevelAssembly.swift in Sources */,
@@ -1403,8 +1411,7 @@
 				C70000000000000000000004 /* WorldRenderExtractionValues.swift in Sources */,
 				B10000000000000000000012 /* CanonicalPackage.swift in Sources */,
 				BB000000000000000000000B /* LevelValues.swift in Sources */,
-				BB000000000000000000000C /* TrainingLevelValues.swift in Sources */,
-				BB000000000000000000000D /* TrainingLevelValidation.swift in Sources */,
+				BB000000000000000000000C /* CanonicalAudioClips.swift in Sources */,
 				B1000000000000000000000C /* Level.swift in Sources */,
 				BC1000000000000000000003 /* PlayerLevelValidation.swift in Sources */,
 				BB000000000000000000000E /* LevelAssembly.swift in Sources */,
@@ -1428,6 +1435,10 @@
 				3F060492A182DCCB6B37F0DF /* DefaultScript.swift in Sources */,
 				7A0700000000000000000002 /* LevelScriptImport.swift in Sources */,
 				57E59D7F305BF23842DBBFAE /* GameModuleImport.swift in Sources */,
+				3B4870A9CEA55D5B7429E34D /* ObjectPresentationImport.swift in Sources */,
+				B832FD6AAB4A9BF30ADB3563 /* RoomPresentationImport.swift in Sources */,
+				6676A2A04063A9C462BAEA80 /* AudioImport.swift in Sources */,
+				1EA64A0C9178EECAF40BCE2F /* ImportSources.swift in Sources */,
 				178E0A29105B54E9E2F53A02 /* StringTableImport.swift in Sources */,
 				7B1400000000000000000001 /* GenericPage.swift in Sources */,
 				7A0600000000000000000004 /* LevelScripting.swift in Sources */,
@@ -1545,8 +1556,7 @@
 				B10000000000000000000016 /* D3ImportOperation.swift in Sources */,
 				B10000000000000000000013 /* CanonicalPackage.swift in Sources */,
 				BB0000000000000000000010 /* LevelValues.swift in Sources */,
-				BB0000000000000000000011 /* TrainingLevelValues.swift in Sources */,
-				BB0000000000000000000012 /* TrainingLevelValidation.swift in Sources */,
+				BB0000000000000000000011 /* CanonicalAudioClips.swift in Sources */,
 				B1000000000000000000000D /* Level.swift in Sources */,
 				BC1000000000000000000004 /* PlayerLevelValidation.swift in Sources */,
 				BB0000000000000000000013 /* LevelAssembly.swift in Sources */,
@@ -1558,7 +1568,6 @@
 				B10000000000000000000003 /* PreparedRetailProfile.swift in Sources */,
 				B10000000000000000000005 /* MissionFile.swift in Sources */,
 				BB000000000000000000001A /* TrainingLevelValidationTests.swift in Sources */,
-				DC0000000000000000000014 /* TrainingLevelValidationTests+LaterLessons.swift in Sources */,
 				BB000000000000000000001B /* IndoorMovementTraceTests.swift in Sources */,
 				B10000000000000000000009 /* CanonicalLevelTests.swift in Sources */,
 				B10000000000000000000014 /* D3ImportOperationTests.swift in Sources */,
@@ -1644,8 +1653,7 @@
 				C70000000000000000000006 /* WorldRenderExtractionValues.swift in Sources */,
 				F10000000000000000000003 /* CanonicalPackage.swift in Sources */,
 				BB0000000000000000000015 /* LevelValues.swift in Sources */,
-				BB0000000000000000000016 /* TrainingLevelValues.swift in Sources */,
-				BB0000000000000000000017 /* TrainingLevelValidation.swift in Sources */,
+				BB0000000000000000000016 /* CanonicalAudioClips.swift in Sources */,
 				F10000000000000000000002 /* Level.swift in Sources */,
 				BC1000000000000000000005 /* PlayerLevelValidation.swift in Sources */,
 				BB0000000000000000000018 /* LevelAssembly.swift in Sources */,

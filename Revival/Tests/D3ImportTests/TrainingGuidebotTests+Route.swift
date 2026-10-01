@@ -62,15 +62,15 @@ extension WorldRenderingTests {
             resumedAtTimestamp: 100
         )
         XCTAssertEqual(restored.world, continuation)
+        // The Guide-Bot AIInitAll made shows its page's model.
         let guidebot = try XCTUnwrap(
-            restored.runtimeLevel.objects.first { $0.instanceName == "GuideBotB" }
+            restored.world.objects[restored.world.buddyHandle]
         )
-        XCTAssertTrue(restored.runtimeLevel.objectPresentations.contains {
-            $0.objectHandle == guidebot.handle
-                && $0.primaryModel.sourceName
-                    .caseInsensitiveCompare("Buddybot.oof")
-                    == .orderedSame
-        })
+        XCTAssertEqual(
+            restored.runtimeLevel.objectPresentation(of: guidebot)?
+                .primaryModel.sourceName,
+            "Buddybot.oof"
+        )
         let resumed = restored.update(at: 100.1, input: .zero)
         XCTAssertEqual(
             restored.world.objectType(restored.world.buddyHandle),
@@ -145,7 +145,7 @@ extension WorldRenderingTests {
     @MainActor
     func testTrainingGalleryAudioFailureStillPresentsHUD() {
         var presentedActions: [String] = []
-        RevivalGameplayView.presentTrainingFeedback(
+        RevivalGameplayView.presentFeedback(
             voicePrecedesHUDMessages: true,
             attemptVoice: {
                 presentedActions.append("voice")
@@ -176,7 +176,7 @@ extension WorldRenderingTests {
             )
         ]
         var orderedPresentation: [String] = []
-        RevivalGameplayView.presentTrainingFeedbackSequence(
+        RevivalGameplayView.presentFeedbackSequence(
             sameFrameReturn,
             attemptVoice: {
                 orderedPresentation.append("voice:\($0)")
@@ -223,7 +223,7 @@ extension WorldRenderingTests {
         ]
         var presentation: [String] = []
 
-        RevivalGameplayView.presentTrainingFeedbackSequence(
+        RevivalGameplayView.presentFeedbackSequence(
             feedback,
             attemptVoice: {
                 presentation.append("voice:\($0)")

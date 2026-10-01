@@ -558,35 +558,6 @@ func legacyNameOrder(_ lhs: String, _ rhs: String) -> Bool {
     return lhs.utf8.lexicographicallyPrecedes(rhs.utf8)
 }
 
-/// The texture of each model texture slot name, as ReadModelTexture
-/// (model/polymodel.cpp:949) finds it: first a page that shows the slot's
-/// bitmap (FindTextureBitmapName, Descent3/gametexture.cpp:372, the lowest
-/// index wins), then a page with the slot's name (FindTextureName). The
-/// definitions are unique and in ascending stored-index order. Keys are
-/// lowercased.
-func modelTextureSlotTable(
-    _ definitions: [RetailTextureDefinition]
-) -> [String: SourceResource] {
-    var table: [String: SourceResource] = [:]
-    for definition in definitions {
-        table[definition.name.lowercased()] = SourceResource(
-            storedIndex: definition.storedIndex,
-            sourceName: definition.name
-        )
-    }
-    var bitmapTable: [String: SourceResource] = [:]
-    for definition in definitions {
-        let bitmapKey = URL(fileURLWithPath: definition.bitmapSourceName)
-            .deletingPathExtension().lastPathComponent.lowercased()
-        guard bitmapTable[bitmapKey] == nil else { continue }
-        bitmapTable[bitmapKey] = SourceResource(
-            storedIndex: definition.storedIndex,
-            sourceName: definition.name
-        )
-    }
-    return table.merging(bitmapTable) { _, bitmapMatch in bitmapMatch }
-}
-
 func resolveRetailSurfacePhysics(
     table: Data,
     overlay: Data,
@@ -637,6 +608,86 @@ private func sourceDefaultSurfaceBehavior(
     default:
         nil
     }
+}
+
+/// The texture page of each model texture slot, as ReadNewModelFile's TXTR
+/// chunk finds it (model/polymodel.cpp:1762): first FindTextureBitmapName
+/// of "<slot>.OGF" (Descent3/gametexture.cpp:372), which scans the texture
+/// pages in index order and compares a still page's bitmap name (its file
+/// stem plus ".ogf", bm_ChangeEndName, bitmap/bitmain.cpp:649) or each frame
+/// bitmap name of an animated page's vclip; then FindTextureName of the
+/// slot. `animationFrameNames` gives the frame bitmap names of a vclip file
+/// (nil when the vclip cannot be read). Keys are lowercased slot names.
+func resolveRetailModelTextureSlots(
+    table: Data,
+    overlay: Data,
+    slotNames: Set<String>,
+    animationFrameNames: (String) -> [String]?
+) throws -> [String: RetailTextureDefinition] {
+    let pages = try mergedRetailTexturePages(table: table, overlay: overlay)
+    let ordered = pages.byName.values.sorted { $0.storedIndex < $1.storedIndex }
+    func stem(_ name: String) -> String {
+        URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent
+            .lowercased()
+    }
+    var framesByBitmap: [String: [String]] = [:]
+    func frameStems(_ bitmap: String) -> [String] {
+        let key = bitmap.lowercased()
+        if let known = framesByBitmap[key] { return known }
+        let frames = (animationFrameNames(bitmap) ?? []).map { name in
+            name.lowercased().hasSuffix(".ogf") ? stem(name) : name.lowercased()
+        }
+        framesByBitmap[key] = frames
+        return frames
+    }
+    var resolved: [String: RetailTextureDefinition] = [:]
+    for slot in slotNames.sorted(by: legacyNameOrder) {
+        let key = slot.lowercased()
+        var match: RetailTexturePage?
+        for page in ordered where !page.bitmapSourceName.isEmpty {
+            if page.bitmapSourceName.lowercased().hasSuffix(".oaf") {
+                if frameStems(page.bitmapSourceName).contains(key) {
+                    match = page
+                    break
+                }
+            } else if stem(page.bitmapSourceName) == key {
+                match = page
+                break
+            }
+        }
+        guard let page = match ?? pages.byName[key] else {
+            throw RetailTextureTableError.missingName(slot)
+        }
+        resolved[key] = try canonicalTextureDefinition(page)
+    }
+    return resolved
+}
+
+/// The texture page that shows a bitmap or vclip file (the lowest index
+/// wins, as FindTextureBitmapName scans), if any.
+func resolveRetailTextureShowingBitmap(
+    table: Data,
+    overlay: Data,
+    bitmapName: String
+) throws -> RetailTextureDefinition? {
+    let pages = try mergedRetailTexturePages(table: table, overlay: overlay)
+    guard let page = pages.byName.values
+        .sorted(by: { $0.storedIndex < $1.storedIndex })
+        .first(where: {
+            $0.bitmapSourceName.caseInsensitiveCompare(bitmapName)
+                == .orderedSame
+        })
+    else {
+        return nil
+    }
+    return try canonicalTextureDefinition(page)
+}
+
+/// The number of texture slots the table and its overlay use: the first
+/// index no page uses.
+func retailTexturePageCount(table: Data, overlay: Data) throws -> Int {
+    let pages = try mergedRetailTexturePages(table: table, overlay: overlay)
+    return (pages.byName.values.map(\.storedIndex).max() ?? -1) + 1
 }
 
 private struct MergedRetailTexturePages {
@@ -1411,50 +1462,17 @@ struct RetailGenericAIDefinition: Equatable, Sendable {
     let circleDistance: Float
 }
 
-struct ReachedObjectModelPages: Equatable, Sendable {
-    let ship: RetailModelPageSelection
-    let generic: RetailModelPageSelection
-}
-
-func resolveReachedObjectModelPages(
+/// Every model page (generic and ship) of the table and its overlay, by
+/// lowercased name; an overlay page replaces the table's page.
+func resolveRetailModelPages(
     table: Data,
-    overlay: Data,
-    shipName: String,
-    genericName: String
-) throws -> ReachedObjectModelPages {
-    let base = try parseRetailModelPages(table)
-    let overlayPages = try parseRetailModelPages(overlay)
-    var pages = Dictionary(uniqueKeysWithValues: base.map { ($0.name.lowercased(), $0) })
-    for page in overlayPages { pages[page.name.lowercased()] = page }
-    guard let ship = pages[shipName.lowercased()], ship.dyingModelName != nil else {
-        throw RetailTextureTableError.missingName(shipName)
-    }
-    guard let generic = pages[genericName.lowercased()], generic.dyingModelName == nil else {
-        throw RetailTextureTableError.missingName(genericName)
-    }
-    return .init(ship: ship, generic: generic)
-}
-
-func resolveRetailGenericModelPage(
-    table: Data,
-    overlay: Data,
-    name: String
-) throws -> RetailModelPageSelection {
-    let base = try parseRetailModelPages(table)
-    let overlayPages = try parseRetailModelPages(overlay)
-    var pages = Dictionary(
-        uniqueKeysWithValues: base.map { ($0.name.lowercased(), $0) }
-    )
-    for page in overlayPages {
+    overlay: Data
+) throws -> [String: RetailModelPageSelection] {
+    var pages: [String: RetailModelPageSelection] = [:]
+    for page in try parseRetailModelPages(table) + parseRetailModelPages(overlay) {
         pages[page.name.lowercased()] = page
     }
-    guard let page = pages[name.lowercased()],
-          page.shipDefinition == nil,
-          page.dyingModelName == nil
-    else {
-        throw RetailTextureTableError.missingName(name)
-    }
-    return page
+    return pages
 }
 
 private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelection] {
@@ -2409,8 +2427,40 @@ func decodeReachedOutrage16OAF(
     )
 }
 
+/// The bitmap name of each frame of an OAF vclip: the name each frame's
+/// OGF header stores, which bm_AllocLoadBitmap gives the frame's bitmap
+/// (bitmap/bitmain.cpp:916, tga.cpp:355) and FindTextureBitmapName compares
+/// (Descent3/gametexture.cpp:372).
+func outrageAnimationFrameNames(_ data: Data) throws -> [String] {
+    var cursor = OGFByteCursor(data)
+    guard try cursor.readUInt8() == 127 else {
+        throw Outrage1555DecodeError.unsupportedHeader
+    }
+    let version = Int(try cursor.readUInt8())
+    let frameCount = Int(try cursor.readUInt8())
+    _ = try cursor.readFloat()
+    guard version == 1, frameCount > 0 else {
+        throw Outrage1555DecodeError.unsupportedHeader
+    }
+    var names: [String] = []
+    for _ in 0..<frameCount {
+        var name = ""
+        _ = try decodeReachedOutrage16OGF(cursor: &cursor, name: &name)
+        names.append(name)
+    }
+    return names
+}
+
 private func decodeReachedOutrage16OGF(
     cursor: inout OGFByteCursor
+) throws -> Outrage1555Image {
+    var name = ""
+    return try decodeReachedOutrage16OGF(cursor: &cursor, name: &name)
+}
+
+private func decodeReachedOutrage16OGF(
+    cursor: inout OGFByteCursor,
+    name: inout String
 ) throws -> Outrage1555Image {
     let imageIdentifierLength = Int(try cursor.readUInt8())
     guard try cursor.readUInt8() == 0 else {
@@ -2423,7 +2473,7 @@ private func decodeReachedOutrage16OGF(
     case 122: pixelFormat = .argb1555
     default: throw Outrage1555DecodeError.unsupportedHeader
     }
-    _ = try cursor.readCString(maximumByteCount: 35)
+    name = try cursor.readCString(maximumByteCount: 35)
     let mipCount = Int(try cursor.readUInt8())
     guard mipCount > 0 else { throw Outrage1555DecodeError.unsupportedHeader }
     try cursor.skip(9)

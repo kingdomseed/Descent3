@@ -6,27 +6,27 @@ import CoreGraphics
 @preconcurrency import GameController
 import MetalKit
 
-enum TrainingOpeningPresentationError: LocalizedError {
+enum GameplayPresentationError: LocalizedError {
     case voicePlaybackFailed(String)
     case soundPlaybackFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .voicePlaybackFailed(let sourceName):
-            "Training voice playback failed for \(sourceName)"
+            "Voice playback failed for \(sourceName)"
         case .soundPlaybackFailed(let sourceName):
-            "Training sound playback failed for \(sourceName)"
+            "Sound playback failed for \(sourceName)"
         }
     }
 }
 
-enum TrainingPlayerSaveAction: Equatable {
+enum PlayerSaveAction: Equatable {
     case quicksave
     case quickload
 }
 
 @MainActor
-private final class NoninteractiveTrainingOverlay: NSView {
+private final class NoninteractiveOverlay: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         nil
     }
@@ -47,9 +47,9 @@ final class RevivalGameplayView: MTKView {
     var rearViewInputChanged: ((Bool, Bool) -> Void)?
     var rearViewInputCancelled: (() -> Void)?
     var soloPauseChanged: ((Bool) -> Void)?
-    var playerSaveActionRequested: ((TrainingPlayerSaveAction) -> Void)?
-    var trainingResultAcknowledgementRequested: (() -> Void)?
-    var trainingRestartRequested: (() -> Void)?
+    var playerSaveActionRequested: ((PlayerSaveAction) -> Void)?
+    var levelResultAcknowledgementRequested: (() -> Void)?
+    var playAgainRequested: (() -> Void)?
     var pilotProfileCreationRequested: ((String) -> Void)?
     var pilotProfileConfirmationRequested: ((UUID) -> Void)?
     var pilotProfileCancellationRequested: (() -> Void)?
@@ -63,22 +63,22 @@ final class RevivalGameplayView: MTKView {
     private var primaryFireIsHeld = false
     private var secondaryFireIsHeld = false
     private var afterburnerIsHeld = false
-    private let trainingMessageLabel = NSTextField(labelWithString: "")
+    private let hudMessageLabel = NSTextField(labelWithString: "")
     private let enabledControlsLabel = NSTextField(labelWithString: "")
     private let energyLabel = NSTextField(labelWithString: "")
     private let afterburnerLabel = NSTextField(labelWithString: "")
     private let shieldsLabel = NSTextField(labelWithString: "")
     private let invulnerabilityStatusLabel =
         NSTextField(labelWithString: "")
-    private let cloakShipMonitor = NoninteractiveTrainingOverlay()
+    private let cloakShipMonitor = NoninteractiveOverlay()
     private let cloakShipMonitorShape = CAShapeLayer()
     private let cloakStatusLabel = NSTextField(labelWithString: "")
-    private let invulnerabilityMonitorRing = NoninteractiveTrainingOverlay()
-    private let cameraMonitorBorder = NoninteractiveTrainingOverlay()
-    private let trainingEndLevelOverlay = NoninteractiveTrainingOverlay()
-    private let trainingEndLevelLabel = NSTextField(labelWithString: "")
-    private let trainingRestartButton = NSButton(
-        title: "Play Training Again",
+    private let invulnerabilityMonitorRing = NoninteractiveOverlay()
+    private let cameraMonitorBorder = NoninteractiveOverlay()
+    private let levelEndOverlay = NoninteractiveOverlay()
+    private let levelEndLabel = NSTextField(labelWithString: "")
+    private let playAgainButton = NSButton(
+        title: "Play Again",
         target: nil,
         action: nil
     )
@@ -104,24 +104,24 @@ final class RevivalGameplayView: MTKView {
         action: nil
     )
     private var pilotProfileIDs: [UUID] = []
-    private var trainingVoicePlayer: AVAudioPlayer?
-    private var trainingSoundPlayers: [AVAudioPlayer] = []
+    private var voicePlayer: AVAudioPlayer?
+    private var soundPlayers: [AVAudioPlayer] = []
     private var objectSoundLoopPlayer: AVAudioPlayer?
-    private var pausedTrainingVoicePlayer: AVAudioPlayer?
-    private var pausedTrainingSoundPlayers: [AVAudioPlayer] = []
-    private var pausedTrainingGuidebotAmbientEnginePlayer: AVAudioPlayer?
+    private var pausedVoicePlayer: AVAudioPlayer?
+    private var pausedSoundPlayers: [AVAudioPlayer] = []
+    private var pausedObjectSoundLoopPlayer: AVAudioPlayer?
     private var soloPauseAlertIsPresented = false
-    private var trainingMessageExpiresAt: Float?
-    private var trainingResultIsPresented = false
-    private var trainingResultPresentedAt: TimeInterval?
-    private var pendingTrainingResultKeyAcknowledgement = false
+    private var hudMessageExpiresAt: Float?
+    private var levelResultIsPresented = false
+    private var levelResultPresentedAt: TimeInterval?
+    private var pendingLevelResultKeyAcknowledgement = false
     private var selectedBuddyMenuItem: Int?
 
     override var acceptsFirstResponder: Bool { true }
 
     override init(frame frameRect: NSRect, device: (any MTLDevice)?) {
         super.init(frame: frameRect, device: device)
-        configureTrainingOverlay()
+        configureOverlay()
         configurePilotProfileOverlay()
         NotificationCenter.default.addObserver(
             self,
@@ -163,14 +163,14 @@ final class RevivalGameplayView: MTKView {
             width: width,
             height: 24
         )
-        trainingMessageLabel.frame = NSRect(
+        hudMessageLabel.frame = NSRect(
             x: left,
             y: enabledControlsLabel.frame.maxY + 8,
             width: width,
-            height: CGFloat(trainingMessageLabel.maximumNumberOfLines) * 28
+            height: CGFloat(hudMessageLabel.maximumNumberOfLines) * 28
         )
         let statusY = max(
-            trainingMessageLabel.frame.maxY + 40,
+            hudMessageLabel.frame.maxY + 40,
             bounds.height - 52
         )
         energyLabel.frame = NSRect(
@@ -217,18 +217,18 @@ final class RevivalGameplayView: MTKView {
             drawableWidth: bounds.width,
             drawableHeight: bounds.height
         )
-        trainingEndLevelOverlay.frame = bounds
-        trainingEndLevelLabel.frame = NSRect(
+        levelEndOverlay.frame = bounds
+        levelEndLabel.frame = NSRect(
             x: max(24, bounds.midX - 240),
             y: max(24, bounds.midY - 180),
             width: min(480, max(0, bounds.width - 48)),
             height: min(360, max(0, bounds.height - 48))
         )
-        trainingRestartButton.sizeToFit()
-        trainingRestartButton.frame.origin = NSPoint(
+        playAgainButton.sizeToFit()
+        playAgainButton.frame.origin = NSPoint(
             x: max(
                 24,
-                bounds.midX - trainingRestartButton.frame.width / 2
+                bounds.midX - playAgainButton.frame.width / 2
             ),
             y: max(24, bounds.midY - 150)
         )
@@ -279,23 +279,23 @@ final class RevivalGameplayView: MTKView {
     }
 
     override func keyDown(with event: NSEvent) {
-        if trainingResultIsPresented,
-           Self.isTrainingResultAcknowledgementKey(event.keyCode) {
-            pendingTrainingResultKeyAcknowledgement = true
-            requestTrainingResultAcknowledgement()
+        if levelResultIsPresented,
+           Self.isLevelResultAcknowledgementKey(event.keyCode) {
+            pendingLevelResultKeyAcknowledgement = true
+            requestLevelResultAcknowledgement()
             return
         }
-        if let action = Self.requestedTrainingPlayerSaveAction(
+        if let action = Self.requestedPlayerSaveAction(
             keyCode: event.keyCode,
             modifierFlags: event.modifierFlags,
             isRepeat: event.isARepeat,
-            gameplayIsActive: gameplayIsActive && !trainingResultIsPresented
+            gameplayIsActive: gameplayIsActive && !levelResultIsPresented
         ) {
             if let playerSaveActionRequested {
                 playerSaveActionRequested(action)
             } else {
                 clearInput()
-                pauseCurrentTrainingAudio()
+                pauseCurrentAudio()
                 soloPauseChanged?(true)
                 if presentPlayerSaveUnavailableAlert() {
                     soloPauseChanged?(false)
@@ -307,7 +307,7 @@ final class RevivalGameplayView: MTKView {
            !event.isARepeat,
            gameplayIsActive {
             clearInput()
-            pauseCurrentTrainingAudio()
+            pauseCurrentAudio()
             soloPauseChanged?(true)
             if presentSoloHelpAlert() {
                 soloPauseChanged?(false)
@@ -320,7 +320,7 @@ final class RevivalGameplayView: MTKView {
             gameplayIsActive: gameplayIsActive
         ) {
             clearInput()
-            pauseCurrentTrainingAudio()
+            pauseCurrentAudio()
             soloPauseChanged?(true)
             if presentSoloPauseAlert() {
                 soloPauseChanged?(false)
@@ -412,8 +412,8 @@ final class RevivalGameplayView: MTKView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        if trainingResultIsPresented {
-            requestTrainingResultAcknowledgement()
+        if levelResultIsPresented {
+            requestLevelResultAcknowledgement()
             return
         }
         guard gameplayIsActive else {
@@ -458,7 +458,7 @@ final class RevivalGameplayView: MTKView {
         } else {
             disconnectController()
             clearInput()
-            trainingMessageLabel.stringValue = ""
+            hudMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
             energyLabel.stringValue = ""
             energyLabel.isHidden = true
@@ -470,18 +470,18 @@ final class RevivalGameplayView: MTKView {
             cloakShipMonitor.isHidden = true
             cloakStatusLabel.stringValue = ""
             invulnerabilityMonitorRing.isHidden = true
-            trainingMessageExpiresAt = nil
-            trainingVoicePlayer?.stop()
-            trainingVoicePlayer = nil
-            trainingSoundPlayers.forEach { $0.stop() }
-            trainingSoundPlayers.removeAll()
+            hudMessageExpiresAt = nil
+            voicePlayer?.stop()
+            voicePlayer = nil
+            soundPlayers.forEach { $0.stop() }
+            soundPlayers.removeAll()
             stopObjectSoundLoop()
-            clearPausedTrainingAudio()
+            clearPausedAudio()
             cameraMonitorBorder.isHidden = true
         }
     }
 
-    func presentTrainingOpening(
+    func presentGameplayFrame(
         frame: PlayerSimulationFrame,
         voiceClips: [CanonicalVoiceClip],
         soundClips: [CanonicalSoundClip] = [],
@@ -489,7 +489,7 @@ final class RevivalGameplayView: MTKView {
     ) throws {
         if let finalGoal = frame.levelEnd {
             clearInput()
-            trainingMessageLabel.stringValue = ""
+            hudMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
             energyLabel.isHidden = true
             afterburnerLabel.isHidden = true
@@ -499,48 +499,48 @@ final class RevivalGameplayView: MTKView {
             cloakStatusLabel.stringValue = ""
             invulnerabilityMonitorRing.isHidden = true
             cameraMonitorBorder.isHidden = true
-            trainingMessageExpiresAt = nil
-            trainingVoicePlayer?.stop()
-            trainingVoicePlayer = nil
-            trainingSoundPlayers.forEach { $0.stop() }
-            trainingSoundPlayers.removeAll()
+            hudMessageExpiresAt = nil
+            voicePlayer?.stop()
+            voicePlayer = nil
+            soundPlayers.forEach { $0.stop() }
+            soundPlayers.removeAll()
             stopObjectSoundLoop()
-            trainingEndLevelLabel.stringValue =
-                Self.trainingPostLevelResultText(
+            levelEndLabel.stringValue =
+                Self.postLevelResultText(
                     finalGoal.postLevelResult
                 )
-            trainingRestartButton.isEnabled = false
-            trainingRestartButton.isHidden = true
-            if !trainingResultIsPresented {
-                trainingResultPresentedAt =
+            playAgainButton.isEnabled = false
+            playAgainButton.isHidden = true
+            if !levelResultIsPresented {
+                levelResultPresentedAt =
                     ProcessInfo.processInfo.systemUptime
                 perform(
-                    #selector(trainingResultAdmissionDidOpen),
+                    #selector(levelResultAdmissionDidOpen),
                     with: nil,
                     afterDelay: 2
                 )
             }
-            trainingResultIsPresented = true
-            trainingEndLevelOverlay.isHidden = false
-            trainingEndLevelLabel.isHidden = false
+            levelResultIsPresented = true
+            levelEndOverlay.isHidden = false
+            levelEndLabel.isHidden = false
             return
         }
-        trainingResultIsPresented = false
-        trainingResultPresentedAt = nil
-        pendingTrainingResultKeyAcknowledgement = false
+        levelResultIsPresented = false
+        levelResultPresentedAt = nil
+        pendingLevelResultKeyAcknowledgement = false
         NSObject.cancelPreviousPerformRequests(
             withTarget: self,
-            selector: #selector(trainingResultAdmissionDidOpen),
+            selector: #selector(levelResultAdmissionDidOpen),
             object: nil
         )
-        trainingEndLevelOverlay.isHidden = true
-        trainingEndLevelLabel.isHidden = true
-        trainingRestartButton.isHidden = true
+        levelEndOverlay.isHidden = true
+        levelEndLabel.isHidden = true
+        playAgainButton.isHidden = true
         let showsOrdinaryGameplayOverlays =
             Self.showsOrdinaryGameplayOverlays(
                 rearViewIsActive: frame.rearViewIsActive
             )
-        trainingMessageLabel.isHidden = !showsOrdinaryGameplayOverlays
+        hudMessageLabel.isHidden = !showsOrdinaryGameplayOverlays
         enabledControlsLabel.isHidden = !showsOrdinaryGameplayOverlays
         energyLabel.isHidden = !showsOrdinaryGameplayOverlays
         afterburnerLabel.isHidden = !showsOrdinaryGameplayOverlays
@@ -623,11 +623,11 @@ final class RevivalGameplayView: MTKView {
             rooms: rooms
         )
         guard !voiceClips.isEmpty else {
-            trainingMessageLabel.stringValue = ""
+            hudMessageLabel.stringValue = ""
             enabledControlsLabel.stringValue = ""
-            trainingMessageExpiresAt = nil
-            trainingVoicePlayer?.stop()
-            trainingVoicePlayer = nil
+            hudMessageExpiresAt = nil
+            voicePlayer?.stop()
+            voicePlayer = nil
             return
         }
         enabledControlsLabel.stringValue =
@@ -635,21 +635,21 @@ final class RevivalGameplayView: MTKView {
                 ? Self.controlSummary(frame.enabledPlayerControls)
                 : ""
         guard !frame.presentationFeedback.isEmpty else {
-            if let expiry = trainingMessageExpiresAt,
+            if let expiry = hudMessageExpiresAt,
                frame.gameTime >= expiry {
-                trainingMessageLabel.stringValue = ""
-                trainingMessageExpiresAt = nil
+                hudMessageLabel.stringValue = ""
+                hudMessageExpiresAt = nil
             }
             return
         }
         var presentedHUDMessages: [String] = []
-        Self.presentTrainingFeedbackSequence(
+        Self.presentFeedbackSequence(
             frame.presentationFeedback,
             attemptVoice: {
-                try self.playTrainingVoice(named: $0, from: voiceClips)
+                try self.playVoiceClip(named: $0, from: voiceClips)
             },
             attemptSound: {
-                try self.playTrainingSound(
+                try self.playSoundClip(
                     named: $0,
                     eventVolume: $1,
                     from: soundClips
@@ -657,19 +657,19 @@ final class RevivalGameplayView: MTKView {
             },
             presentHUDMessages: { messages in
                 presentedHUDMessages.append(contentsOf: messages)
-                self.trainingMessageLabel.maximumNumberOfLines =
-                    Self.trainingMessageLineCount(
+                self.hudMessageLabel.maximumNumberOfLines =
+                    Self.hudMessageLineCount(
                         for: frame.presentationFeedback
                     )
                 self.needsLayout = true
-                self.trainingMessageLabel.stringValue =
+                self.hudMessageLabel.stringValue =
                     presentedHUDMessages.joined(separator: "\n")
-                self.trainingMessageExpiresAt = frame.gameTime + 5
+                self.hudMessageExpiresAt = frame.gameTime + 5
             }
         )
     }
 
-    static func presentTrainingFeedback(
+    static func presentFeedback(
         voicePrecedesHUDMessages: Bool,
         attemptVoice: () throws -> Void,
         attemptSound: () throws -> Void = {},
@@ -685,7 +685,7 @@ final class RevivalGameplayView: MTKView {
         }
     }
 
-    static func presentTrainingFeedbackSequence(
+    static func presentFeedbackSequence(
         _ feedback: [PresentationFeedback],
         attemptVoice: (String) throws -> Void,
         attemptSound: (String, Float?) throws -> Void,
@@ -695,7 +695,7 @@ final class RevivalGameplayView: MTKView {
             !feedback[$0].voiceSourceName.isEmpty
         }
         for (index, event) in feedback.enumerated() {
-            presentTrainingFeedback(
+            presentFeedback(
                 voicePrecedesHUDMessages:
                     event.voicePrecedesHUDMessages,
                 attemptVoice: {
@@ -726,13 +726,13 @@ final class RevivalGameplayView: MTKView {
         }
     }
 
-    private func playTrainingSound(
+    private func playSoundClip(
         named soundSourceName: String,
         eventVolume: Float?,
         from soundClips: [CanonicalSoundClip]
     ) throws {
         do {
-            trainingSoundPlayers.removeAll { !$0.isPlaying }
+            soundPlayers.removeAll { !$0.isPlaying }
             guard
                 let clip = soundClips.first(where: {
                     $0.sourceName.caseInsensitiveCompare(soundSourceName)
@@ -741,21 +741,21 @@ final class RevivalGameplayView: MTKView {
                         == .orderedSame
                 })
             else {
-                throw TrainingOpeningPresentationError.soundPlaybackFailed(
+                throw GameplayPresentationError.soundPlaybackFailed(
                     soundSourceName
                 )
             }
             let player = try AVAudioPlayer(data: Self.waveData(for: clip))
-            trainingSoundPlayers.append(player)
+            soundPlayers.append(player)
             player.volume = clip.importVolume * (eventVolume ?? 1)
             player.prepareToPlay()
             guard player.play() else {
-                throw TrainingOpeningPresentationError.soundPlaybackFailed(
+                throw GameplayPresentationError.soundPlaybackFailed(
                     soundSourceName
                 )
             }
         } catch {
-            throw TrainingOpeningPresentationError.soundPlaybackFailed(
+            throw GameplayPresentationError.soundPlaybackFailed(
                 soundSourceName
             )
         }
@@ -1048,28 +1048,28 @@ final class RevivalGameplayView: MTKView {
         ).squareRoot()
     }
 
-    private func playTrainingVoice(
+    private func playVoiceClip(
         named voiceSourceName: String,
         from voiceClips: [CanonicalVoiceClip]
     ) throws {
         do {
-            trainingVoicePlayer?.stop()
+            voicePlayer?.stop()
             let clip = voiceClips.first(where: {
                 $0.sourceName.caseInsensitiveCompare(voiceSourceName)
                     == .orderedSame
             })!
             let player = try AVAudioPlayer(data: Self.waveData(for: clip))
-            trainingVoicePlayer = player
+            voicePlayer = player
             player.prepareToPlay()
             guard player.play() else {
-                throw TrainingOpeningPresentationError.voicePlaybackFailed(
+                throw GameplayPresentationError.voicePlaybackFailed(
                     voiceSourceName
                 )
             }
         } catch {
-            trainingVoicePlayer?.stop()
-            trainingVoicePlayer = nil
-            throw TrainingOpeningPresentationError.voicePlaybackFailed(
+            voicePlayer?.stop()
+            voicePlayer = nil
+            throw GameplayPresentationError.voicePlaybackFailed(
                 voiceSourceName
             )
         }
@@ -1092,35 +1092,35 @@ final class RevivalGameplayView: MTKView {
         releaseMouse()
     }
 
-    func pauseCurrentTrainingAudio() {
-        clearPausedTrainingAudio()
-        if let player = trainingVoicePlayer, player.isPlaying {
+    func pauseCurrentAudio() {
+        clearPausedAudio()
+        if let player = voicePlayer, player.isPlaying {
             player.pause()
-            pausedTrainingVoicePlayer = player
+            pausedVoicePlayer = player
         }
-        trainingSoundPlayers.removeAll { !$0.isPlaying }
-        pausedTrainingSoundPlayers = trainingSoundPlayers
-        pausedTrainingSoundPlayers.forEach { $0.pause() }
+        soundPlayers.removeAll { !$0.isPlaying }
+        pausedSoundPlayers = soundPlayers
+        pausedSoundPlayers.forEach { $0.pause() }
         if let player = objectSoundLoopPlayer,
            player.isPlaying {
             player.pause()
-            pausedTrainingGuidebotAmbientEnginePlayer = player
+            pausedObjectSoundLoopPlayer = player
         }
     }
 
-    func resumePausedTrainingAudio() {
-        if pausedTrainingVoicePlayer === trainingVoicePlayer {
-            pausedTrainingVoicePlayer?.play()
+    func resumePausedAudio() {
+        if pausedVoicePlayer === voicePlayer {
+            pausedVoicePlayer?.play()
         }
-        for player in pausedTrainingSoundPlayers where
-            trainingSoundPlayers.contains(where: { $0 === player }) {
+        for player in pausedSoundPlayers where
+            soundPlayers.contains(where: { $0 === player }) {
             player.play()
         }
-        if pausedTrainingGuidebotAmbientEnginePlayer
+        if pausedObjectSoundLoopPlayer
             === objectSoundLoopPlayer {
-            pausedTrainingGuidebotAmbientEnginePlayer?.play()
+            pausedObjectSoundLoopPlayer?.play()
         }
-        clearPausedTrainingAudio()
+        clearPausedAudio()
     }
 
     @discardableResult
@@ -1207,10 +1207,10 @@ final class RevivalGameplayView: MTKView {
         return alert.runModal() == .alertFirstButtonReturn
     }
 
-    private func clearPausedTrainingAudio() {
-        pausedTrainingVoicePlayer = nil
-        pausedTrainingSoundPlayers.removeAll()
-        pausedTrainingGuidebotAmbientEnginePlayer = nil
+    private func clearPausedAudio() {
+        pausedVoicePlayer = nil
+        pausedSoundPlayers.removeAll()
+        pausedObjectSoundLoopPlayer = nil
     }
 
     /// RunGameMenu's GAME_BUDDY_INTERFACE case (gamesequence.cpp:1972)
@@ -1222,7 +1222,7 @@ final class RevivalGameplayView: MTKView {
     /// the view, so the HUD and the paused sounds survive the modal.
     func runBuddyMenu(_ simulation: GameSession) {
         clearInput()
-        pauseCurrentTrainingAudio()
+        pauseCurrentAudio()
         soloPauseChanged?(true)
         let opened = max(
             ProcessInfo.processInfo.systemUptime,
@@ -1301,39 +1301,39 @@ final class RevivalGameplayView: MTKView {
         return String(field.stringValue.prefix(BuddyMenu.maximumAnswerLength))
     }
 
-    func presentTrainingContentReadyState(
+    func presentContentReadyState(
         completedLevelName: String,
         succeeded: Bool = true
     ) {
         NSObject.cancelPreviousPerformRequests(
             withTarget: self,
-            selector: #selector(trainingResultAdmissionDidOpen),
+            selector: #selector(levelResultAdmissionDidOpen),
             object: nil
         )
-        trainingResultIsPresented = false
-        trainingResultPresentedAt = nil
-        pendingTrainingResultKeyAcknowledgement = false
-        trainingEndLevelLabel.stringValue = """
+        levelResultIsPresented = false
+        levelResultPresentedAt = nil
+        pendingLevelResultKeyAcknowledgement = false
+        levelEndLabel.stringValue = """
         \(completedLevelName) \(succeeded ? "completed" : "failed").
 
-        Play Training Again, open canonical content, or quit.
+        Play again, open canonical content, or quit.
         """
-        trainingEndLevelOverlay.isHidden = false
-        trainingEndLevelLabel.isHidden = false
-        trainingRestartButton.isHidden = false
-        setTrainingRestartAvailable(true)
+        levelEndOverlay.isHidden = false
+        levelEndLabel.isHidden = false
+        playAgainButton.isHidden = false
+        setPlayAgainAvailable(true)
     }
 
-    func prepareForTrainingSession() {
-        trainingRestartButton.isEnabled = false
-        trainingRestartButton.isHidden = true
-        trainingEndLevelOverlay.isHidden = true
-        trainingEndLevelLabel.isHidden = true
+    func prepareForLevelSession() {
+        playAgainButton.isEnabled = false
+        playAgainButton.isHidden = true
+        levelEndOverlay.isHidden = true
+        levelEndLabel.isHidden = true
     }
 
-    func setTrainingRestartAvailable(_ available: Bool) {
-        guard !trainingRestartButton.isHidden else { return }
-        trainingRestartButton.isEnabled = available
+    func setPlayAgainAvailable(_ available: Bool) {
+        guard !playAgainButton.isHidden else { return }
+        playAgainButton.isEnabled = available
     }
 
     func presentPilotProfileSelection(
@@ -1378,13 +1378,13 @@ final class RevivalGameplayView: MTKView {
         pilotProfileCancellationRequested?()
     }
 
-    @objc func requestTrainingRestart() {
-        guard !trainingRestartButton.isHidden,
-              trainingRestartButton.isEnabled else {
+    @objc func requestPlayAgain() {
+        guard !playAgainButton.isHidden,
+              playAgainButton.isEnabled else {
             return
         }
-        setTrainingRestartAvailable(false)
-        trainingRestartRequested?()
+        setPlayAgainAvailable(false)
+        playAgainRequested?()
     }
 
     nonisolated static func heldInput(
@@ -1489,12 +1489,12 @@ final class RevivalGameplayView: MTKView {
         gameplayIsActive && !isRepeat && keyCode == 35
     }
 
-    nonisolated static func requestedTrainingPlayerSaveAction(
+    nonisolated static func requestedPlayerSaveAction(
         keyCode: UInt16,
         modifierFlags: NSEvent.ModifierFlags,
         isRepeat: Bool,
         gameplayIsActive: Bool
-    ) -> TrainingPlayerSaveAction? {
+    ) -> PlayerSaveAction? {
         guard gameplayIsActive, !isRepeat else { return nil }
         let primaryModifiers = modifierFlags.intersection([
             .shift, .control, .option, .command,
@@ -1653,7 +1653,7 @@ final class RevivalGameplayView: MTKView {
         )
     }
 
-    private func configureTrainingOverlay() {
+    private func configureOverlay() {
         invulnerabilityMonitorRing.wantsLayer = true
         invulnerabilityMonitorRing.layer?.borderColor =
             NSColor.systemRed.cgColor
@@ -1673,7 +1673,7 @@ final class RevivalGameplayView: MTKView {
         cameraMonitorBorder.layer?.borderWidth = 2
         cameraMonitorBorder.isHidden = true
         cameraMonitorBorder.setAccessibilityLabel(
-            "Training Camera Monitor view"
+            "Small view"
         )
         addSubview(cameraMonitorBorder)
         cloakShipMonitor.wantsLayer = true
@@ -1687,7 +1687,7 @@ final class RevivalGameplayView: MTKView {
         addSubview(cloakShipMonitor)
         for label in [
             enabledControlsLabel,
-            trainingMessageLabel,
+            hudMessageLabel,
             energyLabel,
             afterburnerLabel,
             shieldsLabel,
@@ -1705,10 +1705,10 @@ final class RevivalGameplayView: MTKView {
             addSubview(label)
         }
         enabledControlsLabel.setAccessibilityLabel(
-            "Enabled Training controls"
+            "Enabled controls"
         )
-        trainingMessageLabel.maximumNumberOfLines = 2
-        trainingMessageLabel.setAccessibilityLabel("Training instruction")
+        hudMessageLabel.maximumNumberOfLines = 2
+        hudMessageLabel.setAccessibilityLabel("HUD message")
         energyLabel.alignment = .left
         energyLabel.font = .monospacedDigitSystemFont(
             ofSize: 18,
@@ -1736,33 +1736,33 @@ final class RevivalGameplayView: MTKView {
         )
         cloakStatusLabel.textColor = .systemBlue
         cloakStatusLabel.setAccessibilityLabel("Cloak status")
-        trainingEndLevelOverlay.wantsLayer = true
-        trainingEndLevelOverlay.layer?.backgroundColor =
+        levelEndOverlay.wantsLayer = true
+        levelEndOverlay.layer?.backgroundColor =
             NSColor.black.cgColor
-        trainingEndLevelOverlay.isHidden = true
-        trainingEndLevelOverlay.setAccessibilityLabel(
-            "Training mission result"
+        levelEndOverlay.isHidden = true
+        levelEndOverlay.setAccessibilityLabel(
+            "Level result"
         )
-        addSubview(trainingEndLevelOverlay)
-        trainingEndLevelLabel.isEditable = false
-        trainingEndLevelLabel.isSelectable = false
-        trainingEndLevelLabel.drawsBackground = false
-        trainingEndLevelLabel.textColor = .white
-        trainingEndLevelLabel.alignment = .center
-        trainingEndLevelLabel.maximumNumberOfLines = 14
-        trainingEndLevelLabel.font = .boldSystemFont(ofSize: 20)
-        trainingEndLevelLabel.isHidden = true
-        trainingEndLevelLabel.setAccessibilityLabel(
-            "Training mission result text"
+        addSubview(levelEndOverlay)
+        levelEndLabel.isEditable = false
+        levelEndLabel.isSelectable = false
+        levelEndLabel.drawsBackground = false
+        levelEndLabel.textColor = .white
+        levelEndLabel.alignment = .center
+        levelEndLabel.maximumNumberOfLines = 14
+        levelEndLabel.font = .boldSystemFont(ofSize: 20)
+        levelEndLabel.isHidden = true
+        levelEndLabel.setAccessibilityLabel(
+            "Level result text"
         )
-        addSubview(trainingEndLevelLabel)
-        trainingRestartButton.target = self
-        trainingRestartButton.action = #selector(requestTrainingRestart)
-        trainingRestartButton.isHidden = true
-        trainingRestartButton.setAccessibilityLabel(
-            "Play Training Again"
+        addSubview(levelEndLabel)
+        playAgainButton.target = self
+        playAgainButton.action = #selector(requestPlayAgain)
+        playAgainButton.isHidden = true
+        playAgainButton.setAccessibilityLabel(
+            "Play Again"
         )
-        addSubview(trainingRestartButton)
+        addSubview(playAgainButton)
     }
 
     private func configurePilotProfileOverlay() {
@@ -1801,7 +1801,7 @@ final class RevivalGameplayView: MTKView {
         pilotProfileOverlay.addSubview(pilotProfileCancelButton)
     }
 
-    nonisolated static func trainingEndLevelText(
+    nonisolated static func levelEndText(
         _ presentation: LevelEndPresentation
     ) -> String {
         [
@@ -1811,7 +1811,7 @@ final class RevivalGameplayView: MTKView {
         ].joined(separator: "\n")
     }
 
-    nonisolated static func trainingPostLevelResultText(
+    nonisolated static func postLevelResultText(
         _ result: PostLevelResult
     ) -> String {
         let elapsedSeconds = max(0, Int(result.elapsedTime))
@@ -1835,21 +1835,21 @@ final class RevivalGameplayView: MTKView {
         return lines.joined(separator: "\n")
     }
 
-    nonisolated static func requestsTrainingResultAcknowledgement(
+    nonisolated static func requestsLevelResultAcknowledgement(
         keyCode: UInt16,
         resultIsPresented: Bool,
         presentationElapsedTime: TimeInterval
     ) -> Bool {
-        requestsTrainingResultAcknowledgement(
+        requestsLevelResultAcknowledgement(
             resultIsPresented: resultIsPresented,
             presentationElapsedTime: presentationElapsedTime,
-            queuedKey: isTrainingResultAcknowledgementKey(keyCode),
+            queuedKey: isLevelResultAcknowledgementKey(keyCode),
             mouseButtonIsPressed: false,
             controllerButtonIsPressed: false
         )
     }
 
-    nonisolated static func requestsTrainingResultAcknowledgement(
+    nonisolated static func requestsLevelResultAcknowledgement(
         resultIsPresented: Bool,
         presentationElapsedTime: TimeInterval,
         queuedKey: Bool,
@@ -1865,7 +1865,7 @@ final class RevivalGameplayView: MTKView {
             )
     }
 
-    nonisolated private static func isTrainingResultAcknowledgementKey(
+    nonisolated private static func isLevelResultAcknowledgementKey(
         _ keyCode: UInt16
     ) -> Bool {
         [36, 49, 53].contains(keyCode)
@@ -1896,7 +1896,7 @@ final class RevivalGameplayView: MTKView {
         return names.isEmpty ? "" : "Enabled: " + names.joined(separator: ", ")
     }
 
-    nonisolated static func trainingMessageLineCount(
+    nonisolated static func hudMessageLineCount(
         for feedback: [PresentationFeedback]
     ) -> Int {
         min(4, max(2, feedback.reduce(0) {
@@ -1998,10 +1998,10 @@ final class RevivalGameplayView: MTKView {
             [weak self] _, element in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if self.trainingResultIsPresented,
+                if self.levelResultIsPresented,
                    let button = element as? GCControllerButtonInput,
                    button.isPressed {
-                    self.requestTrainingResultAcknowledgement()
+                    self.requestLevelResultAcknowledgement()
                     return
                 }
                 self.publishControllerInput()
@@ -2010,37 +2010,37 @@ final class RevivalGameplayView: MTKView {
         publishControllerInput()
     }
 
-    private func requestTrainingResultAcknowledgement() {
-        guard Self.requestsTrainingResultAcknowledgement(
-            resultIsPresented: trainingResultIsPresented,
+    private func requestLevelResultAcknowledgement() {
+        guard Self.requestsLevelResultAcknowledgement(
+            resultIsPresented: levelResultIsPresented,
             presentationElapsedTime:
-                trainingResultPresentationElapsedTime,
-            queuedKey: pendingTrainingResultKeyAcknowledgement,
+                levelResultPresentationElapsedTime,
+            queuedKey: pendingLevelResultKeyAcknowledgement,
             mouseButtonIsPressed: NSEvent.pressedMouseButtons != 0,
             controllerButtonIsPressed:
                 controllerHasPressedButton
         ) else {
             return
         }
-        trainingResultIsPresented = false
-        trainingResultPresentedAt = nil
-        pendingTrainingResultKeyAcknowledgement = false
+        levelResultIsPresented = false
+        levelResultPresentedAt = nil
+        pendingLevelResultKeyAcknowledgement = false
         NSObject.cancelPreviousPerformRequests(
             withTarget: self,
-            selector: #selector(trainingResultAdmissionDidOpen),
+            selector: #selector(levelResultAdmissionDidOpen),
             object: nil
         )
-        trainingResultAcknowledgementRequested?()
+        levelResultAcknowledgementRequested?()
     }
 
-    @objc private func trainingResultAdmissionDidOpen() {
-        requestTrainingResultAcknowledgement()
+    @objc private func levelResultAdmissionDidOpen() {
+        requestLevelResultAcknowledgement()
     }
 
-    private var trainingResultPresentationElapsedTime: TimeInterval {
-        guard let trainingResultPresentedAt else { return 0 }
+    private var levelResultPresentationElapsedTime: TimeInterval {
+        guard let levelResultPresentedAt else { return 0 }
         return ProcessInfo.processInfo.systemUptime
-            - trainingResultPresentedAt
+            - levelResultPresentedAt
     }
 
     private var controllerHasPressedButton: Bool {

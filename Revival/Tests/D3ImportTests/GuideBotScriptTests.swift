@@ -59,7 +59,13 @@ final class GuideBotScriptTests: XCTestCase {
         let world = session(level).world
         let player = world.testPlayerObject
         let buddy = try XCTUnwrap(world.testGuideBotObject)
-        XCTAssertEqual(buddy.handle, ObjectHandle(6_164))
+        // ObjCreate takes the lowest free slot of the loaded table and the
+        // next handle count of that slot (object.cpp:1700).
+        let loaded = ObjectTable(level: level)
+        let slot = try XCTUnwrap(
+            (0..<ObjectTable.capacity).first { loaded.slots[$0] == nil }
+        )
+        XCTAssertEqual(buddy.handle, loaded.handles[slot].nextSignature())
         XCTAssertEqual(buddy.type, .dummy)
         XCTAssertEqual(buddy.dummyType, .robot)
         XCTAssertEqual(buddy.parent, player.handle)
@@ -637,8 +643,8 @@ final class GuideBotScriptTests: XCTestCase {
     }
 
     /// Real content, opt-in (REVIVAL_TRAINING_PACKAGE, engineering.md
-    /// section 2): the imported aigame module data, AIInitAll's takeover of
-    /// the placed GuideBotB, its retail menu, and the release through the
+    /// section 2): the imported aigame module data, AIInitAll's ObjCreate of
+    /// the Guide-Bot, its retail menu, and the release through the
     /// exit command to GBM_AMBIENT.
     func testImportedTrainingPackageReleasesTheTranslatedGuideBot() throws {
         guard let path = ProcessInfo.processInfo.environment[
@@ -669,8 +675,13 @@ final class GuideBotScriptTests: XCTestCase {
             level: level,
             presentationReadyTimestamp: 0
         )
+        // AIInitAll's ObjCreate takes slot 20, the lowest free slot, whose
+        // stored handle 6164 the level file retired (CHUNK_OBJECT_HANDLES,
+        // LoadLevel.cpp:3847): the next handle count is 8212
+        // (object.cpp:1700).
         let buddy = simulation.world.buddyHandle
-        XCTAssertEqual(buddy, level.findObjectName("GuideBotB"))
+        XCTAssertEqual(level.retiredObjectHandles, [6_164])
+        XCTAssertEqual(buddy, ObjectHandle(8_212))
         XCTAssertEqual(simulation.world.objectType(buddy), .dummy)
         XCTAssertEqual(
             simulation.world.testGuideBot?.mode,

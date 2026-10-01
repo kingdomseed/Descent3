@@ -258,6 +258,7 @@ extension Level {
     /// would drop them.
     func preservingScripting(of source: Level) -> Level {
         var level = source.scripting.map(addingScripting) ?? self
+        level.missionName = source.missionName
         level.objectInfos = source.objectInfos
         level.weapons = source.weapons
         level.gameModules = source.gameModules

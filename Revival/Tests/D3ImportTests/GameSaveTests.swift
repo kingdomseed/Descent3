@@ -45,7 +45,9 @@ final class GameSaveTests: XCTestCase {
     /// and visibility checks after it.
     func testSavedWorldAdvancesIdenticallyAfterGuidebotRelease() throws {
         let level = withTrainingGuideBot(makeTrainingCameraMonitorLevel())
-        let chain = try XCTUnwrap(level.trainingRobotGuidebotChain)
+        // The Guide-Bot AIInitAll made at level start (AImain.cpp:3833).
+        let startBuddy = GameWorld(level: level).buddyHandle
+        XCTAssertNotEqual(startBuddy, .none)
         try assertSaveContinuation(
             level: level,
             prepare: { session in
@@ -59,10 +61,7 @@ final class GameSaveTests: XCTestCase {
                     session.world.objectType(session.world.buddyHandle),
                     .robot
                 )
-                XCTAssertEqual(
-                    session.world.buddyHandle,
-                    ObjectHandle(chain.guidebotObjectHandle)
-                )
+                XCTAssertEqual(session.world.buddyHandle, startBuddy)
                 XCTAssertEqual(
                     session.world.testGuideBot?.mode,
                     GuideBotScript.birthMode

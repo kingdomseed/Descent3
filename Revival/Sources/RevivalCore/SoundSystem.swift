@@ -110,10 +110,13 @@ enum EngineSound {
     /// :609).
     static let cloakOn = "Cloak on"
     static let cloakOff = "Cloak off"
+    /// SOUND_HEADLIGHT (sounds.h:123), which the headlight key plays
+    /// (Controls.cpp:1405).
+    static let headlight = "Headlight1"
 
     /// Every engine sound, in a fixed order for the import.
     static let names = [
         powerupPickup, goalComplete, invulnerabilityOn, invulnerabilityOff,
-        cloakOn, cloakOff,
+        cloakOn, cloakOff, headlight,
     ]
 }

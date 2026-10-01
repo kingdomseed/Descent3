@@ -504,49 +504,12 @@ func readOutrageModelGuns(
     return (gunpoints, batteries)
 }
 
-/// The weapons the AI pages of `placedDefinitions` fire: for each model
-/// battery (WBAT) of the page's primary model, the weapons of the gun points
-/// a firing mask sets, in first-use order.
-func retailAIWeaponNames(
-    placedDefinitions: [String],
-    genericPages: [String: RetailGenericPage],
-    modelPayload: (String) -> Data?
-) throws -> [String] {
-    var names: [String] = []
-    var seen = Set<String>()
-    for definition in placedDefinitions {
-        guard seen.insert(definition.lowercased()).inserted,
-              let page = genericPages[definition.lowercased()],
-              page.flags & CanonicalObjectInfo.controlAIFlag != 0
-        else {
-            continue
-        }
-        guard let payload = modelPayload(page.primaryModelName.lowercased())
-        else {
-            throw GenericPageImportError.missingModel(page.primaryModelName)
-        }
-        let guns = try readOutrageModelGuns(payload, name: page.primaryModelName)
-        for (index, battery) in guns.batteries.enumerated() {
-            let retail = page.weaponBatteries[index]
-            let masks = retail.fireMasks.prefix(max(1, min(8, retail.numberOfMasks)))
-            for (bit, weapon) in page.weaponNames[index]
-                .prefix(battery.gunpoints.count).enumerated()
-            where masks.contains(where: { $0 & (1 << bit) != 0 })
-                && !names.contains(where: {
-                    $0.caseInsensitiveCompare(weapon) == .orderedSame
-                }) {
-                names.append(weapon)
-            }
-        }
-    }
-    return names
-}
-
 extension Level {
     /// The object tables for the placed objects (additive in package schema
-    /// 12): one object_info per generic page a placed generic object uses,
-    /// the gun points and weapon batteries of those pages' models, the ship
-    /// batteries `shipBatteries` with the ship model's guns, and the weapons
+    /// 12): one object_info per generic page a placed generic object uses
+    /// or the engine creates at level start (the Guide-Bot), the gun points
+    /// and weapon batteries of those pages' models, the ship batteries
+    /// `shipBatteries` with the ship model's guns, and the weapons
     /// all those batteries fire. `soundKey` maps a sound page name to the
     /// level's canonical clip key, importing the clip if needed;
     /// `modelPayload` returns an OOF by lowercased name; `textureFrames`
@@ -565,44 +528,45 @@ extension Level {
         var level = self
         var infos: [CanonicalObjectInfo] = []
         var weaponNames: [String] = []
-        var modelGuns: [SourceResource: (gunpoints: [ModelGunpoint],
-                                          batteries: [ModelWeaponBattery])] = [:]
-        // IS_GENERIC: robot, powerup, clutter, building.
-        let genericTypes: Set<UInt8> = [2, 7, 11, 16]
-        for placed in objects where genericTypes.contains(placed.type) {
-            guard let name = placed.definition?.sourceName,
-                  !infos.contains(where: {
-                      $0.name.caseInsensitiveCompare(name) == .orderedSame
-                  })
-            else {
-                continue
+        var modelGuns: [String: (gunpoints: [ModelGunpoint],
+                                 batteries: [ModelWeaponBattery])] = [:]
+        func guns(of modelName: String) throws
+            -> (gunpoints: [ModelGunpoint], batteries: [ModelWeaponBattery])
+        {
+            let key = modelName.lowercased()
+            if let known = modelGuns[key] { return known }
+            guard let payload = modelPayload(key) else {
+                throw GenericPageImportError.missingModel(modelName)
             }
+            let guns = try readOutrageModelGuns(payload, name: modelName)
+            modelGuns[key] = guns
+            return guns
+        }
+        // IS_GENERIC: robot, powerup, clutter, building. The placed objects'
+        // pages, then the pages the engine creates at level start: in single
+        // player AIInitAll makes ROBOT_GUIDEBOT for a player
+        // (AImain.cpp:3833), when the tables have that page.
+        let genericTypes: Set<UInt8> = [2, 7, 11, 16]
+        var pageNames = objects
+            .filter { genericTypes.contains($0.type) }
+            .compactMap { $0.definition?.sourceName }
+        if objects.contains(where: {
+            $0.type == D3SourceIdentity.playerObjectType
+        }), genericPages[CanonicalObjectInfo.guideBotPageName.lowercased()] != nil {
+            pageNames.append(CanonicalObjectInfo.guideBotPageName)
+        }
+        for name in pageNames where !infos.contains(where: {
+            $0.name.caseInsensitiveCompare(name) == .orderedSame
+        }) {
             guard let page = genericPages[name.lowercased()] else {
                 throw GenericPageImportError.missingPage(name)
             }
             let controlsAI = page.flags & CanonicalObjectInfo.controlAIFlag != 0
             var batteries: [CanonicalWeaponBattery] = []
-            if controlsAI, let model = placedObjectModel(
-                ObjectHandle(placed.handle)
-            ) {
-                let guns: (gunpoints: [ModelGunpoint],
-                           batteries: [ModelWeaponBattery])
-                if let known = modelGuns[model.source] {
-                    guns = known
-                } else {
-                    guard let payload = modelPayload(
-                        model.source.sourceName.lowercased()
-                    ) else {
-                        throw GenericPageImportError.missingModel(
-                            model.source.sourceName
-                        )
-                    }
-                    guns = try readOutrageModelGuns(
-                        payload,
-                        name: model.source.sourceName
-                    )
-                    modelGuns[model.source] = guns
-                }
+            if controlsAI, !page.primaryModelName.isEmpty {
+                // The page's model batteries (WBAT) with the page's
+                // static_wb (ObjInit's WBClearInfo, ObjInit.cpp:815).
+                let guns = try guns(of: page.primaryModelName)
                 for (index, modelBattery) in guns.batteries.enumerated() {
                     let retail = page.weaponBatteries[index]
                     let maskCount = max(1, min(8, retail.numberOfMasks))
@@ -689,18 +653,7 @@ extension Level {
         var shipWeaponBatteries: [CanonicalShipWeaponBattery] = []
         if !shipBatteries.isEmpty,
            let ship = shipDefinitions.first {
-            guard let payload = modelPayload(
-                ship.primaryModel.sourceName.lowercased()
-            ) else {
-                throw GenericPageImportError.missingModel(
-                    ship.primaryModel.sourceName
-                )
-            }
-            let guns = try readOutrageModelGuns(
-                payload,
-                name: ship.primaryModel.sourceName
-            )
-            modelGuns[ship.primaryModel] = guns
+            let guns = try guns(of: ship.primaryModel.sourceName)
             let gunCount = guns.batteries.first?.gunpoints.count ?? 0
             for retail in shipBatteries {
                 let weaponsFired = retail.weaponNames.prefix(gunCount)
@@ -767,7 +720,7 @@ extension Level {
         }
         level.models = models.map { model in
             var model = model
-            if let guns = modelGuns[model.source] {
+            if let guns = modelGuns[model.source.sourceName.lowercased()] {
                 model.gunpoints = guns.gunpoints
                 model.weaponBatteries = guns.batteries
             }

@@ -744,14 +744,14 @@ extension WorldRenderingTests {
             ]
         )
         var presentationOrder: [String] = []
-        RevivalGameplayView.presentTrainingFeedbackSequence(
+        RevivalGameplayView.presentFeedbackSequence(
             onFrame.presentationFeedback,
             attemptVoice: { _ in
                 XCTFail("Headlight feedback has no voice")
             },
             attemptSound: { name, volume in
                 presentationOrder.append("sound:\(name):\(volume ?? -1)")
-                throw TrainingOpeningPresentationError.soundPlaybackFailed(
+                throw GameplayPresentationError.soundPlaybackFailed(
                     name
                 )
             },

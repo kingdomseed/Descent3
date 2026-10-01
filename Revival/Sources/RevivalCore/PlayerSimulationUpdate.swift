@@ -33,7 +33,7 @@ extension GameSession {
                 ],
                 voiceSourceName: "",
                 voicePrecedesHUDMessages: false,
-                soundSourceName: "Headlight1",
+                soundSourceName: EngineSound.headlight,
                 soundEventVolume: 1
             )
         }

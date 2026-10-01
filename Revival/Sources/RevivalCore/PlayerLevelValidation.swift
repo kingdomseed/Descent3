@@ -112,21 +112,12 @@ extension Level {
                         SourceVisibleFace(roomSourceIndex: room.sourceIndex, faceIndex: $0)
                     }
                 }
-        } else if rooms.contains(where: { $0.sourceIndex == 3 }) {
-            do {
-                presentationFaces = try extractSourceVisibleWorld(
-                    self,
-                    roomStates: RoomState.canonical(self),
-                    camera: .trainingRoom3,
-                    startRoomSourceIndex: 3,
-                    portalBlends: Dictionary(
-                        uniqueKeysWithValues: presentationMaterials.map {
-                            ($0.texture, $0.blend)
-                        }
-                    )
-                ).faces
-            } catch {
-                throw LevelValidationError.invalidDependency("reference presentation view")
+        } else if !presentationMaterials.isEmpty {
+            // A level with no player start shows every room.
+            presentationFaces = rooms.flatMap { room in
+                room.faces.indices.map {
+                    SourceVisibleFace(roomSourceIndex: room.sourceIndex, faceIndex: $0)
+                }
             }
         } else {
             guard presentationMaterials.isEmpty,

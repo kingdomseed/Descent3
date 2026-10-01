@@ -1,156 +1,6 @@
 import XCTest
 
 final class PreparedRetailProfileTests: XCTestCase {
-    func testTrainingMessagesRequireScript006GoDown() throws {
-        let missingGoLeft = Data("""
-            Welcome=Welcome
-            GoForward=Forward
-            GoodJob=Excellent
-            GoBackwards=Reverse
-            GoRight=Right
-            GoUp=Up
-            GoDown=Down
-            Repeat=Repeat
-            ContinueToCourse=Continue
-            CourseInstructions=Course
-            """.utf8)
-        XCTAssertThrowsError(try parseTrainingMessages(missingGoLeft)) {
-            XCTAssertEqual(
-                $0 as? D3ImportOperationError,
-                .missingPresentationAsset("TrainingMission.msg")
-            )
-        }
-
-        let missingGoRight = Data("""
-            Welcome=Welcome
-            GoForward=Forward
-            GoodJob=Excellent
-            GoBackwards=Reverse
-            GoLeft=Left
-            GoUp=Up
-            GoDown=Down
-            Repeat=Repeat
-            ContinueToCourse=Continue
-            CourseInstructions=Course
-            """.utf8)
-        XCTAssertThrowsError(try parseTrainingMessages(missingGoRight)) {
-            XCTAssertEqual(
-                $0 as? D3ImportOperationError,
-                .missingPresentationAsset("TrainingMission.msg")
-            )
-        }
-
-        let missingGoUp = Data("""
-            Welcome=Welcome
-            GoForward=Forward
-            GoodJob=Excellent
-            GoBackwards=Reverse
-            GoLeft=Left
-            GoRight=Right
-            GoDown=Down
-            Repeat=Repeat
-            ContinueToCourse=Continue
-            CourseInstructions=Course
-            """.utf8)
-        XCTAssertThrowsError(try parseTrainingMessages(missingGoUp)) {
-            XCTAssertEqual(
-                $0 as? D3ImportOperationError,
-                .missingPresentationAsset("TrainingMission.msg")
-            )
-        }
-
-        let missingGoDown = Data("""
-            Welcome=Welcome
-            GoForward=Forward
-            GoodJob=Excellent
-            GoBackwards=Reverse
-            GoLeft=Left
-            GoRight=Right
-            GoUp=Up
-            Repeat=Repeat
-            ContinueToCourse=Continue
-            CourseInstructions=Course
-            """.utf8)
-        XCTAssertThrowsError(try parseTrainingMessages(missingGoDown)) {
-            XCTAssertEqual(
-                $0 as? D3ImportOperationError,
-                .missingPresentationAsset("TrainingMission.msg")
-            )
-        }
-
-        let missingRepeat = Data("""
-            Welcome=Welcome
-            GoForward=Forward
-            GoodJob=Excellent
-            GoBackwards=Reverse
-            GoLeft=Left
-            GoRight=Right
-            GoUp=Up
-            GoDown=Down
-            ContinueToCourse=Continue
-            CourseInstructions=Course
-            """.utf8)
-        XCTAssertThrowsError(try parseTrainingMessages(missingRepeat)) {
-            XCTAssertEqual(
-                $0 as? D3ImportOperationError,
-                .missingPresentationAsset("TrainingMission.msg")
-            )
-        }
-
-        let complete = Data("""
-            Welcome=Welcome
-            GoForward=Forward
-            GoodJob=Excellent
-            GoBackwards=Reverse
-            GoLeft=Left
-            GoRight=Right
-            GoUp=Now Slide up  until you stop.
-            GoDown=Now Slide down until you return to the start position.
-            Repeat=Let's repeat the exercise we just did.
-            ContinueToCourse=Continue Sliding down to start the next step.
-            CourseInstructions=Now, manuever through this tunnel using the sliding skills you just learned.
-            DodgeIntro=Next you are going to practice dodging.
-            Dodge30=To complete this step, dodge the turrett fire for 20 seconds.
-            KeepDodging=Oops, you were hit! Keep moving!
-            AlmostDoneDodge=You are almost done! Keep up the good work!
-            LeaveDodge=Now using your sliding skills, proceed forward to the flashing green light.
-            KeepMovingOutofDodging=Now keep moving forward into the next room.
-            """.utf8)
-        XCTAssertEqual(
-            try parseTrainingMessages(complete)["GoDown"],
-            "Now Slide down until you return to the start position."
-        )
-        XCTAssertEqual(
-            try parseTrainingMessages(complete)["Repeat"],
-            "Let's repeat the exercise we just did."
-        )
-        XCTAssertEqual(
-            try parseTrainingMessages(complete)[
-                "KeepMovingOutofDodging"
-            ],
-            "Now keep moving forward into the next room."
-        )
-
-        let missingScript019Message = Data(
-            String(decoding: complete, as: UTF8.self)
-                .split(whereSeparator: \.isNewline)
-                .filter {
-                    !$0.trimmingCharacters(in: .whitespaces)
-                        .hasPrefix("KeepMovingOutofDodging=")
-                }
-                .joined(separator: "\n")
-                .utf8
-        )
-        XCTAssertThrowsError(
-            try parseTrainingMessages(missingScript019Message)
-        ) {
-            XCTAssertEqual(
-                $0 as? D3ImportOperationError,
-                .missingPresentationAsset("TrainingMission.msg")
-            )
-        }
-    }
-
     func testTrainingProfilePinsTheOwnedPreparedInstallation() {
         XCTAssertEqual(
             PreparedRetailProfile.training.files,
@@ -177,7 +27,7 @@ final class PreparedRetailProfileTests: XCTestCase {
         PROGRESS trainingload.ogf
         MINE trainingmission.d3l
         """
-        let mission = try parseTrainingMission(Data(source.utf8))
+        let mission = try parseMissionDescriptor(Data(source.utf8))
         let archive = HOG2Archive(
             entries: [
                 HOG2Entry(
@@ -190,8 +40,23 @@ final class PreparedRetailProfileTests: XCTestCase {
         )
 
         XCTAssertEqual(mission.name, "Pilot Training")
-        XCTAssertEqual(mission.levelName, "Pilot Training")
-        XCTAssertEqual(mission.mineSourceName, "trainingmission.d3l")
-        XCTAssertEqual(archive.uniqueEntry(named: mission.mineSourceName).sourceName, "TrainingMission.d3l")
+        XCTAssertEqual(mission.levels.map(\.name), ["Pilot Training"])
+        XCTAssertEqual(mission.levels.map(\.mineSourceName), ["trainingmission.d3l"])
+        XCTAssertEqual(
+            archive.uniqueEntry(named: mission.levels[0].mineSourceName).sourceName,
+            "TrainingMission.d3l"
+        )
+        // The profile's scopes name this mission and its one level.
+        let profile = PreparedRetailProfile.training
+        XCTAssertEqual(
+            profile.importTarget(scope: "descent3.mission.pilot-training")?.levelIndex,
+            0
+        )
+        XCTAssertEqual(
+            profile.importTarget(scope: "descent3.level.training-mission")?
+                .mission.descriptorName,
+            "training.msn"
+        )
+        XCTAssertNil(profile.importTarget(scope: "descent3.level.unknown"))
     }
 }

@@ -395,8 +395,8 @@ final class TrainingQuicksaveTests: XCTestCase {
         modifiers: NSEvent.ModifierFlags = [],
         isRepeat: Bool = false,
         gameplayIsActive: Bool = true
-    ) -> TrainingPlayerSaveAction? {
-        RevivalGameplayView.requestedTrainingPlayerSaveAction(
+    ) -> PlayerSaveAction? {
+        RevivalGameplayView.requestedPlayerSaveAction(
             keyCode: keyCode,
             modifierFlags: modifiers,
             isRepeat: isRepeat,

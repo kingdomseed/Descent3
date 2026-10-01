@@ -443,7 +443,7 @@ extension GameWorld {
                 continue
             }
             if candidate.type == .robot {
-                let batteries = level.placedObjectModel(candidate.handle)?
+                let batteries = level.polygonModel(of: candidate)?
                     .weaponBatteries?.count ?? 0
                 if batteries == 0 { continue }
                 if batteries == 1,

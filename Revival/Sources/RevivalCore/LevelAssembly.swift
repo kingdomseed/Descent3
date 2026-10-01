@@ -82,8 +82,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -167,8 +165,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: newObjectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -209,8 +205,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: dependencyManifest,
@@ -260,8 +254,6 @@ extension Level {
             shipDefinitions: [ship],
             defaultPlayerBinding: binding,
             objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips,
             soundClips: soundClips,
             dependencyManifest: .init(
@@ -329,8 +321,6 @@ extension Level {
             shipDefinitions: shipDefinitions,
             defaultPlayerBinding: defaultPlayerBinding,
             objectPresentations: objectPresentations,
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
             voiceClips: voiceClips + addedVoiceClips,
             soundClips: soundClips + addedSoundClips,
             dependencyManifest: .init(
@@ -341,175 +331,4 @@ extension Level {
             sourceChunks: sourceChunks
         ).preservingScripting(of: self)
     }
-
-    func addingTrainingGalleryBarrier(
-        _ barrier: TrainingGalleryBarrier,
-        voiceClip: CanonicalVoiceClip
-    ) -> Level {
-        let dependency = DependencyRecord(
-            category: "voice",
-            source: .init(
-                storedIndex: voiceClip.sourceEntryIndex,
-                sourceName: voiceClip.sourceName
-            ),
-            state: "canonical-pcm-imported",
-            provenance:
-                "\(voiceClip.sourceArchive) \(voiceClip.sourceSHA256)"
-        )
-        return Level(
-            schemaVersion: schemaVersion,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects,
-            retiredObjectHandles: retiredObjectHandles,
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations: objectPresentations,
-            trainingGalleryBarrier: barrier,
-            trainingRobotGuidebotChain: trainingRobotGuidebotChain,
-            voiceClips: voiceClips + [voiceClip],
-            soundClips: soundClips,
-            dependencyManifest: .init(
-                current: dependencyManifest.current + [dependency],
-                historicalEagerBaseline:
-                    dependencyManifest.historicalEagerBaseline
-            ),
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
-    func addingTrainingRobotGuidebotChain(
-        _ chain: TrainingRobotGuidebotChain,
-        voiceClips addedVoiceClips: [CanonicalVoiceClip],
-        soundClips addedSoundClips: [CanonicalSoundClip] = []
-    ) -> Level {
-        var dependencies = addedVoiceClips.map { clip in
-            DependencyRecord(
-                category: "voice",
-                source: .init(
-                    storedIndex: clip.sourceEntryIndex,
-                    sourceName: clip.sourceName
-                ),
-                state: "canonical-pcm-imported",
-                provenance:
-                    "\(clip.sourceArchive) \(clip.sourceSHA256)"
-            )
-        }
-        if !dependencyManifest.current.contains(where: {
-            $0.category.caseInsensitiveCompare("object-definition")
-                == .orderedSame
-                && $0.source.sourceName.caseInsensitiveCompare("GuideBot")
-                    == .orderedSame
-        }) {
-            dependencies.append(.init(
-                category: "object-definition",
-                source: .init(storedIndex: 0, sourceName: "GuideBot"),
-                state: "canonical-reserved-object",
-                provenance: "scripts/AIGame.cpp:4668-4728"
-            ))
-        }
-        dependencies += addedSoundClips.map { clip in
-            DependencyRecord(
-                category: "sound",
-                source: .init(
-                    storedIndex: clip.sourceEntryIndex,
-                    sourceName: clip.sourceName
-                ),
-                state: "canonical-pcm-imported",
-                provenance:
-                    "\(clip.sourceArchive) \(clip.sourceSHA256)"
-            )
-        }
-        let player = objects.first {
-            $0.handle == defaultPlayerBinding?.objectHandle
-        }!
-        let guidebotModel = models.first {
-            $0.source.sourceName.caseInsensitiveCompare("Buddybot.oof")
-                == .orderedSame
-        }!
-        let guidebotObject = PlacedObject(
-            handle: chain.guidebotObjectHandle,
-            type: 2,
-            storedID: 0,
-            definition: .init(storedIndex: 0, sourceName: "GuideBot"),
-            instanceName: "GuideBotB",
-            flags: 0x110f,
-            doorShields: nil,
-            location: player.location,
-            position: player.position,
-            orientation: player.orientation,
-            containsType: 0,
-            containsID: 0,
-            containsCount: 0,
-            lifeLeft: 0,
-            soundSource: nil,
-            inertScriptName: nil,
-            inertModuleName: nil,
-            lightmapSubmodels: []
-        )
-        let guidebotPresentation = ObjectPresentationReference(
-            objectHandle: chain.guidebotObjectHandle,
-            primaryModel: guidebotModel.source,
-            mediumModel: nil,
-            lowModel: nil,
-            dyingModel: nil,
-            mediumDistance: nil,
-            lowDistance: nil,
-            isVisible: false
-        )
-        return Level(
-            schemaVersion: schemaVersion,
-            missionKey: missionKey,
-            levelKey: levelKey,
-            source: source,
-            metadata: metadata,
-            rooms: rooms,
-            terrain: terrain,
-            objects: objects + [guidebotObject],
-            retiredObjectHandles: retiredObjectHandles.filter {
-                $0 != chain.guidebotObjectHandle
-            },
-            paths: paths,
-            goals: goals,
-            goalFlags: goalFlags,
-            triggers: triggers,
-            playerStartFlags: playerStartFlags,
-            indoorNavigation: indoorNavigation,
-            lightmaps: lightmaps,
-            surfacePhysics: surfacePhysics,
-            presentationMaterials: presentationMaterials,
-            presentationCoronaAssets: presentationCoronaAssets,
-            models: models,
-            shipDefinitions: shipDefinitions,
-            defaultPlayerBinding: defaultPlayerBinding,
-            objectPresentations:
-                objectPresentations + [guidebotPresentation],
-            trainingGalleryBarrier: trainingGalleryBarrier,
-            trainingRobotGuidebotChain: chain,
-            voiceClips: voiceClips + addedVoiceClips,
-            soundClips: soundClips + addedSoundClips,
-            dependencyManifest: .init(
-                current: dependencyManifest.current + dependencies,
-                historicalEagerBaseline:
-                    dependencyManifest.historicalEagerBaseline
-            ),
-            sourceChunks: sourceChunks
-        ).preservingScripting(of: self)
-    }
-
 }

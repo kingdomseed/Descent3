@@ -478,10 +478,6 @@ private func pathNode(
 
 func makeTrainingRobotGuidebotLevel() -> Level {
     var level = makeTrainingGalleryBarrierLevel()
-    let buddySource = SourceResource(
-        storedIndex: 200,
-        sourceName: "Buddybot.oof"
-    )
     let gyroSource = SourceResource(
         storedIndex: 201,
         sourceName: "gyro.OOF"
@@ -490,14 +486,6 @@ func makeTrainingRobotGuidebotLevel() -> Level {
     level = replacing(
         level,
         models: level.models + [
-            .init(
-                source: buddySource,
-                collisionRadius: 5.659_440_5,
-                submodels: modelTemplate.submodels,
-                bounds: modelTemplate.bounds,
-                sourceArchive: modelTemplate.sourceArchive,
-                sourceSHA256: String(repeating: "d", count: 64)
-            ),
             .init(
                 source: gyroSource,
                 collisionRadius: 4.576_441_8,
@@ -520,12 +508,6 @@ func makeTrainingRobotGuidebotLevel() -> Level {
         ],
         dependencyManifest: .init(
             current: level.dependencyManifest.current + [
-                .init(
-                    category: "model",
-                    source: buddySource,
-                    state: "presentation-payload-imported",
-                    provenance: "synthetic canonical fixture"
-                ),
                 .init(
                     category: "model",
                     source: gyroSource,
@@ -582,15 +564,7 @@ func makeTrainingRobotGuidebotLevel() -> Level {
     // DestroyBot2's page: a destroyable RAS1 flyer (no AI here).
     level = level.addingObjectInfo(fixtureTargetRobotInfo)
     return rescriptedTrainingLevel(
-        level.addingTrainingRobotGuidebotChain(
-            .init(
-                guidebotObjectHandle: 6_164,
-                deployedGuidebotObjectType: 2,
-                deployedGuidebotMessage:
-                    "Have the Guidebot help you complete a goal.  Press F4 and select item 1.  Fly over the object he leads you to.",
-                deployedGuidebotVoiceSourceName: "guidebotb.osf",
-                guidebot: .stockTraining
-            ),
+        level.addingAudioClips(
             voiceClips: [
                 .init(
                     sourceName: "proceed5.osf",
@@ -1030,18 +1004,6 @@ func makeTrainingKillbotEntryLevel() -> Level {
         )
     }
     let gallery = level.trainingGalleryBarrier!
-    let syntheticGallery = TrainingGalleryBarrier(
-        triggerName: gallery.triggerName,
-        triggerRoomSourceIndex: gallery.triggerRoomSourceIndex,
-        triggerFaceIndex: 0,
-        barrierRoomSourceIndex: gallery.barrierRoomSourceIndex,
-        orderedPortalIndices: gallery.orderedPortalIndices,
-        markerLightObjectHandle: gallery.markerLightObjectHandle,
-        openMarkerLightDistance: gallery.openMarkerLightDistance,
-        successMessage: gallery.successMessage,
-        guidebotInstruction: gallery.guidebotInstruction,
-        voiceSourceName: gallery.voiceSourceName
-    )
     let triggers = level.triggers.map { candidate in
         candidate.name == gallery.triggerName
             ? .init(
@@ -1059,8 +1021,7 @@ func makeTrainingKillbotEntryLevel() -> Level {
                 level,
                 rooms: rooms,
                 triggers: triggers,
-                surfacePhysics: level.surfacePhysics,
-                trainingGalleryBarrier: syntheticGallery
+                surfacePhysics: level.surfacePhysics
             ),
             voiceClips: addedVoices
         )

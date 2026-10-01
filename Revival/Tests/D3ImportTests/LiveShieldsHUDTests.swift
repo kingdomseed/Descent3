@@ -27,7 +27,7 @@ extension WorldRenderingTests {
             device: nil
         )
         let initialFrame = simulation.update(at: 0.01, input: .zero)
-        try view.presentTrainingOpening(
+        try view.presentGameplayFrame(
             frame: initialFrame,
             voiceClips: []
         )
@@ -59,7 +59,7 @@ extension WorldRenderingTests {
 
         simulation.shields = 20.75
         let truncatedFrame = simulation.update(at: 0.02, input: .zero)
-        try view.presentTrainingOpening(
+        try view.presentGameplayFrame(
             frame: truncatedFrame,
             voiceClips: []
         )
@@ -75,7 +75,7 @@ extension WorldRenderingTests {
 
         simulation.shields = 20
         let warningFrame = simulation.update(at: 0.03, input: .zero)
-        try view.presentTrainingOpening(frame: warningFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: warningFrame, voiceClips: [])
         XCTAssertEqual(shieldsItem.stringValue, "Shields: 020")
         XCTAssertEqual(
             shieldsItem.accessibilityLabel(),
@@ -94,10 +94,10 @@ extension WorldRenderingTests {
             input: .init(rearViewPressed: true, rearViewHeld: true)
         )
         XCTAssertTrue(rearFrame.rearViewIsActive)
-        try view.presentTrainingOpening(frame: rearFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: rearFrame, voiceClips: [])
         XCTAssertTrue(shieldsItem.isHidden)
 
-        try view.presentTrainingOpening(frame: warningFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: warningFrame, voiceClips: [])
         XCTAssertFalse(shieldsItem.isHidden)
         XCTAssertFalse(energyItem.isHidden)
         XCTAssertFalse(afterburnerItem.isHidden)
@@ -105,7 +105,7 @@ extension WorldRenderingTests {
         // Script 057 ends the level (TrainingMission.cpp:2309).
         let finalFrame = try trainingLevelEndFrame().frame
         XCTAssertNotNil(finalFrame.levelEnd)
-        try view.presentTrainingOpening(frame: finalFrame, voiceClips: [])
+        try view.presentGameplayFrame(frame: finalFrame, voiceClips: [])
         XCTAssertTrue(shieldsItem.isHidden)
         XCTAssertNotNil(try? hudItem(
             identifiedBy: "Live Energy HUD",
@@ -125,7 +125,7 @@ extension WorldRenderingTests {
             )
         let editorFrame = editorSimulation.update(at: 0.01, input: .zero)
         let editorView = RevivalGameplayView(frame: view.frame, device: nil)
-        try editorView.presentTrainingOpening(
+        try editorView.presentGameplayFrame(
             frame: editorFrame,
             voiceClips: []
         )

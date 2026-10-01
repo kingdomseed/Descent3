@@ -383,7 +383,7 @@ extension GameWorld {
             return false
         }
         if target.ai != nil, !target.usesPhysics,
-           (level.placedObjectModel(target.handle)?.weaponBatteries?.count
+           (level.polygonModel(of: target)?.weaponBatteries?.count
                 ?? 0) == 0 {
             return false
         }

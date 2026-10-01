@@ -20,7 +20,7 @@ extension GameWorld {
     mutating func aiFire(_ handle: ObjectHandle, level: Level) {
         guard let object = objects[handle], let ai = object.ai,
               let infoIndex = object.info,
-              let model = level.placedObjectModel(handle),
+              let model = level.polygonModel(of: object),
               let modelBatteries = model.weaponBatteries
         else {
             return

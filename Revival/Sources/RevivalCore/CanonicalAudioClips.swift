@@ -1,47 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The canonical audio a level package carries: the streamed voice files
+// (OSF, the stream library of aSoundPlaySteamingText) and the sound pages'
+// WAV clips (sndlib/soundload.cpp), decoded to PCM16 by D3Import.
+
 import Foundation
-
-struct TrainingGalleryBarrier: Codable, Equatable, Sendable {
-    let triggerName: String
-    let triggerRoomSourceIndex: Int
-    let triggerFaceIndex: Int
-    let barrierRoomSourceIndex: Int
-    let orderedPortalIndices: [Int]
-    let markerLightObjectHandle: UInt32
-    let openMarkerLightDistance: Float
-    let successMessage: String
-    let guidebotInstruction: String
-    let voiceSourceName: String
-}
-
-struct TrainingRobotGuidebotChain: Codable, Equatable, Sendable {
-    let guidebotObjectHandle: UInt32
-    let deployedGuidebotObjectType: UInt8
-    let deployedGuidebotMessage: String
-    let deployedGuidebotVoiceSourceName: String
-    var releaseSoundSourceName: String? = nil
-    var ambientEngineSoundSourceName: String? = nil
-    let guidebot: TrainingGuidebotDefinition
-}
-
-struct TrainingGuidebotDefinition: Codable, Equatable, Sendable {
-    let collisionRadius: Float
-    let maximumVelocity: Float
-    let maximumDeltaVelocity: Float
-    let birthForwardVelocity: Float
-    let goalForwardDistance: Float
-    let goalCircleDistance: Float
-}
-
-extension TrainingGuidebotDefinition {
-    static let stockTraining = Self(
-        collisionRadius: 5.659_440_5,
-        maximumVelocity: 60,
-        maximumDeltaVelocity: 199.999_98,
-        birthForwardVelocity: 40,
-        goalForwardDistance: 200,
-        goalCircleDistance: 1
-    )
-}
 
 struct CanonicalVoiceClip: Codable, Equatable, Sendable {
     let sourceName: String

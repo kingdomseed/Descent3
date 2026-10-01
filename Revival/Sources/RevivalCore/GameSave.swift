@@ -703,7 +703,7 @@ extension GameWorld {
             )
             let modelBatteries = object.info == nil
                 ? []
-                : level.placedObjectModel(object.handle)?.weaponBatteries
+                : level.polygonModel(of: object)?.weaponBatteries
                     ?? []
             // An AI object has one dynamic battery per model battery
             // (WBClearInfo, ObjInit.cpp:815-817), which ai_fire indexes;

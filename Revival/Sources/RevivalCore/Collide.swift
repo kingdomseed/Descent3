@@ -390,7 +390,10 @@ extension Level {
             }
             return models.first { $0.source == ship.primaryModel }
         }
-        return placedObjectModel(object.handle)
+        guard let presentation = objectPresentation(of: object) else {
+            return nil
+        }
+        return models.first { $0.source == presentation.primaryModel }
     }
 
     /// The `size` ObjInit gives a placed object from its polymodel

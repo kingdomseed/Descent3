@@ -65,9 +65,8 @@ extension GameWorld {
             )
             createExtraFireballs(handle, sizeScale: sizeScale, level: level)
         }
-        if let dyingModel = level.objectPresentations.first(where: {
-            $0.objectHandle == handle.rawValue
-        })?.dyingModel {
+        if let object = objects[handle],
+           let dyingModel = level.objectPresentation(of: object)?.dyingModel {
             objects[handle]?.model = dyingModel
         }
         if deathFlags & DeathFlags.breaksApart != 0 {

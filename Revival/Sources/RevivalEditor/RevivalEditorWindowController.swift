@@ -610,7 +610,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             simulation: simulation,
             at: ProcessInfo.processInfo.systemUptime
         )
-        gameplayView.resumePausedTrainingAudio()
+        gameplayView.resumePausedAudio()
         window?.makeFirstResponder(gameplayView)
     }
 
@@ -943,7 +943,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                             )
                             return
                         }
-                        try self.gameplayView.presentTrainingOpening(
+                        try self.gameplayView.presentGameplayFrame(
                             frame: frame,
                             voiceClips: simulation.level.voiceClips,
                             soundClips: simulation.level.soundClips,
@@ -1297,14 +1297,8 @@ func editorIdleStatusMessage(
     selection: RevivalEditorSelection
 ) -> String {
     let level = project.level
-    let status =
+    return
         "Editing \(level.metadata.name) — \(level.rooms.count) complete resident rooms — source room \(selection.room.sourceIndex), face \(selection.face.faceIndex) selected — \(project.semanticDiff.count) authored changes."
-    let sourceDiagnostics = [
-        project.trainingGalleryBarrierSourceDiagnostic,
-        project.trainingRobotGuidebotSourceDiagnostic,
-    ].compactMap { $0 }
-    guard !sourceDiagnostics.isEmpty else { return status }
-    return "\(status)\nSource: \(sourceDiagnostics.joined(separator: "; "))"
 }
 
 func editorPlayStatusMessage(

@@ -5,10 +5,8 @@ import Foundation
 private let pilotProfileRecordName = "profiles.json"
 private let maximumPilotProfileRecordByteCount = 1_024 * 1_024
 private let currentPilotProfileSchemaVersion = 1
-private let pilotTrainingMissionName = "Pilot Training"
-private let pilotTrainingMissionKey = "descent3.mission.pilot-training"
-private let pilotTrainingLevelKey = "descent3.level.training-mission"
-private let pilotTrainingDefaultShipPermissions = 0x01
+/// Default_ship_permission (pilot.cpp:1481): the first ship only.
+private let defaultShipPermissions = 0x01
 
 struct PilotProfile: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
@@ -193,13 +191,17 @@ struct PilotProfileLibrary: Sendable {
         return updated
     }
 
-    func recordTrainingCompletion(
+    /// CurrentPilotUpdateMissionStatus (pilot.cpp:1463) after a level ends
+    /// in success: the pilot's progress for the package's mission, keyed by
+    /// its mission key, records the mission as finished. The mission keeps
+    /// its descriptor NAME.
+    func recordMissionCompletion(
         profileID: UUID,
-        package: CanonicalPackageReference
+        package: CanonicalPackageReference,
+        missionName: String
     ) throws -> PilotProfileLibraryRecord {
         try package.validate()
-        guard package.missionKey == pilotTrainingMissionKey,
-              package.levelKey == pilotTrainingLevelKey else {
+        guard !missionName.isEmpty else {
             throw PilotProfileLibraryError.malformedRecord
         }
         let record = try load()
@@ -212,17 +214,16 @@ struct PilotProfileLibrary: Sendable {
         var profiles = record.profiles
         let profile = profiles[profileIndex]
         let progress = PilotMissionProgress(
-            missionName: pilotTrainingMissionName,
+            missionName: missionName,
             package: package,
             highestLevel: 0,
             finished: true,
             restoreCount: 0,
             saveCount: 0,
-            shipPermissions: pilotTrainingDefaultShipPermissions
+            shipPermissions: defaultShipPermissions
         )
         var missionProgress = profile.missionProgress.filter {
-            $0.missionName.caseInsensitiveCompare(pilotTrainingMissionName)
-                != .orderedSame
+            $0.package.missionKey != package.missionKey
         }
         missionProgress.append(progress)
         profiles[profileIndex] = PilotProfile(
@@ -291,11 +292,10 @@ struct PilotProfileLibrary: Sendable {
             guard names.insert(profile.name.lowercased()).inserted else {
                 throw PilotProfileLibraryError.malformedRecord
             }
-            var missionNames: Set<String> = []
+            var missionKeys: Set<String> = []
             for progress in profile.missionProgress {
-                guard missionNames.insert(
-                    progress.missionName.lowercased()
-                ).inserted else {
+                guard missionKeys.insert(progress.package.missionKey).inserted
+                else {
                     throw PilotProfileLibraryError.malformedRecord
                 }
                 try validate(progress)
@@ -316,14 +316,14 @@ struct PilotProfileLibrary: Sendable {
         } catch {
             throw PilotProfileLibraryError.malformedRecord
         }
-        guard progress.missionName == pilotTrainingMissionName,
-              progress.package.missionKey == pilotTrainingMissionKey,
-              progress.package.levelKey == pilotTrainingLevelKey,
+        // The mission flow (M3) and saves (M4) record only finished
+        // missions with the default ship so far.
+        guard !progress.missionName.isEmpty,
               progress.highestLevel == 0,
               progress.finished,
               progress.restoreCount == 0,
               progress.saveCount == 0,
-              progress.shipPermissions == pilotTrainingDefaultShipPermissions
+              progress.shipPermissions == defaultShipPermissions
         else {
             throw PilotProfileLibraryError.malformedRecord
         }

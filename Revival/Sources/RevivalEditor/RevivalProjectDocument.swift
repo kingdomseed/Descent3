@@ -51,7 +51,11 @@ final class RevivalProjectDocument: NSDocument {
     private nonisolated let library: CanonicalPackageLibrary
     private var selection: RevivalEditorSelection?
     let cameraContainingRoomSourceIndex = 3
-    private(set) var camera = RoomCamera.trainingRoom3
+    private(set) var camera = RoomCamera(
+        position: .init(x: 2_061.7124, y: -220.75536, z: 2_206.3005),
+        target: .init(x: 2_061.7124, y: -200, z: 2_206.3005),
+        up: .init(x: 0, y: 0, z: 1)
+    )
     private(set) var playSession: RevivalPlaySession?
 
     override init() {
@@ -270,13 +274,6 @@ final class RevivalProjectDocument: NSDocument {
         guard let selection = editorSelection.portal else {
             preconditionFailure("A portal must be selected before editing its rendering state")
         }
-        if project.isTrainingGalleryBarrierPortal(
-            roomSourceIndex: selection.roomSourceIndex,
-            portalIndex: selection.portalIndex
-        ) {
-            try setTrainingGalleryBarrierOpen(!rendersFace)
-            return
-        }
         var previous = false
         try projectStorage.withLock { storedProject in
             guard var project = storedProject else {
@@ -291,20 +288,6 @@ final class RevivalProjectDocument: NSDocument {
         }
         registerPortalRenderingUndo(selection: selection, rendersFace: previous)
         undoManager?.setActionName("Set Portal Rendering")
-        refreshWindowControllers()
-    }
-
-    func setTrainingGalleryBarrierOpen(_ isOpen: Bool) throws {
-        var previous = false
-        try projectStorage.withLock { storedProject in
-            guard var project = storedProject else {
-                throw RevivalProjectDocumentError.projectNotLoaded
-            }
-            previous = try project.setTrainingGalleryBarrierOpen(isOpen)
-            storedProject = project
-        }
-        registerTrainingGalleryBarrierUndo(isOpen: previous)
-        undoManager?.setActionName("Set Training Gallery Barrier")
         refreshWindowControllers()
     }
 
@@ -676,18 +659,6 @@ final class RevivalProjectDocument: NSDocument {
                 try document.setSelectedPortalRendersFaces(rendersFace)
             } catch {
                 preconditionFailure("Portal-rendering undo invariant failed: \(error)")
-            }
-        }
-    }
-
-    private func registerTrainingGalleryBarrierUndo(isOpen: Bool) {
-        undoManager?.registerUndo(withTarget: self) { document in
-            do {
-                try document.setTrainingGalleryBarrierOpen(isOpen)
-            } catch {
-                preconditionFailure(
-                    "Training-gallery barrier undo invariant failed: \(error)"
-                )
             }
         }
     }

@@ -1,5 +1,14 @@
 import XCTest
 
+extension RoomCamera {
+    /// The Training room 3 reference view the fixtures render from.
+    static let trainingRoom3 = RoomCamera(
+        position: .init(x: 2_061.7124, y: -220.75536, z: 2_206.3005),
+        target: .init(x: 2_061.7124, y: -200, z: 2_206.3005),
+        up: .init(x: 0, y: 0, z: 1)
+    )
+}
+
 final class WorldRenderingTests: XCTestCase {}
 
 extension Array {

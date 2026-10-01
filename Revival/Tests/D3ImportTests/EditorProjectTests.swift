@@ -80,12 +80,13 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
@@ -142,7 +143,8 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         var base = makeMinimalCanonicalPackageLevel()
         let roomIndex = try XCTUnwrap(base.rooms.firstIndex { $0.sourceIndex == 3 })
@@ -150,7 +152,7 @@ final class EditorProjectTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(base, to: candidate)
+        try writeCanonicalPackage(base, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
@@ -443,12 +445,13 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         let importedBase = makeEditableProjectLevel()
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(importedBase, to: candidate)
+        try writeCanonicalPackage(importedBase, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
@@ -761,13 +764,14 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         let importedBase = makeConnectedRoomProjectLevel()
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(importedBase, to: candidate)
+        try writeCanonicalPackage(importedBase, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
@@ -821,12 +825,13 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
@@ -874,12 +879,13 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
@@ -925,7 +931,8 @@ final class EditorProjectTests: XCTestCase {
             directoryHint: .isDirectory
         )
         let library = CanonicalPackageLibrary(
-            rootURL: temporaryRoot.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: temporaryRoot.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: temporaryRoot) }
 
@@ -933,7 +940,7 @@ final class EditorProjectTests: XCTestCase {
             at: temporaryRoot,
             withIntermediateDirectories: false
         )
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         let original = try RevivalProject(activatedBase: activation)
         let document = RevivalProjectDocument(project: original, library: library)
@@ -1504,12 +1511,13 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         let base = makeGeometryProjectLevel()
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(base, to: candidate)
+        try writeCanonicalPackage(base, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
@@ -1616,12 +1624,13 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let base = makeGeometryProjectLevel()
-        try writeCanonicalPackage(base, to: candidate)
+        try writeCanonicalPackage(base, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         var source = RevivalProjectSource(base: activation.reference)
         let object = try XCTUnwrap(base.objects.first { $0.handle == 6_147 })
@@ -1653,12 +1662,13 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let base = makeClosedRoomProjectLevel()
-        try writeCanonicalPackage(base, to: candidate)
+        try writeCanonicalPackage(base, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         let room = try XCTUnwrap(base.rooms.first { $0.sourceIndex == 3 })
         var source = RevivalProjectSource(base: activation.reference)
@@ -1683,12 +1693,13 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let base = makeGeometryProjectLevel()
-        try writeCanonicalPackage(base, to: candidate)
+        try writeCanonicalPackage(base, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let activation = try library.installAndActivate(from: candidate)
         let object = try XCTUnwrap(base.objects.first { $0.handle == 6_147 })
         var source = RevivalProjectSource(base: activation.reference)
@@ -1737,12 +1748,13 @@ func makeProject(importedBase: Level) throws -> RevivalProject {
         .appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
     let library = CanonicalPackageLibrary(
-        rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+        schemaPolicy: .includingScriptFreeTestSchemas
     )
     defer { try? FileManager.default.removeItem(at: root) }
 
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-    try writeCanonicalPackage(importedBase, to: candidate)
+    try writeCanonicalPackage(importedBase, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
     return try RevivalProject(
         activatedBase: library.installAndActivate(from: candidate)
     )

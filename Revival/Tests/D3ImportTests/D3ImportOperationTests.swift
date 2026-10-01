@@ -75,57 +75,16 @@ final class D3ImportOperationTests: XCTestCase {
         )
     }
 
-    func testCanonicalizesStockConcussionImpactSoundName() {
-        XCTAssertEqual(
-            canonicalPlayerConcussionImpactSoundLogicalName(
-                retailLogicalName: "Laser hit wall",
-                sourceName: "Explode1.wav"
-            ),
-            "Explode1"
-        )
-        XCTAssertEqual(
-            canonicalPlayerConcussionImpactSoundLogicalName(
-                retailLogicalName: "GBExpulsionA",
-                sourceName: "GBExpulsionA.wav"
-            ),
-            "GBExpulsionA"
-        )
-    }
-
-    func testAdmitsRetailConcussionAnimationUsingWeaponLifetimeCadence() throws {
-        let image = Outrage1555Image(
-            width: 1,
-            height: 1,
-            rgba8: Data(repeating: 0, count: 4),
-            sourceWasARGB4444: false
-        )
-        let animation = Outrage1555Animation(
-            version: 1,
-            sourceFrameTime: 0.07,
-            frames: Array(repeating: image, count: 15)
-        )
-
-        let admitted = try admitPlayerConcussionExplosionAnimation(
-            texture: .init(storedIndex: 0, sourceName: "ExplosionE"),
-            animation: animation
-        )
-
-        XCTAssertEqual(admitted.images, animation.frames)
-        XCTAssertEqual(
-            admitted.sourceFrameTime.bitPattern,
-            (Float(0.5) / 15).bitPattern
-        )
-    }
-
     func testParsesReachedShipPhysicsInReleasedFieldOrderAndTypesFlags() throws {
-        let pages = try resolveReachedObjectModelPages(
+        let pages = try resolveRetailModelPages(
             table: makeRetailShipTablePage(includeBatteries: true)
                 + makeRetailGenericModelTablePage(),
-            overlay: Data(),
-            shipName: "Pyro-GL",
-            genericName: "Invisiblepowerup"
+            overlay: Data()
         )
-        let definition = try XCTUnwrap(pages.ship.shipDefinition)
+        XCTAssertNotNil(pages["invisiblepowerup"])
+        let definition = try XCTUnwrap(
+            pages[defaultShipPageName.lowercased()]?.shipDefinition
+        )
 
         XCTAssertEqual(definition.name, "Pyro-GL")
         XCTAssertEqual(definition.presentationSize, 6.676084041595459)
@@ -470,7 +429,13 @@ final class D3ImportOperationTests: XCTestCase {
                     byteCount: second.count,
                     sha256: canonicalSHA256(second)
                 ),
-            ]
+            ],
+            baseArchiveSearchOrder: ["d3.hog"],
+            tableArchive: "d3.hog",
+            tableName: "Table.gam",
+            overlayArchive: "d3.hog",
+            overlayName: "extra.gam",
+            missions: []
         )
 
         let validated = try profile.files.map {
@@ -543,8 +508,8 @@ final class D3ImportOperationTests: XCTestCase {
 
         let prior = makeMinimalCanonicalPackageLevel(levelKey: "test.level.prior")
         let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
-        try writeCanonicalPackage(prior, to: destination)
-        try writeCanonicalPackage(successor, to: staging)
+        try writeCanonicalPackage(prior, to: destination, schemaPolicy: .includingScriptFreeTestSchemas)
+        try writeCanonicalPackage(successor, to: staging, schemaPolicy: .includingScriptFreeTestSchemas)
         let reportData = Data("{\"result\":\"ok\"}".utf8)
 
         try promoteCanonicalPackage(
@@ -552,10 +517,11 @@ final class D3ImportOperationTests: XCTestCase {
             to: destination,
             reportData: reportData,
             reportURL: report,
-            cancellationCheck: { nil }
+            cancellationCheck: { nil },
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
 
-        XCTAssertEqual(try loadCanonicalLevel(from: destination), successor)
+        XCTAssertEqual(try loadCanonicalLevel(from: destination, schemaPolicy: .includingScriptFreeTestSchemas), successor)
         XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path))
         XCTAssertEqual(try Data(contentsOf: report), reportData)
     }
@@ -577,7 +543,7 @@ final class D3ImportOperationTests: XCTestCase {
         let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         try unrelatedData.write(to: destination)
         try priorReport.write(to: report)
-        try writeCanonicalPackage(successor, to: staging)
+        try writeCanonicalPackage(successor, to: staging, schemaPolicy: .includingScriptFreeTestSchemas)
 
         XCTAssertThrowsError(
             try promoteCanonicalPackage(
@@ -585,13 +551,14 @@ final class D3ImportOperationTests: XCTestCase {
                 to: destination,
                 reportData: Data("{\"result\":\"successor\"}".utf8),
                 reportURL: report,
-                cancellationCheck: { nil }
+                cancellationCheck: { nil },
+                schemaPolicy: .includingScriptFreeTestSchemas
             )
         ) { error in
             XCTAssertEqual(error as? CanonicalPackageError, .invalidPackageDirectory)
         }
         XCTAssertEqual(try Data(contentsOf: destination), unrelatedData)
-        XCTAssertEqual(try loadCanonicalLevel(from: staging), successor)
+        XCTAssertEqual(try loadCanonicalLevel(from: staging, schemaPolicy: .includingScriptFreeTestSchemas), successor)
         XCTAssertEqual(try Data(contentsOf: report), priorReport)
     }
 
@@ -604,7 +571,7 @@ final class D3ImportOperationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: destination)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: destination, schemaPolicy: .includingScriptFreeTestSchemas)
 
         XCTAssertThrowsError(
             try validateD3ImportPaths(
@@ -661,8 +628,8 @@ final class D3ImportOperationTests: XCTestCase {
         let prior = makeMinimalCanonicalPackageLevel(levelKey: "test.level.prior")
         let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         let priorReport = Data("{\"result\":\"prior\"}".utf8)
-        try writeCanonicalPackage(prior, to: destination)
-        try writeCanonicalPackage(successor, to: staging)
+        try writeCanonicalPackage(prior, to: destination, schemaPolicy: .includingScriptFreeTestSchemas)
+        try writeCanonicalPackage(successor, to: staging, schemaPolicy: .includingScriptFreeTestSchemas)
         try priorReport.write(to: report)
         var cancellationChecks = 0
 
@@ -675,13 +642,14 @@ final class D3ImportOperationTests: XCTestCase {
                 cancellationCheck: {
                     cancellationChecks += 1
                     return cancellationChecks == 2 ? SIGTERM : nil
-                }
+                },
+                schemaPolicy: .includingScriptFreeTestSchemas
             )
         ) { error in
             XCTAssertEqual(error as? D3ImportOperationError, .cancelled(SIGTERM))
         }
-        XCTAssertEqual(try loadCanonicalLevel(from: destination), prior)
-        XCTAssertEqual(try loadCanonicalLevel(from: staging), successor)
+        XCTAssertEqual(try loadCanonicalLevel(from: destination, schemaPolicy: .includingScriptFreeTestSchemas), prior)
+        XCTAssertEqual(try loadCanonicalLevel(from: staging, schemaPolicy: .includingScriptFreeTestSchemas), successor)
         XCTAssertEqual(try Data(contentsOf: report), priorReport)
         XCTAssertEqual(
             Set(try FileManager.default.contentsOfDirectory(atPath: root.path)),
@@ -700,8 +668,8 @@ final class D3ImportOperationTests: XCTestCase {
         let prior = makeMinimalCanonicalPackageLevel(levelKey: "test.level.prior")
         let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         let priorReport = Data("{\"result\":\"prior\"}".utf8)
-        try writeCanonicalPackage(prior, to: destination)
-        try writeCanonicalPackage(successor, to: staging)
+        try writeCanonicalPackage(prior, to: destination, schemaPolicy: .includingScriptFreeTestSchemas)
+        try writeCanonicalPackage(successor, to: staging, schemaPolicy: .includingScriptFreeTestSchemas)
         try priorReport.write(to: report)
         var cancellationChecks = 0
 
@@ -714,10 +682,11 @@ final class D3ImportOperationTests: XCTestCase {
             cancellationCheck: {
                 cancellationChecks += 1
                 return cancellationChecks == 3 ? SIGTERM : nil
-            }
+            },
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         XCTAssertEqual(cancellationChecks, 2)
-        XCTAssertEqual(try loadCanonicalLevel(from: destination), successor)
+        XCTAssertEqual(try loadCanonicalLevel(from: destination, schemaPolicy: .includingScriptFreeTestSchemas), successor)
         XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path))
         XCTAssertEqual(try Data(contentsOf: report), successorReport)
         XCTAssertEqual(
@@ -735,7 +704,7 @@ final class D3ImportOperationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
-        try writeCanonicalPackage(successor, to: staging)
+        try writeCanonicalPackage(successor, to: staging, schemaPolicy: .includingScriptFreeTestSchemas)
         var cancellationChecks = 0
 
         XCTAssertThrowsError(
@@ -747,12 +716,13 @@ final class D3ImportOperationTests: XCTestCase {
                 cancellationCheck: {
                     cancellationChecks += 1
                     return cancellationChecks == 2 ? SIGTERM : nil
-                }
+                },
+                schemaPolicy: .includingScriptFreeTestSchemas
             )
         ) { error in
             XCTAssertEqual(error as? D3ImportOperationError, .cancelled(SIGTERM))
         }
-        XCTAssertEqual(try loadCanonicalLevel(from: staging), successor)
+        XCTAssertEqual(try loadCanonicalLevel(from: staging, schemaPolicy: .includingScriptFreeTestSchemas), successor)
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: report.path))
         XCTAssertEqual(
@@ -771,8 +741,8 @@ final class D3ImportOperationTests: XCTestCase {
         let prior = makeMinimalCanonicalPackageLevel(levelKey: "test.level.prior")
         let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         let priorReport = Data("{\"result\":\"prior\"}".utf8)
-        try writeCanonicalPackage(prior, to: destination)
-        try writeCanonicalPackage(successor, to: staging)
+        try writeCanonicalPackage(prior, to: destination, schemaPolicy: .includingScriptFreeTestSchemas)
+        try writeCanonicalPackage(successor, to: staging, schemaPolicy: .includingScriptFreeTestSchemas)
         try priorReport.write(to: report)
         XCTAssertEqual(chflags(report.path, UInt32(UF_IMMUTABLE)), 0)
         defer {
@@ -786,13 +756,14 @@ final class D3ImportOperationTests: XCTestCase {
                 to: destination,
                 reportData: Data("{\"result\":\"successor\"}".utf8),
                 reportURL: report,
-                cancellationCheck: { nil }
+                cancellationCheck: { nil },
+                schemaPolicy: .includingScriptFreeTestSchemas
             )
         ) { error in
             XCTAssertEqual(error as? D3ImportOperationError, .reportPromotionFailed)
         }
-        XCTAssertEqual(try loadCanonicalLevel(from: destination), prior)
-        XCTAssertEqual(try loadCanonicalLevel(from: staging), successor)
+        XCTAssertEqual(try loadCanonicalLevel(from: destination, schemaPolicy: .includingScriptFreeTestSchemas), prior)
+        XCTAssertEqual(try loadCanonicalLevel(from: staging, schemaPolicy: .includingScriptFreeTestSchemas), successor)
         XCTAssertEqual(try Data(contentsOf: report), priorReport)
     }
 
@@ -807,8 +778,8 @@ final class D3ImportOperationTests: XCTestCase {
         let successor = makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor")
         let priorReport = Data("{\"result\":\"prior\"}".utf8)
         let successorReport = Data("{\"result\":\"successor\"}".utf8)
-        try writeCanonicalPackage(prior, to: destination)
-        try writeCanonicalPackage(successor, to: staging)
+        try writeCanonicalPackage(prior, to: destination, schemaPolicy: .includingScriptFreeTestSchemas)
+        try writeCanonicalPackage(successor, to: staging, schemaPolicy: .includingScriptFreeTestSchemas)
         try priorReport.write(to: report)
         XCTAssertEqual(chflags(destination.path, UInt32(UF_IMMUTABLE)), 0)
         defer {
@@ -822,13 +793,14 @@ final class D3ImportOperationTests: XCTestCase {
                 to: destination,
                 reportData: successorReport,
                 reportURL: report,
-                cancellationCheck: { nil }
+                cancellationCheck: { nil },
+                schemaPolicy: .includingScriptFreeTestSchemas
             )
         ) { error in
             XCTAssertEqual(error as? D3ImportOperationError, .packagePromotionFailed)
         }
-        XCTAssertEqual(try loadCanonicalLevel(from: destination), prior)
-        XCTAssertEqual(try loadCanonicalLevel(from: staging), successor)
+        XCTAssertEqual(try loadCanonicalLevel(from: destination, schemaPolicy: .includingScriptFreeTestSchemas), prior)
+        XCTAssertEqual(try loadCanonicalLevel(from: staging, schemaPolicy: .includingScriptFreeTestSchemas), successor)
         XCTAssertEqual(try Data(contentsOf: report), priorReport)
     }
 
@@ -846,9 +818,9 @@ final class D3ImportOperationTests: XCTestCase {
         let levelB = makeMinimalCanonicalPackageLevel(levelKey: "test.level.writer-b")
         let reportA = Data("{\"levelKey\":\"test.level.writer-a\"}".utf8)
         let reportB = Data("{\"levelKey\":\"test.level.writer-b\"}".utf8)
-        try writeCanonicalPackage(prior, to: destination)
-        try writeCanonicalPackage(levelA, to: stagingA)
-        try writeCanonicalPackage(levelB, to: stagingB)
+        try writeCanonicalPackage(prior, to: destination, schemaPolicy: .includingScriptFreeTestSchemas)
+        try writeCanonicalPackage(levelA, to: stagingA, schemaPolicy: .includingScriptFreeTestSchemas)
+        try writeCanonicalPackage(levelB, to: stagingB, schemaPolicy: .includingScriptFreeTestSchemas)
         try Data("{\"levelKey\":\"test.level.prior\"}".utf8).write(to: report)
 
         let aBeforePackageCommit = DispatchSemaphore(value: 0)
@@ -875,7 +847,8 @@ final class D3ImportOperationTests: XCTestCase {
                             releaseA.wait()
                         }
                         return nil
-                    }
+                    },
+                    schemaPolicy: .includingScriptFreeTestSchemas
                 )
             }
             aFinished.signal()
@@ -897,7 +870,8 @@ final class D3ImportOperationTests: XCTestCase {
                             releaseB.wait()
                         }
                         return nil
-                    }
+                    },
+                    schemaPolicy: .includingScriptFreeTestSchemas
                 )
             }
             bFinished.signal()
@@ -918,7 +892,7 @@ final class D3ImportOperationTests: XCTestCase {
 
         XCTAssertNil(outcomeA.error)
         XCTAssertNil(outcomeB.error)
-        let installed = try loadCanonicalLevel(from: destination)
+        let installed = try loadCanonicalLevel(from: destination, schemaPolicy: .includingScriptFreeTestSchemas)
         let installedReport = try Data(contentsOf: report)
         XCTAssertTrue(
             (installed == levelA && installedReport == reportA)

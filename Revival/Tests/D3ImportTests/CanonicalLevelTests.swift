@@ -194,18 +194,141 @@ final class CanonicalLevelTests: XCTestCase {
         XCTAssertNil(requests.startNextIfIdle())
     }
 
+    /// A released package holds only the current schema, whose level
+    /// carries its script data (Level.validateForPackage): the writer, the
+    /// loader, and the library refuse a script-free schema 11 level and a
+    /// schema 12 level; only the synthetic test policy accepts schema 11.
+    func testReleasedPackageBoundaryRefusesSchemasBeforeThirteen() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        func isInvalidIdentity(_ error: Error) -> Bool {
+            error as? LevelValidationError == .invalidIdentity
+        }
+
+        let scriptFree = replacing(
+            makeMinimalCanonicalPackageLevel(),
+            schemaVersion: 11,
+            soundClips: []
+        )
+        XCTAssertNoThrow(try scriptFree.validate())
+        let refusedWrite = root.appending(path: "refused.revival", directoryHint: .isDirectory)
+        XCTAssertThrowsError(try writeCanonicalPackage(scriptFree, to: refusedWrite)) {
+            XCTAssertTrue(isInvalidIdentity($0))
+        }
+        let legacy = root.appending(path: "legacy.revival", directoryHint: .isDirectory)
+        try writeCanonicalPackage(
+            scriptFree,
+            to: legacy,
+            schemaPolicy: .includingScriptFreeTestSchemas
+        )
+        XCTAssertThrowsError(try loadCanonicalLevel(from: legacy)) {
+            XCTAssertTrue(isInvalidIdentity($0))
+        }
+        XCTAssertThrowsError(try library.installAndActivate(from: legacy)) {
+            XCTAssertTrue(isInvalidIdentity($0))
+        }
+        XCTAssertEqual(
+            try loadCanonicalLevel(
+                from: legacy,
+                schemaPolicy: .includingScriptFreeTestSchemas
+            ),
+            scriptFree
+        )
+
+        let current = addingTrainingMissionScripting(makeMinimalCanonicalPackageLevel())
+        XCTAssertEqual(current.schemaVersion, Level.scriptedSchemaVersion)
+        let released = root.appending(path: "released.revival", directoryHint: .isDirectory)
+        try writeCanonicalPackage(current, to: released)
+        XCTAssertEqual(try loadCanonicalLevel(from: released), current)
+        // The same level marked schema 12 (with its script data) is refused.
+        var levelObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: canonicalJSONData(current))
+                as? [String: Any]
+        )
+        levelObject["schemaVersion"] = 12
+        try overwriteCanonicalPackageLevelData(
+            JSONSerialization.data(withJSONObject: levelObject, options: [.sortedKeys]),
+            identity: current,
+            at: released
+        )
+        XCTAssertThrowsError(try loadCanonicalLevel(from: released)) {
+            XCTAssertTrue(isInvalidIdentity($0))
+        }
+        XCTAssertThrowsError(try loadCanonicalLevel(
+            from: released,
+            schemaPolicy: .includingScriptFreeTestSchemas
+        )) {
+            XCTAssertTrue(isInvalidIdentity($0))
+        }
+    }
+
+    /// A valid level with a presented object but no default player binding
+    /// prepares its draws from the placed objects; only a level with a
+    /// player start runs level start for them (GameWorld.init needs the
+    /// player).
+    func testPreparedModelDrawsWithoutAPlayerBindingUseThePlacedObjects() throws {
+        let packaged = makeMinimalCanonicalPackageLevel()
+        let level = Level(
+            schemaVersion: packaged.schemaVersion,
+            missionKey: packaged.missionKey,
+            levelKey: packaged.levelKey,
+            source: packaged.source,
+            metadata: packaged.metadata,
+            rooms: packaged.rooms,
+            terrain: packaged.terrain,
+            objects: packaged.objects,
+            retiredObjectHandles: packaged.retiredObjectHandles,
+            paths: packaged.paths,
+            goals: packaged.goals,
+            goalFlags: packaged.goalFlags,
+            triggers: packaged.triggers,
+            playerStartFlags: packaged.playerStartFlags,
+            lightmaps: packaged.lightmaps,
+            surfacePhysics: packaged.surfacePhysics,
+            presentationMaterials: packaged.presentationMaterials,
+            models: packaged.models,
+            objectPresentations: packaged.objectPresentations,
+            dependencyManifest: .init(
+                current: packaged.dependencyManifest.current.filter {
+                    $0.category != "ship-definition"
+                },
+                historicalEagerBaseline: nil
+            ),
+            sourceChunks: packaged.sourceChunks
+        )
+        XCTAssertNil(level.defaultPlayerBinding)
+        XCTAssertFalse(level.objectPresentations.isEmpty)
+        try level.validate()
+
+        let items = extractPreparedModelDrawItems(
+            level,
+            startRoomSourceIndex: 3,
+            excludedObjectHandle: nil
+        )
+        XCTAssertEqual(
+            Set(items.map(\.objectHandle)),
+            Set(level.objectPresentations.map(\.objectHandle))
+        )
+    }
+
     func testNativeLibraryStagesValidatesPromotesAndActivatesACanonicalBase() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         let level = makeMinimalCanonicalPackageLevel()
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(level, to: candidate)
+        try writeCanonicalPackage(level, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
 
         let activation = try library.installAndActivate(from: candidate)
 
@@ -233,12 +356,13 @@ final class CanonicalLevelTests: XCTestCase {
         let priorCandidate = root.appending(path: "prior.revival", directoryHint: .isDirectory)
         let invalidCandidate = root.appending(path: "invalid.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: priorCandidate)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: priorCandidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let prior = try library.installAndActivate(from: priorCandidate)
         try FileManager.default.createDirectory(
             at: invalidCandidate,
@@ -267,15 +391,16 @@ final class CanonicalLevelTests: XCTestCase {
             directoryHint: .isDirectory
         )
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let bound = makeSliceSixObjectRenderLevel()
-        try writeCanonicalPackage(bound, to: priorCandidate)
+        try writeCanonicalPackage(bound, to: priorCandidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let prior = try library.installAndActivate(from: priorCandidate)
-        try writeCanonicalPackage(bound, to: unboundCandidate)
+        try writeCanonicalPackage(bound, to: unboundCandidate, schemaPolicy: .includingScriptFreeTestSchemas)
         try overwriteCanonicalPackageLevel(
             removingDefaultPlayerPresentation(from: makeMinimalCanonicalPackageLevel()),
             at: unboundCandidate
@@ -332,12 +457,13 @@ final class CanonicalLevelTests: XCTestCase {
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let missing = root.appending(path: "missing.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let prior = try library.installAndActivate(from: candidate)
 
         XCTAssertThrowsError(try library.installAndActivate(from: missing))
@@ -359,16 +485,18 @@ final class CanonicalLevelTests: XCTestCase {
             directoryHint: .isDirectory
         )
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: priorCandidate)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: priorCandidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let prior = try library.installAndActivate(from: priorCandidate)
         try writeCanonicalPackage(
             makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor"),
-            to: successorCandidate
+            to: successorCandidate,
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         let successorManifest = try JSONDecoder().decode(
             CanonicalPackageManifest.self,
@@ -404,7 +532,7 @@ final class CanonicalLevelTests: XCTestCase {
     func testNativeLibraryRemovesOnlyItsAbandonedStagingOnNextPreparation() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = CanonicalPackageLibrary(rootURL: root)
+        let library = CanonicalPackageLibrary(rootURL: root, schemaPolicy: .includingScriptFreeTestSchemas)
         let packages = root.appending(path: "packages", directoryHint: .isDirectory)
         let abandoned = packages.appending(
             path: ".candidate-abandoned.revival",
@@ -431,7 +559,8 @@ final class CanonicalLevelTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         let abandoned = library.rootURL
             .appending(path: "packages", directoryHint: .isDirectory)
@@ -439,7 +568,7 @@ final class CanonicalLevelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
         try library.prepareForUse()
         try FileManager.default.createDirectory(at: abandoned, withIntermediateDirectories: false)
 
@@ -456,15 +585,17 @@ final class CanonicalLevelTests: XCTestCase {
         let firstCandidate = root.appending(path: "first.revival", directoryHint: .isDirectory)
         let secondCandidate = root.appending(path: "second.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: firstCandidate)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: firstCandidate, schemaPolicy: .includingScriptFreeTestSchemas)
         try writeCanonicalPackage(
             makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor"),
-            to: secondCandidate
+            to: secondCandidate,
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         let duplicate = try library.installAndActivate(from: firstCandidate)
         let active = try library.installAndActivate(from: secondCandidate)
@@ -498,15 +629,17 @@ final class CanonicalLevelTests: XCTestCase {
         let firstCandidate = root.appending(path: "first.revival", directoryHint: .isDirectory)
         let secondCandidate = root.appending(path: "second.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: firstCandidate)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: firstCandidate, schemaPolicy: .includingScriptFreeTestSchemas)
         try writeCanonicalPackage(
             makeMinimalCanonicalPackageLevel(levelKey: "test.level.successor"),
-            to: secondCandidate
+            to: secondCandidate,
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         let first = try library.installAndActivate(from: firstCandidate)
         let active = try library.installAndActivate(from: secondCandidate)
@@ -523,7 +656,7 @@ final class CanonicalLevelTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: package) }
 
-        XCTAssertThrowsError(try writeCanonicalPackage(topologyOnly, to: package)) { error in
+        XCTAssertThrowsError(try writeCanonicalPackage(topologyOnly, to: package, schemaPolicy: .includingScriptFreeTestSchemas)) { error in
             XCTAssertEqual(
                 error as? LevelValidationError,
                 .invalidDependency("missing canonical presentation")
@@ -538,7 +671,7 @@ final class CanonicalLevelTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: package) }
 
-        try writeCanonicalPackage(valid, to: package)
+        try writeCanonicalPackage(valid, to: package, schemaPolicy: .includingScriptFreeTestSchemas)
         let levelURL = package.appending(
             path: "levels/\(valid.levelKey)/level.json"
         )
@@ -577,7 +710,7 @@ final class CanonicalLevelTests: XCTestCase {
         )
         try canonicalJSONData(hostileManifest).write(to: manifestURL)
 
-        XCTAssertThrowsError(try loadCanonicalLevel(from: package)) { error in
+        XCTAssertThrowsError(try loadCanonicalLevel(from: package, schemaPolicy: .includingScriptFreeTestSchemas)) { error in
             XCTAssertEqual(error as? CanonicalPackageError, .identityMismatch)
         }
     }
@@ -598,8 +731,8 @@ final class CanonicalLevelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
 
         try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: false)
-        try writeCanonicalPackage(level, to: firstPackage)
-        try writeCanonicalPackage(level, to: secondPackage)
+        try writeCanonicalPackage(level, to: firstPackage, schemaPolicy: .includingScriptFreeTestSchemas)
+        try writeCanonicalPackage(level, to: secondPackage, schemaPolicy: .includingScriptFreeTestSchemas)
 
         let levelPath = "levels/\(level.levelKey)/level.json"
         XCTAssertEqual(
@@ -610,7 +743,7 @@ final class CanonicalLevelTests: XCTestCase {
             try Data(contentsOf: firstPackage.appending(path: "content.json")),
             try Data(contentsOf: secondPackage.appending(path: "content.json"))
         )
-        XCTAssertEqual(try loadCanonicalLevel(from: firstPackage), level)
+        XCTAssertEqual(try loadCanonicalLevel(from: firstPackage, schemaPolicy: .includingScriptFreeTestSchemas), level)
     }
 
     func testSchemaNineLoaderDefaultsAbsentSoundClipsToEmpty() throws {
@@ -619,7 +752,7 @@ final class CanonicalLevelTests: XCTestCase {
         let package = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: package) }
-        try writeCanonicalPackage(level, to: package)
+        try writeCanonicalPackage(level, to: package, schemaPolicy: .includingScriptFreeTestSchemas)
         var object = try XCTUnwrap(
             JSONSerialization.jsonObject(
                 with: canonicalJSONData(level)
@@ -636,7 +769,7 @@ final class CanonicalLevelTests: XCTestCase {
             at: package
         )
 
-        let loaded = try loadCanonicalLevel(from: package)
+        let loaded = try loadCanonicalLevel(from: package, schemaPolicy: .includingScriptFreeTestSchemas)
 
         XCTAssertEqual(loaded.schemaVersion, 9)
         XCTAssertEqual(loaded.soundClips, [])
@@ -680,10 +813,10 @@ final class CanonicalLevelTests: XCTestCase {
         let package = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: package) }
-        try writeCanonicalPackage(base, to: package)
+        try writeCanonicalPackage(base, to: package, schemaPolicy: .includingScriptFreeTestSchemas)
         try overwriteCanonicalPackageLevel(hostile, at: package)
 
-        XCTAssertThrowsError(try loadCanonicalLevel(from: package)) {
+        XCTAssertThrowsError(try loadCanonicalLevel(from: package, schemaPolicy: .includingScriptFreeTestSchemas)) {
             XCTAssertEqual(
                 $0 as? LevelValidationError,
                 .invalidDependency("Canonical voice clip")
@@ -734,7 +867,7 @@ final class CanonicalLevelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
 
         try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: false)
-        try writeCanonicalPackage(level, to: package)
+        try writeCanonicalPackage(level, to: package, schemaPolicy: .includingScriptFreeTestSchemas)
         let manifest = try JSONDecoder().decode(
             CanonicalPackageManifest.self,
             from: Data(contentsOf: package.appending(path: "content.json"))
@@ -778,14 +911,14 @@ final class CanonicalLevelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
 
         try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: false)
-        try writeCanonicalPackage(level, to: package)
+        try writeCanonicalPackage(level, to: package, schemaPolicy: .includingScriptFreeTestSchemas)
         let levelURL = package.appending(path: "levels/\(level.levelKey)/level.json")
         let original = try Data(contentsOf: levelURL)
         try original.write(to: outside)
         try FileManager.default.removeItem(at: levelURL)
         try FileManager.default.createSymbolicLink(at: levelURL, withDestinationURL: outside)
 
-        XCTAssertThrowsError(try loadCanonicalLevel(from: package)) { error in
+        XCTAssertThrowsError(try loadCanonicalLevel(from: package, schemaPolicy: .includingScriptFreeTestSchemas)) { error in
             XCTAssertEqual(error as? CanonicalPackageError, .notRegularFile("level.json"))
         }
     }
@@ -822,13 +955,13 @@ final class CanonicalLevelTests: XCTestCase {
                 at: temporaryDirectory,
                 withIntermediateDirectories: false
             )
-            try writeCanonicalPackage(validLevel, to: package)
+            try writeCanonicalPackage(validLevel, to: package, schemaPolicy: .includingScriptFreeTestSchemas)
             try overwriteCanonicalPackageLevel(
                 replacing(validLevel, objects: objects),
                 at: package
             )
 
-            XCTAssertThrowsError(try loadCanonicalLevel(from: package)) { error in
+            XCTAssertThrowsError(try loadCanonicalLevel(from: package, schemaPolicy: .includingScriptFreeTestSchemas)) { error in
                 XCTAssertEqual(error as? LevelValidationError, expectedError)
             }
         }
@@ -851,10 +984,10 @@ final class CanonicalLevelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(valid, to: package)
+        try writeCanonicalPackage(valid, to: package, schemaPolicy: .includingScriptFreeTestSchemas)
         try overwriteCanonicalPackageLevel(hostile, at: package)
 
-        XCTAssertThrowsError(try loadCanonicalLevel(from: package)) { error in
+        XCTAssertThrowsError(try loadCanonicalLevel(from: package, schemaPolicy: .includingScriptFreeTestSchemas)) { error in
             XCTAssertEqual(
                 error as? LevelValidationError,
                 .invalidFace(room: 3, face: 0)
@@ -907,7 +1040,7 @@ final class CanonicalLevelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(valid, to: package)
+        try writeCanonicalPackage(valid, to: package, schemaPolicy: .includingScriptFreeTestSchemas)
         let cases: [(x1: UInt8, y1: UInt8, size: UInt8, writes: Bool)] = [
             (128, 64, 1, false),
             (129, 64, 1, false),
@@ -923,7 +1056,7 @@ final class CanonicalLevelTests: XCTestCase {
             )
             try overwriteCanonicalPackageLevel(outside, at: package)
 
-            let loaded = try loadCanonicalLevel(from: package)
+            let loaded = try loadCanonicalLevel(from: package, schemaPolicy: .includingScriptFreeTestSchemas)
             let material = try XCTUnwrap(loaded.presentationMaterials.first)
             let definition = try XCTUnwrap(material.waterProcedural)
             var evaluator = WaterProceduralEvaluator(
@@ -967,7 +1100,8 @@ final class CanonicalLevelTests: XCTestCase {
             directoryHint: .isDirectory
         )
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
+            schemaPolicy: .includingScriptFreeTestSchemas
         )
         let priorLevel = makeSliceSixObjectRenderLevel()
         let validSuccessor = priorLevel
@@ -1053,9 +1187,9 @@ final class CanonicalLevelTests: XCTestCase {
             hostileMaterial.lightCorona
         )
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(priorLevel, to: priorCandidate)
+        try writeCanonicalPackage(priorLevel, to: priorCandidate, schemaPolicy: .includingScriptFreeTestSchemas)
         let prior = try library.installAndActivate(from: priorCandidate)
-        try writeCanonicalPackage(validSuccessor, to: successorCandidate)
+        try writeCanonicalPackage(validSuccessor, to: successorCandidate, schemaPolicy: .includingScriptFreeTestSchemas)
         try overwriteCanonicalPackageLevel(hostile, at: successorCandidate)
 
         let activated = try library.installAndActivate(from: successorCandidate)
@@ -1095,13 +1229,13 @@ final class CanonicalLevelTests: XCTestCase {
                 at: temporaryDirectory,
                 withIntermediateDirectories: false
             )
-            try writeCanonicalPackage(validLevel, to: package)
+            try writeCanonicalPackage(validLevel, to: package, schemaPolicy: .includingScriptFreeTestSchemas)
             try overwriteCanonicalPackageLevel(
                 replacing(validLevel, source: invalidSource),
                 at: package
             )
 
-            XCTAssertThrowsError(try loadCanonicalLevel(from: package)) { error in
+            XCTAssertThrowsError(try loadCanonicalLevel(from: package, schemaPolicy: .includingScriptFreeTestSchemas)) { error in
                 XCTAssertEqual(error as? LevelValidationError, .invalidIdentity)
             }
         }
@@ -2278,8 +2412,6 @@ func replacing(
     shipDefinitions: [CanonicalShipDefinition]? = nil,
     defaultPlayerBinding: DefaultPlayerBinding? = nil,
     objectPresentations: [ObjectPresentationReference]? = nil,
-    trainingGalleryBarrier: TrainingGalleryBarrier? = nil,
-    trainingRobotGuidebotChain: TrainingRobotGuidebotChain? = nil,
     voiceClips: [CanonicalVoiceClip]? = nil,
     soundClips: [CanonicalSoundClip]? = nil,
     dependencyManifest: DependencyManifest? = nil,
@@ -2316,22 +2448,20 @@ func replacing(
         shipDefinitions: shipDefinitions ?? level.shipDefinitions,
         defaultPlayerBinding: defaultPlayerBinding ?? level.defaultPlayerBinding,
         objectPresentations: objectPresentations ?? level.objectPresentations,
-        trainingGalleryBarrier:
-            trainingGalleryBarrier ?? level.trainingGalleryBarrier,
-        trainingRobotGuidebotChain:
-            trainingRobotGuidebotChain ?? level.trainingRobotGuidebotChain,
         voiceClips: voiceClips ?? level.voiceClips,
         soundClips: soundClips ?? level.soundClips,
         dependencyManifest: dependencyManifest ?? level.dependencyManifest,
         sourceChunks: sourceChunks ?? level.sourceChunks
     )
+    replaced.missionName = level.missionName
     replaced.objectInfos = level.objectInfos
     replaced.weapons = level.weapons
     replaced.gameModules = level.gameModules
     replaced.boaTables = level.boaTables
-    // Package schema 12 keeps the level's script data, bound again to the
+    // A scripted package keeps the level's script data, bound again to the
     // replaced objects and clips.
-    return replaced.schemaVersion == 12 && level.scripting != nil
+    return replaced.schemaVersion == Level.scriptedSchemaVersion
+        && level.scripting != nil
         ? rescriptedTrainingLevel(replaced.preservingScripting(of: level))
         : replaced
 }

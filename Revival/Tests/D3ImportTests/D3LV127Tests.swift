@@ -633,17 +633,100 @@ final class D3LV127Tests: XCTestCase {
             overlay: Data(),
             names: ["high", "low", "shared"]
         )
-        var definitions: [RetailTextureDefinition] = []
-        for definition in resolved.sorted(by: { $0.storedIndex < $1.storedIndex })
-        where definitions.last?.storedIndex != definition.storedIndex {
-            definitions.append(definition)
-        }
+        XCTAssertEqual(resolved.count, 3)
 
-        let slots = modelTextureSlotTable(definitions)
+        let slots = try resolveRetailModelTextureSlots(
+            table: table,
+            overlay: Data(),
+            slotNames: ["high", "low", "shared"],
+            animationFrameNames: { _ in nil }
+        )
 
-        XCTAssertEqual(slots["shared"], SourceResource(storedIndex: 0, sourceName: "low"))
-        XCTAssertEqual(slots["low"], SourceResource(storedIndex: 0, sourceName: "low"))
-        XCTAssertEqual(slots["high"], SourceResource(storedIndex: 1, sourceName: "high"))
+        XCTAssertEqual(slots["shared"]?.storedIndex, 0)
+        XCTAssertEqual(slots["low"]?.storedIndex, 0)
+        XCTAssertEqual(slots["high"]?.storedIndex, 1)
+    }
+
+    /// FindTextureBitmapName (Descent3/gametexture.cpp:372) compares each
+    /// frame bitmap of an animated page's vclip, in page order, before
+    /// ReadNewModelFile falls back to FindTextureName (polymodel.cpp:1762).
+    /// A slot with an extension finds its page by name.
+    func testModelSlotFindsAnAnimatedPageByItsFrameBitmap() throws {
+        let table = makeSimpleTextureTablePage(
+            name: "red flare", bitmapSourceName: "Flashers.oaf", flags: 0
+        ) + makeSimpleTextureTablePage(
+            name: "Flashers000", bitmapSourceName: "unrelated.ogf", flags: 0
+        ) + makeSimpleTextureTablePage(
+            name: "energy.TGA1", bitmapSourceName: "energy.ogf", flags: 0
+        )
+        var asked: [String] = []
+        let slots = try resolveRetailModelTextureSlots(
+            table: table,
+            overlay: Data(),
+            slotNames: ["flashers000", "Flashers001", "energy.tga1"],
+            animationFrameNames: { bitmap in
+                asked.append(bitmap)
+                return bitmap == "Flashers.oaf"
+                    ? ["Flashers000.ogf", "flashers001.OGF"] : nil
+            }
+        )
+
+        XCTAssertEqual(slots["flashers000"]?.name, "red flare")
+        XCTAssertEqual(slots["flashers001"]?.name, "red flare")
+        XCTAssertEqual(slots["energy.tga1"]?.name, "energy")
+        XCTAssertEqual(slots["energy.tga1"]?.storedIndex, 2)
+        // Each vclip is read once.
+        XCTAssertEqual(asked, ["Flashers.oaf"])
+        XCTAssertThrowsError(try resolveRetailModelTextureSlots(
+            table: table,
+            overlay: Data(),
+            slotNames: ["missing"],
+            animationFrameNames: { _ in nil }
+        ))
+    }
+
+    /// A weapon's vclip fire image shares the vclip of the page that shows
+    /// that file (vclip.cpp:426), even when another page's bitmap stem is
+    /// that page's name: page Foo shows Shot.oaf, page Bar shows Foo.ogf,
+    /// and a weapon firing Shot.oaf gets Foo.
+    func testSharedFireImageKeepsThePageThatShowsTheFile() throws {
+        let table = makeSimpleTextureTablePage(
+            name: "Foo", bitmapSourceName: "Shot.oaf", flags: 0
+        ) + makeSimpleTextureTablePage(
+            name: "Bar", bitmapSourceName: "Foo.ogf", flags: 0
+        )
+        let weapon = RetailWeaponPresentationSelection(
+            storedIndex: 1, name: "Shot", hudImageName: "",
+            fireImageName: "shot.OAF", particleName: "", particleCount: 0,
+            particleLifetime: 0, particleSize: 0,
+            weaponFlags: CanonicalWeapon.imageVClipFlag,
+            timeoutSpawnName: "", timeoutSpawnCount: 0,
+            alternateSpawnName: "", alternateSpawnChance: 0,
+            customSize: 0, modelPageSize: 0, mass: 0, drag: 0,
+            physicsFlags: 0, coefficientOfRestitution: 0, speed: 0,
+            rotationalVelocity: .zero, lifetime: 0,
+            explosionTextureName: "", explosionLifetime: 0, explosionSize: 0,
+            playerDamage: 0, genericDamage: 0, impactSize: 0, impactTime: 0,
+            impactPlayerDamage: 0, impactGenericDamage: 0, impactForce: 0,
+            lightDistance: 0,
+            lightPresentation: .init(
+                primaryColor: .zero, secondaryColor: .zero, timeInterval: 0,
+                flickerDistance: 0, directionalDot: 0, flags: 0, timebits: 0,
+                angle: 0, lightingRenderType: 0
+            ),
+            soundLogicalNames: []
+        )
+
+        let resolved = try resolveWeaponTextureDefinitions(
+            [weapon],
+            table: table,
+            overlay: Data()
+        )
+
+        let shared = try XCTUnwrap(resolved.sharedFireImages["shot.oaf"])
+        XCTAssertEqual(shared.name, "Foo")
+        XCTAssertEqual(shared.storedIndex, 0)
+        XCTAssertEqual(shared.bitmapSourceName, "Shot.oaf")
     }
 
     /// stricmp order: lowercase ASCII fold, then the exact bytes. `_` (0x5f)
@@ -1288,6 +1371,18 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertTrue(level.metadata.alwaysCheckCeiling)
         XCTAssertEqual(level.retiredObjectHandles, [6_164])
     }
+}
+
+/// The package identity the synthetic levels decode with.
+let fixtureLevelIdentity = D3LevelIdentity(
+    missionKey: "descent3.mission.pilot-training",
+    levelKey: "descent3.level.training-mission",
+    historicalEagerBaseline: nil
+)
+
+/// Decodes a synthetic level with the fixture identity.
+func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
+    try parseD3LV127(data, source: source, identity: fixtureLevelIdentity)
 }
 
 func makeSyntheticD3LV127(

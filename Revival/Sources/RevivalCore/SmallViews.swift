@@ -180,7 +180,7 @@ extension GameWorld {
             let camera: RoomCamera
             let cameraRoom: Int
             if view.gun != -1,
-               let model = level.placedObjectModel(viewer.handle) {
+               let model = level.polygonModel(of: viewer) {
                 let gun = weaponCalcGun(viewer, gunpoint: view.gun,
                                         model: model)
                 let forward = sourceVectorNormalized(gun.normal)

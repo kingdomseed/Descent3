@@ -407,14 +407,14 @@ final class PowerupEffectTests: XCTestCase {
         XCTAssertTrue(won.recordsMissionProgress)
 
         let view = RevivalGameplayView(frame: .zero, device: nil)
-        view.presentTrainingContentReadyState(
+        view.presentContentReadyState(
             completedLevelName: "Training Mission",
             succeeded: false
         )
         XCTAssertTrue(view.subviews.compactMap { $0 as? NSTextField }.contains {
             $0.stringValue.hasPrefix("Training Mission failed.")
         })
-        view.presentTrainingContentReadyState(
+        view.presentContentReadyState(
             completedLevelName: "Training Mission",
             succeeded: true
         )

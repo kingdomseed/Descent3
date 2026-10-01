@@ -154,11 +154,7 @@ final class GameSession {
             wallTrace.containingRoomSourceIndex
         var selectedFraction = vectorDistance(start, selectedPosition) / 300
         let visitedRooms = Set(wallTrace.visitedRoomSourceIndices)
-        let presentationByHandle = Dictionary(
-            uniqueKeysWithValues: level.objectPresentations.map {
-                ($0.objectHandle, $0)
-            }
-        )
+        let presentations = ObjectPresentationLookup(level)
         let modelBySource = Dictionary(
             uniqueKeysWithValues: level.models.map { ($0.source, $0) }
         )
@@ -166,8 +162,7 @@ final class GameSession {
             guard object.handle != player.handle,
                   case let .room(roomSourceIndex) = object.location,
                   visitedRooms.contains(roomSourceIndex),
-                  let presentation =
-                    presentationByHandle[object.handle.rawValue],
+                  let presentation = presentations.presentation(of: object),
                   object.renderType == .polyobj,
                   let model = modelBySource[presentation.primaryModel]
             else {
