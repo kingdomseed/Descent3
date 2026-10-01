@@ -122,17 +122,8 @@ struct CanonicalPackageRequestQueue<Request> {
 /// It owns one directory of immutable package generations and
 /// one atomically replaced active-base reference; package publication remains
 /// D3Import's separate responsibility.
-/// The level schemas a package boundary accepts. A released package holds
-/// only the current schema, whose level carries its script data; the
-/// synthetic test levels may also use the script-free schemas 9-11.
-enum CanonicalPackageSchemaPolicy: Equatable, Sendable {
-    case current
-    case includingScriptFreeTestSchemas
-}
-
 struct CanonicalPackageLibrary: Sendable {
     let rootURL: URL
-    let schemaPolicy: CanonicalPackageSchemaPolicy
 
     static let revivalMac = applicationSupportLibrary(component: "RevivalMac")
     static let revivalEditor = applicationSupportLibrary(component: "RevivalEditor")
@@ -142,12 +133,8 @@ struct CanonicalPackageLibrary: Sendable {
         rootURL
     }
 
-    init(
-        rootURL: URL,
-        schemaPolicy: CanonicalPackageSchemaPolicy = .current
-    ) {
+    init(rootURL: URL) {
         self.rootURL = rootURL.standardizedFileURL
-        self.schemaPolicy = schemaPolicy
     }
 
     func prepareForUse() throws {
@@ -186,7 +173,7 @@ struct CanonicalPackageLibrary: Sendable {
         }
 
         try FileManager.default.copyItem(at: candidateURL, to: stagingURL)
-        let stagedPackage = try validateCanonicalPackage(from: stagingURL, schemaPolicy: schemaPolicy)
+        let stagedPackage = try validateCanonicalPackage(from: stagingURL)
         let reference = stagedPackage.reference
         let installedURL = installedPackageURL(for: reference)
 
@@ -228,10 +215,7 @@ struct CanonicalPackageLibrary: Sendable {
         try requireCanonicalDirectory(packagesDirectoryURL)
 
         let packageURL = installedPackageURL(for: reference)
-        let package = try validateCanonicalPackage(
-            from: packageURL,
-            schemaPolicy: schemaPolicy
-        )
+        let package = try validateCanonicalPackage(from: packageURL)
         guard package.reference == reference else {
             throw CanonicalPackageError.identityMismatch
         }
@@ -241,7 +225,7 @@ struct CanonicalPackageLibrary: Sendable {
     func loadInstalledPackage(
         matching candidateURL: URL
     ) throws -> ActivatedCanonicalPackage {
-        let candidate = try validateCanonicalPackage(from: candidateURL, schemaPolicy: schemaPolicy)
+        let candidate = try validateCanonicalPackage(from: candidateURL)
         let reference = candidate.reference
         return ActivatedCanonicalPackage(
             reference: reference,
@@ -314,10 +298,9 @@ struct CanonicalPackageLibrary: Sendable {
 
 func writeCanonicalPackage(
     _ level: Level,
-    to packageURL: URL,
-    schemaPolicy: CanonicalPackageSchemaPolicy = .current
+    to packageURL: URL
 ) throws {
-    try level.validateForPackage(schemaPolicy)
+    try level.validateForPackage()
     guard level.hasPlayerPresentation else {
         throw LevelValidationError.invalidDependency("missing canonical presentation")
     }
@@ -365,11 +348,8 @@ func writeCanonicalPackage(
     try manifestData.write(to: packageURL.appending(path: canonicalContentName))
 }
 
-func loadCanonicalLevel(
-    from packageURL: URL,
-    schemaPolicy: CanonicalPackageSchemaPolicy = .current
-) throws -> Level {
-    try validateCanonicalPackage(from: packageURL, schemaPolicy: schemaPolicy).level
+func loadCanonicalLevel(from packageURL: URL) throws -> Level {
+    try validateCanonicalPackage(from: packageURL).level
 }
 
 private struct ValidatedCanonicalPackage {
@@ -378,8 +358,7 @@ private struct ValidatedCanonicalPackage {
 }
 
 private func validateCanonicalPackage(
-    from packageURL: URL,
-    schemaPolicy: CanonicalPackageSchemaPolicy
+    from packageURL: URL
 ) throws -> ValidatedCanonicalPackage {
     try requireCanonicalDirectory(packageURL)
     guard Set(try FileManager.default.contentsOfDirectory(atPath: packageURL.path))
@@ -432,7 +411,7 @@ private func validateCanonicalPackage(
           level.dependencyManifest.current == manifest.currentDependencies else {
         throw CanonicalPackageError.identityMismatch
     }
-    try level.validateForPackage(schemaPolicy)
+    try level.validateForPackage()
     guard level.hasPlayerPresentation else {
         throw CanonicalPackageError.identityMismatch
     }

@@ -1,20 +1,16 @@
 import Foundation
 import XCTest
 
+// The D3LV-127 level reader (D3LV127.swift, D3LV127Decoder.swift;
+// Descent3/LoadLevel.cpp): chunk walking, rooms, lightmaps, objects,
+// terrain, BOA and node chunks, texture and surface definitions, and the
+// reached voice and image decoders.
+
 final class D3LV127Tests: XCTestCase {
     func testDecodesOSFACMToCanonicalMonoPCMWithoutForcingStereo() throws {
         let bits: [(UInt32, Int)] = [
-            (0x03_28_97, 24),
-            (1, 8),
-            (5, 16),
-            (0, 16),
-            (1, 16),
-            (22_050, 16),
-            (0, 4),
-            (4, 12),
-            (1, 4),
-            (1, 16),
-            (0, 5),
+            (0x03_28_97, 24), (1, 8), (5, 16), (0, 16), (1, 16), (22_050, 16),
+            (0, 4), (4, 12), (1, 4), (1, 16), (0, 5),
         ]
         var compressed = Data()
         var accumulator: UInt64 = 0
@@ -51,10 +47,8 @@ final class D3LV127Tests: XCTestCase {
 
         let wave = RevivalGameplayView.waveData(
             for: .init(
-                sourceName: "voice.osf",
-                sourceEntryIndex: 7,
-                sampleRate: voice.sampleRate,
-                channelCount: voice.channelCount,
+                sourceName: "voice.osf", sourceEntryIndex: 7,
+                sampleRate: voice.sampleRate, channelCount: voice.channelCount,
                 frameCount: voice.frameCount,
                 pcm16LittleEndian: voice.pcm16LittleEndian,
                 pcmSHA256: canonicalSHA256(voice.pcm16LittleEndian),
@@ -67,17 +61,8 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertEqual(wave.count, 52)
 
         let paddedSource: [(UInt32, Int)] = [
-            (0x03_28_97, 24),
-            (1, 8),
-            (16, 16),
-            (0, 16),
-            (1, 16),
-            (22_050, 16),
-            (0, 4),
-            (16, 12),
-            (1, 4),
-            (1, 16),
-            (17, 5),
+            (0x03_28_97, 24), (1, 8), (16, 16), (0, 16), (1, 16), (22_050, 16),
+            (0, 4), (16, 12), (1, 4), (1, 16), (17, 5),
         ]
         var paddedCompressed = Data()
         accumulator = 0
@@ -86,30 +71,25 @@ final class D3LV127Tests: XCTestCase {
             accumulator |= UInt64(value) << available
             available += count
             while available >= 8 {
-                paddedCompressed.append(
-                    UInt8(truncatingIfNeeded: accumulator)
-                )
+                paddedCompressed.append(UInt8(truncatingIfNeeded: accumulator))
                 accumulator >>= 8
                 available -= 8
             }
         }
         if available > 0 {
-            paddedCompressed.append(
-                UInt8(truncatingIfNeeded: accumulator)
-            )
+            paddedCompressed.append(UInt8(truncatingIfNeeded: accumulator))
         }
-        let paddedVoice = try decodeOSFACMVoice(
-            paddedCompressed + header
-        )
+
+        let paddedVoice = try decodeOSFACMVoice(paddedCompressed + header)
         XCTAssertEqual(paddedVoice.frameCount, 16)
         XCTAssertEqual(
-            paddedVoice.pcm16LittleEndian,
-            Data(repeating: 0, count: 32)
+            paddedVoice.pcm16LittleEndian, Data(repeating: 0, count: 32)
         )
 
         XCTAssertThrowsError(try decodeOSFACMVoice(Data("OSF1".utf8))) {
             XCTAssertEqual($0 as? OSFACMDecodeError, .truncated)
         }
+
         var malformed = compressed + header
         malformed[0] = 0
         XCTAssertThrowsError(try decodeOSFACMVoice(malformed)) {
@@ -121,19 +101,14 @@ final class D3LV127Tests: XCTestCase {
         let wall = SourceResource(storedIndex: 20, sourceName: "wall")
         let flythrough = SourceResource(storedIndex: 21, sourceName: "flythrough")
         let table = makeSimpleTextureTablePage(
-            name: "wall",
-            bitmapSourceName: "wall.ogf",
-            flags: 0
+            name: "wall", bitmapSourceName: "wall.ogf", flags: 0
         ) + makeSimpleTextureTablePage(
-            name: "flythrough",
-            bitmapSourceName: "flythrough.ogf",
+            name: "flythrough", bitmapSourceName: "flythrough.ogf",
             flags: 0x0001_0000
         )
 
         let physics = try resolveRetailSurfacePhysics(
-            table: table,
-            overlay: Data(),
-            textures: [wall, flythrough]
+            table: table, overlay: Data(), textures: [wall, flythrough]
         )
 
         XCTAssertEqual(
@@ -148,16 +123,14 @@ final class D3LV127Tests: XCTestCase {
 
     func testTranslatesForceFieldTextureFlagIntoSurfacePhysics() throws {
         let forceField = SourceResource(
-            storedIndex: 22,
-            sourceName: "Alien Force Field_1"
+            storedIndex: 22, sourceName: "Alien Force Field_1"
         )
 
         XCTAssertEqual(
             try resolveRetailSurfacePhysics(
                 table: makeSimpleTextureTablePage(
                     name: forceField.sourceName,
-                    bitmapSourceName: "forcefield.ogf",
-                    flags: 0x0000_0020
+                    bitmapSourceName: "forcefield.ogf", flags: 0x0000_0020
                 ),
                 overlay: Data(),
                 textures: [forceField]
@@ -173,9 +146,7 @@ final class D3LV127Tests: XCTestCase {
 
         XCTAssertEqual(
             try resolveRetailSurfacePhysics(
-                table: Data(),
-                overlay: Data(),
-                textures: [sample, rainbow]
+                table: Data(), overlay: Data(), textures: [sample, rainbow]
             ),
             [
                 .init(texture: sample, behavior: .blocking),
@@ -202,10 +173,7 @@ final class D3LV127Tests: XCTestCase {
 
         XCTAssertEqual(image.width, 2)
         XCTAssertEqual(image.height, 1)
-        XCTAssertEqual(
-            image.rgba8,
-            Data([255, 0, 0, 255, 0, 255, 0, 255])
-        )
+        XCTAssertEqual(image.rgba8, Data([255, 0, 0, 255, 0, 255, 0, 255]))
     }
 
     func testDecodesReachedOutrage4444FirstMip() throws {
@@ -239,6 +207,7 @@ final class D3LV127Tests: XCTestCase {
             data.appendLittleEndian(pixel)
             return data
         }
+
         var oaf = Data([127, 1, 6])
         oaf.appendLittleEndian(Float(0.07).bitPattern)
         for (index, pixel) in [
@@ -261,31 +230,27 @@ final class D3LV127Tests: XCTestCase {
         // then "<bitmap> frame <n>".
         let texture = SourceResource(storedIndex: 878, sourceName: "yellowspark")
         let admission = try admitAnimatedTextureFrames(
-            texture: texture,
-            bitmapSourceName: "yellowspark.oaf",
+            texture: texture, bitmapSourceName: "yellowspark.oaf",
             animation: animation
         )
         XCTAssertEqual(
             admission.resources,
             [texture] + (1...5).map {
                 SourceResource(
-                    storedIndex: 878,
-                    sourceName: "yellowspark.oaf frame \($0)"
+                    storedIndex: 878, sourceName: "yellowspark.oaf frame \($0)"
                 )
             }
         )
         XCTAssertEqual(admission.images, animation.frames)
         XCTAssertEqual(
-            admission.sourceFrameTime.bitPattern,
-            Float(0.07).bitPattern
+            admission.sourceFrameTime.bitPattern, Float(0.07).bitPattern
         )
         XCTAssertThrowsError(
             try admitAnimatedTextureFrames(
                 texture: texture,
                 bitmapSourceName: "yellowspark.oaf",
                 animation: .init(
-                    version: animation.version,
-                    sourceFrameTime: 0,
+                    version: animation.version, sourceFrameTime: 0,
                     frames: animation.frames
                 )
             )
@@ -366,9 +331,7 @@ final class D3LV127Tests: XCTestCase {
         table.append(payload)
 
         let weapon = try resolveRetailWeaponPresentation(
-            table: table,
-            overlay: Data(),
-            named: "Yellow flare"
+            table: table, overlay: Data(), named: "Yellow flare"
         )
 
         XCTAssertEqual(weapon.speed, 100)
@@ -414,9 +377,7 @@ final class D3LV127Tests: XCTestCase {
 
         let definition = try XCTUnwrap(
             resolveRetailTextureDefinitions(
-                table: table,
-                overlay: Data(),
-                names: ["alien force field_1"]
+                table: table, overlay: Data(), names: ["alien force field_1"]
             ).first
         )
 
@@ -430,74 +391,32 @@ final class D3LV127Tests: XCTestCase {
                 dampingShift: 6,
                 elements: [
                     .init(
-                        kind: .heightBlob,
-                        frequency: 20,
-                        speed: 40,
-                        size: 100,
-                        x1: 127,
-                        y1: 58,
-                        x2: 186,
-                        y2: 13
+                        kind: .heightBlob, frequency: 20, speed: 40, size: 100,
+                        x1: 127, y1: 58, x2: 186, y2: 13
                     ),
                     .init(
-                        kind: .heightBlob,
-                        frequency: 20,
-                        speed: 40,
-                        size: 100,
-                        x1: 0,
-                        y1: 59,
-                        x2: 13,
-                        y2: 240
+                        kind: .heightBlob, frequency: 20, speed: 40, size: 100,
+                        x1: 0, y1: 59, x2: 13, y2: 240
                     ),
                     .init(
-                        kind: .heightBlob,
-                        frequency: 20,
-                        speed: 40,
-                        size: 100,
-                        x1: 0,
-                        y1: 58,
-                        x2: 240,
-                        y2: 173
+                        kind: .heightBlob, frequency: 20, speed: 40, size: 100,
+                        x1: 0, y1: 58, x2: 240, y2: 173
                     ),
                     .init(
-                        kind: .heightBlob,
-                        frequency: 20,
-                        speed: 40,
-                        size: 100,
-                        x1: 62,
-                        y1: 1,
-                        x2: 173,
-                        y2: 186
+                        kind: .heightBlob, frequency: 20, speed: 40, size: 100,
+                        x1: 62, y1: 1, x2: 173, y2: 186
                     ),
                     .init(
-                        kind: .heightBlob,
-                        frequency: 20,
-                        speed: 40,
-                        size: 100,
-                        x1: 62,
-                        y1: 126,
-                        x2: 186,
-                        y2: 13
+                        kind: .heightBlob, frequency: 20, speed: 40, size: 100,
+                        x1: 62, y1: 126, x2: 186, y2: 13
                     ),
                     .init(
-                        kind: .heightBlob,
-                        frequency: 20,
-                        speed: 40,
-                        size: 100,
-                        x1: 62,
-                        y1: 3,
-                        x2: 13,
-                        y2: 240
+                        kind: .heightBlob, frequency: 20, speed: 40, size: 100,
+                        x1: 62, y1: 3, x2: 13, y2: 240
                     ),
                     .init(
-                        kind: .noOp,
-                        frequency: 0,
-                        speed: 1,
-                        size: 1,
-                        x1: 91,
-                        y1: 38,
-                        x2: 240,
-                        y2: 173
+                        kind: .noOp, frequency: 0, speed: 1, size: 1, x1: 91,
+                        y1: 38, x2: 240, y2: 173
                     ),
                 ]
             )
@@ -505,40 +424,45 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertEqual(definition.lightCorona?.bitmapSourceName, "StarFlare6.ogf")
         XCTAssertEqual(definition.lightCorona?.tint, .init(x: 0.25, y: 0.5, z: 0.75))
         XCTAssertEqual(
-            definition.lightCorona?.blend,
-            .additiveSourceAlpha(opacity: 102)
+            definition.lightCorona?.blend, .additiveSourceAlpha(opacity: 102)
         )
     }
 
-    func testRejectsWaterWithoutSaturateBeforeCanonicalization() {
-        let table = makeTextureTablePage(
-            name: "unsupported-water-blend",
-            bitmapSourceName: "water.ogf",
-            red: 0,
-            green: 0,
-            blue: 0,
-            alpha: 0.7,
-            coronaType: 0,
-            flags: 0x0348_0020,
-            proceduralLighting: 8,
-            proceduralThickness: 6,
-            evaluationIntervalSeconds: 0,
-            elements: [
-                (type: 0, frequency: 0, speed: 1, size: 1, x1: 1, y1: 1, x2: 1, y2: 1),
-            ]
-        )
-
-        XCTAssertThrowsError(
-            try resolveRetailTextureDefinitions(
-                table: table,
-                overlay: Data(),
-                names: ["unsupported-water-blend"]
+    /// Water the procedural evaluator does not translate is refused before
+    /// canonicalization: no saturate blend, an oscillation time, or a V7
+    /// element type other than the translated ones.
+    func testRejectsUntranslatedWaterBeforeCanonicalization() {
+        let cases: [(
+            name: String, flags: UInt32, oscillation: Float, type: UInt8,
+            frequency: UInt8
+        )] = [
+            ("unsupported-water-blend", 0x0348_0020, 0, 0, 0),
+            ("unsupported-water-oscillation", 0x0368_0020, 1, 0, 0),
+            ("unsupported-water", 0x0368_0020, 0, 2, 1),
+        ]
+        for c in cases {
+            let table = makeTextureTablePage(
+                name: c.name, bitmapSourceName: "water.ogf", red: 0, green: 0,
+                blue: 0, alpha: 0.7, coronaType: 0, flags: c.flags,
+                proceduralLighting: 8, proceduralThickness: 6,
+                evaluationIntervalSeconds: 0,
+                oscillationTimeSeconds: c.oscillation,
+                elements: [(
+                    type: c.type, frequency: c.frequency, speed: 1, size: 1,
+                    x1: 1, y1: 1, x2: 1, y2: 1
+                )]
             )
-        ) { error in
-            XCTAssertEqual(
-                error as? RetailTextureTableError,
-                .unsupportedPresentation("unsupported-water-blend")
-            )
+            XCTAssertThrowsError(
+                try resolveRetailTextureDefinitions(
+                    table: table, overlay: Data(), names: [c.name]
+                ),
+                c.name
+            ) {
+                XCTAssertEqual(
+                    $0 as? RetailTextureTableError,
+                    .unsupportedPresentation(c.name)
+                )
+            }
         }
     }
 
@@ -550,26 +474,21 @@ final class D3LV127Tests: XCTestCase {
         let sharedNames = (0..<12).map { "shared page \($0)" }
         let table = sharedNames.map {
             makeSimpleTextureTablePage(
-                name: $0,
-                bitmapSourceName: "Shared.ogf",
-                flags: 0
+                name: $0, bitmapSourceName: "Shared.ogf", flags: 0
             )
         }.reduce(Data(), +)
         let overlay = makeSimpleTextureTablePage(
-            name: "overlay shared page",
-            bitmapSourceName: "shared.ogf",
+            name: "overlay shared page", bitmapSourceName: "shared.ogf",
             flags: 0
         )
 
         for _ in 0..<32 {
             let resolved = try resolveRetailTextureDefinitions(
-                table: table,
-                overlay: overlay,
+                table: table, overlay: overlay,
                 names: ["Shared.tga1", "shared page 7"]
             )
             XCTAssertEqual(
-                resolved.map(\.name),
-                ["shared page 0", "shared page 7"]
+                resolved.map(\.name), ["shared page 0", "shared page 7"]
             )
             XCTAssertEqual(resolved.map(\.storedIndex), [0, 7])
         }
@@ -588,9 +507,7 @@ final class D3LV127Tests: XCTestCase {
         )
 
         let resolved = try resolveRetailTextureDefinitions(
-            table: table,
-            overlay: overlay,
-            names: ["two", "three"]
+            table: table, overlay: overlay, names: ["two", "three"]
         )
 
         XCTAssertEqual(resolved.map(\.name), ["three", "Two"])
@@ -610,9 +527,7 @@ final class D3LV127Tests: XCTestCase {
 
         for _ in 0..<32 {
             let resolved = try resolveRetailTextureDefinitions(
-                table: table,
-                overlay: overlay,
-                names: ["other", "shared"]
+                table: table, overlay: overlay, names: ["other", "shared"]
             )
             XCTAssertEqual(resolved.map(\.name), ["first", "second"])
             XCTAssertEqual(resolved.map(\.storedIndex), [0, 1])
@@ -629,9 +544,7 @@ final class D3LV127Tests: XCTestCase {
             name: "high", bitmapSourceName: "shared.ogf", flags: 0
         )
         let resolved = try resolveRetailTextureDefinitions(
-            table: table,
-            overlay: Data(),
-            names: ["high", "low", "shared"]
+            table: table, overlay: Data(), names: ["high", "low", "shared"]
         )
         XCTAssertEqual(resolved.count, 3)
 
@@ -718,9 +631,7 @@ final class D3LV127Tests: XCTestCase {
         )
 
         let resolved = try resolveWeaponTextureDefinitions(
-            [weapon],
-            table: table,
-            overlay: Data()
+            [weapon], table: table, overlay: Data()
         )
 
         let shared = try XCTUnwrap(resolved.sharedFireImages["shot.oaf"])
@@ -738,78 +649,11 @@ final class D3LV127Tests: XCTestCase {
         )
     }
 
-    func testRejectsOscillatingWaterBeforeCanonicalization() {
-        let table = makeTextureTablePage(
-            name: "unsupported-water-oscillation",
-            bitmapSourceName: "water.ogf",
-            red: 0,
-            green: 0,
-            blue: 0,
-            alpha: 0.7,
-            coronaType: 0,
-            flags: 0x0368_0020,
-            proceduralLighting: 8,
-            proceduralThickness: 6,
-            evaluationIntervalSeconds: 0,
-            oscillationTimeSeconds: 1,
-            elements: [
-                (type: 0, frequency: 0, speed: 1, size: 1, x1: 1, y1: 1, x2: 1, y2: 1),
-            ]
-        )
-
-        XCTAssertThrowsError(
-            try resolveRetailTextureDefinitions(
-                table: table,
-                overlay: Data(),
-                names: ["unsupported-water-oscillation"]
-            )
-        ) { error in
-            XCTAssertEqual(
-                error as? RetailTextureTableError,
-                .unsupportedPresentation("unsupported-water-oscillation")
-            )
-        }
-    }
-
-    func testRejectsUnsupportedV7WaterElementBeforeCanonicalization() {
-        let table = makeTextureTablePage(
-            name: "unsupported-water",
-            bitmapSourceName: "water.ogf",
-            red: 0,
-            green: 0,
-            blue: 0,
-            alpha: 0.7,
-            coronaType: 0,
-            flags: 0x0368_0020,
-            proceduralLighting: 8,
-            proceduralThickness: 6,
-            evaluationIntervalSeconds: 0,
-            elements: [
-                (type: 2, frequency: 1, speed: 1, size: 1, x1: 1, y1: 1, x2: 1, y2: 1),
-            ]
-        )
-
-        XCTAssertThrowsError(
-            try resolveRetailTextureDefinitions(
-                table: table,
-                overlay: Data(),
-                names: ["unsupported-water"]
-            )
-        ) { error in
-            XCTAssertEqual(
-                error as? RetailTextureTableError,
-                .unsupportedPresentation("unsupported-water")
-            )
-        }
-    }
-
     func testConvertsNLMPPixelsToCanonicalRGBAInD3Import() throws {
         let level = try parseD3LV127(
             makeSyntheticD3LV127(
                 lightmapPayload: makeLightmapPayload(
-                    width: 2,
-                    height: 1,
-                    pixels: [0xfc00, 0x83e0]
+                    width: 2, height: 1, pixels: [0xfc00, 0x83e0]
                 )
             ),
             source: syntheticSource
@@ -823,6 +667,7 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertThrowsError(try level.validate()) { error in
             XCTAssertEqual(error as? LevelValidationError, .invalidSurfacePhysics)
         }
+
         let surfaceComplete = level.addingSurfacePhysics([
             .init(texture: level.rooms[0].faces[0].texture, behavior: .blocking),
         ])
@@ -918,10 +763,7 @@ final class D3LV127Tests: XCTestCase {
             try parseD3LV127(
                 makeSyntheticD3LV127(
                     lightmapPayload: makeLightmapPayload(
-                        width: 4,
-                        height: 4,
-                        infoWidth: 1,
-                        infoHeight: 2
+                        width: 4, height: 4, infoWidth: 1, infoHeight: 2
                     )
                 ),
                 source: syntheticSource
@@ -1007,8 +849,7 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertThrowsError(
             try parseD3LV127(
                 makeSyntheticD3LV127(
-                    objectTypes: [1],
-                    objectLightmapFaceCount: .max
+                    objectTypes: [1], objectLightmapFaceCount: .max
                 ),
                 source: syntheticSource
             )
@@ -1019,13 +860,8 @@ final class D3LV127Tests: XCTestCase {
 
     func testRejectsImpossibleObjectSourceIdentities() {
         let cases: [(handle: UInt32, type: UInt8, storedID: UInt16)] = [
-            (0, 6, 0),
-            (1, 6, 0),
-            (0x800, 18, 0),
-            (0x800, 26, 0),
-            (0x800, 255, 0),
-            (0x800, 6, 0x8000),
-            (0x800, 2, 910),
+            (0, 6, 0), (1, 6, 0), (0x800, 18, 0), (0x800, 26, 0),
+            (0x800, 255, 0), (0x800, 6, 0x8000), (0x800, 2, 910),
             (0x800, 17, 60),
         ]
 
@@ -1042,8 +878,7 @@ final class D3LV127Tests: XCTestCase {
             ) { error in
                 XCTAssertEqual(
                     error as? D3LV127DecodeError,
-                    .invalidReference("OBJS identity"),
-                    "identity \(value)"
+                    .invalidReference("OBJS identity"), "identity \(value)"
                 )
             }
         }
@@ -1169,9 +1004,7 @@ final class D3LV127Tests: XCTestCase {
 
     func testRejectsSourceFixedTranslationTableCounts() {
         let cases: [(String, UInt32)] = [
-            ("TXNM", 3_101),
-            ("GNNM", 911),
-            ("DRNM", 61),
+            ("TXNM", 3_101), ("GNNM", 911), ("DRNM", 61),
         ]
         for (section, count) in cases {
             var oversized = Data()
@@ -1196,18 +1029,15 @@ final class D3LV127Tests: XCTestCase {
     /// matches them (BOA.cpp:1200, :2029); otherwise MakeBOA remakes them.
     func testKeepsStoredBOATablesOnlyWhenTheMineChecksumMatches() throws {
         let stale = try parseD3LV127(
-            makeSyntheticD3LV127(),
-            source: syntheticSource
+            makeSyntheticD3LV127(), source: syntheticSource
         )
         XCTAssertNil(stale.boaTables)
         let checksum = try XCTUnwrap(boaMineChecksum(
-            rooms: stale.rooms,
-            terrain: stale.terrain
+            rooms: stale.rooms, terrain: stale.terrain
         ))
         XCTAssertNotEqual(checksum, 0)
         let level = try parseD3LV127(
-            makeSyntheticD3LV127(boaChecksum: checksum),
-            source: syntheticSource
+            makeSyntheticD3LV127(boaChecksum: checksum), source: syntheticSource
         )
         let tables = try XCTUnwrap(level.boaTables)
         XCTAssertEqual(tables.highestRoomIndex, 2)
@@ -1217,8 +1047,7 @@ final class D3LV127Tests: XCTestCase {
 
     func testDecodesACompleteSyntheticResidentLevel() throws {
         let level = try parseD3LV127(
-            makeSyntheticD3LV127(),
-            source: syntheticSource
+            makeSyntheticD3LV127(), source: syntheticSource
         )
 
         XCTAssertEqual(level.rooms.map(\.sourceIndex), [2])
@@ -1228,10 +1057,7 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertEqual(level.rooms[0].faces[0].texture.sourceName, "wall")
         XCTAssertEqual(level.terrain.heights.count, 65_536)
         let dispositions = Dictionary(uniqueKeysWithValues: level.sourceChunks.map { ($0.name, $0.disposition) })
-        XCTAssertEqual(
-            dispositions["NLMP"],
-            "canonical-metadata"
-        )
+        XCTAssertEqual(dispositions["NLMP"], "canonical-metadata")
         XCTAssertEqual(dispositions["NODE"], "canonical-indoor-boundary-navigation")
         XCTAssertEqual(dispositions["LIFE"], "evidence-only-future-opportunity-f-001")
         XCTAssertEqual(dispositions["OHND"], "canonical-retired-handle-continuity")
@@ -1287,10 +1113,8 @@ final class D3LV127Tests: XCTestCase {
                                 edges: [
                                     .init(
                                         destinationRoomSourceIndex: 2,
-                                        destinationNodeIndex: 1,
-                                        flags: 4,
-                                        cost: 1,
-                                        maximumRadius: 6
+                                        destinationNodeIndex: 1, flags: 4,
+                                        cost: 1, maximumRadius: 6
                                     ),
                                 ]
                             ),
@@ -1299,10 +1123,8 @@ final class D3LV127Tests: XCTestCase {
                                 edges: [
                                     .init(
                                         destinationRoomSourceIndex: 2,
-                                        destinationNodeIndex: 0,
-                                        flags: 4,
-                                        cost: 7,
-                                        maximumRadius: 6
+                                        destinationNodeIndex: 0, flags: 4,
+                                        cost: 7, maximumRadius: 6
                                     ),
                                 ]
                             ),
@@ -1320,8 +1142,7 @@ final class D3LV127Tests: XCTestCase {
 
     func testAcceptsZeroAlignmentPaddingAfterNameTables() throws {
         let level = try parseD3LV127(
-            makeSyntheticD3LV127(padNameTables: true),
-            source: syntheticSource
+            makeSyntheticD3LV127(padNameTables: true), source: syntheticSource
         )
 
         XCTAssertEqual(level.rooms.count, 1)
@@ -1362,8 +1183,7 @@ final class D3LV127Tests: XCTestCase {
     func testPreservesCeilingCollisionAndRetiredHandleState() throws {
         let level = try parseD3LV127(
             makeSyntheticD3LV127(
-                alwaysCheckCeiling: true,
-                retiredObjectHandles: [6_164]
+                alwaysCheckCeiling: true, retiredObjectHandles: [6_164]
             ),
             source: syntheticSource
         )
@@ -1376,8 +1196,7 @@ final class D3LV127Tests: XCTestCase {
 /// The package identity the synthetic levels decode with.
 let fixtureLevelIdentity = D3LevelIdentity(
     missionKey: "descent3.mission.pilot-training",
-    levelKey: "descent3.level.training-mission",
-    historicalEagerBaseline: nil
+    levelKey: "descent3.level.training-mission", historicalEagerBaseline: nil
 )
 
 /// Decodes a synthetic level with the fixture identity.
@@ -1386,31 +1205,19 @@ func parseD3LV127(_ data: Data, source: LevelSource) throws -> Level {
 }
 
 func makeSyntheticD3LV127(
-    padNameTables: Bool = false,
-    lightmapPaddingCount: Int = 0,
-    terrainHeightPaddingCount: Int = 0,
-    alwaysCheckCeiling: Bool = false,
-    retiredObjectHandles: [UInt32] = [],
-    lightmapPayload: Data? = nil,
-    objectTypes: [UInt8] = [],
-    objectHandles: [UInt32]? = nil,
-    objectStoredIDs: [UInt16]? = nil,
-    objectNames: [String]? = nil,
+    padNameTables: Bool = false, lightmapPaddingCount: Int = 0,
+    terrainHeightPaddingCount: Int = 0, alwaysCheckCeiling: Bool = false,
+    retiredObjectHandles: [UInt32] = [], lightmapPayload: Data? = nil,
+    objectTypes: [UInt8] = [], objectHandles: [UInt32]? = nil,
+    objectStoredIDs: [UInt16]? = nil, objectNames: [String]? = nil,
     objectScriptOverrides: [(script: String, module: String)]? = nil,
-    terrainSoundCount: UInt32 = 0,
-    movingTextureCount: UInt32 = 0,
-    roomTextureIndex: UInt16 = 0,
-    roomFaceCount: UInt32 = 1,
-    roomPortalCount: UInt32 = 0,
-    terrainHeightPayload: Data? = nil,
-    textureNamesPayload: Data? = nil,
-    genericNamesPayload: Data? = nil,
-    doorNamesPayload: Data? = nil,
-    objectLightmapFaceCount: UInt16? = nil,
-    volumeLightWidth: Int32? = nil,
-    gravity: Float = -32.2,
-    navigationPayload: Data = Data(),
-    boaChecksum: Int32 = 0
+    terrainSoundCount: UInt32 = 0, movingTextureCount: UInt32 = 0,
+    roomTextureIndex: UInt16 = 0, roomFaceCount: UInt32 = 1,
+    roomPortalCount: UInt32 = 0, terrainHeightPayload: Data? = nil,
+    textureNamesPayload: Data? = nil, genericNamesPayload: Data? = nil,
+    doorNamesPayload: Data? = nil, objectLightmapFaceCount: UInt16? = nil,
+    volumeLightWidth: Int32? = nil, gravity: Float = -32.2,
+    navigationPayload: Data = Data(), boaChecksum: Int32 = 0
 ) -> Data {
     var level = Data("D3LV".utf8)
     level.appendLittleEndian(Int32(127))
@@ -1439,10 +1246,8 @@ func makeSyntheticD3LV127(
     level.appendChunk(
         "ROOM",
         payload: makeSyntheticRoom(
-            textureIndex: roomTextureIndex,
-            faceCount: roomFaceCount,
-            portalCount: roomPortalCount,
-            volumeLightWidth: volumeLightWidth
+            textureIndex: roomTextureIndex, faceCount: roomFaceCount,
+            portalCount: roomPortalCount, volumeLightWidth: volumeLightWidth
         )
     )
     level.appendChunk(
@@ -1462,10 +1267,8 @@ func makeSyntheticD3LV127(
     level.appendChunk(
         "OBJS",
         payload: makeSyntheticObjects(
-            types: objectTypes,
-            handles: objectHandles,
-            storedIDs: objectStoredIDs,
-            names: objectNames,
+            types: objectTypes, handles: objectHandles,
+            storedIDs: objectStoredIDs, names: objectNames,
             scriptOverrides: objectScriptOverrides,
             lightmapFaceCount: objectLightmapFaceCount
         )
@@ -1521,9 +1324,7 @@ private func makeNameTable(_ names: [String]) -> Data {
 }
 
 private func makeSyntheticRoom(
-    textureIndex: UInt16 = 0,
-    faceCount: UInt32 = 1,
-    portalCount: UInt32 = 0,
+    textureIndex: UInt16 = 0, faceCount: UInt32 = 1, portalCount: UInt32 = 0,
     volumeLightWidth: Int32? = nil
 ) -> Data {
     var data = Data()
@@ -1582,11 +1383,8 @@ private func makeEmptyLightmapPayload() -> Data {
 }
 
 private func makeLightmapPayload(
-    width: UInt16,
-    height: UInt16,
-    infoWidth: UInt16? = nil,
-    infoHeight: UInt16? = nil,
-    pixels: [UInt16]? = nil
+    width: UInt16, height: UInt16, infoWidth: UInt16? = nil,
+    infoHeight: UInt16? = nil, pixels: [UInt16]? = nil
 ) -> Data {
     var data = Data()
     data.appendLittleEndian(UInt32(1))
@@ -1629,14 +1427,8 @@ private func makeTextureTablePage(
     oscillationTimeSeconds: Float = 0,
     oscillationValue: UInt8 = 8,
     elements: [(
-        type: UInt8,
-        frequency: UInt8,
-        speed: UInt8,
-        size: UInt8,
-        x1: UInt8,
-        y1: UInt8,
-        x2: UInt8,
-        y2: UInt8
+        type: UInt8, frequency: UInt8, speed: UInt8, size: UInt8, x1: UInt8,
+        y1: UInt8, x2: UInt8, y2: UInt8
     )]
 ) -> Data {
     var body = Data()
@@ -1665,14 +1457,8 @@ private func makeTextureTablePage(
     body.appendLittleEndian(UInt16(elements.count))
     for element in elements {
         body.append(contentsOf: [
-            element.type,
-            element.frequency,
-            element.speed,
-            element.size,
-            element.x1,
-            element.y1,
-            element.x2,
-            element.y2,
+            element.type, element.frequency, element.speed, element.size,
+            element.x1, element.y1, element.x2, element.y2,
         ])
     }
     body.appendCString("")
@@ -1685,9 +1471,7 @@ private func makeTextureTablePage(
 }
 
 private func makeSimpleTextureTablePage(
-    name: String,
-    bitmapSourceName: String,
-    flags: UInt32
+    name: String, bitmapSourceName: String, flags: UInt32
 ) -> Data {
     var body = Data()
     body.appendLittleEndian(UInt16(7))
@@ -1715,9 +1499,7 @@ private func makeSimpleTextureTablePage(
 }
 
 private func makeSyntheticObjects(
-    types: [UInt8],
-    handles: [UInt32]? = nil,
-    storedIDs: [UInt16]? = nil,
+    types: [UInt8], handles: [UInt32]? = nil, storedIDs: [UInt16]? = nil,
     names: [String]? = nil,
     scriptOverrides: [(script: String, module: String)]? = nil,
     lightmapFaceCount: UInt16? = nil
@@ -1765,8 +1547,7 @@ private let syntheticSource = LevelSource(
     profileIdentifier: "synthetic",
     profileFiles: [
         .init(
-            relativePath: "synthetic.hog",
-            byteCount: 1,
+            relativePath: "synthetic.hog", byteCount: 1,
             sha256: String(repeating: "a", count: 64)
         ),
     ],
@@ -1787,8 +1568,7 @@ private func payload(named target: String, in data: Data) -> Data {
 }
 
 private func makeSyntheticTerrain(
-    heightPaddingCount: Int = 0,
-    heightPayload: Data? = nil
+    heightPaddingCount: Int = 0, heightPayload: Data? = nil
 ) -> Data {
     var terrain = Data()
     var heights = heightPayload ?? rawCompressedBytes(count: 65_536)

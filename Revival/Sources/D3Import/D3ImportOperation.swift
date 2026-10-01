@@ -319,8 +319,7 @@ func promoteCanonicalPackage(
     to destinationURL: URL,
     reportData: Data,
     reportURL: URL,
-    cancellationCheck: D3ImportCancellationCheck,
-    schemaPolicy: CanonicalPackageSchemaPolicy = .current
+    cancellationCheck: D3ImportCancellationCheck
 ) throws {
     let packageDirectory = open(
         stagingURL.deletingLastPathComponent().path,
@@ -337,7 +336,7 @@ func promoteCanonicalPackage(
 
     let hadDestination = FileManager.default.fileExists(atPath: destinationURL.path)
     if hadDestination {
-        _ = try loadCanonicalLevel(from: destinationURL, schemaPolicy: schemaPolicy)
+        _ = try loadCanonicalLevel(from: destinationURL)
     }
 
     let hadReport = FileManager.default.fileExists(atPath: reportURL.path)

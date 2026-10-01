@@ -159,28 +159,15 @@ let fixtureAIGameStrings: [String] = [
 /// velocity, and auto-avoid friends; 60 units per second.
 let fixtureGuideBotInfo: CanonicalObjectInfo = {
     var ai = fixtureAIInfo(
-        flags: 0x0209_2c40,
-        aiType: 5,
-        movementType: 1,
-        fov: -1,
-        maxVelocity: 60,
-        maxDeltaVelocity: 200,
-        maxTurnRate: 60_000,
-        maxDeltaTurnRate: 600_000,
-        notifyFlags: 0x1ffb_fbf2,
-        circleDistance: 10,
+        flags: 0x0209_2c40, aiType: 5, movementType: 1, fov: -1,
+        maxVelocity: 60, maxDeltaVelocity: 200, maxTurnRate: 60_000,
+        maxDeltaTurnRate: 600_000, notifyFlags: 0x1ffb_fbf2, circleDistance: 10,
         aggression: 1
     )
     ai.avoidFriendsDistance = 10
     return CanonicalObjectInfo(
-        name: "GuideBot",
-        type: 2,
-        flags: 0x110f,
-        size: 5.659_440_5,
-        hitPoints: 500,
-        lightDistance: 25,
-        lighting: fixtureNoLight,
-        ai: ai,
+        name: "GuideBot", type: 2, flags: 0x110f, size: 5.659_440_5,
+        hitPoints: 500, lightDistance: 25, lighting: fixtureNoLight, ai: ai,
         weaponBatteries: [],
         physics: .init(flags: 0x0002_0000, mass: 5, drag: 10, restitution: 1)
     )
@@ -188,14 +175,8 @@ let fixtureGuideBotInfo: CanonicalObjectInfo = {
 
 /// The Invisiblepowerup page that the Guide-Bot's helper objects use.
 let fixtureInvisiblePowerupInfo = CanonicalObjectInfo(
-    name: "Invisiblepowerup",
-    type: 7,
-    flags: 0x2,
-    size: 10.052_408,
-    hitPoints: 100,
-    lightDistance: 0,
-    lighting: fixtureNoLight,
-    ai: nil,
+    name: "Invisiblepowerup", type: 7, flags: 0x2, size: 10.052_408,
+    hitPoints: 100, lightDistance: 0, lighting: fixtureNoLight, ai: nil,
     weaponBatteries: [],
     physics: .init(flags: 0x1fa0_0120, mass: 1, drag: 0.1, restitution: 1)
 )
@@ -221,15 +202,12 @@ func withTrainingGuideBot(_ source: Level) -> Level {
     var level = source
     if let template = level.models.first {
         let buddySource = SourceResource(
-            storedIndex: 200,
-            sourceName: "Buddybot.oof"
+            storedIndex: 200, sourceName: "Buddybot.oof"
         )
         if !level.models.contains(where: { $0.source == buddySource }) {
             level.models.append(.init(
-                source: buddySource,
-                collisionRadius: 5.659_440_5,
-                submodels: template.submodels,
-                bounds: template.bounds,
+                source: buddySource, collisionRadius: 5.659_440_5,
+                submodels: template.submodels, bounds: template.bounds,
                 sourceArchive: template.sourceArchive,
                 sourceSHA256: String(repeating: "d", count: 64)
             ))
@@ -238,8 +216,7 @@ func withTrainingGuideBot(_ source: Level) -> Level {
                 dependencyManifest: .init(
                     current: level.dependencyManifest.current + [
                         .init(
-                            category: "model",
-                            source: buddySource,
+                            category: "model", source: buddySource,
                             state: "presentation-payload-imported",
                             provenance: "synthetic canonical fixture"
                         ),
@@ -250,12 +227,8 @@ func withTrainingGuideBot(_ source: Level) -> Level {
             )
         }
         guideBotInfo.presentation = .init(
-            primaryModel: buddySource,
-            mediumModel: nil,
-            lowModel: nil,
-            dyingModel: nil,
-            mediumDistance: nil,
-            lowDistance: nil
+            primaryModel: buddySource, mediumModel: nil, lowModel: nil,
+            dyingModel: nil, mediumDistance: nil, lowDistance: nil
         )
     }
     level = level
@@ -269,20 +242,14 @@ func withTrainingGuideBot(_ source: Level) -> Level {
     let missing = AIGame.references.soundNames.enumerated().filter { _, name in
         !level.soundClips.contains { $0.logicalName == name }
     }.map { offset, name in
-        CanonicalSoundClip(
+        CanonicalSoundClip.silent(
             logicalName: name,
             sourceName: "gbfixture_\(name).wav",
-            sourceEntryIndex: 31_000 + offset,
-            sampleRate: 22_050,
-            channelCount: 1,
-            frameCount: 1,
-            pcm16LittleEndian: pcm,
-            pcmSHA256: canonicalSHA256(pcm),
-            sourceArchive: archiveClip?.sourceArchive
+            index: 31_000 + offset,
+            archive: archiveClip?.sourceArchive
                 ?? profileFile?.relativePath ?? "d3.hog",
             sourceSHA256: archiveClip?.sourceSHA256
-                ?? String(repeating: "9", count: 64),
-            importVolume: 1
+                ?? String(repeating: "9", count: 64)
         )
     }
     level = level.appendingSoundClips(missing)
@@ -294,9 +261,7 @@ func withTrainingGuideBot(_ source: Level) -> Level {
             strings: fixtureAIGameStrings,
             sounds: AIGame.references.soundNames.map {
                 .init(
-                    name: $0,
-                    key: $0,
-                    flags: fixtureGuideBotSoundFlags[$0] ?? 0
+                    name: $0, key: $0, flags: fixtureGuideBotSoundFlags[$0] ?? 0
                 )
             }
         ),
@@ -338,8 +303,7 @@ extension GameWorld {
     /// (AIGame.cpp:6106-6120): goal slot 1 used, and slots 2 and 3 used when
     /// `helperSlotsAreUsed`. The other timed checks wait.
     mutating func prepareTestGuideBotFlare(
-        helperSlotsAreUsed: Bool,
-        level: Level
+        helperSlotsAreUsed: Bool, level: Level
     ) {
         let me = buddyHandle
         XCTAssertEqual(guideBot(me)?.mode, GuideBotScript.ambientMode)
@@ -351,14 +315,14 @@ extension GameWorld {
             $0.timeUntilNextPlayerVisibilityCheck = 100
             $0.returnTime = time + 100
         }
+
         let player = testPlayerObject.handle
         for slot in 1...3 {
             objects[me]?.ai?.goals[slot].used = false
             if slot == 1 || helperSlotsAreUsed {
                 aiGoalAdd(
-                    me, type: AIGoal.getToObjectType, level: slot,
-                    influence: 1, guid: -1, flags: 0,
-                    .object(player), world: level
+                    me, type: AIGoal.getToObjectType, level: slot, influence: 1,
+                    guid: -1, flags: 0, .object(player), world: level
                 )
             }
         }
@@ -420,16 +384,14 @@ extension GameSession {
     /// every frame.
     @discardableResult
     func runFrames(
-        _ frames: Int,
-        from timestamp: inout Double,
+        _ frames: Int, from timestamp: inout Double,
         firstInput: InputSnapshot = .zero
     ) -> [PlayerSimulationFrame] {
         var result: [PlayerSimulationFrame] = []
         for index in 0..<frames {
             timestamp += 0.1
             result.append(update(
-                at: timestamp,
-                input: index == 0 ? firstInput : .zero
+                at: timestamp, input: index == 0 ? firstInput : .zero
             ))
         }
         return result
@@ -448,15 +410,66 @@ func soundNames(_ frames: [PlayerSimulationFrame]) -> [String] {
     }
 }
 
-/// `weapon` under another page name.
-func fixtureRenamedWeapon(_ weapon: CanonicalWeapon,
-                          name: String) -> CanonicalWeapon {
-    let encoded = try! JSONEncoder().encode(weapon)
-    var object = try! JSONSerialization.jsonObject(with: encoded)
-        as! [String: Any]
-    object["name"] = name
-    return try! JSONDecoder().decode(
-        CanonicalWeapon.self,
-        from: JSONSerialization.data(withJSONObject: object)
+/// The Guide-Bot goal level with a buddyantivirus GBPowerup (handle 4136)
+/// beside the player.
+func makeGuideBotPowerupLevel() -> (Level, ObjectHandle) {
+    var level = makeGuideBotGoalLevel(goalDistance: 300)
+    let player = level.objects.first {
+        $0.handle == level.defaultPlayerBinding?.objectHandle
+    }!
+    let antivirus = CanonicalObjectInfo(
+        name: "buddyantivirus",
+        type: 7,
+        flags: 0x3,
+        size: 4.732_707_5,
+        hitPoints: 100,
+        lightDistance: 0,
+        lighting: fixtureNoLight,
+        ai: fixtureAIInfo(
+            flags: 0x0003_0040, aiType: 5, movementType: 1, fov: 0,
+            notifyFlags: 0x1ff9_f2a2
+        ),
+        weaponBatteries: [],
+        physics: .init(flags: 0x4, mass: 1, drag: 1, restitution: 1),
+        moduleName: "aigame",
+        scriptNameOverride: "GBPowerup"
     )
+    level = level.addingObjectInfo(antivirus)
+    level.objects.append(PlacedObject.fixture(
+        handle: 4_136,
+        type: 7,
+        storedID: 300,
+        definition: .init(storedIndex: 300, sourceName: "buddyantivirus"),
+        name: "GB powerup",
+        location: player.location,
+        position: player.position
+            + player.orientation.forward * 60
+            + player.orientation.right * 20,
+        orientation: player.orientation
+    ))
+    level.objectPresentations.append(.fixture(4_136, level.models[0].source))
+    return (level, ObjectHandle(4_136))
+}
+
+/// A Training world with the translated Guide-Bot, the player and the
+/// Camera Monitor (the level's one active goal) in a large room 39, the
+/// monitor `goalDistance` units ahead of the player.
+func makeGuideBotGoalLevel(goalDistance: Float = 120) -> Level {
+    var level = makeTrainingCameraMonitorLevel()
+    let playerIndex = level.objects.firstIndex {
+        $0.handle == level.defaultPlayerBinding?.objectHandle
+    }!
+    let pickupIndex = level.objects.firstIndex { $0.handle == 6_167 }!
+    let player = level.objects[playerIndex]
+    let forward = player.orientation.forward
+    level.rooms.append(makeSourceContainmentRoom(
+        center: player.position + forward * 60,
+        texture: level.surfacePhysics[0].texture, sourceIndex: 39,
+        halfExtent: 200
+    ))
+    level.objects[playerIndex].location = .room(39)
+    level.objects[pickupIndex].location = .room(39)
+    level.objects[pickupIndex].position =
+        player.position + forward * goalDistance
+    return withTrainingGuideBot(level)
 }

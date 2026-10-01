@@ -16,13 +16,10 @@ final class GenericPageImportTests: XCTestCase {
             let page = try XCTUnwrap(pages.first, "version \(version)")
             XCTAssertEqual(page.name, "Synthetic Robot", "version \(version)")
             XCTAssertEqual(
-                page.fireSoundNames[0][0],
-                "FireSound",
-                "version \(version)"
+                page.fireSoundNames[0][0], "FireSound", "version \(version)"
             )
             XCTAssertEqual(
-                page.fireSoundNames[20][7],
-                "LastFireSound",
+                page.fireSoundNames[20][7], "LastFireSound",
                 "version \(version)"
             )
             // mng_ReadPhysicsChunk, the death spew, and sounds[GSI_EXPLODE]
@@ -33,8 +30,7 @@ final class GenericPageImportTests: XCTestCase {
             XCTAssertEqual(page.physics.numberOfBounces, -1)
             XCTAssertEqual(page.physics.restitution, 0.5)
             XCTAssertEqual(
-                page.physics.rotationalVelocity,
-                .init(x: 1, y: 2, z: 3)
+                page.physics.rotationalVelocity, .init(x: 1, y: 2, z: 3)
             )
             XCTAssertEqual(page.deathSpew, CanonicalDeathSpew(
                 flags: 0,
@@ -58,13 +54,11 @@ final class GenericPageImportTests: XCTestCase {
         )
         XCTAssertThrowsError(
             try readOutrageModelGuns(
-                syntheticModel(batteries: 22),
-                name: "too many"
+                syntheticModel(batteries: 22), name: "too many"
             )
         ) {
             XCTAssertEqual(
-                $0 as? GenericPageImportError,
-                .invalidModelGuns("too many")
+                $0 as? GenericPageImportError, .invalidModelGuns("too many")
             )
         }
     }
@@ -78,16 +72,19 @@ private func syntheticGenericPageTable(version: UInt16) -> Data {
         page.append(UInt8(value & 0xff))
         page.append(UInt8(value >> 8))
     }
+
     func u32(_ value: UInt32) {
         for shift in stride(from: 0, to: 32, by: 8) {
             page.append(UInt8((value >> UInt32(shift)) & 0xff))
         }
     }
+
     func f32(_ value: Float) { u32(value.bitPattern) }
     func string(_ value: String) {
         page.append(contentsOf: Array(value.utf8))
         page.append(0)
     }
+
     func zeros(_ count: Int) { page.append(Data(count: count)) }
 
     u16(version)
@@ -168,6 +165,7 @@ private func syntheticModel(batteries: Int) -> Data {
             target.append(UInt8((bits >> UInt32(shift)) & 0xff))
         }
     }
+
     func chunk(_ name: String, _ body: Data) {
         data.append(Data(name.utf8))
         i32(Int32(body.count), into: &data)

@@ -16,18 +16,13 @@ final class TriggerTests: XCTestCase {
     }
 
     private func check(
-        _ session: GameSession,
-        _ trigger: Int,
-        object: ObjectHandle,
+        _ session: GameSession, _ trigger: Int, object: ObjectHandle,
         _ type: TriggerEventType
     ) {
         let info = session.level.triggers[trigger]
         session.world.checkTrigger(
-            room: info.roomIndex,
-            face: info.faceIndex,
-            object: object,
-            eventType: type,
-            level: session.level
+            room: info.roomIndex, face: info.faceIndex, object: object,
+            eventType: type, level: session.level
         )
     }
 
@@ -74,14 +69,12 @@ final class TriggerTests: XCTestCase {
         XCTAssertFalse(fired(simulation))
         simulation.world.triggerFlags[trigger] &= ~TriggerFlag.disabled
         XCTAssertNotEqual(
-            simulation.level.triggers[trigger].flags & TriggerFlag.oneShot,
-            0
+            simulation.level.triggers[trigger].flags & TriggerFlag.oneShot, 0
         )
         check(simulation, trigger, object: player, .passThrough)
         XCTAssertTrue(fired(simulation))
         XCTAssertNotEqual(
-            simulation.world.triggerFlags[trigger] & TriggerFlag.dead,
-            0
+            simulation.world.triggerFlags[trigger] & TriggerFlag.dead, 0
         )
         simulation.world.trainingMission.script032Count = 0
         check(simulation, trigger, object: player, .passThrough)
@@ -131,10 +124,10 @@ final class TriggerTests: XCTestCase {
             .init(
                 corners: face.corners,
                 flags: face.flags | (trigger ? LevelFace.hasTriggerFlag : 0),
-                portalIndex: 0,
-                texture: face.texture
+                portalIndex: 0, texture: face.texture
             )
         }
+
         let box2 = makeSourceContainmentRoom(
             center: start, texture: texture, sourceIndex: 2, halfExtent: 100
         )
@@ -172,26 +165,22 @@ final class TriggerTests: XCTestCase {
             object.location = .room(object.handle == player ? 2 : 1)
             object.position = object.handle == player ? start : far
             object.orientation = .init(
-                right: .init(x: 1, y: 0, z: 0),
-                up: .init(x: 0, y: 1, z: 0),
+                right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 1, z: 0),
                 forward: .init(x: 0, y: 0, z: 1)
             )
             return object
         }
+
         let ship = base.shipDefinitions[0]
         let physics = ship.physics
         XCTAssertTrue(physics.behaviors.contains(.wiggle))
         let bigWiggle = CanonicalShipPhysics(
-            mass: physics.mass,
-            drag: physics.drag,
-            fullThrust: physics.fullThrust,
-            behaviors: physics.behaviors,
+            mass: physics.mass, drag: physics.drag,
+            fullThrust: physics.fullThrust, behaviors: physics.behaviors,
             rotationalDrag: physics.rotationalDrag,
             fullRotationalThrust: physics.fullRotationalThrust,
-            numberOfBounces: physics.numberOfBounces,
-            initialForwardVelocity: 0,
-            initialAngularVelocity: .zero,
-            wiggleAmplitude: 100_000,
+            numberOfBounces: physics.numberOfBounces, initialForwardVelocity: 0,
+            initialAngularVelocity: .zero, wiggleAmplitude: 100_000,
             wigglesPerSecond: physics.wigglesPerSecond,
             coefficientOfRestitution: physics.coefficientOfRestitution,
             hitDieDot: physics.hitDieDot,
@@ -206,15 +195,12 @@ final class TriggerTests: XCTestCase {
                              flags: TriggerFlag.oneShot, activator: 1)],
             indoorNavigation: .init(
                 sourceHighestRoomPlusTerrainRegions: 11,
-                sourceWasVerified: true,
-                rooms: []
+                sourceWasVerified: true, rooms: []
             )
         )
         level = replacing(level, shipDefinitions: [.init(
-            source: ship.source,
-            primaryModel: ship.primaryModel,
-            presentationSize: ship.presentationSize,
-            physics: bigWiggle,
+            source: ship.source, primaryModel: ship.primaryModel,
+            presentationSize: ship.presentationSize, physics: bigWiggle,
             weaponBatteries: ship.weaponBatteries
         )])
         let simulation = GameSession(level: level, presentationReadyTimestamp: 0)

@@ -48,12 +48,12 @@ final class AIGoalPathTests: XCTestCase {
         guard case let .room(room) = player.location else {
             return XCTFail("indoor player")
         }
+
         let start = try XCTUnwrap(session.world.objects[bot]).position
         let target = start + player.orientation.forward * 15
         let slot = session.world.goalAddGoal(
-            bot, type: AIGoal.getToPositionType,
-            .position(target, room: room), level: 1,
-            flags: AIGoal.notifiesFlag, guid: 77, world: level
+            bot, type: AIGoal.getToPositionType, .position(target, room: room),
+            level: 1, flags: AIGoal.notifiesFlag, guid: 77, world: level
         )
         XCTAssertEqual(slot, 1)
         let goal = try XCTUnwrap(session.world.objects[bot]?.ai?.goals[1])
@@ -146,31 +146,6 @@ final class AIGoalPathTests: XCTestCase {
         )
     }
 
-    /// BOA_GetNextRoom over the tables MakeBOA makes for a level without
-    /// stored ones: a route across an open portal (not rendered, or
-    /// rendered fly-through; BOA.cpp:259) passes each portal's path point
-    /// (architecture.md section 9).
-    func testBOARouteCrossesPortalPathPoints() throws {
-        let level = makeTrainingManeuverFollowLevel()
-        let world = GameSession(level: level, presentationReadyTimestamp: 0)
-            .world
-        func isOpen(_ portal: LevelPortal) -> Bool {
-            (portal.flags & 1 == 0 || portal.flags & 2 != 0)
-                && portal.flags & 32 == 0
-                && level.rooms.contains { $0.sourceIndex == portal.connectedRoom }
-        }
-        let room = try XCTUnwrap(level.rooms.first {
-            $0.portals.contains(where: isOpen)
-        })
-        let portal = try XCTUnwrap(room.portals.first(where: isOpen))
-        let rooms = try XCTUnwrap(world.boaRoomRoute(
-            from: room.sourceIndex, to: portal.connectedRoom, level: level
-        ))
-        XCTAssertEqual(rooms, [room.sourceIndex, portal.connectedRoom])
-        XCTAssertNil(world.boaRoomRoute(from: room.sourceIndex, to: -5,
-                                        level: level))
-    }
-
     /// A world saved on a dynamic path loads (the path nodes are checked at
     /// load) and continues exactly like the uninterrupted world.
     func testSaveContinuationMidRoute() throws {
@@ -181,6 +156,7 @@ final class AIGoalPathTests: XCTestCase {
         guard case let .room(room) = player.location else {
             return XCTFail("indoor player")
         }
+
         let target = session.world.objects[bot]!.position
             + player.orientation.forward * 30
         session.world.goalAddGoal(
@@ -261,51 +237,6 @@ final class AIGoalPathTests: XCTestCase {
         )
     }
 
-    /// The boundary node selector takes the direction to each node with
-    /// vm_NormalizeVector: a start on a node gives the x unit vector, not a
-    /// trap.
-    func testBoundaryNodeRouteFromANodeDoesNotTrap() throws {
-        let base = makeTrainingManeuverFollowLevel()
-        let world = GameSession(level: base, presentationReadyTimestamp: 0)
-            .world
-        let player = world.testPlayerObject
-        guard case let .room(room) = player.location else {
-            return XCTFail("indoor player")
-        }
-        let start = player.position
-        let node = IndoorNavigationNode(
-            position: start,
-            edges: [.init(destinationRoomSourceIndex: room,
-                          destinationNodeIndex: 0, flags: 0, cost: 1,
-                          maximumRadius: 100)]
-        )
-        let level = replacing(
-            base,
-            indoorNavigation: .init(
-                sourceHighestRoomPlusTerrainRegions: 0,
-                sourceWasVerified: true,
-                rooms: [.init(sourceIndex: room, nodes: [node])]
-            )
-        )
-        // An end past a wall blocks the straight line, so the route takes
-        // the boundary nodes.
-        let directions: [Vector3] = [
-            .init(x: 1, y: 0, z: 0), .init(x: -1, y: 0, z: 0),
-            .init(x: 0, y: 1, z: 0), .init(x: 0, y: -1, z: 0),
-            .init(x: 0, y: 0, z: 1), .init(x: 0, y: 0, z: -1),
-        ]
-        let end = try XCTUnwrap(directions.map { start + $0 * 5_000 }.first {
-            !world.boaProbeIsClear(room: room, start: start, end: $0,
-                                   radius: 5, level: level)
-        })
-        let route = world.boaRoute(
-            startRoom: room, start: start,
-            startForward: player.orientation.forward, endRoom: room,
-            end: end, radius: 5, level: level
-        )
-        XCTAssertEqual(route?.map(\.position), [start])
-    }
-
     /// A page may give a circle distance of 0 (the Evader2 get-around goal
     /// takes it as is, AIGoal.cpp:1331). ai_move then divides 0 by 0 for
     /// an object at the goal (AImain.cpp:4649); the NaN direction fails
@@ -337,5 +268,75 @@ final class AIGoalPathTests: XCTestCase {
         XCTAssertThrowsError(try GameSession(
             level: level, world: session.world, resumedAtTimestamp: time
         ))
+    }
+
+    /// AIObjFriend (AImain.cpp:5637-5643): besides ObjectsAreRelated, an
+    /// object and its direct parent or child are friends with no time
+    /// limit.
+    func testAIObjFriendKeepsDirectParentLinks() throws {
+        let level = withTrainingGuideBot(makeTrainingGuidebotYellowFlareLevel())
+        var world = GameWorld(level: level)
+        let me = world.buddyHandle
+        let player = world.testPlayerObject
+        world.objects[me]?.ai?.flags &= ~ObjectAIFrame.teamMask
+        world.objects[me]?.ai?.flags |= ObjectAIFrame.teamPTMC
+        world.objects[me]?.parent = player.handle
+        world.gameTime = 10
+        let buddy = try XCTUnwrap(world.objects[me])
+        XCTAssertFalse(world.objectsAreRelated(buddy, player, level: level))
+        XCTAssertTrue(world.aiObjFriend(buddy, player, level: level))
+        world.objects[me]?.parent = .none
+        XCTAssertFalse(world.aiObjFriend(
+            try XCTUnwrap(world.objects[me]), player, level: level
+        ))
+    }
+
+    /// AIGoalFollowPathSimple with GF_PATH_CIRCLE_AT_END (the flags of
+    /// Script 023, TrainingMission.cpp:1523) moves the object to each node
+    /// of the path in order and back to node 0 after the last node
+    /// (AIPathMoveTurnTowardsNode, aipath.cpp:332).
+    func testFollowPathGoalVisitsTheNodesInOrderAndCircles() throws {
+        let (session, followBot) = try syntheticPathSession()
+        session.world.aAISetState(1, followBot)
+        session.world.aAIGoalFollowPathSimple(
+            followBot, 0, 9_437_444, 0, 3, level: session.level
+        )
+        var visited: [Int] = []
+        var timestamp = 0.0
+        for _ in 0..<600 {
+            timestamp += 0.05
+            _ = session.update(at: timestamp, input: .zero)
+            let node = try XCTUnwrap(
+                session.world.objects[followBot]?.ai?.path.currentNode
+            )
+            if visited.last != node { visited.append(node) }
+            if visited.count >= 5 { break }
+        }
+        XCTAssertEqual(visited, [0, 1, 2, 3, 0])
+        let goal = try XCTUnwrap(session.world.objects[followBot]?.ai?.goals[3])
+        XCTAssertTrue(goal.used)
+        XCTAssertEqual(goal.type, AIGoal.followPathType)
+    }
+
+    /// Without GF_PATH_CIRCLE_AT_END or GF_KEEP_AT_COMPLETION, the end of
+    /// the path completes the goal: GoalPathComplete clears it with
+    /// AIN_GOAL_COMPLETE (AIGoal.cpp GoalClearGoal), which frees the slot.
+    func testFollowPathGoalWithoutCircleCompletesAndClears() throws {
+        let (session, followBot) = try syntheticPathSession()
+        session.world.aAISetState(1, followBot)
+        session.world.aAIGoalFollowPathSimple(
+            followBot, 0, 0x1100, 0, 3, level: session.level
+        )
+        XCTAssertNotNil(activeFollowPath(session.world, followBot.rawValue))
+        var timestamp = 0.0
+        for _ in 0..<600
+        where activeFollowPath(session.world, followBot.rawValue) != nil {
+            timestamp += 0.05
+            _ = session.update(at: timestamp, input: .zero)
+        }
+        XCTAssertNil(activeFollowPath(session.world, followBot.rawValue))
+        let end = session.level.paths[0].nodes[3].position
+        let position = try XCTUnwrap(session.world.objects[followBot]?.position)
+        XCTAssertLessThan(sqrt(dot(position - end, position - end)), 10)
     }
 }

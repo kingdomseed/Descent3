@@ -138,15 +138,10 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     /// The package boundary (writeCanonicalPackage and the package loader):
-    /// a released package holds only the current schema, whose level carries
-    /// its script data. Only the synthetic test levels' explicit policy also
-    /// accepts the script-free schemas 9-11.
-    func validateForPackage(
-        _ policy: CanonicalPackageSchemaPolicy = .current
-    ) throws {
-        guard policy == .includingScriptFreeTestSchemas
-            || schemaVersion == Self.scriptedSchemaVersion
-        else {
+    /// a package holds only the current schema, whose level carries its
+    /// script data.
+    func validateForPackage() throws {
+        guard schemaVersion == Self.scriptedSchemaVersion else {
             throw LevelValidationError.invalidIdentity
         }
         try validate()

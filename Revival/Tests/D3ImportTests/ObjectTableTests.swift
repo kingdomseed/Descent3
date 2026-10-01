@@ -11,8 +11,7 @@ final class ObjectTableTests: XCTestCase {
             location: .room(0),
             position: .zero,
             orientation: .init(
-                right: .init(x: 1, y: 0, z: 0),
-                up: .init(x: 0, y: 1, z: 0),
+                right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 1, z: 0),
                 forward: .init(x: 0, y: 0, z: 1)
             )
         ))
@@ -41,8 +40,7 @@ final class ObjectTableTests: XCTestCase {
         let reusedSecond = try create(&table)
         let fresh = try create(&table)
         XCTAssertEqual(
-            [reusedFirst.slot, reusedSecond.slot, fresh.slot],
-            [0, 1, 3]
+            [reusedFirst.slot, reusedSecond.slot, fresh.slot], [0, 1, 3]
         )
         XCTAssertEqual(reusedFirst.rawValue, 0x1000)
         XCTAssertEqual(reusedSecond.rawValue, 0x1001)
@@ -57,29 +55,17 @@ final class ObjectTableTests: XCTestCase {
         let level = replacing(
             makeMinimalCanonicalLevel(),
             objects: [
-                PlacedObject(
+                PlacedObject.fixture(
                     handle: 0x1003,
                     type: 6,
                     storedID: 0,
-                    definition: nil,
-                    instanceName: nil,
-                    flags: 0,
-                    doorShields: nil,
                     location: .room(2),
                     position: position,
                     orientation: .init(
                         right: .init(x: 1, y: 0, z: 0),
                         up: .init(x: 0, y: 1, z: 0),
                         forward: .init(x: 0, y: 0, z: 1)
-                    ),
-                    containsType: 0,
-                    containsID: 0,
-                    containsCount: 0,
-                    lifeLeft: 0,
-                    soundSource: nil,
-                    inertScriptName: nil,
-                    inertModuleName: nil,
-                    lightmapSubmodels: []
+                    )
                 ),
             ],
             retiredObjectHandles: [0x2801]
@@ -161,8 +147,7 @@ final class ObjectTableTests: XCTestCase {
         XCTAssertEqual(wrapped.slot, 7)
         XCTAssertEqual(wrapped.rawValue, 0x0000_0807)
         XCTAssertEqual(
-            ObjectHandle(0xffff_f000 | 7).nextSignature().rawValue,
-            0xffff_f807
+            ObjectHandle(0xffff_f000 | 7).nextSignature().rawValue, 0xffff_f807
         )
     }
 
@@ -177,31 +162,41 @@ final class ObjectTableTests: XCTestCase {
             location: .room(0),
             position: .zero,
             orientation: .init(
-                right: .init(x: 1, y: 0, z: 0),
-                up: .init(x: 0, y: 1, z: 0),
+                right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 1, z: 0),
                 forward: .init(x: 0, y: 0, z: 1)
             )
         ))
+    }
+
+    /// In single player StartLevel deletes every other player object
+    /// (DeleteMultiplayerObjects, Player.cpp:1365; gamesequence.cpp:1572),
+    /// so its slot is the next one ObjCreate takes.
+    func testTheOtherPlayerObjectsAreDeletedAtLevelStart() throws {
+        let level = makeTrainingRASBot1DeathLevel()
+        let player = try XCTUnwrap(level.defaultPlayerBinding).objectHandle
+        let others = level.objects.filter {
+            $0.type == 4 && $0.handle != player
+        }
+        XCTAssertFalse(others.isEmpty)
+        let world = GameWorld(level: level)
+        XCTAssertEqual(world.objects.filter { $0.type == .player }.count, 1)
+        for other in others {
+            XCTAssertNil(world.objects[ObjectHandle(other.handle)])
+        }
+        XCTAssertEqual(world.objects.freeSlots.last,
+                       ObjectHandle(others.last!.handle).slot)
     }
 }
 
 /// The placed object with other stored flags.
 private func placed(_ object: PlacedObject, flags: UInt32) -> PlacedObject {
-    PlacedObject(
-        handle: object.handle,
-        type: object.type,
-        storedID: object.storedID,
-        definition: object.definition,
-        instanceName: object.instanceName,
-        flags: flags,
-        doorShields: object.doorShields,
-        location: object.location,
-        position: object.position,
-        orientation: object.orientation,
-        containsType: object.containsType,
-        containsID: object.containsID,
-        containsCount: object.containsCount,
-        lifeLeft: object.lifeLeft,
+    PlacedObject.fixture(
+        handle: object.handle, type: object.type, storedID: object.storedID,
+        definition: object.definition, name: object.instanceName, flags: flags,
+        doorShields: object.doorShields, location: object.location,
+        position: object.position, orientation: object.orientation,
+        containsType: object.containsType, containsID: object.containsID,
+        containsCount: object.containsCount, lifeLeft: object.lifeLeft,
         soundSource: object.soundSource,
         inertScriptName: object.inertScriptName,
         inertModuleName: object.inertModuleName,

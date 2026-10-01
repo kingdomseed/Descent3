@@ -38,9 +38,13 @@ rtk xcodebuild -quiet build -project Revival.xcodeproj -scheme RevivalMobile \
   -derivedDataPath /private/tmp/revival-dd-<task> CODE_SIGNING_ALLOWED=NO
 ```
 
+### Test layout
+
+All tests are in `Revival/Tests/D3ImportTests`. A test file covers one legacy source file or one system, named after it (for example `ObjectTableTests`, `OsirisDispatchTests`, `WeaponFireTests`, `BOATests`, `GameSaveTests`, `D3LV127Tests`, `PresentationImportTests`, `MetalWorldPlanTests`, `RevivalGameplayViewTests`). The Training level module is `TrainingMissionScriptTests`, one class split by lesson (`+Dodge`, `+Robots`, `+GuideBot`, `+LateLessons`) that drives events into synthetic scripted levels. Shared fixtures are in the `*Fixtures.swift` and `SyntheticLevelBuilders.swift` helper files. A synthetic level that a test writes as a package must be schema 13 with level script data: use `makeMinimalCanonicalPackageLevel()` or `packageLevel(_:)`.
+
 ### Tests that use real Training content
 
-Some tests read an owned `level.json` path from an environment variable (for example `REVIVAL_GUIDEBOT_GREETING_OWNED_LEVEL`). The retained package is at `runtime-data/revival-evidence/current-training-schema11/training.revival/levels/descent3.level.training-mission/level.json` (SHA-256 `ff61f9b2f36c4d4a0631927c51dda4f4f159d2bec0cf0277b50f166b554deee1`). The Xcode test host cannot read the `Documents` folder. Copy the package to `/private/tmp/`, check the hash, and point the variable at the copy. Milestone M1 replaces these per-script variables with one: `REVIVAL_TRAINING_PACKAGE`, the path of an imported `training.revival` package (schema 13; a schema 12 package must be imported again). It is in use from M1 step 4 (`TrainingMissionScriptTests`).
+One variable gates real content: `REVIVAL_TRAINING_PACKAGE`, the path of an imported `training.revival` package (schema 13; import an older package again). Only `TrainingPlaythroughTests` reads it; without it, that one test skips. The Xcode test host cannot read the `Documents` folder, so import into `/private/tmp/` (see below) and pass the variable to the test runner as `TEST_RUNNER_REVIVAL_TRAINING_PACKAGE=<path>/training.revival`.
 
 ### Import real content
 

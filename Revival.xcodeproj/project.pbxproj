@@ -7,26 +7,49 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B94BA64CF34D12B7A89C23D6 /* PresentationImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E86856937181DD5DC2383D18 /* PresentationImportTests.swift */; };
+		D30EB6A71DDF8E037CB764A5 /* EditorProjectTests+PathNodes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D56A1D5C005C7C99B563C691 /* EditorProjectTests+PathNodes.swift */; };
+		40F2899E1FD735785534BDBA /* TrainingLevelFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0901229F461B5212C000897D /* TrainingLevelFixtures.swift */; };
+		68E345798A142734AF67EB1E /* TrainingLevelFixtures+Lessons.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CF359B5095EFC5B627BCB3 /* TrainingLevelFixtures+Lessons.swift */; };
+		F85152F9F16471CC4D05F8BF /* TrainingLevelFixtures+FinalRooms.swift in Sources */ = {isa = PBXBuildFile; fileRef = B544D8C174BFCD0D67B4FB1B /* TrainingLevelFixtures+FinalRooms.swift */; };
+		760925A268BD64FCF44F33B3 /* ObjectInfoFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9277D6E1387D084968BD54B /* ObjectInfoFixtures.swift */; };
+		1F5176A605304A90EC12E126 /* LevelValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6834EBE826702F9BAFE1FF2E /* LevelValidationTests.swift */; };
+		A54D4BD1439F3F8E48E61B33 /* CanonicalPackageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DB70A633C9C578B77804D95 /* CanonicalPackageTests.swift */; };
+		75D6BFDABBFA3AA8108F576A /* CanonicalLevelFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8BB9782A22777AFA0E3B37 /* CanonicalLevelFixtures.swift */; };
+		299BEEB0395290122D064192 /* RevivalGameplayViewTests+HUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB30B4EA58F46FA2986FADA /* RevivalGameplayViewTests+HUD.swift */; };
+		5C122FD1053814C17580B8DC /* PilotProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E38F8A420C04D41D49AC48E9 /* PilotProfileTests.swift */; };
+		F9744A62666E57A47753B232 /* RevivalGameplayViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE4EE35E71F9892FA9C39F2 /* RevivalGameplayViewTests.swift */; };
+		4E5459D635A3E6060E6DEA7D /* PlayerInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5762B377477EF4470BD03B7F /* PlayerInputTests.swift */; };
+		5659E8F6664B8160FED701B0 /* GameplayViewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53A713B59D2C9FBBED43275C /* GameplayViewFixtures.swift */; };
+		89F282B2908C0860DB9DBACE /* TrainingMissionScriptTests+Robots.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5BAD93BA5D46A0BCEF64488 /* TrainingMissionScriptTests+Robots.swift */; };
+		EFBF35B9BCC3C775A499F9FB /* TrainingMissionScriptTests+LateLessons.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6443EDE1F64404756870016 /* TrainingMissionScriptTests+LateLessons.swift */; };
+		1D3BE5228C02AE55274F9F70 /* TrainingMissionScriptTests+GuideBot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A159A72DBC1DFB4E7FA43DB /* TrainingMissionScriptTests+GuideBot.swift */; };
+		11D005190458420EE9C15E89 /* TrainingMissionScriptTests+Dodge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEFA361D5562E365CEB2654F /* TrainingMissionScriptTests+Dodge.swift */; };
+		8DF2F498CD21EBCEB328489C /* TrainingPlaythroughTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A87B07A5BC4A9ABD6217CF /* TrainingPlaythroughTests.swift */; };
+		3CB104FB1CB3C53D74486261 /* SmallViewsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9104331E93995E4094C3929 /* SmallViewsTests.swift */; };
+		3CA94BE3044951EB0E3264B5 /* MultisafePowerupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10D38E76B6E7CA2A9975EB6B /* MultisafePowerupTests.swift */; };
+		755A49B9602F72F3B46109C8 /* LevelGoalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0E8844B467BB166934749A /* LevelGoalTests.swift */; };
+		480E71D846F1712D940BB98F /* InventoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C45737D4E88DB78A7D3373 /* InventoryTests.swift */; };
+		512E64D4402CB153F7221A54 /* BOATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A9AA29477428A2820513BDE /* BOATests.swift */; };
+		60D3F39FEF8D315A1780BB14 /* WeaponFireTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FE25C1D42B08DCE3F886CF6 /* WeaponFireTests.swift */; };
+		7DC78DB756BCB2FBDB253BF2 /* PolyCollideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A99E206DBC682A976ABF0EF /* PolyCollideTests.swift */; };
+		3CE15E41109B0DBB89AA8955 /* PlayerPhysicsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBBCDF5830CCB2C4B0B1931D /* PlayerPhysicsTests.swift */; };
+		40925023DDC790F60AE62CDA /* OsirisDispatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40E884AFD4A76BA699DF7F26 /* OsirisDispatchTests.swift */; };
+		D380369CCC89DB3F3FC1793E /* FireballTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D237ACF30CD652389FADAB /* FireballTests.swift */; };
+		1750F9CA61CBD61709D26739 /* DamageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CE9F69C115D200C1C3E9F80 /* DamageTests.swift */; };
+		A2941C1628D1A04165EF7DDA /* DallasFuncsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99940A3E79AFD2AA64500F0A /* DallasFuncsTests.swift */; };
+		C133A5E799CB2D6A88DFB73D /* CollideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01D1D24C17CD6F072FB43DDD /* CollideTests.swift */; };
+		97BAFFEC2A4C4907215F5DE5 /* AIGameGuideBotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73EF47520C869B0AAAB174E6 /* AIGameGuideBotTests.swift */; };
+		FE90E99DC2BAA37C8F0D2313 /* SyntheticLevelBuilders.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1575AC9BBF64EE6E60184CB /* SyntheticLevelBuilders.swift */; };
 		7A1400000000000000000001 /* TrainingMissionScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A14000000000000000000F0 /* TrainingMissionScriptTests.swift */; };
 		5E6300000000000000000001 /* GenericPageImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E63000000000000000000F0 /* GenericPageImportTests.swift */; };
 		5E6200000000000000000001 /* ObjectFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E62000000000000000000F0 /* ObjectFrameTests.swift */; };
 		4FAADC5C5B9E3D485F7203DB /* AIGoalPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16722C836F6149118106C212 /* AIGoalPathTests.swift */; };
-		C9C9C85F72E6203EFF4D2E29 /* GuideBotEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8A6F8C3DD74DB6C7C1FF5A /* GuideBotEngineTests.swift */; };
 		8E11FDA916308E5D87FDE173 /* StringTableImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */; };
-		C92AD00AAA0B4B237E1B1B17 /* GuideBotScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */; };
 		75501B9C341D45FBD07768EC /* TriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB2B52F636938E83E7CDA8 /* TriggerTests.swift */; };
-		B905C73663FA1F3B5FFA1B92 /* PowerupEffectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D51A057178FB7860E08B6F0 /* PowerupEffectTests.swift */; };
-		F0CFB308BDEA0CAABAADC648 /* InventoryLevelGoalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3051C17126DE0505BC800DFD /* InventoryLevelGoalTests.swift */; };
-		9DB17E9B9765D8279D24E7E1 /* TrainingLateLessonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E34E39746B5C2C17BA1962 /* TrainingLateLessonTests.swift */; };
 		7A0E47CDEFFE44C430D1F008 /* BuddyMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC90A27E30D55B716BD00FD /* BuddyMenuTests.swift */; };
 		01D46C5909D21CDAD71F06D4 /* GuideBotFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */; };
-		5E6100000000000000000001 /* TrainingDodgeManeuverScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */; };
-		7A1300000000000000000001 /* OsirisTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A13000000000000000000F0 /* OsirisTests.swift */; };
-		7B1500000000000000000001 /* ObjectTableFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B15000000000000000000F0 /* ObjectTableFixtures.swift */; };
 		787131116615C98BFB5176DA /* WeaponFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27DDFD7AED50C2C9C464C3E3 /* WeaponFixtures.swift */; };
-		4583BCEE19F17C147B809190 /* DeathEffectsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4CC63E17CB0E4903A4222D /* DeathEffectsTests.swift */; };
-		39BAC26F07DB9FA5A500F7D0 /* TrainingRobotScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24F5D069FB8D794F5D53F3F /* TrainingRobotScriptTests.swift */; };
-		FD20EB54F25263D2217B2E0C /* WeaponDamageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70CC6DBF9E776A30BDAFCE80 /* WeaponDamageTests.swift */; };
 		7A1200000000000000000001 /* LevelScriptFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A12000000000000000000F0 /* LevelScriptFixtures.swift */; };
 		7A1100000000000000000005 /* AIMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11000000000000000000F0 /* AIMain.swift */; };
 		7B1100000000000000000001 /* Object+Frame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B11000000000000000000F0 /* Object+Frame.swift */; };
@@ -310,7 +333,6 @@
 		B10000000000000000000006 /* D3LV127Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000004 /* D3LV127Tests.swift */; };
 		B10000000000000000000007 /* D3LV127.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* D3LV127.swift */; };
 		B10000000000000000000008 /* D3LV127.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* D3LV127.swift */; };
-		B10000000000000000000009 /* CanonicalLevelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000006 /* CanonicalLevelTests.swift */; };
 		B1000000000000000000000A /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
 		B1000000000000000000000B /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
 		B1000000000000000000000C /* Level.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* Level.swift */; };
@@ -340,7 +362,6 @@
 		BB0000000000000000000016 /* CanonicalAudioClips.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* CanonicalAudioClips.swift */; };
 		BB0000000000000000000018 /* LevelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* LevelAssembly.swift */; };
 		BB0000000000000000000019 /* IndoorMovementTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* IndoorMovementTrace.swift */; };
-		BB000000000000000000001A /* TrainingLevelValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000006 /* TrainingLevelValidationTests.swift */; };
 		BB000000000000000000001B /* IndoorMovementTraceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000007 /* IndoorMovementTraceTests.swift */; };
 		B1000000000000000000000E /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
 		B1000000000000000000000F /* D3LV127Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* D3LV127Decoder.swift */; };
@@ -379,7 +400,6 @@
 		C70000000000000000000005 /* WorldRenderExtractionValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000001 /* WorldRenderExtractionValues.swift */; };
 		C70000000000000000000006 /* WorldRenderExtractionValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000001 /* WorldRenderExtractionValues.swift */; };
 		C10000000000000000000008 /* EditorProjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000004 /* EditorProjectTests.swift */; };
-		BD1000000000000000000001 /* TrainingBehaviorEditorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000001 /* TrainingBehaviorEditorTests.swift */; };
 		C10000000000000000000009 /* RevivalProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000005 /* RevivalProject.swift */; };
 		C1000000000000000000000A /* RevivalProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000005 /* RevivalProject.swift */; };
 		D10000000000000000000001 /* MetalWorldPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* MetalWorldPlanTests.swift */; };
@@ -445,25 +465,9 @@
 		DB0000000000000000000030 /* PlayerSimulationPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000008 /* PlayerSimulationPhysics.swift */; };
 		DB0000000000000000000031 /* SourceVectorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000009 /* SourceVectorMath.swift */; };
 		DB0000000000000000000032 /* WorldRenderExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9000000000000000000000A /* WorldRenderExtraction.swift */; };
-		DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000003 /* TrainingGuidebotTests.swift */; };
-		DC0000000000000000000016 /* TrainingGuidebotTests+Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */; };
-		DC0000000000000000000004 /* TrainingCameraAndReturnTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */; };
-		DC0000000000000000000006 /* TrainingMissionCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */; };
-		DC0000000000000000000007 /* PlayerInputAndAppKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */; };
-		DC0000000000000000000008 /* PlayerWeaponTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000008 /* PlayerWeaponTests.swift */; };
-		20289F365E81B1B2BD5BC482 /* FlareWeaponTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A616FE3D3F2A8D13B680283D /* FlareWeaponTests.swift */; };
-		DC0000000000000000000009 /* PlayerFlightAndCollisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000009 /* PlayerFlightAndCollisionTests.swift */; };
 		DC000000000000000000000A /* WorldRenderExtractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000A /* WorldRenderExtractionTests.swift */; };
 		DC000000000000000000000B /* WorldRenderFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000B /* WorldRenderFixtures.swift */; };
-		DC000000000000000000000C /* TrainingBehaviorFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000C /* TrainingBehaviorFixtures.swift */; };
-		DC0000000000000000000017 /* TrainingBehaviorFixtures+Guidebot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000017 /* TrainingBehaviorFixtures+Guidebot.swift */; };
-		DC0000000000000000000018 /* TrainingBehaviorFixtures+FinalRooms.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000018 /* TrainingBehaviorFixtures+FinalRooms.swift */; };
 		DC000000000000000000000D /* PlayerSimulationFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000D /* PlayerSimulationFixtures.swift */; };
-		DC000000000000000000000E /* SoloPauseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000E /* SoloPauseTests.swift */; };
-		DC000000000000000000000F /* LiveEnergyHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA000000000000000000000F /* LiveEnergyHUDTests.swift */; };
-		DC0000000000000000000010 /* LiveAfterburnerHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */; };
-		DC0000000000000000000011 /* LiveShieldsHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000011 /* LiveShieldsHUDTests.swift */; };
-		DC0000000000000000000012 /* SoloHelpTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000012 /* SoloHelpTests.swift */; };
 		EA0000000000000000000001 /* GameSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000001 /* GameSave.swift */; };
 		7A0300000000000000000001 /* ObjectTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A03000000000000000000F0 /* ObjectTable.swift */; };
 		7A0200000000000000000001 /* GameObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A02000000000000000000F0 /* GameObject.swift */; };
@@ -479,32 +483,54 @@
 		EA0000000000000000000005 /* GameSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000001 /* GameSave.swift */; };
 		7A0300000000000000000005 /* ObjectTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A03000000000000000000F0 /* ObjectTable.swift */; };
 		7A0200000000000000000005 /* GameObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A02000000000000000000F0 /* GameObject.swift */; };
-		EA0000000000000000000006 /* TrainingQuicksaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90000000000000000000002 /* TrainingQuicksaveTests.swift */; };
 		7A0400000000000000000001 /* GameSaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A04000000000000000000F0 /* GameSaveTests.swift */; };
 		7A0100000000000000000001 /* ObjectTableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A01000000000000000000F0 /* ObjectTableTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E86856937181DD5DC2383D18 /* PresentationImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationImportTests.swift; sourceTree = "<group>"; };
+		D56A1D5C005C7C99B563C691 /* EditorProjectTests+PathNodes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EditorProjectTests+PathNodes.swift"; sourceTree = "<group>"; };
+		0901229F461B5212C000897D /* TrainingLevelFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLevelFixtures.swift; sourceTree = "<group>"; };
+		D4CF359B5095EFC5B627BCB3 /* TrainingLevelFixtures+Lessons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLevelFixtures+Lessons.swift"; sourceTree = "<group>"; };
+		B544D8C174BFCD0D67B4FB1B /* TrainingLevelFixtures+FinalRooms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLevelFixtures+FinalRooms.swift"; sourceTree = "<group>"; };
+		D9277D6E1387D084968BD54B /* ObjectInfoFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectInfoFixtures.swift; sourceTree = "<group>"; };
+		6834EBE826702F9BAFE1FF2E /* LevelValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelValidationTests.swift; sourceTree = "<group>"; };
+		0DB70A633C9C578B77804D95 /* CanonicalPackageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalPackageTests.swift; sourceTree = "<group>"; };
+		3D8BB9782A22777AFA0E3B37 /* CanonicalLevelFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalLevelFixtures.swift; sourceTree = "<group>"; };
+		4EB30B4EA58F46FA2986FADA /* RevivalGameplayViewTests+HUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RevivalGameplayViewTests+HUD.swift"; sourceTree = "<group>"; };
+		E38F8A420C04D41D49AC48E9 /* PilotProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PilotProfileTests.swift; sourceTree = "<group>"; };
+		CAE4EE35E71F9892FA9C39F2 /* RevivalGameplayViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalGameplayViewTests.swift; sourceTree = "<group>"; };
+		5762B377477EF4470BD03B7F /* PlayerInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerInputTests.swift; sourceTree = "<group>"; };
+		53A713B59D2C9FBBED43275C /* GameplayViewFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameplayViewFixtures.swift; sourceTree = "<group>"; };
+		E5BAD93BA5D46A0BCEF64488 /* TrainingMissionScriptTests+Robots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingMissionScriptTests+Robots.swift"; sourceTree = "<group>"; };
+		B6443EDE1F64404756870016 /* TrainingMissionScriptTests+LateLessons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingMissionScriptTests+LateLessons.swift"; sourceTree = "<group>"; };
+		6A159A72DBC1DFB4E7FA43DB /* TrainingMissionScriptTests+GuideBot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingMissionScriptTests+GuideBot.swift"; sourceTree = "<group>"; };
+		FEFA361D5562E365CEB2654F /* TrainingMissionScriptTests+Dodge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingMissionScriptTests+Dodge.swift"; sourceTree = "<group>"; };
+		A3A87B07A5BC4A9ABD6217CF /* TrainingPlaythroughTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingPlaythroughTests.swift; sourceTree = "<group>"; };
+		A9104331E93995E4094C3929 /* SmallViewsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmallViewsTests.swift; sourceTree = "<group>"; };
+		10D38E76B6E7CA2A9975EB6B /* MultisafePowerupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultisafePowerupTests.swift; sourceTree = "<group>"; };
+		3A0E8844B467BB166934749A /* LevelGoalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelGoalTests.swift; sourceTree = "<group>"; };
+		79C45737D4E88DB78A7D3373 /* InventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryTests.swift; sourceTree = "<group>"; };
+		5A9AA29477428A2820513BDE /* BOATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BOATests.swift; sourceTree = "<group>"; };
+		1FE25C1D42B08DCE3F886CF6 /* WeaponFireTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeaponFireTests.swift; sourceTree = "<group>"; };
+		5A99E206DBC682A976ABF0EF /* PolyCollideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolyCollideTests.swift; sourceTree = "<group>"; };
+		DBBCDF5830CCB2C4B0B1931D /* PlayerPhysicsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerPhysicsTests.swift; sourceTree = "<group>"; };
+		40E884AFD4A76BA699DF7F26 /* OsirisDispatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsirisDispatchTests.swift; sourceTree = "<group>"; };
+		63D237ACF30CD652389FADAB /* FireballTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireballTests.swift; sourceTree = "<group>"; };
+		2CE9F69C115D200C1C3E9F80 /* DamageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DamageTests.swift; sourceTree = "<group>"; };
+		99940A3E79AFD2AA64500F0A /* DallasFuncsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DallasFuncsTests.swift; sourceTree = "<group>"; };
+		01D1D24C17CD6F072FB43DDD /* CollideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollideTests.swift; sourceTree = "<group>"; };
+		73EF47520C869B0AAAB174E6 /* AIGameGuideBotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIGameGuideBotTests.swift; sourceTree = "<group>"; };
+		A1575AC9BBF64EE6E60184CB /* SyntheticLevelBuilders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyntheticLevelBuilders.swift; sourceTree = "<group>"; };
 		7A14000000000000000000F0 /* TrainingMissionScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingMissionScriptTests.swift; sourceTree = "<group>"; };
 		5E63000000000000000000F0 /* GenericPageImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenericPageImportTests.swift; sourceTree = "<group>"; };
 		5E62000000000000000000F0 /* ObjectFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectFrameTests.swift; sourceTree = "<group>"; };
 		16722C836F6149118106C212 /* AIGoalPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIGoalPathTests.swift; sourceTree = "<group>"; };
-		3B8A6F8C3DD74DB6C7C1FF5A /* GuideBotEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotEngineTests.swift; sourceTree = "<group>"; };
 		51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringTableImportTests.swift; sourceTree = "<group>"; };
-		A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotScriptTests.swift; sourceTree = "<group>"; };
 		7ACB2B52F636938E83E7CDA8 /* TriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerTests.swift; sourceTree = "<group>"; };
-		9D51A057178FB7860E08B6F0 /* PowerupEffectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerupEffectTests.swift; sourceTree = "<group>"; };
-		3051C17126DE0505BC800DFD /* InventoryLevelGoalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryLevelGoalTests.swift; sourceTree = "<group>"; };
-		65E34E39746B5C2C17BA1962 /* TrainingLateLessonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLateLessonTests.swift; sourceTree = "<group>"; };
 		2DC90A27E30D55B716BD00FD /* BuddyMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyMenuTests.swift; sourceTree = "<group>"; };
 		F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideBotFixtures.swift; sourceTree = "<group>"; };
-		5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDodgeManeuverScriptTests.swift; sourceTree = "<group>"; };
-		7A13000000000000000000F0 /* OsirisTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsirisTests.swift; sourceTree = "<group>"; };
-		7B15000000000000000000F0 /* ObjectTableFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectTableFixtures.swift; sourceTree = "<group>"; };
 		27DDFD7AED50C2C9C464C3E3 /* WeaponFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeaponFixtures.swift; sourceTree = "<group>"; };
-		5C4CC63E17CB0E4903A4222D /* DeathEffectsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeathEffectsTests.swift; sourceTree = "<group>"; };
-		C24F5D069FB8D794F5D53F3F /* TrainingRobotScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingRobotScriptTests.swift; sourceTree = "<group>"; };
-		70CC6DBF9E776A30BDAFCE80 /* WeaponDamageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeaponDamageTests.swift; sourceTree = "<group>"; };
 		7A12000000000000000000F0 /* LevelScriptFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScriptFixtures.swift; sourceTree = "<group>"; };
 		7A11000000000000000000F0 /* AIMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIMain.swift; sourceTree = "<group>"; };
 		7B11000000000000000000F0 /* Object+Frame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Object+Frame.swift"; sourceTree = "<group>"; };
@@ -580,14 +606,12 @@
 		B20000000000000000000003 /* MissionFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissionFile.swift; sourceTree = "<group>"; };
 		B20000000000000000000004 /* D3LV127Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127Tests.swift; sourceTree = "<group>"; };
 		B20000000000000000000005 /* D3LV127.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127.swift; sourceTree = "<group>"; };
-		B20000000000000000000006 /* CanonicalLevelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalLevelTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000007 /* Level.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Level.swift; sourceTree = "<group>"; };
 		BC0000000000000000000001 /* PlayerLevelValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerLevelValidation.swift; sourceTree = "<group>"; };
 		BA0000000000000000000001 /* LevelValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelValues.swift; sourceTree = "<group>"; };
 		BA0000000000000000000002 /* CanonicalAudioClips.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalAudioClips.swift; sourceTree = "<group>"; };
 		BA0000000000000000000004 /* LevelAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelAssembly.swift; sourceTree = "<group>"; };
 		BA0000000000000000000005 /* IndoorMovementTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorMovementTrace.swift; sourceTree = "<group>"; };
-		BA0000000000000000000006 /* TrainingLevelValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLevelValidationTests.swift; sourceTree = "<group>"; };
 		BA0000000000000000000007 /* IndoorMovementTraceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorMovementTraceTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000008 /* D3LV127Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = D3LV127Decoder.swift; sourceTree = "<group>"; };
 		B20000000000000000000009 /* CanonicalPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalPackage.swift; sourceTree = "<group>"; };
@@ -600,7 +624,6 @@
 		C60000000000000000000001 /* ReciprocalPortalComponent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReciprocalPortalComponent.swift; sourceTree = "<group>"; };
 		C70000000000000000000001 /* WorldRenderExtractionValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtractionValues.swift; sourceTree = "<group>"; };
 		C20000000000000000000004 /* EditorProjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorProjectTests.swift; sourceTree = "<group>"; };
-		BD0000000000000000000001 /* TrainingBehaviorEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingBehaviorEditorTests.swift; sourceTree = "<group>"; };
 		C20000000000000000000005 /* RevivalProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevivalProject.swift; sourceTree = "<group>"; };
 		D20000000000000000000001 /* MetalWorldPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalWorldPlanTests.swift; sourceTree = "<group>"; };
 		D20000000000000000000002 /* MetalWorldPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalWorldPlan.swift; sourceTree = "<group>"; };
@@ -621,29 +644,12 @@
 		D90000000000000000000008 /* PlayerSimulationPhysics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationPhysics.swift; sourceTree = "<group>"; };
 		D90000000000000000000009 /* SourceVectorMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceVectorMath.swift; sourceTree = "<group>"; };
 		D9000000000000000000000A /* WorldRenderExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtraction.swift; sourceTree = "<group>"; };
-		DA0000000000000000000003 /* TrainingGuidebotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingGuidebotTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingGuidebotTests+Route.swift"; sourceTree = "<group>"; };
-		DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingCameraAndReturnTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingMissionCompletionTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerInputAndAppKitTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000008 /* PlayerWeaponTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerWeaponTests.swift; sourceTree = "<group>"; };
-		A616FE3D3F2A8D13B680283D /* FlareWeaponTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlareWeaponTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000009 /* PlayerFlightAndCollisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerFlightAndCollisionTests.swift; sourceTree = "<group>"; };
 		DA000000000000000000000A /* WorldRenderExtractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderExtractionTests.swift; sourceTree = "<group>"; };
 		DA000000000000000000000B /* WorldRenderFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldRenderFixtures.swift; sourceTree = "<group>"; };
-		DA000000000000000000000C /* TrainingBehaviorFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingBehaviorFixtures.swift; sourceTree = "<group>"; };
-		DA0000000000000000000017 /* TrainingBehaviorFixtures+Guidebot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingBehaviorFixtures+Guidebot.swift"; sourceTree = "<group>"; };
-		DA0000000000000000000018 /* TrainingBehaviorFixtures+FinalRooms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingBehaviorFixtures+FinalRooms.swift"; sourceTree = "<group>"; };
 		DA000000000000000000000D /* PlayerSimulationFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSimulationFixtures.swift; sourceTree = "<group>"; };
-		DA000000000000000000000E /* SoloPauseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoloPauseTests.swift; sourceTree = "<group>"; };
-		DA000000000000000000000F /* LiveEnergyHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEnergyHUDTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAfterburnerHUDTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000011 /* LiveShieldsHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveShieldsHUDTests.swift; sourceTree = "<group>"; };
-		DA0000000000000000000012 /* SoloHelpTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoloHelpTests.swift; sourceTree = "<group>"; };
 		E90000000000000000000001 /* GameSave.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSave.swift; sourceTree = "<group>"; };
 		7A03000000000000000000F0 /* ObjectTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectTable.swift; sourceTree = "<group>"; };
 		7A02000000000000000000F0 /* GameObject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameObject.swift; sourceTree = "<group>"; };
-		E90000000000000000000002 /* TrainingQuicksaveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingQuicksaveTests.swift; sourceTree = "<group>"; };
 		7A04000000000000000000F0 /* GameSaveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSaveTests.swift; sourceTree = "<group>"; };
 		7A01000000000000000000F0 /* ObjectTableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectTableTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -907,57 +913,60 @@
 		A3000000000000000000000B /* D3ImportTests */ = {
 			isa = PBXGroup;
 			children = (
+				E86856937181DD5DC2383D18 /* PresentationImportTests.swift */,
+				D56A1D5C005C7C99B563C691 /* EditorProjectTests+PathNodes.swift */,
+				0901229F461B5212C000897D /* TrainingLevelFixtures.swift */,
+				D4CF359B5095EFC5B627BCB3 /* TrainingLevelFixtures+Lessons.swift */,
+				B544D8C174BFCD0D67B4FB1B /* TrainingLevelFixtures+FinalRooms.swift */,
+				D9277D6E1387D084968BD54B /* ObjectInfoFixtures.swift */,
+				6834EBE826702F9BAFE1FF2E /* LevelValidationTests.swift */,
+				0DB70A633C9C578B77804D95 /* CanonicalPackageTests.swift */,
+				3D8BB9782A22777AFA0E3B37 /* CanonicalLevelFixtures.swift */,
+				4EB30B4EA58F46FA2986FADA /* RevivalGameplayViewTests+HUD.swift */,
+				E38F8A420C04D41D49AC48E9 /* PilotProfileTests.swift */,
+				CAE4EE35E71F9892FA9C39F2 /* RevivalGameplayViewTests.swift */,
+				5762B377477EF4470BD03B7F /* PlayerInputTests.swift */,
+				53A713B59D2C9FBBED43275C /* GameplayViewFixtures.swift */,
+				E5BAD93BA5D46A0BCEF64488 /* TrainingMissionScriptTests+Robots.swift */,
+				B6443EDE1F64404756870016 /* TrainingMissionScriptTests+LateLessons.swift */,
+				6A159A72DBC1DFB4E7FA43DB /* TrainingMissionScriptTests+GuideBot.swift */,
+				FEFA361D5562E365CEB2654F /* TrainingMissionScriptTests+Dodge.swift */,
+				A3A87B07A5BC4A9ABD6217CF /* TrainingPlaythroughTests.swift */,
+				A9104331E93995E4094C3929 /* SmallViewsTests.swift */,
+				10D38E76B6E7CA2A9975EB6B /* MultisafePowerupTests.swift */,
+				3A0E8844B467BB166934749A /* LevelGoalTests.swift */,
+				79C45737D4E88DB78A7D3373 /* InventoryTests.swift */,
+				5A9AA29477428A2820513BDE /* BOATests.swift */,
+				1FE25C1D42B08DCE3F886CF6 /* WeaponFireTests.swift */,
+				5A99E206DBC682A976ABF0EF /* PolyCollideTests.swift */,
+				DBBCDF5830CCB2C4B0B1931D /* PlayerPhysicsTests.swift */,
+				40E884AFD4A76BA699DF7F26 /* OsirisDispatchTests.swift */,
+				63D237ACF30CD652389FADAB /* FireballTests.swift */,
+				2CE9F69C115D200C1C3E9F80 /* DamageTests.swift */,
+				99940A3E79AFD2AA64500F0A /* DallasFuncsTests.swift */,
+				01D1D24C17CD6F072FB43DDD /* CollideTests.swift */,
+				73EF47520C869B0AAAB174E6 /* AIGameGuideBotTests.swift */,
+				A1575AC9BBF64EE6E60184CB /* SyntheticLevelBuilders.swift */,
 				7A05000000000000000000F0 /* LevelScriptImportTests.swift */,
-				E90000000000000000000002 /* TrainingQuicksaveTests.swift */,
 				7A04000000000000000000F0 /* GameSaveTests.swift */,
 				7A14000000000000000000F0 /* TrainingMissionScriptTests.swift */,
 				5E63000000000000000000F0 /* GenericPageImportTests.swift */,
 				5E62000000000000000000F0 /* ObjectFrameTests.swift */,
 				16722C836F6149118106C212 /* AIGoalPathTests.swift */,
-				3B8A6F8C3DD74DB6C7C1FF5A /* GuideBotEngineTests.swift */,
 				51C1BB8DCDF136D8E2E45996 /* StringTableImportTests.swift */,
-				A6AAFBD0F9F454BB2BCE43A4 /* GuideBotScriptTests.swift */,
 				7ACB2B52F636938E83E7CDA8 /* TriggerTests.swift */,
-				9D51A057178FB7860E08B6F0 /* PowerupEffectTests.swift */,
-				3051C17126DE0505BC800DFD /* InventoryLevelGoalTests.swift */,
-				65E34E39746B5C2C17BA1962 /* TrainingLateLessonTests.swift */,
 				2DC90A27E30D55B716BD00FD /* BuddyMenuTests.swift */,
 				F9FBEFEB9A394956D6F202A4 /* GuideBotFixtures.swift */,
-				5E61000000000000000000F0 /* TrainingDodgeManeuverScriptTests.swift */,
-				7A13000000000000000000F0 /* OsirisTests.swift */,
-				7B15000000000000000000F0 /* ObjectTableFixtures.swift */,
 				27DDFD7AED50C2C9C464C3E3 /* WeaponFixtures.swift */,
-				5C4CC63E17CB0E4903A4222D /* DeathEffectsTests.swift */,
-				C24F5D069FB8D794F5D53F3F /* TrainingRobotScriptTests.swift */,
-				70CC6DBF9E776A30BDAFCE80 /* WeaponDamageTests.swift */,
 				7A12000000000000000000F0 /* LevelScriptFixtures.swift */,
 				7A01000000000000000000F0 /* ObjectTableTests.swift */,
 				F20000000000000000000003 /* RevivalMobilePresentationStateTests.swift */,
 				D20000000000000000000001 /* MetalWorldPlanTests.swift */,
 				C20000000000000000000004 /* EditorProjectTests.swift */,
-				BD0000000000000000000001 /* TrainingBehaviorEditorTests.swift */,
-				DA0000000000000000000003 /* TrainingGuidebotTests.swift */,
-				DA0000000000000000000016 /* TrainingGuidebotTests+Route.swift */,
-				DA0000000000000000000004 /* TrainingCameraAndReturnTests.swift */,
-				DA0000000000000000000006 /* TrainingMissionCompletionTests.swift */,
-				DA0000000000000000000007 /* PlayerInputAndAppKitTests.swift */,
-				DA0000000000000000000008 /* PlayerWeaponTests.swift */,
-				A616FE3D3F2A8D13B680283D /* FlareWeaponTests.swift */,
-				DA0000000000000000000009 /* PlayerFlightAndCollisionTests.swift */,
 				DA000000000000000000000A /* WorldRenderExtractionTests.swift */,
 				DA000000000000000000000B /* WorldRenderFixtures.swift */,
-				DA000000000000000000000C /* TrainingBehaviorFixtures.swift */,
-				DA0000000000000000000017 /* TrainingBehaviorFixtures+Guidebot.swift */,
-				DA0000000000000000000018 /* TrainingBehaviorFixtures+FinalRooms.swift */,
 				DA000000000000000000000D /* PlayerSimulationFixtures.swift */,
-				DA000000000000000000000E /* SoloPauseTests.swift */,
-				DA0000000000000000000012 /* SoloHelpTests.swift */,
-				DA000000000000000000000F /* LiveEnergyHUDTests.swift */,
-				DA0000000000000000000010 /* LiveAfterburnerHUDTests.swift */,
-				DA0000000000000000000011 /* LiveShieldsHUDTests.swift */,
-				BA0000000000000000000006 /* TrainingLevelValidationTests.swift */,
 				BA0000000000000000000007 /* IndoorMovementTraceTests.swift */,
-				B20000000000000000000006 /* CanonicalLevelTests.swift */,
 				B2000000000000000000000A /* D3ImportOperationTests.swift */,
 				A20000000000000000000004 /* HOG2ArchiveTests.swift */,
 				B20000000000000000000004 /* D3LV127Tests.swift */,
@@ -1425,6 +1434,40 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B94BA64CF34D12B7A89C23D6 /* PresentationImportTests.swift in Sources */,
+				D30EB6A71DDF8E037CB764A5 /* EditorProjectTests+PathNodes.swift in Sources */,
+				40F2899E1FD735785534BDBA /* TrainingLevelFixtures.swift in Sources */,
+				68E345798A142734AF67EB1E /* TrainingLevelFixtures+Lessons.swift in Sources */,
+				F85152F9F16471CC4D05F8BF /* TrainingLevelFixtures+FinalRooms.swift in Sources */,
+				760925A268BD64FCF44F33B3 /* ObjectInfoFixtures.swift in Sources */,
+				1F5176A605304A90EC12E126 /* LevelValidationTests.swift in Sources */,
+				A54D4BD1439F3F8E48E61B33 /* CanonicalPackageTests.swift in Sources */,
+				75D6BFDABBFA3AA8108F576A /* CanonicalLevelFixtures.swift in Sources */,
+				299BEEB0395290122D064192 /* RevivalGameplayViewTests+HUD.swift in Sources */,
+				5C122FD1053814C17580B8DC /* PilotProfileTests.swift in Sources */,
+				F9744A62666E57A47753B232 /* RevivalGameplayViewTests.swift in Sources */,
+				4E5459D635A3E6060E6DEA7D /* PlayerInputTests.swift in Sources */,
+				5659E8F6664B8160FED701B0 /* GameplayViewFixtures.swift in Sources */,
+				89F282B2908C0860DB9DBACE /* TrainingMissionScriptTests+Robots.swift in Sources */,
+				EFBF35B9BCC3C775A499F9FB /* TrainingMissionScriptTests+LateLessons.swift in Sources */,
+				1D3BE5228C02AE55274F9F70 /* TrainingMissionScriptTests+GuideBot.swift in Sources */,
+				11D005190458420EE9C15E89 /* TrainingMissionScriptTests+Dodge.swift in Sources */,
+				8DF2F498CD21EBCEB328489C /* TrainingPlaythroughTests.swift in Sources */,
+				3CB104FB1CB3C53D74486261 /* SmallViewsTests.swift in Sources */,
+				3CA94BE3044951EB0E3264B5 /* MultisafePowerupTests.swift in Sources */,
+				755A49B9602F72F3B46109C8 /* LevelGoalTests.swift in Sources */,
+				480E71D846F1712D940BB98F /* InventoryTests.swift in Sources */,
+				512E64D4402CB153F7221A54 /* BOATests.swift in Sources */,
+				60D3F39FEF8D315A1780BB14 /* WeaponFireTests.swift in Sources */,
+				7DC78DB756BCB2FBDB253BF2 /* PolyCollideTests.swift in Sources */,
+				3CE15E41109B0DBB89AA8955 /* PlayerPhysicsTests.swift in Sources */,
+				40925023DDC790F60AE62CDA /* OsirisDispatchTests.swift in Sources */,
+				D380369CCC89DB3F3FC1793E /* FireballTests.swift in Sources */,
+				1750F9CA61CBD61709D26739 /* DamageTests.swift in Sources */,
+				A2941C1628D1A04165EF7DDA /* DallasFuncsTests.swift in Sources */,
+				C133A5E799CB2D6A88DFB73D /* CollideTests.swift in Sources */,
+				97BAFFEC2A4C4907215F5DE5 /* AIGameGuideBotTests.swift in Sources */,
+				FE90E99DC2BAA37C8F0D2313 /* SyntheticLevelBuilders.swift in Sources */,
 				7A0A00000000000000000004 /* TrainingMission.swift in Sources */,
 				7A0900000000000000000004 /* LevelModule.swift in Sources */,
 				242120FF97188232EF032EE6 /* OsirisPredefs.swift in Sources */,
@@ -1484,28 +1527,16 @@
 				7A0C00000000000000000004 /* OsirisLoadandBind+Timers.swift in Sources */,
 				7A0B00000000000000000004 /* OsirisLoadandBind.swift in Sources */,
 				7A0500000000000000000001 /* LevelScriptImportTests.swift in Sources */,
-				EA0000000000000000000006 /* TrainingQuicksaveTests.swift in Sources */,
 				7A0400000000000000000001 /* GameSaveTests.swift in Sources */,
 				7A1400000000000000000001 /* TrainingMissionScriptTests.swift in Sources */,
 				5E6300000000000000000001 /* GenericPageImportTests.swift in Sources */,
 				5E6200000000000000000001 /* ObjectFrameTests.swift in Sources */,
 				4FAADC5C5B9E3D485F7203DB /* AIGoalPathTests.swift in Sources */,
-				C9C9C85F72E6203EFF4D2E29 /* GuideBotEngineTests.swift in Sources */,
 				8E11FDA916308E5D87FDE173 /* StringTableImportTests.swift in Sources */,
-				C92AD00AAA0B4B237E1B1B17 /* GuideBotScriptTests.swift in Sources */,
 				75501B9C341D45FBD07768EC /* TriggerTests.swift in Sources */,
-				B905C73663FA1F3B5FFA1B92 /* PowerupEffectTests.swift in Sources */,
-				F0CFB308BDEA0CAABAADC648 /* InventoryLevelGoalTests.swift in Sources */,
-				9DB17E9B9765D8279D24E7E1 /* TrainingLateLessonTests.swift in Sources */,
 				7A0E47CDEFFE44C430D1F008 /* BuddyMenuTests.swift in Sources */,
 				01D46C5909D21CDAD71F06D4 /* GuideBotFixtures.swift in Sources */,
-				5E6100000000000000000001 /* TrainingDodgeManeuverScriptTests.swift in Sources */,
-				7A1300000000000000000001 /* OsirisTests.swift in Sources */,
-				7B1500000000000000000001 /* ObjectTableFixtures.swift in Sources */,
 				787131116615C98BFB5176DA /* WeaponFixtures.swift in Sources */,
-				4583BCEE19F17C147B809190 /* DeathEffectsTests.swift in Sources */,
-				39BAC26F07DB9FA5A500F7D0 /* TrainingRobotScriptTests.swift in Sources */,
-				FD20EB54F25263D2217B2E0C /* WeaponDamageTests.swift in Sources */,
 				7A1200000000000000000001 /* LevelScriptFixtures.swift in Sources */,
 				7A0100000000000000000001 /* ObjectTableTests.swift in Sources */,
 				EA0000000000000000000004 /* GameSave.swift in Sources */,
@@ -1520,28 +1551,11 @@
 				D10000000000000000000001 /* MetalWorldPlanTests.swift in Sources */,
 				C1000000000000000000000A /* RevivalProject.swift in Sources */,
 				C10000000000000000000008 /* EditorProjectTests.swift in Sources */,
-				BD1000000000000000000001 /* TrainingBehaviorEditorTests.swift in Sources */,
 				C30000000000000000000005 /* PlayerInput.swift in Sources */,
 				C40000000000000000000005 /* PlayerSimulationPresentation.swift in Sources */,
-				DC0000000000000000000003 /* TrainingGuidebotTests.swift in Sources */,
-				DC0000000000000000000016 /* TrainingGuidebotTests+Route.swift in Sources */,
-				DC0000000000000000000004 /* TrainingCameraAndReturnTests.swift in Sources */,
-				DC0000000000000000000006 /* TrainingMissionCompletionTests.swift in Sources */,
-				DC0000000000000000000007 /* PlayerInputAndAppKitTests.swift in Sources */,
-				DC0000000000000000000008 /* PlayerWeaponTests.swift in Sources */,
-				20289F365E81B1B2BD5BC482 /* FlareWeaponTests.swift in Sources */,
-				DC0000000000000000000009 /* PlayerFlightAndCollisionTests.swift in Sources */,
 				DC000000000000000000000A /* WorldRenderExtractionTests.swift in Sources */,
 				DC000000000000000000000B /* WorldRenderFixtures.swift in Sources */,
-				DC000000000000000000000C /* TrainingBehaviorFixtures.swift in Sources */,
-				DC0000000000000000000017 /* TrainingBehaviorFixtures+Guidebot.swift in Sources */,
-				DC0000000000000000000018 /* TrainingBehaviorFixtures+FinalRooms.swift in Sources */,
 				DC000000000000000000000D /* PlayerSimulationFixtures.swift in Sources */,
-				DC000000000000000000000E /* SoloPauseTests.swift in Sources */,
-				DC0000000000000000000012 /* SoloHelpTests.swift in Sources */,
-				DC000000000000000000000F /* LiveEnergyHUDTests.swift in Sources */,
-				DC0000000000000000000010 /* LiveAfterburnerHUDTests.swift in Sources */,
-				DC0000000000000000000011 /* LiveShieldsHUDTests.swift in Sources */,
 				DB000000000000000000001F /* PlayerSimulationValues.swift in Sources */,
 				DB0000000000000000000020 /* GameSession.swift in Sources */,
 				DB0000000000000000000023 /* PlayerSimulationUpdate.swift in Sources */,
@@ -1567,9 +1581,7 @@
 				A10000000000000000000007 /* HOG2Archive.swift in Sources */,
 				B10000000000000000000003 /* PreparedRetailProfile.swift in Sources */,
 				B10000000000000000000005 /* MissionFile.swift in Sources */,
-				BB000000000000000000001A /* TrainingLevelValidationTests.swift in Sources */,
 				BB000000000000000000001B /* IndoorMovementTraceTests.swift in Sources */,
-				B10000000000000000000009 /* CanonicalLevelTests.swift in Sources */,
 				B10000000000000000000014 /* D3ImportOperationTests.swift in Sources */,
 				A10000000000000000000004 /* HOG2ArchiveTests.swift in Sources */,
 				B10000000000000000000006 /* D3LV127Tests.swift in Sources */,

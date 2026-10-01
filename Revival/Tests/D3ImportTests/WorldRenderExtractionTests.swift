@@ -1,6 +1,9 @@
 import XCTest
 
-extension WorldRenderingTests {
+// Room, object, corona, and water extraction for the renderer
+// (WorldRenderExtraction.swift: render.cpp, renderobject.cpp, procedurals.cpp).
+
+final class WorldRenderExtractionTests: XCTestCase {
     func testDefaultPlayerViewDerivesCanonicalPoseRadiusAndExcludesViewer() throws {
         let level = makeSliceSixObjectRenderLevel()
         let view = defaultPlayerView(in: level)
@@ -46,14 +49,11 @@ extension WorldRenderingTests {
             (1 / tan(wide.horizontalFieldOfViewRadians / 2))
             * wide.aspectRatio
         XCTAssertEqual(
-            fourByThree.horizontalFieldOfViewRadians,
-            3.14 * 72 / 180,
+            fourByThree.horizontalFieldOfViewRadians, 3.14 * 72 / 180,
             accuracy: 0.000_001
         )
         XCTAssertEqual(
-            wideVerticalScale,
-            fourByThreeVerticalScale,
-            accuracy: 0.000_001
+            wideVerticalScale, fourByThreeVerticalScale, accuracy: 0.000_001
         )
         XCTAssertLessThan(
             1 / tan(wide.horizontalFieldOfViewRadians / 2),
@@ -61,8 +61,7 @@ extension WorldRenderingTests {
         )
 
         let portrait = fullDrawableMetalViewport(
-            drawableWidth: 1_170,
-            drawableHeight: 2_532
+            drawableWidth: 1_170, drawableHeight: 2_532
         )
         XCTAssertEqual(portrait.originX, 0)
         XCTAssertEqual(portrait.originY, 0)
@@ -70,8 +69,7 @@ extension WorldRenderingTests {
         XCTAssertEqual(portrait.height, 2_532)
 
         let landscape = fullDrawableMetalViewport(
-            drawableWidth: 2_360,
-            drawableHeight: 1_640
+            drawableWidth: 2_360, drawableHeight: 1_640
         )
         XCTAssertEqual(landscape.originX, 0)
         XCTAssertEqual(landscape.originY, 0)
@@ -82,39 +80,33 @@ extension WorldRenderingTests {
     func testRoomThreeConvexShellContainmentAcceptsItsBoundaryAndRejectsPastIt() {
         let center = RoomCamera.trainingRoom3.position
         let room = makeSourceContainmentRoom(
-            center: center,
-            texture: .init(storedIndex: 0, sourceName: "wall")
+            center: center, texture: .init(storedIndex: 0, sourceName: "wall")
         )
 
         XCTAssertTrue(
             sourceRoomThreeContains(
-                .init(x: center.x - 0.5, y: center.y, z: center.z),
-                in: room
+                .init(x: center.x - 0.5, y: center.y, z: center.z), in: room
             )
         )
         XCTAssertTrue(
             sourceRoomThreeContains(
-                .init(x: center.x, y: center.y + 1, z: center.z),
-                in: room
+                .init(x: center.x, y: center.y + 1, z: center.z), in: room
             )
         )
         XCTAssertFalse(
             sourceRoomThreeContains(
-                .init(x: center.x, y: center.y + 1.25, z: center.z),
-                in: room
+                .init(x: center.x, y: center.y + 1.25, z: center.z), in: room
             )
         )
     }
 
     func testEvaluatesTypedCoronaNearCutoffAndRenderedPortalOcclusion() throws {
         let camera = RoomCamera(
-            position: .zero,
-            target: .init(x: 0, y: 1, z: 0),
+            position: .zero, target: .init(x: 0, y: 1, z: 0),
             up: .init(x: 0, y: 0, z: 1)
         )
         let visible = try extractWorldForRendering(
-            makeCoronaEvaluationLevel(blocked: false),
-            camera: camera,
+            makeCoronaEvaluationLevel(blocked: false), camera: camera,
             startRoomSourceIndex: 3
         )
         let corona = try XCTUnwrap(visible.lightCoronas.only)
@@ -126,8 +118,7 @@ extension WorldRenderingTests {
         XCTAssertEqual(corona.tint, .init(x: 0.25, y: 0.5, z: 0.75))
         XCTAssertEqual(corona.blend, .additiveSourceAlpha(opacity: 102))
         let plan = try makeMetalWorldPlan(
-            level: makeCoronaEvaluationLevel(blocked: false),
-            camera: camera,
+            level: makeCoronaEvaluationLevel(blocked: false), camera: camera,
             startRoomSourceIndex: 3
         )
         XCTAssertEqual(plan.preparedLightCoronaCandidates, [corona])
@@ -139,37 +130,31 @@ extension WorldRenderingTests {
         )
 
         let nearCamera = RoomCamera(
-            position: .init(x: 0, y: 1, z: 0),
-            target: .init(x: 0, y: 2, z: 0),
+            position: .init(x: 0, y: 1, z: 0), target: .init(x: 0, y: 2, z: 0),
             up: .init(x: 0, y: 0, z: 1)
         )
         XCTAssertTrue(
             try extractWorldForRendering(
-                makeCoronaEvaluationLevel(blocked: false),
-                camera: nearCamera,
+                makeCoronaEvaluationLevel(blocked: false), camera: nearCamera,
                 startRoomSourceIndex: 3
             ).lightCoronas.isEmpty
         )
         XCTAssertTrue(
             try extractWorldForRendering(
-                makeCoronaEvaluationLevel(blocked: true),
-                camera: camera,
+                makeCoronaEvaluationLevel(blocked: true), camera: camera,
                 startRoomSourceIndex: 3
             ).lightCoronas.isEmpty
         )
         XCTAssertTrue(
             try extractWorldForRendering(
-                makeCoronaEvaluationLevel(objectBlocked: true),
-                camera: camera,
+                makeCoronaEvaluationLevel(objectBlocked: true), camera: camera,
                 startRoomSourceIndex: 3
             ).lightCoronas.isEmpty
         )
         XCTAssertEqual(
             try extractWorldForRendering(
-                makeCoronaEvaluationLevel(objectBlocked: true),
-                camera: camera,
-                startRoomSourceIndex: 3,
-                excludedObjectHandle: 99
+                makeCoronaEvaluationLevel(objectBlocked: true), camera: camera,
+                startRoomSourceIndex: 3, excludedObjectHandle: 99
             ).lightCoronas.count,
             1
         )
@@ -177,16 +162,14 @@ extension WorldRenderingTests {
 
     func testHiddenObjectPresentationDoesNotOccludeTypedCorona() throws {
         let camera = RoomCamera(
-            position: .zero,
-            target: .init(x: 0, y: 1, z: 0),
+            position: .zero, target: .init(x: 0, y: 1, z: 0),
             up: .init(x: 0, y: 0, z: 1)
         )
 
         XCTAssertEqual(
             try extractWorldForRendering(
                 makeCoronaEvaluationLevel(
-                    objectBlocked: true,
-                    objectPresentationVisible: false
+                    objectBlocked: true, objectPresentationVisible: false
                 ),
                 camera: camera,
                 startRoomSourceIndex: 3
@@ -206,16 +189,14 @@ extension WorldRenderingTests {
                 base.append(UInt8((x + y) & 0xff))
             }
         }
+
         var evaluator = WaterProceduralEvaluator(
             image: .init(width: 128, height: 128, rgba8: base),
             definition: alienForceFieldWaterDefinition()
         )
 
         let frame0 = evaluator.rgba8(visualTick: 0)
-        XCTAssertEqual(
-            evaluator.rgba8(visualTick: 0),
-            frame0
-        )
+        XCTAssertEqual(evaluator.rgba8(visualTick: 0), frame0)
         let frame1 = evaluator.rgba8(visualTick: 1)
         var frame15 = frame1
         for frame in 2...15 {
@@ -243,14 +224,14 @@ extension WorldRenderingTests {
         for frame in 1...7 {
             boundedSequentialFrame = boundedSequentialEvaluator.rgba8(visualTick: frame)
         }
+
         var boundedSkippedEvaluator = WaterProceduralEvaluator(
             image: .init(width: 128, height: 128, rgba8: base),
             definition: alienForceFieldWaterDefinition()
         )
         _ = boundedSkippedEvaluator.rgba8(visualTick: 0)
         XCTAssertEqual(
-            boundedSkippedEvaluator.rgba8(visualTick: 7),
-            boundedSequentialFrame
+            boundedSkippedEvaluator.rgba8(visualTick: 7), boundedSequentialFrame
         )
 
         var skippedEvaluator = WaterProceduralEvaluator(
@@ -271,6 +252,7 @@ extension WorldRenderingTests {
         for _ in 0..<(128 * 128) {
             base.append(contentsOf: [0, 90, 0, 255])
         }
+
         var evaluator = WaterProceduralEvaluator(
             image: .init(width: 128, height: 128, rgba8: base),
             definition: .init(
@@ -279,14 +261,8 @@ extension WorldRenderingTests {
                 dampingShift: 6,
                 elements: [
                     .init(
-                        kind: .heightBlob,
-                        frequency: 0,
-                        speed: 29,
-                        size: 1,
-                        x1: 64,
-                        y1: 64,
-                        x2: 0,
-                        y2: 0
+                        kind: .heightBlob, frequency: 0, speed: 29, size: 1,
+                        x1: 64, y1: 64, x2: 0, y2: 0
                     ),
                 ]
             )
@@ -308,15 +284,12 @@ extension WorldRenderingTests {
     func testTraversesTheTwoAlignedRenderedPortalsAndStopsAtRoomOne() throws {
         let level = makeSelectedRoomRenderLevel()
         let camera = RoomCamera(
-            position: .zero,
-            target: .init(x: 0, y: 1, z: 0),
+            position: .zero, target: .init(x: 0, y: 1, z: 0),
             up: .init(x: 0, y: 0, z: 1)
         )
 
         let extraction = try extractWorldForRendering(
-            level,
-            camera: camera,
-            startRoomSourceIndex: 3
+            level, camera: camera, startRoomSourceIndex: 3
         )
 
         XCTAssertEqual(extraction.visibleRoomSourceIndices, [3, 2, 1])
@@ -347,14 +320,11 @@ extension WorldRenderingTests {
         try level.validate()
 
         let extraction = try extractWorldForRendering(
-            level,
-            camera: .trainingRoom3,
-            startRoomSourceIndex: 3
+            level, camera: .trainingRoom3, startRoomSourceIndex: 3
         )
 
         XCTAssertEqual(
-            extraction.admittedObjectHandles,
-            [18_441, 2_048, 12_300, 6_147]
+            extraction.admittedObjectHandles, [18_441, 2_048, 12_300, 6_147]
         )
         XCTAssertEqual(
             Set(extraction.modelDrawItems.map(\.objectHandle)),
@@ -396,8 +366,7 @@ extension WorldRenderingTests {
             Vector3(x: 2_063.4604, y: -230.09009, z: 2_202.0276),
         ]
         for (actual, expected) in zip(
-            facing.vertices.map(\.position),
-            expectedFacingPositions
+            facing.vertices.map(\.position), expectedFacingPositions
         ) {
             XCTAssertEqual(actual.x, expected.x, accuracy: 0.000_1)
             XCTAssertEqual(actual.y, expected.y, accuracy: 0.000_1)
@@ -409,9 +378,7 @@ extension WorldRenderingTests {
                 && $0.vertices.count == 3
         })
         let rotating = try extractWorldForRendering(
-            level,
-            camera: .trainingRoom3,
-            startRoomSourceIndex: 3,
+            level, camera: .trainingRoom3, startRoomSourceIndex: 3,
             presentationGameTime: 0.25
         )
         let rotated = try XCTUnwrap(
@@ -420,14 +387,10 @@ extension WorldRenderingTests {
             }
         )
         XCTAssertEqual(
-            rotated.vertices[0].position.x,
-            2_064.0604,
-            accuracy: 0.001
+            rotated.vertices[0].position.x, 2_064.0604, accuracy: 0.001
         )
         XCTAssertEqual(
-            rotated.vertices[0].position.z,
-            2_208.0276,
-            accuracy: 0.001
+            rotated.vertices[0].position.z, 2_208.0276, accuracy: 0.001
         )
     }
 }

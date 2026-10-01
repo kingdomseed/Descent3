@@ -1,5 +1,9 @@
 import XCTest
 
+// The synthetic render levels: the room 3 camera, the corona level, the
+// containment shells, and the Slice 6 object level the other fixtures
+// build on.
+
 extension RoomCamera {
     /// The Training room 3 reference view the fixtures render from.
     static let trainingRoom3 = RoomCamera(
@@ -9,31 +13,24 @@ extension RoomCamera {
     )
 }
 
-final class WorldRenderingTests: XCTestCase {}
-
 extension Array {
     var only: Element? { count == 1 ? self[0] : nil }
 }
 
 func makeCoronaEvaluationLevel(
-    blocked: Bool = false,
-    objectBlocked: Bool = false,
+    blocked: Bool = false, objectBlocked: Bool = false,
     objectPresentationVisible: Bool = true
 ) -> Level {
     let base = makeMinimalCanonicalLevel()
     let light = SourceResource(storedIndex: 1, sourceName: "light")
     let blocker = SourceResource(storedIndex: 2, sourceName: "blocker")
     let candidateVertices = [
-        Vector3(x: -1, y: 21, z: -1),
-        Vector3(x: 1, y: 21, z: -1),
-        Vector3(x: 1, y: 21, z: 1),
-        Vector3(x: -1, y: 21, z: 1),
+        Vector3(x: -1, y: 21, z: -1), Vector3(x: 1, y: 21, z: -1),
+        Vector3(x: 1, y: 21, z: 1), Vector3(x: -1, y: 21, z: 1),
     ]
     let blockerVertices = [
-        Vector3(x: -5, y: 10, z: -5),
-        Vector3(x: 5, y: 10, z: -5),
-        Vector3(x: 5, y: 10, z: 5),
-        Vector3(x: -5, y: 10, z: 5),
+        Vector3(x: -5, y: 10, z: -5), Vector3(x: 5, y: 10, z: -5),
+        Vector3(x: 5, y: 10, z: 5), Vector3(x: -5, y: 10, z: 5),
     ]
     let corners = [
         FaceCorner(vertexIndex: 0, u: 0, v: 0, alpha: 255),
@@ -43,10 +40,7 @@ func makeCoronaEvaluationLevel(
     ]
     var faces = [
         LevelFace(
-            corners: corners,
-            flags: 0,
-            portalIndex: nil,
-            texture: light,
+            corners: corners, flags: 0, portalIndex: nil, texture: light,
             allowsLightCorona: true
         ),
     ]
@@ -56,9 +50,7 @@ func makeCoronaEvaluationLevel(
             LevelFace(
                 corners: corners.map {
                     FaceCorner(
-                        vertexIndex: $0.vertexIndex + 4,
-                        u: $0.u,
-                        v: $0.v,
+                        vertexIndex: $0.vertexIndex + 4, u: $0.u, v: $0.v,
                         alpha: $0.alpha
                     )
                 },
@@ -71,20 +63,17 @@ func makeCoronaEvaluationLevel(
             .init(flags: 1, faceIndex: 1, connectedRoom: 4, connectedPortal: 0)
         )
     }
+
     let room3 = LevelRoom(
-        sourceIndex: 3,
-        vertices: candidateVertices + blockerVertices,
-        faces: faces,
-        portals: portals
+        sourceIndex: 3, vertices: candidateVertices + blockerVertices,
+        faces: faces, portals: portals
     )
     let room4 = LevelRoom(
         sourceIndex: 4,
         vertices: blockerVertices,
         faces: blocked ? [
             .init(
-                corners: Array(corners.reversed()),
-                flags: 0,
-                portalIndex: 0,
+                corners: Array(corners.reversed()), flags: 0, portalIndex: 0,
                 texture: blocker
             ),
         ] : [],
@@ -93,29 +82,16 @@ func makeCoronaEvaluationLevel(
         ] : []
     )
     let blockerModelSource = SourceResource(storedIndex: 3, sourceName: "blocker.oof")
-    let blockerObject = PlacedObject(
+    let blockerObject = PlacedObject.fixture(
         handle: 99,
         type: 2,
         storedID: 0,
-        definition: nil,
-        instanceName: nil,
-        flags: 0,
-        doorShields: nil,
         location: .room(3),
         position: .init(x: 0, y: 10, z: 0),
         orientation: .init(
-            right: .init(x: 1, y: 0, z: 0),
-            up: .init(x: 0, y: 1, z: 0),
+            right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 1, z: 0),
             forward: .init(x: 0, y: 0, z: 1)
-        ),
-        containsType: 0,
-        containsID: 0,
-        containsCount: 0,
-        lifeLeft: 0,
-        soundSource: nil,
-        inertScriptName: nil,
-        inertModuleName: nil,
-        lightmapSubmodels: []
+        )
     )
     let blockerModel = CanonicalModel(
         source: blockerModelSource,
@@ -135,8 +111,7 @@ func makeCoronaEvaluationLevel(
             ),
         ],
         bounds: .init(
-            minimum: .init(x: -2, y: 0, z: -2),
-            maximum: .init(x: 2, y: 0, z: 2)
+            minimum: .init(x: -2, y: 0, z: -2), maximum: .init(x: 2, y: 0, z: 2)
         ),
         sourceArchive: "test.hog",
         sourceSHA256: String(repeating: "d", count: 64)
@@ -163,20 +138,16 @@ func makeCoronaEvaluationLevel(
                 lightmapBlend: .none,
                 waterProcedural: nil,
                 lightCorona: .init(
-                    assetIndex: 0,
-                    tint: .init(x: 0.25, y: 0.5, z: 0.75),
+                    assetIndex: 0, tint: .init(x: 0.25, y: 0.5, z: 0.75),
                     blend: .additiveSourceAlpha(opacity: 102)
                 ),
                 sourceArchive: "test.hog",
                 sourceSHA256: String(repeating: "a", count: 64)
             ),
             .init(
-                texture: blocker,
-                bitmapSourceName: "blocker.ogf",
+                texture: blocker, bitmapSourceName: "blocker.ogf",
                 image: .init(width: 1, height: 1, rgba8: Data([255, 255, 255, 255])),
-                blend: .opaque,
-                lightmapBlend: .none,
-                waterProcedural: nil,
+                blend: .opaque, lightmapBlend: .none, waterProcedural: nil,
                 sourceArchive: "test.hog",
                 sourceSHA256: String(repeating: "b", count: 64)
             ),
@@ -192,14 +163,8 @@ func makeCoronaEvaluationLevel(
         ],
         models: objectBlocked ? [blockerModel] : [],
         objectPresentations: objectBlocked ? [
-            .init(
-                objectHandle: blockerObject.handle,
-                primaryModel: blockerModelSource,
-                mediumModel: nil,
-                lowModel: nil,
-                dyingModel: nil,
-                mediumDistance: nil,
-                lowDistance: nil,
+            .fixture(
+                blockerObject.handle, blockerModelSource,
                 isVisible: objectPresentationVisible
             ),
         ] : [],
@@ -209,50 +174,40 @@ func makeCoronaEvaluationLevel(
 }
 
 func makeSourceContainmentRoom(
-    center: Vector3,
-    texture: SourceResource,
-    sourceIndex: Int = 3,
+    center: Vector3, texture: SourceResource, sourceIndex: Int = 3,
     halfExtent: Float = 1
 ) -> LevelRoom {
     let vertices = [
         Vector3(
-            x: center.x - halfExtent,
-            y: center.y - halfExtent,
+            x: center.x - halfExtent, y: center.y - halfExtent,
             z: center.z - halfExtent
         ),
         Vector3(
-            x: center.x + halfExtent,
-            y: center.y - halfExtent,
+            x: center.x + halfExtent, y: center.y - halfExtent,
             z: center.z - halfExtent
         ),
         Vector3(
-            x: center.x + halfExtent,
-            y: center.y + halfExtent,
+            x: center.x + halfExtent, y: center.y + halfExtent,
             z: center.z - halfExtent
         ),
         Vector3(
-            x: center.x - halfExtent,
-            y: center.y + halfExtent,
+            x: center.x - halfExtent, y: center.y + halfExtent,
             z: center.z - halfExtent
         ),
         Vector3(
-            x: center.x - halfExtent,
-            y: center.y - halfExtent,
+            x: center.x - halfExtent, y: center.y - halfExtent,
             z: center.z + halfExtent
         ),
         Vector3(
-            x: center.x + halfExtent,
-            y: center.y - halfExtent,
+            x: center.x + halfExtent, y: center.y - halfExtent,
             z: center.z + halfExtent
         ),
         Vector3(
-            x: center.x + halfExtent,
-            y: center.y + halfExtent,
+            x: center.x + halfExtent, y: center.y + halfExtent,
             z: center.z + halfExtent
         ),
         Vector3(
-            x: center.x - halfExtent,
-            y: center.y + halfExtent,
+            x: center.x - halfExtent, y: center.y + halfExtent,
             z: center.z + halfExtent
         ),
     ]
@@ -261,8 +216,7 @@ func makeSourceContainmentRoom(
             corners: indices.enumerated().map { index, vertexIndex in
                 FaceCorner(
                     vertexIndex: vertexIndex,
-                    u: index == 1 || index == 2 ? 1 : 0,
-                    v: index >= 2 ? 1 : 0,
+                    u: index == 1 || index == 2 ? 1 : 0, v: index >= 2 ? 1 : 0,
                     alpha: 255
                 )
             },
@@ -275,27 +229,19 @@ func makeSourceContainmentRoom(
         sourceIndex: sourceIndex,
         vertices: vertices,
         faces: [
-            face([0, 3, 7, 4]),
-            face([1, 5, 6, 2]),
-            face([0, 4, 5, 1]),
-            face([3, 2, 6, 7]),
-            face([0, 1, 2, 3]),
-            face([4, 7, 6, 5]),
+            face([0, 3, 7, 4]), face([1, 5, 6, 2]), face([0, 4, 5, 1]),
+            face([3, 2, 6, 7]), face([0, 1, 2, 3]), face([4, 7, 6, 5]),
         ],
         portals: []
     )
 }
 
 func addingSourceContainmentShell(
-    to room: LevelRoom,
-    center: Vector3,
-    texture: SourceResource,
+    to room: LevelRoom, center: Vector3, texture: SourceResource,
     halfExtent: Float
 ) -> LevelRoom {
     let shell = makeSourceContainmentRoom(
-        center: center,
-        texture: texture,
-        sourceIndex: room.sourceIndex,
+        center: center, texture: texture, sourceIndex: room.sourceIndex,
         halfExtent: halfExtent
     )
     let vertexOffset = room.vertices.count
@@ -303,10 +249,8 @@ func addingSourceContainmentShell(
         LevelFace(
             corners: face.corners.map {
                 .init(
-                    vertexIndex: $0.vertexIndex + vertexOffset,
-                    u: $0.u,
-                    v: $0.v,
-                    alpha: $0.alpha
+                    vertexIndex: $0.vertexIndex + vertexOffset, u: $0.u,
+                    v: $0.v, alpha: $0.alpha
                 )
             },
             flags: face.flags,
@@ -314,24 +258,9 @@ func addingSourceContainmentShell(
             texture: face.texture
         )
     }
-    return LevelRoom(
-        sourceIndex: room.sourceIndex,
-        name: room.name,
-        pathPoint: room.pathPoint,
-        vertices: room.vertices + shell.vertices,
-        faces: room.faces + shellFaces,
-        portals: room.portals,
-        flags: room.flags,
-        pulseTime: room.pulseTime,
-        pulseOffset: room.pulseOffset,
-        mirrorFaceIndex: room.mirrorFaceIndex,
-        door: room.door,
-        volumeLights: room.volumeLights,
-        fog: room.fog,
-        ambientSoundPattern: room.ambientSoundPattern,
-        reverb: room.reverb,
-        damage: room.damage,
-        damageType: room.damageType
+    return replacing(
+        room, vertices: room.vertices + shell.vertices,
+        faces: room.faces + shellFaces
     )
 }
 
@@ -351,14 +280,8 @@ func alienForceFieldWaterDefinition() -> WaterProceduralDefinition {
         dampingShift: 6,
         elements: raw.map {
             WaterProceduralElement(
-                kind: $0.0,
-                frequency: $0.1,
-                speed: $0.2,
-                size: $0.3,
-                x1: $0.4,
-                y1: $0.5,
-                x2: $0.6,
-                y2: $0.7
+                kind: $0.0, frequency: $0.1, speed: $0.2, size: $0.3, x1: $0.4,
+                y1: $0.5, x2: $0.6, y2: $0.7
             )
         }
     )
@@ -376,34 +299,25 @@ func makeSelectedRoomRenderLevel() -> Level {
     ]
     let reversedQuad = [quad[3], quad[2], quad[1], quad[0]]
     let forwardVertices = [
-        Vector3(x: 1, y: 2, z: 1),
-        Vector3(x: -1, y: 2, z: 1),
-        Vector3(x: -1, y: 2, z: -1),
-        Vector3(x: 1, y: 2, z: -1),
-        Vector3(x: 0.5, y: 4, z: 0.5),
-        Vector3(x: -0.5, y: 4, z: 0.5),
-        Vector3(x: -0.5, y: 4, z: -0.5),
-        Vector3(x: 0.5, y: 4, z: -0.5),
-        Vector3(x: 0.5, y: 6, z: 0.5),
-        Vector3(x: -0.5, y: 6, z: 0.5),
-        Vector3(x: -0.5, y: 6, z: -0.5),
-        Vector3(x: 0.5, y: 6, z: -0.5),
-        Vector3(x: 1, y: -2, z: 1),
-        Vector3(x: -1, y: -2, z: 1),
-        Vector3(x: -1, y: -2, z: -1),
-        Vector3(x: 1, y: -2, z: -1),
+        Vector3(x: 1, y: 2, z: 1), Vector3(x: -1, y: 2, z: 1),
+        Vector3(x: -1, y: 2, z: -1), Vector3(x: 1, y: 2, z: -1),
+        Vector3(x: 0.5, y: 4, z: 0.5), Vector3(x: -0.5, y: 4, z: 0.5),
+        Vector3(x: -0.5, y: 4, z: -0.5), Vector3(x: 0.5, y: 4, z: -0.5),
+        Vector3(x: 0.5, y: 6, z: 0.5), Vector3(x: -0.5, y: 6, z: 0.5),
+        Vector3(x: -0.5, y: 6, z: -0.5), Vector3(x: 0.5, y: 6, z: -0.5),
+        Vector3(x: 1, y: -2, z: 1), Vector3(x: -1, y: -2, z: 1),
+        Vector3(x: -1, y: -2, z: -1), Vector3(x: 1, y: -2, z: -1),
     ]
     func corners(_ offset: Int, reversed: Bool = false) -> [FaceCorner] {
         let source = reversed ? reversedQuad : quad
         return source.map {
             FaceCorner(
-                vertexIndex: $0.vertexIndex + offset,
-                u: $0.u,
-                v: $0.v,
+                vertexIndex: $0.vertexIndex + offset, u: $0.u, v: $0.v,
                 alpha: $0.alpha
             )
         }
     }
+
     let room2 = LevelRoom(
         sourceIndex: 2,
         vertices: forwardVertices,
@@ -431,10 +345,8 @@ func makeSelectedRoomRenderLevel() -> Level {
     let room1 = LevelRoom(
         sourceIndex: 1,
         vertices: forwardVertices + [
-            Vector3(x: 12, y: 6, z: 0.5),
-            Vector3(x: 10, y: 6, z: 0.5),
-            Vector3(x: 10, y: 6, z: -0.5),
-            Vector3(x: 12, y: 6, z: -0.5),
+            Vector3(x: 12, y: 6, z: 0.5), Vector3(x: 10, y: 6, z: 0.5),
+            Vector3(x: 10, y: 6, z: -0.5), Vector3(x: 12, y: 6, z: -0.5),
         ],
         faces: [
             .init(corners: corners(4, reversed: true), flags: 0, portalIndex: 0, texture: forceField),
@@ -475,8 +387,7 @@ func makeSelectedRoomRenderLevel() -> Level {
                 texture: forceField,
                 bitmapSourceName: "force-field.ogf",
                 image: .init(
-                    width: 128,
-                    height: 128,
+                    width: 128, height: 128,
                     rgba8: Data(repeating: 255, count: 128 * 128 * 4)
                 ),
                 blend: .additiveSourceAlpha(opacity: 178),
@@ -489,9 +400,7 @@ func makeSelectedRoomRenderLevel() -> Level {
                 texture: wall,
                 bitmapSourceName: "wall.ogf",
                 image: .init(
-                    width: 2,
-                    height: 2,
-                    rgba8: Data(repeating: 255, count: 16)
+                    width: 2, height: 2, rgba8: Data(repeating: 255, count: 16)
                 ),
                 blend: .opaque,
                 lightmapBlend: .multiply,
@@ -503,10 +412,8 @@ func makeSelectedRoomRenderLevel() -> Level {
         dependencyManifest: .init(
             current: [
                 .init(
-                    category: "texture",
-                    source: wall,
-                    state: "presentation-payload-imported",
-                    provenance: "test"
+                    category: "texture", source: wall,
+                    state: "presentation-payload-imported", provenance: "test"
                 ),
                 .init(category: "texture", source: forceField, state: "presentation-payload-imported", provenance: "test"),
             ],
@@ -521,32 +428,18 @@ func makeSliceSixObjectRenderLevel() -> Level {
     let cameraOrigin = RoomCamera.trainingRoom3.position
     func translated(_ point: Vector3) -> Vector3 {
         .init(
-            x: point.x + cameraOrigin.x,
-            y: point.y + cameraOrigin.y,
+            x: point.x + cameraOrigin.x, y: point.y + cameraOrigin.y,
             z: point.z + cameraOrigin.z
         )
     }
+
     let rooms = base.rooms.map { room in
-        LevelRoom(
-            sourceIndex: room.sourceIndex,
-            name: room.name,
-            pathPoint: translated(room.pathPoint),
-            vertices: room.vertices.map(translated),
-            faces: room.faces,
-            portals: room.portals,
-            flags: room.flags,
-            pulseTime: room.pulseTime,
-            pulseOffset: room.pulseOffset,
-            mirrorFaceIndex: room.mirrorFaceIndex,
-            door: room.door,
-            volumeLights: room.volumeLights,
-            fog: room.fog,
-            ambientSoundPattern: room.ambientSoundPattern,
-            reverb: room.reverb,
-            damage: room.damage,
-            damageType: room.damageType
+        replacing(
+            room, pathPoint: translated(room.pathPoint),
+            vertices: room.vertices.map(translated)
         )
     }
+
     let modelTexture = SourceResource(storedIndex: 50, sourceName: "model-surface")
     let modelSources = [
         SourceResource(storedIndex: 0, sourceName: "PyroGL.OOF"),
@@ -557,18 +450,9 @@ func makeSliceSixObjectRenderLevel() -> Level {
     ]
     let shipSource = SourceResource(storedIndex: 0, sourceName: "Pyro-GL")
     let modelVertices = [
-        ModelVertex(
-            position: .init(x: -5, y: 0, z: -0.4),
-            alpha: 1
-        ),
-        ModelVertex(
-            position: .init(x: 5, y: 0, z: -0.4),
-            alpha: 1
-        ),
-        ModelVertex(
-            position: .init(x: 0, y: 0, z: 0.4),
-            alpha: 1
-        ),
+        ModelVertex(position: .init(x: -5, y: 0, z: -0.4), alpha: 1),
+        ModelVertex(position: .init(x: 5, y: 0, z: -0.4), alpha: 1),
+        ModelVertex(position: .init(x: 0, y: 0, z: 0.4), alpha: 1),
     ]
     let modelCorners = [
         ModelFaceCorner(vertexIndex: 0, u: 0, v: 0),
@@ -602,11 +486,8 @@ func makeSliceSixObjectRenderLevel() -> Level {
                     presentation: .standard
                 ),
                 .init(
-                    sourceIndex: 1,
-                    parentIndex: nil,
-                    offset: .init(x: 3, y: 0, z: 0),
-                    vertices: [],
-                    faces: [],
+                    sourceIndex: 1, parentIndex: nil,
+                    offset: .init(x: 3, y: 0, z: 0), vertices: [], faces: [],
                     presentation: .standard
                 ),
                 .init(
@@ -650,8 +531,7 @@ func makeSliceSixObjectRenderLevel() -> Level {
                         ),
                     ],
                     presentation: .rotate(
-                        rate: 1,
-                        axis: .init(x: 0, y: 1, z: 0)
+                        rate: 1, axis: .init(x: 0, y: 1, z: 0)
                     )
                 ),
             ],
@@ -663,44 +543,25 @@ func makeSliceSixObjectRenderLevel() -> Level {
             sourceSHA256: String(repeating: "e", count: 64)
         )
     }
+
     let identity = Matrix3(
-        right: .init(x: 1, y: 0, z: 0),
-        up: .init(x: 0, y: 1, z: 0),
+        right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 1, z: 0),
         forward: .init(x: 0, y: 0, z: 1)
     )
     let invisibleDefinition = SourceResource(
-        storedIndex: 67,
-        sourceName: "Invisiblepowerup"
+        storedIndex: 67, sourceName: "Invisiblepowerup"
     )
     func object(
-        handle: UInt32,
-        type: UInt8,
-        storedID: Int,
-        name: String?,
-        room: Int,
+        handle: UInt32, type: UInt8, storedID: Int, name: String?, room: Int,
         position: Vector3
     ) -> PlacedObject {
-        PlacedObject(
-            handle: handle,
-            type: type,
-            storedID: storedID,
-            definition: type == 7 ? invisibleDefinition : nil,
-            instanceName: name,
-            flags: 0,
-            doorShields: nil,
-            location: .room(room),
-            position: position,
-            orientation: identity,
-            containsType: 0,
-            containsID: 0,
-            containsCount: 0,
-            lifeLeft: 0,
-            soundSource: nil,
-            inertScriptName: nil,
-            inertModuleName: nil,
-            lightmapSubmodels: []
+        PlacedObject.fixture(
+            handle: handle, type: type, storedID: storedID,
+            definition: type == 7 ? invisibleDefinition : nil, name: name,
+            location: .room(room), position: position, orientation: identity
         )
     }
+
     let objects = [
         object(handle: 2_048, type: 4, storedID: 0, name: nil, room: 1,
                position: .init(x: 2_060.6497, y: -131.22517, z: 2_204.4216)),
@@ -718,69 +579,47 @@ func makeSliceSixObjectRenderLevel() -> Level {
                position: .init(x: 2_060.4836, y: -131.22517, z: 2_310.928)),
     ]
     let pyroPresentation = ObjectPresentationReference(
-        objectHandle: 2_048,
-        primaryModel: modelSources[0],
-        mediumModel: modelSources[1],
-        lowModel: modelSources[2],
-        dyingModel: modelSources[3],
-        mediumDistance: 75,
-        lowDistance: 100
+        objectHandle: 2_048, primaryModel: modelSources[0],
+        mediumModel: modelSources[1], lowModel: modelSources[2],
+        dyingModel: modelSources[3], mediumDistance: 75, lowDistance: 100
     )
     let objectPresentations = [pyroPresentation,
         .init(
-            objectHandle: 2_052,
-            primaryModel: modelSources[0],
-            mediumModel: modelSources[1],
-            lowModel: modelSources[2],
-            dyingModel: modelSources[3],
-            mediumDistance: 75,
-            lowDistance: 100
+            objectHandle: 2_052, primaryModel: modelSources[0],
+            mediumModel: modelSources[1], lowModel: modelSources[2],
+            dyingModel: modelSources[3], mediumDistance: 75, lowDistance: 100
         ),
     ] + objects.filter { $0.type == 7 }.map {
-        ObjectPresentationReference(
-            objectHandle: $0.handle,
-            primaryModel: modelSources[4],
-            mediumModel: nil,
-            lowModel: nil,
-            dyingModel: nil,
-            mediumDistance: nil,
-            lowDistance: nil
-        )
+        ObjectPresentationReference.fixture($0.handle, modelSources[4])
     }
+
     let modelMaterial = PresentationMaterial(
-        texture: modelTexture,
-        bitmapSourceName: "model-surface.ogf",
+        texture: modelTexture, bitmapSourceName: "model-surface.ogf",
         image: .init(width: 1, height: 1, rgba8: Data([255, 255, 255, 128])),
-        blend: .sourceAlpha(opacity: 255),
-        lightmapBlend: .none,
+        blend: .sourceAlpha(opacity: 255), lightmapBlend: .none,
         waterProcedural: nil,
         sourceArchive: base.source.profileFiles[0].relativePath,
         sourceSHA256: String(repeating: "f", count: 64)
     )
     let dependencies = base.dependencyManifest.current + [
         DependencyRecord(
-            category: "object-definition",
-            source: invisibleDefinition,
-            state: "identity-recorded",
-            provenance: "synthetic Slice 6 fixture"
+            category: "object-definition", source: invisibleDefinition,
+            state: "identity-recorded", provenance: "synthetic Slice 6 fixture"
         ),
         DependencyRecord(
-            category: "texture",
-            source: modelTexture,
+            category: "texture", source: modelTexture,
             state: "presentation-payload-imported",
             provenance: "synthetic Slice 6 fixture"
         ),
     ] + modelSources.map {
         DependencyRecord(
-            category: "model",
-            source: $0,
+            category: "model", source: $0,
             state: "presentation-payload-imported",
             provenance: "synthetic Slice 6 fixture"
         )
     } + [
         DependencyRecord(
-            category: "ship-definition",
-            source: shipSource,
+            category: "ship-definition", source: shipSource,
             state: "canonical-typed-definition",
             provenance: "synthetic Slice 9 fixture"
         ),
@@ -790,21 +629,13 @@ func makeSliceSixObjectRenderLevel() -> Level {
         primaryModel: modelSources[0],
         presentationSize: 6.676084041595459,
         physics: .init(
-            mass: 30,
-            drag: 90,
-            fullThrust: 5_400,
-            behaviors: [.turnroll, .wiggle, .usesThrust],
-            rotationalDrag: 225,
-            fullRotationalThrust: 6_860_000,
-            numberOfBounces: -1,
-            initialForwardVelocity: 0,
-            initialAngularVelocity: .zero,
-            wiggleAmplitude: 0.17,
-            wigglesPerSecond: 0.9,
-            coefficientOfRestitution: 1,
-            hitDieDot: -1,
-            maximumTurnrollRate: 8_000,
-            turnrollRatio: 0.13
+            mass: 30, drag: 90, fullThrust: 5_400,
+            behaviors: [.turnroll, .wiggle, .usesThrust], rotationalDrag: 225,
+            fullRotationalThrust: 6_860_000, numberOfBounces: -1,
+            initialForwardVelocity: 0, initialAngularVelocity: .zero,
+            wiggleAmplitude: 0.17, wigglesPerSecond: 0.9,
+            coefficientOfRestitution: 1, hitDieDot: -1,
+            maximumTurnrollRate: 8_000, turnrollRatio: 0.13
         )
     )
     return Level(
@@ -825,37 +656,32 @@ func makeSliceSixObjectRenderLevel() -> Level {
         models: models,
         shipDefinitions: [ship],
         defaultPlayerBinding: .init(
-            playerID: 0,
-            objectHandle: 2_048,
-            ship: shipSource
+            playerID: 0, objectHandle: 2_048, ship: shipSource
         ),
         objectPresentations: objectPresentations,
         dependencyManifest: .init(
-            current: dependencies,
-            historicalEagerBaseline: nil
+            current: dependencies, historicalEagerBaseline: nil
         ),
         sourceChunks: base.sourceChunks
     )
 }
 
 func makeFastPlayerHeadlightLevel(
-    includesVisibleObject: Bool = true,
-    halfExtent: Float = 400
+    includesVisibleObject: Bool = true, halfExtent: Float = 400
 ) -> Level {
     var level = makeSliceSixObjectRenderLevel()
     let player = level.objects.first { $0.handle == 2_048 }!
     level.rooms = [
         makeSourceContainmentRoom(
-            center: player.position,
-            texture: level.surfacePhysics[0].texture,
-            sourceIndex: 1,
-            halfExtent: halfExtent
+            center: player.position, texture: level.surfacePhysics[0].texture,
+            sourceIndex: 1, halfExtent: halfExtent
         ),
     ]
     level.objects.removeAll {
         $0.handle != 2_048
             && (!includesVisibleObject || $0.handle != 12_301)
     }
+
     let retainedHandles = Set(level.objects.map(\.handle))
     level.objectPresentations.removeAll {
         !retainedHandles.contains($0.objectHandle)

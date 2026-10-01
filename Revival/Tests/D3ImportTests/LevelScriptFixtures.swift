@@ -47,13 +47,12 @@ let fixtureTrainingMessages = [
     ("GBExtra", "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns."),
 ].map { LevelScriptMessage(name: $0.0, text: $0.1) }
 
-/// The level with Training script data (package schema 12), so the world
+/// The level with Training script data (package schema 13), so the world
 /// loads the Training level module. Every scriptable object gets a binding,
 /// as D3Import writes one. The level keeps every other field. It validates
 /// only when the level holds the clips the Training module names.
 func addingTrainingMissionScripting(
-    _ level: Level,
-    messages: [LevelScriptMessage] = fixtureTrainingMessages
+    _ level: Level, messages: [LevelScriptMessage] = fixtureTrainingMessages
 ) -> Level {
     var level = withTrainingStreamPadding(level)
     // Silent clips for the module's sounds the level lacks.
@@ -63,18 +62,10 @@ func addingTrainingMissionScripting(
             !level.soundClips.contains { $0.logicalName == name }
         }
         .map { offset, name in
-            CanonicalSoundClip(
-                logicalName: name,
-                sourceName: "\(name) padding.wav",
-                sourceEntryIndex: 30_000 + offset,
-                sampleRate: 22_050,
-                channelCount: 1,
-                frameCount: 1,
-                pcm16LittleEndian: pcm,
-                pcmSHA256: canonicalSHA256(pcm),
-                sourceArchive: "missions/training.mn3",
-                sourceSHA256: String(repeating: "b", count: 64),
-                importVolume: 1
+            CanonicalSoundClip.silent(
+                logicalName: name, sourceName: "\(name) padding.wav",
+                index: 30_000 + offset,
+                sourceSHA256: String(repeating: "b", count: 64)
             )
         }
     if !missingSounds.isEmpty {
@@ -99,6 +90,7 @@ func addingTrainingMissionScripting(
             )
         )
     }
+
     let bindings = level.objects
         .filter { LevelScripting.scriptableObjectTypes.contains($0.type) }
         .map { object in
@@ -147,6 +139,7 @@ func withTrainingStreamPadding(_ level: Level) -> Level {
         record.category == "voice"
             && record.provenance.hasSuffix(paddingClipSHA256)
     }
+
     let kept = level.voiceClips.filter { $0.sourceSHA256 != paddingClipSHA256 }
     let keptDependencies = level.dependencyManifest.current.filter {
         !isPadding($0)
@@ -159,12 +152,12 @@ func withTrainingStreamPadding(_ level: Level) -> Level {
     let padding = fixtureTrainingStreamClips(excluding: kept).filter {
         !recordedVoices.contains($0.sourceName)
     }
+
     let dependencies = keptDependencies + padding.map {
         DependencyRecord(
             category: "voice",
             source: .init(
-                storedIndex: $0.sourceEntryIndex,
-                sourceName: $0.sourceName
+                storedIndex: $0.sourceEntryIndex, sourceName: $0.sourceName
             ),
             state: "canonical-pcm-imported",
             provenance: "\($0.sourceArchive) \($0.sourceSHA256)"
@@ -194,37 +187,21 @@ private func fixtureTrainingStreamClips(
         .filter { !present.contains($0) }
         .enumerated()
         .map { offset, name in
-            CanonicalVoiceClip(
-                sourceName: name,
-                sourceEntryIndex: 900 + offset,
-                sampleRate: 22_050,
-                channelCount: 1,
-                frameCount: 1,
-                pcm16LittleEndian: pcm,
-                pcmSHA256: canonicalSHA256(pcm),
-                sourceArchive: "missions/training.mn3",
-                sourceSHA256: paddingClipSHA256
+            CanonicalVoiceClip.silent(
+                name, index: 900 + offset, sourceSHA256: paddingClipSHA256
             )
         }
 }
 
 /// A copy of a placed object with another name.
 func renamed(_ object: PlacedObject, _ name: String?) -> PlacedObject {
-    PlacedObject(
-        handle: object.handle,
-        type: object.type,
-        storedID: object.storedID,
-        definition: object.definition,
-        instanceName: name,
-        flags: object.flags,
-        doorShields: object.doorShields,
-        location: object.location,
-        position: object.position,
-        orientation: object.orientation,
-        containsType: object.containsType,
-        containsID: object.containsID,
-        containsCount: object.containsCount,
-        lifeLeft: object.lifeLeft,
+    PlacedObject.fixture(
+        handle: object.handle, type: object.type, storedID: object.storedID,
+        definition: object.definition, name: name, flags: object.flags,
+        doorShields: object.doorShields, location: object.location,
+        position: object.position, orientation: object.orientation,
+        containsType: object.containsType, containsID: object.containsID,
+        containsCount: object.containsCount, lifeLeft: object.lifeLeft,
         soundSource: object.soundSource,
         inertScriptName: object.inertScriptName,
         inertModuleName: object.inertModuleName,
@@ -235,8 +212,7 @@ func renamed(_ object: PlacedObject, _ name: String?) -> PlacedObject {
 /// The world with its Training action counters changed, as a script that
 /// already ran leaves them.
 func settingTrainingCounters(
-    _ world: GameWorld,
-    _ change: (inout TrainingMissionState) -> Void
+    _ world: GameWorld, _ change: (inout TrainingMissionState) -> Void
 ) -> GameWorld {
     var world = world
     var state = world.testTrainingMission!
@@ -258,8 +234,7 @@ extension GameWorld {
 /// Moves every pending Osiris timer in a test world object to Gametime
 /// `time`, so a test that starts mid-lesson does not see Script 002.
 func deferringOsirisTimers(
-    _ object: inout [String: Any],
-    to time: Float
+    _ object: inout [String: Any], to time: Float
 ) throws {
     var timers = try XCTUnwrap(object["osirisTimers"] as? [String: Any])
     var entries = try XCTUnwrap(timers["entries"] as? [[String: Any]])
@@ -345,8 +320,7 @@ extension GameSession {
     /// goal at rest use it: a move that does not close in hits nothing.
     func collidePlayer(with name: String) {
         world.collideTwoObjects(
-            world.testPlayerObject.handle,
-            level.findObjectName(name),
+            world.testPlayerObject.handle, level.findObjectName(name),
             level: level
         )
     }
@@ -355,14 +329,10 @@ extension GameSession {
 /// Sets one Training action counter in a test world object, as a script
 /// that already ran leaves it.
 func setTrainingCounter(
-    _ object: inout [String: Any],
-    _ name: String,
-    _ value: Int
+    _ object: inout [String: Any], _ name: String, _ value: Int
 ) throws {
     var module = try XCTUnwrap(object["levelModule"] as? [String: Any])
-    var training = try XCTUnwrap(
-        module["trainingMission"] as? [String: Any]
-    )
+    var training = try XCTUnwrap(module["trainingMission"] as? [String: Any])
     var state = try XCTUnwrap(training["_0"] as? [String: Any])
     state[name] = value
     training["_0"] = state
@@ -386,10 +356,8 @@ extension GameSession {
     func killRobotsAsPlayer(_ handles: [UInt32]) {
         for handle in handles {
             world.killObject(
-                ObjectHandle(handle),
-                killer: world.testPlayerObject.handle,
-                damage: 1,
-                level: level
+                ObjectHandle(handle), killer: world.testPlayerObject.handle,
+                damage: 1, level: level
             )
         }
     }
@@ -424,8 +392,7 @@ extension Level {
             triggerRoomSourceIndex: trigger.roomIndex,
             triggerFaceIndex: trigger.faceIndex,
             barrierRoomSourceIndex: trigger.roomIndex,
-            orderedPortalIndices: [1, 0],
-            markerLightObjectHandle: marker.handle
+            orderedPortalIndices: [1, 0], markerLightObjectHandle: marker.handle
         )
     }
 }
@@ -434,23 +401,19 @@ extension GameSession {
     /// The world Script 036 leaves when DestroyBot2 dies
     /// (TrainingMission.cpp:2040-2046), for an unscripted fixture: the robot
     /// is gone, FlashLight-2 is lit, the gallery barrier is open, and every
-    /// control is on. The scripted path is TrainingRobotScriptTests.
+    /// control is on. The scripted path is in TrainingMissionScriptTests+Robots.
     func applyTrainingScript036Outcome() {
         world.objects.delete(ObjectHandle(4_112))
         if let barrier = level.trainingGalleryBarrier {
             world.setObjectLightDistance(
-                ObjectHandle(barrier.markerLightObjectHandle),
-                50
+                ObjectHandle(barrier.markerLightObjectHandle), 50
             )
         }
         if let barrier = level.trainingGalleryBarrier {
             for portal in barrier.orderedPortalIndices {
                 world.setPortalRender(
-                    room: barrier.barrierRoomSourceIndex,
-                    portal: portal,
-                    state: false,
-                    doubleSided: true,
-                    level: level
+                    room: barrier.barrierRoomSourceIndex, portal: portal,
+                    state: false, doubleSided: true, level: level
                 )
             }
         }
@@ -477,15 +440,8 @@ extension GameSession {
 /// whose default script is GenericScript.
 func fixtureGenericPowerupInfo(_ name: String) -> CanonicalObjectInfo {
     var info = CanonicalObjectInfo(
-        name: name,
-        type: 7,
-        flags: 0x6,
-        size: 3,
-        hitPoints: 100,
-        lightDistance: 0,
-        lighting: fixtureNoLight,
-        ai: nil,
-        weaponBatteries: []
+        name: name, type: 7, flags: 0x6, size: 3, hitPoints: 100,
+        lightDistance: 0, lighting: fixtureNoLight, ai: nil, weaponBatteries: []
     )
     info.moduleName = GenericModule.moduleName
     return info
@@ -499,9 +455,7 @@ func withFixtureGameModules(_ level: Level) -> Level {
     if level.reachedGameModules.contains(GenericModule.moduleName),
        !modules.contains(where: { $0.module == GenericModule.moduleName }) {
         modules.append(.init(
-            module: GenericModule.moduleName,
-            strings: [],
-            sounds: []
+            module: GenericModule.moduleName, strings: [], sounds: []
         ))
     }
     level.gameModules = modules.sorted { $0.module < $1.module }
@@ -511,8 +465,7 @@ func withFixtureGameModules(_ level: Level) -> Level {
 /// The level with more voice and sound clips (the ones it lacks), and their
 /// dependency records.
 func addingFixtureAudio(
-    _ level: Level,
-    voiceClips: [CanonicalVoiceClip] = [],
+    _ level: Level, voiceClips: [CanonicalVoiceClip] = [],
     soundClips: [CanonicalSoundClip] = []
 ) -> Level {
     level.addingAudioClips(
@@ -531,8 +484,7 @@ func addingFixtureAudio(
 /// The level with "object-definition" dependency records for these pages,
 /// as D3Import records each placed object's definition.
 func addingFixtureObjectDefinitions(
-    _ level: Level,
-    _ definitions: [SourceResource]
+    _ level: Level, _ definitions: [SourceResource]
 ) -> Level {
     let added = definitions.filter { source in
         !level.dependencyManifest.current.contains {
@@ -540,8 +492,7 @@ func addingFixtureObjectDefinitions(
         }
     }.map {
         DependencyRecord(
-            category: "object-definition",
-            source: $0,
+            category: "object-definition", source: $0,
             state: "canonical-object-definition",
             provenance: "synthetic canonical fixture"
         )
@@ -565,4 +516,51 @@ extension GameSession {
         _ = touch("CameraMonitor", at: timestamp)
         return update(at: timestamp + 0.1, input: .init(usesInventory: true))
     }
+}
+
+/// A synthetic level as a package holds it (schema 13): the Training level
+/// script data, bound again to the level's objects.
+func packageLevel(_ level: Level) -> Level {
+    // Drop the audio records of clips a rebuilt level no longer holds, so
+    // the padding is added once.
+    let clipNames = Set(level.voiceClips.map { $0.sourceName.lowercased() })
+        .union(level.soundClips.map { $0.sourceName.lowercased() })
+    let records = level.dependencyManifest.current.filter {
+        !["voice", "sound"].contains($0.category)
+            || clipNames.contains($0.source.sourceName.lowercased())
+    }
+    return addingTrainingMissionScripting(
+        replacing(
+            level,
+            dependencyManifest: .init(
+                current: records,
+                historicalEagerBaseline:
+                    level.dependencyManifest.historicalEagerBaseline
+            )
+        ),
+        messages: level.scripting?.messages ?? fixtureTrainingMessages
+    )
+}
+
+extension GameSession {
+    /// Turns every player control on, as the Training lessons do: a package
+    /// level loads the Training module, whose Script 000 leaves only
+    /// forward on (TrainingMission.cpp:1461).
+    func enableAllPlayerControls() {
+        world.aToggleAllPlayerControls(1, 0, level: level)
+    }
+}
+
+/// The session as a save at this point leaves it: the world through JSON,
+/// resumed at `timestamp`.
+func restored(_ session: GameSession, at timestamp: Double) throws
+    -> GameSession
+{
+    try GameSession(
+        level: session.level,
+        world: JSONDecoder().decode(
+            GameWorld.self, from: JSONEncoder().encode(session.world)
+        ),
+        resumedAtTimestamp: timestamp
+    )
 }

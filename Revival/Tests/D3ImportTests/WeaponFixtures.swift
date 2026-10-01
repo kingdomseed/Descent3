@@ -30,14 +30,9 @@ func fixtureBlueLaser(model: SourceResource) -> CanonicalWeapon {
         lightDistance: 15,
         lighting: .init(
             primaryColor: .init(x: 0.25, y: 0.25, z: 1),
-            secondaryColor: .init(x: 0.25, y: 0.5, z: 1),
-            timeInterval: 0,
-            flickerDistance: 0,
-            directionalDot: 0,
-            flags: 0,
-            timebits: 0,
-            angle: 0,
-            lightingRenderType: 0
+            secondaryColor: .init(x: 0.25, y: 0.5, z: 1), timeInterval: 0,
+            flickerDistance: 0, directionalDot: 0, flags: 0, timebits: 0,
+            angle: 0, lightingRenderType: 0
         )
     )
 }
@@ -46,8 +41,7 @@ func fixtureBlueLaser(model: SourceResource) -> CanonicalWeapon {
 /// 15 s, does 6 damage, and explodes into a 0.1 s shockwave of radius 32
 /// and 19 damage.
 func fixtureConcussion(
-    model: SourceResource,
-    explosionFrames: [SourceResource],
+    model: SourceResource, explosionFrames: [SourceResource],
     impactWallSound: String = ""
 ) -> CanonicalWeapon {
     CanonicalWeapon(
@@ -70,22 +64,14 @@ func fixtureConcussion(
             force: 3_000
         ),
         explosion: .init(
-            hasImage: true,
-            frames: explosionFrames,
-            lifetime: 0.5,
-            size: 10
+            hasImage: true, frames: explosionFrames, lifetime: 0.5, size: 10
         ),
         lightDistance: 12.5,
         lighting: .init(
             primaryColor: .init(x: 1, y: 0.5, z: 0.25),
-            secondaryColor: .init(x: 1, y: 0.75, z: 0.25),
-            timeInterval: 0,
-            flickerDistance: 0,
-            directionalDot: 0,
-            flags: 0,
-            timebits: 0,
-            angle: 0,
-            lightingRenderType: 0
+            secondaryColor: .init(x: 1, y: 0.75, z: 0.25), timeInterval: 0,
+            flickerDistance: 0, directionalDot: 0, flags: 0, timebits: 0,
+            angle: 0, lightingRenderType: 0
         )
     )
 }
@@ -102,17 +88,10 @@ func fixturePlayerShipBatteries(
         .init(
             index: 0,
             battery: .init(
-                gunpointWeapons: ["", laser, laser],
-                fireMasks: [6],
-                fireWaits: [0.25],
-                fireSounds: [""],
-                aimingGunpointIndex: 0,
-                aimingFlags: 0,
-                aiming3DDot: 0,
-                aiming3DDistance: 0,
-                aimingXZDot: 0,
-                flags: 0,
-                quadFireMask: 0
+                gunpointWeapons: ["", laser, laser], fireMasks: [6],
+                fireWaits: [0.25], fireSounds: [""], aimingGunpointIndex: 0,
+                aimingFlags: 0, aiming3DDot: 0, aiming3DDistance: 0,
+                aimingXZDot: 0, flags: 0, quadFireMask: 0
             ),
             energyUsage: 0.15,
             ammoUsage: 0,
@@ -122,16 +101,10 @@ func fixturePlayerShipBatteries(
             index: 10,
             battery: .init(
                 gunpointWeapons: ["", "Concussion", "Concussion"],
-                fireMasks: [2, 4],
-                fireWaits: [0.5, 0.5],
+                fireMasks: [2, 4], fireWaits: [0.5, 0.5],
                 fireSounds: [concussionFireSound, concussionFireSound],
-                aimingGunpointIndex: 0,
-                aimingFlags: 0,
-                aiming3DDot: 0,
-                aiming3DDistance: 0,
-                aimingXZDot: 0,
-                flags: 0,
-                quadFireMask: 0
+                aimingGunpointIndex: 0, aimingFlags: 0, aiming3DDot: 0,
+                aiming3DDistance: 0, aimingXZDot: 0, flags: 0, quadFireMask: 0
             ),
             energyUsage: 0,
             ammoUsage: 1,
@@ -177,17 +150,9 @@ let fixtureFlyerDeathTypes = [
 /// A robot page with no AI, destroyable, with the RAS1 flyer's hit points,
 /// death, and score: a target the player can shoot down.
 let fixtureTargetRobotInfo = CanonicalObjectInfo(
-    name: "RAS1 Light Security Flyer",
-    type: 2,
-    flags: 0x204,
-    size: 4.576_441_8,
-    hitPoints: 55,
-    lightDistance: 0,
-    lighting: fixtureNoLight,
-    ai: nil,
-    weaponBatteries: [],
-    score: 200,
-    impact: .init(size: 0, time: 0, damage: 0),
+    name: "RAS1 Light Security Flyer", type: 2, flags: 0x204, size: 4.576_441_8,
+    hitPoints: 55, lightDistance: 0, lighting: fixtureNoLight, ai: nil,
+    weaponBatteries: [], score: 200, impact: .init(size: 0, time: 0, damage: 0),
     deathTypes: fixtureFlyerDeathTypes
 )
 
@@ -207,21 +172,17 @@ extension Level {
                     .map(\.source.storedIndex)
         ).max().map { $0 + 1 } ?? 0
         let laserModel = SourceResource(
-            storedIndex: nextModelIndex,
-            sourceName: "bluelaser.OOF"
+            storedIndex: nextModelIndex, sourceName: "bluelaser.OOF"
         )
         let missileModel = SourceResource(
-            storedIndex: nextModelIndex + 1,
-            sourceName: "ConcussionMissile.OOF"
+            storedIndex: nextModelIndex + 1, sourceName: "ConcussionMissile.OOF"
         )
         let newModels = [laserModel, missileModel].filter { source in
             !level.models.contains { $0.source.sourceName == source.sourceName }
         }.map { source in
             CanonicalModel(
-                source: source,
-                collisionRadius: 1,
-                submodels: template.submodels,
-                bounds: template.bounds,
+                source: source, collisionRadius: 1,
+                submodels: template.submodels, bounds: template.bounds,
                 sourceArchive: template.sourceArchive,
                 sourceSHA256: String(repeating: "c", count: 64)
             )
@@ -237,8 +198,7 @@ extension Level {
         ).max().map { $0 + 1 } ?? 0
         let explosionFrames = !existingFrames.isEmpty ? existingFrames : [
             SourceResource(
-                storedIndex: firstExplosionIndex,
-                sourceName: "ExplosionE"
+                storedIndex: firstExplosionIndex, sourceName: "ExplosionE"
             ),
         ] + (1..<15).map {
             SourceResource(
@@ -246,20 +206,20 @@ extension Level {
                 sourceName: "ExplosionE.oaf frame \($0)"
             )
         }
+
         let newFrames = existingFrames.isEmpty ? explosionFrames : []
         let materialTemplate = level.presentationMaterials[0]
         let explosionMaterials = newFrames.map { frame in
             PresentationMaterial(
-                texture: frame,
-                bitmapSourceName: "ExplosionE.oaf",
+                texture: frame, bitmapSourceName: "ExplosionE.oaf",
                 image: materialTemplate.image,
-                blend: .additiveSourceAlpha(opacity: 255),
-                lightmapBlend: .none,
+                blend: .additiveSourceAlpha(opacity: 255), lightmapBlend: .none,
                 waterProcedural: nil,
                 sourceArchive: materialTemplate.sourceArchive,
                 sourceSHA256: String(repeating: "e", count: 64)
             )
         }
+
         var soundClips = level.soundClips
         if concussionSounds {
             let soundTemplate = level.soundClips[0]
@@ -268,8 +228,7 @@ extension Level {
                 ("Explode1", "Explode1.wav", 20_001),
             ] where !soundClips.contains(where: { $0.logicalName == logical }) {
                 soundClips.append(.init(
-                    logicalName: logical,
-                    sourceName: source,
+                    logicalName: logical, sourceName: source,
                     sourceEntryIndex: entry,
                     sampleRate: soundTemplate.sampleRate,
                     channelCount: soundTemplate.channelCount,
@@ -277,22 +236,20 @@ extension Level {
                     pcm16LittleEndian: soundTemplate.pcm16LittleEndian,
                     pcmSHA256: soundTemplate.pcmSHA256,
                     sourceArchive: soundTemplate.sourceArchive,
-                    sourceSHA256: soundTemplate.sourceSHA256,
-                    importVolume: 1
+                    sourceSHA256: soundTemplate.sourceSHA256, importVolume: 1
                 ))
             }
         }
+
         let dependencies = newModels.map {
             DependencyRecord(
-                category: "model",
-                source: $0.source,
+                category: "model", source: $0.source,
                 state: "presentation-payload-imported",
                 provenance: "synthetic canonical fixture"
             )
         } + newFrames.map {
             DependencyRecord(
-                category: "texture",
-                source: $0,
+                category: "texture", source: $0,
                 state: "presentation-payload-imported",
                 provenance: "synthetic canonical fixture"
             )
@@ -300,13 +257,13 @@ extension Level {
             DependencyRecord(
                 category: "sound",
                 source: .init(
-                    storedIndex: $0.sourceEntryIndex,
-                    sourceName: $0.sourceName
+                    storedIndex: $0.sourceEntryIndex, sourceName: $0.sourceName
                 ),
                 state: "canonical-pcm-imported",
                 provenance: "synthetic canonical fixture"
             )
         }
+
         var ship = level.shipDefinitions[0]
         // A flare battery the level has stays.
         ship.weaponBatteries = fixturePlayerShipBatteries(
@@ -336,13 +293,11 @@ extension Level {
         return level
             .addingWeapon(fixtureBlueLaser(model: laserSource))
             .addingWeapon(fixtureConcussion(
-                model: missileSource,
-                explosionFrames: explosionFrames,
+                model: missileSource, explosionFrames: explosionFrames,
                 impactWallSound: concussionSounds ? "Explode1" : ""
             ))
             .settingModelGuns(
-                ship.primaryModel,
-                gunpoints: fixturePlayerShipGunpoints,
+                ship.primaryModel, gunpoints: fixturePlayerShipGunpoints,
                 batteries: [ModelWeaponBattery(gunpoints: [0, 1, 2], turrets: [])]
             )
     }
@@ -353,10 +308,7 @@ extension Level {
 let fixtureYellowSparkFrames = [
     SourceResource(storedIndex: 878, sourceName: "yellowspark"),
 ] + (1...5).map {
-    SourceResource(
-        storedIndex: 878,
-        sourceName: "yellowspark.oaf frame \($0)"
-    )
+    SourceResource(storedIndex: 878, sourceName: "yellowspark.oaf frame \($0)")
 }
 
 /// The retail "Yellow flare" page (WF_CUSTOM_SIZE | WF_SPAWNS_TIMEOUT;
@@ -365,8 +317,7 @@ let fixtureYellowSparkFrames = [
 /// light of 35 by up to 2, and times out into a FlarePuff and 9
 /// YellowFlareSparks.
 func fixtureYellowFlare(
-    model: SourceResource,
-    explosion: SourceResource
+    model: SourceResource, explosion: SourceResource
 ) -> CanonicalWeapon {
     CanonicalWeapon(
         name: "Yellow flare",
@@ -387,33 +338,20 @@ func fixtureYellowFlare(
             size: 0, time: 0, playerDamage: 1, genericDamage: 1, force: 100
         ),
         explosion: .init(
-            hasImage: true,
-            frames: [explosion],
-            lifetime: 0.2,
-            size: 2
+            hasImage: true, frames: [explosion], lifetime: 0.2, size: 2
         ),
         lightDistance: 35,
         lighting: .init(
-            primaryColor: .init(x: 1, y: 1, z: 0.8),
-            secondaryColor: .zero,
-            timeInterval: 0.2,
-            flickerDistance: 5,
-            directionalDot: 0,
-            flags: 16,
-            timebits: UInt32.max,
-            angle: 0,
-            lightingRenderType: 0
+            primaryColor: .init(x: 1, y: 1, z: 0.8), secondaryColor: .zero,
+            timeInterval: 0.2, flickerDistance: 5, directionalDot: 0, flags: 16,
+            timebits: UInt32.max, angle: 0, lightingRenderType: 0
         ),
         particles: .init(
-            count: 25,
-            lifetime: 0.3,
-            size: 0.2,
+            count: 25, lifetime: 0.3, size: 0.2,
             frames: fixtureYellowSparkFrames
         ),
         spawn: .init(
-            weapon: "YellowFlareSparks",
-            count: 9,
-            alternateWeapon: "",
+            weapon: "YellowFlareSparks", count: 9, alternateWeapon: "",
             alternateChance: 0
         )
     )
@@ -444,28 +382,18 @@ func fixtureYellowFlareSparks() -> CanonicalWeapon {
             size: 0, time: 0, playerDamage: 0, genericDamage: 0, force: 0
         ),
         explosion: .init(
-            hasImage: true,
-            frames: fixtureYellowSparkFrames,
-            lifetime: 0.2,
+            hasImage: true, frames: fixtureYellowSparkFrames, lifetime: 0.2,
             size: 0.07
         ),
         lightDistance: 6,
         lighting: .init(
-            primaryColor: .init(x: 1, y: 1, z: 0.5),
-            secondaryColor: .zero,
-            timeInterval: 0,
-            flickerDistance: 0,
-            directionalDot: 0,
-            flags: 0,
-            timebits: 0,
-            angle: 0,
-            lightingRenderType: 0
+            primaryColor: .init(x: 1, y: 1, z: 0.5), secondaryColor: .zero,
+            timeInterval: 0, flickerDistance: 0, directionalDot: 0, flags: 0,
+            timebits: 0, angle: 0, lightingRenderType: 0
         ),
         fireImage: .init(frames: fixtureYellowSparkFrames, frameTime: 0.07),
         particles: .init(
-            count: 25,
-            lifetime: 0.3,
-            size: 0.3,
+            count: 25, lifetime: 0.3, size: 0.3,
             frames: fixtureYellowSparkFrames
         )
     )
@@ -476,17 +404,10 @@ func fixtureYellowFlareSparks() -> CanonicalWeapon {
 let fixtureFlareShipBattery = CanonicalShipWeaponBattery(
     index: PlayerWeaponState.flareIndex,
     battery: .init(
-        gunpointWeapons: ["Yellow flare", "", ""],
-        fireMasks: [1],
-        fireWaits: [1],
-        fireSounds: ["Flare"],
-        aimingGunpointIndex: 0,
-        aimingFlags: 0,
-        aiming3DDot: 0,
-        aiming3DDistance: 0,
-        aimingXZDot: 0,
-        flags: 0,
-        quadFireMask: 0
+        gunpointWeapons: ["Yellow flare", "", ""], fireMasks: [1],
+        fireWaits: [1], fireSounds: ["Flare"], aimingGunpointIndex: 0,
+        aimingFlags: 0, aiming3DDot: 0, aiming3DDistance: 0, aimingXZDot: 0,
+        flags: 0, quadFireMask: 0
     ),
     energyUsage: 0,
     ammoUsage: 0,
@@ -511,73 +432,58 @@ extension Level {
                     .map(\.source.storedIndex)
         ).max().map { $0 + 1 } ?? 0
         let modelSource = SourceResource(
-            storedIndex: nextModelIndex,
-            sourceName: "FlareYellowBright.OOF"
+            storedIndex: nextModelIndex, sourceName: "FlareYellowBright.OOF"
         )
         let flareModel = CanonicalModel(
             source: modelSource,
             collisionRadius: Float(bitPattern: 0x405f_d5ea),
-            submodels: templateModel.submodels,
-            bounds: templateModel.bounds,
+            submodels: templateModel.submodels, bounds: templateModel.bounds,
             sourceArchive: templateModel.sourceArchive,
             sourceSHA256: String(repeating: "f", count: 64)
         )
         let templateMaterial = level.presentationMaterials[0]
         let sparkMaterials = fixtureYellowSparkFrames.map { frame in
             PresentationMaterial(
-                texture: frame,
-                bitmapSourceName: "yellowspark.oaf",
+                texture: frame, bitmapSourceName: "yellowspark.oaf",
                 image: templateMaterial.image,
-                blend: .additiveSourceAlpha(opacity: 255),
-                lightmapBlend: .none,
+                blend: .additiveSourceAlpha(opacity: 255), lightmapBlend: .none,
                 waterProcedural: nil,
                 sourceArchive: templateMaterial.sourceArchive,
                 sourceSHA256: String(repeating: "e", count: 64)
             )
         }
+
         let explosionTexture = SourceResource(
-            storedIndex: 900,
-            sourceName: "FlarePuff"
+            storedIndex: 900, sourceName: "FlarePuff"
         )
         let explosionMaterial = PresentationMaterial(
-            texture: explosionTexture,
-            bitmapSourceName: "FlarePuff.oaf",
+            texture: explosionTexture, bitmapSourceName: "FlarePuff.oaf",
             image: templateMaterial.image,
-            blend: .additiveSourceAlpha(opacity: 102),
-            lightmapBlend: .none,
-            waterProcedural: nil,
-            sourceArchive: templateMaterial.sourceArchive,
+            blend: .additiveSourceAlpha(opacity: 102), lightmapBlend: .none,
+            waterProcedural: nil, sourceArchive: templateMaterial.sourceArchive,
             sourceSHA256: String(repeating: "d", count: 64)
         )
         var soundClips = level.soundClips
         if !soundClips.contains(where: { $0.logicalName == "Flare" }) {
             let pcm = Data(repeating: 0, count: 2)
-            soundClips.append(.init(
-                logicalName: "Flare",
-                sourceName: "Flare.wav",
-                sourceEntryIndex: 1_158,
-                sampleRate: 22_050,
-                channelCount: 1,
-                frameCount: 1,
-                pcm16LittleEndian: pcm,
-                pcmSHA256: canonicalSHA256(pcm),
-                sourceArchive: templateModel.sourceArchive,
+            soundClips.append(.silent(
+                logicalName: "Flare", sourceName: "Flare.wav", index: 1_158,
+                archive: templateModel.sourceArchive,
                 sourceSHA256: String(repeating: "f", count: 64),
                 importVolume: 0.300_000_07
             ))
         }
+
         let addedSounds = soundClips.dropFirst(level.soundClips.count)
         let dependencies = [
             DependencyRecord(
-                category: "model",
-                source: modelSource,
+                category: "model", source: modelSource,
                 state: "presentation-payload-imported",
                 provenance: "synthetic Yellow flare fixture"
             ),
         ] + (fixtureYellowSparkFrames + [explosionTexture]).map {
             DependencyRecord(
-                category: "texture",
-                source: $0,
+                category: "texture", source: $0,
                 state: "presentation-payload-imported",
                 provenance: "synthetic Yellow flare fixture"
             )
@@ -585,13 +491,13 @@ extension Level {
             DependencyRecord(
                 category: "sound",
                 source: .init(
-                    storedIndex: $0.sourceEntryIndex,
-                    sourceName: $0.sourceName
+                    storedIndex: $0.sourceEntryIndex, sourceName: $0.sourceName
                 ),
                 state: "canonical-pcm-imported",
                 provenance: "synthetic Yellow flare fixture"
             )
         }
+
         var ship = level.shipDefinitions[0]
         ship.weaponBatteries = (ship.weaponBatteries ?? []).filter {
             $0.index != PlayerWeaponState.flareIndex
@@ -611,9 +517,48 @@ extension Level {
         )
         return level
             .addingWeapon(fixtureYellowFlare(
-                model: modelSource,
-                explosion: explosionTexture
+                model: modelSource, explosion: explosionTexture
             ))
             .addingWeapon(fixtureYellowFlareSparks())
     }
+}
+
+/// The player's fire button: battery 0 or the secondary battery.
+enum FireTrigger { case primary, secondary }
+
+/// An open portal of the level: its face center, the normal into its
+/// room, and the room it leads to.
+func openPortalCrossing(
+    _ level: Level, world: GameWorld
+) -> (room: Int, connectedRoom: Int, center: Vector3, normal: Vector3)? {
+    for (index, room) in level.rooms.enumerated() {
+        for (portalIndex, portal) in room.portals.enumerated()
+        where world.rooms[index].portalFlags[portalIndex]
+            & LevelPortal.renderFacesFlag == 0 {
+            let face = room.faces[portal.faceIndex]
+            guard let normal = canonicalFaceNormal(room: room, face: face)
+            else {
+                continue
+            }
+
+            let sum = face.corners.reduce(Vector3.zero) {
+                $0 + room.vertices[$1.vertexIndex]
+            }
+            return (room.sourceIndex, portal.connectedRoom,
+                    sum / Float(face.corners.count), normal)
+        }
+    }
+    return nil
+}
+
+/// FireWeaponFromPlayer with the button held for 0.1 s.
+func fire(_ world: inout GameWorld, _ trigger: FireTrigger, level: Level) {
+    world.fireWeaponFromPlayer(
+        world.testPlayerObject.handle,
+        weaponType: trigger == .primary
+            ? PlayerWeaponState.primary : PlayerWeaponState.secondary,
+        isDown: true,
+        downTime: 0.1,
+        level: level
+    )
 }

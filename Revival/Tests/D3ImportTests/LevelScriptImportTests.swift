@@ -1,5 +1,5 @@
 // Tests for the generic level script data in the canonical package
-// (package schema 12). Legacy sources: Descent3/Mission.cpp:1686
+// (package schema 13). Legacy sources: Descent3/Mission.cpp:1686
 // InitLevelScript, Descent3/OsirisLoadandBind.cpp:884 and :1427,
 // Descent3/LoadLevel.cpp:1718, manage/generic.cpp:1083,
 // manage/doorpage.cpp:261, and the message-file reader generated in every
@@ -19,8 +19,7 @@ final class LevelScriptImportTests: XCTestCase {
             table: makeLevelScriptTable(),
             overlay: makeLevelScriptOverlay(),
             references: .init(
-                soundNames: ["beep"],
-                streamedAudioNames: ["HELLO.osf"]
+                soundNames: ["beep"], streamedAudioNames: ["HELLO.osf"]
             )
         )
 
@@ -30,33 +29,25 @@ final class LevelScriptImportTests: XCTestCase {
             [
                 // The extra.gam page replaces the table page, name included.
                 .init(
-                    objectHandle: 0x800,
-                    name: "Guard1",
-                    defaultModuleName: "aigame3",
-                    defaultScriptName: "TUBBS"
+                    objectHandle: 0x800, name: "Guard1",
+                    defaultModuleName: "aigame3", defaultScriptName: "TUBBS"
                 ),
                 .init(
-                    objectHandle: 0x801,
-                    name: nil,
+                    objectHandle: 0x801, name: nil,
                     defaultModuleName: "custommod",
                     defaultScriptName: "CustomPage"
                 ),
                 .init(
-                    objectHandle: 0x802,
-                    name: "Lamp1",
-                    defaultModuleName: nil,
+                    objectHandle: 0x802, name: "Lamp1", defaultModuleName: nil,
                     defaultScriptName: "LampScript"
                 ),
                 .init(
-                    objectHandle: 0x803,
-                    name: "MainDoor",
+                    objectHandle: 0x803, name: "MainDoor",
                     defaultModuleName: "doormod",
                     defaultScriptName: "MainDoorPage"
                 ),
                 .init(
-                    objectHandle: 0x804,
-                    name: "Cam",
-                    defaultModuleName: nil,
+                    objectHandle: 0x804, name: "Cam", defaultModuleName: nil,
                     defaultScriptName: nil
                 ),
             ]
@@ -87,16 +78,13 @@ final class LevelScriptImportTests: XCTestCase {
             archives: [LevelScriptArchive]? = nil,
             table: Data? = nil,
             references: LevelScriptReferences = .init(
-                soundNames: [],
-                streamedAudioNames: []
+                soundNames: [], streamedAudioNames: []
             )
         ) throws {
             _ = try importLevelScripting(
-                level: level,
-                levelFileName: levelFileName,
+                level: level, levelFileName: levelFileName,
                 archives: archives ?? makeLevelScriptArchives(),
-                table: table ?? makeLevelScriptTable(),
-                overlay: Data(),
+                table: table ?? makeLevelScriptTable(), overlay: Data(),
                 references: references
             )
         }
@@ -111,8 +99,7 @@ final class LevelScriptImportTests: XCTestCase {
         }
         XCTAssertThrowsError(try run(levelFileName: "Other.d3l")) {
             XCTAssertEqual(
-                $0 as? LevelScriptImportError,
-                .missingMessageFile("other.msg")
+                $0 as? LevelScriptImportError, .missingMessageFile("other.msg")
             )
         }
         XCTAssertThrowsError(
@@ -135,8 +122,7 @@ final class LevelScriptImportTests: XCTestCase {
             try run(references: .init(soundNames: ["Missing"], streamedAudioNames: []))
         ) {
             XCTAssertEqual(
-                $0 as? LevelScriptImportError,
-                .unresolvedSound("Missing")
+                $0 as? LevelScriptImportError, .unresolvedSound("Missing")
             )
         }
         // cfopen searches the mission archive first (cfile.cpp:264), so a
@@ -153,8 +139,7 @@ final class LevelScriptImportTests: XCTestCase {
             )
         ) {
             XCTAssertEqual(
-                $0 as? LevelScriptImportError,
-                .unresolvedSound("Beep")
+                $0 as? LevelScriptImportError, .unresolvedSound("Beep")
             )
         }
         XCTAssertThrowsError(
@@ -188,6 +173,7 @@ final class LevelScriptImportTests: XCTestCase {
             data.append(UInt8(truncatingIfNeeded: sample >> 8))
             return data
         }
+
         let mission = makeLevelScriptArchive(
             relativePath: "missions/synthetic.mn3",
             entries: [("Shared.wav", wav(1))]
@@ -208,23 +194,21 @@ final class LevelScriptImportTests: XCTestCase {
                 archive: archive.archive
             )
         }
+
         let table = makeRetailPage(type: 7, body: makeSoundPageBody("Beep", "Beep.wav"))
             + makeRetailPage(type: 7, body: makeSoundPageBody("Shared Page", "Shared.wav"))
             + EngineSound.names.map {
                 makeRetailPage(type: 7, body: makeSoundPageBody($0, "\($0).wav"))
             }.reduce(Data(), +)
         let sources = ImportSources(
-            profile: .training,
-            inventories: [],
-            searchOrder: [library(mission), library(base)],
-            table: table,
+            profile: .training, inventories: [],
+            searchOrder: [library(mission), library(base)], table: table,
             overlay: Data(),
             mission: PreparedRetailProfile.training.missions[0],
             descriptor: .init(name: "Synthetic", levels: []),
             level: PreparedRetailProfile.training.missions[0].levels[0],
             levelFileName: "Synthetic.D3L",
-            levelEntry: mission.archive.entries[0],
-            levelData: Data()
+            levelEntry: mission.archive.entries[0], levelData: Data()
         )
         var sounds = SoundImportCache(sources: sources)
         let level = try makeLevelScriptImportLevel()
@@ -280,6 +264,7 @@ final class LevelScriptImportTests: XCTestCase {
             data.appendLevelScriptUInt16(pixel)
             return data
         }
+
         var oaf = Data([127, 1, 2])
         oaf.appendLevelScriptUInt32(Float(0.3).bitPattern)
         oaf.append(ogf("spark000.ogf", 0xfc00))
@@ -298,17 +283,13 @@ final class LevelScriptImportTests: XCTestCase {
             archive: archive.archive
         )
         let sources = ImportSources(
-            profile: .training,
-            inventories: [],
-            searchOrder: [library],
-            table: Data(),
-            overlay: Data(),
+            profile: .training, inventories: [], searchOrder: [library],
+            table: Data(), overlay: Data(),
             mission: PreparedRetailProfile.training.missions[0],
             descriptor: .init(name: "Synthetic", levels: []),
             level: PreparedRetailProfile.training.missions[0].levels[0],
             levelFileName: "Synthetic.D3L",
-            levelEntry: archive.archive.entries[0],
-            levelData: Data()
+            levelEntry: archive.archive.entries[0], levelData: Data()
         )
         func weapon(_ fireImage: String, flags: UInt32) -> RetailWeaponPresentationSelection {
             .init(
@@ -335,8 +316,7 @@ final class LevelScriptImportTests: XCTestCase {
 
         let slot = SourceResource(storedIndex: 3_000, sourceName: "spark.OAF")
         let vclip = try importWeaponFireImage(
-            weapon("spark.OAF", flags: 1 << 5 | 1 << 10),
-            texture: slot,
+            weapon("spark.OAF", flags: 1 << 5 | 1 << 10), texture: slot,
             sources: sources
         )
         XCTAssertEqual(
@@ -378,22 +358,20 @@ final class LevelScriptImportTests: XCTestCase {
     func testMessageFileFollowsLegacyReaderRules() throws {
         // cfgetc (cfile.cpp:627) turns CR, CRLF, and LF into one newline.
         // cf_ReadString (cfile.cpp:783) keeps at most 1,023 bytes of a line
-        // and drops the rest. AddMessageToList stores an empty name too.
+        // and drops the rest. A line that starts with // is a comment.
+        // AddMessageToList stores an empty name too.
         let long = "L=" + String(repeating: "a", count: 1_100)
         let lateSeparator = "M" + String(repeating: "b", count: 1_100) + "=z"
-        let source = "//c\r\n\r\nA=1\r\n  B =  2  \r\nA=dup\r\nnone\r\n=x\r\n=y\n"
+        let source = "//c=0\r\n\r\nA=1\r\n  B =  2  \r\nA=dup\r\nnone\r\n=x\r\n=y\n"
             + "C=3\rD=4\r\(long)\n\(lateSeparator)\nE=5"
         let messages = try parseLevelScriptMessages(
-            Data(source.utf8),
-            fileName: "x.msg"
+            Data(source.utf8), fileName: "x.msg"
         )
         XCTAssertEqual(
             messages,
             [
-                .init(name: "A", text: "1"),
-                .init(name: "B ", text: "  2"),
-                .init(name: "", text: "x"),
-                .init(name: "C", text: "3"),
+                .init(name: "A", text: "1"), .init(name: "B ", text: "  2"),
+                .init(name: "", text: "x"), .init(name: "C", text: "3"),
                 .init(name: "D", text: "4"),
                 .init(name: "L", text: String(repeating: "a", count: 1_021)),
                 .init(name: "E", text: "5"),
@@ -403,10 +381,10 @@ final class LevelScriptImportTests: XCTestCase {
             try parseLevelScriptMessages(Data([0x41, 0x3d, 0xff]), fileName: "x.msg")
         ) {
             XCTAssertEqual(
-                $0 as? LevelScriptImportError,
-                .malformedMessageFile("x.msg")
+                $0 as? LevelScriptImportError, .malformedMessageFile("x.msg")
             )
         }
+
         let many = (0..<300).map { "M\($0)=t\n" }.joined()
         XCTAssertEqual(
             try parseLevelScriptMessages(Data(many.utf8), fileName: "x.msg").count,
@@ -428,14 +406,13 @@ final class LevelScriptImportTests: XCTestCase {
         XCTAssertNil(LevelModule.scriptReferences(forLevelScript: "none"))
     }
 
-    func testSchemaTwelveRoundTripsThroughCanonicalPackage() throws {
+    func testScriptedLevelRoundTripsThroughCanonicalPackage() throws {
         let (base, scripting) = try makeScriptedTrainingLevel()
         let level = base.addingScripting(scripting)
         try level.validate()
 
         let decoded = try JSONDecoder().decode(
-            Level.self,
-            from: canonicalJSONData(level)
+            Level.self, from: canonicalJSONData(level)
         )
         XCTAssertEqual(decoded, level)
         XCTAssertEqual(decoded.scripting, scripting)
@@ -443,8 +420,8 @@ final class LevelScriptImportTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory
             .appending(path: "revival-scripting-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
-        try writeCanonicalPackage(level, to: root, schemaPolicy: .includingScriptFreeTestSchemas)
-        XCTAssertEqual(try loadCanonicalLevel(from: root, schemaPolicy: .includingScriptFreeTestSchemas), level)
+        try writeCanonicalPackage(level, to: root)
+        XCTAssertEqual(try loadCanonicalLevel(from: root), level)
     }
 
     func testSchemaElevenLoadsWithoutScriptData() throws {
@@ -460,7 +437,7 @@ final class LevelScriptImportTests: XCTestCase {
         XCTAssertNoThrow(try decoded.validate())
     }
 
-    func testSchemaTwelveRequiresStructurallyValidScriptData() throws {
+    func testScriptedLevelRequiresStructurallyValidScriptData() throws {
         let (base, valid) = try makeScriptedTrainingLevel()
         let level = base.addingScripting(valid)
         XCTAssertNoThrow(try level.validate())
@@ -471,8 +448,7 @@ final class LevelScriptImportTests: XCTestCase {
         )
         object["scripting"] = nil
         let missing = try JSONDecoder().decode(
-            Level.self,
-            from: JSONSerialization.data(withJSONObject: object)
+            Level.self, from: JSONSerialization.data(withJSONObject: object)
         )
         XCTAssertThrowsError(try missing.validate()) {
             XCTAssertEqual($0 as? LevelValidationError, .invalidIdentity)
@@ -486,17 +462,16 @@ final class LevelScriptImportTests: XCTestCase {
             sounds: [LevelScriptAudioReference]? = nil
         ) -> LevelScripting {
             LevelScripting(
-                levelScript: levelScript,
-                objects: objects ?? valid.objects,
+                levelScript: levelScript, objects: objects ?? valid.objects,
                 messages: messages ?? valid.messages,
                 streamedAudio: streamedAudio ?? valid.streamedAudio,
                 sounds: sounds ?? valid.sounds
             )
         }
+
         func assertInvalid(_ value: LevelScripting, line: UInt = #line) {
             XCTAssertThrowsError(
-                try base.addingScripting(value).validate(),
-                line: line
+                try base.addingScripting(value).validate(), line: line
             ) {
                 guard case .invalidScripting = $0 as? LevelValidationError else {
                     return XCTFail("\($0)", line: line)
@@ -514,18 +489,14 @@ final class LevelScriptImportTests: XCTestCase {
         // No compiled level script lists its references.
         assertInvalid(scripting(levelScript: "other"))
         assertInvalid(scripting(objects: valid.objects + [.init(
-            objectHandle: 0xffff_ffff,
-            name: nil,
-            defaultModuleName: nil,
+            objectHandle: 0xffff_ffff, name: nil, defaultModuleName: nil,
             defaultScriptName: nil
         )]))
         assertInvalid(scripting(objects: Array(valid.objects.dropLast())))
         assertInvalid(scripting(objects: valid.objects.map {
             .init(
-                objectHandle: $0.objectHandle,
-                name: $0.name,
-                defaultModuleName: $0.defaultModuleName,
-                defaultScriptName: ""
+                objectHandle: $0.objectHandle, name: $0.name,
+                defaultModuleName: $0.defaultModuleName, defaultScriptName: ""
             )
         }))
         assertInvalid(scripting(
@@ -567,25 +538,20 @@ final class LevelScriptImportTests: XCTestCase {
             let corners = (0..<cornerCount).map {
                 face.corners[$0 % face.corners.count]
             }
+
             var faces = submodel.faces
             faces[0] = ModelFace(
-                normal: face.normal,
-                corners: corners,
-                material: face.material
+                normal: face.normal, corners: corners, material: face.material
             )
             submodels[submodelIndex] = ModelSubmodel(
                 sourceIndex: submodel.sourceIndex,
-                parentIndex: submodel.parentIndex,
-                offset: submodel.offset,
-                vertices: submodel.vertices,
-                faces: faces,
+                parentIndex: submodel.parentIndex, offset: submodel.offset,
+                vertices: submodel.vertices, faces: faces,
                 presentation: submodel.presentation
             )
             var replaced = CanonicalModel(
-                source: model.source,
-                collisionRadius: model.collisionRadius,
-                submodels: submodels,
-                bounds: model.bounds,
+                source: model.source, collisionRadius: model.collisionRadius,
+                submodels: submodels, bounds: model.bounds,
                 sourceArchive: model.sourceArchive,
                 sourceSHA256: model.sourceSHA256
             )
@@ -606,13 +572,11 @@ private let levelScriptTestSource = LevelSource(
     profileIdentifier: "synthetic",
     profileFiles: [
         .init(
-            relativePath: "missions/synthetic.mn3",
-            byteCount: 1,
+            relativePath: "missions/synthetic.mn3", byteCount: 1,
             sha256: String(repeating: "a", count: 64)
         ),
         .init(
-            relativePath: "base.hog",
-            byteCount: 1,
+            relativePath: "base.hog", byteCount: 1,
             sha256: String(repeating: "e", count: 64)
         ),
     ],
@@ -649,31 +613,16 @@ private func makeLevelScriptImportLevel() throws -> Level {
         playerStartFlags: parsed.playerStartFlags,
         lightmaps: parsed.lightmaps,
         voiceClips: [
-            .init(
-                sourceName: "hello.osf",
-                sourceEntryIndex: 0,
-                sampleRate: 22_050,
-                channelCount: 1,
-                frameCount: 1,
-                pcm16LittleEndian: pcm,
-                pcmSHA256: canonicalSHA256(pcm),
-                sourceArchive: "missions/synthetic.mn3",
+            .silent(
+                "hello.osf", index: 0, archive: "missions/synthetic.mn3",
                 sourceSHA256: String(repeating: "d", count: 64)
             ),
         ],
         soundClips: [
-            .init(
-                logicalName: "Beep",
-                sourceName: "BeepSrc.wav",
-                sourceEntryIndex: 0,
-                sampleRate: 22_050,
-                channelCount: 1,
-                frameCount: 1,
-                pcm16LittleEndian: pcm,
-                pcmSHA256: canonicalSHA256(pcm),
-                sourceArchive: "base.hog",
-                sourceSHA256: String(repeating: "f", count: 64),
-                importVolume: 1
+            .silent(
+                logicalName: "Beep", sourceName: "BeepSrc.wav", index: 0,
+                archive: "base.hog",
+                sourceSHA256: String(repeating: "f", count: 64)
             ),
         ],
         dependencyManifest: parsed.dependencyManifest,
@@ -697,8 +646,7 @@ private func makeLevelScriptArchives() -> [LevelScriptArchive] {
         makeLevelScriptArchive(
             relativePath: "missions/synthetic.mn3",
             entries: [
-                ("Hello.OSF", Data([1])),
-                ("NoClip.osf", Data([2])),
+                ("Hello.OSF", Data([1])), ("NoClip.osf", Data([2])),
                 ("Synthetic.msg", Data(messages.utf8)),
             ]
         ),
@@ -710,12 +658,12 @@ private func makeLevelScriptArchives() -> [LevelScriptArchive] {
 }
 
 func makeLevelScriptArchive(
-    relativePath: String,
-    entries: [(String, Data)]
+    relativePath: String, entries: [(String, Data)]
 ) -> LevelScriptArchive {
     let sorted = entries.sorted {
         $0.0.lowercased().utf8.lexicographicallyPrecedes($1.0.lowercased().utf8)
     }
+
     var data = Data("HOG2".utf8)
     data.appendLevelScriptUInt32(UInt32(sorted.count))
     data.appendLevelScriptUInt32(UInt32(68 + sorted.count * 48))
@@ -730,9 +678,7 @@ func makeLevelScriptArchive(
     }
     for (_, payload) in sorted { data.append(payload) }
     return .init(
-        relativePath: relativePath,
-        data: data,
-        archive: try! parseHOG2(data)
+        relativePath: relativePath, data: data, archive: try! parseHOG2(data)
     )
 }
 
@@ -758,10 +704,7 @@ private func makeRetailPage(type: UInt8, body: Data) -> Data {
 
 /// manage/generic.cpp:1083 mng_ReadNewGenericPage, version 27.
 private func makeGenericPageBody(
-    _ name: String,
-    type: UInt8 = 2,
-    module: String,
-    override: String
+    _ name: String, type: UInt8 = 2, module: String, override: String
 ) -> Data {
     var body = Data()
     body.appendLevelScriptUInt16(27)
@@ -825,7 +768,6 @@ private extension Data {
     }
 }
 
-
 /// A schema 11 Training fixture with every clip the compiled Training script
 /// names, plus the scripting that binds them.
 private func makeScriptedTrainingLevel() throws -> (Level, LevelScripting) {
@@ -840,6 +782,7 @@ private func makeScriptedTrainingLevel() throws -> (Level, LevelScripting) {
     func json(_ value: some Encodable) throws -> Any {
         try JSONSerialization.jsonObject(with: canonicalJSONData(value))
     }
+
     let pcm = Data(repeating: 0, count: 2)
     var voices = object["voiceClips"] as? [Any] ?? []
     var sounds = object["soundClips"] as? [Any] ?? []
@@ -851,48 +794,32 @@ private func makeScriptedTrainingLevel() throws -> (Level, LevelScripting) {
     for name in references.streamedAudioNames
     where !voiceNames.contains(name.lowercased()) {
         nextIndex += 1
-        let clip = CanonicalVoiceClip(
-            sourceName: name.lowercased(),
-            sourceEntryIndex: nextIndex,
-            sampleRate: 22_050,
-            channelCount: 1,
-            frameCount: 1,
-            pcm16LittleEndian: pcm,
-            pcmSHA256: canonicalSHA256(pcm),
-            sourceArchive: archive,
+        let clip = CanonicalVoiceClip.silent(
+            name.lowercased(), index: nextIndex, archive: archive,
             sourceSHA256: String(repeating: "9", count: 64)
         )
         voices.append(try json(clip))
         records.append(try json(DependencyRecord(
             category: "voice",
             source: .init(storedIndex: nextIndex, sourceName: clip.sourceName),
-            state: "canonical-pcm-imported",
-            provenance: "synthetic"
+            state: "canonical-pcm-imported", provenance: "synthetic"
         )))
     }
+
     let soundNames = Set(base.soundClips.map { $0.logicalName.lowercased() })
     for name in references.soundNames
     where !soundNames.contains(name.lowercased()) {
         nextIndex += 1
-        let clip = CanonicalSoundClip(
-            logicalName: name,
-            sourceName: "\(name)Synthetic.wav",
-            sourceEntryIndex: nextIndex,
-            sampleRate: 22_050,
-            channelCount: 1,
-            frameCount: 1,
-            pcm16LittleEndian: pcm,
-            pcmSHA256: canonicalSHA256(pcm),
-            sourceArchive: archive,
-            sourceSHA256: String(repeating: "8", count: 64),
-            importVolume: 1
+        let clip = CanonicalSoundClip.silent(
+            logicalName: name, sourceName: "\(name)Synthetic.wav",
+            index: nextIndex, archive: archive,
+            sourceSHA256: String(repeating: "8", count: 64)
         )
         sounds.append(try json(clip))
         records.append(try json(DependencyRecord(
             category: "sound",
             source: .init(storedIndex: nextIndex, sourceName: clip.sourceName),
-            state: "canonical-pcm-imported",
-            provenance: "synthetic"
+            state: "canonical-pcm-imported", provenance: "synthetic"
         )))
     }
     object["voiceClips"] = voices
@@ -900,8 +827,7 @@ private func makeScriptedTrainingLevel() throws -> (Level, LevelScripting) {
     manifest["current"] = records
     object["dependencyManifest"] = manifest
     let level = try JSONDecoder().decode(
-        Level.self,
-        from: JSONSerialization.data(withJSONObject: object)
+        Level.self, from: JSONSerialization.data(withJSONObject: object)
     )
     try level.validate()
 
@@ -911,8 +837,7 @@ private func makeScriptedTrainingLevel() throws -> (Level, LevelScripting) {
             .filter { LevelScripting.scriptableObjectTypes.contains($0.type) }
             .map {
                 .init(
-                    objectHandle: $0.handle,
-                    name: $0.instanceName,
+                    objectHandle: $0.handle, name: $0.instanceName,
                     defaultModuleName: $0.type == 9 ? nil : "aigame",
                     defaultScriptName: $0.type == 9 ? nil : "Page"
                 )

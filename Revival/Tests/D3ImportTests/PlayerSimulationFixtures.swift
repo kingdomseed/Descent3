@@ -34,24 +34,8 @@ func makeSliceTenContactLevel(clearance: Float = 20) -> Level {
         portalIndex: nil,
         texture: room.faces[0].texture
     )
-    let contactRoom = LevelRoom(
-        sourceIndex: room.sourceIndex,
-        name: room.name,
-        pathPoint: room.pathPoint,
-        vertices: vertices,
-        faces: room.faces + [wall],
-        portals: room.portals,
-        flags: room.flags,
-        pulseTime: room.pulseTime,
-        pulseOffset: room.pulseOffset,
-        mirrorFaceIndex: room.mirrorFaceIndex,
-        door: room.door,
-        volumeLights: room.volumeLights,
-        fog: room.fog,
-        ambientSoundPattern: room.ambientSoundPattern,
-        reverb: room.reverb,
-        damage: room.damage,
-        damageType: room.damageType
+    let contactRoom = replacing(
+        room, vertices: vertices, faces: room.faces + [wall]
     )
     var rooms = level.rooms
     rooms[roomIndex] = contactRoom
@@ -67,8 +51,7 @@ func makeSliceThirteenWiggleLevel(blocked: Bool = false) -> Level {
     var objects = level.objects
     let playerIndex = objects.firstIndex { $0.handle == 2_048 }!
     objects[playerIndex].orientation = Matrix3(
-        right: .init(x: 1, y: 0, z: 0),
-        up: .init(x: 0, y: 0, z: 1),
+        right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 0, z: 1),
         forward: .init(x: 0, y: -1, z: 0)
     )
     return replacing(level, objects: objects)
@@ -88,43 +71,23 @@ func makeSliceThirteenPortalWiggleLevel() -> Level {
         Vector3(x: player.position.x + 20, y: player.position.y - 20, z: z),
     ]
     let corners = (0..<4).map {
-        FaceCorner(
-            vertexIndex: firstVertex + $0,
-            u: 0,
-            v: 0,
-            alpha: 255
-        )
+        FaceCorner(vertexIndex: firstVertex + $0, u: 0, v: 0, alpha: 255)
     }
+
     let portalFace = LevelFace(
-        corners: corners,
-        flags: 0,
-        portalIndex: room.portals.count,
+        corners: corners, flags: 0, portalIndex: room.portals.count,
         texture: room.faces[0].texture
     )
-    let sourceRoom = LevelRoom(
-        sourceIndex: room.sourceIndex,
-        name: room.name,
-        pathPoint: room.pathPoint,
+    let sourceRoom = replacing(
+        room,
         vertices: room.vertices + portalVertices,
         faces: room.faces + [portalFace],
         portals: room.portals + [
             .init(
-                faceIndex: room.faces.count,
-                connectedRoom: 99,
+                faceIndex: room.faces.count, connectedRoom: 99,
                 connectedPortal: 0
             ),
-        ],
-        flags: room.flags,
-        pulseTime: room.pulseTime,
-        pulseOffset: room.pulseOffset,
-        mirrorFaceIndex: room.mirrorFaceIndex,
-        door: room.door,
-        volumeLights: room.volumeLights,
-        fog: room.fog,
-        ambientSoundPattern: room.ambientSoundPattern,
-        reverb: room.reverb,
-        damage: room.damage,
-        damageType: room.damageType
+        ]
     )
     let connectedRoom = LevelRoom(
         sourceIndex: 99,
@@ -133,10 +96,8 @@ func makeSliceThirteenPortalWiggleLevel() -> Level {
             .init(
                 corners: corners.reversed().map {
                     FaceCorner(
-                        vertexIndex: $0.vertexIndex - firstVertex,
-                        u: $0.u,
-                        v: $0.v,
-                        alpha: $0.alpha
+                        vertexIndex: $0.vertexIndex - firstVertex, u: $0.u,
+                        v: $0.v, alpha: $0.alpha
                     )
                 },
                 flags: 0,
@@ -175,24 +136,8 @@ func makeSliceElevenCornerLevel(clearance: Float) -> Level {
         portalIndex: nil,
         texture: room.faces[0].texture
     )
-    let cornerRoom = LevelRoom(
-        sourceIndex: room.sourceIndex,
-        name: room.name,
-        pathPoint: room.pathPoint,
-        vertices: vertices,
-        faces: room.faces + [wall],
-        portals: room.portals,
-        flags: room.flags,
-        pulseTime: room.pulseTime,
-        pulseOffset: room.pulseOffset,
-        mirrorFaceIndex: room.mirrorFaceIndex,
-        door: room.door,
-        volumeLights: room.volumeLights,
-        fog: room.fog,
-        ambientSoundPattern: room.ambientSoundPattern,
-        reverb: room.reverb,
-        damage: room.damage,
-        damageType: room.damageType
+    let cornerRoom = replacing(
+        room, vertices: vertices, faces: room.faces + [wall]
     )
     var rooms = level.rooms
     rooms[roomIndex] = cornerRoom
@@ -233,24 +178,8 @@ func makeSliceElevenTrappedLevel(clearance: Float) -> Level {
         portalIndex: nil,
         texture: room.faces[0].texture
     )
-    let trappedRoom = LevelRoom(
-        sourceIndex: room.sourceIndex,
-        name: room.name,
-        pathPoint: room.pathPoint,
-        vertices: vertices,
-        faces: room.faces + [wall],
-        portals: room.portals,
-        flags: room.flags,
-        pulseTime: room.pulseTime,
-        pulseOffset: room.pulseOffset,
-        mirrorFaceIndex: room.mirrorFaceIndex,
-        door: room.door,
-        volumeLights: room.volumeLights,
-        fog: room.fog,
-        ambientSoundPattern: room.ambientSoundPattern,
-        reverb: room.reverb,
-        damage: room.damage,
-        damageType: room.damageType
+    let trappedRoom = replacing(
+        room, vertices: vertices, faces: room.faces + [wall]
     )
     var rooms = level.rooms
     rooms[roomIndex] = trappedRoom
@@ -263,8 +192,7 @@ func makeSliceElevenTrappedLevel(clearance: Float) -> Level {
 func decodeTestWorld(_ object: [String: Any]) throws -> GameWorld {
     var object = object
     let placement = [
-        ("playerLocation", "location"),
-        ("playerPosition", "position"),
+        ("playerLocation", "location"), ("playerPosition", "position"),
         ("playerOrientation", "orientation"),
     ]
     if placement.contains(where: { object[$0.0] != nil }) {
@@ -285,8 +213,7 @@ func decodeTestWorld(_ object: [String: Any]) throws -> GameWorld {
         object["objects"] = objects
     }
     return try JSONDecoder().decode(
-        GameWorld.self,
-        from: JSONSerialization.data(withJSONObject: object)
+        GameWorld.self, from: JSONSerialization.data(withJSONObject: object)
     )
 }
 
@@ -295,6 +222,7 @@ extension GameWorld {
     var testPlayerObject: GameObject {
         objects.first { $0.type == .player }!
     }
+
     var playerLocation: SpatialLocation { testPlayerObject.location }
     var playerPosition: Vector3 { testPlayerObject.position }
     var playerOrientation: Matrix3 { testPlayerObject.orientation }
@@ -310,6 +238,7 @@ extension GameSession {
             guard let object = world.objects[ObjectHandle(placed.handle)] else {
                 return nil
             }
+
             var placed = placed
             placed.location = object.location
             placed.position = object.position
@@ -379,6 +308,7 @@ func testWorldObject(_ world: GameWorld) throws -> [String: Any]? {
     ) as? [String: Any] else {
         return nil
     }
+
     let player = try JSONSerialization.jsonObject(
         with: JSONEncoder().encode(world.testPlayerObject)
     ) as? [String: Any]

@@ -1,26 +1,24 @@
 import AppKit
 import XCTest
 
+// The creator project and document (RevivalProject.swift,
+// RevivalProjectDocument.swift): selection, the value edits and their
+// undo, persistence of the deltas over the installed base, the canonical
+// boundary, and disposable play.
 final class EditorProjectTests: XCTestCase {
-
     func testEditorSelectionValidatesRoomFaceAndPortalAgainstCanonicalLevel() throws {
         let level = makeConnectedRoomProjectLevel()
 
         XCTAssertEqual(
-            try RevivalRoomSelection(sourceIndex: 3, in: level).sourceIndex,
-            3
+            try RevivalRoomSelection(sourceIndex: 3, in: level).sourceIndex, 3
         )
         let face = try RevivalFaceSelection(
-            roomSourceIndex: 3,
-            faceIndex: 0,
-            in: level
+            roomSourceIndex: 3, faceIndex: 0, in: level
         )
         XCTAssertEqual(face.roomSourceIndex, 3)
         XCTAssertEqual(face.faceIndex, 0)
         let portal = try RevivalPortalSelection(
-            roomSourceIndex: 3,
-            portalIndex: 0,
-            in: level
+            roomSourceIndex: 3, portalIndex: 0, in: level
         )
         XCTAssertEqual(portal.roomSourceIndex, 3)
         XCTAssertEqual(portal.portalIndex, 0)
@@ -49,8 +47,7 @@ final class EditorProjectTests: XCTestCase {
     func testEditorSelectionFollowsReciprocalPortalReferences() throws {
         let level = makeConnectedRoomProjectLevel()
         var selection = try RevivalEditorSelection(
-            roomSourceIndex: 3,
-            in: level
+            roomSourceIndex: 3, in: level
         )
 
         try selection.selectPortal(0, in: level)
@@ -80,13 +77,12 @@ final class EditorProjectTests: XCTestCase {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
         let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
         )
         defer { try? FileManager.default.removeItem(at: root) }
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate)
         let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
@@ -106,14 +102,9 @@ final class EditorProjectTests: XCTestCase {
         XCTAssertEqual(
             Set(object.keys),
             [
-                "base",
-                "faceMaterialEdits",
-                "objectTransformEdits",
-                "pathNodeOrientationEdits",
-                "playerStartTransformEdits",
-                "portalRenderingEdits",
-                "roomNameEdits",
-                "roomVertexEdits",
+                "base", "faceMaterialEdits", "objectTransformEdits",
+                "pathNodeOrientationEdits", "playerStartTransformEdits",
+                "portalRenderingEdits", "roomNameEdits", "roomVertexEdits",
                 "schemaVersion",
             ]
         )
@@ -139,21 +130,11 @@ final class EditorProjectTests: XCTestCase {
 
     @MainActor
     func testProjectRoundTripCanClearANameOwnedByTheInstalledBase() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
-        let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
-        )
         var base = makeMinimalCanonicalPackageLevel()
         let roomIndex = try XCTUnwrap(base.rooms.firstIndex { $0.sourceIndex == 3 })
         base.rooms[roomIndex].name = "Training Start"
+        let (root, library, activation) = try makeActivatedLibrary(base)
         defer { try? FileManager.default.removeItem(at: root) }
-
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(base, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
-        let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
             library: library
@@ -165,10 +146,7 @@ final class EditorProjectTests: XCTestCase {
             wrapper.fileWrappers?["project.json"]?.regularFileContents
         )
         let source = try JSONDecoder().decode(RevivalProjectSource.self, from: projectJSON)
-        XCTAssertEqual(
-            source.roomNameEdits,
-            [.init(sourceIndex: 3, name: nil)]
-        )
+        XCTAssertEqual(source.roomNameEdits, [.init(sourceIndex: 3, name: nil)])
 
         let reopened = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
@@ -203,8 +181,7 @@ final class EditorProjectTests: XCTestCase {
         var project = try makeProject(importedBase: importedBase)
 
         let previousName = try project.renameRoom(
-            sourceIndex: 3,
-            to: "Course Start"
+            sourceIndex: 3, to: "Course Start"
         )
 
         XCTAssertNil(previousName)
@@ -280,8 +257,7 @@ final class EditorProjectTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: projectPackage) }
 
         try FileManager.default.createDirectory(
-            at: projectPackage,
-            withIntermediateDirectories: false
+            at: projectPackage, withIntermediateDirectories: false
         )
         XCTAssertTrue(FileManager.default.createFile(atPath: projectJSON.path, contents: nil))
         let handle = try FileHandle(forWritingTo: projectJSON)
@@ -290,34 +266,14 @@ final class EditorProjectTests: XCTestCase {
 
         XCTAssertThrowsError(
             try document.read(
-                from: projectPackage,
-                ofType: RevivalProjectDocument.projectType
+                from: projectPackage, ofType: RevivalProjectDocument.projectType
             )
         ) {
             XCTAssertEqual(
-                $0 as? RevivalProjectDocumentError,
-                .projectFileTooLarge
+                $0 as? RevivalProjectDocumentError, .projectFileTooLarge
             )
         }
         XCTAssertEqual(document.project, original)
-    }
-
-    @MainActor
-    func testRenameSelectedRoomRegistersNamedUndoAndRedo() throws {
-        let document = RevivalProjectDocument(
-            project: try makeProject(importedBase: makeMinimalCanonicalPackageLevel())
-        )
-
-        try document.renameSelectedRoom(to: "Course Start")
-        XCTAssertEqual(document.project.level.rooms.first { $0.sourceIndex == 3 }?.name, "Course Start")
-        XCTAssertEqual(document.undoManager?.undoActionName, "Rename Room")
-
-        document.undoManager?.undo()
-        XCTAssertNil(document.project.level.rooms.first { $0.sourceIndex == 3 }?.name)
-        XCTAssertEqual(document.undoManager?.redoActionName, "Rename Room")
-
-        document.undoManager?.redo()
-        XCTAssertEqual(document.project.level.rooms.first { $0.sourceIndex == 3 }?.name, "Course Start")
     }
 
     @MainActor
@@ -355,15 +311,13 @@ final class EditorProjectTests: XCTestCase {
         )
     }
 
-
     @MainActor
     func testObjectAndPlayerStartTransformsUseStableIdentitiesAndNamedUndo() throws {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())
         )
         let quarterTurn = Matrix3(
-            right: .init(x: 0, y: 1, z: 0),
-            up: .init(x: -1, y: 0, z: 0),
+            right: .init(x: 0, y: 1, z: 0), up: .init(x: -1, y: 0, z: 0),
             forward: .init(x: 0, y: 0, z: 1)
         )
 
@@ -376,16 +330,14 @@ final class EditorProjectTests: XCTestCase {
                 to: .init(
                     position: .init(
                         x: objectBefore.position.x + 0.25,
-                        y: objectBefore.position.y,
-                        z: objectBefore.position.z
+                        y: objectBefore.position.y, z: objectBefore.position.z
                     ),
                     orientation: objectBefore.orientation
                 )
             )
         ) {
             XCTAssertEqual(
-                $0 as? RevivalProjectError,
-                .invalidObjectTransformEdit(6_147)
+                $0 as? RevivalProjectError, .invalidObjectTransformEdit(6_147)
             )
         }
         XCTAssertEqual(
@@ -414,8 +366,7 @@ final class EditorProjectTests: XCTestCase {
                 to: .init(
                     position: .init(
                         x: playerBefore.position.x + 0.25,
-                        y: playerBefore.position.y,
-                        z: playerBefore.position.z
+                        y: playerBefore.position.y, z: playerBefore.position.z
                     ),
                     orientation: playerBefore.orientation
                 )
@@ -441,25 +392,15 @@ final class EditorProjectTests: XCTestCase {
 
     @MainActor
     func testSelectedValueDeltasRoundTripDeterministicallyWithSemanticDiff() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
-        let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
-        )
         let importedBase = makeEditableProjectLevel()
+        let (root, library, activation) = try makeActivatedLibrary(importedBase)
         defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(importedBase, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
-        let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
             library: library
         )
         let quarterTurn = Matrix3(
-            right: .init(x: 0, y: 1, z: 0),
-            up: .init(x: -1, y: 0, z: 0),
+            right: .init(x: 0, y: 1, z: 0), up: .init(x: -1, y: 0, z: 0),
             forward: .init(x: 0, y: 0, z: 1)
         )
 
@@ -477,8 +418,7 @@ final class EditorProjectTests: XCTestCase {
         )
         let player = try XCTUnwrap(importedBase.objects.first { $0.handle == 2_048 })
         try document.setPlayerStartTransform(
-            playerID: player.storedID,
-            handle: player.handle,
+            playerID: player.storedID, handle: player.handle,
             to: .init(position: player.position, orientation: quarterTurn)
         )
 
@@ -508,35 +448,10 @@ final class EditorProjectTests: XCTestCase {
         var faces = room.faces
         let portalFaceIndex = room.portals[1].faceIndex
         let portalFace = faces[portalFaceIndex]
-        faces[portalFaceIndex] = LevelFace(
-            corners: Array(portalFace.corners.reversed()),
-            flags: portalFace.flags,
-            portalIndex: portalFace.portalIndex,
-            texture: portalFace.texture,
-            lightmapInfoIndex: portalFace.lightmapInfoIndex,
-            allowsLightCorona: portalFace.allowsLightCorona,
-            lightMultiple: portalFace.lightMultiple,
-            special: portalFace.special
+        faces[portalFaceIndex] = replacing(
+            portalFace, corners: Array(portalFace.corners.reversed())
         )
-        level.rooms[roomIndex] = LevelRoom(
-            sourceIndex: room.sourceIndex,
-            name: room.name,
-            pathPoint: room.pathPoint,
-            vertices: room.vertices,
-            faces: faces,
-            portals: room.portals,
-            flags: room.flags,
-            pulseTime: room.pulseTime,
-            pulseOffset: room.pulseOffset,
-            mirrorFaceIndex: room.mirrorFaceIndex,
-            door: room.door,
-            volumeLights: room.volumeLights,
-            fog: room.fog,
-            ambientSoundPattern: room.ambientSoundPattern,
-            reverb: room.reverb,
-            damage: room.damage,
-            damageType: room.damageType
-        )
+        level.rooms[roomIndex] = replacing(room, faces: faces)
 
         XCTAssertThrowsError(try level.validate()) {
             XCTAssertEqual(
@@ -551,13 +466,11 @@ final class EditorProjectTests: XCTestCase {
         let roomIndex = try XCTUnwrap(level.rooms.firstIndex { $0.sourceIndex == 2 })
         let portal = level.rooms[roomIndex].portals[1]
         level.rooms[roomIndex].portals[1] = LevelPortal(
-            flags: portal.flags,
-            faceIndex: level.rooms[roomIndex].faces.count,
+            flags: portal.flags, faceIndex: level.rooms[roomIndex].faces.count,
             connectedRoom: portal.connectedRoom,
             connectedPortal: portal.connectedPortal,
             boundaryNodeIndex: portal.boundaryNodeIndex,
-            pathPoint: portal.pathPoint,
-            combineMaster: portal.combineMaster
+            pathPoint: portal.pathPoint, combineMaster: portal.combineMaster
         )
 
         XCTAssertThrowsError(try level.validate()) {
@@ -598,63 +511,51 @@ final class EditorProjectTests: XCTestCase {
         )
         XCTAssertThrowsError(try degenerate.validate()) {
             XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .degenerateFace(room: 10, face: 0)
+                $0 as? LevelValidationError, .degenerateFace(room: 10, face: 0)
             )
         }
 
         let lowPrecisionNormal = levelWithFace(
             vertices: [
-                .zero,
-                .init(x: 0.01, y: 0, z: 0),
-                .init(x: 0, y: 0.01, z: 0),
+                .zero, .init(x: 0.01, y: 0, z: 0), .init(x: 0, y: 0.01, z: 0),
             ],
             indices: [0, 1, 2]
         )
         XCTAssertThrowsError(try lowPrecisionNormal.validate()) {
             XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .invalidFace(room: 10, face: 0)
+                $0 as? LevelValidationError, .invalidFace(room: 10, face: 0)
             )
         }
 
         let nonplanar = levelWithFace(
             vertices: [
-                .zero,
-                .init(x: 1, y: 0, z: 0),
-                .init(x: 1, y: 1, z: 0.5),
+                .zero, .init(x: 1, y: 0, z: 0), .init(x: 1, y: 1, z: 0.5),
                 .init(x: 0, y: 1, z: 0),
             ],
             indices: [0, 1, 2, 3]
         )
         XCTAssertThrowsError(try nonplanar.validate()) {
             XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .nonplanarFace(room: 10, face: 0)
+                $0 as? LevelValidationError, .nonplanarFace(room: 10, face: 0)
             )
         }
 
         let concave = levelWithFace(
             vertices: [
-                .zero,
-                .init(x: 2, y: 0, z: 0),
-                .init(x: 1, y: 0.5, z: 0),
-                .init(x: 2, y: 2, z: 0),
-                .init(x: 0, y: 2, z: 0),
+                .zero, .init(x: 2, y: 0, z: 0), .init(x: 1, y: 0.5, z: 0),
+                .init(x: 2, y: 2, z: 0), .init(x: 0, y: 2, z: 0),
             ],
             indices: [0, 1, 2, 3, 4]
         )
         XCTAssertThrowsError(try concave.validate()) {
             XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .concaveFace(room: 10, face: 0)
+                $0 as? LevelValidationError, .concaveFace(room: 10, face: 0)
             )
         }
 
         let sourceToleranceConcave = levelWithFace(
             vertices: [
-                .zero,
-                .init(x: 1.2037811, y: 1.5971571, z: 0),
+                .zero, .init(x: 1.2037811, y: 1.5971571, z: 0),
                 .init(x: 1.7434071, y: 1.1602463, z: -0.70276165),
                 .init(x: 2.3259587, y: 0.75136924, z: -1.4231515),
                 .init(x: 1.1221776, y: -0.8457879, z: -1.4231515),
@@ -663,42 +564,36 @@ final class EditorProjectTests: XCTestCase {
         )
         XCTAssertThrowsError(try sourceToleranceConcave.validate()) {
             XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .concaveFace(room: 10, face: 0)
+                $0 as? LevelValidationError, .concaveFace(room: 10, face: 0)
             )
         }
     }
 
     func testEditorQuarterTurnPreservesRigidOrientation() throws {
         let identity = Matrix3(
-            right: .init(x: 1, y: 0, z: 0),
-            up: .init(x: 0, y: 1, z: 0),
+            right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 1, z: 0),
             forward: .init(x: 0, y: 0, z: 1)
         )
 
         XCTAssertEqual(
             quarterTurnedProjectOrientation(identity),
             Matrix3(
-                right: .init(x: 0, y: 1, z: 0),
-                up: .init(x: -1, y: 0, z: 0),
+                right: .init(x: 0, y: 1, z: 0), up: .init(x: -1, y: 0, z: 0),
                 forward: .init(x: 0, y: 0, z: 1)
             )
         )
         let sourceObjectOrientation = Matrix3(
-            right: .init(x: -1, y: 0, z: 0),
-            up: .init(x: 0, y: 1, z: 0),
+            right: .init(x: -1, y: 0, z: 0), up: .init(x: 0, y: 1, z: 0),
             forward: .init(x: 0, y: 0, z: -1)
         )
         XCTAssertEqual(
             quarterTurnedProjectOrientation(sourceObjectOrientation),
             Matrix3(
-                right: .init(x: 0, y: 1, z: 0),
-                up: .init(x: 1, y: 0, z: 0),
+                right: .init(x: 0, y: 1, z: 0), up: .init(x: 1, y: 0, z: 0),
                 forward: .init(x: 0, y: 0, z: -1)
             )
         )
     }
-
 
     func testCombinedPortalRenderingEditIsRefusedWithoutChangingProject() throws {
         var level = makeEditableProjectLevel()
@@ -708,30 +603,26 @@ final class EditorProjectTests: XCTestCase {
             )
             let portal = level.rooms[roomIndex].portals[portalIndex]
             level.rooms[roomIndex].portals[portalIndex] = LevelPortal(
-                flags: portal.flags | 0x0000_0008,
-                faceIndex: portal.faceIndex,
+                flags: portal.flags | 0x0000_0008, faceIndex: portal.faceIndex,
                 connectedRoom: portal.connectedRoom,
                 connectedPortal: portal.connectedPortal,
                 boundaryNodeIndex: portal.boundaryNodeIndex,
-                pathPoint: portal.pathPoint,
-                combineMaster: portalIndex
+                pathPoint: portal.pathPoint, combineMaster: portalIndex
             )
         }
+
         var project = try makeProject(importedBase: level)
         let before = project
 
         XCTAssertThrowsError(
             try project.setPortalRendersFace(
-                roomSourceIndex: 3,
-                portalIndex: 0,
-                to: false
+                roomSourceIndex: 3, portalIndex: 0, to: false
             )
         ) {
             XCTAssertEqual(
                 $0 as? RevivalProjectError,
                 .combinedPortalRenderingEditDeferred(
-                    roomSourceIndex: 3,
-                    portalIndex: 0
+                    roomSourceIndex: 3, portalIndex: 0
                 )
             )
         }
@@ -739,10 +630,7 @@ final class EditorProjectTests: XCTestCase {
     }
 
     func testSemanticChangesSummaryStaysBoundedForTheEditorSidebar() {
-        XCTAssertEqual(
-            boundedSemanticChangesText([]),
-            "No authored changes"
-        )
+        XCTAssertEqual(boundedSemanticChangesText([]), "No authored changes")
         XCTAssertEqual(
             boundedSemanticChangesText(["Room 3 face 9 material changed"]),
             "Room 3 face 9 material changed"
@@ -760,19 +648,9 @@ final class EditorProjectTests: XCTestCase {
 
     @MainActor
     func testNonRoomThreeRenameUndoAndProjectReopenPreserveImmutableBase() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
-        let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
-        )
         let importedBase = makeConnectedRoomProjectLevel()
+        let (root, library, activation) = try makeActivatedLibrary(importedBase)
         defer { try? FileManager.default.removeItem(at: root) }
-
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(importedBase, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
-        let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
             library: library
@@ -821,18 +699,10 @@ final class EditorProjectTests: XCTestCase {
 
     @MainActor
     func testCaseOnlyRenameSupportsUndoRedoAndProjectRoundTrip() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
-        let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
+        let (root, library, activation) = try makeActivatedLibrary(
+            makeMinimalCanonicalPackageLevel()
         )
         defer { try? FileManager.default.removeItem(at: root) }
-
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
-        let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
             library: library
@@ -875,18 +745,10 @@ final class EditorProjectTests: XCTestCase {
 
     @MainActor
     func testProjectWrapperIsDeterministicAndRestoresDefaultViewState() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
-        let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
+        let (root, library, activation) = try makeActivatedLibrary(
+            makeMinimalCanonicalPackageLevel()
         )
         defer { try? FileManager.default.removeItem(at: root) }
-
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
-        let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
             library: library
@@ -913,8 +775,7 @@ final class EditorProjectTests: XCTestCase {
             library: library
         )
         try reopened.read(
-            from: firstWrapper,
-            ofType: RevivalProjectDocument.projectType
+            from: firstWrapper, ofType: RevivalProjectDocument.projectType
         )
         XCTAssertEqual(reopened.project, expectedProject)
         XCTAssertEqual(reopened.selectedRoomSourceIndex, 3)
@@ -927,20 +788,17 @@ final class EditorProjectTests: XCTestCase {
         let temporaryRoot = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let candidate = temporaryRoot.appending(
-            path: "candidate.revival",
-            directoryHint: .isDirectory
+            path: "candidate.revival", directoryHint: .isDirectory
         )
         let library = CanonicalPackageLibrary(
-            rootURL: temporaryRoot.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
+            rootURL: temporaryRoot.appending(path: "library", directoryHint: .isDirectory)
         )
         defer { try? FileManager.default.removeItem(at: temporaryRoot) }
 
         try FileManager.default.createDirectory(
-            at: temporaryRoot,
-            withIntermediateDirectories: false
+            at: temporaryRoot, withIntermediateDirectories: false
         )
-        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
+        try writeCanonicalPackage(makeMinimalCanonicalPackageLevel(), to: candidate)
         let activation = try library.installAndActivate(from: candidate)
         let original = try RevivalProject(activatedBase: activation)
         let document = RevivalProjectDocument(project: original, library: library)
@@ -953,8 +811,7 @@ final class EditorProjectTests: XCTestCase {
             ["sourceIndex": 3, "name": "control room"],
         ]
         let hostileJSON = try JSONSerialization.data(
-            withJSONObject: root,
-            options: [.sortedKeys]
+            withJSONObject: root, options: [.sortedKeys]
         )
         let hostileWrapper = FileWrapper(directoryWithFileWrappers: [
             "project.json": FileWrapper(regularFileWithContents: hostileJSON),
@@ -962,23 +819,18 @@ final class EditorProjectTests: XCTestCase {
 
         XCTAssertThrowsError(
             try document.read(
-                from: hostileWrapper,
-                ofType: RevivalProjectDocument.projectType
+                from: hostileWrapper, ofType: RevivalProjectDocument.projectType
             )
         ) {
             XCTAssertEqual(
-                $0 as? RevivalProjectError,
-                .duplicateRoomName("control room")
+                $0 as? RevivalProjectError, .duplicateRoomName("control room")
             )
         }
         XCTAssertEqual(document.project, original)
 
-        root["roomNameEdits"] = [
-            ["sourceIndex": 2, "name": "  "],
-        ]
+        root["roomNameEdits"] = [["sourceIndex": 2, "name": "  "]]
         let whitespaceJSON = try JSONSerialization.data(
-            withJSONObject: root,
-            options: [.sortedKeys]
+            withJSONObject: root, options: [.sortedKeys]
         )
         let whitespaceWrapper = FileWrapper(directoryWithFileWrappers: [
             "project.json": FileWrapper(regularFileWithContents: whitespaceJSON),
@@ -993,12 +845,9 @@ final class EditorProjectTests: XCTestCase {
         }
         XCTAssertEqual(document.project, original)
 
-        root["roomNameEdits"] = [
-            ["sourceIndex": 999, "name": "Unknown Room"],
-        ]
+        root["roomNameEdits"] = [["sourceIndex": 999, "name": "Unknown Room"]]
         let unknownRoomJSON = try JSONSerialization.data(
-            withJSONObject: root,
-            options: [.sortedKeys]
+            withJSONObject: root, options: [.sortedKeys]
         )
         let unknownRoomWrapper = FileWrapper(directoryWithFileWrappers: [
             "project.json": FileWrapper(regularFileWithContents: unknownRoomJSON),
@@ -1030,16 +879,14 @@ final class EditorProjectTests: XCTestCase {
         let wrapper = FileWrapper(directoryWithFileWrappers: [
             "project.json": FileWrapper(
                 regularFileWithContents: try JSONSerialization.data(
-                    withJSONObject: object,
-                    options: [.sortedKeys]
+                    withJSONObject: object, options: [.sortedKeys]
                 )
             ),
         ])
 
         XCTAssertThrowsError(
             try document.read(
-                from: wrapper,
-                ofType: RevivalProjectDocument.projectType
+                from: wrapper, ofType: RevivalProjectDocument.projectType
             )
         ) {
             XCTAssertEqual($0 as? RevivalProjectError, .unsupportedSchema(5))
@@ -1105,22 +952,14 @@ final class EditorProjectTests: XCTestCase {
             objects.firstIndex { $0.handle == binding.objectHandle }
         )
         let player = objects[playerIndex]
-        objects[playerIndex] = PlacedObject(
-            handle: player.handle,
-            type: player.type,
-            storedID: player.storedID,
-            definition: player.definition,
-            instanceName: player.instanceName,
-            flags: player.flags,
-            doorShields: player.doorShields,
-            location: .room(3),
-            position: RoomCamera.trainingRoom3.position,
-            orientation: player.orientation,
-            containsType: player.containsType,
-            containsID: player.containsID,
-            containsCount: player.containsCount,
-            lifeLeft: player.lifeLeft,
-            soundSource: player.soundSource,
+        objects[playerIndex] = PlacedObject.fixture(
+            handle: player.handle, type: player.type, storedID: player.storedID,
+            definition: player.definition, name: player.instanceName,
+            flags: player.flags, doorShields: player.doorShields,
+            location: .room(3), position: RoomCamera.trainingRoom3.position,
+            orientation: player.orientation, containsType: player.containsType,
+            containsID: player.containsID, containsCount: player.containsCount,
+            lifeLeft: player.lifeLeft, soundSource: player.soundSource,
             inertScriptName: player.inertScriptName,
             inertModuleName: player.inertModuleName,
             lightmapSubmodels: player.lightmapSubmodels
@@ -1128,9 +967,7 @@ final class EditorProjectTests: XCTestCase {
         let project = try makeProject(
             importedBase: replacing(base, objects: objects)
         )
-        let document = RevivalProjectDocument(
-            project: project
-        )
+        let document = RevivalProjectDocument(project: project)
         let editorCamera = document.camera
 
         let staged = document.makePlaySession()
@@ -1155,30 +992,25 @@ final class EditorProjectTests: XCTestCase {
         let center = points.reduce(Vector3.zero) {
             .init(x: $0.x + $1.x, y: $0.y + $1.y, z: $0.z + $1.z)
         }
+
         let faceCenter = Vector3(
             x: center.x / Float(points.count),
-            y: center.y / Float(points.count),
-            z: center.z / Float(points.count)
+            y: center.y / Float(points.count), z: center.z / Float(points.count)
         )
         let normal = try XCTUnwrap(canonicalFaceNormal(room: room, face: face))
         let start = Vector3(
-            x: faceCenter.x + normal.x * 0.5,
-            y: faceCenter.y + normal.y * 0.5,
+            x: faceCenter.x + normal.x * 0.5, y: faceCenter.y + normal.y * 0.5,
             z: faceCenter.z + normal.z * 0.5
         )
         let end = Vector3(
-            x: faceCenter.x - normal.x * 0.5,
-            y: faceCenter.y - normal.y * 0.5,
+            x: faceCenter.x - normal.x * 0.5, y: faceCenter.y - normal.y * 0.5,
             z: faceCenter.z - normal.z * 0.5
         )
 
         try document.selectPortal(0)
         document.commitPlaySession(document.makePlaySession())
         let blocked = try document.tracePlayIndoorMovement(
-            startRoom: 3,
-            start: start,
-            end: end,
-            radius: 0
+            startRoom: 3, start: start, end: end, radius: 0
         )
         guard case .wallHit(let contact) = blocked.outcome else {
             return XCTFail("Rendered room 3 portal 0 must block")
@@ -1197,10 +1029,7 @@ final class EditorProjectTests: XCTestCase {
         try document.setSelectedPortalRendersFaces(false)
         document.commitPlaySession(document.makePlaySession())
         let open = try document.tracePlayIndoorMovement(
-            startRoom: 3,
-            start: start,
-            end: end,
-            radius: 0
+            startRoom: 3, start: start, end: end, radius: 0
         )
         XCTAssertEqual(open.outcome, .noHit)
         XCTAssertEqual(open.containingRoomSourceIndex, 2)
@@ -1230,13 +1059,11 @@ final class EditorProjectTests: XCTestCase {
 
         let movedCamera = RoomCamera(
             position: .init(
-                x: staged.camera.position.x + 0.25,
-                y: staged.camera.position.y,
+                x: staged.camera.position.x + 0.25, y: staged.camera.position.y,
                 z: staged.camera.position.z
             ),
             target: .init(
-                x: staged.camera.target.x + 0.25,
-                y: staged.camera.target.y,
+                x: staged.camera.target.x + 0.25, y: staged.camera.target.y,
                 z: staged.camera.target.z
             ),
             up: staged.camera.up,
@@ -1261,11 +1088,9 @@ final class EditorProjectTests: XCTestCase {
         let simulation = staged.makePlayerSimulation(
             presentationReadyTimestamp: 0
         )
+        simulation.enableAllPlayerControls()
 
-        let frame = simulation.update(
-            at: 0.016,
-            input: .init(afterburner: 1)
-        )
+        let frame = simulation.update(at: 0.016, input: .init(afterburner: 1))
 
         XCTAssertNotEqual(frame.playerView.camera.position, authoredPosition)
         XCTAssertTrue(simulation.afterburnerIsActive)
@@ -1323,13 +1148,11 @@ final class EditorProjectTests: XCTestCase {
         let before = try XCTUnwrap(document.playSession)
         let proposed = RoomCamera(
             position: .init(
-                x: before.camera.position.x - 2,
-                y: before.camera.position.y,
+                x: before.camera.position.x - 2, y: before.camera.position.y,
                 z: before.camera.position.z
             ),
             target: .init(
-                x: before.camera.target.x - 2,
-                y: before.camera.target.y,
+                x: before.camera.target.x - 2, y: before.camera.target.y,
                 z: before.camera.target.z
             ),
             up: before.camera.up,
@@ -1338,8 +1161,7 @@ final class EditorProjectTests: XCTestCase {
 
         XCTAssertThrowsError(try document.makePlaySession(movingCameraTo: proposed)) {
             XCTAssertEqual(
-                $0 as? RevivalProjectDocumentError,
-                .cameraOutsideRoom(3)
+                $0 as? RevivalProjectDocumentError, .cameraOutsideRoom(3)
             )
         }
         XCTAssertEqual(document.playSession, before)
@@ -1356,9 +1178,7 @@ final class EditorProjectTests: XCTestCase {
         let typedPosition = Vector3(x: 0.25, y: 0.125, z: 0)
 
         try document.setRoomVertex(
-            roomSourceIndex: 40,
-            vertexIndex: 0,
-            to: typedPosition
+            roomSourceIndex: 40, vertexIndex: 0, to: typedPosition
         )
         XCTAssertEqual(
             document.project.level.rooms.first { $0.sourceIndex == 40 }!.vertices[0],
@@ -1375,9 +1195,7 @@ final class EditorProjectTests: XCTestCase {
             $0.sourceIndex == 41
         }!.vertices[0]
         try document.snapRoomVertex(
-            roomSourceIndex: 40,
-            vertexIndex: 0,
-            toRoomSourceIndex: 41,
+            roomSourceIndex: 40, vertexIndex: 0, toRoomSourceIndex: 41,
             toVertexIndex: 0
         )
         XCTAssertEqual(
@@ -1400,10 +1218,10 @@ final class EditorProjectTests: XCTestCase {
         let center = points.reduce(Vector3.zero) {
             .init(x: $0.x + $1.x, y: $0.y + $1.y, z: $0.z + $1.z)
         }
+
         let portalCenter = Vector3(
             x: center.x / Float(points.count),
-            y: center.y / Float(points.count),
-            z: center.z / Float(points.count)
+            y: center.y / Float(points.count), z: center.z / Float(points.count)
         )
         let normal = try XCTUnwrap(canonicalFaceNormal(room: room3, face: face))
         let room2Point = Vector3(
@@ -1477,8 +1295,7 @@ final class EditorProjectTests: XCTestCase {
             }
         )
         let result = try closed.movePlayerStart(
-            playerID: 0,
-            handle: player.handle,
+            playerID: 0, handle: player.handle,
             to: .init(x: player.position.x - 10, y: player.position.y, z: player.position.z)
         )
         XCTAssertEqual(result.committedLocation, .room(3))
@@ -1507,26 +1324,16 @@ final class EditorProjectTests: XCTestCase {
 
     @MainActor
     func testNewAuthoredValuesRoundTripByteStablyAndPlayThroughSeparateCopy() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
-        let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
-        )
         let base = makeGeometryProjectLevel()
+        let (root, library, activation) = try makeActivatedLibrary(base)
         defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-        try writeCanonicalPackage(base, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
-        let activation = try library.installAndActivate(from: candidate)
         let document = RevivalProjectDocument(
             project: try RevivalProject(activatedBase: activation),
             library: library
         )
 
         try document.setRoomVertex(
-            roomSourceIndex: 40,
-            vertexIndex: 0,
+            roomSourceIndex: 40, vertexIndex: 0,
             to: .init(x: 0.25, y: 0.125, z: 0)
         )
         let room3 = document.project.level.rooms.first { $0.sourceIndex == 3 }!
@@ -1534,9 +1341,11 @@ final class EditorProjectTests: XCTestCase {
         let portalPoints = portalFace.corners.map {
             room3.vertices[$0.vertexIndex]
         }
+
         let portalSum = portalPoints.reduce(Vector3.zero) {
             .init(x: $0.x + $1.x, y: $0.y + $1.y, z: $0.z + $1.z)
         }
+
         let portalCenter = Vector3(
             x: portalSum.x / Float(portalPoints.count),
             y: portalSum.y / Float(portalPoints.count),
@@ -1571,8 +1380,7 @@ final class EditorProjectTests: XCTestCase {
             playerID: 0,
             handle: player.handle,
             to: .init(
-                x: player.position.x + 0.05,
-                y: player.position.y,
+                x: player.position.x + 0.05, y: player.position.y,
                 z: player.position.z
             )
         )
@@ -1600,8 +1408,7 @@ final class EditorProjectTests: XCTestCase {
         XCTAssertEqual(
             reopened.project.level.objects.first { $0.handle == 2_048 }?.position,
             .init(
-                x: player.position.x + 0.05,
-                y: player.position.y,
+                x: player.position.x + 0.05, y: player.position.y,
                 z: player.position.z
             )
         )
@@ -1620,18 +1427,9 @@ final class EditorProjectTests: XCTestCase {
     }
 
     func testProjectBoundaryRejectsPlacementWhoseRecordedRoomDoesNotContainIt() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
-        let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
-        )
-        defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let base = makeGeometryProjectLevel()
-        try writeCanonicalPackage(base, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
-        let activation = try library.installAndActivate(from: candidate)
+        let (root, library, activation) = try makeActivatedLibrary(base)
+        defer { try? FileManager.default.removeItem(at: root) }
         var source = RevivalProjectSource(base: activation.reference)
         let object = try XCTUnwrap(base.objects.first { $0.handle == 6_147 })
         source.objectTransformEdits = [
@@ -1640,8 +1438,7 @@ final class EditorProjectTests: XCTestCase {
                 location: .room(2),
                 transform: .init(
                     position: .init(
-                        x: object.position.x + 0.05,
-                        y: object.position.y,
+                        x: object.position.x + 0.05, y: object.position.y,
                         z: object.position.z
                     ),
                     orientation: object.orientation
@@ -1658,49 +1455,29 @@ final class EditorProjectTests: XCTestCase {
     }
 
     func testProjectBoundaryValidatesGeometryBeforeContainment() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
-        let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
-        )
-        defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let base = makeClosedRoomProjectLevel()
-        try writeCanonicalPackage(base, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
-        let activation = try library.installAndActivate(from: candidate)
+        let (root, library, activation) = try makeActivatedLibrary(base)
+        defer { try? FileManager.default.removeItem(at: root) }
         let room = try XCTUnwrap(base.rooms.first { $0.sourceIndex == 3 })
         var source = RevivalProjectSource(base: activation.reference)
         source.roomVertexEdits = [3, 4, 7].map {
             .init(
-                roomSourceIndex: room.sourceIndex,
-                vertexIndex: $0,
+                roomSourceIndex: room.sourceIndex, vertexIndex: $0,
                 position: room.vertices[0]
             )
         }
 
         XCTAssertThrowsError(try RevivalProject(source: source, library: library)) {
             XCTAssertEqual(
-                $0 as? LevelValidationError,
-                .invalidFace(room: 3, face: 0)
+                $0 as? LevelValidationError, .invalidFace(room: 3, face: 0)
             )
         }
     }
 
     func testProjectBoundaryRejectsDeferredTerrainPlacement() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
-        let library = CanonicalPackageLibrary(
-            rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-            schemaPolicy: .includingScriptFreeTestSchemas
-        )
-        defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let base = makeGeometryProjectLevel()
-        try writeCanonicalPackage(base, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
-        let activation = try library.installAndActivate(from: candidate)
+        let (root, library, activation) = try makeActivatedLibrary(base)
+        defer { try? FileManager.default.removeItem(at: root) }
         let object = try XCTUnwrap(base.objects.first { $0.handle == 6_147 })
         var source = RevivalProjectSource(base: activation.reference)
         source.objectTransformEdits = [
@@ -1708,8 +1485,7 @@ final class EditorProjectTests: XCTestCase {
                 handle: object.handle,
                 location: .terrainCell(0),
                 transform: .init(
-                    position: object.position,
-                    orientation: object.orientation
+                    position: object.position, orientation: object.orientation
                 )
             ),
         ]
@@ -1726,20 +1502,118 @@ final class EditorProjectTests: XCTestCase {
         var project = try makeProject(importedBase: makeGeometryProjectLevel())
         let object = try XCTUnwrap(project.level.objects.first { $0.handle == 6_147 })
         let end = Vector3(
-            x: object.position.x - 10,
-            y: object.position.y,
+            x: object.position.x - 10, y: object.position.y,
             z: object.position.z
         )
 
         XCTAssertThrowsError(try project.moveObject(handle: object.handle, to: end)) {
             guard case .placementBlocked(
-                owner: "Object 6147",
-                roomSourceIndex: 3,
-                faceIndex: _
+                owner: "Object 6147", roomSourceIndex: 3, faceIndex: _
             ) = $0 as? RevivalProjectError else {
                 return XCTFail("Expected the canonical object radius to refuse a near-wall move")
             }
         }
+    }
+
+    /// A project keeps the package's object and weapon tables and the
+    /// object names a level script looks up (osipf_FindObjectName): object
+    /// edits persist through save and reopen and reach the disposable play
+    /// level, and the installed base keeps its values.
+    @MainActor
+    func testObjectEditsKeepTheObjectTablesAndNamesThroughSaveAndPlay()
+        throws
+    {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let candidate = root.appending(
+            path: "candidate.revival", directoryHint: .isDirectory
+        )
+        let library = CanonicalPackageLibrary(
+            rootURL: root.appending(path: "library", directoryHint: .isDirectory)
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root, withIntermediateDirectories: false
+        )
+        let base = makeTrainingDodgeAttemptLevel()
+        try writeCanonicalPackage(base, to: candidate)
+        let activation = try library.installAndActivate(from: candidate)
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        XCTAssertEqual(document.project.level.objectInfos, base.objectInfos)
+        let names = [
+            "StartGoal", "LeftGoal", "UpGoal", "ForwardGoal", "FinishCourse",
+        ]
+        let handles = names.map { base.findObjectName($0) }
+        func orientation(_ level: Level, _ handle: ObjectHandle) -> Matrix3? {
+            level.objects.first { ObjectHandle($0.handle) == handle }?
+                .orientation
+        }
+        // Opening both portals of room 2, each with its undo and redo,
+        // leaves the portals of rooms 49 and 36 closed.
+        func portalFlags(_ room: Int) -> [UInt32] {
+            document.project.level.rooms.first { $0.sourceIndex == room }!
+                .portals.map { $0.flags & 1 }
+        }
+        try document.selectRoom(sourceIndex: 2)
+        for portalIndex in [0, 1] {
+            try document.selectPortal(portalIndex)
+            try document.setSelectedPortalRendersFaces(false)
+            XCTAssertEqual(
+                document.undoManager?.undoActionName, "Set Portal Rendering"
+            )
+            document.undoManager?.undo()
+            XCTAssertEqual(portalFlags(2)[portalIndex], 1)
+            document.undoManager?.redo()
+            XCTAssertEqual(portalFlags(2)[portalIndex], 0)
+        }
+        XCTAssertEqual(portalFlags(49), [1, 1])
+        XCTAssertEqual(portalFlags(36), [1, 1])
+
+        for handle in handles {
+            try document.rotateObjectQuarterTurn(handle: handle.rawValue)
+            XCTAssertEqual(
+                document.undoManager?.undoActionName, "Transform Object"
+            )
+            let rotated = orientation(document.project.level, handle)
+            XCTAssertNotEqual(rotated, orientation(base, handle))
+            document.undoManager?.undo()
+            XCTAssertEqual(
+                orientation(document.project.level, handle),
+                orientation(base, handle)
+            )
+            document.undoManager?.redo()
+            XCTAssertEqual(orientation(document.project.level, handle), rotated)
+        }
+
+        let edited = document.project.level
+
+        let reopened = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        try reopened.read(
+            from: document.fileWrapper(ofType: RevivalProjectDocument.projectType),
+            ofType: RevivalProjectDocument.projectType
+        )
+        XCTAssertEqual(reopened.project, document.project)
+        let play = reopened.makePlaySession()
+        reopened.commitPlaySession(play, renderingWorld: false)
+        for (name, handle) in zip(names, handles) {
+            XCTAssertEqual(play.level.findObjectName(name), handle, name)
+            XCTAssertEqual(
+                orientation(play.level, handle), orientation(edited, handle),
+                name
+            )
+        }
+        XCTAssertEqual(play.level.objectInfos, base.objectInfos)
+        XCTAssertEqual(play.level.weapons, base.weapons)
+        reopened.returnToEditor(renderingWorld: false)
+        XCTAssertNil(reopened.playSession)
+        XCTAssertEqual(reopened.project.level, edited)
+        XCTAssertEqual(try library.loadActive()?.level, base)
     }
 }
 
@@ -1748,13 +1622,12 @@ func makeProject(importedBase: Level) throws -> RevivalProject {
         .appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let candidate = root.appending(path: "candidate.revival", directoryHint: .isDirectory)
     let library = CanonicalPackageLibrary(
-        rootURL: root.appending(path: "library", directoryHint: .isDirectory),
-        schemaPolicy: .includingScriptFreeTestSchemas
+        rootURL: root.appending(path: "library", directoryHint: .isDirectory)
     )
     defer { try? FileManager.default.removeItem(at: root) }
 
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-    try writeCanonicalPackage(importedBase, to: candidate, schemaPolicy: .includingScriptFreeTestSchemas)
+    try writeCanonicalPackage(packageLevel(importedBase), to: candidate)
     return try RevivalProject(
         activatedBase: library.installAndActivate(from: candidate)
     )
@@ -1779,8 +1652,7 @@ private func makeConnectedRoomProjectLevel() -> Level {
                 FaceCorner(
                     vertexIndex: vertexIndex,
                     u: offset == 1 || offset == 2 ? 1 : 0,
-                    v: offset >= 2 ? 1 : 0,
-                    alpha: 255
+                    v: offset >= 2 ? 1 : 0, alpha: 255
                 )
             },
             flags: 0,
@@ -1791,53 +1663,29 @@ private func makeConnectedRoomProjectLevel() -> Level {
 
     let room3Index = level.rooms.firstIndex { $0.sourceIndex == 3 }!
     let room3 = level.rooms[room3Index]
-    level.rooms[room3Index] = LevelRoom(
-        sourceIndex: room3.sourceIndex,
-        name: room3.name,
-        pathPoint: room3.pathPoint,
-        vertices: room3.vertices,
+    level.rooms[room3Index] = replacing(
+        room3,
         faces: room3.faces.enumerated().map { index, face in
             guard index == 0 else { return face }
-            return LevelFace(
-                corners: face.corners,
-                flags: face.flags,
-                portalIndex: 0,
-                texture: face.texture,
-                lightmapInfoIndex: face.lightmapInfoIndex,
-                allowsLightCorona: face.allowsLightCorona,
-                lightMultiple: face.lightMultiple,
-                special: face.special
-            )
+            return replacing(face, portalIndex: 0)
         },
-        portals: [.init(faceIndex: 0, connectedRoom: 2, connectedPortal: 1)],
-        flags: room3.flags,
-        pulseTime: room3.pulseTime,
-        pulseOffset: room3.pulseOffset,
-        mirrorFaceIndex: room3.mirrorFaceIndex,
-        door: room3.door,
-        volumeLights: room3.volumeLights,
-        fog: room3.fog,
-        ambientSoundPattern: room3.ambientSoundPattern,
-        reverb: room3.reverb,
-        damage: room3.damage,
-        damageType: room3.damageType
+        portals: [.init(faceIndex: 0, connectedRoom: 2, connectedPortal: 1)]
     )
     let room3PortalPoints = level.rooms[room3Index].faces[0].corners.map {
         level.rooms[room3Index].vertices[$0.vertexIndex]
     }
+
     let room1PortalPoints = room3PortalPoints.map {
         Vector3(x: $0.x - 2, y: $0.y, z: $0.z)
     }
+
     let room2Vertices = room3PortalPoints + room1PortalPoints
     level.rooms.removeAll { $0.sourceIndex == 2 || $0.sourceIndex == 4 }
     level.rooms.append(
         LevelRoom(
             sourceIndex: 2,
             vertices: room2Vertices,
-            faces: [
-                portalFace([4, 5, 6, 7], 0),
-                portalFace([0, 3, 2, 1], 1),
-            ],
+            faces: [portalFace([4, 5, 6, 7], 0), portalFace([0, 3, 2, 1], 1)],
             portals: [
                 .init(faceIndex: 0, connectedRoom: 1, connectedPortal: 0),
                 .init(faceIndex: 1, connectedRoom: 3, connectedPortal: 0),
@@ -1846,8 +1694,7 @@ private func makeConnectedRoomProjectLevel() -> Level {
     )
     level.rooms.append(
         LevelRoom(
-            sourceIndex: 1,
-            vertices: room1PortalPoints,
+            sourceIndex: 1, vertices: room1PortalPoints,
             faces: [portalFace([0, 3, 2, 1], 0)],
             portals: [.init(faceIndex: 0, connectedRoom: 2, connectedPortal: 0)]
         )
@@ -1859,12 +1706,9 @@ private func makeEditableProjectLevel() -> Level {
     let base = makeConnectedRoomProjectLevel()
     let alternateTexture = SourceResource(storedIndex: 1, sourceName: "alternate-wall")
     let alternateMaterial = PresentationMaterial(
-        texture: alternateTexture,
-        bitmapSourceName: "alternate-wall.ogf",
+        texture: alternateTexture, bitmapSourceName: "alternate-wall.ogf",
         image: .init(width: 1, height: 1, rgba8: Data([128, 128, 128, 255])),
-        blend: .opaque,
-        lightmapBlend: .multiply,
-        waterProcedural: nil,
+        blend: .opaque, lightmapBlend: .multiply, waterProcedural: nil,
         sourceArchive: base.source.profileFiles[0].relativePath,
         sourceSHA256: String(repeating: "e", count: 64)
     )
@@ -1872,80 +1716,37 @@ private func makeEditableProjectLevel() -> Level {
     let roomIndex = rooms.firstIndex { $0.sourceIndex == 3 }!
     let room = rooms[roomIndex]
     let faces = room.faces.enumerated().map { index, face in
-        LevelFace(
-            corners: face.corners,
-            flags: face.flags,
-            portalIndex: face.portalIndex,
-            texture: index == 1 || index == 2 ? alternateTexture : face.texture,
-            lightmapInfoIndex: face.lightmapInfoIndex,
-            allowsLightCorona: face.allowsLightCorona,
-            lightMultiple: face.lightMultiple,
-            special: face.special
+        replacing(
+            face,
+            texture: index == 1 || index == 2 ? alternateTexture : face.texture
         )
     }
-    rooms[roomIndex] = LevelRoom(
-        sourceIndex: room.sourceIndex,
-        name: room.name,
-        pathPoint: room.pathPoint,
-        vertices: room.vertices,
+    rooms[roomIndex] = replacing(
+        room,
         faces: faces,
         portals: room.portals.map {
             LevelPortal(
-                flags: $0.flags | 1,
-                faceIndex: $0.faceIndex,
+                flags: $0.flags | 1, faceIndex: $0.faceIndex,
                 connectedRoom: $0.connectedRoom,
                 connectedPortal: $0.connectedPortal,
                 boundaryNodeIndex: $0.boundaryNodeIndex,
-                pathPoint: $0.pathPoint,
-                combineMaster: $0.combineMaster
+                pathPoint: $0.pathPoint, combineMaster: $0.combineMaster
             )
-        },
-        flags: room.flags,
-        pulseTime: room.pulseTime,
-        pulseOffset: room.pulseOffset,
-        mirrorFaceIndex: room.mirrorFaceIndex,
-        door: room.door,
-        volumeLights: room.volumeLights,
-        fog: room.fog,
-        ambientSoundPattern: room.ambientSoundPattern,
-        reverb: room.reverb,
-        damage: room.damage,
-        damageType: room.damageType
+        }
     )
     let identity = Matrix3(
-        right: .init(x: 1, y: 0, z: 0),
-        up: .init(x: 0, y: 1, z: 0),
+        right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 1, z: 0),
         forward: .init(x: 0, y: 0, z: 1)
     )
     func object(
-        handle: UInt32,
-        type: UInt8,
-        storedID: Int,
-        room: Int,
-        position: Vector3
+        handle: UInt32, type: UInt8, storedID: Int, room: Int, position: Vector3
     ) -> PlacedObject {
-        PlacedObject(
-            handle: handle,
-            type: type,
-            storedID: storedID,
-            definition: nil,
-            instanceName: nil,
-            flags: 0,
-            doorShields: nil,
-            location: .room(room),
-            position: position,
-            orientation: identity,
-            containsType: 0,
-            containsID: 0,
-            containsCount: 0,
-            lifeLeft: 0,
-            soundSource: nil,
-            inertScriptName: nil,
-            inertModuleName: nil,
-            lightmapSubmodels: []
+        PlacedObject.fixture(
+            handle: handle, type: type, storedID: storedID,
+            location: .room(room), position: position, orientation: identity
         )
     }
-    return Level(
+    return packageLevel(Level(
         schemaVersion: base.schemaVersion,
         missionKey: base.missionKey,
         levelKey: base.levelKey,
@@ -1955,17 +1756,11 @@ private func makeEditableProjectLevel() -> Level {
         terrain: base.terrain,
         objects: [
             object(
-                handle: 2_048,
-                type: D3SourceIdentity.playerObjectType,
-                storedID: 0,
-                room: 1,
-                position: .init(x: 0.25, y: 0.25, z: 0)
+                handle: 2_048, type: D3SourceIdentity.playerObjectType,
+                storedID: 0, room: 1, position: .init(x: 0.25, y: 0.25, z: 0)
             ),
             object(
-                handle: 6_147,
-                type: 6,
-                storedID: 0,
-                room: 3,
+                handle: 6_147, type: 6, storedID: 0, room: 3,
                 position: RoomCamera.trainingRoom3.target
             ),
         ],
@@ -1988,8 +1783,7 @@ private func makeEditableProjectLevel() -> Level {
         dependencyManifest: .init(
             current: base.dependencyManifest.current + [
                 .init(
-                    category: "texture",
-                    source: alternateTexture,
+                    category: "texture", source: alternateTexture,
                     state: "presentation-payload-imported",
                     provenance: "synthetic editable project fixture"
                 ),
@@ -1997,7 +1791,7 @@ private func makeEditableProjectLevel() -> Level {
             historicalEagerBaseline: base.dependencyManifest.historicalEagerBaseline
         ),
         sourceChunks: base.sourceChunks
-    )
+    ))
 }
 
 private func makeGeometryProjectLevel() -> Level {
@@ -2007,10 +1801,8 @@ private func makeGeometryProjectLevel() -> Level {
         LevelFace(
             corners: indices.enumerated().map { offset, vertexIndex in
                 FaceCorner(
-                    vertexIndex: vertexIndex,
-                    u: offset == 1 ? 1 : 0,
-                    v: offset == 2 ? 1 : 0,
-                    alpha: 255
+                    vertexIndex: vertexIndex, u: offset == 1 ? 1 : 0,
+                    v: offset == 2 ? 1 : 0, alpha: 255
                 )
             },
             flags: 0,
@@ -2018,12 +1810,12 @@ private func makeGeometryProjectLevel() -> Level {
             texture: texture
         )
     }
+
     let rooms = [
         LevelRoom(
             sourceIndex: 40,
             vertices: [
-                .init(x: 0, y: 0, z: 0),
-                .init(x: 2, y: 0, z: 0),
+                .init(x: 0, y: 0, z: 0), .init(x: 2, y: 0, z: 0),
                 .init(x: 0, y: 2, z: 0),
             ],
             faces: [face([0, 1, 2])],
@@ -2032,8 +1824,7 @@ private func makeGeometryProjectLevel() -> Level {
         LevelRoom(
             sourceIndex: 41,
             vertices: [
-                .init(x: 0.5, y: 0.25, z: 0),
-                .init(x: 2.5, y: 0.25, z: 0),
+                .init(x: 0.5, y: 0.25, z: 0), .init(x: 2.5, y: 0.25, z: 0),
                 .init(x: 0.5, y: 2.25, z: 0),
             ],
             faces: [face([0, 1, 2])],
@@ -2048,23 +1839,14 @@ private func makeGeometryProjectLevel() -> Level {
         objects[index].location = .room(3)
         objects[index].position = RoomCamera.trainingRoom3.position
     }
+
     var presentations = base.objectPresentations
     if !presentations.contains(where: { $0.objectHandle == 6_147 }),
        let model = base.models.first {
-        presentations.append(.init(
-            objectHandle: 6_147,
-            primaryModel: model.source,
-            mediumModel: nil,
-            lowModel: nil,
-            dyingModel: nil,
-            mediumDistance: nil,
-            lowDistance: nil
-        ))
+        presentations.append(.fixture(6_147, model.source))
     }
     return replacing(
-        base,
-        rooms: base.rooms + rooms,
-        objects: objects,
+        base, rooms: base.rooms + rooms, objects: objects,
         objectPresentations: presentations
     )
 }

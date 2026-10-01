@@ -1,6 +1,9 @@
 import Foundation
 import XCTest
 
+// The HOG2 archive reader (HOG2Archive.swift; cfile.cpp's library
+// loader): the header, the entry table, and the payload bounds.
+
 final class HOG2ArchiveTests: XCTestCase {
     func testRejectsTruncatedHeader() {
         XCTAssertThrowsError(try parseHOG2(Data(repeating: 0, count: 67))) { error in
@@ -102,8 +105,7 @@ final class HOG2ArchiveTests: XCTestCase {
 
     func testRejectsTruncatedPayload() {
         let data = makeArchive(
-            nameFields: [nameField("short.bin")],
-            payloads: [Data([1, 2, 3])],
+            nameFields: [nameField("short.bin")], payloads: [Data([1, 2, 3])],
             declaredLengths: [4]
         )
 
@@ -126,8 +128,7 @@ final class HOG2ArchiveTests: XCTestCase {
 
     func testRejectsUndeclaredTrailingBytes() {
         let data = makeArchive(
-            nameFields: [nameField("empty.bin")],
-            payloads: [Data()],
+            nameFields: [nameField("empty.bin")], payloads: [Data()],
             trailingBytes: Data([0xff])
         )
 
@@ -155,8 +156,7 @@ final class HOG2ArchiveTests: XCTestCase {
 
     func testReadsPayloadAfterDeclaredGap() throws {
         let data = makeArchive(
-            nameFields: [nameField("gap.bin")],
-            payloads: [Data([0x7f])],
+            nameFields: [nameField("gap.bin")], payloads: [Data([0x7f])],
             firstPayloadOffset: 120
         )
 
@@ -192,11 +192,8 @@ private func makeHeader(entryCount: UInt32, firstPayloadOffset: UInt32) -> Data 
 }
 
 private func makeArchive(
-    nameFields: [[UInt8]],
-    payloads: [Data],
-    declaredLengths: [UInt32]? = nil,
-    firstPayloadOffset: UInt32? = nil,
-    trailingBytes: Data = Data()
+    nameFields: [[UInt8]], payloads: [Data], declaredLengths: [UInt32]? = nil,
+    firstPayloadOffset: UInt32? = nil, trailingBytes: Data = Data()
 ) -> Data {
     precondition(nameFields.count == payloads.count)
     precondition(nameFields.allSatisfy { $0.count == 36 })

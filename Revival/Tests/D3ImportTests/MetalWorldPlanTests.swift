@@ -1,29 +1,27 @@
 import XCTest
 
+// The retained Metal world plan (RevivalMetal/MetalWorldPlan.swift): rooms,
+// objects, weapons, effects, lights, coronas, the cloak, the popup view's
+// auxiliary camera, and plan updates.
+
 final class MetalWorldPlanTests: XCTestCase {
     func testFastPlayerHeadlightLightsRetainedVisibleObjectDraw() throws {
         let level = makeFastPlayerHeadlightLevel()
         let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+            level: level, presentationReadyTimestamp: 0
         )
         let frame = simulation.update(
-            at: 0.1,
-            input: .init(togglesHeadlight: true)
+            at: 0.1, input: .init(togglesHeadlight: true)
         )
         let initial = try makeMetalWorldPlan(
-            level: simulation.runtimeLevel,
-            playerView: frame.playerView
+            level: simulation.runtimeLevel, playerView: frame.playerView
         )
         let baseline = initial.draws.first {
             $0.objectHandle == 12_301
         }!
         let lit = try updateMetalWorldPlan(
-            initial,
-            level: simulation.level,
-            objects: simulation.world.objects,
-            roomStates: simulation.world.rooms,
-            playerView: frame.playerView,
+            initial, level: simulation.level, objects: simulation.world.objects,
+            roomStates: simulation.world.rooms, playerView: frame.playerView,
             playerFastHeadlight: frame.playerFastHeadlight
         )
         let litObject = try XCTUnwrap(lit.draws.first {
@@ -38,26 +36,21 @@ final class MetalWorldPlanTests: XCTestCase {
         )
 
         let monitorLevel = scriptingTrainingCameraMonitorLevel(
-            makeTrainingCameraMonitorLevel(),
-            guideBot: false
+            makeTrainingCameraMonitorLevel(), guideBot: false
         )
         let monitorSimulation = GameSession(
-            level: monitorLevel,
-            presentationReadyTimestamp: 0
+            level: monitorLevel, presentationReadyTimestamp: 0
         )
         let used = monitorSimulation.takeAndUseCameraMonitor(at: 0.1)
         let monitor = try XCTUnwrap(used.popupView)
         let monitorInitial = try makeMetalWorldPlan(
-            level: monitorLevel,
-            playerView: used.playerView
+            level: monitorLevel, playerView: used.playerView
         )
         let monitorBaseline = try updateMetalWorldPlan(
-            monitorInitial,
-            level: monitorLevel,
+            monitorInitial, level: monitorLevel,
             objects: ObjectTable(level: monitorLevel),
             roomStates: RoomState.canonical(monitorLevel),
-            playerView: used.playerView,
-            popupView: monitor
+            playerView: used.playerView, popupView: monitor
         )
         let auxiliaryOnlyIndex = try XCTUnwrap(
             monitorBaseline.auxiliaryActiveDrawIndices.first {
@@ -79,8 +72,7 @@ final class MetalWorldPlanTests: XCTestCase {
             playerFastHeadlight: .init(
                 roomSourceIndex: monitor.roomSourceIndex,
                 position: .init(
-                    x: auxiliaryTarget.x,
-                    y: auxiliaryTarget.y,
+                    x: auxiliaryTarget.x, y: auxiliaryTarget.y,
                     z: auxiliaryTarget.z
                 ),
                 lightDistance: 20
@@ -106,9 +98,7 @@ final class MetalWorldPlanTests: XCTestCase {
         let frame = session.update(at: 0.01, input: .zero)
         session.world.fireWeaponFromPlayer(
             session.world.testPlayerObject.handle,
-            weaponType: PlayerWeaponState.primary,
-            isDown: true,
-            downTime: 0.01,
+            weaponType: PlayerWeaponState.primary, isDown: true, downTime: 0.01,
             level: level
         )
         let laser = try XCTUnwrap(
@@ -119,23 +109,19 @@ final class MetalWorldPlanTests: XCTestCase {
             2
         )
         let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: frame.playerView
+            level: level, playerView: frame.playerView
         )
         let updated = try updateMetalWorldPlan(
-            initial,
-            level: level,
-            objects: session.world.objects,
-            roomStates: session.world.rooms,
-            playerView: frame.playerView
+            initial, level: level, objects: session.world.objects,
+            roomStates: session.world.rooms, playerView: frame.playerView
         )
         let expectedVertexPositions = extractWeaponObjectDrawItems(
-            level,
-            objects: session.world.objects,
+            level, objects: session.world.objects,
             camera: frame.playerView.camera
         ).filter { $0.model == laser }.flatMap {
             $0.vertices.map(\.position)
         }
+
         let actualVertexPositions = updated.draws.filter {
             $0.model == laser
         }.flatMap {
@@ -156,8 +142,7 @@ final class MetalWorldPlanTests: XCTestCase {
         let concussion = try XCTUnwrap(level.weapon(named: "Concussion"))
         let frames = try XCTUnwrap(concussion.explosion?.frames)
         let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: playerView
+            level: level, playerView: playerView
         )
         XCTAssertTrue(initial.preparedDraws.contains {
             $0.objectHandle == UInt32.max - 7_000
@@ -171,42 +156,30 @@ final class MetalWorldPlanTests: XCTestCase {
             PlayerWeaponState.concussionIndex
         world.fireWeaponFromPlayer(
             world.testPlayerObject.handle,
-            weaponType: PlayerWeaponState.secondary,
-            isDown: true,
-            downTime: 0.1,
-            level: level
+            weaponType: PlayerWeaponState.secondary, isDown: true,
+            downTime: 0.1, level: level
         )
         let missile = try XCTUnwrap(world.objects.first { $0.type == .weapon })
         let position = playerView.camera.position
         let explosion = BillboardFrame(
-            roomSourceIndex: playerView.roomSourceIndex,
-            position: position,
-            size: 10,
-            texture: frames[0],
-            opacity: 1
+            roomSourceIndex: playerView.roomSourceIndex, position: position,
+            size: 10, texture: frames[0], opacity: 1
         )
         let lighting = try XCTUnwrap(concussion.lighting)
         let light = ObjectLightRequest(
             roomSourceIndex: playerView.roomSourceIndex,
             position: missile.position,
             distance: try XCTUnwrap(concussion.lightDistance) * 1.5,
-            color: lighting.primaryColor,
-            direction: nil,
-            directionalDot: 0
+            color: lighting.primaryColor, direction: nil, directionalDot: 0
         )
         let spark = VisEffectLineSparkFrame(
-            roomSourceIndex: playerView.roomSourceIndex,
-            start: position,
+            roomSourceIndex: playerView.roomSourceIndex, start: position,
             end: .init(x: position.x + 1, y: position.y, z: position.z)
         )
         let updated = try updateMetalWorldPlan(
-            initial,
-            level: level,
-            objects: world.objects,
-            roomStates: world.rooms,
-            playerView: playerView,
-            visEffectBillboards: [explosion],
-            visEffectLineSparks: [spark],
+            initial, level: level, objects: world.objects,
+            roomStates: world.rooms, playerView: playerView,
+            visEffectBillboards: [explosion], visEffectLineSparks: [spark],
             objectLights: [light]
         )
         // The Concussion's page light is (1, 0.5, 0.25).
@@ -237,12 +210,10 @@ final class MetalWorldPlanTests: XCTestCase {
     func testConcussionSimulationFrameReachesRendererComposition() throws {
         let level = try makePlayerConcussionLevel()
         let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+            level: level, presentationReadyTimestamp: 0
         )
         let frame = simulation.update(
-            at: 0.01,
-            input: .init(firesSecondaryWeapon: true)
+            at: 0.01, input: .init(firesSecondaryWeapon: true)
         )
         let concussion = try XCTUnwrap(level.weapon(named: "Concussion"))
         XCTAssertEqual(
@@ -250,14 +221,10 @@ final class MetalWorldPlanTests: XCTestCase {
             1
         )
         let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: frame.playerView
+            level: level, playerView: frame.playerView
         )
         let updated = try updateMetalWorldPlan(
-            initial,
-            level: level,
-            world: simulation.world,
-            frame: frame,
+            initial, level: level, world: simulation.world, frame: frame,
             drawableAspect: 1
         )
         XCTAssertTrue(updated.draws.contains { $0.model == concussion.model })
@@ -282,8 +249,7 @@ final class MetalWorldPlanTests: XCTestCase {
         level.objects[playerIndex].location = start.location
         level.objects[playerIndex].position = start.position
         let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+            level: level, presentationReadyTimestamp: 0
         )
         // The player starts on StartDodge at rest; its contact is the
         // collide_two_objects call of a move into it.
@@ -304,8 +270,7 @@ final class MetalWorldPlanTests: XCTestCase {
         )
 
         let initial = try makeMetalWorldPlan(
-            level: simulation.runtimeLevel,
-            playerView: frame.playerView
+            level: simulation.runtimeLevel, playerView: frame.playerView
         )
         let initialTurretVertices = initial.draws.filter {
             $0.objectHandle == turret.rawValue
@@ -324,10 +289,7 @@ final class MetalWorldPlanTests: XCTestCase {
         let updatedTurretVertices = updated.draws.filter {
             $0.objectHandle == turret.rawValue
         }.flatMap(\.vertices)
-        XCTAssertNotEqual(
-            updatedTurretVertices,
-            initialTurretVertices
-        )
+        XCTAssertNotEqual(updatedTurretVertices, initialTurretVertices)
         let laser = try XCTUnwrap(level.weapons?.first?.model)
         XCTAssertTrue(
             updated.draws.contains {
@@ -342,8 +304,7 @@ final class MetalWorldPlanTests: XCTestCase {
         let playerView = defaultPlayerView(in: level)
         let marker = level.findObjectName("FlashLight-1")
         let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: playerView
+            level: level, playerView: playerView
         )
         var world = GameWorld(level: level)
         func plan(_ world: GameWorld) throws -> MetalWorldPlan {
@@ -356,11 +317,11 @@ final class MetalWorldPlanTests: XCTestCase {
                 // At Gametime 0.5 the page's LF_PULSE (interval 0.5) is at
                 // its full distance.
                 presentationFrame: .init(
-                    systemsFrameDuration: 0.1,
-                    systemsGameTime: 0.5
+                    systemsFrameDuration: 0.1, systemsGameTime: 0.5
                 )
             )
         }
+
         let target = try XCTUnwrap(
             plan(world).draws.first?.vertices.first?.position
         )
@@ -379,18 +340,15 @@ final class MetalWorldPlanTests: XCTestCase {
 
     func testCloakAlphaReachesAuxiliaryCameraPlayerDraws() throws {
         let level = scriptingTrainingCameraMonitorLevel(
-            makeTrainingCloakPickupLevel(),
-            guideBot: false
+            makeTrainingCloakPickupLevel(), guideBot: false
         )
         let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+            level: level, presentationReadyTimestamp: 0
         )
         let used = simulation.takeAndUseCameraMonitor(at: 0.1)
         let monitor = try XCTUnwrap(used.popupView)
         let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: used.playerView
+            level: level, playerView: used.playerView
         )
 
         let faded = try updateMetalWorldPlan(
@@ -401,9 +359,7 @@ final class MetalWorldPlanTests: XCTestCase {
             playerView: used.playerView,
             popupView: monitor,
             playerCloak: .init(
-                phase: .fadingOut,
-                phaseRemaining: 0.5,
-                phaseDuration: 1
+                phase: .fadingOut, phaseRemaining: 0.5, phaseDuration: 1
             )
         )
         let playerDraws = faded.auxiliaryDraws.filter {
@@ -412,31 +368,19 @@ final class MetalWorldPlanTests: XCTestCase {
 
         XCTAssertFalse(playerDraws.isEmpty)
         for draw in playerDraws {
-            XCTAssertEqual(
-                draw.blend,
-                .sourceAlpha(opacity: 138)
-            )
+            XCTAssertEqual(draw.blend, .sourceAlpha(opacity: 138))
             for vertex in draw.vertices {
-                XCTAssertEqual(
-                    vertex.presentation.x,
-                    0.54,
-                    accuracy: 0.000_1
-                )
+                XCTAssertEqual(vertex.presentation.x, 0.54, accuracy: 0.000_1)
             }
         }
 
         let cloakFrame = ObjectCloakFrame(
-            phase: .cloaked,
-            phaseRemaining: 20,
-            phaseDuration: 30
+            phase: .cloaked, phaseRemaining: 20, phaseDuration: 30
         )
         XCTAssertEqual(cloakFrame.objectDeformationRange, 0.1)
         let baseline = try updateMetalWorldPlan(
-            initial,
-            level: level,
-            objects: ObjectTable(level: level),
-            roomStates: RoomState.canonical(level),
-            playerView: used.playerView,
+            initial, level: level, objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level), playerView: used.playerView,
             popupView: monitor
         )
         let cloaked = try updateMetalWorldPlan(
@@ -446,8 +390,7 @@ final class MetalWorldPlanTests: XCTestCase {
             roomStates: RoomState.canonical(level),
             playerView: used.playerView,
             presentationFrame: .init(
-                systemsFrameDuration: 0.1,
-                systemsGameTime: 1
+                systemsFrameDuration: 0.1, systemsGameTime: 1
             ),
             popupView: monitor,
             playerCloak: cloakFrame
@@ -471,8 +414,7 @@ final class MetalWorldPlanTests: XCTestCase {
         })
         var changedVertexCount = 0
         for (baselineVertex, cloakedVertex) in zip(
-            baselinePlayerDraw.vertices,
-            cloakedPlayerDraw.vertices
+            baselinePlayerDraw.vertices, cloakedPlayerDraw.vertices
         ) {
             let baselineOffset = SIMD3<Float>(
                 baselineVertex.position.x - player.position.x,
@@ -507,8 +449,7 @@ final class MetalWorldPlanTests: XCTestCase {
 
     func testCameraMonitorUsesSourceLeftBiggerPopupViewport() {
         let viewport = cameraMonitorMetalViewport(
-            drawableWidth: 1_200,
-            drawableHeight: 900
+            drawableWidth: 1_200, drawableHeight: 900
         )
 
         XCTAssertEqual(viewport.originX, 59.375)
@@ -519,32 +460,23 @@ final class MetalWorldPlanTests: XCTestCase {
 
     func testCameraMonitorUsesRetainedWorldPlanForItsSecurityCamera() throws {
         let level = scriptingTrainingCameraMonitorLevel(
-            makeTrainingCameraMonitorLevel(),
-            guideBot: false
+            makeTrainingCameraMonitorLevel(), guideBot: false
         )
         let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+            level: level, presentationReadyTimestamp: 0
         )
         let used = simulation.takeAndUseCameraMonitor(at: 0.1)
         let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: defaultPlayerView(in: level)
+            level: level, playerView: defaultPlayerView(in: level)
         )
 
         let updated = try updateMetalWorldPlan(
-            initial,
-            level: simulation.level,
-            objects: simulation.world.objects,
-            roomStates: simulation.world.rooms,
-            playerView: used.playerView,
+            initial, level: simulation.level, objects: simulation.world.objects,
+            roomStates: simulation.world.rooms, playerView: used.playerView,
             popupView: used.popupView
         )
 
-        XCTAssertEqual(
-            updated.auxiliaryCamera,
-            used.popupView?.camera
-        )
+        XCTAssertEqual(updated.auxiliaryCamera, used.popupView?.camera)
         XCTAssertEqual(
             updated.auxiliaryStartRoomSourceIndex,
             used.popupView?.roomSourceIndex
@@ -565,8 +497,7 @@ final class MetalWorldPlanTests: XCTestCase {
             $0.handle == playerView.objectHandle
         })
         let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: playerView
+            level: level, playerView: playerView
         )
         let monitor = SmallViewFrame(
             window: 0,
@@ -592,11 +523,8 @@ final class MetalWorldPlanTests: XCTestCase {
         )
 
         let updated = try updateMetalWorldPlan(
-            initial,
-            level: level,
-            objects: ObjectTable(level: level),
-            roomStates: RoomState.canonical(level),
-            playerView: playerView,
+            initial, level: level, objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level), playerView: playerView,
             popupView: monitor
         )
 
@@ -612,8 +540,7 @@ final class MetalWorldPlanTests: XCTestCase {
         var level = makeTrainingCameraMonitorLevel()
         let initialPlayerView = defaultPlayerView(in: level)
         let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: initialPlayerView
+            level: level, playerView: initialPlayerView
         )
         let initialPlayerDraw = try XCTUnwrap(
             initial.preparedDraws.first {
@@ -625,9 +552,7 @@ final class MetalWorldPlanTests: XCTestCase {
         })
         let oldPosition = level.objects[playerIndex].position
         level.objects[playerIndex].position = .init(
-            x: oldPosition.x + 5,
-            y: oldPosition.y,
-            z: oldPosition.z
+            x: oldPosition.x + 5, y: oldPosition.y, z: oldPosition.z
         )
         let movedPlayerView = defaultPlayerView(in: level)
         let movedPlayer = level.objects[playerIndex]
@@ -655,11 +580,8 @@ final class MetalWorldPlanTests: XCTestCase {
         )
 
         let updated = try updateMetalWorldPlan(
-            initial,
-            level: level,
-            objects: ObjectTable(level: level),
-            roomStates: RoomState.canonical(level),
-            playerView: movedPlayerView,
+            initial, level: level, objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level), playerView: movedPlayerView,
             popupView: monitor
         )
         let auxiliaryPlayerDraw = try XCTUnwrap(
@@ -668,8 +590,7 @@ final class MetalWorldPlanTests: XCTestCase {
             }
         )
         let freshAuxiliary = try makeMetalWorldPlan(
-            level: level,
-            camera: monitor.camera,
+            level: level, camera: monitor.camera,
             startRoomSourceIndex: monitor.roomSourceIndex
         )
         let freshPlayerDraw = try XCTUnwrap(freshAuxiliary.draws.first {
@@ -703,16 +624,12 @@ final class MetalWorldPlanTests: XCTestCase {
             isPopup: true
         )
         let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: playerView
+            level: level, playerView: playerView
         )
 
         let updated = try updateMetalWorldPlan(
-            initial,
-            level: level,
-            objects: ObjectTable(level: level),
-            roomStates: RoomState.canonical(level),
-            playerView: playerView,
+            initial, level: level, objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level), playerView: playerView,
             popupView: monitor
         )
         let auxiliaryFacingHandles = Set(
@@ -736,20 +653,13 @@ final class MetalWorldPlanTests: XCTestCase {
                     && $0.faceIndex == faceIndex
             }
         )
-        XCTAssertNotEqual(
-            primaryFacing.vertices,
-            auxiliaryFacing.vertices
-        )
+        XCTAssertNotEqual(primaryFacing.vertices, auxiliaryFacing.vertices)
     }
 
     func testUsesPerDrawLocalCoronaIndicesWithOffsetVertexBindings() {
         XCTAssertEqual(
             makeMetalLightCoronaIndices(drawCapacity: 3),
-            [
-                0, 1, 2, 0, 2, 3,
-                0, 1, 2, 0, 2, 3,
-                0, 1, 2, 0, 2, 3,
-            ]
+            [0, 1, 2, 0, 2, 3, 0, 1, 2, 0, 2, 3, 0, 1, 2, 0, 2, 3]
         )
     }
 
@@ -757,13 +667,10 @@ final class MetalWorldPlanTests: XCTestCase {
         let level = makeCoronaEvaluationLevel()
         let camera = RoomCamera(
             position: .init(x: 0, y: -100, z: 0),
-            target: .init(x: 0, y: -99, z: 0),
-            up: .init(x: 0, y: 0, z: 1)
+            target: .init(x: 0, y: -99, z: 0), up: .init(x: 0, y: 0, z: 1)
         )
         let initial = try makeMetalWorldPlan(
-            level: level,
-            camera: camera,
-            startRoomSourceIndex: 3
+            level: level, camera: camera, startRoomSourceIndex: 3
         )
         XCTAssertEqual(initial.lightCoronaStates.map(\.scalar), [0])
         XCTAssertEqual(initial.lightCoronaDraws.map(\.opacity), [0])
@@ -772,35 +679,30 @@ final class MetalWorldPlanTests: XCTestCase {
             initial,
             camera: camera,
             presentationFrame: .init(
-                systemsFrameDuration: 0.25,
-                systemsGameTime: 0
+                systemsFrameDuration: 0.25, systemsGameTime: 0
             )
         )
         let clamped = try updateMetalWorldPlan(
             fullScalar,
             camera: camera,
             presentationFrame: .init(
-                systemsFrameDuration: 0,
-                systemsGameTime: 0
+                systemsFrameDuration: 0, systemsGameTime: 0
             )
         )
         XCTAssertEqual(
             try XCTUnwrap(clamped.lightCoronaDraws.first).opacity,
-            102.0 / 255.0,
-            accuracy: 0.000_001
+            102.0 / 255.0, accuracy: 0.000_001
         )
 
         let interiorCamera = RoomCamera(
             position: .init(x: 0, y: -19, z: 0),
-            target: .init(x: 0, y: -18, z: 0),
-            up: .init(x: 0, y: 0, z: 1)
+            target: .init(x: 0, y: -18, z: 0), up: .init(x: 0, y: 0, z: 1)
         )
         let interior = try updateMetalWorldPlan(
             fullScalar,
             camera: interiorCamera,
             presentationFrame: .init(
-                systemsFrameDuration: 0,
-                systemsGameTime: 0
+                systemsFrameDuration: 0, systemsGameTime: 0
             )
         )
         let interiorCorona = try XCTUnwrap(
@@ -841,8 +743,7 @@ final class MetalWorldPlanTests: XCTestCase {
             initial,
             camera: camera,
             presentationFrame: .init(
-                systemsFrameDuration: 0.1,
-                systemsGameTime: 0
+                systemsFrameDuration: 0.1, systemsGameTime: 0
             )
         )
         XCTAssertEqual(first.lightCoronaDraws.map(\.opacity), [0])
@@ -853,42 +754,36 @@ final class MetalWorldPlanTests: XCTestCase {
             first,
             camera: camera,
             presentationFrame: .init(
-                systemsFrameDuration: 0.016,
-                systemsGameTime: 0.016
+                systemsFrameDuration: 0.016, systemsGameTime: 0.016
             )
         )
         XCTAssertGreaterThan(try XCTUnwrap(second.lightCoronaDraws.first).opacity, 0)
         XCTAssertEqual(
-            try XCTUnwrap(second.lightCoronaStates.first).scalar,
-            0.464,
+            try XCTUnwrap(second.lightCoronaStates.first).scalar, 0.464,
             accuracy: 0.000_001
         )
         let expectedFacing = 2 * 121 / sqrt(Float(121 * 121 + 2))
         XCTAssertEqual(
             try XCTUnwrap(second.lightCoronaDraws.first).opacity,
-            min(expectedFacing * 0.4, 1) * (102.0 / 255.0),
-            accuracy: 0.000_001
+            min(expectedFacing * 0.4, 1) * (102.0 / 255.0), accuracy: 0.000_001
         )
         XCTAssertEqual(second.presentationVisualTick, 0)
 
         let nearCamera = RoomCamera(
-            position: .init(x: 0, y: 1, z: 0),
-            target: .init(x: 0, y: 2, z: 0),
+            position: .init(x: 0, y: 1, z: 0), target: .init(x: 0, y: 2, z: 0),
             up: .init(x: 0, y: 0, z: 1)
         )
         let fading = try updateMetalWorldPlan(
             second,
             camera: nearCamera,
             presentationFrame: .init(
-                systemsFrameDuration: 0.1,
-                systemsGameTime: 1.0 / 60
+                systemsFrameDuration: 0.1, systemsGameTime: 1.0 / 60
             )
         )
         XCTAssertEqual(fading.lightCoronaDraws.count, 1)
         XCTAssertEqual(try XCTUnwrap(fading.lightCoronaDraws.first).opacity, 0)
         XCTAssertEqual(
-            try XCTUnwrap(fading.lightCoronaStates.first).scalar,
-            0.064,
+            try XCTUnwrap(fading.lightCoronaStates.first).scalar, 0.064,
             accuracy: 0.000_001
         )
         XCTAssertEqual(fading.presentationVisualTick, 1)
@@ -897,15 +792,13 @@ final class MetalWorldPlanTests: XCTestCase {
             fading,
             camera: nearCamera,
             presentationFrame: .init(
-                systemsFrameDuration: 0.016,
-                systemsGameTime: 2.0 / 60
+                systemsFrameDuration: 0.016, systemsGameTime: 2.0 / 60
             )
         )
         XCTAssertEqual(retainedAtZero.lightCoronaDraws.count, 1)
         XCTAssertEqual(try XCTUnwrap(retainedAtZero.lightCoronaDraws.first).opacity, 0)
         XCTAssertEqual(
-            try XCTUnwrap(retainedAtZero.lightCoronaStates.first).scalar,
-            0,
+            try XCTUnwrap(retainedAtZero.lightCoronaStates.first).scalar, 0,
             accuracy: 0.000_001
         )
 
@@ -913,8 +806,7 @@ final class MetalWorldPlanTests: XCTestCase {
             retainedAtZero,
             camera: nearCamera,
             presentationFrame: .init(
-                systemsFrameDuration: 0.001,
-                systemsGameTime: 3.0 / 60
+                systemsFrameDuration: 0.001, systemsGameTime: 3.0 / 60
             )
         )
         XCTAssertEqual(removedAfterZeroDraw.lightCoronaDraws.count, 1)
@@ -924,8 +816,7 @@ final class MetalWorldPlanTests: XCTestCase {
             removedAfterZeroDraw,
             camera: nearCamera,
             presentationFrame: .init(
-                systemsFrameDuration: 0.001,
-                systemsGameTime: 4.0 / 60
+                systemsFrameDuration: 0.001, systemsGameTime: 4.0 / 60
             )
         )
         XCTAssertTrue(absent.lightCoronaDraws.isEmpty)
@@ -935,31 +826,22 @@ final class MetalWorldPlanTests: XCTestCase {
     func testBuildsCameraFacingTintedCoronaVerticesForTheSharedWorldPass() throws {
         let level = makeCoronaEvaluationLevel()
         let camera = RoomCamera(
-            position: .zero,
-            target: .init(x: 0, y: 1, z: 0),
+            position: .zero, target: .init(x: 0, y: 1, z: 0),
             up: .init(x: 0, y: 0, z: 1)
         )
         let corona = try XCTUnwrap(
             try makeMetalWorldPlan(
-                level: level,
-                camera: camera,
-                startRoomSourceIndex: 3
+                level: level, camera: camera, startRoomSourceIndex: 3
             ).preparedLightCoronaCandidates.first
         )
 
         let vertices = makeMetalLightCoronaVertices(
-            corona,
-            camera: camera,
-            imageWidth: 2,
-            imageHeight: 1,
-            opacity: 0.25
+            corona, camera: camera, imageWidth: 2, imageHeight: 1, opacity: 0.25
         )
 
         XCTAssertEqual(vertices.count, 4)
         XCTAssertEqual(vertices.map(\.textureAndLightmapUV), [
-            .init(0, 0, 0, 0),
-            .init(1, 0, 0, 0),
-            .init(1, 1, 0, 0),
+            .init(0, 0, 0, 0), .init(1, 0, 0, 0), .init(1, 1, 0, 0),
             .init(0, 1, 0, 0),
         ])
         XCTAssertTrue(vertices.allSatisfy {
@@ -977,20 +859,15 @@ final class MetalWorldPlanTests: XCTestCase {
         let initialView = defaultPlayerView(in: level)
         let initial = try makeMetalWorldPlan(level: level, playerView: initialView)
         let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+            level: level, presentationReadyTimestamp: 0
         )
         let frame = simulation.update(
-            at: 0.016,
-            input: .init(forward: 1, sideways: 1)
+            at: 0.016, input: .init(forward: 1, sideways: 1)
         )
 
         let updated = try updateMetalWorldPlan(
-            initial,
-            level: simulation.level,
-            objects: simulation.world.objects,
-            roomStates: simulation.world.rooms,
-            playerView: frame.playerView
+            initial, level: simulation.level, objects: simulation.world.objects,
+            roomStates: simulation.world.rooms, playerView: frame.playerView
         )
 
         XCTAssertEqual(
@@ -1010,9 +887,7 @@ final class MetalWorldPlanTests: XCTestCase {
     func testUpdatesReachedRotatingSubmodelFromPreUpdateGameTime() throws {
         let level = makeSliceSixObjectRenderLevel()
         let initial = try makeMetalWorldPlan(
-            level: level,
-            camera: .trainingRoom3,
-            startRoomSourceIndex: 3
+            level: level, camera: .trainingRoom3, startRoomSourceIndex: 3
         )
         let before = try XCTUnwrap(initial.preparedDraws.first {
             $0.objectHandle == 6_147 && $0.submodelIndex == 4
@@ -1022,8 +897,7 @@ final class MetalWorldPlanTests: XCTestCase {
             initial,
             camera: .trainingRoom3,
             presentationFrame: .init(
-                systemsFrameDuration: 0.016,
-                systemsGameTime: 0.25
+                systemsFrameDuration: 0.016, systemsGameTime: 0.25
             )
         )
         let after = try XCTUnwrap(updated.preparedDraws.first {
@@ -1032,14 +906,10 @@ final class MetalWorldPlanTests: XCTestCase {
 
         XCTAssertNotEqual(after.vertices, before.vertices)
         XCTAssertEqual(
-            after.vertices[0].position.x,
-            2_064.0604,
-            accuracy: 0.001
+            after.vertices[0].position.x, 2_064.0604, accuracy: 0.001
         )
         XCTAssertEqual(
-            after.vertices[0].position.z,
-            2_208.0276,
-            accuracy: 0.001
+            after.vertices[0].position.z, 2_208.0276, accuracy: 0.001
         )
         XCTAssertEqual(
             updated.activeDrawIndices.map { updated.preparedDraws[$0] },
@@ -1051,8 +921,7 @@ final class MetalWorldPlanTests: XCTestCase {
         let level = withTrainingGuideBot(makeTrainingRobotGuidebotLevel())
         let playerView = defaultPlayerView(in: level)
         let initial = try makeMetalWorldPlan(
-            level: level,
-            playerView: playerView
+            level: level, playerView: playerView
         )
         // The Guide-Bot AIInitAll makes at level start has prepared draws.
         let guidebotHandle = GameWorld(level: level).buddyHandle.rawValue
@@ -1065,20 +934,13 @@ final class MetalWorldPlanTests: XCTestCase {
         })
 
         let simulation = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+            level: level, presentationReadyTimestamp: 0
         )
         simulation.releaseOrRecallTestGuideBot()
-        let frame = simulation.update(
-            at: 0.1,
-            input: .zero
-        )
+        let frame = simulation.update(at: 0.1, input: .zero)
         let updated = try updateMetalWorldPlan(
-            initial,
-            level: simulation.level,
-            objects: simulation.world.objects,
-            roomStates: simulation.world.rooms,
-            playerView: frame.playerView
+            initial, level: simulation.level, objects: simulation.world.objects,
+            roomStates: simulation.world.rooms, playerView: frame.playerView
         )
 
         XCTAssertTrue(updated.draws.contains {
@@ -1100,18 +962,14 @@ final class MetalWorldPlanTests: XCTestCase {
         level.objects[playerIndex].location = .room(3)
         level.objects[playerIndex].position = RoomCamera.trainingRoom3.position
         level.objects[playerIndex].orientation = .init(
-            right: .init(x: 1, y: 0, z: 0),
-            up: .init(x: 0, y: 0, z: 1),
+            right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 0, z: 1),
             forward: .init(x: 0, y: 1, z: 0)
         )
         let movedView = defaultPlayerView(in: level)
 
         let updated = try updateMetalWorldPlan(
-            initial,
-            level: level,
-            objects: ObjectTable(level: level),
-            roomStates: RoomState.canonical(level),
-            playerView: movedView
+            initial, level: level, objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level), playerView: movedView
         )
         let fresh = try makeMetalWorldPlan(level: level, playerView: movedView)
 
@@ -1131,16 +989,12 @@ final class MetalWorldPlanTests: XCTestCase {
         let initialView = defaultPlayerView(in: level)
         let initial = try makeMetalWorldPlan(level: level, playerView: initialView)
         let resizedCamera = RoomCamera(
-            position: initial.camera.position,
-            target: initial.camera.target,
+            position: initial.camera.position, target: initial.camera.target,
             up: initial.camera.up,
             projection: initial.camera.projection.withAspectRatio(16.0 / 9.0)
         )
 
-        let resized = try updateMetalWorldPlan(
-            initial,
-            camera: resizedCamera
-        )
+        let resized = try updateMetalWorldPlan(initial, camera: resizedCamera)
 
         XCTAssertEqual(resized.camera, resizedCamera)
         XCTAssertEqual(
@@ -1158,8 +1012,7 @@ final class MetalWorldPlanTests: XCTestCase {
 
     func testAddsObjectModelsToTheOneWorldPlanWithTypedMaterials() throws {
         let plan = try makeMetalWorldPlan(
-            level: makeSliceSixObjectRenderLevel(),
-            camera: .trainingRoom3,
+            level: makeSliceSixObjectRenderLevel(), camera: .trainingRoom3,
             startRoomSourceIndex: 3
         )
 
@@ -1193,8 +1046,7 @@ final class MetalWorldPlanTests: XCTestCase {
         let plan = try makeMetalWorldPlan(
             level: makeSelectedRoomRenderLevel(),
             camera: .init(
-                position: .zero,
-                target: .init(x: 0, y: 1, z: 0),
+                position: .zero, target: .init(x: 0, y: 1, z: 0),
                 up: .init(x: 0, y: 0, z: 1)
             ),
             startRoomSourceIndex: 3
@@ -1211,8 +1063,7 @@ final class MetalWorldPlanTests: XCTestCase {
             plan.draws
         )
         XCTAssertEqual(plan.draws.map(\.blend), [
-            .opaque,
-            .additiveSourceAlpha(opacity: 178),
+            .opaque, .additiveSourceAlpha(opacity: 178),
             .additiveSourceAlpha(opacity: 178),
         ])
 
@@ -1224,8 +1075,7 @@ final class MetalWorldPlanTests: XCTestCase {
             SIMD4<Float>(1, 1, 0, 0)
         )
         XCTAssertEqual(
-            forceField.vertices[0].presentation.x,
-            Float(178) / 255,
+            forceField.vertices[0].presentation.x, Float(178) / 255,
             accuracy: 0.000_001
         )
         XCTAssertEqual(forceField.vertices[0].presentation.y, 1, accuracy: 0.000_001)

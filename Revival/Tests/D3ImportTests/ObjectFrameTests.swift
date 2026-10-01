@@ -15,8 +15,7 @@ final class ObjectFrameTests: XCTestCase {
     /// the frame, even though the player then flies clear.
     func testWeaponInALowerSlotMovesBeforeThePlayer() throws {
         let level = try relocatingPlayer(
-            try dodgeLevelWithRoomyPlayerRoom(),
-            toSlot: 1_400
+            try dodgeLevelWithRoomyPlayerRoom(), toSlot: 1_400
         )
         let session = GameSession(level: level, presentationReadyTimestamp: 0)
         let player = try XCTUnwrap(session.world.objects[ObjectHandle(
@@ -24,9 +23,7 @@ final class ObjectFrameTests: XCTestCase {
         )])
         XCTAssertEqual(player.handle.slot, 1_400)
         let weapon = try XCTUnwrap(fireTestShot(
-            &session.world,
-            level: level,
-            modelStart: .init(x: 3, y: -5, z: 0),
+            &session.world, level: level, modelStart: .init(x: 3, y: -5, z: 0),
             modelVelocity: .init(x: 0, y: 100, z: 0)
         ))
         XCTAssertLessThan(weapon.slot, player.handle.slot)
@@ -57,68 +54,8 @@ final class ObjectFrameTests: XCTestCase {
         let gameTime = session.world.gameTime
         _ = session.update(at: 0.2, input: .zero)
         XCTAssertEqual(
-            session.world.objects[turret]?.ai?.lastRenderTime,
-            gameTime
+            session.world.objects[turret]?.ai?.lastRenderTime, gameTime
         )
-    }
-
-    /// The small views render after the main view (DrawSmallViews calls
-    /// GameRenderWorld, SmallViews.cpp:332), so their AI objects join
-    /// AI_RenderedList (renderobject.cpp:1239), and the next AIFrameAll tells them the player sees them
-    /// (AImain.cpp:6225). A robot behind the player is seen only through a
-    /// popup view that looks back.
-    func testARobotSeenOnlyThroughThePopupViewHearsThePlayerSeesIt()
-        throws
-    {
-        func session(popup: Bool) throws -> (GameSession, ObjectHandle) {
-            let level = try dodgeLevelWithRoomyPlayerRoom()
-            let session = GameSession(level: level, presentationReadyTimestamp: 0)
-            let turret = level.findObjectName("DodgeTurrett")
-            session.world.aAISetState(1, turret)
-            let player = session.world.testPlayerObject
-            var object = try XCTUnwrap(session.world.objects[turret])
-            object.location = player.location
-            object.position = player.position - player.orientation.forward * 30
-            session.world.objects[turret] = object
-            if popup {
-                let viewer = try XCTUnwrap(session.world.objects.first {
-                    $0.type == .powerup
-                }).handle
-                session.world.objects[viewer]?.location = player.location
-                session.world.objects[viewer]?.position = player.position
-                session.world.objects[viewer]?.orientation = .init(
-                    right: player.orientation.right * -1,
-                    up: player.orientation.up,
-                    forward: player.orientation.forward * -1
-                )
-                session.world.aCreatePopupView(-1, viewer, 10, 1)
-            }
-            return (session, turret)
-        }
-
-        // A robot in both views joins the list for each view: each
-        // GameRenderWorld marks its rooms' objects OF_SAFE_TO_RENDER again
-        // (render.cpp:1126).
-        let (both, bothTurret) = try session(popup: true)
-        let bothPlayer = both.world.testPlayerObject
-        both.world.objects[bothTurret]?.position =
-            bothPlayer.position + bothPlayer.orientation.forward * 30
-        let bothViewer = try XCTUnwrap(both.world.smallViews.first?.viewer)
-        both.world.objects[bothViewer]?.orientation = bothPlayer.orientation
-        _ = both.update(at: 0.1, input: .zero)
-        XCTAssertEqual(both.world.aiRenderedList, [bothTurret, bothTurret])
-
-        let (unseen, unseenTurret) = try session(popup: false)
-        _ = unseen.update(at: 0.1, input: .zero)
-        XCTAssertFalse(unseen.world.aiRenderedList.contains(unseenTurret))
-
-        let (seen, turret) = try session(popup: true)
-        _ = seen.update(at: 0.1, input: .zero)
-        XCTAssertEqual(seen.world.aiRenderedList, [turret])
-        XCTAssertEqual(seen.world.objects[turret]?.ai?.lastRenderTime, -1)
-        let gameTime = seen.world.gameTime
-        _ = seen.update(at: 0.2, input: .zero)
-        XCTAssertEqual(seen.world.objects[turret]?.ai?.lastRenderTime, gameTime)
     }
 
     // MARK: Player and weapon collision
@@ -131,9 +68,7 @@ final class ObjectFrameTests: XCTestCase {
         let session = GameSession(level: level, presentationReadyTimestamp: 0)
         let player = session.world.testPlayerObject
         let weapon = try XCTUnwrap(fireTestShot(
-            &session.world,
-            level: level,
-            modelStart: .init(x: 3, y: -5, z: 0),
+            &session.world, level: level, modelStart: .init(x: 3, y: -5, z: 0),
             modelVelocity: .zero
         ))
         session.world.velocity = player.orientation.up * -100
@@ -151,21 +86,18 @@ final class ObjectFrameTests: XCTestCase {
         let level = try dodgeLevelWithRoomyPlayerRoom()
         for (offset, hits) in [(Float(0), true), (3, false)] {
             let session = GameSession(
-                level: level,
-                presentationReadyTimestamp: 0
+                level: level, presentationReadyTimestamp: 0
             )
             let size = session.world.testPlayerObject.size
             XCTAssertLessThan(sqrt(9 + offset * offset), size + 0.5)
             let weapon = try XCTUnwrap(fireTestShot(
-                &session.world,
-                level: level,
+                &session.world, level: level,
                 modelStart: .init(x: 3, y: -5, z: offset),
                 modelVelocity: .init(x: 0, y: 100, z: 0)
             ))
             session.world.moveWeapon(weapon, level: level)
             XCTAssertEqual(
-                session.world.shields,
-                hits ? 100 - 6.75 : 100,
+                session.world.shields, hits ? 100 - 6.75 : 100,
                 "offset \(offset)"
             )
         }
@@ -190,6 +122,7 @@ final class ObjectFrameTests: XCTestCase {
             timestamp += 0.1
             _ = session.update(at: timestamp, input: .zero)
         }
+
         let renewed = try XCTUnwrap(
             session.world.objects[followBot]?.ai?.memoryTimeUntilNextUpdate
         )
@@ -211,14 +144,11 @@ final class ObjectFrameTests: XCTestCase {
         world.frameDuration = 0.1
         var object = world.testPlayerObject
         object.orientation = Matrix3(
-            right: .init(x: 1, y: 0, z: 0),
-            up: .init(x: 0, y: 1, z: 0),
+            right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 1, z: 0),
             forward: .init(x: 0, y: 0, z: 1)
         )
         world.aiTurnTowardsDir(
-            &object,
-            direction: .init(x: 0, y: 0, z: -1),
-            turnRate: 12_000
+            &object, direction: .init(x: 0, y: 0, z: -1), turnRate: 12_000
         )
         let angle = Float(1_200) * (2 * Float.pi / 65_536)
         XCTAssertEqual(object.orientation.forward.x, sin(angle), accuracy: 1e-4)
@@ -236,23 +166,18 @@ final class ObjectFrameTests: XCTestCase {
         world.aAISetState(1, turret)
         world.objects[turret]?.ai?.memory[0].numberOfHitEnemy = 32_767
         world.aiNotifyWeaponHitObject(
-            turret,
-            target: world.testPlayerObject.handle,
-            level: level
+            turret, target: world.testPlayerObject.handle, level: level
         )
         XCTAssertEqual(
-            world.objects[turret]?.ai?.memory[0].numberOfHitEnemy,
-            -32_768
+            world.objects[turret]?.ai?.memory[0].numberOfHitEnemy, -32_768
         )
     }
 }
 
 /// A red laser of the dodge fixture, fired by DodgeTurrett, at a point and
 /// with a velocity given in the player's model frame.
-private func fireTestShot(
-    _ world: inout GameWorld,
-    level: Level,
-    modelStart: Vector3,
+func fireTestShot(
+    _ world: inout GameWorld, level: Level, modelStart: Vector3,
     modelVelocity: Vector3
 ) -> ObjectHandle? {
     guard let player = world.objects[ObjectHandle(
@@ -260,6 +185,7 @@ private func fireTestShot(
     )] else {
         return nil
     }
+
     let frame = player.orientation
     func toWorld(_ vector: Vector3) -> Vector3 {
         frame.right * vector.x + frame.up * vector.y + frame.forward * vector.z
@@ -268,14 +194,12 @@ private func fireTestShot(
     // lasts until the first DoPlayerFrame; these shots come later.
     world.playerInvulnerableTime = nil
     guard let handle = world.objects.create(
-        type: .weapon,
-        renderType: .polyobj,
-        location: player.location,
-        position: player.position + toWorld(modelStart),
-        orientation: frame
+        type: .weapon, renderType: .polyobj, location: player.location,
+        position: player.position + toWorld(modelStart), orientation: frame
     ) else {
         return nil
     }
+
     var weapon = world.objects[handle]!
     weapon.weapon = 0
     weapon.parent = level.findObjectName("DodgeTurrett")
@@ -289,7 +213,7 @@ private func fireTestShot(
 
 /// The level with its player object moved to `slot`, keeping the handle's
 /// count.
-private func relocatingPlayer(_ level: Level, toSlot slot: UInt32) throws
+func relocatingPlayer(_ level: Level, toSlot slot: UInt32) throws
     -> Level
 {
     let old = try XCTUnwrap(level.defaultPlayerBinding?.objectHandle)
@@ -312,15 +236,14 @@ private func relocatingPlayer(_ level: Level, toSlot slot: UInt32) throws
     binding["objectHandle"] = new
     object["defaultPlayerBinding"] = binding
     return try JSONDecoder().decode(
-        Level.self,
-        from: JSONSerialization.data(withJSONObject: object)
+        Level.self, from: JSONSerialization.data(withJSONObject: object)
     )
 }
 
 /// The dodge fixture with the player's room replaced by a 1,000-unit box
 /// around the player that keeps the room's portals, so test moves meet no
 /// wall.
-private func dodgeLevelWithRoomyPlayerRoom() throws -> Level {
+func dodgeLevelWithRoomyPlayerRoom() throws -> Level {
     var level = makeTrainingDodgeAttemptLevel()
     let placed = try XCTUnwrap(level.objects.first {
         $0.handle == level.defaultPlayerBinding?.objectHandle
@@ -328,44 +251,29 @@ private func dodgeLevelWithRoomyPlayerRoom() throws -> Level {
     guard case let .room(roomSourceIndex) = placed.location else {
         throw XCTSkip("indoor player")
     }
+
     let roomIndex = try XCTUnwrap(level.rooms.firstIndex {
         $0.sourceIndex == roomSourceIndex
     })
     let original = level.rooms[roomIndex]
     let containment = makeSourceContainmentRoom(
-        center: placed.position,
-        texture: level.surfacePhysics[0].texture,
-        sourceIndex: roomSourceIndex,
-        halfExtent: 500
+        center: placed.position, texture: level.surfacePhysics[0].texture,
+        sourceIndex: roomSourceIndex, halfExtent: 500
     )
     var faces = containment.faces
     let portals = original.portals.enumerated().map { index, portal in
         let face = faces[index]
-        faces[index] = .init(
-            corners: face.corners,
-            flags: face.flags,
-            portalIndex: index,
-            texture: face.texture,
-            lightmapInfoIndex: face.lightmapInfoIndex,
-            allowsLightCorona: face.allowsLightCorona,
-            lightMultiple: face.lightMultiple,
-            special: face.special
-        )
+        faces[index] = replacing(face, portalIndex: index)
         return LevelPortal(
-            flags: portal.flags,
-            faceIndex: index,
+            flags: portal.flags, faceIndex: index,
             connectedRoom: portal.connectedRoom,
             connectedPortal: portal.connectedPortal,
             boundaryNodeIndex: portal.boundaryNodeIndex,
-            pathPoint: portal.pathPoint,
-            combineMaster: portal.combineMaster
+            pathPoint: portal.pathPoint, combineMaster: portal.combineMaster
         )
     }
     level.rooms[roomIndex] = replacing(
-        original,
-        vertices: containment.vertices,
-        faces: faces,
-        portals: portals
+        original, vertices: containment.vertices, faces: faces, portals: portals
     )
     return level
 }

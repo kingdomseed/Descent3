@@ -11,8 +11,7 @@ final class GameSaveTests: XCTestCase {
             atSave: { session in
                 // Script 002 ran on frame 11.
                 XCTAssertEqual(
-                    session.world.testTrainingMission?.script002Count,
-                    1
+                    session.world.testTrainingMission?.script002Count, 1
                 )
             }
         )
@@ -29,12 +28,10 @@ final class GameSaveTests: XCTestCase {
             followFrames: 10,
             atSave: { session in
                 XCTAssertEqual(
-                    session.world.osirisTimers.entries.count(where: \.isUsed),
-                    1
+                    session.world.osirisTimers.entries.count(where: \.isUsed), 1
                 )
                 XCTAssertEqual(
-                    session.world.testTrainingMission?.script002Count,
-                    0
+                    session.world.testTrainingMission?.script002Count, 0
                 )
             }
         )
@@ -58,13 +55,11 @@ final class GameSaveTests: XCTestCase {
             followFrames: 60,
             atSave: { session in
                 XCTAssertEqual(
-                    session.world.objectType(session.world.buddyHandle),
-                    .robot
+                    session.world.objectType(session.world.buddyHandle), .robot
                 )
                 XCTAssertEqual(session.world.buddyHandle, startBuddy)
                 XCTAssertEqual(
-                    session.world.testGuideBot?.mode,
-                    GuideBotScript.birthMode
+                    session.world.testGuideBot?.mode, GuideBotScript.birthMode
                 )
             }
         )
@@ -120,11 +115,8 @@ final class GameSaveTests: XCTestCase {
             level: level,
             prepare: { session in
                 session.world.killObject(
-                    rasBot1,
-                    killer: session.world.testPlayerObject.handle,
-                    damage: 10,
-                    deathFlags: DeathFlags.fireball,
-                    delayTime: 1.5,
+                    rasBot1, killer: session.world.testPlayerObject.handle,
+                    damage: 10, deathFlags: DeathFlags.fireball, delayTime: 1.5,
                     level: session.level
                 )
             },
@@ -164,12 +156,9 @@ final class GameSaveTests: XCTestCase {
                 guard case let .room(room) = player.location else { return }
                 let forward = player.orientation.forward
                 let toWall = traceIndoorMovement(
-                    in: level,
-                    roomStates: session.world.rooms,
-                    startRoom: room,
+                    in: level, roomStates: session.world.rooms, startRoom: room,
                     start: player.position,
-                    end: player.position + forward * 5_000,
-                    radius: 0.1
+                    end: player.position + forward * 5_000, radius: 0.1
                 )
                 guard case let .wallHit(contact) = toWall.outcome else {
                     return
@@ -184,10 +173,8 @@ final class GameSaveTests: XCTestCase {
                 ) ?? .none
                 let timed = session.world.createAndFireWeapon(
                     position: player.position + forward * 20,
-                    direction: forward,
-                    parent: player.handle,
-                    weaponIndex: flareIndex,
-                    level: level
+                    direction: forward, parent: player.handle,
+                    weaponIndex: flareIndex, level: level
                 )
                 if let timed {
                     session.world.objects[timed]?.lifeLeft = 0.45
@@ -247,18 +234,15 @@ final class GameSaveTests: XCTestCase {
                 Vector3(x: bad, y: 0, z: 0)
             XCTAssertThrowsError(try hostile.validate(against: level))
         }
+
         var heavy = world
         heavy.objects[debris.handle]?.physics?.mass = .infinity
         XCTAssertThrowsError(try heavy.validate(against: level))
         var attached = base
         attached.visEffects = [VisEffect(
             id: VisEffect.lightningBoltID,
-            roomSourceIndex: level.rooms[0].sourceIndex,
-            position: .zero,
-            size: 1,
-            lifeLeft: 1,
-            lifetime: 1,
-            creationTime: 0,
+            roomSourceIndex: level.rooms[0].sourceIndex, position: .zero,
+            size: 1, lifeLeft: 1, lifetime: 1, creationTime: 0,
             flags: VisEffect.usesLifeLeftFlag | VisEffect.attachedFlag,
             attachedObject: ObjectHandle(4_112)
         )]
@@ -280,10 +264,7 @@ final class GameSaveTests: XCTestCase {
         let first = session.world
         let saveFile = GameSaveFile(rootURL: root)
         try saveFile.save(
-            profileID: profileID,
-            package: package,
-            world: first,
-            level: level
+            profileID: profileID, package: package, world: first, level: level
         )
         let saveURL = saveFile.quicksaveURL(profileID: profileID)
         let firstData = try Data(contentsOf: saveURL)
@@ -294,9 +275,7 @@ final class GameSaveTests: XCTestCase {
         let second = session.world
         XCTAssertNotEqual(second, first)
         let secondData = try canonicalJSONData(GameSave(
-            profileID: profileID,
-            package: package,
-            world: second
+            profileID: profileID, package: package, world: second
         ))
         let strayURL = saveURL.deletingLastPathComponent().appending(
             path: ".quicksave.json.\(UUID().uuidString).tmp"
@@ -305,9 +284,7 @@ final class GameSaveTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: saveURL), firstData)
         XCTAssertEqual(
             try saveFile.load(
-                profileID: profileID,
-                package: package,
-                baseLevel: level,
+                profileID: profileID, package: package, baseLevel: level,
                 resumedAtTimestamp: 10
             ).world,
             first
@@ -318,32 +295,24 @@ final class GameSaveTests: XCTestCase {
         var invalid = second
         invalid.gameTime = .nan
         XCTAssertThrowsError(try saveFile.save(
-            profileID: profileID,
-            package: package,
-            world: invalid,
-            level: level
+            profileID: profileID, package: package, world: invalid, level: level
         )) {
             XCTAssertEqual(
-                $0 as? GameSaveError,
-                .invalidWorld(.nonFiniteValue("gameTime"))
+                $0 as? GameSaveError, .invalidWorld(.nonFiniteValue("gameTime"))
             )
         }
         XCTAssertEqual(try Data(contentsOf: saveURL), firstData)
 
         // A complete save replaces the prior one atomically.
         try saveFile.save(
-            profileID: profileID,
-            package: package,
-            world: second,
-            level: level
+            profileID: profileID, package: package, world: second, level: level
         )
         XCTAssertEqual(try Data(contentsOf: saveURL), secondData)
         let remaining = try FileManager.default.contentsOfDirectory(
             atPath: saveURL.deletingLastPathComponent().path
         ).sorted()
         XCTAssertEqual(
-            remaining,
-            [strayURL.lastPathComponent, "quicksave.json"].sorted()
+            remaining, [strayURL.lastPathComponent, "quicksave.json"].sorted()
         )
     }
 
@@ -351,8 +320,7 @@ final class GameSaveTests: XCTestCase {
         let level = makeTrainingRASBot1DeathLevel()
         let binding = try XCTUnwrap(level.defaultPlayerBinding)
         let world = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0
+            level: level, presentationReadyTimestamp: 0
         ).world
         XCTAssertNoThrow(try world.validate(against: level))
 
@@ -363,19 +331,17 @@ final class GameSaveTests: XCTestCase {
         ) {
             XCTAssertThrowsError(
                 try GameSession(
-                    level: level,
-                    world: candidate,
-                    resumedAtTimestamp: 0
+                    level: level, world: candidate, resumedAtTimestamp: 0
                 ),
                 line: line
             ) {
                 XCTAssertEqual(
-                    $0 as? GameSessionRestoreError,
-                    .invalidWorld(expected),
+                    $0 as? GameSessionRestoreError, .invalidWorld(expected),
                     line: line
                 )
             }
         }
+
         func decoded(
             _ mutate: (inout [String: Any]) throws -> Void
         ) throws -> GameWorld {
@@ -390,6 +356,7 @@ final class GameSaveTests: XCTestCase {
                 from: JSONSerialization.data(withJSONObject: object)
             )
         }
+
         func mutateObjects(
             _ mutate: (inout [String: Any]) throws -> Void
         ) throws -> GameWorld {
@@ -424,9 +391,7 @@ final class GameSaveTests: XCTestCase {
             .objectLocation(slot: playerSlot),
             try mutateObjects { objects in
                 var slots = try XCTUnwrap(objects["slots"] as? [Any])
-                var player = try XCTUnwrap(
-                    slots[playerSlot] as? [String: Any]
-                )
+                var player = try XCTUnwrap(slots[playerSlot] as? [String: Any])
                 player["location"] = ["room": ["_0": 9_999]]
                 slots[playerSlot] = player
                 objects["slots"] = slots
@@ -436,9 +401,7 @@ final class GameSaveTests: XCTestCase {
             .outOfDomain("object \(playerSlot)"),
             try mutateObjects { objects in
                 var slots = try XCTUnwrap(objects["slots"] as? [Any])
-                var player = try XCTUnwrap(
-                    slots[playerSlot] as? [String: Any]
-                )
+                var player = try XCTUnwrap(slots[playerSlot] as? [String: Any])
                 var position = try XCTUnwrap(
                     player["position"] as? [String: Any]
                 )
@@ -466,14 +429,8 @@ final class GameSaveTests: XCTestCase {
         extraGoal.goals.append(contentsOf: extraGoal.goals.prefix(1))
         if level.goals.isEmpty {
             extraGoal.goals.append(.init(
-                status: 0,
-                priority: 0,
-                list: 0,
-                name: "",
-                itemName: "",
-                description: "",
-                completionMessage: "",
-                items: []
+                status: 0, priority: 0, list: 0, name: "", itemName: "",
+                description: "", completionMessage: "", items: []
             ))
         }
         assertRejected(.goals, extraGoal)
@@ -491,8 +448,7 @@ final class GameSaveTests: XCTestCase {
     {
         let concussionLevel = try makePlayerConcussionLevel()
         let concussionWorld = GameSession(
-            level: concussionLevel,
-            presentationReadyTimestamp: 0
+            level: concussionLevel, presentationReadyTimestamp: 0
         ).world
         XCTAssertNoThrow(try concussionWorld.validate(against: concussionLevel))
         // The player's dynamic battery mask indexes its ship battery's
@@ -501,29 +457,23 @@ final class GameSaveTests: XCTestCase {
         guard case let .room(playerRoom) = player.location else {
             return XCTFail("indoor player")
         }
+
         var maskIndex = concussionWorld
         maskIndex.objects[player.handle]?.weaponBatteries[10]
             .currentFiringMask = 2
         assertRejected(
             .indexOutOfRange("object \(player.handle.slot) weapon battery 10"),
-            maskIndex,
-            level: concussionLevel
+            maskIndex, level: concussionLevel
         )
         // VisEffects hold at most MAX_VIS_EFFECTS.
         var effects = concussionWorld
         let effect = VisEffect(
-            id: VisEffect.fadingLineID,
-            roomSourceIndex: playerRoom,
-            position: player.position,
-            size: 1,
-            lifeLeft: 1,
-            lifetime: 1,
-            creationTime: 0,
-            flags: VisEffect.usesLifeLeftFlag
+            id: VisEffect.fadingLineID, roomSourceIndex: playerRoom,
+            position: player.position, size: 1, lifeLeft: 1, lifetime: 1,
+            creationTime: 0, flags: VisEffect.usesLifeLeftFlag
         )
         effects.visEffects = Array(
-            repeating: effect,
-            count: VisEffect.capacity + 1
+            repeating: effect, count: VisEffect.capacity + 1
         )
         assertRejected(.capacity("visEffects"), effects, level: concussionLevel)
         var effectRoom = concussionWorld
@@ -531,18 +481,14 @@ final class GameSaveTests: XCTestCase {
         roomless.roomSourceIndex = 99_999
         effectRoom.visEffects = [roomless]
         assertRejected(
-            .roomReference("roomSourceIndex"),
-            effectRoom,
+            .roomReference("roomSourceIndex"), effectRoom,
             level: concussionLevel
         )
         // A weapon's parent is a well-formed handle.
         var parentHandle = concussionWorld
         parentHandle.fireWeaponFromPlayer(
-            player.handle,
-            weaponType: PlayerWeaponState.primary,
-            isDown: true,
-            downTime: 0.1,
-            level: concussionLevel
+            player.handle, weaponType: PlayerWeaponState.primary, isDown: true,
+            downTime: 0.1, level: concussionLevel
         )
         let bolt = try XCTUnwrap(parentHandle.objects.first {
             $0.type == .weapon
@@ -550,23 +496,17 @@ final class GameSaveTests: XCTestCase {
         XCTAssertNoThrow(try parentHandle.validate(against: concussionLevel))
         parentHandle.objects[bolt.handle]?.parent = ObjectHandle(0x7ff)
         assertRejected(
-            .objectReference(0x7ff),
-            parentHandle,
-            level: concussionLevel
+            .objectReference(0x7ff), parentHandle, level: concussionLevel
         )
 
         let guidebotLevel = withTrainingGuideBot(
             makeTrainingCameraMonitorLevel()
         )
         let guidebotSession = GameSession(
-            level: guidebotLevel,
-            presentationReadyTimestamp: 0
+            level: guidebotLevel, presentationReadyTimestamp: 0
         )
         guidebotSession.releaseOrRecallTestGuideBot()
-        _ = guidebotSession.update(
-            at: 0.1,
-            input: .zero
-        )
+        _ = guidebotSession.update(at: 0.1, input: .zero)
         let deployed = guidebotSession.world
         XCTAssertNotNil(deployed.testGuideBot)
         XCTAssertNoThrow(try deployed.validate(against: guidebotLevel))
@@ -576,31 +516,25 @@ final class GameSaveTests: XCTestCase {
         }
         assertRejected(
             .unexpectedState("object \(deployed.buddyHandle.slot) scripts"),
-            badPowerups,
-            level: guidebotLevel
+            badPowerups, level: guidebotLevel
         )
         var badTime = deployed
         badTime.updateGuideBot(deployed.buddyHandle) {
             $0.modeTime = .nan
         }
         assertRejected(
-            .nonFiniteValue("modeTime"),
-            badTime,
-            level: guidebotLevel
+            .nonFiniteValue("modeTime"), badTime, level: guidebotLevel
         )
         var badLoop = deployed
         badLoop.soundSystem.objectLoops = [
             .init(handle: 0, soundIndex: 10_000, object: deployed.buddyHandle),
         ]
         assertRejected(
-            .indexOutOfRange("soundSystem"),
-            badLoop,
-            level: guidebotLevel
+            .indexOutOfRange("soundSystem"), badLoop, level: guidebotLevel
         )
         let dodgeLevel = makeTrainingMovingTargetHandoffLevel()
         let dodgeWorld = GameSession(
-            level: dodgeLevel,
-            presentationReadyTimestamp: 0
+            level: dodgeLevel, presentationReadyTimestamp: 0
         ).world
         XCTAssertNoThrow(try dodgeWorld.validate(against: dodgeLevel))
         // The turret's dynamic_wb keeps MAX_WB_TURRETS angles.
@@ -608,38 +542,32 @@ final class GameSaveTests: XCTestCase {
         var angles = dodgeWorld
         angles.objects[turret]?.weaponBatteries[0].turretAngles = [0]
         assertRejected(
-            .indexOutOfRange("object \(turret.slot) weapon battery 0"),
-            angles,
+            .indexOutOfRange("object \(turret.slot) weapon battery 0"), angles,
             level: dodgeLevel
         )
         // A goal names a node of a game path.
         let followBot = dodgeLevel.findObjectName("FollowBot1")
         var goal = dodgeWorld
         goal.aiGoalFollowPathSimple(
-            followBot, pathID: 0, guid: 0, flags: 0, slot: 3,
-            level: dodgeLevel
+            followBot, pathID: 0, guid: 0, flags: 0, slot: 3, level: dodgeLevel
         )
         XCTAssertNoThrow(try goal.validate(against: dodgeLevel))
         goal.objects[followBot]?.ai?.goals[3].staticPathCurrentNode = 99
         assertRejected(
-            .indexOutOfRange("object \(followBot.slot) goal"),
-            goal,
+            .indexOutOfRange("object \(followBot.slot) goal"), goal,
             level: dodgeLevel
         )
         // A weapon object names a weapon of the level.
         var weapon = dodgeWorld
         let shot = try XCTUnwrap(weapon.createAndFireWeapon(
             position: try XCTUnwrap(weapon.objects[turret]).position,
-            direction: .init(x: 0, y: 0, z: -1),
-            parent: turret,
-            weaponIndex: 0,
+            direction: .init(x: 0, y: 0, z: -1), parent: turret, weaponIndex: 0,
             level: dodgeLevel
         ))
         XCTAssertNoThrow(try weapon.validate(against: dodgeLevel))
         weapon.objects[shot]?.weapon = 5
         assertRejected(
-            .indexOutOfRange("object \(shot.slot) weapon"),
-            weapon,
+            .indexOutOfRange("object \(shot.slot) weapon"), weapon,
             level: dodgeLevel
         )
     }
@@ -666,8 +594,7 @@ final class GameSaveTests: XCTestCase {
         var playerBasis = world
         playerBasis.objects[player.handle]?.orientation = zero
         assertRejected(
-            .orientation("object \(player.handle.slot)"),
-            playerBasis,
+            .orientation("object \(player.handle.slot)"), playerBasis,
             level: level
         )
         guard case let .room(playerRoom) = player.location else {
@@ -676,23 +603,18 @@ final class GameSaveTests: XCTestCase {
         // A weapon object keeps an orthonormal basis.
         var weaponBasis = world
         weaponBasis.fireWeaponFromPlayer(
-            player.handle,
-            weaponType: PlayerWeaponState.primary,
-            isDown: true,
-            downTime: 0.1,
-            level: level
+            player.handle, weaponType: PlayerWeaponState.primary, isDown: true,
+            downTime: 0.1, level: level
         )
         let bolt = try XCTUnwrap(weaponBasis.objects.first {
             $0.type == .weapon
         })
         weaponBasis.objects[bolt.handle]?.orientation = .init(
-            right: player.orientation.forward,
-            up: player.orientation.forward,
+            right: player.orientation.forward, up: player.orientation.forward,
             forward: player.orientation.forward
         )
         assertRejected(
-            .orientation("object \(bolt.handle.slot)"),
-            weaponBasis,
+            .orientation("object \(bolt.handle.slot)"), weaponBasis,
             level: level
         )
     }
@@ -702,29 +624,27 @@ final class GameSaveTests: XCTestCase {
     {
         let dodgeLevel = makeTrainingMovingTargetHandoffLevel()
         let dodgeWorld = GameSession(
-            level: dodgeLevel,
-            presentationReadyTimestamp: 0
+            level: dodgeLevel, presentationReadyTimestamp: 0
         ).world
         let player = dodgeWorld.testPlayerObject
         guard case let .room(playerRoom) = player.location else {
             return XCTFail("indoor player")
         }
+
         let turret = dodgeLevel.findObjectName("DodgeTurrett")
         // The firing mask indexes the page's masks (WBFireBattery).
         var firingMask = dodgeWorld
         firingMask.objects[turret]?.weaponBatteries[0].currentFiringMask = 2
         assertRejected(
             .indexOutOfRange("object \(turret.slot) weapon battery 0"),
-            firingMask,
-            level: dodgeLevel
+            firingMask, level: dodgeLevel
         )
         // ai_fire wraps turret angles into 0...1.
         var turretAngle = dodgeWorld
         turretAngle.objects[turret]?.weaponBatteries[0].turretAngles[0] = 1.5
         assertRejected(
             .indexOutOfRange("object \(turret.slot) weapon battery 0"),
-            turretAngle,
-            level: dodgeLevel
+            turretAngle, level: dodgeLevel
         )
         // An AI object keeps one dynamic battery per model battery
         // (WBClearInfo, ObjInit.cpp:817); ai_fire indexes them.
@@ -732,8 +652,7 @@ final class GameSaveTests: XCTestCase {
         noBatteries.objects[turret]?.weaponBatteries = []
         assertRejected(
             .indexOutOfRange("object \(turret.slot) weaponBatteries"),
-            noBatteries,
-            level: dodgeLevel
+            noBatteries, level: dodgeLevel
         )
         // ai_mem's counters are int16_t (aistruct.h:724-727); a saved count
         // out of that range does not load.
@@ -754,24 +673,19 @@ final class GameSaveTests: XCTestCase {
         awareness.objects[turret]?.ai?.awareness = .infinity
         // The world's finite-value sweep names the field.
         assertRejected(
-            .nonFiniteValue("awareness"),
-            awareness,
-            level: dodgeLevel
+            .nonFiniteValue("awareness"), awareness, level: dodgeLevel
         )
         var scriptCounter = dodgeWorld
         var counters = try XCTUnwrap(scriptCounter.testTrainingMission)
         counters.script030Count = Int.max
         scriptCounter.levelModule = .trainingMission(counters)
         assertRejected(
-            .outOfDomain("script030Count"),
-            scriptCounter,
-            level: dodgeLevel
+            .outOfDomain("script030Count"), scriptCounter, level: dodgeLevel
         )
 
         let concussionLevel = try makePlayerConcussionLevel()
         let concussionWorld = GameSession(
-            level: concussionLevel,
-            presentationReadyTimestamp: 0
+            level: concussionLevel, presentationReadyTimestamp: 0
         ).world
         let concussionPlayer = concussionWorld.testPlayerObject
         guard case let .room(concussionRoom) = concussionPlayer.location
@@ -781,26 +695,19 @@ final class GameSaveTests: XCTestCase {
         // A live visual effect has life left of at most its lifetime.
         var effectLife = concussionWorld
         effectLife.visEffects = [VisEffect(
-            id: VisEffect.customExplosionID,
-            roomSourceIndex: concussionRoom,
-            position: concussionPlayer.position,
-            size: 1,
-            lifeLeft: 5,
-            lifetime: 0.5,
-            creationTime: 0,
-            flags: VisEffect.usesLifeLeftFlag
+            id: VisEffect.customExplosionID, roomSourceIndex: concussionRoom,
+            position: concussionPlayer.position, size: 1, lifeLeft: 5,
+            lifetime: 0.5, creationTime: 0, flags: VisEffect.usesLifeLeftFlag
         )]
         assertRejected(
-            .outOfDomain("visEffects.lifeLeft"),
-            effectLife,
+            .outOfDomain("visEffects.lifeLeft"), effectLife,
             level: concussionLevel
         )
         // An effect that never ages (no VF_USES_LIFELEFT) or whose life
         // already ran out is not a live effect; VisEffectMoveAll marks an
         // effect dead when its life left drops below 0.
         for (lifeLeft, lifetime, flags) in [
-            (Float(-1), Float(1e-20), UInt16(0)),
-            (0.1, 0.5, 0),
+            (Float(-1), Float(1e-20), UInt16(0)), (0.1, 0.5, 0),
             (-0.1, 0.5, VisEffect.usesLifeLeftFlag),
             (0.1, 0.5, VisEffect.usesLifeLeftFlag | 0x4000),
         ] {
@@ -808,45 +715,35 @@ final class GameSaveTests: XCTestCase {
             unaged.visEffects = [VisEffect(
                 id: VisEffect.customExplosionID,
                 roomSourceIndex: concussionRoom,
-                position: concussionPlayer.position,
-                size: 1,
-                lifeLeft: lifeLeft,
-                lifetime: lifetime,
-                creationTime: 0,
-                flags: flags,
-                customWeapon: 0
+                position: concussionPlayer.position, size: 1,
+                lifeLeft: lifeLeft, lifetime: lifetime, creationTime: 0,
+                flags: flags, customWeapon: 0
             )]
             assertRejected(
-                .outOfDomain("visEffects.lifeLeft"),
-                unaged,
+                .outOfDomain("visEffects.lifeLeft"), unaged,
                 level: concussionLevel
             )
         }
         // A shockwave divides by its impact time (DoConcussiveForce).
         var shockwave = concussionWorld
         let wave = try XCTUnwrap(shockwave.objects.create(
-            type: .shockwave,
-            renderType: .none,
+            type: .shockwave, renderType: .none,
             location: concussionPlayer.location,
             position: concussionPlayer.position,
             orientation: concussionPlayer.orientation
         ))
         shockwave.objects[wave]?.lifeLeft = 0.1
         shockwave.objects[wave]?.shockwave = .init(
-            size: 32, time: 0, playerDamage: 19, genericDamage: 19,
-            force: 3_000
+            size: 32, time: 0, playerDamage: 19, genericDamage: 19, force: 3_000
         )
         assertRejected(
-            .outOfDomain("object \(wave.slot) shockwave"),
-            shockwave,
+            .outOfDomain("object \(wave.slot) shockwave"), shockwave,
             level: concussionLevel
         )
         var ammo = concussionWorld
         ammo.playerWeaponAmmo[10] = -1
         assertRejected(
-            .outOfDomain("playerWeaponAmmo"),
-            ammo,
-            level: concussionLevel
+            .outOfDomain("playerWeaponAmmo"), ammo, level: concussionLevel
         )
         var hugeClock = concussionWorld
         hugeClock.frameDuration = 1e30
@@ -856,19 +753,15 @@ final class GameSaveTests: XCTestCase {
         // bound, so no deadline, timer, or vector overflows its consumer.
         var hugeVelocity = concussionWorld
         hugeVelocity.fireWeaponFromPlayer(
-            concussionPlayer.handle,
-            weaponType: PlayerWeaponState.primary,
-            isDown: true,
-            downTime: 0.1,
-            level: concussionLevel
+            concussionPlayer.handle, weaponType: PlayerWeaponState.primary,
+            isDown: true, downTime: 0.1, level: concussionLevel
         )
         let bolt = try XCTUnwrap(hugeVelocity.objects.first {
             $0.type == .weapon
         })
         hugeVelocity.objects[bolt.handle]?.velocity = .init(x: 1e30, y: 0, z: 0)
         assertRejected(
-            .outOfDomain("object \(bolt.handle.slot)"),
-            hugeVelocity,
+            .outOfDomain("object \(bolt.handle.slot)"), hugeVelocity,
             level: concussionLevel
         )
 
@@ -877,38 +770,29 @@ final class GameSaveTests: XCTestCase {
         var pendingLink = concussionWorld
         pendingLink.physicsLinkList = [concussionPlayer.handle]
         assertRejected(
-            .unexpectedState("physicsLinkList"),
-            pendingLink,
+            .unexpectedState("physicsLinkList"), pendingLink,
             level: concussionLevel
         )
         var pendingLight = concussionWorld
         pendingLight.objectLights = [.init(
             roomSourceIndex: concussionRoom,
-            position: concussionPlayer.position,
-            distance: 1,
-            color: .init(x: 1, y: 1, z: 1),
-            direction: nil,
-            directionalDot: 0
+            position: concussionPlayer.position, distance: 1,
+            color: .init(x: 1, y: 1, z: 1), direction: nil, directionalDot: 0
         )]
         assertRejected(
-            .unexpectedState("objectLights"),
-            pendingLight,
+            .unexpectedState("objectLights"), pendingLight,
             level: concussionLevel
         )
         var headingFreeLink = hugeVelocity
         headingFreeLink.objects[bolt.handle]?.velocity = .zero
         headingFreeLink.objects[bolt.handle]?.usesPhysics = false
         headingFreeLink.objects[bolt.handle]?.objectLink = .init(
-            parentHandle: concussionPlayer.handle,
-            submodel: 0,
-            position: .zero,
-            forward: .zero,
-            up: .init(x: 0, y: 1, z: 0)
+            parentHandle: concussionPlayer.handle, submodel: 0, position: .zero,
+            forward: .zero, up: .init(x: 0, y: 1, z: 0)
         )
         assertRejected(
             .indexOutOfRange("object \(bolt.handle.slot) objectLink"),
-            headingFreeLink,
-            level: concussionLevel
+            headingFreeLink, level: concussionLevel
         )
     }
 
@@ -920,15 +804,12 @@ final class GameSaveTests: XCTestCase {
     ) {
         XCTAssertThrowsError(
             try GameSession(
-                level: level,
-                world: candidate,
-                resumedAtTimestamp: 0
+                level: level, world: candidate, resumedAtTimestamp: 0
             ),
             line: line
         ) {
             XCTAssertEqual(
-                $0 as? GameSessionRestoreError,
-                .invalidWorld(expected),
+                $0 as? GameSessionRestoreError, .invalidWorld(expected),
                 line: line
             )
         }
@@ -950,8 +831,7 @@ final class GameSaveTests: XCTestCase {
         let profileID = UUID()
         let package = makePackageReference()
         let original = GameSession(
-            level: level,
-            presentationReadyTimestamp: 0,
+            level: level, presentationReadyTimestamp: 0,
             authoritativeRandomSeed: 0x2468_ace0
         )
         prepare(original)
@@ -968,15 +848,11 @@ final class GameSaveTests: XCTestCase {
 
         let saveFile = GameSaveFile(rootURL: root)
         try saveFile.save(
-            profileID: profileID,
-            package: package,
-            world: original.world,
+            profileID: profileID, package: package, world: original.world,
             level: level
         )
         let restored = try saveFile.load(
-            profileID: profileID,
-            package: package,
-            baseLevel: level,
+            profileID: profileID, package: package, baseLevel: level,
             resumedAtTimestamp: timestamp
         )
         XCTAssertEqual(restored.world, original.world, file: file, line: line)
@@ -988,28 +864,21 @@ final class GameSaveTests: XCTestCase {
             let actual = restored.update(at: timestamp, input: input)
             XCTAssertEqual(actual, expected, "frame \(frame)", file: file, line: line)
             XCTAssertEqual(
-                restored.world,
-                original.world,
-                "frame \(frame)",
-                file: file,
+                restored.world, original.world, "frame \(frame)", file: file,
                 line: line
             )
         }
         XCTAssertEqual(
             try canonicalJSONData(restored.world),
-            try canonicalJSONData(original.world),
-            file: file,
-            line: line
+            try canonicalJSONData(original.world), file: file, line: line
         )
     }
 
     private func scriptedInput(_ frame: Int) -> InputSnapshot {
         InputSnapshot(
             forward: frame % 7 < 4 ? 1 : -0.5,
-            sideways: frame % 5 == 0 ? 0.5 : 0,
-            yaw: Float(frame % 9) / 9 - 0.4,
-            roll: frame % 11 == 0 ? 0.3 : 0,
-            firesPrimaryWeapon: frame % 6 == 0,
+            sideways: frame % 5 == 0 ? 0.5 : 0, yaw: Float(frame % 9) / 9 - 0.4,
+            roll: frame % 11 == 0 ? 0.3 : 0, firesPrimaryWeapon: frame % 6 == 0,
             firesPlayerFlare: frame % 13 == 0
         )
     }
@@ -1020,8 +889,7 @@ final class GameSaveTests: XCTestCase {
             directoryHint: .isDirectory
         )
         try FileManager.default.createDirectory(
-            at: root,
-            withIntermediateDirectories: false
+            at: root, withIntermediateDirectories: false
         )
         return root
     }
@@ -1032,5 +900,298 @@ final class GameSaveTests: XCTestCase {
             missionKey: "descent3.mission.pilot-training",
             levelKey: "descent3.level.training-mission"
         )
+    }
+
+    /// The save boundary rejects timer and script state the runtime would
+    /// trap on: a repeat count below -1 and script ids the level module does
+    /// not bind.
+    func testLoadValidationRejectsHostileTimersAndScriptBindings() throws {
+        let level = makeTrainingScript003Level()
+        let world = GameWorld(level: level)
+        XCTAssertNoThrow(try world.validate(against: level))
+        let object = try XCTUnwrap(testWorldObject(world))
+
+        func decoded(_ edit: (inout [String: Any]) throws -> Void) throws
+            -> GameWorld
+        {
+            var copy = object
+            try edit(&copy)
+            return try decodeTestWorld(copy)
+        }
+
+        let hostileRepeat = try decoded { object in
+            var timers = try XCTUnwrap(object["osirisTimers"] as? [String: Any])
+            var entries = try XCTUnwrap(timers["entries"] as? [[String: Any]])
+            entries[0]["repeats"] = true
+            entries[0]["repeatCount"] = Int(Int32.min)
+            timers["entries"] = entries
+            object["osirisTimers"] = timers
+        }
+        XCTAssertThrowsError(try hostileRepeat.validate(against: level))
+
+        let bound = try XCTUnwrap(world.objects.first { $0.scripts != nil })
+        let custom = try XCTUnwrap(bound.scripts?.custom)
+        let hostileBindings: [ObjectScripts?] = [
+            ObjectScripts(custom: custom, level: 0),
+            ObjectScripts(custom: custom + 100, level: nil),
+            nil, // a cleared required binding
+        ]
+        for scripts in hostileBindings {
+            var hostile = world
+            hostile.objects[bound.handle]?.scripts = scripts
+            XCTAssertThrowsError(try hostile.validate(against: level))
+        }
+    }
+
+    func testQuicksaveRoundTripRestoresGameWorldAndContinuesDeterministically()
+        throws
+    {
+        let root = try makeTemporarySaveRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let profileID = UUID()
+        let package = makePackageReference()
+        let level = withTrainingGuideBot(makeTrainingRASBot1DeathLevel())
+        try level.validate()
+        let original = GameSession(
+            level: level, presentationReadyTimestamp: 0,
+            authoritativeRandomSeed: 0x1234_5678
+        )
+        original.releaseOrRecallTestGuideBot()
+        _ = original.update(at: 0.1, input: .zero)
+        let saved = original.world
+        let saveFile = GameSaveFile(rootURL: root)
+
+        try saveFile.save(
+            profileID: profileID, package: package, world: saved, level: level
+        )
+        let encoded = try Data(contentsOf: saveFile.quicksaveURL(
+            profileID: profileID
+        ))
+        let save = try JSONDecoder().decode(GameSave.self, from: encoded)
+        XCTAssertEqual(save.schemaVersion, 3)
+        XCTAssertEqual(save.profileID, profileID)
+        XCTAssertEqual(save.package, package)
+        XCTAssertEqual(save.world, saved)
+        XCTAssertNotEqual(saved.authoritativeRandomState, 0x1234_5678)
+
+        let restored = try saveFile.load(
+            profileID: profileID, package: package, baseLevel: level,
+            resumedAtTimestamp: 100
+        )
+        XCTAssertEqual(restored.world, saved)
+        XCTAssertEqual(
+            restored.world.authoritativeRandomState,
+            saved.authoritativeRandomState
+        )
+        let originalNext = original.update(at: 0.2, input: .zero)
+        let restoredNext = restored.update(at: 100.1, input: .zero)
+        XCTAssertEqual(originalNext, restoredNext)
+        XCTAssertEqual(original.world, restored.world)
+    }
+
+    func testQuicksaveRejectsHostileFilesAndWrongIdentity() throws {
+        let root = try makeTemporarySaveRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let profileID = UUID()
+        let package = makePackageReference()
+        let level = makeTrainingRASBot1DeathLevel()
+        try level.validate()
+        let simulation = GameSession(
+            level: level, presentationReadyTimestamp: 0
+        )
+        let saveFile = GameSaveFile(rootURL: root)
+        try saveFile.save(
+            profileID: profileID, package: package, world: simulation.world,
+            level: level
+        )
+        let saveURL = saveFile.quicksaveURL(profileID: profileID)
+        let validData = try Data(contentsOf: saveURL)
+
+        try Data("{".utf8).write(to: saveURL)
+        assertLoadError(
+            .malformedSave, saveFile: saveFile, profileID: profileID,
+            package: package, level: level
+        )
+
+        try Data(count: 8 * 1_024 * 1_024 + 1).write(to: saveURL)
+        assertLoadError(
+            .tooLarge, saveFile: saveFile, profileID: profileID,
+            package: package, level: level
+        )
+
+        try writeMutatedJSON(validData, to: saveURL) {
+            $0["schemaVersion"] = 1
+        }
+        assertLoadError(
+            .unsupportedSaveSchema(1), saveFile: saveFile, profileID: profileID,
+            package: package, level: level
+        )
+        // A save from before M1 step 9 (schema 2, with no inventory items,
+        // goals, small views, or effects) is unsupported, not corrupt.
+        try writeMutatedJSON(validData, to: saveURL) {
+            $0["schemaVersion"] = 2
+        }
+        assertLoadError(
+            .unsupportedSaveSchema(2), saveFile: saveFile, profileID: profileID,
+            package: package, level: level
+        )
+
+        let otherProfileID = UUID()
+        try writeMutatedJSON(validData, to: saveURL) {
+            $0["profileID"] = otherProfileID.uuidString
+        }
+        assertLoadError(
+            .profileMismatch, saveFile: saveFile, profileID: profileID,
+            package: package, level: level
+        )
+
+        try writeMutatedJSON(validData, to: saveURL) {
+            var hostilePackage = $0["package"] as! [String: Any]
+            hostilePackage["identitySHA256"] = String(repeating: "b", count: 64)
+            $0["package"] = hostilePackage
+        }
+        assertLoadError(
+            .packageMismatch, saveFile: saveFile, profileID: profileID,
+            package: package, level: level
+        )
+
+        try FileManager.default.removeItem(at: saveURL)
+        try FileManager.default.createDirectory(
+            at: saveURL, withIntermediateDirectories: false
+        )
+        assertLoadError(
+            .nonRegularFile, saveFile: saveFile, profileID: profileID,
+            package: package, level: level
+        )
+
+        try FileManager.default.removeItem(at: saveURL)
+        let targetURL = root.appending(path: "hostile-target.json")
+        try validData.write(to: targetURL)
+        try FileManager.default.createSymbolicLink(
+            at: saveURL, withDestinationURL: targetURL
+        )
+        assertLoadError(
+            .nonRegularFile, saveFile: saveFile, profileID: profileID,
+            package: package, level: level
+        )
+    }
+
+    func testQuicksaveFailedOverwritePreservesPriorValidSave() throws {
+        let root = try makeTemporarySaveRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let profileID = UUID()
+        let package = makePackageReference()
+        let level = makeTrainingRASBot1DeathLevel()
+        let simulation = GameSession(
+            level: level, presentationReadyTimestamp: 0
+        )
+        _ = simulation.update(at: 0.1, input: .zero)
+        let first = simulation.world
+        let saveFile = GameSaveFile(rootURL: root)
+        try saveFile.save(
+            profileID: profileID, package: package, world: first, level: level
+        )
+        let saveURL = saveFile.quicksaveURL(profileID: profileID)
+        let originalData = try Data(contentsOf: saveURL)
+        _ = simulation.update(at: 0.2, input: .zero)
+        let replacement = simulation.world
+        XCTAssertNotEqual(replacement, first)
+
+        let profileURL = saveURL.deletingLastPathComponent()
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o500], ofItemAtPath: profileURL.path
+        )
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o700], ofItemAtPath: profileURL.path
+            )
+        }
+        XCTAssertThrowsError(try saveFile.save(
+            profileID: profileID, package: package, world: replacement,
+            level: level
+        )) {
+            guard let error = $0 as? GameSaveError,
+                  case .writeFailed = error else {
+                return XCTFail("unexpected error: \($0)")
+            }
+        }
+        XCTAssertEqual(try Data(contentsOf: saveURL), originalData)
+        let restored = try saveFile.load(
+            profileID: profileID, package: package, baseLevel: level,
+            resumedAtTimestamp: 10
+        )
+        XCTAssertEqual(restored.world, first)
+    }
+
+    func testQuickloadFailurePreservesTheLiveSimulation() throws {
+        let root = try makeTemporarySaveRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let profileID = UUID()
+        let package = makePackageReference()
+        let level = makeTrainingRASBot1DeathLevel()
+        let original = GameSession(level: level, presentationReadyTimestamp: 0)
+        _ = original.update(at: 0.1, input: .zero)
+        let liveWorld = original.world
+        var live = original
+        let saveFile = GameSaveFile(rootURL: root)
+        try saveFile.save(
+            profileID: profileID, package: package, world: liveWorld,
+            level: level
+        )
+        let saveURL = saveFile.quicksaveURL(profileID: profileID)
+        let validData = try Data(contentsOf: saveURL)
+        try writeMutatedJSON(validData, to: saveURL) {
+            var world = $0["world"] as! [String: Any]
+            var objects = world["objects"] as! [String: Any]
+            var freeSlots = objects["freeSlots"] as! [Int]
+            freeSlots.append(freeSlots[0])
+            objects["freeSlots"] = freeSlots
+            world["objects"] = objects
+            $0["world"] = world
+        }
+
+        do {
+            let candidate = try saveFile.load(
+                profileID: profileID, package: package, baseLevel: level,
+                resumedAtTimestamp: 10
+            )
+            live = candidate
+            XCTFail("hostile world loaded")
+        } catch {
+            XCTAssertEqual(error as? GameSaveError, .invalidWorld(.freeList))
+        }
+        XCTAssertTrue(live === original)
+        XCTAssertEqual(live.world, liveWorld)
+    }
+
+    private func assertLoadError(
+        _ expected: GameSaveError,
+        saveFile: GameSaveFile,
+        profileID: UUID,
+        package: CanonicalPackageReference,
+        level: Level,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertThrowsError(try saveFile.load(
+            profileID: profileID, package: package, baseLevel: level,
+            resumedAtTimestamp: 10
+        ), file: file, line: line) {
+            XCTAssertEqual(
+                $0 as? GameSaveError, expected, file: file, line: line
+            )
+        }
+    }
+
+    private func writeMutatedJSON(
+        _ data: Data, to url: URL, mutate: (inout [String: Any]) -> Void
+    ) throws {
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        mutate(&object)
+        try JSONSerialization.data(
+            withJSONObject: object, options: [.sortedKeys]
+        ).write(to: url)
     }
 }

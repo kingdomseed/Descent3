@@ -1,5 +1,8 @@
 import XCTest
 
+// The pinned prepared retail installation and the mission descriptor
+// (PreparedRetailProfile.swift, MissionFile.swift).
+
 final class PreparedRetailProfileTests: XCTestCase {
     func testTrainingProfilePinsTheOwnedPreparedInstallation() {
         XCTAssertEqual(
@@ -31,9 +34,7 @@ final class PreparedRetailProfileTests: XCTestCase {
         let archive = HOG2Archive(
             entries: [
                 HOG2Entry(
-                    sourceName: "TrainingMission.d3l",
-                    flags: 0,
-                    timestamp: 0,
+                    sourceName: "TrainingMission.d3l", flags: 0, timestamp: 0,
                     payloadRange: 10..<20
                 )
             ]

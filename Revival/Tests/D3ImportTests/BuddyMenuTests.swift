@@ -25,9 +25,7 @@ final class BuddyMenuTests: XCTestCase {
 
         let dying = session()
         dying.world.playerDeath = .init(
-            fate: .instant,
-            killer: .none,
-            initialDeathTime: 0
+            fate: .instant, killer: .none, initialDeathTime: 0
         )
         _ = dying.update(at: 0.1, input: .init(opensBuddyMenu: true))
         XCTAssertFalse(dying.buddyMenuIsRequested)
@@ -48,9 +46,7 @@ final class BuddyMenuTests: XCTestCase {
         XCTAssertNil(simulation.buddyMenu)
         _ = simulation.update(at: 5.1, input: .zero)
         XCTAssertEqual(
-            simulation.world.gameTime - gameTime,
-            0.1,
-            accuracy: 0.000_1
+            simulation.world.gameTime - gameTime, 0.1, accuracy: 0.000_1
         )
     }
 
@@ -73,8 +69,7 @@ final class BuddyMenuTests: XCTestCase {
         var timestamp = 0.0
         simulation.runFrames(1, from: &timestamp)
         XCTAssertEqual(
-            simulation.world.testGuideBot?.mode,
-            GuideBotScript.birthMode
+            simulation.world.testGuideBot?.mode, GuideBotScript.birthMode
         )
         XCTAssertNil(simulation.openBuddyMenu(at: timestamp))
         XCTAssertNil(simulation.buddyMenu)
@@ -102,8 +97,7 @@ final class BuddyMenuTests: XCTestCase {
             GuideBotScript.exitShipCommand
         ))
         XCTAssertEqual(
-            simulation.world.objectType(simulation.world.buddyHandle),
-            .robot
+            simulation.world.objectType(simulation.world.buddyHandle), .robot
         )
         XCTAssertTrue(simulation.world.presentationRequests.isEmpty)
         XCTAssertNoThrow(try simulation.world.validate(against: simulation.level))
@@ -138,22 +132,19 @@ final class BuddyMenuTests: XCTestCase {
     func testRenameUsesTheDialogAnswer() throws {
         let simulation = session()
         XCTAssertTrue(simulation.selectTestBuddyCommand(
-            GuideBotScript.renameCommand,
-            text: "Sparkyxyz"
+            GuideBotScript.renameCommand, text: "Sparkyxyz"
         ))
         XCTAssertEqual(simulation.world.testGuideBot?.name, "Sparkyx")
         XCTAssertEqual(simulation.world.playerGuideBotName, "Sparkyx")
         var timestamp = 0.0
         let renamed = simulation.runFrames(1, from: &timestamp)
         XCTAssertEqual(
-            hudMessages(renamed),
-            ["Sparkyx: Thank you for the new name!"]
+            hudMessages(renamed), ["Sparkyx: Thank you for the new name!"]
         )
 
         simulation.runFrames(30, from: &timestamp)
         XCTAssertTrue(simulation.selectTestBuddyCommand(
-            GuideBotScript.renameCommand,
-            text: nil
+            GuideBotScript.renameCommand, text: nil
         ))
         XCTAssertEqual(simulation.world.testGuideBot?.name, "Sparkyx")
         let refused = simulation.runFrames(1, from: &timestamp)
@@ -169,41 +160,13 @@ final class BuddyMenuTests: XCTestCase {
         _ = simulation.update(at: 0.1, input: .init(opensBuddyMenu: true))
         XCTAssertTrue(simulation.buddyMenuIsRequested)
         let saved = try JSONDecoder().decode(
-            GameWorld.self,
-            from: JSONEncoder().encode(simulation.world)
+            GameWorld.self, from: JSONEncoder().encode(simulation.world)
         )
         let restored = try GameSession(
-            level: simulation.level,
-            world: saved,
-            resumedAtTimestamp: 10
+            level: simulation.level, world: saved, resumedAtTimestamp: 10
         )
         XCTAssertFalse(restored.buddyMenuIsRequested)
         XCTAssertNil(restored.buddyMenu)
         XCTAssertEqual(saved, simulation.world)
-    }
-
-    /// The app runs the buddy menu as a solo pause, as F1 and P do
-    /// (PauseGame and ResumeGame, GameLoop.cpp:2770, :2780): it pauses the
-    /// shell before the modal and resumes it after, and the view never
-    /// deactivates gameplay, so the HUD and paused sounds survive. With no
-    /// Guide-Bot command no modal opens, and the game resumes.
-    @MainActor
-    func testTheViewRunsTheMenuAsASoloPause() {
-        _ = NSApplication.shared
-        let view = RevivalGameplayView(frame: .zero, device: nil)
-        var pauseChanges: [Bool] = []
-        view.soloPauseChanged = { pauseChanges.append($0) }
-        view.setGameplayActive(true)
-        let simulation = session(makeTrainingCameraMonitorLevel())
-        simulation.buddyMenuIsRequested = true
-        view.runBuddyMenu(simulation)
-        XCTAssertEqual(pauseChanges, [true, false])
-        XCTAssertFalse(simulation.buddyMenuIsRequested)
-        XCTAssertNil(simulation.buddyMenu)
-        XCTAssertEqual(simulation.pauseDepth, 0)
-        XCTAssertEqual(
-            simulation.pendingMenuPresentation,
-            [.hudMessage(BuddyMenu.noGuideBotText)]
-        )
     }
 }

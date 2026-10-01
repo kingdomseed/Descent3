@@ -62,8 +62,7 @@ final class StringTableImportTests: XCTestCase {
         data.append(0)
         data.append(contentsOf: Array("after\n!=!next".utf8))
         XCTAssertEqual(
-            try parseStringTable(data, fileName: "t.str"),
-            ["before", "next"]
+            try parseStringTable(data, fileName: "t.str"), ["before", "next"]
         )
     }
 

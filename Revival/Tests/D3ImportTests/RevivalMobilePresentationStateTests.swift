@@ -8,12 +8,10 @@ final class RevivalMobilePresentationStateTests: XCTestCase {
         let beta = URL(fileURLWithPath: "/tmp/Beta.revival")
 
         XCTAssertEqual(
-            orderedRevivalMobileContentURLs([beta, alpha]),
-            [alpha, beta]
+            orderedRevivalMobileContentURLs([beta, alpha]), [alpha, beta]
         )
         XCTAssertEqual(
-            orderedRevivalMobileContentURLs([alpha, beta]),
-            [alpha, beta]
+            orderedRevivalMobileContentURLs([alpha, beta]), [alpha, beta]
         )
     }
 
@@ -26,7 +24,7 @@ final class RevivalMobilePresentationStateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: rootURL) }
 
         let coordinator = RevivalMobileContentCoordinator(
-            library: CanonicalPackageLibrary(rootURL: rootURL, schemaPolicy: .includingScriptFreeTestSchemas)
+            library: CanonicalPackageLibrary(rootURL: rootURL)
         )
         try coordinator.prepareForUse()
 
@@ -68,8 +66,7 @@ final class RevivalMobilePresentationStateTests: XCTestCase {
         XCTAssertTrue(state.didReplacePresentation(for: activeReload!))
         XCTAssertTrue(
             state.didFailReplacement(
-                for: queuedInstall!,
-                presentationRemainsAvailable: true
+                for: queuedInstall!, presentationRemainsAvailable: true
             )
         )
         XCTAssertTrue(state.hasPresentation)
@@ -92,8 +89,7 @@ final class RevivalMobilePresentationStateTests: XCTestCase {
         XCTAssertNotNil(failedRequest)
         XCTAssertTrue(
             state.didFailReplacement(
-                for: failedRequest!,
-                presentationRemainsAvailable: true
+                for: failedRequest!, presentationRemainsAvailable: true
             )
         )
         XCTAssertTrue(state.hasPresentation)

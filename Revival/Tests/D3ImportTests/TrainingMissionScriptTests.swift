@@ -13,17 +13,14 @@ final class TrainingMissionScriptTests: XCTestCase {
     /// (TrainingMission.cpp:1506-1508).
     func testLevelTimerFiresOnEleventhFrameWithWelcomeVoiceAndTwoMessages() {
         let session = GameSession(
-            level: makeTrainingScript003Level(),
-            presentationReadyTimestamp: 0
+            level: makeTrainingScript003Level(), presentationReadyTimestamp: 0
         )
         for frameIndex in 1...10 {
             let frame = session.update(
-                at: Double(frameIndex) * 0.1,
-                input: .zero
+                at: Double(frameIndex) * 0.1, input: .zero
             )
             XCTAssertTrue(
-                frame.presentationFeedback.isEmpty,
-                "frame \(frameIndex)"
+                frame.presentationFeedback.isEmpty, "frame \(frameIndex)"
             )
             XCTAssertEqual(frame.enabledPlayerControls, [.forward])
             XCTAssertTrue(frame.showsEnabledPlayerControls)
@@ -37,18 +34,15 @@ final class TrainingMissionScriptTests: XCTestCase {
             [
                 .init(
                     hudMessages: ["Welcome to the Descent 3 Training session."],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false
+                    voiceSourceName: "", voicePrecedesHUDMessages: false
                 ),
                 .init(
-                    hudMessages: [],
-                    voiceSourceName: "welcome.osf",
+                    hudMessages: [], voiceSourceName: "welcome.osf",
                     voicePrecedesHUDMessages: false
                 ),
                 .init(
                     hudMessages: ["Move forward until you stop."],
-                    voiceSourceName: "",
-                    voicePrecedesHUDMessages: false
+                    voiceSourceName: "", voicePrecedesHUDMessages: false
                 ),
             ]
         )
@@ -78,6 +72,7 @@ final class TrainingMissionScriptTests: XCTestCase {
         level.objects = level.objects.map { object in
             names[object.handle].map { renamed(object, $0) } ?? object
         }
+
         let unscripted = GameWorld(level: level)
         let world = GameWorld(level: addingTrainingMissionScripting(level))
 
@@ -93,8 +88,7 @@ final class TrainingMissionScriptTests: XCTestCase {
         XCTAssertEqual(
             light.localLighting,
             ObjectLocalLighting(
-                lightDistance: 0,
-                color: Vector3(x: 0.2, y: 1, z: 0.2)
+                lightDistance: 0, color: Vector3(x: 0.2, y: 1, z: 0.2)
             )
         )
         XCTAssertEqual(world.objects[ObjectHandle(12_301)]?.renderType, ObjectRenderType.none)
@@ -122,115 +116,19 @@ final class TrainingMissionScriptTests: XCTestCase {
         XCTAssertNil(unghosted.objects[ObjectHandle(12_299)]?.dummyType)
     }
 
-    /// Real content, opt-in: REVIVAL_TRAINING_PACKAGE names an imported
-    /// `training.revival` package (engineering.md section 2). The imported
-    /// level starts the Training module, the 1 s level timer shows the
-    /// retail Welcome and GoForward messages around welcome.osf, flying
-    /// forward into ForwardGoal runs Script 001, and reversing into
-    /// StartGoal runs Script 003.
-    func testImportedTrainingPackageRunsLevelStartThroughFirstTimer() throws {
-        guard let path = ProcessInfo.processInfo.environment[
-            "REVIVAL_TRAINING_PACKAGE"
-        ] else {
-            throw XCTSkip("set REVIVAL_TRAINING_PACKAGE to a training.revival")
-        }
-        let level = try loadCanonicalLevel(from: URL(fileURLWithPath: path))
-        let scripting = try XCTUnwrap(level.scripting)
-        XCTAssertEqual(scripting.levelScript, "trainingmission")
-        let welcome = try XCTUnwrap(scripting.message(named: "Welcome"))
-        let goForward = try XCTUnwrap(scripting.message(named: "GoForward"))
-        XCTAssertTrue(level.voiceClips.contains {
-            $0.sourceName == "welcome.osf"
-        })
-
-        let session = GameSession(level: level, presentationReadyTimestamp: 0)
-        XCTAssertEqual(session.world.testTrainingMission?.script000Count, 1)
-        XCTAssertEqual(session.world.playerControllerBitflags, [.forward])
-        for name in ["FlashLight-1", "FlashLight-5"] {
-            let handle = level.findObjectName(name)
-            XCTAssertEqual(
-                session.world.objects[handle]?.localLighting?.lightDistance,
-                0,
-                name
-            )
-        }
-        for name in ["DestroyBot1", "DestroyBot2"] {
-            XCTAssertEqual(
-                session.world.objects[level.findObjectName(name)]?.type,
-                .dummy,
-                name
-            )
-        }
-        var feedback: [PresentationFeedback] = []
-        for frameIndex in 1...10 {
-            feedback += session.update(
-                at: Double(frameIndex) * 0.1,
-                input: .zero
-            ).presentationFeedback
-        }
-        XCTAssertTrue(feedback.isEmpty)
-        let eleventh = session.update(at: 1.1, input: .zero)
-        XCTAssertEqual(
-            eleventh.presentationFeedback.map(\.hudMessages),
-            [[welcome], [], [goForward]]
-        )
-        XCTAssertEqual(
-            eleventh.presentationFeedback.map(\.voiceSourceName),
-            ["", "welcome.osf", ""]
-        )
-
-        // Script 001 on real content: thrust forward into ForwardGoal. The
-        // player's physics move sends its EVT_COLLIDE.
-        let goodJob = try XCTUnwrap(scripting.message(named: "GoodJob"))
-        let goBackwards = try XCTUnwrap(
-            scripting.message(named: "GoBackwards")
-        )
-        var log: [String] = []
-        var timestamp = 1.1
-        for _ in 0..<300
-        where session.world.testTrainingMission?.script001Count == 0 {
-            timestamp += 0.1
-            log += presentationLog(
-                session.update(at: timestamp, input: InputSnapshot(forward: 1))
-            )
-        }
-        XCTAssertEqual(session.world.testTrainingMission?.script001Count, 1)
-        XCTAssertEqual(
-            log,
-            ["hud:\(goodJob)", "voice:return1.osf", "hud:\(goBackwards)"]
-        )
-        XCTAssertEqual(session.world.playerControllerBitflags, [.reverse])
-
-        // Script 003: reverse back into StartGoal.
-        let goLeft = try XCTUnwrap(scripting.message(named: "GoLeft"))
-        log = []
-        for _ in 0..<300
-        where session.world.testTrainingMission?.script003Count == 0 {
-            timestamp += 0.1
-            log += presentationLog(
-                session.update(at: timestamp, input: InputSnapshot(forward: -1))
-            )
-        }
-        XCTAssertEqual(session.world.testTrainingMission?.script003Count, 1)
-        XCTAssertEqual(log, ["hud:\(goLeft)", "voice:left1.osf"])
-        XCTAssertEqual(session.world.playerControllerBitflags, [.left])
-    }
-
     /// A missing message name shows NO_MESSAGE_STRING
     /// (TrainingMission.cpp:822).
     func testMissingMessageShowsNoMessageString() {
         let session = GameSession(
             level: addingTrainingMissionScripting(
-                makeSliceSixObjectRenderLevel(),
-                messages: []
+                makeSliceSixObjectRenderLevel(), messages: []
             ),
             presentationReadyTimestamp: 0
         )
         var feedback: [PresentationFeedback] = []
         for frameIndex in 1...11 {
             feedback += session.update(
-                at: Double(frameIndex) * 0.1,
-                input: .zero
+                at: Double(frameIndex) * 0.1, input: .zero
             ).presentationFeedback
         }
         XCTAssertEqual(
@@ -261,8 +159,7 @@ final class TrainingMissionScriptTests: XCTestCase {
 
         let frame = session.touch("ForwardGoal", at: 1.2)
         XCTAssertEqual(presentationLog(frame), [
-            "hud:Excellent!",
-            "voice:return1.osf",
+            "hud:Excellent!", "voice:return1.osf",
             "hud:\(trainingText("GoBackwards"))",
         ])
         XCTAssertEqual(frame.enabledPlayerControls, [.reverse])
@@ -319,8 +216,7 @@ final class TrainingMissionScriptTests: XCTestCase {
                 "sound:MenuBeepEnter", "hud:\(trainingText("GoDown"))",
             ], [.down]),                                          // 012
             ("StartGoal", [
-                "voice:proceed1.osf",
-                "hud:\(trainingText("ContinueToCourse"))",
+                "voice:proceed1.osf", "hud:\(trainingText("ContinueToCourse"))",
             ], [.down]),                                          // 013
         ]
         let portalRoom = try XCTUnwrap(
@@ -340,6 +236,7 @@ final class TrainingMissionScriptTests: XCTestCase {
             XCTAssertEqual(presentationLog(frame), step.1, "step \(index)")
             XCTAssertEqual(frame.enabledPlayerControls, step.2, "step \(index)")
         }
+
         let state = try XCTUnwrap(session.world.testTrainingMission)
         XCTAssertEqual(
             [
@@ -396,8 +293,7 @@ final class TrainingMissionScriptTests: XCTestCase {
 
         let start = session.touch("StartCourse", at: 1.2)
         XCTAssertEqual(presentationLog(start), [
-            "hud:\(trainingText("CourseInstructions"))",
-            "voice:intro1.osf",
+            "hud:\(trainingText("CourseInstructions"))", "voice:intro1.osf",
         ])
         XCTAssertEqual(start.enabledPlayerControls.rawValue, 63)
         XCTAssertEqual(session.world.rooms[roomOne].portalFlags, [0, 1])
@@ -475,13 +371,10 @@ final class TrainingMissionScriptTests: XCTestCase {
         original.touch("StartGoal", at: 1.3)
         original.touch("LeftGoal", at: 1.4)
         let saved = try JSONDecoder().decode(
-            GameWorld.self,
-            from: JSONEncoder().encode(original.world)
+            GameWorld.self, from: JSONEncoder().encode(original.world)
         )
         let restored = try GameSession(
-            level: original.level,
-            world: saved,
-            resumedAtTimestamp: 1.4
+            level: original.level, world: saved, resumedAtTimestamp: 1.4
         )
         XCTAssertEqual(restored.world, original.world)
         for (index, name) in ["StartGoal", "UpGoal", "StartGoal"].enumerated() {
@@ -505,16 +398,7 @@ final class TrainingMissionScriptTests: XCTestCase {
             pathPoint: playerRoom.pathPoint,
             vertices: playerRoom.vertices,
             faces: playerRoom.faces.map {
-                LevelFace(
-                    corners: $0.corners,
-                    flags: $0.flags,
-                    portalIndex: nil,
-                    texture: $0.texture,
-                    lightmapInfoIndex: $0.lightmapInfoIndex,
-                    allowsLightCorona: $0.allowsLightCorona,
-                    lightMultiple: $0.lightMultiple,
-                    special: $0.special
-                )
+                replacing($0, portalIndex: .some(nil))
             },
             portals: []
         ))
@@ -606,11 +490,11 @@ final class TrainingMissionScriptTests: XCTestCase {
             $0.script001Count = 1
             $0.script004Count = 1
         }
+
         let frame = session.touch("StartGoal", at: 1.2)
         XCTAssertEqual(presentationLog(frame), [
             "hud:\(trainingText("GoLeft"))", "voice:left1.osf",
-            "hud:Excellent!", "voice:up1.osf",
-            "hud:\(trainingText("GoUp"))",
+            "hud:Excellent!", "voice:up1.osf", "hud:\(trainingText("GoUp"))",
         ])
         XCTAssertEqual(session.world.testTrainingMission?.script003Count, 1)
         XCTAssertEqual(session.world.testTrainingMission?.script005Count, 1)
@@ -643,25 +527,20 @@ final class TrainingMissionScriptTests: XCTestCase {
         let roomTwo = level.rooms.firstIndex { $0.sourceIndex == 2 }!
         level.rooms[roomTwo].name = nil
         func box(
-            _ sourceIndex: Int,
-            z offset: Float,
-            name: String?,
+            _ sourceIndex: Int, z offset: Float, name: String?,
             portals: [(face: Int, room: Int, portal: Int, flags: UInt32)]
         ) -> LevelRoom {
             let shell = makeSourceContainmentRoom(
                 center: center + Vector3(x: 0, y: 0, z: offset),
-                texture: texture,
-                sourceIndex: sourceIndex,
+                texture: texture, sourceIndex: sourceIndex,
                 halfExtent: halfExtent
             )
             var faces = shell.faces
             for (index, portal) in portals.enumerated() {
                 let face = faces[portal.face]
                 faces[portal.face] = LevelFace(
-                    corners: face.corners,
-                    flags: face.flags,
-                    portalIndex: index,
-                    texture: face.texture
+                    corners: face.corners, flags: face.flags,
+                    portalIndex: index, texture: face.texture
                 )
             }
             return LevelRoom(
@@ -672,14 +551,13 @@ final class TrainingMissionScriptTests: XCTestCase {
                 faces: faces,
                 portals: portals.map {
                     LevelPortal(
-                        flags: $0.flags,
-                        faceIndex: $0.face,
-                        connectedRoom: $0.room,
-                        connectedPortal: $0.portal
+                        flags: $0.flags, faceIndex: $0.face,
+                        connectedRoom: $0.room, connectedPortal: $0.portal
                     )
                 }
             )
         }
+
         let portalOneFlags: UInt32 = portalOneIsOpen ? 0 : 1
         level.rooms += [
             box(60, z: 0, name: "PortalRoom1", portals: [
@@ -746,6 +624,7 @@ final class TrainingMissionScriptTests: XCTestCase {
         let after012: (inout TrainingMissionState) -> Void = {
             $0.script012Count = 1
         }
+
         let unhit = crossingFrame(level, goal: nil, counters: after012)
         XCTAssertEqual(unhit.world.playerLocation, .room(60))
 
@@ -775,6 +654,7 @@ final class TrainingMissionScriptTests: XCTestCase {
             XCTAssertEqual(started, frame.systemsGameTime >= end)
             if started { startFrame = frame }
         }
+
         let frame = try XCTUnwrap(startFrame)
         XCTAssertEqual(presentationLog(frame).last, "hud:\(instruction)")
         XCTAssertNil(startDodgeTimer(session))
@@ -798,5 +678,40 @@ final class TrainingMissionScriptTests: XCTestCase {
         }
         XCTAssertFalse(log.contains("hud:\(instruction)"))
         XCTAssertEqual(session.world.testTrainingMission?.script016Count, 0)
+    }
+
+    /// A shockwave that reaches the pilot during the object frames lowers
+    /// the shields; Script 030 runs later in the same frame's level
+    /// EVT_INTERVAL (GameLoop.cpp:3013, TrainingMission.cpp:1385-1392) and
+    /// restores 50.
+    func testScript030RestoresShieldsAfterASameFrameShockwave() throws {
+        let level = addingTrainingMissionScripting(
+            try makePlayerConcussionLevel()
+        )
+        let simulation = GameSession(level: level, presentationReadyTimestamp: 0)
+        simulation.world.trainingMission.script014Count = 1
+        simulation.world.shields = 30
+        simulation.world.playerWeapons[PlayerWeaponState.secondary].index =
+            PlayerWeaponState.concussionIndex
+        let player = simulation.world.testPlayerObject
+        simulation.world.fireWeaponFromPlayer(
+            player.handle, weaponType: PlayerWeaponState.secondary,
+            isDown: true, downTime: 0.1, level: level
+        )
+        let missile = try XCTUnwrap(
+            simulation.world.objects.first { $0.type == .weapon }
+        )
+        simulation.world.objects[missile.handle]?.position = player.position
+        simulation.world.objects[missile.handle]?.location = player.location
+        simulation.world.doWeaponExploded(missile.handle, level: level)
+        simulation.world.objects[missile.handle]?.flags |= GameObject.deadFlag
+        XCTAssertNotNil(simulation.world.objects.first { $0.type == .shockwave })
+
+        _ = simulation.update(at: 0.1, input: .zero)
+        XCTAssertEqual(simulation.world.shields, 50)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script030Count, 1)
+        XCTAssertNil(simulation.world.playerDeath)
+        _ = simulation.update(at: 0.2, input: .zero)
+        XCTAssertEqual(simulation.world.testTrainingMission?.script030Count, 1)
     }
 }
