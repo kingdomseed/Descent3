@@ -66,9 +66,11 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         )
         gameplayView = metalView
         metalView.translatesAutoresizingMaskIntoConstraints = false
-        metalView.setAccessibilityLabel("Training level viewport")
+        metalView.setAccessibilityLabel(
+            "\(document.project.contentDisplayName) level viewport"
+        )
         metalView.setAccessibilityHelp(
-            "Shows the fixed source room 3 portal closure. Editor selection can move independently without recentering this camera."
+            "Shows the level from the default view in source room \(document.cameraContainingRoomSourceIndex). Editor selection can move independently without recentering this camera."
         )
         do {
             renderer = try MetalWorldRenderer(view: metalView)
@@ -77,12 +79,12 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
             rendererError = error.localizedDescription
         }
 
-        selectedRoomHeading = NSTextField(labelWithString: "Selected Source Room 3")
+        selectedRoomHeading = NSTextField(labelWithString: "Selected Source Room")
         selectedRoomHeading.font = .preferredFont(forTextStyle: .headline)
 
         roomPopup = NSPopUpButton(frame: .zero, pullsDown: false)
         roomPopup.setAccessibilityLabel("Selected source room")
-        roomPopup.setAccessibilityHelp("Selects a room in the complete canonical Training level.")
+        roomPopup.setAccessibilityHelp("Selects a room in the complete canonical level.")
 
         facePopup = NSPopUpButton(frame: .zero, pullsDown: false)
         facePopup.setAccessibilityLabel("Selected face")
@@ -939,7 +941,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
                                 self.roomNameField
                             )
                             self.setSuccessStatus(
-                                "Training complete. Returned to the unchanged editor document state."
+                                "\(self.projectDocument.project.contentDisplayName) complete. Returned to the unchanged editor document state."
                             )
                             return
                         }
@@ -1175,9 +1177,7 @@ final class RevivalEditorWindowController: NSWindowController, NSWindowDelegate 
         }
         let nodes = level.paths[selectedPathIndex].nodes
         if !nodes.indices.contains(selectedPathNodeIndex ?? -1) {
-            selectedPathNodeIndex = nodes.indices.contains(1)
-                ? 1
-                : nodes.indices.first
+            selectedPathNodeIndex = nodes.indices.first
         }
         for nodeIndex in nodes.indices {
             pathNodePopup.addItem(withTitle: "Node \(nodeIndex)")

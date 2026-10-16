@@ -50,12 +50,6 @@ final class RevivalProjectDocument: NSDocument {
     private nonisolated let projectStorage = Mutex<RevivalProject?>(nil)
     private nonisolated let library: CanonicalPackageLibrary
     private var selection: RevivalEditorSelection?
-    let cameraContainingRoomSourceIndex = 3
-    private(set) var camera = RoomCamera(
-        position: .init(x: 2_061.7124, y: -220.75536, z: 2_206.3005),
-        target: .init(x: 2_061.7124, y: -200, z: 2_206.3005),
-        up: .init(x: 0, y: 0, z: 1)
-    )
     private(set) var playSession: RevivalPlaySession?
 
     override init() {
@@ -181,19 +175,27 @@ final class RevivalProjectDocument: NSDocument {
         return project
     }
 
+    private var editorView: RevivalEditorDefaultView {
+        project.baseEditorView
+    }
+
+    var cameraContainingRoomSourceIndex: Int { editorView.roomSourceIndex }
+    var camera: RoomCamera { editorView.camera }
+
     var editorSelection: RevivalEditorSelection {
         if let selection {
             return selection
         }
+        let roomSourceIndex = editorView.roomSourceIndex
         do {
             let initialSelection = try RevivalEditorSelection(
-                roomSourceIndex: 3,
+                roomSourceIndex: roomSourceIndex,
                 in: project.level
             )
             selection = initialSelection
             return initialSelection
         } catch {
-            preconditionFailure("The canonical Training level must contain source room 3 face 0: \(error)")
+            preconditionFailure("The level must contain source room \(roomSourceIndex) face 0: \(error)")
         }
     }
 

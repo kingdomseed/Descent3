@@ -270,6 +270,29 @@ struct RevivalEditorSelection: Equatable, Sendable {
     }
 }
 
+struct RevivalEditorDefaultView: Equatable, Sendable {
+    let roomSourceIndex: Int
+    let camera: RoomCamera
+
+    init(level: Level) {
+        guard let binding = level.defaultPlayerBinding,
+              let start = level.objects.first(where: {
+                  $0.handle == binding.objectHandle
+              }),
+              case let .room(room) = start.location
+        else {
+            preconditionFailure("An installed package must have an indoor player start.")
+        }
+        roomSourceIndex = room
+        camera = RoomCamera(
+            position: start.position,
+            target: start.position + start.orientation.forward,
+            up: start.orientation.up
+        )
+    }
+
+}
+
 struct RevivalPlaySession: Equatable, Sendable {
     let level: Level
     var playerView: PlayerView
@@ -471,6 +494,10 @@ struct RevivalProject: Equatable, Sendable {
     private(set) var level: Level
 
     var baseReference: CanonicalPackageReference { source.base }
+    var baseEditorView: RevivalEditorDefaultView {
+        RevivalEditorDefaultView(level: importedBase)
+    }
+    var contentDisplayName: String { level.missionName ?? level.levelKey }
     var persistedSource: RevivalProjectSource { source }
     var semanticDiff: [RevivalProjectDifference] {
         var differences = source.roomNameEdits.map { edit in

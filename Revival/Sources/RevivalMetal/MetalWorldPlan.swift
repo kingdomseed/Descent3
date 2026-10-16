@@ -60,12 +60,26 @@ struct MetalWorldPlan: Equatable, Sendable {
     let lightCoronaDraws: [MetalLightCoronaDraw]
     let presentationVisualTick: Int
     let preparedDraws: [MetalWorldDraw]
+    let preparedObjectDrawRange: Range<Int>
     let activeDrawIndices: [Int]
     let draws: [MetalWorldDraw]
     let auxiliaryCamera: RoomCamera?
     let auxiliaryStartRoomSourceIndex: Int?
     let auxiliaryActiveDrawIndices: [Int]
     let auxiliaryDraws: [MetalWorldDraw]
+
+    func hasSamePreparedGeometry(as other: MetalWorldPlan) -> Bool {
+        preparedDraws.count == other.preparedDraws.count
+            && zip(preparedDraws, other.preparedDraws).allSatisfy {
+                $0.vertices.count == $1.vertices.count
+                    && $0.indices == $1.indices
+                    && $0.texture == $1.texture
+                    && $0.blend == $1.blend
+                    && $0.writesDepth == $1.writesDepth
+                    && $0.lightmapBlend == $1.lightmapBlend
+                    && $0.lightmapPageIndex == $1.lightmapPageIndex
+            }
+    }
 }
 
 func makeMetalWorldPlan(
@@ -115,11 +129,8 @@ private func makeMetalWorldPlan(
         level,
         startRoomSourceIndex: startRoomSourceIndex
     ).map(makeMetalWorldDraw)
-    let preparedObjectDraws = extractPreparedModelDrawItems(
-        level,
-        startRoomSourceIndex: startRoomSourceIndex,
-        excludedObjectHandle: nil
-    ).map(makeMetalWorldDraw)
+    let preparedObjectDraws = extractPreparedModelDrawItems(level)
+        .map(makeMetalWorldDraw)
     let preparedWeaponObjectDraws =
         extractPreparedWeaponObjectDrawItems(level)
         .map(makeMetalWorldDraw)
@@ -156,8 +167,6 @@ private func makeMetalWorldPlan(
     let objectOffset = preparedRoomDraws.count
     let activeDrawIndices =
         Array(initialRoomIndices.prefix(opaqueRoomDraws.count))
-        // An object with no prepared draws (one made after level start) is
-        // not drawn.
         + objectDraws.compactMap {
             preparedObjectIndexByIdentity[MetalModelDrawIdentity($0)]
                 .map { objectOffset + $0 }
@@ -197,6 +206,8 @@ private func makeMetalWorldPlan(
         },
         presentationVisualTick: 0,
         preparedDraws: preparedDraws,
+        preparedObjectDrawRange:
+            objectOffset..<(objectOffset + preparedObjectDraws.count * 2),
         activeDrawIndices: Array(activeDrawIndices),
         draws: draws,
         auxiliaryCamera: nil,
@@ -361,21 +372,31 @@ private func updateMetalWorldPlan(
         capacity: weaponObjectPresentationCapacity,
         handleBase: weaponBillboardHandleBase
     )
+    var preparedDraws = prepared.preparedDraws
+    var objectDrawRange = prepared.preparedObjectDrawRange
+    let oldPresentations = ObjectPresentationLookup(prepared.level)
+    let presentations = ObjectPresentationLookup(level)
+    if prepared.objects.compactMap({ oldPresentations.presentation(of: $0) })
+        != objects.compactMap({ presentations.presentation(of: $0) }) {
+        let draws = extractPreparedModelDrawItems(level, objects: objects)
+            .map(makeMetalWorldDraw)
+        preparedDraws.replaceSubrange(objectDrawRange, with: draws + draws)
+        objectDrawRange = objectDrawRange.lowerBound..<(objectDrawRange.lowerBound
+            + draws.count * 2)
+    }
     let roomIndexByIdentity = Dictionary(
-        uniqueKeysWithValues: prepared.preparedDraws.enumerated()
+        uniqueKeysWithValues: preparedDraws.enumerated()
             .filter { $0.element.objectHandle == nil }
             .map { (MetalRoomDrawIdentity($0.element), $0.offset) }
     )
     let objectIndicesByIdentity = Dictionary(
-        grouping: prepared.preparedDraws.enumerated()
+        grouping: preparedDraws.enumerated()
             .filter { $0.element.objectHandle != nil },
         by: { MetalModelDrawIdentity($0.element) }
     )
     let opaqueIndices = opaqueRoomDraws.map {
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
-    // An object with no prepared draws (one made after level start) is not
-    // drawn.
     let preparedObjectDraws = objectDraws.compactMap { draw in
         objectIndicesByIdentity[MetalModelDrawIdentity(draw)]?.first
             .map { (index: $0.offset, draw: draw) }
@@ -393,7 +414,7 @@ private func updateMetalWorldPlan(
     let weaponBillboardIndices = weaponBillboardDraws.map {
         objectIndicesByIdentity[MetalModelDrawIdentity($0)]!.first!.offset
     }
-    var updatedPreparedDraws = prepared.preparedDraws
+    var updatedPreparedDraws = preparedDraws
     let translucentIndices = translucentRoomDraws.map {
         roomIndexByIdentity[MetalRoomDrawIdentity($0)]!
     }
@@ -588,6 +609,7 @@ private func updateMetalWorldPlan(
         presentationVisualTick: presentationFrame?.visualTick
             ?? prepared.presentationVisualTick,
         preparedDraws: updatedPreparedDraws,
+        preparedObjectDrawRange: objectDrawRange,
         activeDrawIndices: activeDrawIndices,
         draws: activeDrawIndices.map { updatedPreparedDraws[$0] },
         auxiliaryCamera: popupView?.camera,
@@ -888,8 +910,8 @@ func makeMetalLightCoronaVertices(
     opacity: Float
 ) -> [MetalWorldVertex] {
     let forward = normalized(subtract(camera.target, camera.position))
-    let right = normalized(cross3(forward, camera.up))
-    let up = normalized(cross3(right, forward))
+    let right = normalized(cross3(camera.up, forward))
+    let up = normalized(cross3(forward, right))
     let halfWidth = corona.size
     let halfHeight = corona.size * Float(imageHeight) / Float(imageWidth)
     let rightExtent = multiplied(right, halfWidth)
@@ -1173,7 +1195,7 @@ private func makeVisEffectLineSparkDraws(
         let side = multiplied(
             dot3(rawSide, rawSide) > 0.000_001
                 ? normalized(rawSide)
-                : normalized(cross3(cameraForward, camera.up)),
+                : normalized(cross3(camera.up, cameraForward)),
             0.04
         )
         let positions = [
@@ -1223,8 +1245,8 @@ private func makeBillboardDraws(
     let cameraForward = normalized(
         subtract(camera.target, camera.position)
     )
-    let right = normalized(cross3(cameraForward, camera.up))
-    let up = normalized(cross3(right, cameraForward))
+    let right = normalized(cross3(camera.up, cameraForward))
+    let up = normalized(cross3(cameraForward, right))
     return particles.enumerated().map { slot, particle in
         let material = level.presentationMaterials.first {
             $0.texture == particle.texture

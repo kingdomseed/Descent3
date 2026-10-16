@@ -272,6 +272,45 @@ final class PlayerPhysicsTests: XCTestCase {
         )
     }
 
+    func testSustainedPrimaryFirePreventsPitchAutolevelUntilRecentFireExpires() {
+        let simulation = GameSession(
+            level: makeFastPlayerHeadlightLevel(includesVisibleObject: false)
+                .addingFixturePlayerWeapons(),
+            presentationReadyTimestamp: 0
+        )
+        for frame in 1...125 {
+            _ = simulation.update(at: Double(frame) * 0.016, input: .zero)
+        }
+        _ = simulation.update(
+            at: 2.016,
+            input: .init(directLookPitchRadians: 0.25, firesPrimaryWeapon: true)
+        )
+        for frame in 127...250 {
+            _ = simulation.update(
+                at: Double(frame) * 0.016, input: .init(firesPrimaryWeapon: true)
+            )
+        }
+        let firingPlayer = simulation.world.testPlayerObject
+        XCTAssertGreaterThan(firingPlayer.weaponBatteries[0].lastFireTime, 3.5)
+        XCTAssertLessThan(simulation.energy, 99.85)
+        XCTAssertEqual(abs(firingPlayer.orientation.forward.y), sin(0.25), accuracy: 0.000_1)
+
+        for frame in 251...310 {
+            _ = simulation.update(at: Double(frame) * 0.016, input: .zero)
+        }
+        XCTAssertEqual(
+            abs(simulation.world.testPlayerObject.orientation.forward.y),
+            sin(0.25), accuracy: 0.000_1
+        )
+        for frame in 311...375 {
+            _ = simulation.update(at: Double(frame) * 0.016, input: .zero)
+        }
+        XCTAssertLessThan(
+            abs(simulation.world.testPlayerObject.orientation.forward.y),
+            sin(0.25)
+        )
+    }
+
     func testIndoorNewPlayerAutolevelCanBeTurnedOffAfterSourceDelay() {
         let active = GameSession(
             level: makeSliceSixObjectRenderLevel(),

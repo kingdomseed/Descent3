@@ -209,27 +209,33 @@ extension Level {
             modelPayload: { sources.payload(named: $0) },
             soundKey: { try sounds.page(named: $0).logicalName }
         )
-        discovery = try discovery.addingGameModules(
-            archives: sources.scriptArchives,
-            genericPages: genericPages,
-            soundPage: { try sounds.page(named: $0) },
-            soundClip: { try sounds.clip(named: $0) },
-            weapon: weaponPage,
-            weaponModel: { _ in nil }
-        )
-        // The pages of the objects at level start have models: the placed
-        // generic objects' pages and the Guide-Bot's. An object made later
-        // from another page (a death spew, a dead model, a game module's
-        // object) keeps the page size and is not drawn (M2).
+        while true {
+            let pageCount = discovery.objectInfos?.count ?? 0
+            discovery = try discovery.addingGameModules(
+                archives: sources.scriptArchives,
+                genericPages: genericPages,
+                soundPage: { try sounds.page(named: $0) },
+                soundClip: { try sounds.clip(named: $0) },
+                weapon: weaponPage,
+                weaponModel: { _ in nil }
+            )
+            if discovery.objectInfos?.count == pageCount { break }
+            discovery = try discovery.addingObjectTables(
+                genericPages: genericPages,
+                additionalPageNames: (discovery.objectInfos ?? []).map(\.name),
+                shipBatteries: shipBatteries,
+                weapon: weaponPage,
+                weaponModel: { _ in nil },
+                modelPayload: { sources.payload(named: $0) },
+                soundKey: { try sounds.page(named: $0).logicalName }
+            )
+        }
         let genericTypes: Set<UInt8> = [2, 7, 11, 16]
-        let startPageNames = Set(
-            objects.filter { genericTypes.contains($0.type) }
-                .compactMap { $0.definition?.sourceName.lowercased() }
-                + [CanonicalObjectInfo.guideBotPageName.lowercased()]
-        )
-        let reachedPages = (discovery.objectInfos ?? []).compactMap {
-            startPageNames.contains($0.name.lowercased())
-                ? modelPages[$0.name.lowercased()] : nil
+        let reachedPages = try (discovery.objectInfos ?? []).map { info in
+            guard let page = modelPages[info.name.lowercased()] else {
+                throw GenericPageImportError.missingPage(info.name)
+            }
+            return page
         }
         let reachedWeapons = try (discovery.weapons ?? []).map {
             try weaponPage($0.name)
@@ -461,6 +467,7 @@ extension Level {
         let knownClips = level.soundClips
         level = try level.addingObjectTables(
             genericPages: genericPages,
+            additionalPageNames: (discovery.objectInfos ?? []).map(\.name),
             shipBatteries: shipBatteries,
             weapon: weaponPage,
             weaponModel: { modelSources[$0.lowercased()] },
@@ -487,14 +494,12 @@ extension Level {
             textureFrames: textureFrames,
             fireImage: fireImage
         )
-        // The models of the level-start pages, for the objects made from
-        // them at run time (the Guide-Bot).
+        // ObjInitGeneric (ObjInit.cpp:788) gives every created object
+        // its page's models.
         level.objectInfos = level.objectInfos?.map { info in
             var info = info
-            if startPageNames.contains(info.name.lowercased()) {
-                info.presentation = modelPages[info.name.lowercased()]
-                    .flatMap(pagePresentation)
-            }
+            info.presentation = modelPages[info.name.lowercased()]
+                .flatMap(pagePresentation)
             return info
         }
         return level

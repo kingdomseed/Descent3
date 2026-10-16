@@ -193,6 +193,29 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertEqual(image.rgba8, Data([0, 255, 0, 255]))
     }
 
+    func testDecodesUnversionedOAFHeaderAndFrames() throws {
+        let animation = try decodeReachedOutrage16OAF(makeUnversionedOAF())
+        XCTAssertEqual(animation.version, 0)
+        XCTAssertEqual(animation.sourceFrameTime, 0.125)
+        XCTAssertEqual(animation.frames.count, 2)
+        XCTAssertEqual(animation.frames[0].rgba8, Data([255, 0, 0, 255]))
+        XCTAssertEqual(animation.frames[1].rgba8, Data([0, 255, 0, 255]))
+    }
+
+    func testUnversionedOAFFrameNameResolvesModelTextureSlot() throws {
+        let oaf = makeUnversionedOAF()
+        let slots = try resolveRetailModelTextureSlots(
+            table: makeSimpleTextureTablePage(
+                name: "animation page", bitmapSourceName: "legacy.oaf", flags: 0
+            ),
+            overlay: Data(), slotNames: ["Shield"],
+            animationFrameNames: { _ in try? outrageAnimationFrameNames(oaf) }
+        )
+        XCTAssertEqual(slots["shield"]?.name, "animation page")
+        XCTAssertEqual(slots["shield"]?.bitmapSourceName, "legacy.oaf")
+        XCTAssertEqual(try outrageAnimationFrameNames(oaf), ["Shield.ogf", "Shield001.ogf"])
+    }
+
     func testDecodesReachedOutrageOAFFramesForYellowFlareMaterials() throws {
         func ogf(named name: String, pixel: UInt16) -> Data {
             var data = Data([0, 0, 122])
@@ -1314,6 +1337,25 @@ func makeSyntheticD3LV127(
     level.appendChunk("INFO", payload: info)
     level.appendChunk("EDIT", payload: Data())
     return level
+}
+
+private func makeUnversionedOAF() -> Data {
+    var data = Data([2])
+    data.appendLittleEndian(Float(1.5).bitPattern)
+    data.appendLittleEndian(Float(0.125).bitPattern)
+    data.appendLittleEndian(Int32(7))
+    data.appendLittleEndian(Float(-3).bitPattern)
+    for (name, pixel) in [("Shield.ogf", UInt16(0xfc00)), ("Shield001.ogf", 0x83e0)] {
+        data.append(contentsOf: [0, 0, 122])
+        data.appendCString(name)
+        data.append(1)
+        data.append(Data(count: 9))
+        data.appendLittleEndian(UInt16(1))
+        data.appendLittleEndian(UInt16(1))
+        data.append(contentsOf: [32, 40, 0])
+        data.appendLittleEndian(pixel)
+    }
+    return data
 }
 
 private func makeNameTable(_ names: [String]) -> Data {

@@ -21,7 +21,7 @@ The first port hand-built a bespoke Swift type for every Training script ("death
 6. **Write the failing test**, then translate. Keep the order, formulas, Float32 behavior, and RNG draws in source order.
 7. **Before commit, read your diff for:** level-specific names in generic code, placeholder returns, empty branches, `TODO`, disabled paths, reduced limits, or files over 4,000 lines.
 
-A quick Sonnet sweep of callers and dependencies (step 2 and step 3) is fine for large items. Record only real findings, in `plan.md` or a code comment. Do not start a ledger.
+A bounded GPT-6.1 Sol sweep of callers and dependencies (step 2 and step 3) is fine for large items. Record only real findings, in `plan.md` or a code comment. Do not start a ledger.
 
 ## Semantic hazards to check
 

@@ -72,12 +72,16 @@ func sourceIndoorAutoLevelThrust(
     turnrollFixedAngle: Float,
     mode: IndoorAutoLevelMode,
     gameTime: Float,
-    lastThrustTime: Float
+    lastThrustTime: Float,
+    weaponBatteries: [DynamicWeaponBattery]
 ) -> Vector3 {
     guard mode != .off else { return input }
     var result = input
     let angles = sourceExtractAngles(orientation)
-    let firedRecently = gameTime < 1.5
+    // PhysicsDoSimRot (physics/physics.cpp:498-507).
+    let firedRecently = weaponBatteries.contains {
+        $0.lastFireTime + 1.5 > gameTime
+    }
     var pitchWasLeveled = false
 
     if mode == .newPlayer,

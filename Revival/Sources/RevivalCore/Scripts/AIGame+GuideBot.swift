@@ -258,6 +258,44 @@ enum GuideBotScript {
             && memory.name.count <= 7
     }
 
+    static func validateSavedValues(
+        _ state: GuideBotState,
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        guard let memory = state.memory else { return }
+        try rules.number(memory.modeTime, "modeTime")
+        try rules.handleShape(memory.player)
+        try rules.handleShape(memory.foundObject)
+        try rules.handleShape(memory.cameraObject)
+        try rules.number(memory.lastAtGoalTime, "lastAtGoalTime")
+        try rules.number(memory.nextAmbientTime, "nextAmbientTime")
+        try rules.number(memory.lastSoundTime, "lastSoundTime")
+        try rules.number(memory.lastRetreatTime, "lastRetreatTime")
+        try rules.number(memory.returnTime, "returnTime")
+        try rules.handleShape(memory.me)
+        try rules.number(memory.lastAnimationFrame, "lastAnimationFrame")
+        for handle in memory.extinguishObjects {
+            try rules.handleShape(handle)
+        }
+        try rules.number(memory.extinguishObjectTime, "extinguishObjectTime")
+        try rules.number(memory.maximumAcceleration, "maximumAcceleration")
+        try rules.number(memory.maximumSpeed, "maximumSpeed")
+        for handle in memory.antivirusRobots {
+            try rules.handleShape(handle)
+        }
+        for time in memory.antivirusRevertTimes {
+            try rules.number(time, "antivirusRevertTimes")
+        }
+        try rules.number(memory.speedTimeLeft, "speedTimeLeft")
+        try rules.number(
+            memory.timeUntilNextPlayerVisibilityCheck,
+            "timeUntilNextPlayerVisibilityCheck"
+        )
+        try rules.number(memory.timeUntilNextFlare, "timeUntilNextFlare")
+        try rules.handleShape(memory.ambientCamera)
+        try rules.number(memory.nextPowerupCheckTime, "nextPowerupCheckTime")
+    }
+
     // MARK: Messages and modes
 
     private static func text(_ index: Int, _ level: Level) -> String {

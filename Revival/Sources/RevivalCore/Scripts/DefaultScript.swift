@@ -89,6 +89,19 @@ enum DefaultScript: Codable, Equatable, Sendable {
         }
     }
 
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        switch self {
+        case let .guideBot(state):
+            try GuideBotScript.validateSavedValues(state, rules)
+        case let .gbPowerup(state):
+            try GBPowerupScript.validateSavedValues(state, rules)
+        case .genericPowerup:
+            break
+        }
+    }
+
     /// The instance's CallEvent. The instance is read from the object each
     /// time, so a call that re-enters the engine sees the latest state.
     static func callEvent(

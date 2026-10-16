@@ -51,7 +51,9 @@ extension EditorProjectTests {
             .first { $0.title == "Orient Node to Editor View" })
         XCTAssertEqual(pathPopup.selectedItem?.representedObject as? Int, 0)
         XCTAssertEqual(pathPopup.titleOfSelectedItem, "FollowLoop1 — Path 0")
-        XCTAssertEqual(nodePopup.selectedItem?.representedObject as? Int, 1)
+        XCTAssertEqual(nodePopup.selectedItem?.representedObject as? Int, 0)
+        nodePopup.selectItem(at: 1)
+        nodePopup.sendAction(nodePopup.action, to: nodePopup.target)
         let baseNode = base.paths[0].nodes[1]
         XCTAssertEqual(
             forwardLabel.stringValue,
@@ -87,8 +89,8 @@ extension EditorProjectTests {
             forward: viewOrientation.forward, up: viewOrientation.up
         )
         XCTAssertEqual(document.project.level, authored)
-        XCTAssertEqual(forwardLabel.stringValue, "Forward: (0.0, 1.0, 0.0)")
-        XCTAssertEqual(upLabel.stringValue, "Up: (0.0, -0.0, 1.0)")
+        XCTAssertEqual(forwardLabel.stringValue, "Forward: (0.0, 0.0, 1.0)")
+        XCTAssertEqual(upLabel.stringValue, "Up: (0.0, 1.0, 0.0)")
         XCTAssertEqual(document.undoManager?.undoActionName, "Orient Path Node")
         XCTAssertEqual(
             pathNodeOrientationTestHash(
@@ -311,6 +313,53 @@ extension EditorProjectTests {
                 XCTAssertNotNil($0 as? RevivalProjectError)
             }
         }
+    }
+
+    @MainActor
+    func testPathNodeOrientationEditWorksOnAnyGamePath() throws {
+        let base = makeOutpostEditorLevel()
+        let (root, library, activation) = try makeActivatedLibrary(base)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+        let view = sourceOrientation(
+            forward: document.camera.target - document.camera.position,
+            up: document.camera.up
+        )
+        XCTAssertEqual(view.forward, .init(x: -1, y: 0, z: 0))
+        try document.orientPathNode(
+            pathIndex: 0, nodeIndex: 1, forward: view.forward, up: view.up
+        )
+        var authored = try library.load(activation.reference)
+        replacePathNodeOrientationForTest(
+            in: &authored, pathIndex: 0, nodeIndex: 1,
+            forward: view.forward, up: view.up
+        )
+        XCTAssertEqual(document.project.level, authored)
+        XCTAssertEqual(
+            document.project.persistedSource.pathNodeOrientationEdits,
+            [.init(
+                pathIndex: 0, nodeIndex: 1, forward: view.forward,
+                up: view.up
+            )]
+        )
+        XCTAssertEqual(
+            document.project.semanticDiff.map(\.summary),
+            ["Path 0 node 1 orientation changed"]
+        )
+        XCTAssertEqual(document.undoManager?.undoActionName, "Orient Path Node")
+        document.undoManager?.undo()
+        XCTAssertTrue(
+            document.project.persistedSource.pathNodeOrientationEdits.isEmpty
+        )
+        XCTAssertThrowsError(try document.orientPathNode(
+            pathIndex: 0, nodeIndex: 2, forward: view.forward, up: view.up
+        ))
+        XCTAssertThrowsError(try document.orientPathNode(
+            pathIndex: 1, nodeIndex: 0, forward: view.forward, up: view.up
+        ))
     }
 }
 

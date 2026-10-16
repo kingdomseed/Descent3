@@ -8,6 +8,17 @@ final class LevelValidationTests: XCTestCase {
     /// The fixtures the other tests build on keep their stock values: the
     /// maneuver level's paths and FollowBot1's page (the retail RAS1 flyer),
     /// and the minimal level's sparse room numbers.
+    func testModelBatteryCanReferenceATurretWithRotationDisabled() throws {
+        var level = makeSliceSixObjectRenderLevel()
+        level.models[4].weaponBatteries = [.init(gunpoints: [], turrets: [0])]
+        XCTAssertNoThrow(try level.validate())
+        level.models[4].weaponBatteries = [.init(gunpoints: [], turrets: [99])]
+        XCTAssertThrowsError(try level.validate()) {
+            XCTAssertEqual($0 as? LevelValidationError,
+                           .invalidObjectTables("model guns invisiblepowerup.OOF"))
+        }
+    }
+
     func testFixturesKeepTheirStockPathsFlyerAIAndSparseRooms() throws {
         let level = makeTrainingManeuverFollowLevel()
         XCTAssertEqual(level.paths.map(\.name), ["FollowLoop1", "GoToDie"])
@@ -201,9 +212,7 @@ final class LevelValidationTests: XCTestCase {
         XCTAssertFalse(level.objectPresentations.isEmpty)
         try level.validate()
 
-        let items = extractPreparedModelDrawItems(
-            level, startRoomSourceIndex: 3, excludedObjectHandle: nil
-        )
+        let items = extractPreparedModelDrawItems(level)
         XCTAssertEqual(
             Set(items.map(\.objectHandle)),
             Set(level.objectPresentations.map(\.objectHandle))

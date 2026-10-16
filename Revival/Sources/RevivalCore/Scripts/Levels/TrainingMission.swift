@@ -111,27 +111,29 @@ struct TrainingMissionState: Codable, Equatable, Sendable {
     var script057Count: Int = 0
     var dallas = DallasState.dfInit()
 
-    /// Every action counter, for save validation.
-    var actionCounters: [Int] {
+    var actionCounters: [(script: Int, count: Int)] {
         [
-            script000Count, script001Count, script002Count, script003Count,
-            script004Count, script005Count, script006Count, script007Count,
-            script008Count, script009Count, script010Count, script011Count,
-            script012Count, script013Count, script014Count, script015Count,
-            script016Count, script017Count, script018Count, script019Count,
-            script020Count, script021Count, script022Count, script023Count,
-            script024Count, script025Count, script026Count,
-            script033Count, script030Count, script031Count,
-            script027Count, script028Count, script029Count,
-            script036Count, script037Count, script043Count,
-            script044Count, script045Count, script046Count,
-            script051Count, script052Count, script053Count,
-            script054Count, script055Count,
-            script047Count, script048Count, script034Count, script049Count,
-            script035Count, script056Count, script032Count, script059Count,
-            script060Count, script058Count, script040Count, script038Count,
-            script041Count, script042Count, script039Count, script050Count,
-            script057Count,
+            (0, script000Count), (1, script001Count), (2, script002Count),
+            (3, script003Count), (4, script004Count), (5, script005Count),
+            (6, script006Count), (7, script007Count), (8, script008Count),
+            (9, script009Count), (10, script010Count), (11, script011Count),
+            (12, script012Count), (13, script013Count), (14, script014Count),
+            (15, script015Count), (16, script016Count), (17, script017Count),
+            (18, script018Count), (19, script019Count), (20, script020Count),
+            (21, script021Count), (22, script022Count), (23, script023Count),
+            (24, script024Count), (25, script025Count), (26, script026Count),
+            (33, script033Count), (30, script030Count), (31, script031Count),
+            (27, script027Count), (28, script028Count), (29, script029Count),
+            (36, script036Count), (37, script037Count), (43, script043Count),
+            (44, script044Count), (45, script045Count), (46, script046Count),
+            (51, script051Count), (52, script052Count), (53, script053Count),
+            (54, script054Count), (55, script055Count), (47, script047Count),
+            (48, script048Count), (34, script034Count), (49, script049Count),
+            (35, script035Count), (56, script056Count), (32, script032Count),
+            (59, script059Count), (60, script060Count), (58, script058Count),
+            (40, script040Count), (38, script038Count), (41, script041Count),
+            (42, script042Count), (39, script039Count), (50, script050Count),
+            (57, script057Count),
         ]
     }
 }
@@ -222,7 +224,9 @@ enum TrainingMissionScript {
     /// Save validation: the counters stay in their range, and the DALLAS
     /// arrays keep their fixed sizes.
     static func isValidSavedState(_ state: TrainingMissionState) -> Bool {
-        return state.actionCounters.allSatisfy { (0...maximumActionCounter).contains($0) }
+        return state.actionCounters.allSatisfy {
+            (0...maximumActionCounter).contains($0.count)
+        }
             && state.dallas.spewHandles.count
                 == DallasState.maximumSpewHandles
             && state.dallas.soundHandles.count
@@ -230,6 +234,20 @@ enum TrainingMissionScript {
             && state.dallas.userVars.count == DallasState.maximumUserVars
             && state.dallas.savedObjectHandles.count
                 == DallasState.maximumSavedObjectHandles
+    }
+
+    static func validateSavedValues(
+        _ state: TrainingMissionState,
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        for counter in state.actionCounters
+        where !(0...maximumActionCounter).contains(counter.count) {
+            let digits = String(counter.script)
+            let number = String(repeating: "0", count: 3 - digits.count)
+                + digits
+            throw .outOfDomain("script\(number)Count")
+        }
+        try state.dallas.validateSavedValues(rules)
     }
 
     /// Object_handles[index]: Scrpt_FindObjectName(Object_names[index]).

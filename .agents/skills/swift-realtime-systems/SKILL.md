@@ -9,7 +9,7 @@ Read first: `docs/revival/architecture.md` (runtime, timing contract), `docs/rev
 
 ## Toolchain
 
-- Swift 6.4 compiler in Swift 6 language mode (`SWIFT_VERSION = 6.0`), from Xcode 27.0 release. "Swift 6.4 language mode" is not a thing: the compiler version and the language mode are separate.
+- Swift 6.4 compiler in Swift 6 language mode (`SWIFT_VERSION = 6.0`), from Xcode 27.1 release. "Swift 6.4 language mode" is not a thing: the compiler version and the language mode are separate.
 - Use 6.4 features only when they simplify a real contract:
   - `weak let` and `~Sendable` where they state an invariant.
   - Awaited cleanup in `defer`, and `withTaskCancellationShield`, only at import and editor async boundaries. Never in simulation.

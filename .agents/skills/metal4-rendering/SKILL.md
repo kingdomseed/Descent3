@@ -9,7 +9,7 @@ Read first: `docs/revival/architecture.md` (rendering and level lifetime), `docs
 
 ## Toolchain
 
-- Xcode 27.0 release, Swift 6.4, SDK 27, and **Metal 4** (WWDC26 calls the 27-SDK additions "Metal 4.1").
+- Xcode 27.1 release, Swift 6.4, SDK 27, and **Metal 4** (WWDC26 calls the 27-SDK additions "Metal 4.1").
 - Deployment floor: macOS 26 and iOS 26. Everything in the Metal 4 core API is available on 26. Guard any 27-only API with `#available`.
 - Development Mac: macOS 27 on M4. `gpucapture`, `gpudebug`, and `metalperftrace` are available here. Use them as extra evidence, and do not make them a requirement for a 26 target.
 - The clamp-to-edge sampler bug (edge reads return zero) is fixed only in the 27 OS releases. Keep a test of sampler edge behavior that also runs on 26.
@@ -20,7 +20,7 @@ Read first: `docs/revival/architecture.md` (rendering and level lifetime), `docs
 2. Read the legacy path: `renderer/`, `Descent3/render.cpp`, `Descent3/postrender.cpp`, `Descent3/TerrainRender.cpp`, `model/polymodel.cpp`, the effects code, and the matching fork diffs in `sources.md`.
 3. Write one failing CPU-side test for the render extraction: visibility, draw list, material choice, blend mode, sort order, or UV. Do not test Metal itself.
 4. Translate the extraction faithfully, then encode it in Metal.
-5. Check the frame with an Xcode GPU capture and Metal API and shader validation.
+5. Check the frame with an Xcode GPU capture and Metal API and shader validation. On Xcode 27.1, use separate launches for capture and shader validation; `gpucapture` rejects capture while shader validation is enabled.
 
 Keep the original order, blend modes, UVs, lightmaps, fog, clipping, and post-render sort. Adopt the corrected post-render sort: sort **all** N items by depth.
 

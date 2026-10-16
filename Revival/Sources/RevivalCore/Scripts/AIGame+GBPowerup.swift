@@ -32,6 +32,17 @@ enum GBPowerupScript {
         return (0...5).contains(memory.type)
     }
 
+    static func validateSavedValues(
+        _ state: GBPowerupState,
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        guard let memory = state.memory else { return }
+        try rules.number(memory.nextCheckTime, "nextCheckTime")
+        try rules.number(
+            memory.timeUntilNextHUDMessage, "timeUntilNextHUDMessage"
+        )
+    }
+
     /// DoInit (AIGame.cpp:8228).
     static func doInit(_ me: ObjectHandle, _ world: inout GameWorld,
                        _ level: Level) {

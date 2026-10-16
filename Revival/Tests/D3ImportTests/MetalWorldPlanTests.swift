@@ -5,6 +5,87 @@ import XCTest
 // auxiliary camera, and plan updates.
 
 final class MetalWorldPlanTests: XCTestCase {
+    func testBillboardUsesThePlayersRightHandDirection() {
+        let corona = WorldLightCorona(
+            roomSourceIndex: 0, faceIndex: 0, assetIndex: 0,
+            center: .init(x: 0, y: 0, z: 10), size: 1,
+            firstVertex: .zero, normal: .init(x: 0, y: 0, z: -1),
+            tint: .init(x: 1, y: 1, z: 1), blend: .opaque
+        )
+        let vertices = makeMetalLightCoronaVertices(
+            corona,
+            camera: .init(position: .zero, target: .init(x: 0, y: 0, z: 1),
+                          up: .init(x: 0, y: 1, z: 0)),
+            imageWidth: 1, imageHeight: 1, opacity: 1
+        )
+        XCTAssertEqual(vertices.map(\.position), [
+            .init(-1, 1, 10, 1), .init(1, 1, 10, 1),
+            .init(1, -1, 10, 1), .init(-1, -1, 10, 1)
+        ])
+    }
+
+    func testObjectsCreatedAfterStartAndReusedSlotsDrawCurrentPageModels() throws {
+        var level = makeSliceSixObjectRenderLevel()
+        let placed = level.objects.first { $0.handle == 12_300 }!
+        var page = CanonicalObjectInfo(
+            name: "Created object", type: 11, flags: 0, size: 1,
+            hitPoints: 100, lightDistance: 0, lighting: fixtureNoLight,
+            ai: nil, weaponBatteries: []
+        )
+        page.presentation = .init(
+            primaryModel: level.models[4].source, mediumModel: nil,
+            lowModel: nil, dyingModel: nil, mediumDistance: nil, lowDistance: nil
+        )
+        var replacement = CanonicalObjectInfo(
+            name: "Replacement object", type: 11, flags: 0, size: 1,
+            hitPoints: 100, lightDistance: 0, lighting: fixtureNoLight,
+            ai: nil, weaponBatteries: []
+        )
+        replacement.presentation = .init(
+            primaryModel: level.models[3].source, mediumModel: nil,
+            lowModel: nil, dyingModel: nil, mediumDistance: nil, lowDistance: nil
+        )
+        level.objectInfos = [page, replacement]
+        var world = GameWorld(level: level)
+        let initial = try makeMetalWorldPlan(
+            level: level, camera: .trainingRoom3, startRoomSourceIndex: 3
+        )
+        let created = world.objCreate(
+            type: .clutter, id: 0, room: 3, position: placed.position,
+            orientation: placed.orientation, parent: .none, level: level
+        )
+        XCTAssertNotEqual(created, .none)
+        let updated = try updateMetalWorldPlan(
+            initial, level: level, objects: world.objects, roomStates: world.rooms,
+            playerView: .init(playerID: 0, objectHandle: 2_048, roomSourceIndex: 3,
+                              camera: .trainingRoom3, collisionRadius: 1)
+        )
+        let first = updated.draws.filter { $0.objectHandle == created.rawValue }
+        XCTAssertFalse(first.isEmpty)
+        XCTAssertFalse(initial.hasSamePreparedGeometry(as: updated))
+        let stable = try updateMetalWorldPlan(updated, camera: .trainingRoom3)
+        XCTAssertTrue(updated.hasSamePreparedGeometry(as: stable))
+        XCTAssertEqual(Set(first.compactMap(\.model)), [level.models[4].source])
+        XCTAssertEqual(updated.activeDrawIndices.map { updated.preparedDraws[$0] }, updated.draws)
+        world.objects.delete(created)
+        let reused = world.objCreate(
+            type: .clutter, id: 1, room: 3, position: placed.position,
+            orientation: placed.orientation, parent: .none, level: level
+        )
+        XCTAssertEqual(reused.slot, created.slot)
+        XCTAssertNotEqual(reused, created)
+        let replaced = try updateMetalWorldPlan(
+            updated, level: level, objects: world.objects, roomStates: world.rooms,
+            playerView: .init(playerID: 0, objectHandle: 2_048, roomSourceIndex: 3,
+                              camera: .trainingRoom3, collisionRadius: 1)
+        )
+        let second = replaced.draws.filter { $0.objectHandle == reused.rawValue }
+        XCTAssertFalse(second.isEmpty)
+        XCTAssertEqual(Set(second.compactMap(\.model)), [level.models[3].source])
+        XCTAssertFalse(replaced.preparedDraws.contains { $0.objectHandle == created.rawValue })
+        XCTAssertEqual(replaced.preparedDraws.count, updated.preparedDraws.count)
+    }
+
     func testFastPlayerHeadlightLightsRetainedVisibleObjectDraw() throws {
         let level = makeFastPlayerHeadlightLevel()
         let simulation = GameSession(
@@ -848,9 +929,9 @@ final class MetalWorldPlanTests: XCTestCase {
             $0.presentation == .init(0.25, 0, 1, 0)
                 && $0.surfaceColor == .init(0.25, 0.5, 0.75, 0)
         })
-        XCTAssertEqual(vertices[0].position.x, -4, accuracy: 0.000_001)
+        XCTAssertEqual(vertices[0].position.x, 4, accuracy: 0.000_001)
         XCTAssertEqual(vertices[0].position.z, 2, accuracy: 0.000_001)
-        XCTAssertEqual(vertices[2].position.x, 4, accuracy: 0.000_001)
+        XCTAssertEqual(vertices[2].position.x, -4, accuracy: 0.000_001)
         XCTAssertEqual(vertices[2].position.z, -2, accuracy: 0.000_001)
     }
 

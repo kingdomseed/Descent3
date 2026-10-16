@@ -1972,6 +1972,7 @@ func parseReachedOutrageModel(
     var textureNames: [String]?
     var submodels: [ModelSubmodel] = []
     var rotationAxes: [Int: Vector3] = [:]
+    var rotationKeyframeCounts: [Int: Int] = [:]
     while !cursor.isAtEnd {
         let chunkName = try cursor.readASCII(4)
         let byteCount = try cursor.readCount(maximum: cursor.remaining, name: chunkName)
@@ -2010,6 +2011,7 @@ func parseReachedOutrageModel(
                     maximum: 100_000,
                     name: "rotation keyframes"
                 )
+                rotationKeyframeCounts[submodelIndex] = keyframeCount
                 _ = try chunk.readInt32()
                 _ = try chunk.readInt32()
                 for keyframeIndex in 0..<keyframeCount {
@@ -2053,7 +2055,14 @@ func parseReachedOutrageModel(
         $0.sourceIndex < $1.sourceIndex
     }.map { submodel in
         let presentation: ModelSubmodelPresentation
-        if case let .rotate(rate, _) = submodel.presentation {
+        // polymodel.cpp:1954-1959 clears SOF_ROTATE and SOF_TURRET
+        // when the submodel has no rotation keyframes.
+        let hasRotation = (rotationKeyframeCounts[submodel.sourceIndex] ?? 0) > 0
+        if !hasRotation, case .rotate = submodel.presentation {
+            presentation = .standard
+        } else if !hasRotation, case .turret = submodel.presentation {
+            presentation = .standard
+        } else if case let .rotate(rate, _) = submodel.presentation {
             guard let axis = rotationAxes[submodel.sourceIndex] else {
                 throw OutrageModelImportError.missingChunk(
                     "RANI rotation axis"
@@ -2394,22 +2403,29 @@ func decodeReachedOutrage16OGF(_ data: Data) throws -> Outrage1555Image {
     return image
 }
 
+// Descent3/vclip.cpp:320-339 PageInVClip reads both OAF header layouts.
+private func readOutrageAnimationHeader(
+    _ cursor: inout OGFByteCursor
+) throws -> (version: Int, frameCount: Int, sourceFrameTime: Float) {
+    let first = Int(try cursor.readUInt8())
+    let versioned = first == 127
+    let version = versioned ? Int(try cursor.readUInt8()) : 0
+    let frameCount = versioned ? Int(try cursor.readUInt8()) : first
+    if !versioned { try cursor.skip(4) }
+    let sourceFrameTime = try cursor.readFloat()
+    if !versioned { try cursor.skip(8) }
+    guard (!versioned || version == 1), frameCount > 0,
+          sourceFrameTime.isFinite, sourceFrameTime > 0 else {
+        throw Outrage1555DecodeError.unsupportedHeader
+    }
+    return (version, frameCount, sourceFrameTime)
+}
+
 func decodeReachedOutrage16OAF(
     _ data: Data
 ) throws -> Outrage1555Animation {
     var cursor = OGFByteCursor(data)
-    guard try cursor.readUInt8() == 127 else {
-        throw Outrage1555DecodeError.unsupportedHeader
-    }
-    let version = Int(try cursor.readUInt8())
-    let frameCount = Int(try cursor.readUInt8())
-    let sourceFrameTime = try cursor.readFloat()
-    guard version == 1,
-          frameCount > 0,
-          sourceFrameTime.isFinite,
-          sourceFrameTime > 0 else {
-        throw Outrage1555DecodeError.unsupportedHeader
-    }
+    let (version, frameCount, sourceFrameTime) = try readOutrageAnimationHeader(&cursor)
     var frames: [Outrage1555Image] = []
     frames.reserveCapacity(frameCount)
     for _ in 0..<frameCount {
@@ -2433,15 +2449,7 @@ func decodeReachedOutrage16OAF(
 /// (Descent3/gametexture.cpp:372).
 func outrageAnimationFrameNames(_ data: Data) throws -> [String] {
     var cursor = OGFByteCursor(data)
-    guard try cursor.readUInt8() == 127 else {
-        throw Outrage1555DecodeError.unsupportedHeader
-    }
-    let version = Int(try cursor.readUInt8())
-    let frameCount = Int(try cursor.readUInt8())
-    _ = try cursor.readFloat()
-    guard version == 1, frameCount > 0 else {
-        throw Outrage1555DecodeError.unsupportedHeader
-    }
+    let (_, frameCount, _) = try readOutrageAnimationHeader(&cursor)
     var names: [String] = []
     for _ in 0..<frameCount {
         var name = ""

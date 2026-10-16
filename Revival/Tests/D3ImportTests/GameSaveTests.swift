@@ -671,7 +671,6 @@ final class GameSaveTests: XCTestCase {
         XCTAssertThrowsError(try decodeTestWorld(hitCountObject))
         var awareness = dodgeWorld
         awareness.objects[turret]?.ai?.awareness = .infinity
-        // The world's finite-value sweep names the field.
         assertRejected(
             .nonFiniteValue("awareness"), awareness, level: dodgeLevel
         )
@@ -794,6 +793,216 @@ final class GameSaveTests: XCTestCase {
             .indexOutOfRange("object \(bolt.handle.slot) objectLink"),
             headingFreeLink, level: concussionLevel
         )
+    }
+
+    func testLoadValidationChecksNestedValuesByType() throws {
+        let level = makeTrainingMovingTargetHandoffLevel()
+        let world = GameSession(level: level, presentationReadyTimestamp: 0)
+            .world
+        XCTAssertNoThrow(try world.validate(against: level))
+        let player = world.testPlayerObject
+        guard case let .room(room) = player.location else {
+            return XCTFail("indoor player")
+        }
+        let turret = level.findObjectName("DodgeTurrett")
+        let slot = turret.slot
+        let malformed = ObjectHandle(0x7ff)
+
+        var cases: [(GameWorldValidationError, GameWorld)] = []
+        func hostile(
+            _ expected: GameWorldValidationError,
+            _ edit: (inout GameWorld) -> Void
+        ) {
+            var candidate = world
+            edit(&candidate)
+            cases.append((expected, candidate))
+        }
+
+        hostile(.roomReference("roomSourceIndex")) {
+            $0.gameEvents[0] = .init(
+                startTime: 0, endTime: 1,
+                action: .explosion(
+                    position: .zero, fireballID: 0, roomSourceIndex: 99_999,
+                    size: 1, upwardsVelocity: 0
+                )
+            )
+        }
+        hostile(.roomReference("roomSourceIndex")) {
+            $0.gameEvents[0] = .init(
+                startTime: 0, endTime: 1,
+                action: .blastRing(
+                    position: .zero, size: 1, roomSourceIndex: 99_999
+                )
+            )
+        }
+        hostile(.nonFiniteValue("size")) {
+            $0.gameEvents[0] = .init(
+                startTime: 0, endTime: 1,
+                action: .blastRing(
+                    position: .zero, size: .nan, roomSourceIndex: room
+                )
+            )
+        }
+        hostile(.outOfDomain("position")) {
+            $0.gameEvents[0] = .init(
+                startTime: 0, endTime: 1,
+                action: .explosion(
+                    position: .init(x: 0, y: 1e30, z: 0), fireballID: 0,
+                    roomSourceIndex: room, size: 1, upwardsVelocity: 0
+                )
+            )
+        }
+        hostile(.nonFiniteValue("userVars")) {
+            guard case var .trainingMission(state) = $0.levelModule else {
+                return
+            }
+            state.dallas.userVars[3] = .float(.infinity)
+            $0.levelModule = .trainingMission(state)
+        }
+        hostile(.nonFiniteValue("playerInvulnerableTime")) {
+            $0.playerInvulnerableTime = .nan
+        }
+        hostile(.outOfDomain("entryGameTime")) {
+            $0.playerRearViewState = .init(
+                leaveMode: false, entryGameTime: 1e30
+            )
+        }
+        hostile(.roomReference("roomSourceIndex")) {
+            $0.objects[turret]?.ai?.goals[2].roomSourceIndex = 99_999
+        }
+        hostile(.nonFiniteValue("object \(slot)")) {
+            $0.objects[turret]?.lifeLeft = .infinity
+        }
+        hostile(.roomReference("roomSourceIndex")) {
+            $0.objects[turret]?.ai?.path.dynamicNodes = [
+                .init(position: .zero, roomSourceIndex: 99_999),
+            ]
+        }
+        hostile(.nonFiniteValue("position")) {
+            $0.objects[turret]?.ai?.path.dynamicNodes = [
+                .init(
+                    position: .init(x: .nan, y: 0, z: 0),
+                    roomSourceIndex: room
+                ),
+            ]
+        }
+        hostile(.nonFiniteValue("shields")) {
+            $0.objects[turret]?.ai?.memory[4].shields = .nan
+        }
+        hostile(.outOfDomain("timer")) { $0.savedSmallViews[2].timer = 1e30 }
+        hostile(.nonFiniteValue("firingTime")) {
+            $0.playerWeapons[1].firingTime = .nan
+        }
+        hostile(.nonFiniteValue("object \(slot)")) {
+            $0.objects[turret]?.weaponBatteries[0].turretNextThinkTimes[7] =
+                .infinity
+        }
+        hostile(.nonFiniteValue("lastRenderTime")) {
+            $0.rooms[0].lastRenderTime = -.infinity
+        }
+        hostile(.objectReference(0x7ff)) {
+            $0.objects[turret]?.ai?.targetHandle = malformed
+        }
+        hostile(.objectReference(0x7ff)) {
+            $0.objects[turret]?.ai?.goals[9].objectHandle = malformed
+        }
+        hostile(.objectReference(0x7ff)) { $0.buddyHandle = malformed }
+        hostile(.objectReference(0x7ff)) { $0.smallViews[1].viewer = malformed }
+        hostile(.objectReference(0x7ff)) {
+            $0.gameEvents[0] = .init(
+                startTime: 0, endTime: 1, detonator: malformed,
+                action: .blastRing(
+                    position: .zero, size: 1, roomSourceIndex: room
+                )
+            )
+        }
+        hostile(.objectReference(0x7ff)) {
+            guard case var .trainingMission(state) = $0.levelModule else {
+                return
+            }
+            state.dallas.savedObjectHandles[19] = malformed
+            $0.levelModule = .trainingMission(state)
+        }
+        hostile(.objectReference(0x7ff)) {
+            $0.playerDeath = .init(
+                fate: .instant, killer: malformed, initialDeathTime: 0
+            )
+        }
+        hostile(.nonFiniteValue("object \(slot)")) {
+            $0.objects[turret]?.debris = .init(
+                deathFlags: 0, lastSmokeTime: .nan
+            )
+        }
+        hostile(.outOfDomain("object \(slot)")) {
+            $0.objects[turret]?.localLighting = .init(
+                lightDistance: 1, color: .init(x: 1e30, y: 0, z: 0)
+            )
+        }
+        for (expected, candidate) in cases {
+            assertRejected(expected, candidate, level: level)
+        }
+        XCTAssertEqual(cases.count, 25)
+
+        var object = try XCTUnwrap(testWorldObject(world))
+        var timers = try XCTUnwrap(object["osirisTimers"] as? [String: Any])
+        var entries = try XCTUnwrap(timers["entries"] as? [[String: Any]])
+        let used = try XCTUnwrap(entries.firstIndex {
+            $0["isUsed"] as? Bool == true
+        })
+        entries[used]["nextSignal"] = 1e30
+        timers["entries"] = entries
+        object["osirisTimers"] = timers
+        assertRejected(
+            .outOfDomain("nextSignal"), try decodeTestWorld(object),
+            level: level
+        )
+        entries[used]["nextSignal"] = 1
+        entries[used]["detonator"] = 0x7ff
+        timers["entries"] = entries
+        object["osirisTimers"] = timers
+        assertRejected(
+            .objectReference(0x7ff), try decodeTestWorld(object), level: level
+        )
+
+        let guidebotLevel = withTrainingGuideBot(
+            makeTrainingCameraMonitorLevel()
+        )
+        let session = GameSession(
+            level: guidebotLevel, presentationReadyTimestamp: 0
+        )
+        session.releaseOrRecallTestGuideBot()
+        _ = session.update(at: 0.1, input: .zero)
+        let deployed = session.world
+        XCTAssertNoThrow(try deployed.validate(against: guidebotLevel))
+        var foundObject = deployed
+        foundObject.updateGuideBot(deployed.buddyHandle) {
+            $0.foundObject = malformed
+        }
+        assertRejected(
+            .objectReference(0x7ff), foundObject, level: guidebotLevel
+        )
+        var revertTimes = deployed
+        revertTimes.updateGuideBot(deployed.buddyHandle) {
+            $0.antivirusRobots = [.none]
+            $0.antivirusRevertTimes = [.nan]
+        }
+        assertRejected(
+            .nonFiniteValue("antivirusRevertTimes"), revertTimes,
+            level: guidebotLevel
+        )
+
+        let goalLevel = makeTrainingFinalGoalLevel()
+        var renamed = GameSession(
+            level: goalLevel, presentationReadyTimestamp: 0
+        ).world
+        let goal = try XCTUnwrap(renamed.goals.first)
+        renamed.goals[0] = .init(
+            status: goal.status, priority: goal.priority, list: goal.list,
+            name: goal.name + " (edited)", itemName: goal.itemName,
+            description: goal.description,
+            completionMessage: goal.completionMessage, items: goal.items
+        )
+        assertRejected(.goals, renamed, level: goalLevel)
     }
 
     private func assertRejected(

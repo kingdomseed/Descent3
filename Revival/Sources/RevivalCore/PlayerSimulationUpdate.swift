@@ -485,7 +485,8 @@ extension GameSession {
             turnrollFixedAngle: turnrollFixedAngle,
             mode: indoorAutoLevelMode,
             gameTime: gameTime,
-            lastThrustTime: lastThrustTime
+            lastThrustTime: lastThrustTime,
+            weaponBatteries: object.weaponBatteries
         )
         angularVelocity = analyticAngularVelocity(
             velocity: angularVelocity,

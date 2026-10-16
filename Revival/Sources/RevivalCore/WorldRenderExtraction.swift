@@ -89,13 +89,8 @@ func extractPreparedRoomDrawItems(
 
 func extractPreparedModelDrawItems(
     _ level: Level,
-    startRoomSourceIndex: Int,
-    excludedObjectHandle: UInt32?
+    objects: ObjectTable? = nil
 ) -> [ModelDrawItem] {
-    let component = reciprocalPortalComponent(
-        rooms: level.rooms,
-        startRoomSourceIndex: startRoomSourceIndex
-    )
     let presentations = ObjectPresentationLookup(level)
     let modelBySource = Dictionary(
         uniqueKeysWithValues: level.models.map { ($0.source, $0) }
@@ -104,21 +99,13 @@ func extractPreparedModelDrawItems(
         uniqueKeysWithValues: level.presentationMaterials.map { ($0.texture, $0) }
     )
     var items: [ModelDrawItem] = []
-    // GPU preparation covers the objects of the started level: the initial
-    // placement, the eager working set loaded with the level, and the
-    // objects level start makes (AIInitAll's Guide-Bot). An object made
-    // later has no prepared draws and is not drawn.
-    // A level without a player start (a valid non-player scene) has no
-    // level start; its placed objects are prepared.
-    let startObjects = level.defaultPlayerBinding == nil
+    let preparedObjects = objects ?? (level.defaultPlayerBinding == nil
         || level.objectPresentations.isEmpty
             && (level.objectInfos ?? []).allSatisfy { $0.presentation == nil }
         ? ObjectTable(level: level)
-        : GameWorld(level: level).objects
-    for object in startObjects {
-        guard object.handle.rawValue != excludedObjectHandle,
-              case let .room(roomSourceIndex) = object.location,
-              component.contains(roomSourceIndex),
+        : GameWorld(level: level).objects)
+    for object in preparedObjects {
+        guard case .room = object.location,
               let presentation = presentations.presentation(of: object)
         else {
             continue
@@ -1297,14 +1284,6 @@ func extractSourceVisibleWorld(
     )
 }
 
-func sourceRoomThreeContains(_ point: Vector3, in room: LevelRoom) -> Bool {
-    precondition(
-        room.sourceIndex == 3,
-        "Slice 3 camera containment is defined only for source room 3"
-    )
-    return sourceConvexRoomContains(point, in: room)
-}
-
 func sourceConvexRoomContains(_ point: Vector3, in room: LevelRoom) -> Bool {
     room.faces.allSatisfy { face in
         let first = room.vertices[face.corners[0].vertexIndex]
@@ -1376,8 +1355,8 @@ private struct CameraView {
     init(_ camera: RoomCamera) {
         eye = camera.position
         forward = sourceVectorNormalized(camera.target - camera.position)
-        right = sourceVectorNormalized(sourceVectorCross(forward, camera.up))
-        up = sourceVectorCross(right, forward)
+        right = sourceVectorNormalized(sourceVectorCross(camera.up, forward))
+        up = sourceVectorCross(forward, right)
         precondition(
             camera.projection.horizontalFieldOfViewRadians.isFinite
                 && camera.projection.aspectRatio.isFinite

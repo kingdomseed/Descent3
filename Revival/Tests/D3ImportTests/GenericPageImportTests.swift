@@ -65,7 +65,10 @@ final class GenericPageImportTests: XCTestCase {
 }
 
 /// One PAGETYPE_GENERIC page of `version` in a table file.
-private func syntheticGenericPageTable(version: UInt16) -> Data {
+func syntheticGenericPageTable(
+    version: UInt16, name: String = "Synthetic Robot", model: String = "robot.oof",
+    spew: String? = nil, explodeSound: String = "ExplodeSound", module: String = ""
+) -> Data {
     var page = Data()
     func u8(_ value: UInt8) { page.append(value) }
     func u16(_ value: UInt16) {
@@ -89,14 +92,14 @@ private func syntheticGenericPageTable(version: UInt16) -> Data {
 
     u16(version)
     u8(2)                                   // OBJ_ROBOT
-    string("Synthetic Robot")
-    string("robot.oof")
+    string(name)
+    string(model)
     string("")
     string("")
     zeros(12)                               // impact size, time, damage
     zeros(2)                                // score
     string("")                              // script name
-    string("")                              // version >= 18
+    string(module)                          // version >= 18
     string("")                              // version >= 19
     u8(0)                                   // no description
     string("")                              // icon name
@@ -121,7 +124,7 @@ private func syntheticGenericPageTable(version: UInt16) -> Data {
         u8(0)
         f32(percent)
         u16(number)
-        string(name)
+        string(spew ?? name)
     }
     zeros(5 * 24 * (2 + 2 + 4))             // animations (version >= 20)
     for _ in 0..<21 {                       // weapon battery chunk, v2
@@ -131,7 +134,7 @@ private func syntheticGenericPageTable(version: UInt16) -> Data {
     }
     for _ in 0..<(21 * 8) { string("") }    // weapon names
     string("Sound0")
-    string("ExplodeSound")
+    string(explodeSound)
     if version < 26 { string("ObsoleteSound") }
     for index in 0..<5 { string("AISound\(index)") }
     for battery in 0..<21 {

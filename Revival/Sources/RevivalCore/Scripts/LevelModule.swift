@@ -48,6 +48,17 @@ enum LevelModule: Codable, Equatable, Sendable {
         }
     }
 
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        switch self {
+        case .none:
+            break
+        case let .trainingMission(state):
+            try TrainingMissionScript.validateSavedValues(state, rules)
+        }
+    }
+
     /// GetGOScriptID.
     func genericScriptID(pageName: String, isDoor: Bool) -> Int32? {
         switch self {

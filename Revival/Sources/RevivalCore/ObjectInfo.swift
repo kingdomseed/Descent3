@@ -707,14 +707,9 @@ extension Level {
                                 gunpoints.indices.contains($0)
                             }
                             && battery.turrets.allSatisfy { index in
+                                // ReadNewModelFile keeps the WBAT index
+                                // when it clears SOF_TURRET (:1957-1959).
                                 model.submodels.indices.contains(index)
-                                    && {
-                                        if case .turret = model
-                                            .submodels[index].presentation {
-                                            return true
-                                        }
-                                        return false
-                                    }()
                             }
                     },
                 "model guns \(model.source.sourceName)"

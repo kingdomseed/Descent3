@@ -1,12 +1,12 @@
 # Engineering guide
 
-Status: core rules. Updated 2026-09-29.
+Status: core rules. Updated 2026-10-16.
 
 This file tells you how to build, test, translate, review, and clean up. `AGENTS.md` holds the short version.
 
 ## 1. Toolchain
 
-- **Xcode 27.0** (build 27A266a) at `/Applications/Xcode.app`. This is the release version. Do not use beta paths (`Xcode-beta.app` and `Xcode-27-Beta-3.app` no longer exist). `DEVELOPER_DIR` is not needed.
+- **Xcode 27.1** (build 27A9275) at `/Applications/Xcode.app`. This is the installed release version. The project still targets the 26 SDK API floor. Do not use beta paths (`Xcode-beta.app` and `Xcode-27-Beta-3.app` no longer exist). `DEVELOPER_DIR` is not needed.
 - **Swift 6.4** compiler, Swift 6 language mode (`SWIFT_VERSION = 6.0`, complete strict concurrency).
 - Development Mac: macOS 27, M4 Mac mini (Mac16,10, 10 CPU and 10 GPU cores, 16 GB).
 - Deployment floor: **macOS 26.0 arm64** and **iOS/iPadOS 26.0**, built with the 27 SDK. Stay at 26 unless a required feature exists only in 27. Put any 27-only API behind `#available`. Note: the Metal clamp-to-edge sampler bug is fixed only in 27, so test sampler edges on 26.
@@ -101,11 +101,11 @@ For refactors with no behavior change, existing tests are the guard. Run them be
 
 | Work | Who |
 |---|---|
-| Fast lookups, inventory, file search, extracting facts | Claude Sonnet 5.5 subagents |
-| Design, translation, implementation, synthesis | Claude Opus 5.5 |
+| Fast lookups, inventory, file search, extracting facts | GPT-6.1 Sol at medium |
+| Design, translation, implementation, synthesis | GPT-6.1 Sol at high. Keep the implementation direct and small. |
 | **All review and verification** | Codex CLI: `gpt-6.1-sol` at `xhigh` (default). `gpt-6-astra` at `high` only for big reviews: large structural diffs and milestone exits. |
 
-Do not use a Claude subagent to review or verify work.
+Do not use Opus or Claude agents for this project.
 
 ## 6. Review and verification with Codex
 
@@ -117,8 +117,8 @@ Do not use a Claude subagent to review or verify work.
 codex exec -C "$PWD" -m gpt-6.1-sol -c model_reasoning_effort="xhigh" -s read-only --ephemeral \
   -o /private/tmp/revival-review.md "Review the uncommitted change (git diff HEAD). Do not build, test, or launch anything. Report actionable defects with severity and file:line."
 
-# Review a commit range
-codex exec review --base main -m gpt-6.1-sol -c model_reasoning_effort="xhigh"
+# Review a commit range with the same read-only command.
+# In the prompt, name the range, for example git diff main...HEAD.
 
 # Focused verification or milestone exit, read-only, result to a file.
 # Use gpt-6-astra (high) instead of gpt-6.1-sol for big reviews.

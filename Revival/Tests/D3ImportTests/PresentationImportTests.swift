@@ -6,6 +6,90 @@ import XCTest
 // (shippage.cpp), the sound pages and PCM16 WAV payloads, and the texture
 // names.
 final class PresentationImportTests: XCTestCase {
+    func testReachedOOFClearsRotationAndTurretWithoutKeyframes() throws {
+        for properties in ["$fov=90.0,8.0,10.0\r\n", "$rotate=1"] {
+            let model = try parseReachedOutrageModel(
+                makeReachedOOFFixture(properties: properties, rotationKeyframes: 0),
+                sourceName: "SyntheticDead.OOF", sourceArchive: "d3.hog",
+                textureResources: [.init(storedIndex: 0, sourceName: "Synthetic")]
+            )
+            XCTAssertEqual(model.submodels[1].presentation, .standard)
+            XCTAssertEqual(model.submodels[1].vertices.count, 31)
+            XCTAssertEqual(model.submodels[1].faces.count, 1)
+        }
+    }
+
+    func testObjectImportPackagesNestedSpewAndDeadPageModels() throws {
+        let names = [
+            "Hangturret", "Securityturret(DEAD)", "Energy", "Shield",
+            "GuideBot", "Invisiblepowerup", "Helper spew",
+        ]
+        var table = makeRetailShipTablePage()
+        for (index, name) in names.enumerated() {
+            table += syntheticGenericPageTable(
+                version: 26, name: name, model: "\(name).oof",
+                spew: index == 0 ? "Energy" : index == 2 ? "Shield"
+                    : name == "Invisiblepowerup" ? "Helper spew" : "",
+                explodeSound: "", module: name == "GuideBot" ? "aigame" : ""
+            )
+        }
+        for name in AIGame.references.soundNames {
+            table += makeRetailSoundTablePage(
+                logicalName: name, sourceName: "Beep.wav", importVolume: 1
+            )
+        }
+        table += makeModelWeaponTablePage("Yellow flare", spawn: "Child", alternate: "Alternate")
+            + makeModelWeaponTablePage("Child") + makeModelWeaponTablePage("Alternate")
+        let modelNames = names.map { "\($0).oof" } + [
+            "PyroGL.OOF", "PyroGLDying.OOF", "PyroGLMed.OOF", "PyroGLLow.OOF",
+            "Yellow flare.oof", "Child.oof", "Alternate.oof",
+        ]
+        let archive = makeLevelScriptArchive(
+            relativePath: "d3.hog",
+            entries: modelNames.map {
+                ($0, makeReachedOOFFixture(properties: "", textured: false))
+            } + [
+                ("Beep.wav", makePCM16WAV(samples: [0])),
+                ("aigame.str", Data(Array(repeating: "!=!Synthetic", count: 146)
+                    .joined(separator: "\n").utf8)),
+            ]
+        )
+        let library = PreparedLibrary(
+            file: .init(relativePath: "d3.hog", byteCount: archive.data.count,
+                        sha256: canonicalSHA256(archive.data)),
+            data: archive.data, archive: archive.archive
+        )
+        let sources = ImportSources(
+            profile: .training, inventories: [], searchOrder: [library],
+            table: table, overlay: Data(),
+            mission: PreparedRetailProfile.training.missions[0],
+            descriptor: .init(name: "Synthetic", levels: []),
+            level: PreparedRetailProfile.training.missions[0].levels[0],
+            levelFileName: "Synthetic.D3L", levelEntry: archive.archive.entries[0],
+            levelData: Data()
+        )
+        var level = makeSliceSixObjectRenderLevel()
+        let player = level.objects.first { $0.type == 4 }!
+        let original = level.objects.first { $0.type == 7 }!
+        let robot = PlacedObject.fixture(
+            handle: original.handle, type: 2, storedID: 0,
+            definition: .init(storedIndex: 0, sourceName: "Hangturret"),
+            location: original.location, position: original.position,
+            orientation: original.orientation
+        )
+        level.objects = [player, robot]
+        var sounds = SoundImportCache(sources: sources)
+        let imported = try level.addingObjectsAndWeapons(sources: sources, sounds: &sounds)
+        XCTAssertEqual(Set(imported.objectInfos?.map(\.name) ?? []), Set(names))
+        XCTAssertEqual(Set(imported.models.map { $0.source.sourceName }), Set(modelNames))
+        XCTAssertEqual(imported.gameModules?.map(\.module), ["aigame"])
+        XCTAssertEqual(imported.weapons?.map(\.name), ["Yellow flare", "Child", "Alternate"])
+        for name in names {
+            let info = try XCTUnwrap(imported.objectInfos?.first { $0.name == name })
+            XCTAssertEqual(info.presentation?.primaryModel.sourceName, "\(name).oof")
+        }
+    }
+
     func testCanonicalizesStockEnergyTextureName() {
         XCTAssertEqual(
             canonicalPresentationTextureLogicalName("energy.TGA1"), "energy"
@@ -283,7 +367,8 @@ final class PresentationImportTests: XCTestCase {
 
 private func makeReachedOOFFixture(
     properties: String = "$glow=1, 0.5, 0.25, 2", collisionRadius: Float = 200,
-    gunpoint: ReachedModelGunpoint? = nil
+    gunpoint: ReachedModelGunpoint? = nil, rotationKeyframes: Int32 = 2,
+    textured: Bool = true
 ) -> Data {
     var data = Data("PSPO".utf8)
     data.appendInt32(2_300)
@@ -317,14 +402,15 @@ private func makeReachedOOFFixture(
         body: makeReachedSOBJ(
             index: 1, parent: 0, offset: .init(x: 0, y: 0, z: 0),
             properties: properties, vertices: vertices,
-            faceVertexIndices: Array(vertices.indices)
+            faceVertexIndices: Array(vertices.indices), textured: textured
         )
     )
     var rotation = Data()
     for submodelIndex in 0..<2 {
-        rotation.appendInt32(2)
+        rotation.appendInt32(rotationKeyframes)
         rotation.appendInt32(0)
         rotation.appendInt32(1)
+        if rotationKeyframes == 0 { continue }
         rotation.appendInt32(0)
         rotation.appendVector(.init(x: 1, y: 0, z: 0))
         rotation.appendInt32(0)
@@ -346,6 +432,31 @@ private func makeReachedOOFFixture(
         data.appendChunk("GPNT", body: body)
     }
     return data
+}
+
+private func makeModelWeaponTablePage(
+    _ name: String, spawn: String = "", alternate: String = ""
+) -> Data {
+    var body = Data()
+    body.appendUInt16(8)
+    for value in [name, "", "\(name).oof", ""] { body.appendCString(value) }
+    body.append(0)
+    body.append(Data(count: 12))
+    body.appendCString(spawn)
+    body.append(spawn.isEmpty ? 0 : 2)
+    body.appendCString("")
+    body.appendCString(alternate)
+    body.append(alternate.isEmpty ? 0 : 50)
+    body.append(Data(count: 9 * 4 + 4 + 14 * 4 + 1 + 4))
+    body.appendCString("")
+    body.append(Data(count: 20 * 4 + 4 + 4 + 1 + 1 + 4))
+    for _ in 0..<9 { body.appendCString("") }
+    body.appendFloat(0)
+    body.appendCString("")
+    var table = Data([2])
+    table.appendUInt32(UInt32(body.count + 4))
+    table.append(body)
+    return table
 }
 
 private func makeRetailSoundTablePage(
@@ -569,7 +680,8 @@ private func makeReachedOOFWithNonfiniteVertexNormal() -> Data {
 
 private func makeReachedSOBJ(
     index: Int32, parent: Int32, offset: Vector3, properties: String,
-    vertices: [Vector3], normals: [Vector3]? = nil, faceVertexIndices: [Int]
+    vertices: [Vector3], normals: [Vector3]? = nil, faceVertexIndices: [Int],
+    textured: Bool = true
 ) -> Data {
     var body = Data()
     body.appendInt32(index)
@@ -596,8 +708,12 @@ private func makeReachedSOBJ(
     if !faceVertexIndices.isEmpty {
         body.appendVector(.init(x: 0, y: 0, z: 1))
         body.appendInt32(Int32(faceVertexIndices.count))
-        body.appendInt32(1)
-        body.appendInt32(0)
+        body.appendInt32(textured ? 1 : 0)
+        if textured {
+            body.appendInt32(0)
+        } else {
+            body.append(contentsOf: [32, 64, 96])
+        }
         for index in faceVertexIndices {
             body.appendInt32(Int32(index))
             body.appendFloat(0)

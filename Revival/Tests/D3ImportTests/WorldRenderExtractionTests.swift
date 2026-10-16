@@ -77,24 +77,25 @@ final class WorldRenderExtractionTests: XCTestCase {
         XCTAssertEqual(landscape.height, 1_640)
     }
 
-    func testRoomThreeConvexShellContainmentAcceptsItsBoundaryAndRejectsPastIt() {
+    func testConvexRoomContainmentAcceptsItsBoundaryAndRejectsPastIt() {
         let center = RoomCamera.trainingRoom3.position
         let room = makeSourceContainmentRoom(
-            center: center, texture: .init(storedIndex: 0, sourceName: "wall")
+            center: center, texture: .init(storedIndex: 0, sourceName: "wall"),
+            sourceIndex: 41
         )
 
         XCTAssertTrue(
-            sourceRoomThreeContains(
+            sourceConvexRoomContains(
                 .init(x: center.x - 0.5, y: center.y, z: center.z), in: room
             )
         )
         XCTAssertTrue(
-            sourceRoomThreeContains(
+            sourceConvexRoomContains(
                 .init(x: center.x, y: center.y + 1, z: center.z), in: room
             )
         )
         XCTAssertFalse(
-            sourceRoomThreeContains(
+            sourceConvexRoomContains(
                 .init(x: center.x, y: center.y + 1.25, z: center.z), in: room
             )
         )
@@ -360,10 +361,10 @@ final class WorldRenderExtractionTests: XCTestCase {
         XCTAssertEqual(facing.vertices.map(\.u), [0, 1, 1, 0])
         XCTAssertEqual(facing.vertices.map(\.v), [0, 0, 1, 1])
         let expectedFacingPositions = [
-            Vector3(x: 2_063.4604, y: -230.09009, z: 2_204.0276),
             Vector3(x: 2_065.4604, y: -230.09009, z: 2_204.0276),
-            Vector3(x: 2_065.4604, y: -230.09009, z: 2_202.0276),
+            Vector3(x: 2_063.4604, y: -230.09009, z: 2_204.0276),
             Vector3(x: 2_063.4604, y: -230.09009, z: 2_202.0276),
+            Vector3(x: 2_065.4604, y: -230.09009, z: 2_202.0276),
         ]
         for (actual, expected) in zip(
             facing.vertices.map(\.position), expectedFacingPositions

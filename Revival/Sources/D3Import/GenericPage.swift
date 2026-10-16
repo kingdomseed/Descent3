@@ -517,6 +517,7 @@ extension Level {
     /// particle), if any, and `fireImage` a bitmap or vclip fire image.
     func addingObjectTables(
         genericPages: [String: RetailGenericPage],
+        additionalPageNames: [String] = [],
         shipBatteries: [RetailShipWeaponBattery] = [],
         weapon: (String) throws -> RetailWeaponPresentationSelection,
         weaponModel: (String) -> SourceResource?,
@@ -550,14 +551,26 @@ extension Level {
         var pageNames = objects
             .filter { genericTypes.contains($0.type) }
             .compactMap { $0.definition?.sourceName }
+        pageNames += additionalPageNames
         if objects.contains(where: {
             $0.type == D3SourceIdentity.playerObjectType
         }), genericPages[CanonicalObjectInfo.guideBotPageName.lowercased()] != nil {
             pageNames.append(CanonicalObjectInfo.guideBotPageName)
         }
-        for name in pageNames where !infos.contains(where: {
-            $0.name.caseInsensitiveCompare(name) == .orderedSame
-        }) {
+        // CreateDeadObject (fireball.cpp:1316-1339).
+        let deadModels = [
+            "swatter": "swatter(deadmodel)",
+            "hangturret": "Securityturret(DEAD)",
+            "lance": "Lance(DEAD)",
+            "l10 swatter": "swatter(deadmodel)",
+        ]
+        var nextPage = 0
+        while nextPage < pageNames.count {
+            let name = pageNames[nextPage]
+            nextPage += 1
+            guard !infos.contains(where: {
+                $0.name.caseInsensitiveCompare(name) == .orderedSame
+            }) else { continue }
             guard let page = genericPages[name.lowercased()] else {
                 throw GenericPageImportError.missingPage(name)
             }
@@ -613,40 +626,15 @@ extension Level {
                 weaponBatteries: batteries,
                 soundKey: soundKey
             ))
-        }
-        // The pages a death makes objects from without placing them: the
-        // spewed objects (DoDeathSpew, fireball.cpp:1134) and the dead
-        // models (CreateDeadObject, fireball.cpp:1316). They have no AI
-        // batteries here.
-        let deadModels = [
-            "swatter": "swatter(deadmodel)",
-            "hangturret": "Securityturret(DEAD)",
-            "lance": "Lance(DEAD)",
-            "l10 swatter": "swatter(deadmodel)",
-        ]
-        var madePages: [String] = []
-        for info in infos {
-            for entry in info.deathSpew?.entries ?? []
-            where entry.number > 0 && !entry.pageName.isEmpty {
-                madePages.append(entry.pageName)
+            // PageInGeneric (gamesequence.cpp:2456-2460) reaches spew
+            // pages recursively, including their models and weapons.
+            pageNames += page.deathSpew.entries.filter {
+                $0.number > 0 && !$0.pageName.isEmpty
+            }.map(\.pageName)
+            if page.type == 2, let dead = deadModels[page.name.lowercased()],
+               genericPages[dead.lowercased()] != nil {
+                pageNames.append(dead)
             }
-            if info.type == 2, let dead = deadModels[info.name.lowercased()] {
-                madePages.append(dead)
-            }
-        }
-        for name in madePages {
-            guard !infos.contains(where: {
-                      $0.name.caseInsensitiveCompare(name) == .orderedSame
-                  }),
-                  let page = genericPages[name.lowercased()]
-            else {
-                continue
-            }
-            infos.append(try Self.canonicalObjectInfo(
-                page,
-                weaponBatteries: [],
-                soundKey: soundKey
-            ))
         }
         // The ship batteries fire from the ship model's battery 0
         // (WeaponFire.cpp:2977); their gun points follow its gun points.

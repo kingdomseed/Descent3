@@ -227,7 +227,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             try replace(level: level, playerView: playerView)
             return
         }
-        presentation.update(
+        try update(
             try updateMetalWorldPlan(
                 presentation.plan,
                 level: level,
@@ -253,7 +253,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
             && width > 0 && height > 0
             ? width / height
             : frame.playerView.camera.projection.aspectRatio
-        presentation.update(
+        try update(
             try updateMetalWorldPlan(
                 presentation.plan,
                 level: level,
@@ -266,6 +266,15 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
 
     func setFrameUpdate(_ update: ((Double) -> Void)?) {
         frameUpdate = update
+    }
+
+    private func update(_ candidate: MetalWorldPlan) throws {
+        guard let presentation,
+              candidate.hasSamePreparedGeometry(as: presentation.plan) else {
+            try install(candidate)
+            return
+        }
+        presentation.update(candidate)
     }
 
     private func install(_ candidate: MetalWorldPlan) throws {
@@ -559,7 +568,7 @@ final class MetalWorldRenderer: NSObject, MTKViewDelegate {
         }
         guard let presentation else { return }
         do {
-            presentation.update(
+            try update(
                 try updateMetalWorldPlan(
                     presentation.plan,
                     camera: cameraWithDrawableAspect(presentation.plan.camera)
@@ -853,18 +862,7 @@ private final class MetalLevelPresentation {
     }
 
     func update(_ plan: MetalWorldPlan) {
-        precondition(
-            plan.preparedDraws.count == self.plan.preparedDraws.count
-                && zip(plan.preparedDraws, self.plan.preparedDraws)
-                    .allSatisfy {
-                        $0.vertices.count == $1.vertices.count
-                            && $0.indices == $1.indices
-                            && $0.texture == $1.texture
-                            && $0.blend == $1.blend
-                            && $0.lightmapPageIndex
-                                == $1.lightmapPageIndex
-                    }
-        )
+        precondition(plan.hasSamePreparedGeometry(as: self.plan))
         self.plan = plan
         draws = plan.activeDrawIndices.map { preparedDraws[$0] }
         auxiliaryDraws = plan.auxiliaryActiveDrawIndices.map {
@@ -1165,8 +1163,8 @@ private func worldToClip(_ camera: RoomCamera) -> simd_float4x4 {
     let target = SIMD3<Float>(camera.target.x, camera.target.y, camera.target.z)
     let suppliedUp = SIMD3<Float>(camera.up.x, camera.up.y, camera.up.z)
     let forward = simd_normalize(target - eye)
-    let right = simd_normalize(simd_cross(forward, suppliedUp))
-    let up = simd_cross(right, forward)
+    let right = simd_normalize(simd_cross(suppliedUp, forward))
+    let up = simd_cross(forward, right)
 
     let view = simd_float4x4(columns: (
         SIMD4<Float>(right.x, up.x, forward.x, 0),

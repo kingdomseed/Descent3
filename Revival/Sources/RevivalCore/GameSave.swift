@@ -16,9 +16,6 @@ private let quicksaveName = "quicksave.json"
 /// turret's initial last-visible time of -14 s).
 private let maximumSavedMagnitude: Float = 1_000_000
 private let maximumSavedTime = maximumSavedMagnitude
-/// The largest effect creation ordinal a save may hold. A session creates
-/// far fewer effects, and the per-frame increments cannot overflow from it.
-private let maximumSavedCreationOrdinal: UInt64 = 1 << 48
 
 struct GameSave: Codable, Equatable, Sendable {
     /// Schema 2 replaced player save schema 1, which wrapped continuation
@@ -179,9 +176,18 @@ extension GameWorld {
         }
         guard goals.count == level.goals.count,
               zip(goals, level.goals).allSatisfy({ saved, canonical in
-                  saved.items.count == canonical.items.count
+                  saved.priority == canonical.priority
+                      && saved.list == canonical.list
+                      && saved.name == canonical.name
+                      && saved.itemName == canonical.itemName
+                      && saved.description == canonical.description
+                      && saved.completionMessage
+                          == canonical.completionMessage
+                      && saved.items.count == canonical.items.count
                       && zip(saved.items, canonical.items).allSatisfy {
-                          $0.objectHandle == $1.objectHandle
+                          $0.type == $1.type
+                              && $0.sourceHandle == $1.sourceHandle
+                              && $0.objectHandle == $1.objectHandle
                       }
               })
         else {
@@ -219,15 +225,12 @@ extension GameWorld {
             throw .nonFiniteValue("player velocity")
         }
 
-        let sweep = NestedStateSweep(roomSourceIndices: roomSourceIndices)
-        for child in Mirror(reflecting: self).children
-        where !["objects", "rooms", "goals"].contains(child.label) {
-            try sweep.visit(child.value, label: child.label ?? "")
-        }
+        let rules = SavedValueRules(roomSourceIndices: roomSourceIndices)
+        try validateWorldValues(rules)
         // The object_info and weapon indices are checked before the script
         // bindings resolve pages through them.
-        try validateObjectRuntimeState(level: level)
-        try validateScriptState(level: level)
+        try validateObjectRuntimeState(level: level, rules: rules)
+        try validateScriptState(level: level, rules: rules)
         try validateIndicesAndCapacities(level: level)
         try validateNumericDomains(level: level)
     }
@@ -236,7 +239,8 @@ extension GameWorld {
     /// level names, timer handles name their entries, ghost and lighting
     /// fields are consistent, and no presentation request is pending.
     private func validateScriptState(
-        level: Level
+        level: Level,
+        rules: SavedValueRules
     ) throws(GameWorldValidationError) {
         func require(_ condition: Bool, _ name: String)
             throws(GameWorldValidationError)
@@ -289,11 +293,7 @@ extension GameWorld {
                 "object \(object.handle.slot) dummyType"
             )
             // A default script's state is finite and in range.
-            if let defaultScript = object.scripts?.defaultScript {
-                try NestedStateSweep(roomSourceIndices: Set(
-                    level.rooms.map(\.sourceIndex)
-                )).visit(defaultScript, label: "defaultScript")
-            }
+            try object.scripts?.defaultScript?.validateSavedValues(rules)
             // Bound scripts are exactly the ones the modules give.
             try require(
                 object.scripts.map {
@@ -311,6 +311,9 @@ extension GameWorld {
                       lighting.color.map(isFinite) ?? true
                 else {
                     throw .nonFiniteValue("object \(object.handle.slot)")
+                }
+                if let color = lighting.color {
+                    try rules.vector(color, "object \(object.handle.slot)")
                 }
             }
         }
@@ -573,16 +576,14 @@ extension GameWorld {
     /// batteries match the model, turret angles stay in 0...1 (ai_fire
     /// wraps them), and every float and vector is finite and in range.
     private func validateObjectRuntimeState(
-        level: Level
+        level: Level,
+        rules: SavedValueRules
     ) throws(GameWorldValidationError) {
         func require(_ condition: Bool, _ name: String)
             throws(GameWorldValidationError)
         {
             if !condition { throw .indexOutOfRange(name) }
         }
-        let sweep = NestedStateSweep(
-            roomSourceIndices: Set(level.rooms.map(\.sourceIndex))
-        )
         func pathNodeIsValid(_ path: Int, _ node: Int) -> Bool {
             level.paths.indices.contains(path)
                 && level.paths[path].nodes.indices.contains(node)
@@ -599,9 +600,9 @@ extension GameWorld {
         // The last rendered view is a proper camera: IsPointVisible builds
         // its basis and projection from it.
         if let camera = lastRenderCamera {
-            try sweep.visit(camera.position, label: "lastRenderCamera")
-            try sweep.visit(camera.target, label: "lastRenderCamera")
-            try sweep.visit(camera.up, label: "lastRenderCamera")
+            try rules.vector(camera.position, "lastRenderCamera")
+            try rules.vector(camera.target, "lastRenderCamera")
+            try rules.vector(camera.up, "lastRenderCamera")
             let forward = camera.target - camera.position
             let side = sourceVectorCross(camera.up, forward)
             let fov = camera.projection.horizontalFieldOfViewRadians
@@ -616,19 +617,22 @@ extension GameWorld {
         }
         for object in objects {
             let name = "object \(object.handle.slot)"
-            try sweep.visit(object.size, label: name)
-            try sweep.visit(object.shields, label: name)
-            try sweep.visit(object.velocity, label: name)
-            try sweep.visit(object.lastPosition, label: name)
-            try sweep.visit(object.creationTime, label: name)
+            try rules.number(object.size, name)
+            try rules.number(object.shields, name)
+            try rules.vector(object.velocity, name)
+            try rules.vector(object.lastPosition, name)
+            try rules.number(object.creationTime, name)
             try require(object.size >= 0, name)
             // Stored handles are well formed; they may name an object that
             // has since been deleted, which the runtime looks up optionally.
-            for handle in [object.parent, object.attachUltimateHandle]
-            where handle != .none {
-                guard D3SourceIdentity.isValidHandle(handle.rawValue) else {
-                    throw .objectReference(handle.rawValue)
-                }
+            try rules.handleShape(object.parent)
+            try rules.handleShape(object.attachUltimateHandle)
+            if let debris = object.debris {
+                try rules.number(debris.lastSmokeTime, name)
+            }
+            if let fireball = object.fireball {
+                try rules.number(fireball.maximumSize, name)
+                try rules.number(fireball.lifetime, name)
             }
             try require(
                 (object.shockwave != nil) == (object.type == .shockwave)
@@ -638,10 +642,10 @@ extension GameWorld {
                 "\(name) shockwave"
             )
             if let shockwave = object.shockwave {
-                try sweep.visit(shockwave, label: name)
+                try shockwave.validateSavedValues(rules)
             }
             if let dying = object.dying {
-                try sweep.visit(dying, label: name)
+                try dying.validateSavedValues(rules)
                 try require(
                     object.flags & GameObject.dyingFlag != 0,
                     "\(name) dying"
@@ -653,7 +657,7 @@ extension GameWorld {
                 try require(object.lifeLeft != nil, "\(name) lifeleft")
             }
             if let lifeLeft = object.lifeLeft {
-                try sweep.visit(lifeLeft, label: name)
+                try rules.number(lifeLeft, name)
             }
             if let info = object.info {
                 try require(
@@ -673,12 +677,12 @@ extension GameWorld {
             // and a nonzero heading), and the portal it stuck on (a level
             // room's portal, with OF_STUCK_ON_PORTAL).
             if let dropTime = object.lastDropTime {
-                try sweep.visit(dropTime, label: name)
+                try rules.number(dropTime, name)
             }
             if let link = object.objectLink {
-                try sweep.visit(link.position, label: name)
-                try sweep.visit(link.forward, label: name)
-                try sweep.visit(link.up, label: name)
+                try rules.vector(link.position, name)
+                try rules.vector(link.forward, name)
+                try rules.vector(link.up, name)
                 guard D3SourceIdentity.isValidHandle(link.parentHandle.rawValue)
                 else {
                     throw .objectReference(link.parentHandle.rawValue)
@@ -735,7 +739,7 @@ extension GameWorld {
                 "\(name) weaponBatteries"
             )
             for (index, battery) in object.weaponBatteries.enumerated() {
-                try sweep.visit(battery.lastFireTime, label: name)
+                try rules.number(battery.lastFireTime, name)
                 try require(
                     battery.turretAngles.count
                         == DynamicWeaponBattery.maximumTurrets
@@ -753,7 +757,7 @@ extension GameWorld {
                     "\(name) weapon battery \(index)"
                 )
                 for time in battery.turretNextThinkTimes {
-                    try sweep.visit(time, label: name)
+                    try rules.number(time, name)
                 }
             }
             guard let ai = object.ai else { continue }
@@ -761,7 +765,7 @@ extension GameWorld {
                 object.info.flatMap({ level.objectInfos?[$0].ai }) != nil,
                 "\(name) ai"
             )
-            try sweep.visit(ai, label: name)
+            try ai.validateSavedValues(rules)
             try require(
                 ai.goals.count == ObjectAIFrame.maximumGoals
                     && ai.memory.count == ObjectAIFrame.memoryDepth,
@@ -831,94 +835,286 @@ extension GameWorld {
     }
 }
 
-/// One reflective pass over the nested saved state. It checks what the
-/// runtime assumes of every value of a kind, wherever the value lives:
-/// orientations are orthonormal bases, vectors and floats are finite, room
-/// references name a level room, and stored object handles are well formed.
-/// Stored handles may name an object that has since been deleted, because
-/// the runtime looks them up optionally.
-/// MAX_ACTION_CTR_VALUE, the cap of every DALLAS ScriptActionCtr (for
-/// example TrainingMission.cpp:251).
-let maximumScriptActionCounter = 100_000
-
-private struct NestedStateSweep {
+struct SavedValueRules {
     let roomSourceIndices: Set<Int>
 
-    func visit(_ value: Any, label: String) throws(GameWorldValidationError) {
-        switch value {
-        case let orientation as Matrix3:
-            guard isCanonicalRigidTransform(
-                position: .zero,
-                orientation: orientation
-            ) else {
-                throw .orientation(label)
-            }
-            return
-        case let vector as Vector3:
-            guard isFinite(vector) else { throw .nonFiniteValue(label) }
-            guard abs(vector.x) <= maximumSavedMagnitude,
-                  abs(vector.y) <= maximumSavedMagnitude,
-                  abs(vector.z) <= maximumSavedMagnitude
-            else {
-                throw .outOfDomain(label)
-            }
-            return
-        case let scalar as Float:
-            guard scalar.isFinite else { throw .nonFiniteValue(label) }
-            guard abs(scalar) <= maximumSavedMagnitude else {
-                throw .outOfDomain(label)
-            }
-            return
-        case let room as Int
-            where label == "roomSourceIndex" || label.hasSuffix("RoomSourceIndex"):
-            guard roomSourceIndices.contains(room) else {
-                throw .roomReference(label)
-            }
-            return
-        case let rooms as [Int] where label == "roomSourceIndices":
-            guard rooms.allSatisfy(roomSourceIndices.contains) else {
-                throw .roomReference(label)
-            }
-            return
-        case let counter as Int where label.wholeMatch(
-            of: /script\d+Count|scriptActionCounter/
-        ) != nil:
-            // Released scripts cap action counters at MAX_ACTION_CTR_VALUE
-            // (TrainingMission.cpp:251).
-            guard (0...maximumScriptActionCounter).contains(counter)
-            else {
-                throw .outOfDomain(label)
-            }
-            return
-        case let ordinal as UInt64
-            where label == "nextCreationOrdinal":
-            guard ordinal <= maximumSavedCreationOrdinal else {
-                throw .outOfDomain(label)
-            }
-            return
-        case let handle as UInt32 where label.hasSuffix("Handle"):
-            guard D3SourceIdentity.isValidHandle(handle) else {
-                throw .objectReference(handle)
-            }
-            return
-        case let handles as Set<UInt32> where label.hasSuffix("Handles"):
-            for handle in handles.sorted()
-            where !D3SourceIdentity.isValidHandle(handle) {
-                throw .objectReference(handle)
-            }
-            return
-        default:
-            break
+    func number(
+        _ value: Float,
+        _ name: String
+    ) throws(GameWorldValidationError) {
+        guard value.isFinite else { throw .nonFiniteValue(name) }
+        guard abs(value) <= maximumSavedMagnitude else {
+            throw .outOfDomain(name)
         }
-        let mirror = Mirror(reflecting: value)
-        for child in mirror.children {
-            // Optional and collection elements keep their field's label.
-            let childLabel = mirror.displayStyle == .optional
-                || mirror.displayStyle == .collection
-                || mirror.displayStyle == .set
-                ? label
-                : child.label ?? label
-            try visit(child.value, label: childLabel)
+    }
+
+    func vector(
+        _ value: Vector3,
+        _ name: String
+    ) throws(GameWorldValidationError) {
+        guard isFinite(value) else { throw .nonFiniteValue(name) }
+        guard abs(value.x) <= maximumSavedMagnitude,
+              abs(value.y) <= maximumSavedMagnitude,
+              abs(value.z) <= maximumSavedMagnitude
+        else {
+            throw .outOfDomain(name)
+        }
+    }
+
+    func room(_ value: Int, _ name: String) throws(GameWorldValidationError) {
+        guard roomSourceIndices.contains(value) else {
+            throw .roomReference(name)
+        }
+    }
+
+    func handleShape(_ value: ObjectHandle) throws(GameWorldValidationError) {
+        guard value == .none
+                || D3SourceIdentity.isValidHandle(value.rawValue)
+        else {
+            throw .objectReference(value.rawValue)
+        }
+    }
+}
+
+extension GameWorld {
+    fileprivate func validateWorldValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        try rules.number(frameDuration, "frameDuration")
+        try rules.number(gameTime, "gameTime")
+        for room in rooms {
+            try rules.number(room.lastRenderTime, "lastRenderTime")
+        }
+        try rules.vector(velocity, "velocity")
+        try rules.vector(angularVelocity, "angularVelocity")
+        try rules.number(turnrollFixedAngle, "turnrollFixedAngle")
+        try rules.number(afterburnerFuel, "afterburnerFuel")
+        try rules.number(energy, "energy")
+        try rules.number(shields, "shields")
+        try rules.number(afterburnerMagnitude, "afterburnerMagnitude")
+        try rules.number(wiggleFalloff, "wiggleFalloff")
+        try rules.number(lastThrustTime, "lastThrustTime")
+        if let rearView = playerRearViewState {
+            try rules.number(rearView.entryGameTime, "entryGameTime")
+        }
+        for weapon in playerWeapons {
+            try rules.number(weapon.firingTime, "firingTime")
+        }
+        for effect in visEffects {
+            try effect.validateSavedValues(rules)
+        }
+        for event in gameEvents {
+            try event?.validateSavedValues(rules)
+        }
+        if let time = playerInvulnerableTime {
+            try rules.number(time, "playerInvulnerableTime")
+        }
+        if let death = playerDeath {
+            try rules.handleShape(death.killer)
+            try rules.number(death.initialDeathTime, "initialDeathTime")
+        }
+        for item in playerInventory.items {
+            if let object = item.object { try rules.handleShape(object) }
+        }
+        try rules.handleShape(buddyHandle)
+        for loop in soundSystem.objectLoops {
+            try rules.handleShape(loop.object)
+        }
+        for handle in aiRenderedList {
+            try rules.handleShape(handle)
+        }
+        if let camera = lastRenderCamera {
+            try rules.vector(camera.position, "position")
+            try rules.vector(camera.target, "target")
+            try rules.vector(camera.up, "up")
+            try rules.number(
+                camera.projection.horizontalFieldOfViewRadians,
+                "horizontalFieldOfViewRadians"
+            )
+            try rules.number(camera.projection.aspectRatio, "aspectRatio")
+        }
+        try levelModule.validateSavedValues(rules)
+        for timer in osirisTimers.entries {
+            try timer.validateSavedValues(rules)
+        }
+        for view in smallViews + savedSmallViews {
+            try view.validateSavedValues(rules)
+        }
+    }
+}
+
+extension VisEffect {
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        try rules.room(roomSourceIndex, "roomSourceIndex")
+        try rules.vector(position, "position")
+        try rules.vector(endPosition, "endPosition")
+        try rules.vector(velocity, "velocity")
+        try rules.number(mass, "mass")
+        try rules.number(drag, "drag")
+        try rules.number(size, "size")
+        try rules.number(lifeLeft, "lifeLeft")
+        try rules.number(lifetime, "lifetime")
+        try rules.number(creationTime, "creationTime")
+        if let attachedObject { try rules.handleShape(attachedObject) }
+    }
+}
+
+extension GameEvent {
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        try rules.number(startTime, "startTime")
+        try rules.number(endTime, "endTime")
+        if let detonator { try rules.handleShape(detonator) }
+        switch action {
+        case let .explosion(position, _, room, size, upwardsVelocity):
+            try rules.vector(position, "position")
+            try rules.room(room, "roomSourceIndex")
+            try rules.number(size, "size")
+            try rules.number(upwardsVelocity, "upwardsVelocity")
+        case let .blastRing(position, size, room):
+            try rules.vector(position, "position")
+            try rules.number(size, "size")
+            try rules.room(room, "roomSourceIndex")
+        }
+    }
+}
+
+extension OsirisTimer {
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        if let detonator { try rules.handleShape(detonator) }
+        if isUsed, case let .object(handle) = owner {
+            try rules.handleShape(handle)
+        }
+        try rules.number(interval, "interval")
+        try rules.number(nextSignal, "nextSignal")
+        try rules.number(end, "end")
+    }
+}
+
+extension SmallView {
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        try rules.handleShape(viewer)
+        try rules.number(timer, "timer")
+        try rules.number(zoom, "zoom")
+    }
+}
+
+extension ShockwaveInfo {
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        try rules.number(size, "size")
+        try rules.number(time, "time")
+        try rules.number(playerDamage, "playerDamage")
+        try rules.number(genericDamage, "genericDamage")
+        try rules.number(force, "force")
+    }
+}
+
+extension ObjectDyingInfo {
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        try rules.number(delayTime, "delayTime")
+        try rules.number(lastSparkTime, "lastSparkTime")
+        try rules.number(lastFireballTime, "lastFireballTime")
+        try rules.number(lastSmokeTime, "lastSmokeTime")
+    }
+}
+
+extension ObjectAIFrame {
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        for node in path.dynamicNodes {
+            try rules.vector(node.position, "position")
+            try rules.room(node.roomSourceIndex, "roomSourceIndex")
+        }
+        try rules.number(maxVelocity, "maxVelocity")
+        try rules.number(maxDeltaVelocity, "maxDeltaVelocity")
+        try rules.number(maxTurnRate, "maxTurnRate")
+        try rules.number(maxDeltaTurnRate, "maxDeltaTurnRate")
+        try rules.number(circleDistance, "circleDistance")
+        for goal in goals {
+            try goal.validateSavedValues(rules)
+        }
+        try rules.handleShape(targetHandle)
+        try rules.number(nextTargetUpdateTime, "nextTargetUpdateTime")
+        try rules.number(distToTargetActual, "distToTargetActual")
+        try rules.number(distToTargetPerceived, "distToTargetPerceived")
+        try rules.vector(vecToTargetActual, "vecToTargetActual")
+        try rules.vector(vecToTargetPerceived, "vecToTargetPerceived")
+        try rules.number(nextCheckSeeTargetTime, "nextCheckSeeTargetTime")
+        try rules.vector(lastSeeTargetPosition, "lastSeeTargetPosition")
+        try rules.number(lastSeeTargetTime, "lastSeeTargetTime")
+        try rules.number(lastHearTargetTime, "lastHearTargetTime")
+        try rules.number(weaponSpeed, "weaponSpeed")
+        try rules.number(lastRenderTime, "lastRenderTime")
+        try rules.number(fov, "fov")
+        try rules.number(aggression, "aggression")
+        try rules.number(lifePreservation, "lifePreservation")
+        try rules.number(
+            memoryTimeUntilNextUpdate, "memoryTimeUntilNextUpdate"
+        )
+        for slot in memory {
+            try rules.number(slot.shields, "shields")
+        }
+        try rules.number(fireSpread, "fireSpread")
+        try rules.number(leadAccuracy, "leadAccuracy")
+        try rules.number(attackVelocityPercent, "attackVelocityPercent")
+        try rules.number(dodgeVelocityPercent, "dodgeVelocityPercent")
+        try rules.number(fleeVelocityPercent, "fleeVelocityPercent")
+        try rules.number(fightTeam, "fightTeam")
+        try rules.number(fightSame, "fightSame")
+        try rules.number(nextFlinchTime, "nextFlinchTime")
+        try rules.vector(movementDirection, "movementDirection")
+        try rules.number(awareness, "awareness")
+        try rules.number(avoidFriendsDistance, "avoidFriendsDistance")
+    }
+}
+
+extension AIGoal {
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        try rules.number(influence, "influence")
+        try rules.number(creationTime, "creationTime")
+        try rules.number(startTime, "startTime")
+        try rules.number(circleDistance, "circleDistance")
+        try rules.number(nextPathTime, "nextPathTime")
+        try rules.number(distanceToGoal, "distanceToGoal")
+        try rules.handleShape(objectHandle)
+        try rules.vector(position, "position")
+        if let roomSourceIndex {
+            try rules.room(roomSourceIndex, "roomSourceIndex")
+        }
+        for enabler in enablers {
+            try rules.number(enabler.value, "value")
+            try rules.number(enabler.percent, "percent")
+            try rules.number(enabler.checkInterval, "checkInterval")
+            try rules.number(enabler.lastCheckTime, "lastCheckTime")
+        }
+    }
+}
+
+extension DallasState {
+    func validateSavedValues(
+        _ rules: SavedValueRules
+    ) throws(GameWorldValidationError) {
+        for userVar in userVars {
+            if case let .float(value) = userVar {
+                try rules.number(value, "userVars")
+            }
+        }
+        for handle in savedObjectHandles {
+            try rules.handleShape(handle)
         }
     }
 }

@@ -281,6 +281,7 @@ final class EditorProjectTests: XCTestCase {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())
         )
+        try document.selectRoom(sourceIndex: 3)
         let alternateTexture = document.project.level.presentationMaterials[0].texture
 
         try document.selectFace(1)
@@ -779,7 +780,7 @@ final class EditorProjectTests: XCTestCase {
         )
         XCTAssertEqual(reopened.project, expectedProject)
         XCTAssertEqual(reopened.selectedRoomSourceIndex, 3)
-        XCTAssertEqual(reopened.camera, .trainingRoom3)
+        XCTAssertEqual(reopened.camera, fixtureStartCamera)
         try reopened.project.validate()
     }
 
@@ -936,7 +937,7 @@ final class EditorProjectTests: XCTestCase {
         document.returnToEditor()
         XCTAssertNil(document.playSession)
         XCTAssertEqual(document.selectedRoomSourceIndex, 3)
-        XCTAssertEqual(document.camera, .trainingRoom3)
+        XCTAssertEqual(document.camera, fixtureStartCamera)
         XCTAssertEqual(
             document.project.level.rooms.first { $0.sourceIndex == 3 }?.name,
             "Course Revised"
@@ -984,6 +985,7 @@ final class EditorProjectTests: XCTestCase {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())
         )
+        try document.selectRoom(sourceIndex: 3)
         let room = try XCTUnwrap(
             document.project.level.rooms.first { $0.sourceIndex == 3 }
         )
@@ -1076,7 +1078,7 @@ final class EditorProjectTests: XCTestCase {
         document.returnToEditor()
         XCTAssertEqual(document.editorSelection, selectionBeforePlay)
         XCTAssertEqual(document.cameraContainingRoomSourceIndex, 3)
-        XCTAssertEqual(document.camera, .trainingRoom3)
+        XCTAssertEqual(document.camera, fixtureStartCamera)
     }
 
     @MainActor
@@ -1110,8 +1112,14 @@ final class EditorProjectTests: XCTestCase {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())
         )
+        try document.selectRoom(sourceIndex: 3)
         try document.selectFace(1)
         let selectionBeforePlay = document.editorSelection
+        let cameraBeforePlay = document.camera
+        XCTAssertEqual(document.cameraContainingRoomSourceIndex, 1)
+        XCTAssertEqual(
+            cameraBeforePlay.position, .init(x: 0.25, y: 0.25, z: 0)
+        )
         let editedTexture = document.project.level.presentationMaterials[0].texture
         try document.setSelectedFaceMaterial(to: editedTexture)
         let object = try XCTUnwrap(
@@ -1134,7 +1142,7 @@ final class EditorProjectTests: XCTestCase {
         document.returnToEditor()
 
         XCTAssertEqual(document.editorSelection, selectionBeforePlay)
-        XCTAssertEqual(document.camera, .trainingRoom3)
+        XCTAssertEqual(document.camera, cameraBeforePlay)
         XCTAssertEqual(document.project.semanticDiff, diffBeforePlay)
         XCTAssertEqual(document.project.level, staged.level)
     }
@@ -1211,6 +1219,7 @@ final class EditorProjectTests: XCTestCase {
         let document = RevivalProjectDocument(
             project: try makeProject(importedBase: makeEditableProjectLevel())
         )
+        try document.selectRoom(sourceIndex: 3)
         document.undoManager?.groupsByEvent = false
         let room3 = document.project.level.rooms.first { $0.sourceIndex == 3 }!
         let face = room3.faces[0]
@@ -1615,7 +1624,118 @@ final class EditorProjectTests: XCTestCase {
         XCTAssertEqual(reopened.project.level, edited)
         XCTAssertEqual(try library.loadActive()?.level, base)
     }
+
+    /// A level that is not the Training level opens at its own player
+    /// start: no room 3, another level key and mission name, and its own
+    /// path. The package still carries the Training script data, because
+    /// that is the only compiled level module a package can name today.
+    @MainActor
+    func testOtherLevelOpensAtItsPlayerStartWithItsOwnNames() throws {
+        let base = makeOutpostEditorLevel()
+        XCTAssertNil(base.rooms.first { $0.sourceIndex == 3 })
+        let start = try XCTUnwrap(base.objects.first {
+            $0.handle == base.defaultPlayerBinding?.objectHandle
+        })
+        let (root, library, activation) = try makeActivatedLibrary(base)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let document = RevivalProjectDocument(
+            project: try RevivalProject(activatedBase: activation),
+            library: library
+        )
+
+        XCTAssertEqual(document.cameraContainingRoomSourceIndex, 41)
+        XCTAssertEqual(document.camera, RoomCamera(
+            position: start.position,
+            target: start.position + start.orientation.forward,
+            up: start.orientation.up
+        ))
+        XCTAssertEqual(document.selectedRoomSourceIndex, 41)
+        XCTAssertEqual(document.editorSelection.face.roomSourceIndex, 41)
+        XCTAssertEqual(document.editorSelection.face.faceIndex, 0)
+        XCTAssertNil(document.editorSelection.portal)
+        try document.selectRoom(sourceIndex: 40)
+        XCTAssertEqual(document.cameraContainingRoomSourceIndex, 41)
+
+        func descendants(of view: NSView) -> [NSView] {
+            [view] + view.subviews.flatMap(descendants)
+        }
+        let controller = RevivalEditorWindowController(document: document)
+        document.addWindowController(controller)
+        defer {
+            document.removeWindowController(controller)
+            controller.close()
+        }
+        let views = descendants(
+            of: try XCTUnwrap(controller.window?.contentView)
+        )
+        XCTAssertTrue(views.contains {
+            $0.accessibilityLabel() == "Outpost Patrol level viewport"
+        })
+        XCTAssertFalse(views.contains {
+            ($0.accessibilityLabel() ?? "").contains("Training")
+                || ($0.accessibilityHelp() ?? "").contains("Training")
+                || ($0.accessibilityHelp() ?? "").contains("room 3")
+        })
+        let pathPopup = try XCTUnwrap(views.compactMap { $0 as? NSPopUpButton }
+            .first { $0.accessibilityLabel() == "Selected game path" })
+        let nodePopup = try XCTUnwrap(views.compactMap { $0 as? NSPopUpButton }
+            .first { $0.accessibilityLabel() == "Selected path node" })
+        XCTAssertEqual(pathPopup.titleOfSelectedItem, "PatrolRoute — Path 0")
+        XCTAssertEqual(nodePopup.selectedItem?.representedObject as? Int, 0)
+    }
+
+
 }
+
+func makeOutpostEditorLevel() -> Level {
+    let base = makeMinimalCanonicalPackageLevel(
+        levelKey: "descent3.level.outpost"
+    )
+    let texture = base.presentationMaterials[0].texture
+    let first = Vector3(x: 100, y: 200, z: 300)
+    let second = Vector3(x: 400, y: 200, z: 300)
+    var objects = base.objects
+    for index in objects.indices {
+        objects[index].location = .room(41)
+        objects[index].position = second
+        objects[index].orientation = .init(
+            right: .init(x: 0, y: 0, z: 1), up: .init(x: 0, y: 1, z: 0),
+            forward: .init(x: -1, y: 0, z: 0)
+        )
+    }
+    let node: (Vector3, Int) -> GamePathNode = { position, room in
+        .init(
+            position: position, location: .room(room), flags: 0,
+            forward: .init(x: 0, y: 0, z: 1), up: .init(x: 0, y: 1, z: 0)
+        )
+    }
+    var level = replacing(
+        base,
+        rooms: [
+            makeSourceContainmentRoom(
+                center: first, texture: texture, sourceIndex: 40,
+                halfExtent: 10
+            ),
+            makeSourceContainmentRoom(
+                center: second, texture: texture, sourceIndex: 41,
+                halfExtent: 10
+            ),
+        ],
+        objects: objects,
+        paths: [.init(
+            name: "PatrolRoute", flags: 0,
+            nodes: [node(first, 40), node(second, 41)]
+        )]
+    )
+    level.missionName = "Outpost Patrol"
+    return packageLevel(level)
+}
+
+private let fixtureStartCamera = RoomCamera(
+    position: RoomCamera.trainingRoom3.position,
+    target: RoomCamera.trainingRoom3.position + Vector3(x: 0, y: 1, z: 0),
+    up: RoomCamera.trainingRoom3.up
+)
 
 func makeProject(importedBase: Level) throws -> RevivalProject {
     let root = FileManager.default.temporaryDirectory
