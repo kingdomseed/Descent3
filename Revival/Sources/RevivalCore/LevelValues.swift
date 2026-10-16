@@ -694,6 +694,8 @@ struct CanonicalShipDefinition: Codable, Equatable, Sendable {
     let source: SourceResource
     let primaryModel: SourceResource
     let presentationSize: Float
+    /// ship.h armor_scalar, read by shippage.cpp:568.
+    var armorScalar: Float = 1
     let physics: CanonicalShipPhysics
     /// The ship page's `static_wb` batteries whose weapons the package
     /// carries, with their energy and ammo use (ship.h). Absent in packages

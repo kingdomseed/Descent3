@@ -19,12 +19,12 @@ final class PresentationImportTests: XCTestCase {
         }
     }
 
-    func testObjectImportPackagesNestedSpewAndDeadPageModels() throws {
+    func testObjectImportPreservesShipArmorAndReachesNestedSpewAndDeadPageModels() throws {
         let names = [
             "Hangturret", "Securityturret(DEAD)", "Energy", "Shield",
             "GuideBot", "Invisiblepowerup", "Helper spew",
         ]
-        var table = makeRetailShipTablePage()
+        var table = makeRetailShipTablePage(armorScalar: 0.5)
         for (index, name) in names.enumerated() {
             table += syntheticGenericPageTable(
                 version: 26, name: name, model: "\(name).oof",
@@ -84,9 +84,49 @@ final class PresentationImportTests: XCTestCase {
         XCTAssertEqual(Set(imported.models.map { $0.source.sourceName }), Set(modelNames))
         XCTAssertEqual(imported.gameModules?.map(\.module), ["aigame"])
         XCTAssertEqual(imported.weapons?.map(\.name), ["Yellow flare", "Child", "Alternate"])
+        let decoded = try JSONDecoder().decode(
+            Level.self, from: canonicalJSONData(imported)
+        )
+        XCTAssertEqual(decoded.shipDefinitions[0].armorScalar, 0.5)
+        var world = GameWorld(level: decoded)
+        let playerHandle = world.testPlayerObject.handle
+        XCTAssertTrue(world.applyDamageToPlayer(
+            playerHandle, damage: 20, level: decoded
+        ))
+        XCTAssertEqual(world.shields, 90)
+        XCTAssertNil(world.playerDeath)
+        world.applyDamageToPlayer(playerHandle, damage: 180, level: decoded)
+        XCTAssertEqual(world.shields, 0)
+        XCTAssertNil(world.playerDeath)
+        world.applyDamageToPlayer(playerHandle, damage: 2, level: decoded)
+        XCTAssertEqual(world.shields, -1)
+        XCTAssertNotNil(world.playerDeath)
         for name in names {
             let info = try XCTUnwrap(imported.objectInfos?.first { $0.name == name })
             XCTAssertEqual(info.presentation?.primaryModel.sourceName, "\(name).oof")
+        }
+    }
+
+    func testShipArmorOverlayPreservesTheMultiplier() throws {
+        let pages = try resolveRetailModelPages(
+            table: makeRetailShipTablePage(armorScalar: 0.5),
+            overlay: makeRetailShipTablePage(armorScalar: 2)
+        )
+        XCTAssertEqual(
+            pages[defaultShipPageName.lowercased()]?.shipDefinition?.armorScalar,
+            2
+        )
+    }
+
+    func testShipArmorRejectsNonfiniteAndNonpositiveRetailValues() {
+        for scalar: Float in [0, -1, .nan, .infinity, -.infinity] {
+            XCTAssertThrowsError(try resolveRetailModelPages(
+                table: makeRetailShipTablePage(armorScalar: scalar),
+                overlay: Data()
+            )) {
+                XCTAssertEqual($0 as? RetailTextureTableError,
+                               .unsupportedPresentation("Pyro-GL"))
+            }
         }
     }
 
@@ -112,6 +152,7 @@ final class PresentationImportTests: XCTestCase {
 
         XCTAssertEqual(definition.name, "Pyro-GL")
         XCTAssertEqual(definition.presentationSize, 6.676084041595459)
+        XCTAssertEqual(definition.armorScalar, 1)
         XCTAssertEqual(definition.physics.mass, 30)
         XCTAssertEqual(definition.physics.drag, 90)
         XCTAssertEqual(definition.physics.fullThrust, 5_400)
@@ -145,6 +186,7 @@ final class PresentationImportTests: XCTestCase {
             .init(
                 index: 10,
                 fireFlags: 0,
+                spewPowerupName: "",
                 energyUsage: 0,
                 ammoUsage: 1,
                 fireMasks: [1, 2],
@@ -434,25 +476,29 @@ private func makeReachedOOFFixture(
     return data
 }
 
-private func makeModelWeaponTablePage(
-    _ name: String, spawn: String = "", alternate: String = ""
+func makeModelWeaponTablePage(
+    _ name: String, spawn: String = "", alternate: String = "",
+    explosion: String = "", particle: String = "", robot: String = "",
+    smoke: String = "", scorch: String = "", icon: String = ""
 ) -> Data {
     var body = Data()
     body.appendUInt16(8)
-    for value in [name, "", "\(name).oof", ""] { body.appendCString(value) }
+    for value in [name, "", "\(name).oof", particle] { body.appendCString(value) }
     body.append(0)
     body.append(Data(count: 12))
     body.appendCString(spawn)
     body.append(spawn.isEmpty ? 0 : 2)
-    body.appendCString("")
+    body.appendCString(robot)
     body.appendCString(alternate)
     body.append(alternate.isEmpty ? 0 : 50)
     body.append(Data(count: 9 * 4 + 4 + 14 * 4 + 1 + 4))
-    body.appendCString("")
+    body.appendCString(explosion)
     body.append(Data(count: 20 * 4 + 4 + 4 + 1 + 1 + 4))
-    for _ in 0..<9 { body.appendCString("") }
+    for _ in 0..<7 { body.appendCString("") }
+    body.appendCString(smoke)
+    body.appendCString(scorch)
     body.appendFloat(0)
-    body.appendCString("")
+    body.appendCString(icon)
     var table = Data([2])
     table.appendUInt32(UInt32(body.count + 4))
     table.append(body)
@@ -504,7 +550,9 @@ private func makePCM16WAV(samples: [Int16]) -> Data {
     return data
 }
 
-private func makeRetailShipTablePage(includeBatteries: Bool = false) -> Data {
+func makeRetailShipTablePage(
+    includeBatteries: Bool = false, armorScalar: Float = 1, spewPowerupName: String = ""
+) -> Data {
     var body = Data()
     body.appendUInt16(6)
     body.appendCString("Pyro-GL")
@@ -532,14 +580,14 @@ private func makeRetailShipTablePage(includeBatteries: Bool = false) -> Data {
     body.appendFloat(8_000)
     body.appendFloat(0.13)
     body.appendFloat(6.676084041595459)
-    body.appendFloat(1)
+    body.appendFloat(armorScalar)
     body.appendInt32(1)
     if includeBatteries {
         for batteryIndex in 0..<21 {
             body.append(0)
             body.appendCString("")
             body.appendCString("")
-            body.appendCString("")
+            body.appendCString(batteryIndex == 0 ? spewPowerupName : "")
             body.appendInt32(0)
             body.appendFloat(0)
             body.appendFloat(batteryIndex == 10 ? 1 : 0)

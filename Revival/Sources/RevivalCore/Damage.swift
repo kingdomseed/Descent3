@@ -11,9 +11,10 @@
 // SetFallingPhysics and SetFlyingPhysics (damage.cpp:1083, :1121; in
 // Fireball+Effects.swift).
 //
-// The armor scalars are 1: the pilot and ship values are not imported yet,
-// and the retail ship pages set 1. The player damage and invulnerability
-// sounds and effects make no draws and are presentation (M2), as are the
+// The player armor scalar remains its InitPlayerNewShip default of 1
+// (Player.cpp:1548); no translated path changes it. The player damage
+// and invulnerability sounds and effects
+// make no draws and are presentation (M2), as are the
 // weapon damage effects (WF_MICROWAVE, WF_NAPALM, WF_FREEZE), which no
 // Training weapon has. The dying player's frames, explosion, spew, and
 // respawn are the death sequence of M2: until then a dying player stays
@@ -104,7 +105,10 @@ extension GameWorld {
             || playerObject.flags & GameObject.destroyableFlag == 0 {
             return false
         }
-        // DecreasePlayerShields (damage.cpp:679).
+        let binding = level.defaultPlayerBinding!
+        let ship = level.shipDefinitions.first { $0.source == binding.ship }!
+        // ApplyDamageToPlayer (damage.cpp:843-847), then DecreasePlayerShields.
+        let damage = damage * ship.armorScalar
         shields -= damage
         if shields < 0 {
             killPlayer(player, killer: killer, level: level)

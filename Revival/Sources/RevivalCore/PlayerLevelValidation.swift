@@ -29,6 +29,8 @@ extension Level {
               }),
               ship.presentationSize.isFinite,
               ship.presentationSize > 0,
+              ship.armorScalar.isFinite,
+              ship.armorScalar > 0,
               Set(ship.physics.behaviors).count == ship.physics.behaviors.count,
               ship.physics.behaviors == [.turnroll, .wiggle, .usesThrust] else {
             throw LevelValidationError.invalidDependency("default player ship definition")

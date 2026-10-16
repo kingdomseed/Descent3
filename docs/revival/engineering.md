@@ -40,11 +40,11 @@ rtk xcodebuild -quiet build -project Revival.xcodeproj -scheme RevivalMobile \
 
 ### Test layout
 
-All tests are in `Revival/Tests/D3ImportTests`. A test file covers one legacy source file or one system, named after it (for example `ObjectTableTests`, `OsirisDispatchTests`, `WeaponFireTests`, `BOATests`, `GameSaveTests`, `D3LV127Tests`, `PresentationImportTests`, `MetalWorldPlanTests`, `RevivalGameplayViewTests`). The Training level module is `TrainingMissionScriptTests`, one class split by lesson (`+Dodge`, `+Robots`, `+GuideBot`, `+LateLessons`) that drives events into synthetic scripted levels. Shared fixtures are in the `*Fixtures.swift` and `SyntheticLevelBuilders.swift` helper files. A synthetic level that a test writes as a package must be schema 13 with level script data: use `makeMinimalCanonicalPackageLevel()` or `packageLevel(_:)`.
+All tests are in `Revival/Tests/D3ImportTests`. A test file covers one legacy source file or one system, named after it (for example `ObjectTableTests`, `OsirisDispatchTests`, `WeaponFireTests`, `BOATests`, `GameSaveTests`, `D3LV127Tests`, `PresentationImportTests`, `MetalWorldPlanTests`, `RevivalGameplayViewTests`). The Training level module is `TrainingMissionScriptTests`, one class split by lesson (`+Dodge`, `+Robots`, `+GuideBot`, `+LateLessons`) that drives events into synthetic scripted levels. Shared fixtures are in the `*Fixtures.swift` and `SyntheticLevelBuilders.swift` helper files. A synthetic level that a test writes as a package must be schema 14 with level script data: use `makeMinimalCanonicalPackageLevel()` or `packageLevel(_:)`.
 
 ### Tests that use real Training content
 
-One variable gates real content: `REVIVAL_TRAINING_PACKAGE`, the path of an imported `training.revival` package (schema 13; import an older package again). Only `TrainingPlaythroughTests` reads it; without it, that one test skips. The Xcode test host cannot read the `Documents` folder, so import into `/private/tmp/` (see below) and pass the variable to the test runner as `TEST_RUNNER_REVIVAL_TRAINING_PACKAGE=<path>/training.revival`.
+One variable gates real content: `REVIVAL_TRAINING_PACKAGE`, the path of an imported `training.revival` package (schema 14; import an older package again). Only `TrainingPlaythroughTests` reads it; without it, that one test skips. The Xcode test host cannot read the `Documents` folder, so import into `/private/tmp/` (see below) and pass the variable to the test runner as `TEST_RUNNER_REVIVAL_TRAINING_PACKAGE=<path>/training.revival`.
 
 ### Import real content
 

@@ -1,6 +1,6 @@
 # Sources, content rights, and corrections
 
-Status: core reference. Updated 2026-09-30.
+Status: core reference. Updated 2026-10-16.
 
 This file records what the port translates from, what content it may use, and which fixes from maintained forks it adopts.
 
@@ -15,7 +15,9 @@ This file records what the port translates from, what content it may use, and wh
 | [apple/game-porting-toolkit](https://github.com/apple/game-porting-toolkit) | `4f42344c90be22112f46becc3fb9687f423f2f88` (plugin `game-porting-skills` 1.0.0-beta.1, Apache-2.0) | Advisory Metal 4 and GameController guidance only. Do not adopt its porting scaffold, C++ bridges, or dual backends. |
 | [Debian game-data-packager](https://salsa.debian.org/games-team/game-data-packager/-/blob/e29aab5e60e3bd02e2f3d7c295e9415a2b41ef9f/data/descent3.yaml) | `e29aab5e` | Cross-check of retail file hashes only. |
 
-### Upstream check 2026-09-29
+### Upstream check 2026-10-16
+
+All three fetched heads are unchanged from the 2026-09-29 check. The source pin and adopted corrections remain unchanged.
 
 - **Descent3** `upstream/main` is at `a3e82bc2` (2026-09-16). The only change after the pin is PR #733: `Descent3/demofile.cpp` `DemoWriteAttachObjRad` now writes `DT_ATTACH_RAD`, not `DT_ATTACH`. This matters only for demo/replay work, and the port must use the corrected record type there. Keep the pin at `156cba8a`. No release was tagged after `v1.5.0`.
 - **PiccuEngine** master is at `4627d77e` (2026-08-27). The 15 commits after the snapshot are portability changes only (64-bit types, include fixes, registry). Nothing to adopt.

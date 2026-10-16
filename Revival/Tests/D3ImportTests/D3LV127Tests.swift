@@ -513,8 +513,166 @@ final class D3LV127Tests: XCTestCase {
             XCTAssertEqual(
                 resolved.map(\.name), ["shared page 0", "shared page 7"]
             )
-            XCTAssertEqual(resolved.map(\.storedIndex), [0, 7])
+            XCTAssertEqual(resolved.map(\.storedIndex), [1, 8])
         }
+    }
+
+    func testTextureSlotsReserveTheBuiltInSampleTexture() throws {
+        let table = makeSimpleTextureTablePage(
+            name: "Rainbow Texture", bitmapSourceName: "rainbow.ogf", flags: 0
+        )
+        let resolved = try resolveRetailTextureDefinitions(
+            table: table, overlay: Data(), names: ["Rainbow Texture"]
+        )
+
+        XCTAssertEqual(resolved.map(\.storedIndex), [1])
+        XCTAssertEqual(try retailTexturePageCount(table: table, overlay: Data()), 2)
+    }
+
+    func testDestroyedTextureAllocatesBeforeTheNextTablePage() throws {
+        let table = makeSimpleTextureTablePage(
+            name: "intact", bitmapSourceName: "intact.ogf", flags: 128,
+            destroyedTextureName: "broken"
+        ) + makeSimpleTextureTablePage(
+            name: "middle", bitmapSourceName: "shared.ogf", flags: 0
+        ) + makeSimpleTextureTablePage(
+            name: "broken", bitmapSourceName: "shared.ogf", flags: 0
+        )
+        let resolved = try resolveRetailTextureDefinitions(
+            table: table, overlay: Data(), names: ["intact", "middle", "broken"]
+        )
+
+        XCTAssertEqual(resolved.map(\.name), ["broken", "intact", "middle"])
+        XCTAssertEqual(resolved.map(\.storedIndex), [2, 1, 3])
+        let shared = try resolveRetailTextureShowingBitmap(
+            table: table, overlay: Data(), bitmapName: "shared.ogf"
+        )
+        XCTAssertEqual(shared?.name, "broken")
+    }
+
+    func testUnnamedTextureStillOccupiesItsLegacySlot() throws {
+        let table = makeSimpleTextureTablePage(name: "", bitmapSourceName: "unnamed.ogf", flags: 0)
+            + makeSimpleTextureTablePage(name: "next", bitmapSourceName: "next.ogf", flags: 0)
+        let resolved = try resolveRetailTextureDefinitions(table: table, overlay: Data(), names: ["next"])
+        XCTAssertEqual(resolved.map(\.storedIndex), [2])
+        XCTAssertEqual(try retailTexturePageCount(table: table, overlay: Data()), 3)
+    }
+
+    func testDestroyedTextureCycleAllocatesEachNameOnceAndSelfClearsDestroyable() throws {
+        let table = makeSimpleTextureTablePage(
+            name: "A", bitmapSourceName: "a.ogf", flags: 128, destroyedTextureName: "B"
+        ) + makeSimpleTextureTablePage(
+            name: "B", bitmapSourceName: "b.ogf", flags: 128, destroyedTextureName: "a"
+        ) + makeSimpleTextureTablePage(
+            name: "Self", bitmapSourceName: "self.ogf", flags: 128, destroyedTextureName: "SELF"
+        )
+        let pages = try allocateRetailTexturePages(table: table, overlay: Data())
+        XCTAssertEqual(pages.mapValues(\.storedIndex), ["a": 1, "b": 2, "self": 3])
+        XCTAssertEqual(pages["self"]?.flags, 0)
+        XCTAssertEqual(try retailTexturePageCount(table: Data(), overlay: Data()), 1)
+    }
+
+    func testWeaponDependenciesAllocateTexturesInLegacyCallOrder() throws {
+        var table = makeModelWeaponTablePage(
+            "Root", spawn: "Child", alternate: "Alternate", explosion: "Explosion",
+            particle: "Particle", robot: "Robot", smoke: "Smoke", scorch: "Scorch", icon: "Icon"
+        )
+        table += makeSimpleTextureTablePage(name: "Middle", bitmapSourceName: "middle.ogf", flags: 0)
+        table += makeModelWeaponTablePage("Child", explosion: "Child explosion")
+        table += makeModelWeaponTablePage("Alternate", explosion: "Alternate explosion")
+        table += syntheticGenericPageTable(version: 26, name: "Robot", flags: 1, weapon: "Robot shot")
+        table += makeModelWeaponTablePage("Robot shot", explosion: "Robot explosion")
+        let names = ["Explosion", "Particle", "Child explosion", "Alternate explosion",
+                     "Robot explosion", "Smoke", "Scorch", "Icon"]
+        for name in names {
+            table += makeSimpleTextureTablePage(name: name, bitmapSourceName: "\(name).ogf", flags: 0)
+        }
+        let resolved = try resolveRetailTextureDefinitions(
+            table: table, overlay: Data(), names: Set(names + ["Middle"])
+        )
+        XCTAssertEqual(Dictionary(uniqueKeysWithValues: resolved.map { ($0.name, $0.storedIndex) }), [
+            "Explosion": 1, "Particle": 2, "Child explosion": 3, "Alternate explosion": 4,
+            "Robot explosion": 5, "Smoke": 6, "Scorch": 7, "Icon": 8, "Middle": 9,
+        ])
+    }
+
+    func testShipLoadsEveryBatteryBeforeItsSpewPowerups() throws {
+        var table = makeRetailShipTablePage(includeBatteries: true, spewPowerupName: "Powerup")
+        table += makeSimpleTextureTablePage(name: "middle", bitmapSourceName: "middle.ogf", flags: 0)
+        table += makeModelWeaponTablePage("Concussion", explosion: "concussion")
+        table += makeModelWeaponTablePage("Yellow flare", explosion: "flare")
+        table += syntheticGenericPageTable(version: 26, name: "Powerup", flags: 1, weapon: "Spew shot")
+        table += makeModelWeaponTablePage("Spew shot", explosion: "spew")
+        for name in ["concussion", "flare", "spew"] {
+            table += makeSimpleTextureTablePage(name: name, bitmapSourceName: "\(name).ogf", flags: 0)
+        }
+        let pages = try allocateRetailTexturePages(table: table, overlay: Data())
+        XCTAssertEqual(pages.mapValues(\.storedIndex), [
+            "concussion": 1, "flare": 2, "spew": 3, "middle": 4,
+        ])
+    }
+
+    func testGenericOverlayRetainsItsOriginalWeaponAllocationCapability() throws {
+        for (baseFlags, overlayFlags, expected): (UInt32, UInt32, [String: Int]) in [
+            (0, 1, ["middle": 1, "explosion": 2]),
+            (1, 0, ["middle": 2, "explosion": 1]),
+        ] {
+            let base = syntheticGenericPageTable(version: 26, name: "Robot", flags: baseFlags)
+            let overlay = syntheticGenericPageTable(
+                version: 26, name: "Robot", flags: overlayFlags, weapon: "Shot"
+            ) + makeSimpleTextureTablePage(name: "middle", bitmapSourceName: "middle.ogf", flags: 0)
+                + makeModelWeaponTablePage("Shot", explosion: "explosion")
+                + makeSimpleTextureTablePage(name: "explosion", bitmapSourceName: "explosion.ogf", flags: 0)
+            let pages = try allocateRetailTexturePages(table: base, overlay: overlay)
+            XCTAssertEqual(pages.mapValues(\.storedIndex), expected)
+        }
+    }
+
+    func testTextureFallbackUsesTheOriginalByteCursorInExtraTable() throws {
+        let root = makeSimpleTextureTablePage(
+            name: "intact", bitmapSourceName: "intact.ogf", flags: 128, destroyedTextureName: "broken"
+        )
+        let middle = makeSimpleTextureTablePage(name: "middle", bitmapSourceName: "middle.ogf", flags: 0)
+        let broken = makeSimpleTextureTablePage(name: "broken", bitmapSourceName: "broken.ogf", flags: 0)
+        for (paddingLength, brokenIndex, middleIndex) in [(root.count, 2, 3), (root.count - 1, 3, 2)] {
+            var padding = Data([0])
+            padding.appendLittleEndian(UInt32(paddingLength - 1))
+            padding.append(Data(count: paddingLength - 5))
+            let pages = try allocateRetailTexturePages(table: root + middle, overlay: padding + broken)
+            XCTAssertEqual(pages.mapValues(\.storedIndex), [
+                "intact": 1, "broken": brokenIndex, "middle": middleIndex,
+            ])
+        }
+    }
+
+    func testOverlayReplacementStartsItsDependencyLookupAtZero() throws {
+        let base = makeSimpleTextureTablePage(name: "intact", bitmapSourceName: "intact.ogf", flags: 0)
+        let dependency = makeSimpleTextureTablePage(name: "broken", bitmapSourceName: "broken.ogf", flags: 0)
+        var padding = Data([0])
+        padding.appendLittleEndian(UInt32(base.count + dependency.count + 20))
+        padding.append(Data(count: base.count + dependency.count + 16))
+        let overlay = padding + makeSimpleTextureTablePage(
+            name: "intact", bitmapSourceName: "new.ogf", flags: 128, destroyedTextureName: "broken"
+        ) + makeSimpleTextureTablePage(name: "middle", bitmapSourceName: "middle.ogf", flags: 0)
+            + dependency
+        let pages = try allocateRetailTexturePages(table: base, overlay: overlay)
+        XCTAssertEqual(pages.mapValues(\.storedIndex), ["intact": 1, "broken": 2, "middle": 3])
+        XCTAssertEqual(pages["intact"]?.bitmapSourceName, "new.ogf")
+    }
+
+    func testMegacellAllocatesTexturesBeforeTheFollowingPage() throws {
+        var body = Data()
+        body.appendLittleEndian(UInt16(2))
+        body.appendCString("Cell")
+        for index in 0..<64 { body.appendCString(index == 0 ? "cell texture" : "INVALID IMAGE NAME") }
+        body.append(contentsOf: [8, 8])
+        var table = Data([8])
+        table.appendLittleEndian(UInt32(body.count + 4))
+        table.append(body)
+        table += makeSimpleTextureTablePage(name: "middle", bitmapSourceName: "middle.ogf", flags: 0)
+        table += makeSimpleTextureTablePage(name: "cell texture", bitmapSourceName: "cell.ogf", flags: 0)
+        let pages = try allocateRetailTexturePages(table: table, overlay: Data())
+        XCTAssertEqual(pages.mapValues(\.storedIndex), ["middle": 2, "cell texture": 1])
     }
 
     func testOverlayReplacementKeepsTheReplacedStoredIndex() throws {
@@ -534,7 +692,7 @@ final class D3LV127Tests: XCTestCase {
         )
 
         XCTAssertEqual(resolved.map(\.name), ["three", "Two"])
-        XCTAssertEqual(resolved.map(\.storedIndex), [2, 1])
+        XCTAssertEqual(resolved.map(\.storedIndex), [3, 2])
         XCTAssertEqual(resolved.map(\.bitmapSourceName), ["three.ogf", "two-new.ogf"])
     }
 
@@ -553,7 +711,7 @@ final class D3LV127Tests: XCTestCase {
                 table: table, overlay: overlay, names: ["other", "shared"]
             )
             XCTAssertEqual(resolved.map(\.name), ["first", "second"])
-            XCTAssertEqual(resolved.map(\.storedIndex), [0, 1])
+            XCTAssertEqual(resolved.map(\.storedIndex), [1, 2])
         }
     }
 
@@ -578,9 +736,9 @@ final class D3LV127Tests: XCTestCase {
             animationFrameNames: { _ in nil }
         )
 
-        XCTAssertEqual(slots["shared"]?.storedIndex, 0)
-        XCTAssertEqual(slots["low"]?.storedIndex, 0)
-        XCTAssertEqual(slots["high"]?.storedIndex, 1)
+        XCTAssertEqual(slots["shared"]?.storedIndex, 1)
+        XCTAssertEqual(slots["low"]?.storedIndex, 1)
+        XCTAssertEqual(slots["high"]?.storedIndex, 2)
     }
 
     /// FindTextureBitmapName (Descent3/gametexture.cpp:372) compares each
@@ -610,7 +768,7 @@ final class D3LV127Tests: XCTestCase {
         XCTAssertEqual(slots["flashers000"]?.name, "red flare")
         XCTAssertEqual(slots["flashers001"]?.name, "red flare")
         XCTAssertEqual(slots["energy.tga1"]?.name, "energy")
-        XCTAssertEqual(slots["energy.tga1"]?.storedIndex, 2)
+        XCTAssertEqual(slots["energy.tga1"]?.storedIndex, 3)
         // Each vclip is read once.
         XCTAssertEqual(asked, ["Flashers.oaf"])
         XCTAssertThrowsError(try resolveRetailModelTextureSlots(
@@ -659,7 +817,7 @@ final class D3LV127Tests: XCTestCase {
 
         let shared = try XCTUnwrap(resolved.sharedFireImages["shot.oaf"])
         XCTAssertEqual(shared.name, "Foo")
-        XCTAssertEqual(shared.storedIndex, 0)
+        XCTAssertEqual(shared.storedIndex, 1)
         XCTAssertEqual(shared.bitmapSourceName, "Shot.oaf")
     }
 
@@ -1513,13 +1671,14 @@ private func makeTextureTablePage(
 }
 
 private func makeSimpleTextureTablePage(
-    name: String, bitmapSourceName: String, flags: UInt32
+    name: String, bitmapSourceName: String, flags: UInt32,
+    destroyedTextureName: String = ""
 ) -> Data {
     var body = Data()
     body.appendLittleEndian(UInt16(7))
     body.appendCString(name)
     body.appendCString(bitmapSourceName)
-    body.appendCString("")
+    body.appendCString(destroyedTextureName)
     body.appendFloat(0)
     body.appendFloat(0)
     body.appendFloat(0)

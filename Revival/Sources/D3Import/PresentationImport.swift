@@ -687,7 +687,7 @@ func resolveRetailTextureShowingBitmap(
 /// index no page uses.
 func retailTexturePageCount(table: Data, overlay: Data) throws -> Int {
     let pages = try mergedRetailTexturePages(table: table, overlay: overlay)
-    return (pages.byName.values.map(\.storedIndex).max() ?? -1) + 1
+    return (pages.byName.values.map(\.storedIndex).max() ?? 0) + 1
 }
 
 private struct MergedRetailTexturePages {
@@ -699,24 +699,7 @@ private func mergedRetailTexturePages(
     table: Data,
     overlay: Data
 ) throws -> MergedRetailTexturePages {
-    let basePages = try parseRetailTexturePages(table)
-    let overlayPages = try parseRetailTexturePages(overlay)
-    var pageByName: [String: RetailTexturePage] = [:]
-    for page in basePages {
-        let key = page.name.lowercased()
-        guard pageByName[key] == nil else { continue }
-        pageByName[key] = page
-    }
-    var nextStoredIndex = (basePages.map(\.storedIndex).max() ?? -1) + 1
-    for page in overlayPages {
-        let key = page.name.lowercased()
-        if let replaced = pageByName[key] {
-            pageByName[key] = page.replacingStoredIndex(replaced.storedIndex)
-        } else {
-            pageByName[key] = page.replacingStoredIndex(nextStoredIndex)
-            nextStoredIndex += 1
-        }
-    }
+    let pageByName = try allocateRetailTexturePages(table: table, overlay: overlay)
     // FindTextureBitmapName (Descent3/gametexture.cpp:372) scans the texture
     // slots in index order, so the lowest-indexed page that shows a bitmap
     // wins. Scan in stored-index order, never in Dictionary order.
@@ -742,23 +725,25 @@ private func resolvedRetailTexturePage(
     return page
 }
 
-private struct RetailTexturePage {
+struct RetailTexturePage {
     let storedIndex: Int
     let name: String
     let bitmapSourceName: String
+    let destroyedTextureName: String
     let lightColor: Vector3
     let coronaType: UInt8
-    let flags: UInt32
+    var flags: UInt32
     let alpha: Float
     let procedural: RetailProceduralPage?
 }
 
-private extension RetailTexturePage {
+extension RetailTexturePage {
     func replacingStoredIndex(_ index: Int) -> RetailTexturePage {
         .init(
             storedIndex: index,
             name: name,
             bitmapSourceName: bitmapSourceName,
+            destroyedTextureName: destroyedTextureName,
             lightColor: lightColor,
             coronaType: coronaType,
             flags: flags,
@@ -768,7 +753,7 @@ private extension RetailTexturePage {
     }
 }
 
-private struct RetailProceduralPage {
+struct RetailProceduralPage {
     let lighting: UInt8
     let thickness: UInt8
     let evaluationIntervalSeconds: Float
@@ -776,7 +761,7 @@ private struct RetailProceduralPage {
     let elements: [RetailProceduralElement]
 }
 
-private struct RetailProceduralElement {
+struct RetailProceduralElement {
     let type: UInt8
     let frequency: UInt8
     let speed: UInt8
@@ -787,7 +772,7 @@ private struct RetailProceduralElement {
     let y2: UInt8
 }
 
-private func parseRetailTexturePages(_ data: Data) throws -> [RetailTexturePage] {
+func parseRetailTexturePages(_ data: Data) throws -> [RetailTexturePage] {
     var offset = 0
     var pages: [RetailTexturePage] = []
     var textureIndex = 0
@@ -807,7 +792,7 @@ private func parseRetailTexturePages(_ data: Data) throws -> [RetailTexturePage]
             }
             let name = try cursor.readCString(allowEmpty: true)
             let bitmapSourceName = try cursor.readCString(allowEmpty: true)
-            _ = try cursor.readCString(allowEmpty: true)
+            let destroyedTextureName = try cursor.readCString(allowEmpty: true)
             let red = try cursor.readFloat()
             let green = try cursor.readFloat()
             let blue = try cursor.readFloat()
@@ -862,20 +847,19 @@ private func parseRetailTexturePages(_ data: Data) throws -> [RetailTexturePage]
             _ = try cursor.readCString(allowEmpty: true)
             _ = try cursor.readFloat()
             try cursor.requireEnd()
-            if !name.isEmpty {
-                pages.append(
-                    RetailTexturePage(
-                        storedIndex: textureIndex,
-                        name: name,
-                        bitmapSourceName: bitmapSourceName,
-                        lightColor: .init(x: red, y: green, z: blue),
-                        coronaType: coronaType,
-                        flags: flags,
-                        alpha: alpha,
-                        procedural: procedural
-                    )
+            pages.append(
+                RetailTexturePage(
+                    storedIndex: textureIndex,
+                    name: name,
+                    bitmapSourceName: bitmapSourceName,
+                    destroyedTextureName: destroyedTextureName,
+                    lightColor: .init(x: red, y: green, z: blue),
+                    coronaType: coronaType,
+                    flags: flags,
+                    alpha: alpha,
+                    procedural: procedural
                 )
-            }
+            )
             textureIndex += 1
         }
         offset += 1 + length
@@ -1142,6 +1126,10 @@ struct RetailWeaponPresentationSelection:
     let lightDistance: Float
     let lightPresentation: ObjectLightPresentation
     let soundLogicalNames: [String]
+    var robotSpawnName: String = ""
+    var smokeTextureName: String = ""
+    var scorchTextureName: String = ""
+    var iconTextureName: String = ""
 }
 
 func resolveRetailWeaponPresentation(
@@ -1167,7 +1155,7 @@ func resolveRetailWeaponPresentation(
     return selection
 }
 
-private func parseRetailWeaponPresentations(
+func parseRetailWeaponPresentations(
     _ data: Data
 ) throws -> [RetailWeaponPresentationSelection] {
     var offset = 0
@@ -1207,7 +1195,7 @@ private func parseRetailWeaponPresentations(
             let weaponFlags = try cursor.readUInt32()
             let timeoutSpawnName = try cursor.readCString(allowEmpty: true)
             let timeoutSpawnCount = Int(try cursor.readUInt8())
-            _ = try cursor.readCString(allowEmpty: true)
+            let robotSpawnName = try cursor.readCString(allowEmpty: true)
             let alternateSpawnName = try cursor.readCString(allowEmpty: true)
             let alternateSpawnChance = Int(try cursor.readUInt8())
             _ = try cursor.readFloat()
@@ -1271,10 +1259,10 @@ private func parseRetailWeaponPresentations(
             let soundLogicalNames = try (0..<7).map { _ in
                 try cursor.readCString(allowEmpty: true)
             }
-            _ = try cursor.readCString(allowEmpty: true)
-            _ = try cursor.readCString(allowEmpty: true)
+            let smokeTextureName = try cursor.readCString(allowEmpty: true)
+            let scorchTextureName = try cursor.readCString(allowEmpty: true)
             _ = try cursor.readFloat()
-            _ = try cursor.readCString(allowEmpty: true)
+            let iconTextureName = try cursor.readCString(allowEmpty: true)
             try cursor.requireEnd()
             pages.append(.init(
                 storedIndex: weaponIndex,
@@ -1323,7 +1311,11 @@ private func parseRetailWeaponPresentations(
                     angle: lightAngle,
                     lightingRenderType: lightRenderType
                 ),
-                soundLogicalNames: soundLogicalNames
+                soundLogicalNames: soundLogicalNames,
+                robotSpawnName: robotSpawnName,
+                smokeTextureName: smokeTextureName,
+                scorchTextureName: scorchTextureName,
+                iconTextureName: iconTextureName
             ))
             weaponIndex += 1
         }
@@ -1332,7 +1324,7 @@ private func parseRetailWeaponPresentations(
     return pages
 }
 
-private func readTableUInt32(_ data: Data, at offset: Int) -> UInt32 {
+func readTableUInt32(_ data: Data, at offset: Int) -> UInt32 {
     UInt32(data[offset])
         | UInt32(data[offset + 1]) << 8
         | UInt32(data[offset + 2]) << 16
@@ -1418,6 +1410,7 @@ struct RetailModelPageSelection: Equatable, Sendable {
 struct RetailShipDefinition: Equatable, Sendable {
     let name: String
     let presentationSize: Float
+    let armorScalar: Float
     let physics: CanonicalShipPhysics
     /// `static_wb`, all MAX_WBS_PER_OBJ (21), with their fire flags.
     let weaponBatteries: [RetailShipWeaponBattery]?
@@ -1429,6 +1422,7 @@ struct RetailShipDefinition: Equatable, Sendable {
 struct RetailShipWeaponBattery: Equatable, Sendable {
     let index: Int
     let fireFlags: UInt8
+    let spewPowerupName: String
     let energyUsage: Float
     let ammoUsage: Float
     let fireMasks: [UInt8]
@@ -1475,7 +1469,7 @@ func resolveRetailModelPages(
     return pages
 }
 
-private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelection] {
+func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelection] {
     var offset = 0
     var pages: [RetailModelPageSelection] = []
     while offset < data.count {
@@ -1501,7 +1495,7 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                 let lowDistance = try cursor.readFloat()
                 let physics = try cursor.readCanonicalShipPhysics()
                 let presentationSize = try cursor.readFloat()
-                _ = try cursor.readFloat()
+                let armorScalar = try cursor.readFloat()
                 _ = try cursor.readInt32()
                 let playerWeaponBindings = try cursor.isAtEnd
                     ? nil
@@ -1512,7 +1506,9 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                       mediumDistance > 0,
                       lowDistance > mediumDistance,
                       presentationSize.isFinite,
-                      presentationSize > 0 else {
+                      presentationSize > 0,
+                      armorScalar.isFinite,
+                      armorScalar > 0 else {
                     throw RetailTextureTableError.unsupportedPresentation(name)
                 }
                 pages.append(
@@ -1527,6 +1523,7 @@ private func parseRetailModelPages(_ data: Data) throws -> [RetailModelPageSelec
                         shipDefinition: .init(
                             name: name,
                             presentationSize: presentationSize,
+                            armorScalar: armorScalar,
                             physics: physics,
                             weaponBatteries: playerWeaponBindings
                         ),
@@ -1665,7 +1662,7 @@ private extension RetailPageCursor {
             let fireFlags = try readUInt8()
             _ = try readCString(allowEmpty: true)
             _ = try readCString(allowEmpty: true)
-            _ = try readCString(allowEmpty: true)
+            let spewPowerupName = try readCString(allowEmpty: true)
             _ = try readInt32()
             let energyUsage = try readFloat()
             let ammoUsage = try readFloat()
@@ -1698,6 +1695,7 @@ private extension RetailPageCursor {
             batteries.append(.init(
                 index: batteryIndex,
                 fireFlags: fireFlags,
+                spewPowerupName: spewPowerupName,
                 energyUsage: energyUsage,
                 ammoUsage: ammoUsage,
                 fireMasks: Array(firingMasks.prefix(count)),

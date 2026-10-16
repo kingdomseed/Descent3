@@ -6,11 +6,11 @@ Keep this file short. When you finish an item, tick it and edit "Current state".
 
 ## Current state
 
-- **Milestone:** M1 runtime foundation is complete on `codex/finish-m1`. M0 is pushed; M1 remains local. The original checkout and its local changes are preserved.
-- **Runtime:** Training uses the general object table, Osiris events, DALLAS API, AI, weapons, inventory, and goals. Package schema is 13. GameSave schema is 3. There are no bespoke Training package fields.
-- **Verified:** 544 Release tests passed with fresh retail content, with no failures or skips. Mac, editor, and mobile builds passed. Sol xhigh reviewed the save, editor, model, and recent-fire auto-level changes. Astra high granted the M1 exit pass after checking native completion, source fidelity, tests, and builds.
+- **Milestone:** M1 runtime foundation is complete and pushed on `codex/finish-m1`. M2 continues from `22bbadba` on `codex/m2-game-tables`; table identities and ship armor are complete. The original checkout and its local changes are preserved.
+- **Runtime:** Training uses the general object table, Osiris events, DALLAS API, AI, weapons, inventory, and goals. Package schema is 14 and requires the ship armor scalar. GameSave schema is 3. There are no bespoke Training package fields.
+- **Verified:** the M2 texture-identity and ship-armor change passes 559 Release tests with a fresh schema-14 retail import, with no failures or skips. This includes the canonical Training trace. Mac, editor, and unsigned mobile builds pass. Sol xhigh found no actionable defects and judged the change proportionate.
 - **Native:** the fresh-import run completed Training through ordinary controls and app-written saves. All Training checkpoints passed, including Guide-Bot return, Camera Monitor use, both powerups, RASBot1–4, LastBot1–5, and the final goal. The app showed "Mission Successful" with 2,400 points, 12 enemies killed, and zero deaths. Pilot completion was saved and the result acknowledged. The app is closed and the original app state is restored.
-- **Next:** M2 campaign systems. Recheck upstream and fork heads, run the bounded Sol caller scan, then import the full game tables. Push and tags require owner authorization. M1 evidence, the success screenshot, and app-written checkpoints are in ignored `runtime-data/revival-evidence/m1-close-20261016/`.
+- **Next:** pair the missing robot animation data with its general firing consumer. The three fetched source heads are unchanged. Full M2 combat, world systems, and the native attack/death/respawn proof remain open. Push and tags require owner authorization. Evidence is in ignored `runtime-data/revival-evidence/m2-game-tables-20261016/`; the M1 success proof remains in `m1-close-20261016/` on its delivery worktree.
 - **Rendering evidence:** native creation and deletion ran with Metal API and shader validation and no logged errors. A separate five-frame GPU capture records pipelines, bindings, and residency calls. Its replay image has missing surfaces compared with the live view; the cause is unresolved, so the replay image is not visual proof.
 - **Toolchain:** Xcode 27.1 release, build 27A9275, Swift 6.4, macOS 27.0.1. The Metal component is installed. The deployment floor remains macOS and iOS 26.
 
@@ -27,11 +27,23 @@ Keep this file short. When you finish an item, tick it and edit "Current state".
 | M6 | **Mercenary** | `AIGame3` and Merc 1–7 play start to finish. Confirm which game module Mercenary binds to. |
 | M7 | **1.0 release (Mac)** | First-run import UX. Release build on the M4 at 1920×1080: 99th-percentile frame time ≤ 16.7 ms and no frame over 33 ms outside level load, in Training, the largest indoor level, and the largest outdoor level. Every level in the checklist is at `V`, with the executed playthrough results recorded. Every item in the `product.md` acceptance list is checked. Signed and notarized app. No open P1/P2 defects. |
 
-M2 game-tables note: Texture slot order: legacy dependency loading (manage/texpage.cpp:1006) can allocate a later texture early; D3Import uses table ordinal order. Translate the allocation order when the full page tables are imported.
+M2 game-table fields stay in the existing concrete definition tables. Import each missing field with its consumer.
 
 After 1.0: P1 iPhone/iPad, P2 creator suite, P3 multiplayer, P4 replay/demos, P5 enhanced graphics (see `product.md`).
 
 At the start of every milestone: recheck the upstream and fork heads (`sources.md` section 1), and run a bounded GPT-6.1 Sol sweep of the legacy files the milestone touches, looking for missed callers and dependencies. At the end of every milestone: a Codex `gpt-6-astra` high verification of the exit criteria (`engineering.md` section 6), then tag `revival-mN` when the owner authorizes it.
+
+## Next work: M2 campaign systems
+
+First unit exit: the importer assigns texture identities in the legacy dependency-allocation order, preserves base and overlay precedence, and loads the resulting Training package through the canonical consumer. Focused tests fail before and pass after. The full suite and all three app builds pass before commit. No retail input enters product targets or Git.
+
+- [x] **1. Source refresh and caller scan.** Recheck the three source heads and open work. Trace table allocation and import dependencies before changing the package shape.
+- [x] **2. Table identities.** Replace texture table ordinals with the source allocation order. Keep the current concrete page types and canonical consumer.
+- [x] **2a. Ship armor.** Preserve the retail ship armor scalar and apply it through the existing player-damage path. Change the required package schema with the data contract; reimport, with no compatibility decoder.
+- [ ] **3. Full game tables.** Import the remaining page data required by general weapons, objects, ships, powerups, sound, and doors. Add each consumer with its data; do not build unused tables first.
+- [ ] **4. General combat and object frame.** Complete movement/control, collision, robot fire, player death and respawn, inventory, and difficulty in source order.
+- [ ] **5. World systems and audio.** Complete doors, triggers, matcens, goals, fuel centers, force fields, and sound.
+- [ ] **6. M2 exit.** RASBot1 attacks and can kill the player, and the player respawns, through general code. Full suite, native proof, and Astra high exit verification pass.
 
 ## Completed M1 runtime foundation
 

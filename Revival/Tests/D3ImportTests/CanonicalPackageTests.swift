@@ -37,11 +37,7 @@ final class CanonicalPackageTests: XCTestCase {
         XCTAssertNil(requests.startNextIfIdle())
     }
 
-    /// A package holds only the current schema, whose level carries its
-    /// script data (Level.validateForPackage): the writer refuses a
-    /// script-free schema 11 level, and the loader and the library refuse a
-    /// package whose level is schema 11 or 12.
-    func testPackageBoundaryRefusesSchemasBeforeThirteen() throws {
+    func testPackageBoundaryRefusesSchemasBeforeFourteen() throws {
         let root = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -72,19 +68,59 @@ final class CanonicalPackageTests: XCTestCase {
         XCTAssertThrowsError(try library.installAndActivate(from: package)) {
             XCTAssertTrue(isInvalidIdentity($0))
         }
-        // The current level marked schema 12 (with its script data).
-        var levelObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: canonicalJSONData(current))
+        for oldSchema in [12, 13] {
+            var levelObject = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: canonicalJSONData(current))
+                    as? [String: Any]
+            )
+            levelObject["schemaVersion"] = oldSchema
+            try overwriteCanonicalPackageLevelData(
+                JSONSerialization.data(withJSONObject: levelObject, options: [.sortedKeys]),
+                identity: current,
+                at: package
+            )
+            XCTAssertThrowsError(try loadCanonicalLevel(from: package)) {
+                XCTAssertTrue(isInvalidIdentity($0))
+            }
+            XCTAssertThrowsError(try library.installAndActivate(from: package)) {
+                XCTAssertTrue(isInvalidIdentity($0))
+            }
+        }
+    }
+
+    func testPackageRequiresShipArmorAndLoadedDamageUsesItsValue() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        var level = makeMinimalCanonicalPackageLevel()
+        level.shipDefinitions[0].armorScalar = 2
+        try writeCanonicalPackage(level, to: root)
+        let loaded = try loadCanonicalLevel(from: root)
+        XCTAssertEqual(loaded.shipDefinitions[0].armorScalar, 2)
+        var world = GameWorld(level: loaded)
+        world.makePlayerVulnerable()
+        XCTAssertTrue(world.applyDamageToPlayer(
+            world.testPlayerObject.handle, damage: 60, level: loaded
+        ))
+        XCTAssertEqual(world.shields, -20)
+        XCTAssertNotNil(world.playerDeath)
+
+        var encoded = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: canonicalJSONData(level))
                 as? [String: Any]
         )
-        levelObject["schemaVersion"] = 12
+        var ships = try XCTUnwrap(encoded["shipDefinitions"] as? [[String: Any]])
+        ships[0].removeValue(forKey: "armorScalar")
+        encoded["shipDefinitions"] = ships
         try overwriteCanonicalPackageLevelData(
-            JSONSerialization.data(withJSONObject: levelObject, options: [.sortedKeys]),
-            identity: current,
-            at: package
+            JSONSerialization.data(withJSONObject: encoded, options: [.sortedKeys]),
+            identity: level, at: root
         )
-        XCTAssertThrowsError(try loadCanonicalLevel(from: package)) {
-            XCTAssertTrue(isInvalidIdentity($0))
+        XCTAssertThrowsError(try loadCanonicalLevel(from: root)) {
+            guard case let DecodingError.keyNotFound(key, _) = $0 else {
+                return XCTFail("Expected missing armorScalar, got \($0)")
+            }
+            XCTAssertEqual(key.stringValue, "armorScalar")
         }
     }
 
@@ -457,8 +493,6 @@ final class CanonicalPackageTests: XCTestCase {
         XCTAssertEqual(try loadCanonicalLevel(from: firstPackage), level)
     }
 
-    /// A schema 13 level always stores its sound clip table (schemas 10
-    /// and later); a package level without it is refused.
     func testPackageLevelWithoutItsSoundClipTableIsRefused() throws {
         let level = makeMinimalCanonicalPackageLevel()
         let package = FileManager.default.temporaryDirectory

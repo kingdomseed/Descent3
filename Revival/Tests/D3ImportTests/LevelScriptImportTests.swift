@@ -1,5 +1,5 @@
 // Tests for the generic level script data in the canonical package
-// (package schema 13). Legacy sources: Descent3/Mission.cpp:1686
+// Legacy sources: Descent3/Mission.cpp:1686
 // InitLevelScript, Descent3/OsirisLoadandBind.cpp:884 and :1427,
 // Descent3/LoadLevel.cpp:1718, manage/generic.cpp:1083,
 // manage/doorpage.cpp:261, and the message-file reader generated in every

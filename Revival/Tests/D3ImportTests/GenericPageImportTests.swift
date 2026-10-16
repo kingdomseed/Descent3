@@ -67,7 +67,8 @@ final class GenericPageImportTests: XCTestCase {
 /// One PAGETYPE_GENERIC page of `version` in a table file.
 func syntheticGenericPageTable(
     version: UInt16, name: String = "Synthetic Robot", model: String = "robot.oof",
-    spew: String? = nil, explodeSound: String = "ExplodeSound", module: String = ""
+    spew: String? = nil, explodeSound: String = "ExplodeSound", module: String = "",
+    flags: UInt32 = 0, weapon: String = ""
 ) -> Data {
     var page = Data()
     func u8(_ value: UInt8) { page.append(value) }
@@ -113,7 +114,7 @@ func syntheticGenericPageTable(
     f32(5)                                  // size
     zeros(4 + 12 + 4 + 4 + 4 + 12 + 4 + 4 + 1 + 1) // lighting chunk
     zeros(4)                                // hit points
-    u32(0)                                  // flags
+    u32(flags)                              // flags
     zeros(4 + 4)                            // AI flags, class, types
     zeros(4 * 4)                            // fov, velocities, turn rate
     u32(0)                                  // notify flags
@@ -132,7 +133,7 @@ func syntheticGenericPageTable(
         zeros(8 * (1 + 4 + 16))
         zeros(1 + 2 + 1 + 4 + 4 + 4 + 2 + 1)
     }
-    for _ in 0..<(21 * 8) { string("") }    // weapon names
+    for _ in 0..<(21 * 8) { string(weapon) } // weapon names
     string("Sound0")
     string(explodeSound)
     if version < 26 { string("ObsoleteSound") }

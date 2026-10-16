@@ -119,11 +119,7 @@ struct Level: Codable, Equatable, Sendable {
         self.sourceChunks = sourceChunks
     }
 
-    /// Package schema 13: the generic level script data, with no
-    /// level-specific fields. Schema 12 packages held the Training-specific
-    /// fields and a Guide-Bot placed by the importer; they are refused and
-    /// must be imported again.
-    static let scriptedSchemaVersion = 13
+    static let scriptedSchemaVersion = 14
 
     /// The current package schema with the generic level script data.
     func addingScripting(_ scripting: LevelScripting) -> Level {
@@ -156,7 +152,6 @@ struct Level: Codable, Equatable, Sendable {
     }
 
     private func validate(allowImportStagingPresentation: Bool) throws {
-        // Schemas 9-11 have no script data. Schema 12 is refused (reimport).
         guard (
             schemaVersion == 9
             || (

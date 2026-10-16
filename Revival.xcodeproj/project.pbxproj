@@ -304,6 +304,7 @@
 		1EA64A0C9178EECAF40BCE2F /* ImportSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2241C85122ED30DE45F0552 /* ImportSources.swift */; };
 		178E0A29105B54E9E2F53A02 /* StringTableImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */; };
 		7B1400000000000000000001 /* GenericPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B14000000000000000000F0 /* GenericPage.swift */; };
+		7B1600000000000000000001 /* RetailTableAllocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B16000000000000000000F0 /* RetailTableAllocation.swift */; };
 		7A0700000000000000000001 /* LevelScriptImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A07000000000000000000F0 /* LevelScriptImport.swift */; };
 		DFE07CD4F288FB838FD3AC2E /* GameModuleImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5FB7807FD8D90F8A5164FD /* GameModuleImport.swift */; };
 		946035E764B199D768657E7E /* ObjectPresentationImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D25E689CAA2F2DD085E6C3 /* ObjectPresentationImport.swift */; };
@@ -312,6 +313,7 @@
 		B60EAAC0B16E2AD92C0B1AE9 /* ImportSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2241C85122ED30DE45F0552 /* ImportSources.swift */; };
 		832676DCE450A4DD63378622 /* StringTableImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */; };
 		7B1400000000000000000002 /* GenericPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B14000000000000000000F0 /* GenericPage.swift */; };
+		7B1600000000000000000002 /* RetailTableAllocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B16000000000000000000F0 /* RetailTableAllocation.swift */; };
 		7A0600000000000000000005 /* LevelScripting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A06000000000000000000F0 /* LevelScripting.swift */; };
 		7A0600000000000000000004 /* LevelScripting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A06000000000000000000F0 /* LevelScripting.swift */; };
 		7A0600000000000000000003 /* LevelScripting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A06000000000000000000F0 /* LevelScripting.swift */; };
@@ -589,6 +591,7 @@
 		C2241C85122ED30DE45F0552 /* ImportSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportSources.swift; sourceTree = "<group>"; };
 		D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringTableImport.swift; sourceTree = "<group>"; };
 		7B14000000000000000000F0 /* GenericPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenericPage.swift; sourceTree = "<group>"; };
+		7B16000000000000000000F0 /* RetailTableAllocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetailTableAllocation.swift; sourceTree = "<group>"; };
 		7A06000000000000000000F0 /* LevelScripting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScripting.swift; sourceTree = "<group>"; };
 		7A05000000000000000000F0 /* LevelScriptImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelScriptImportTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
@@ -778,6 +781,7 @@
 				C2241C85122ED30DE45F0552 /* ImportSources.swift */,
 				D4BD2EC9922DCA7CE28D3EE8 /* StringTableImport.swift */,
 				7B14000000000000000000F0 /* GenericPage.swift */,
+				7B16000000000000000000F0 /* RetailTableAllocation.swift */,
 				B2000000000000000000000B /* D3ImportOperation.swift */,
 				C20000000000000000000001 /* PresentationImport.swift */,
 				B20000000000000000000005 /* D3LV127.swift */,
@@ -1183,6 +1187,7 @@
 				B60EAAC0B16E2AD92C0B1AE9 /* ImportSources.swift in Sources */,
 				832676DCE450A4DD63378622 /* StringTableImport.swift in Sources */,
 				7B1400000000000000000002 /* GenericPage.swift in Sources */,
+				7B1600000000000000000002 /* RetailTableAllocation.swift in Sources */,
 				7A0600000000000000000001 /* LevelScripting.swift in Sources */,
 				7A1100000000000000000001 /* AIMain.swift in Sources */,
 				7B1100000000000000000005 /* Object+Frame.swift in Sources */,
@@ -1484,6 +1489,7 @@
 				1EA64A0C9178EECAF40BCE2F /* ImportSources.swift in Sources */,
 				178E0A29105B54E9E2F53A02 /* StringTableImport.swift in Sources */,
 				7B1400000000000000000001 /* GenericPage.swift in Sources */,
+				7B1600000000000000000001 /* RetailTableAllocation.swift in Sources */,
 				7A0600000000000000000004 /* LevelScripting.swift in Sources */,
 				7A1100000000000000000004 /* AIMain.swift in Sources */,
 				7B1100000000000000000002 /* Object+Frame.swift in Sources */,

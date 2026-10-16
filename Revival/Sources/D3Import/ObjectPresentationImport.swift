@@ -192,6 +192,7 @@ extension Level {
                 source: shipSource,
                 primaryModel: primaryModel,
                 presentationSize: retailShip.presentationSize,
+                armorScalar: retailShip.armorScalar,
                 physics: retailShip.physics
             )
         }

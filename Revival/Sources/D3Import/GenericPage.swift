@@ -254,6 +254,9 @@ private func readRetailGenericPage(
             try cursor.skip(16)               // animation times and frames
         }
         let numberOfMasks = Int(try cursor.readUInt8())
+        guard numberOfMasks <= 8 else {
+            throw GenericPageImportError.invalidValue("weapon battery mask count")
+        }
         let aimingGunpointIndex = Int(try cursor.readUInt16())
         let aimingFlags = try cursor.readUInt8()
         let aiming3DDot = try cursor.readFloat()

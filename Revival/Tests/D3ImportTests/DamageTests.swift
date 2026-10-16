@@ -9,6 +9,26 @@ import XCTest
 final class DamageTests: XCTestCase {
     private let robot = ObjectHandle(4_112)
 
+    func testWeaponCollisionAppliesShipArmorBeforeShieldAndDeathChecks() throws {
+        for (scalar, remainingShields, dies): (Float, Float, Bool) in [
+            (0.5, 0, false), (1, -3.75, true), (2, -11.25, true),
+        ] {
+            var level = makeTrainingRobotGuidebotLevel()
+            level.shipDefinitions[0].armorScalar = scalar
+            var world = GameWorld(level: level)
+            world.shields = 3.75
+            let shot = try XCTUnwrap(world.fireWeaponFromObject(
+                robot, weaponName: "Laser Level 2 - Blue", gunpoint: -1,
+                forceForward: true, forceTarget: false, level: level
+            ))
+            world.collideTwoObjects(shot, world.testPlayerObject.handle, level: level)
+            XCTAssertEqual(world.shields, remainingShields)
+            XCTAssertEqual(world.playerDeath != nil, dies)
+            XCTAssertEqual(world.playerDeathsLevel, dies ? 1 : 0)
+            XCTAssertNotEqual(world.objects[shot]!.flags & GameObject.deadFlag, 0)
+        }
+    }
+
     /// collide_generic_and_weapon (collide.cpp:2155): a blue laser bolt
     /// does 7.5 generic damage, scaled by Rookie's Diff_robot_damage of
     /// 1.5; its custom explosion and 3 to 8 sparks are made, and it dies.

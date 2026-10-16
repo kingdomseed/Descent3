@@ -47,10 +47,6 @@ let fixtureTrainingMessages = [
     ("GBExtra", "Now recall the Guidebot by pressing F4 and selecting \"Return to Ship\".  Move to the next area when he returns."),
 ].map { LevelScriptMessage(name: $0.0, text: $0.1) }
 
-/// The level with Training script data (package schema 13), so the world
-/// loads the Training level module. Every scriptable object gets a binding,
-/// as D3Import writes one. The level keeps every other field. It validates
-/// only when the level holds the clips the Training module names.
 func addingTrainingMissionScripting(
     _ level: Level, messages: [LevelScriptMessage] = fixtureTrainingMessages
 ) -> Level {
@@ -518,8 +514,6 @@ extension GameSession {
     }
 }
 
-/// A synthetic level as a package holds it (schema 13): the Training level
-/// script data, bound again to the level's objects.
 func packageLevel(_ level: Level) -> Level {
     // Drop the audio records of clips a rebuilt level no longer holds, so
     // the padding is added once.

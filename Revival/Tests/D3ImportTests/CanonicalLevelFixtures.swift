@@ -291,8 +291,6 @@ func makeMinimalCanonicalPackageLevel(
             maximumTurnrollRate: 8_000, turnrollRatio: 0.13
         )
     )
-    // Package schema 13: the level script data of the one compiled level
-    // script, with silent clips for its streams and sounds.
     return addingTrainingMissionScripting(Level(
         missionKey: base.missionKey,
         levelKey: base.levelKey,

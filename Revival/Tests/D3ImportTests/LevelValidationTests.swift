@@ -587,6 +587,18 @@ final class LevelValidationTests: XCTestCase {
         }
     }
 
+    func testRejectsNonfiniteAndNonpositiveShipArmor() {
+        var level = makeSliceSixObjectRenderLevel()
+        for scalar: Float in [0, -1, .nan, .infinity, -.infinity] {
+            level.shipDefinitions[0].armorScalar = scalar
+            assertValidationError(
+                .invalidDependency("default player ship definition"), level
+            )
+        }
+        level.shipDefinitions[0].armorScalar = 0.5
+        XCTAssertNoThrow(try level.validate())
+    }
+
     func testRejectsUsesThrustPlayerShipWithoutPositiveDrag() {
         let level = makeSliceSixObjectRenderLevel()
         let ship = level.shipDefinitions[0]

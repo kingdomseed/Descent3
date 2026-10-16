@@ -1,12 +1,5 @@
 import XCTest
 
-// The retail-gated trace: the imported Training package
-// (REVIVAL_TRAINING_PACKAGE, the path of a schema 13 `training.revival`,
-// engineering.md section 2) played lesson by lesson through the Osiris
-// runtime, the AIGame Guide-Bot, the generic weapons, and the stored BOA
-// tables. Every synthetic test of the same scripts stays in
-// TrainingMissionScriptTests and the system test files; this trace checks
-// that the real level, pages, strings, and sounds reach them.
 final class TrainingPlaythroughTests: XCTestCase {
     func testImportedTrainingPackagePlaysTheTrainingMission() throws {
         guard let path = ProcessInfo.processInfo.environment[
