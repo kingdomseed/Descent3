@@ -67,6 +67,38 @@ final class WeaponFireTests: XCTestCase {
         return state
     }
 
+    func testEvaderFiresItsUnturretedBurstThroughFramesAndDamagesThePlayer() throws {
+        let level = makeNonAnimatedRobotFireLevel()
+        try level.validate()
+        let session = GameSession(level: level, presentationReadyTimestamp: 0,
+                                  authoritativeRandomSeed: seed)
+        prepareNonAnimatedRobotFire(session)
+        let enemy = ObjectHandle(4_112)
+        var shots: [(time: Float, mask: Int)] = []
+        var previousFireTime: Float = -1
+        var sawProjectile = false
+        for frame in 1...60 {
+            _ = session.update(at: Double(frame) * 0.1, input: .zero)
+            let battery = try XCTUnwrap(session.world.objects[enemy]?.weaponBatteries.first)
+            if battery.lastFireTime != previousFireTime {
+                shots.append((battery.lastFireTime, battery.currentFiringMask))
+                previousFireTime = battery.lastFireTime
+            }
+            sawProjectile = sawProjectile || session.world.objects.contains {
+                $0.type == .weapon && $0.parent == enemy
+            }
+        }
+        XCTAssertTrue(sawProjectile)
+        XCTAssertGreaterThan(shots.count, 4)
+        XCTAssertEqual(Array(shots.prefix(5).map(\.mask)), [1, 2, 3, 0, 1])
+        for (index, pair) in zip(shots, shots.dropFirst()).prefix(4).enumerated() {
+            XCTAssertEqual(pair.1.time - pair.0.time,
+                           index == 3 ? 2.4 : 0.2, accuracy: 0.11)
+        }
+        XCTAssertLessThan(session.world.shields, 100)
+        XCTAssertNil(session.world.playerDeath)
+    }
+
     // MARK: Firing
 
     /// FireFlareFromPlayer: the flare key fires the ship's FLARE_INDEX

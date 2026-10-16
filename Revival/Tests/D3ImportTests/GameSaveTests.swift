@@ -3,6 +3,21 @@ import XCTest
 // GameSave continuation contract, structural load validation, and durable
 // writes (architecture.md section 7).
 final class GameSaveTests: XCTestCase {
+    func testSavedEvaderContinuesItsBurstAndProjectileCollisions() throws {
+        try assertSaveContinuation(
+            level: makeNonAnimatedRobotFireLevel(),
+            prepare: prepareNonAnimatedRobotFire,
+            firstInput: .zero, warmupFrames: 17, followFrames: 40,
+            atSave: { session in
+                let robot = session.world.objects[ObjectHandle(4_112)]!
+                XCTAssertGreaterThan(robot.weaponBatteries[0].lastFireTime, 0)
+                XCTAssertTrue(session.world.objects.contains {
+                    $0.type == .weapon && $0.parent == robot.handle
+                })
+            }
+        )
+    }
+
     func testSavedWorldAdvancesIdenticallyAfterMidOpeningLesson() throws {
         try assertSaveContinuation(
             level: makeTrainingMovingTargetHandoffLevel(),

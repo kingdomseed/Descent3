@@ -13,16 +13,6 @@
 // setup (Descent3/ObjInit.cpp:807). ai_move is in AIMain+Move.swift and
 // ai_fire in AIMain+Fire.swift.
 //
-// Scope (M1 step 6). AIDoFrame runs its memory, target, vision, register,
-// goal, and movement steps for every enabled AI object, with their ps_rand
-// draws; only stationary turrets (AIT_STATIONARY_TURRET) fire, and the
-// other AI types fire with the rest of ai_move in M2. Not yet here: animation
-// (ai_do_animation) and walking, the render feedback AIFrameAll gives
-// (AI_RenderedList, AIN_PLAYER_SEES_YOU), AI sounds, AIDoTrackFrame
-// (flocks and tracked friends), AIDoFreud, attached children, and
-// multiplayer. BOA_IsVisible is the reciprocal-portal component of the
-// room (architecture.md section 9).
-
 import Foundation
 
 extension GameWorld {
@@ -310,8 +300,7 @@ extension GameWorld {
 
     // MARK: Frame
 
-    /// AIDoFrame (AImain.cpp:6024) for one CT_AI object. See the file notes
-    /// for the steps translated so far.
+    /// AIDoFrame (AImain.cpp:6024) for one CT_AI object.
     mutating func aiDoFrame(_ handle: ObjectHandle, level: Level) {
         guard let object = objects[handle], var ai = object.ai,
               object.type != .dummy,
@@ -335,9 +324,6 @@ extension GameWorld {
             aiCheckTargetVis(handle, level: level)
         }
         aiUpdateRegisters(handle, level: level)
-        // Scope (M1 step 6): only stationary turrets fire; the other AI
-        // types fire with the rest of ai_move in M2.
-        let fires = ai.aiType == ObjectAIFrame.stationaryTurretType
         guard let current = objects[handle]?.ai else { return }
         if current.awareness != 0
             || current.flags & ObjectAIFrame.persistentFlag != 0 {
@@ -345,7 +331,7 @@ extension GameWorld {
             osirisCallEvent(handle, .aiFrame, level: level)
             goalDoFrame(handle, level: level)
             aiMove(handle, level: level)
-            if fires, let fire = objects[handle]?.ai,
+            if let fire = objects[handle]?.ai,
                fire.statusRegister & ObjectAIFrame.meleeStatus == 0,
                fire.flags & ObjectAIFrame.disableFiringFlag == 0 {
                 aiFire(handle, level: level)

@@ -187,3 +187,85 @@ func activeFollowPath(_ world: GameWorld, _ handle: UInt32) -> Int? {
         $0.used && $0.type == AIGoal.followPathType
     }?.pathID
 }
+
+func makeNonAnimatedRobotFireLevel() -> Level {
+    var level = replacing(makeMinimalCanonicalPackageLevel(), schemaVersion: 11)
+    level.gameModules = nil
+    let player = level.objects[0]
+    let model = level.models[0].source
+    let definition = SourceResource(storedIndex: 106, sourceName: "Firing flyer")
+    let room = makeSourceContainmentRoom(
+        center: player.position, texture: level.presentationMaterials[0].texture,
+        sourceIndex: 3, halfExtent: 500
+    )
+    level = replacing(
+        level, rooms: [room], objects: [player, .fixture(
+            handle: 4_112, type: 2, storedID: 106, definition: definition,
+            name: "Firing flyer", location: .room(3),
+            position: player.position - player.orientation.forward * 60,
+            orientation: player.orientation
+        )], objectPresentations: level.objectPresentations + [.fixture(4_112, model)],
+        dependencyManifest: .init(
+            current: level.dependencyManifest.current + [.init(
+                category: "object-definition", source: definition,
+                state: "identity-recorded", provenance: "synthetic firing fixture"
+            )], historicalEagerBaseline: nil
+        )
+    )
+    level = level.addingObjectInfo(.init(
+        name: definition.sourceName, type: 2, flags: 5, size: 4, hitPoints: 55,
+        lightDistance: 0, lighting: fixtureNoLight,
+        ai: fixtureAIInfo(flags: 0x0200_8fc0, aiType: 2, movementType: 1,
+                          fov: 0, notifyFlags: 0x5150, fireSpread: 0.05),
+        weaponBatteries: [.init(
+            gunpointWeapons: ["Laser Level 1 - Red"],
+            fireMasks: [1, 1, 1, 1], fireWaits: [2.4, 0.2, 0.2, 0.2],
+            fireSounds: ["", "", "", ""], aimingGunpointIndex: 0,
+            aimingFlags: 0, aiming3DDot: 0.9, aiming3DDistance: 1_000,
+            aimingXZDot: 0.9, flags: 0, quadFireMask: 0
+        )]
+    )).addingWeapon(.init(
+        name: "Laser Level 1 - Red", flags: 0x8002_0000, model: model,
+        size: 1, customSize: 0.5, mass: 0.1, drag: 0.1,
+        physicsFlags: 0x20_1800, speed: 200, fullThrust: 0, lifetime: 5,
+        playerDamage: 6.75, genericDamage: 6.75,
+        sounds: Array(repeating: "", count: 7)
+    )).settingModelGuns(
+        model, gunpoints: [.init(parent: 0, position: .init(x: 0, y: 0, z: 8),
+                                 normal: .init(x: 0, y: 0, z: 1))],
+        batteries: [.init(gunpoints: [0], turrets: [])]
+    )
+    let hull = makeSourceContainmentRoom(
+        center: .zero, texture: level.presentationMaterials.last!.texture,
+        sourceIndex: 0, halfExtent: 6
+    )
+    let original = level.models[0]
+    level.models[0] = .init(
+        source: original.source, collisionRadius: 10.4,
+        submodels: [.init(
+            sourceIndex: 0, parentIndex: nil, offset: .zero,
+            vertices: hull.vertices.map { .init(position: $0, alpha: 1) },
+            faces: hull.faces.map { face in .init(
+                normal: canonicalFaceNormal(room: hull, face: face)! * -1,
+                corners: face.corners.reversed().map {
+                    .init(vertexIndex: $0.vertexIndex, u: $0.u, v: $0.v)
+                }, material: .texture(face.texture)
+            ) }, presentation: .standard
+        )], bounds: .init(minimum: .init(x: -6, y: -6, z: -6),
+                          maximum: .init(x: 6, y: 6, z: 6)),
+        sourceArchive: original.sourceArchive, sourceSHA256: original.sourceSHA256,
+        gunpoints: original.gunpoints, weaponBatteries: original.weaponBatteries
+    )
+    return level
+}
+
+func prepareNonAnimatedRobotFire(_ session: GameSession) {
+    let handle = ObjectHandle(4_112)
+    let player = session.world.testPlayerObject
+    session.world.objects[handle]?.ai?.targetHandle = player.handle
+    session.world.objects[handle]?.ai?.awareness = ObjectAIFrame.awareMostly
+    session.world.objects[handle]?.ai?.lastSeeTargetTime = 0
+    session.world.objects[handle]?.ai?.lastHearTargetTime = 0
+    session.world.objects[handle]?.ai?.lastSeeTargetPosition = player.position
+    session.world.makePlayerVulnerable()
+}
