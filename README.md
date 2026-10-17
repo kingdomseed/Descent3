@@ -2,7 +2,7 @@
 
 A native Apple version of Descent 3, translated from the GPL-released C++ source into Swift 6.4 and Metal 4. You need your own retail copy of the game. A one-way importer converts it into Revival's content format.
 
-**Status:** Pilot Training plays to completion on Mac. The work now moves Training onto a general game runtime, then brings up the full campaign. See [the plan](docs/revival/plan.md).
+**Status:** Pilot Training plays to completion on Mac through the general game runtime. Campaign systems are in progress. See [the plan](docs/revival/plan.md).
 
 ## Build
 
