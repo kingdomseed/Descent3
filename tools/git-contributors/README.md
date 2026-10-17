@@ -1,5 +1,7 @@
 # git-contributors.py
 
+> **Legacy reference utility.** This script regenerates the retained C++ engine's HOG credits. It is not the Revival release-note, attribution, or publishing workflow.
+
 **git-contributors.py** - script to generate contributors list from git history.
 
 ## Requirements
@@ -9,10 +11,14 @@
 
 ## Usage
 
-Just run `git-contributors.py`, review and commit `scripts/data/fullhog/oscredits.txt`.
-You're now awesome.
+```sh
+cd tools/git-contributors
+python3 git-contributors.py
+```
 
-**Remember regenerate file before releasing new version!**
+Review and commit `scripts/data/fullhog/oscredits.txt` only when maintaining the retained C++ reference release.
+
+Regenerate the file before a retained C++ reference release.
 
 ## Customization
 

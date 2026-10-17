@@ -1,0 +1,1165 @@
+import XCTest
+
+// The retained Metal world plan (RevivalMetal/MetalWorldPlan.swift): rooms,
+// objects, weapons, effects, lights, coronas, the cloak, the popup view's
+// auxiliary camera, and plan updates.
+
+final class MetalWorldPlanTests: XCTestCase {
+    func testBillboardUsesThePlayersRightHandDirection() {
+        let corona = WorldLightCorona(
+            roomSourceIndex: 0, faceIndex: 0, assetIndex: 0,
+            center: .init(x: 0, y: 0, z: 10), size: 1,
+            firstVertex: .zero, normal: .init(x: 0, y: 0, z: -1),
+            tint: .init(x: 1, y: 1, z: 1), blend: .opaque
+        )
+        let vertices = makeMetalLightCoronaVertices(
+            corona,
+            camera: .init(position: .zero, target: .init(x: 0, y: 0, z: 1),
+                          up: .init(x: 0, y: 1, z: 0)),
+            imageWidth: 1, imageHeight: 1, opacity: 1
+        )
+        XCTAssertEqual(vertices.map(\.position), [
+            .init(-1, 1, 10, 1), .init(1, 1, 10, 1),
+            .init(1, -1, 10, 1), .init(-1, -1, 10, 1)
+        ])
+    }
+
+    func testObjectsCreatedAfterStartAndReusedSlotsDrawCurrentPageModels() throws {
+        var level = makeSliceSixObjectRenderLevel()
+        let placed = level.objects.first { $0.handle == 12_300 }!
+        var page = CanonicalObjectInfo(
+            name: "Created object", type: 11, flags: 0, size: 1,
+            hitPoints: 100, lightDistance: 0, lighting: fixtureNoLight,
+            ai: nil, weaponBatteries: []
+        )
+        page.presentation = .init(
+            primaryModel: level.models[4].source, mediumModel: nil,
+            lowModel: nil, dyingModel: nil, mediumDistance: nil, lowDistance: nil
+        )
+        var replacement = CanonicalObjectInfo(
+            name: "Replacement object", type: 11, flags: 0, size: 1,
+            hitPoints: 100, lightDistance: 0, lighting: fixtureNoLight,
+            ai: nil, weaponBatteries: []
+        )
+        replacement.presentation = .init(
+            primaryModel: level.models[3].source, mediumModel: nil,
+            lowModel: nil, dyingModel: nil, mediumDistance: nil, lowDistance: nil
+        )
+        level.objectInfos = [page, replacement]
+        var world = GameWorld(level: level)
+        let initial = try makeMetalWorldPlan(
+            level: level, camera: .trainingRoom3, startRoomSourceIndex: 3
+        )
+        let created = world.objCreate(
+            type: .clutter, id: 0, room: 3, position: placed.position,
+            orientation: placed.orientation, parent: .none, level: level
+        )
+        XCTAssertNotEqual(created, .none)
+        let updated = try updateMetalWorldPlan(
+            initial, level: level, objects: world.objects, roomStates: world.rooms,
+            playerView: .init(playerID: 0, objectHandle: 2_048, roomSourceIndex: 3,
+                              camera: .trainingRoom3, collisionRadius: 1)
+        )
+        let first = updated.draws.filter { $0.objectHandle == created.rawValue }
+        XCTAssertFalse(first.isEmpty)
+        XCTAssertFalse(initial.hasSamePreparedGeometry(as: updated))
+        let stable = try updateMetalWorldPlan(updated, camera: .trainingRoom3)
+        XCTAssertTrue(updated.hasSamePreparedGeometry(as: stable))
+        XCTAssertEqual(Set(first.compactMap(\.model)), [level.models[4].source])
+        XCTAssertEqual(updated.activeDrawIndices.map { updated.preparedDraws[$0] }, updated.draws)
+        world.objects.delete(created)
+        let reused = world.objCreate(
+            type: .clutter, id: 1, room: 3, position: placed.position,
+            orientation: placed.orientation, parent: .none, level: level
+        )
+        XCTAssertEqual(reused.slot, created.slot)
+        XCTAssertNotEqual(reused, created)
+        let replaced = try updateMetalWorldPlan(
+            updated, level: level, objects: world.objects, roomStates: world.rooms,
+            playerView: .init(playerID: 0, objectHandle: 2_048, roomSourceIndex: 3,
+                              camera: .trainingRoom3, collisionRadius: 1)
+        )
+        let second = replaced.draws.filter { $0.objectHandle == reused.rawValue }
+        XCTAssertFalse(second.isEmpty)
+        XCTAssertEqual(Set(second.compactMap(\.model)), [level.models[3].source])
+        XCTAssertFalse(replaced.preparedDraws.contains { $0.objectHandle == created.rawValue })
+        XCTAssertEqual(replaced.preparedDraws.count, updated.preparedDraws.count)
+    }
+
+    func testFastPlayerHeadlightLightsRetainedVisibleObjectDraw() throws {
+        let level = makeFastPlayerHeadlightLevel()
+        let simulation = GameSession(
+            level: level, presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(
+            at: 0.1, input: .init(togglesHeadlight: true)
+        )
+        let initial = try makeMetalWorldPlan(
+            level: simulation.runtimeLevel, playerView: frame.playerView
+        )
+        let baseline = initial.draws.first {
+            $0.objectHandle == 12_301
+        }!
+        let lit = try updateMetalWorldPlan(
+            initial, level: simulation.level, objects: simulation.world.objects,
+            roomStates: simulation.world.rooms, playerView: frame.playerView,
+            playerFastHeadlight: frame.playerFastHeadlight
+        )
+        let litObject = try XCTUnwrap(lit.draws.first {
+            $0.objectHandle == 12_301
+        })
+        XCTAssertTrue(
+            zip(litObject.vertices, baseline.vertices).contains {
+                $0.0.dynamicLight.x > $0.1.dynamicLight.x
+                    && $0.0.dynamicLight.y > $0.1.dynamicLight.y
+                    && $0.0.dynamicLight.z > $0.1.dynamicLight.z
+            }
+        )
+
+        let monitorLevel = scriptingTrainingCameraMonitorLevel(
+            makeTrainingCameraMonitorLevel(), guideBot: false
+        )
+        let monitorSimulation = GameSession(
+            level: monitorLevel, presentationReadyTimestamp: 0
+        )
+        let used = monitorSimulation.takeAndUseCameraMonitor(at: 0.1)
+        let monitor = try XCTUnwrap(used.popupView)
+        let monitorInitial = try makeMetalWorldPlan(
+            level: monitorLevel, playerView: used.playerView
+        )
+        let monitorBaseline = try updateMetalWorldPlan(
+            monitorInitial, level: monitorLevel,
+            objects: ObjectTable(level: monitorLevel),
+            roomStates: RoomState.canonical(monitorLevel),
+            playerView: used.playerView, popupView: monitor
+        )
+        let auxiliaryOnlyIndex = try XCTUnwrap(
+            monitorBaseline.auxiliaryActiveDrawIndices.first {
+                !monitorBaseline.activeDrawIndices.contains($0)
+                    && !monitorBaseline.preparedDraws[$0].vertices.isEmpty
+            }
+        )
+        let auxiliaryTarget = try XCTUnwrap(
+            monitorBaseline.preparedDraws[auxiliaryOnlyIndex]
+                .vertices.first?.position
+        )
+        let auxiliaryLit = try updateMetalWorldPlan(
+            monitorBaseline,
+            level: monitorLevel,
+            objects: ObjectTable(level: monitorLevel),
+            roomStates: RoomState.canonical(monitorLevel),
+            playerView: used.playerView,
+            popupView: monitor,
+            playerFastHeadlight: .init(
+                roomSourceIndex: monitor.roomSourceIndex,
+                position: .init(
+                    x: auxiliaryTarget.x, y: auxiliaryTarget.y,
+                    z: auxiliaryTarget.z
+                ),
+                lightDistance: 20
+            )
+        )
+        XCTAssertTrue(
+            zip(
+                auxiliaryLit.preparedDraws[auxiliaryOnlyIndex].vertices,
+                monitorBaseline.preparedDraws[auxiliaryOnlyIndex].vertices
+            ).contains {
+                $0.0.dynamicLight.x > $0.1.dynamicLight.x
+                    && $0.0.dynamicLight.y > $0.1.dynamicLight.y
+                    && $0.0.dynamicLight.z > $0.1.dynamicLight.z
+            }
+        )
+    }
+
+    /// The player's laser bolts are weapon objects, drawn through the
+    /// retained weapon-object path (RT_WEAPON).
+    func testPlayerLaserWeaponObjectsUseRetainedObjectDrawPath() throws {
+        let level = makeTrainingMovingTargetHandoffLevel()
+        let session = GameSession(level: level, presentationReadyTimestamp: 0)
+        let frame = session.update(at: 0.01, input: .zero)
+        session.world.fireWeaponFromPlayer(
+            session.world.testPlayerObject.handle,
+            weaponType: PlayerWeaponState.primary, isDown: true, downTime: 0.01,
+            level: level
+        )
+        let laser = try XCTUnwrap(
+            level.weapon(named: "Laser Level 2 - Blue")?.model
+        )
+        XCTAssertEqual(
+            session.world.objects.filter { $0.type == .weapon }.count,
+            2
+        )
+        let initial = try makeMetalWorldPlan(
+            level: level, playerView: frame.playerView
+        )
+        let updated = try updateMetalWorldPlan(
+            initial, level: level, objects: session.world.objects,
+            roomStates: session.world.rooms, playerView: frame.playerView
+        )
+        let expectedVertexPositions = extractWeaponObjectDrawItems(
+            level, objects: session.world.objects,
+            camera: frame.playerView.camera
+        ).filter { $0.model == laser }.flatMap {
+            $0.vertices.map(\.position)
+        }
+
+        let actualVertexPositions = updated.draws.filter {
+            $0.model == laser
+        }.flatMap {
+            $0.vertices.map {
+                Vector3(x: $0.position.x, y: $0.position.y, z: $0.position.z)
+            }
+        }
+        XCTAssertFalse(actualVertexPositions.isEmpty)
+        XCTAssertEqual(actualVertexPositions, expectedVertexPositions)
+    }
+
+    /// A weapon light DoObjectLight cast lights the world, and the
+    /// explosion and line-spark visual effects use the prepared quads.
+    func testWeaponLightExplosionAndSparkDrawsReachRetainedPlan() throws {
+        let level = try makePlayerConcussionLevel()
+        var world = GameWorld(level: level)
+        let playerView = defaultPlayerView(in: level)
+        let concussion = try XCTUnwrap(level.weapon(named: "Concussion"))
+        let frames = try XCTUnwrap(concussion.explosion?.frames)
+        let initial = try makeMetalWorldPlan(
+            level: level, playerView: playerView
+        )
+        XCTAssertTrue(initial.preparedDraws.contains {
+            $0.objectHandle == UInt32.max - 7_000
+                && $0.texture == frames[0]
+        })
+        XCTAssertTrue(initial.preparedDraws.contains {
+            $0.objectHandle == UInt32.max - 8_000
+        })
+
+        world.playerWeapons[PlayerWeaponState.secondary].index =
+            PlayerWeaponState.concussionIndex
+        world.fireWeaponFromPlayer(
+            world.testPlayerObject.handle,
+            weaponType: PlayerWeaponState.secondary, isDown: true,
+            downTime: 0.1, level: level
+        )
+        let missile = try XCTUnwrap(world.objects.first { $0.type == .weapon })
+        let position = playerView.camera.position
+        let explosion = BillboardFrame(
+            roomSourceIndex: playerView.roomSourceIndex, position: position,
+            size: 10, texture: frames[0], opacity: 1
+        )
+        let lighting = try XCTUnwrap(concussion.lighting)
+        let light = ObjectLightRequest(
+            roomSourceIndex: playerView.roomSourceIndex,
+            position: missile.position,
+            distance: try XCTUnwrap(concussion.lightDistance) * 1.5,
+            color: lighting.primaryColor, direction: nil, directionalDot: 0
+        )
+        let spark = VisEffectLineSparkFrame(
+            roomSourceIndex: playerView.roomSourceIndex, start: position,
+            end: .init(x: position.x + 1, y: position.y, z: position.z)
+        )
+        let updated = try updateMetalWorldPlan(
+            initial, level: level, objects: world.objects,
+            roomStates: world.rooms, playerView: playerView,
+            visEffectBillboards: [explosion], visEffectLineSparks: [spark],
+            objectLights: [light]
+        )
+        // The Concussion's page light is (1, 0.5, 0.25).
+        XCTAssertTrue(updated.draws.contains { draw in
+            draw.model == concussion.model
+                && draw.vertices.contains {
+                    $0.dynamicLight.x > 0 && $0.dynamicLight.y > 0
+                        && $0.dynamicLight.z > 0
+                }
+        })
+        XCTAssertNotNil(missile.weapon)
+        XCTAssertTrue(updated.draws.contains {
+            $0.objectHandle == UInt32.max - 7_000
+                && $0.texture == frames[0]
+        })
+        XCTAssertTrue(updated.draws.contains {
+            $0.objectHandle == UInt32.max - 8_000
+                && $0.sourceColor == .init(1, 0.5, 0)
+        })
+        XCTAssertEqual(
+            updated.activeDrawIndices.map { updated.preparedDraws[$0] },
+            updated.draws
+        )
+    }
+
+    /// The frame's visual effects and the world's weapon objects reach the
+    /// renderer's composition.
+    func testConcussionSimulationFrameReachesRendererComposition() throws {
+        let level = try makePlayerConcussionLevel()
+        let simulation = GameSession(
+            level: level, presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(
+            at: 0.01, input: .init(firesSecondaryWeapon: true)
+        )
+        let concussion = try XCTUnwrap(level.weapon(named: "Concussion"))
+        XCTAssertEqual(
+            simulation.world.objects.filter { $0.type == .weapon }.count,
+            1
+        )
+        let initial = try makeMetalWorldPlan(
+            level: level, playerView: frame.playerView
+        )
+        let updated = try updateMetalWorldPlan(
+            initial, level: level, world: simulation.world, frame: frame,
+            drawableAspect: 1
+        )
+        XCTAssertTrue(updated.draws.contains { $0.model == concussion.model })
+    }
+
+    /// The turret's dynamic_wb angles turn its turret submodels, and its
+    /// weapon objects draw with their weapon model (RT_WEAPON), through the
+    /// retained plan.
+    func testTurretAnglesAndWeaponObjectsReachRetainedMetalPlan()
+        throws
+    {
+        var level = makeTrainingDodgeAttemptLevel()
+        let turret = level.findObjectName("DodgeTurrett")
+        let playerIndex = try XCTUnwrap(
+            level.objects.firstIndex {
+                $0.handle == level.defaultPlayerBinding?.objectHandle
+            })
+        let start = try XCTUnwrap(
+            level.objects.first {
+                $0.handle == level.findObjectName("StartDodge").rawValue
+            })
+        level.objects[playerIndex].location = start.location
+        level.objects[playerIndex].position = start.position
+        let simulation = GameSession(
+            level: level, presentationReadyTimestamp: 0
+        )
+        // The player starts on StartDodge at rest; its contact is the
+        // collide_two_objects call of a move into it.
+        simulation.collidePlayer(with: "StartDodge")
+        var frame = simulation.update(at: 0.1, input: .zero)
+        var timestamp = 0.1
+        func weapons() -> [GameObject] {
+            simulation.world.objects.filter { $0.type == .weapon }
+        }
+        for _ in 0..<300 where weapons().isEmpty {
+            timestamp += 0.1
+            frame = simulation.update(at: timestamp, input: .zero)
+        }
+        XCTAssertFalse(weapons().isEmpty)
+        XCTAssertTrue(
+            try XCTUnwrap(simulation.world.objects[turret])
+                .weaponBatteries[0].turretAngles.contains { $0 != 0 }
+        )
+
+        let initial = try makeMetalWorldPlan(
+            level: simulation.runtimeLevel, playerView: frame.playerView
+        )
+        let initialTurretVertices = initial.draws.filter {
+            $0.objectHandle == turret.rawValue
+        }.flatMap(\.vertices)
+        let updated = try updateMetalWorldPlan(
+            initial,
+            level: simulation.level,
+            objects: simulation.world.objects,
+            roomStates: simulation.world.rooms,
+            playerView: frame.playerView,
+            presentationFrame: .init(
+                systemsFrameDuration: frame.systemsFrameDuration,
+                systemsGameTime: frame.systemsGameTime
+            )
+        )
+        let updatedTurretVertices = updated.draws.filter {
+            $0.objectHandle == turret.rawValue
+        }.flatMap(\.vertices)
+        XCTAssertNotEqual(updatedTurretVertices, initialTurretVertices)
+        let laser = try XCTUnwrap(level.weapons?.first?.model)
+        XCTAssertTrue(
+            updated.draws.contains {
+                $0.objectHandle == UInt32.max && $0.model == laser
+            })
+    }
+
+    /// An object light a script turns on (aObjSetLightingDist, Script 019)
+    /// lights the world with its page's flicker and the script's color.
+    func testScriptObjectLightReachesRetainedMetalPlan() throws {
+        let level = makeTrainingDodgeAttemptLevel()
+        let playerView = defaultPlayerView(in: level)
+        let marker = level.findObjectName("FlashLight-1")
+        let initial = try makeMetalWorldPlan(
+            level: level, playerView: playerView
+        )
+        var world = GameWorld(level: level)
+        func plan(_ world: GameWorld) throws -> MetalWorldPlan {
+            try updateMetalWorldPlan(
+                initial,
+                level: level,
+                objects: world.objects,
+                roomStates: RoomState.canonical(level),
+                playerView: playerView,
+                // At Gametime 0.5 the page's LF_PULSE (interval 0.5) is at
+                // its full distance.
+                presentationFrame: .init(
+                    systemsFrameDuration: 0.1, systemsGameTime: 0.5
+                )
+            )
+        }
+
+        let target = try XCTUnwrap(
+            plan(world).draws.first?.vertices.first?.position
+        )
+        var light = try XCTUnwrap(world.objects[marker])
+        light.location = .room(playerView.roomSourceIndex)
+        light.position = .init(x: target.x + 20, y: target.y, z: target.z)
+        world.objects[marker] = light
+        func lit(_ world: GameWorld) throws -> Float {
+            try plan(world).draws[0].vertices[0].dynamicLight.y
+        }
+        // Script 000 set its distance to 0: no light.
+        XCTAssertEqual(try lit(world), 0)
+        world.aObjSetLightingDist(marker, 50)
+        XCTAssertGreaterThan(try lit(world), 0)
+    }
+
+    func testCloakAlphaReachesAuxiliaryCameraPlayerDraws() throws {
+        let level = scriptingTrainingCameraMonitorLevel(
+            makeTrainingCloakPickupLevel(), guideBot: false
+        )
+        let simulation = GameSession(
+            level: level, presentationReadyTimestamp: 0
+        )
+        let used = simulation.takeAndUseCameraMonitor(at: 0.1)
+        let monitor = try XCTUnwrap(used.popupView)
+        let initial = try makeMetalWorldPlan(
+            level: level, playerView: used.playerView
+        )
+
+        let faded = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
+            playerView: used.playerView,
+            popupView: monitor,
+            playerCloak: .init(
+                phase: .fadingOut, phaseRemaining: 0.5, phaseDuration: 1
+            )
+        )
+        let playerDraws = faded.auxiliaryDraws.filter {
+            $0.objectHandle == used.playerView.objectHandle
+        }
+
+        XCTAssertFalse(playerDraws.isEmpty)
+        for draw in playerDraws {
+            XCTAssertEqual(draw.blend, .sourceAlpha(opacity: 138))
+            for vertex in draw.vertices {
+                XCTAssertEqual(vertex.presentation.x, 0.54, accuracy: 0.000_1)
+            }
+        }
+
+        let cloakFrame = ObjectCloakFrame(
+            phase: .cloaked, phaseRemaining: 20, phaseDuration: 30
+        )
+        XCTAssertEqual(cloakFrame.objectDeformationRange, 0.1)
+        let baseline = try updateMetalWorldPlan(
+            initial, level: level, objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level), playerView: used.playerView,
+            popupView: monitor
+        )
+        let cloaked = try updateMetalWorldPlan(
+            initial,
+            level: level,
+            objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level),
+            playerView: used.playerView,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1, systemsGameTime: 1
+            ),
+            popupView: monitor,
+            playerCloak: cloakFrame
+        )
+        let baselinePlayerDraw = try XCTUnwrap(
+            baseline.auxiliaryDraws.first {
+                $0.objectHandle == used.playerView.objectHandle
+            }
+        )
+        let cloakedPlayerDraw = try XCTUnwrap(
+            cloaked.auxiliaryDraws.first {
+                $0.objectHandle == used.playerView.objectHandle
+                    && $0.model == baselinePlayerDraw.model
+                    && $0.submodelIndex
+                        == baselinePlayerDraw.submodelIndex
+                    && $0.faceIndex == baselinePlayerDraw.faceIndex
+            }
+        )
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == used.playerView.objectHandle
+        })
+        var changedVertexCount = 0
+        for (baselineVertex, cloakedVertex) in zip(
+            baselinePlayerDraw.vertices, cloakedPlayerDraw.vertices
+        ) {
+            let baselineOffset = SIMD3<Float>(
+                baselineVertex.position.x - player.position.x,
+                baselineVertex.position.y - player.position.y,
+                baselineVertex.position.z - player.position.z
+            )
+            let cloakedOffset = SIMD3<Float>(
+                cloakedVertex.position.x - player.position.x,
+                cloakedVertex.position.y - player.position.y,
+                cloakedVertex.position.z - player.position.z
+            )
+            let baselineRadius = (
+                baselineOffset.x * baselineOffset.x
+                    + baselineOffset.y * baselineOffset.y
+                    + baselineOffset.z * baselineOffset.z
+            ).squareRoot()
+            let cloakedRadius = (
+                cloakedOffset.x * cloakedOffset.x
+                    + cloakedOffset.y * cloakedOffset.y
+                    + cloakedOffset.z * cloakedOffset.z
+            ).squareRoot()
+            guard baselineRadius > 0 else { continue }
+            let ratio = cloakedRadius / baselineRadius
+            XCTAssertGreaterThanOrEqual(ratio, 0.9)
+            XCTAssertLessThanOrEqual(ratio, 1.1)
+            if abs(ratio - 1) > 0.000_1 {
+                changedVertexCount += 1
+            }
+        }
+        XCTAssertGreaterThan(changedVertexCount, 0)
+    }
+
+    func testCameraMonitorUsesSourceLeftBiggerPopupViewport() {
+        let viewport = cameraMonitorMetalViewport(
+            drawableWidth: 1_200, drawableHeight: 900
+        )
+
+        XCTAssertEqual(viewport.originX, 59.375)
+        XCTAssertEqual(viewport.originY, 609.375)
+        XCTAssertEqual(viewport.width, 281.25)
+        XCTAssertEqual(viewport.height, 281.25)
+    }
+
+    func testCameraMonitorUsesRetainedWorldPlanForItsSecurityCamera() throws {
+        let level = scriptingTrainingCameraMonitorLevel(
+            makeTrainingCameraMonitorLevel(), guideBot: false
+        )
+        let simulation = GameSession(
+            level: level, presentationReadyTimestamp: 0
+        )
+        let used = simulation.takeAndUseCameraMonitor(at: 0.1)
+        let initial = try makeMetalWorldPlan(
+            level: level, playerView: defaultPlayerView(in: level)
+        )
+
+        let updated = try updateMetalWorldPlan(
+            initial, level: simulation.level, objects: simulation.world.objects,
+            roomStates: simulation.world.rooms, playerView: used.playerView,
+            popupView: used.popupView
+        )
+
+        XCTAssertEqual(updated.auxiliaryCamera, used.popupView?.camera)
+        XCTAssertEqual(
+            updated.auxiliaryStartRoomSourceIndex,
+            used.popupView?.roomSourceIndex
+        )
+        XCTAssertFalse(updated.auxiliaryDraws.isEmpty)
+        XCTAssertEqual(
+            updated.auxiliaryActiveDrawIndices.map {
+                updated.preparedDraws[$0]
+            },
+            updated.auxiliaryDraws
+        )
+    }
+
+    func testCameraMonitorIncludesPlayerShipOutsidePrimaryFirstPersonView() throws {
+        let level = makeTrainingCameraMonitorLevel()
+        let playerView = defaultPlayerView(in: level)
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == playerView.objectHandle
+        })
+        let initial = try makeMetalWorldPlan(
+            level: level, playerView: playerView
+        )
+        let monitor = SmallViewFrame(
+            window: 0,
+            camera: RoomCamera(
+                position: .init(
+                    x:
+                        player.position.x
+                        - player.orientation.forward.x * 20,
+                    y:
+                        player.position.y
+                        - player.orientation.forward.y * 20,
+                    z:
+                        player.position.z
+                        - player.orientation.forward.z * 20
+                ),
+                target: player.position,
+                up: player.orientation.up
+            ),
+            roomSourceIndex: playerView.roomSourceIndex,
+            viewerObjectHandle: 6_183,
+            remainingDuration: 10,
+            isPopup: true
+        )
+
+        let updated = try updateMetalWorldPlan(
+            initial, level: level, objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level), playerView: playerView,
+            popupView: monitor
+        )
+
+        XCTAssertFalse(updated.draws.contains {
+            $0.objectHandle == playerView.objectHandle
+        })
+        XCTAssertTrue(updated.auxiliaryDraws.contains {
+            $0.objectHandle == playerView.objectHandle
+        })
+    }
+
+    func testCameraMonitorRefreshesPlayerVisibleOnlyToAuxiliaryCamera() throws {
+        var level = makeTrainingCameraMonitorLevel()
+        let initialPlayerView = defaultPlayerView(in: level)
+        let initial = try makeMetalWorldPlan(
+            level: level, playerView: initialPlayerView
+        )
+        let initialPlayerDraw = try XCTUnwrap(
+            initial.preparedDraws.first {
+                $0.objectHandle == initialPlayerView.objectHandle
+            }
+        )
+        let playerIndex = try XCTUnwrap(level.objects.firstIndex {
+            $0.handle == initialPlayerView.objectHandle
+        })
+        let oldPosition = level.objects[playerIndex].position
+        level.objects[playerIndex].position = .init(
+            x: oldPosition.x + 5, y: oldPosition.y, z: oldPosition.z
+        )
+        let movedPlayerView = defaultPlayerView(in: level)
+        let movedPlayer = level.objects[playerIndex]
+        let monitor = SmallViewFrame(
+            window: 0,
+            camera: RoomCamera(
+                position: .init(
+                    x:
+                        movedPlayer.position.x
+                        - movedPlayer.orientation.forward.x * 20,
+                    y:
+                        movedPlayer.position.y
+                        - movedPlayer.orientation.forward.y * 20,
+                    z:
+                        movedPlayer.position.z
+                        - movedPlayer.orientation.forward.z * 20
+                ),
+                target: movedPlayer.position,
+                up: movedPlayer.orientation.up
+            ),
+            roomSourceIndex: movedPlayerView.roomSourceIndex,
+            viewerObjectHandle: 6_183,
+            remainingDuration: 10,
+            isPopup: true
+        )
+
+        let updated = try updateMetalWorldPlan(
+            initial, level: level, objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level), playerView: movedPlayerView,
+            popupView: monitor
+        )
+        let auxiliaryPlayerDraw = try XCTUnwrap(
+            updated.auxiliaryDraws.first {
+                $0.objectHandle == movedPlayerView.objectHandle
+            }
+        )
+        let freshAuxiliary = try makeMetalWorldPlan(
+            level: level, camera: monitor.camera,
+            startRoomSourceIndex: monitor.roomSourceIndex
+        )
+        let freshPlayerDraw = try XCTUnwrap(freshAuxiliary.draws.first {
+            $0.objectHandle == movedPlayerView.objectHandle
+        })
+
+        XCTAssertNotEqual(auxiliaryPlayerDraw.vertices, initialPlayerDraw.vertices)
+        XCTAssertEqual(auxiliaryPlayerDraw, freshPlayerDraw)
+    }
+
+    func testCameraMonitorKeepsFacingGeometryDistinctForBothViews() throws {
+        let level = makeTrainingCameraMonitorLevel()
+        let playerView = defaultPlayerView(in: level)
+        let player = try XCTUnwrap(level.objects.first {
+            $0.handle == playerView.objectHandle
+        })
+        let monitor = SmallViewFrame(
+            window: 0,
+            camera: RoomCamera(
+                position: .init(
+                    x: player.position.x + player.orientation.right.x * 20,
+                    y: player.position.y + player.orientation.right.y * 20,
+                    z: player.position.z + player.orientation.right.z * 20
+                ),
+                target: player.position,
+                up: player.orientation.up
+            ),
+            roomSourceIndex: playerView.roomSourceIndex,
+            viewerObjectHandle: 6_183,
+            remainingDuration: 10,
+            isPopup: true
+        )
+        let initial = try makeMetalWorldPlan(
+            level: level, playerView: playerView
+        )
+
+        let updated = try updateMetalWorldPlan(
+            initial, level: level, objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level), playerView: playerView,
+            popupView: monitor
+        )
+        let auxiliaryFacingHandles = Set(
+            updated.auxiliaryDraws
+                .filter { $0.submodelIndex == 3 }
+                .compactMap(\.objectHandle)
+        )
+        let primaryFacing = try XCTUnwrap(updated.draws.first {
+            $0.submodelIndex == 3
+                && $0.objectHandle.map(auxiliaryFacingHandles.contains) == true
+        })
+        let objectHandle = primaryFacing.objectHandle
+        let model = primaryFacing.model
+        let submodelIndex = primaryFacing.submodelIndex
+        let faceIndex = primaryFacing.faceIndex
+        let auxiliaryFacing = try XCTUnwrap(
+            updated.auxiliaryDraws.first {
+                $0.objectHandle == objectHandle
+                    && $0.model == model
+                    && $0.submodelIndex == submodelIndex
+                    && $0.faceIndex == faceIndex
+            }
+        )
+        XCTAssertNotEqual(primaryFacing.vertices, auxiliaryFacing.vertices)
+    }
+
+    func testUsesPerDrawLocalCoronaIndicesWithOffsetVertexBindings() {
+        XCTAssertEqual(
+            makeMetalLightCoronaIndices(drawCapacity: 3),
+            [0, 1, 2, 0, 2, 3, 0, 1, 2, 0, 2, 3, 0, 1, 2, 0, 2, 3]
+        )
+    }
+
+    func testSchedulesCoronaWithOldDeltaDrawThenPostUpdateAndFadeLifetime() throws {
+        let level = makeCoronaEvaluationLevel()
+        let camera = RoomCamera(
+            position: .init(x: 0, y: -100, z: 0),
+            target: .init(x: 0, y: -99, z: 0), up: .init(x: 0, y: 0, z: 1)
+        )
+        let initial = try makeMetalWorldPlan(
+            level: level, camera: camera, startRoomSourceIndex: 3
+        )
+        XCTAssertEqual(initial.lightCoronaStates.map(\.scalar), [0])
+        XCTAssertEqual(initial.lightCoronaDraws.map(\.opacity), [0])
+
+        let fullScalar = try updateMetalWorldPlan(
+            initial,
+            camera: camera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.25, systemsGameTime: 0
+            )
+        )
+        let clamped = try updateMetalWorldPlan(
+            fullScalar,
+            camera: camera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0, systemsGameTime: 0
+            )
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(clamped.lightCoronaDraws.first).opacity,
+            102.0 / 255.0, accuracy: 0.000_001
+        )
+
+        let interiorCamera = RoomCamera(
+            position: .init(x: 0, y: -19, z: 0),
+            target: .init(x: 0, y: -18, z: 0), up: .init(x: 0, y: 0, z: 1)
+        )
+        let interior = try updateMetalWorldPlan(
+            fullScalar,
+            camera: interiorCamera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0, systemsGameTime: 0
+            )
+        )
+        let interiorCorona = try XCTUnwrap(
+            fullScalar.lightCoronaStates.first
+        ).corona
+        let toEye = Vector3(
+            x: interiorCamera.position.x - interiorCorona.firstVertex.x,
+            y: interiorCamera.position.y - interiorCorona.firstVertex.y,
+            z: interiorCamera.position.z - interiorCorona.firstVertex.z
+        )
+        let toEyeSquared = toEye.x * toEye.x
+            + toEye.y * toEye.y
+            + toEye.z * toEye.z
+        let toEyeLength = sqrt(toEyeSquared)
+        let facingDot = toEye.x * interiorCorona.normal.x
+            + toEye.y * interiorCorona.normal.y
+            + toEye.z * interiorCorona.normal.z
+        let expectedInteriorFacing = 2 * facingDot / toEyeLength
+        let offset = Vector3(
+            x: interiorCorona.center.x - interiorCamera.position.x,
+            y: interiorCorona.center.y - interiorCamera.position.y,
+            z: interiorCorona.center.z - interiorCamera.position.z
+        )
+        let distanceSquared = offset.x * offset.x
+            + offset.y * offset.y
+            + offset.z * offset.z
+        let interiorDistance = sqrt(distanceSquared)
+        let expectedInteriorFade = (
+            interiorDistance - interiorCorona.size * 5
+        ) / (interiorCorona.size * 15)
+        XCTAssertEqual(
+            try XCTUnwrap(interior.lightCoronaDraws.first).opacity,
+            expectedInteriorFacing * expectedInteriorFade * (102.0 / 255.0),
+            accuracy: 0.000_001
+        )
+
+        let first = try updateMetalWorldPlan(
+            initial,
+            camera: camera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1, systemsGameTime: 0
+            )
+        )
+        XCTAssertEqual(first.lightCoronaDraws.map(\.opacity), [0])
+        XCTAssertEqual(first.lightCoronaStates.map(\.scalar), [0.4])
+        XCTAssertEqual(first.presentationVisualTick, 0)
+
+        let second = try updateMetalWorldPlan(
+            first,
+            camera: camera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.016, systemsGameTime: 0.016
+            )
+        )
+        XCTAssertGreaterThan(try XCTUnwrap(second.lightCoronaDraws.first).opacity, 0)
+        XCTAssertEqual(
+            try XCTUnwrap(second.lightCoronaStates.first).scalar, 0.464,
+            accuracy: 0.000_001
+        )
+        let expectedFacing = 2 * 121 / sqrt(Float(121 * 121 + 2))
+        XCTAssertEqual(
+            try XCTUnwrap(second.lightCoronaDraws.first).opacity,
+            min(expectedFacing * 0.4, 1) * (102.0 / 255.0), accuracy: 0.000_001
+        )
+        XCTAssertEqual(second.presentationVisualTick, 0)
+
+        let nearCamera = RoomCamera(
+            position: .init(x: 0, y: 1, z: 0), target: .init(x: 0, y: 2, z: 0),
+            up: .init(x: 0, y: 0, z: 1)
+        )
+        let fading = try updateMetalWorldPlan(
+            second,
+            camera: nearCamera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.1, systemsGameTime: 1.0 / 60
+            )
+        )
+        XCTAssertEqual(fading.lightCoronaDraws.count, 1)
+        XCTAssertEqual(try XCTUnwrap(fading.lightCoronaDraws.first).opacity, 0)
+        XCTAssertEqual(
+            try XCTUnwrap(fading.lightCoronaStates.first).scalar, 0.064,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(fading.presentationVisualTick, 1)
+
+        let retainedAtZero = try updateMetalWorldPlan(
+            fading,
+            camera: nearCamera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.016, systemsGameTime: 2.0 / 60
+            )
+        )
+        XCTAssertEqual(retainedAtZero.lightCoronaDraws.count, 1)
+        XCTAssertEqual(try XCTUnwrap(retainedAtZero.lightCoronaDraws.first).opacity, 0)
+        XCTAssertEqual(
+            try XCTUnwrap(retainedAtZero.lightCoronaStates.first).scalar, 0,
+            accuracy: 0.000_001
+        )
+
+        let removedAfterZeroDraw = try updateMetalWorldPlan(
+            retainedAtZero,
+            camera: nearCamera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.001, systemsGameTime: 3.0 / 60
+            )
+        )
+        XCTAssertEqual(removedAfterZeroDraw.lightCoronaDraws.count, 1)
+        XCTAssertTrue(removedAfterZeroDraw.lightCoronaStates.isEmpty)
+
+        let absent = try updateMetalWorldPlan(
+            removedAfterZeroDraw,
+            camera: nearCamera,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.001, systemsGameTime: 4.0 / 60
+            )
+        )
+        XCTAssertTrue(absent.lightCoronaDraws.isEmpty)
+        XCTAssertTrue(absent.lightCoronaStates.isEmpty)
+    }
+
+    func testBuildsCameraFacingTintedCoronaVerticesForTheSharedWorldPass() throws {
+        let level = makeCoronaEvaluationLevel()
+        let camera = RoomCamera(
+            position: .zero, target: .init(x: 0, y: 1, z: 0),
+            up: .init(x: 0, y: 0, z: 1)
+        )
+        let corona = try XCTUnwrap(
+            try makeMetalWorldPlan(
+                level: level, camera: camera, startRoomSourceIndex: 3
+            ).preparedLightCoronaCandidates.first
+        )
+
+        let vertices = makeMetalLightCoronaVertices(
+            corona, camera: camera, imageWidth: 2, imageHeight: 1, opacity: 0.25
+        )
+
+        XCTAssertEqual(vertices.count, 4)
+        XCTAssertEqual(vertices.map(\.textureAndLightmapUV), [
+            .init(0, 0, 0, 0), .init(1, 0, 0, 0), .init(1, 1, 0, 0),
+            .init(0, 1, 0, 0),
+        ])
+        XCTAssertTrue(vertices.allSatisfy {
+            $0.presentation == .init(0.25, 0, 1, 0)
+                && $0.surfaceColor == .init(0.25, 0.5, 0.75, 0)
+        })
+        XCTAssertEqual(vertices[0].position.x, 4, accuracy: 0.000_001)
+        XCTAssertEqual(vertices[0].position.z, 2, accuracy: 0.000_001)
+        XCTAssertEqual(vertices[2].position.x, -4, accuracy: 0.000_001)
+        XCTAssertEqual(vertices[2].position.z, -2, accuracy: 0.000_001)
+    }
+
+    func testUpdatesPlayerCameraAndActiveDrawsWithoutReplacingPreparedPresentation() throws {
+        let level = makeSliceSixObjectRenderLevel()
+        let initialView = defaultPlayerView(in: level)
+        let initial = try makeMetalWorldPlan(level: level, playerView: initialView)
+        let simulation = GameSession(
+            level: level, presentationReadyTimestamp: 0
+        )
+        let frame = simulation.update(
+            at: 0.016, input: .init(forward: 1, sideways: 1)
+        )
+
+        let updated = try updateMetalWorldPlan(
+            initial, level: simulation.level, objects: simulation.world.objects,
+            roomStates: simulation.world.rooms, playerView: frame.playerView
+        )
+
+        XCTAssertEqual(
+            updated.preparedDraws.map(\.indices),
+            initial.preparedDraws.map(\.indices)
+        )
+        XCTAssertNotEqual(updated.camera, initial.camera)
+        XCTAssertEqual(
+            updated.activeDrawIndices.map { updated.preparedDraws[$0] },
+            updated.draws
+        )
+        XCTAssertFalse(updated.draws.contains {
+            $0.objectHandle == frame.playerView.objectHandle
+        })
+    }
+
+    func testUpdatesReachedRotatingSubmodelFromPreUpdateGameTime() throws {
+        let level = makeSliceSixObjectRenderLevel()
+        let initial = try makeMetalWorldPlan(
+            level: level, camera: .trainingRoom3, startRoomSourceIndex: 3
+        )
+        let before = try XCTUnwrap(initial.preparedDraws.first {
+            $0.objectHandle == 6_147 && $0.submodelIndex == 4
+        })
+
+        let updated = try updateMetalWorldPlan(
+            initial,
+            camera: .trainingRoom3,
+            presentationFrame: .init(
+                systemsFrameDuration: 0.016, systemsGameTime: 0.25
+            )
+        )
+        let after = try XCTUnwrap(updated.preparedDraws.first {
+            $0.objectHandle == 6_147 && $0.submodelIndex == 4
+        })
+
+        XCTAssertNotEqual(after.vertices, before.vertices)
+        XCTAssertEqual(
+            after.vertices[0].position.x, 2_064.0604, accuracy: 0.001
+        )
+        XCTAssertEqual(
+            after.vertices[0].position.z, 2_208.0276, accuracy: 0.001
+        )
+        XCTAssertEqual(
+            updated.activeDrawIndices.map { updated.preparedDraws[$0] },
+            updated.draws
+        )
+    }
+
+    func testF4ActivatesReservedGuidebotDrawInTheRetainedPlan() throws {
+        let level = withTrainingGuideBot(makeTrainingRobotGuidebotLevel())
+        let playerView = defaultPlayerView(in: level)
+        let initial = try makeMetalWorldPlan(
+            level: level, playerView: playerView
+        )
+        // The Guide-Bot AIInitAll makes at level start has prepared draws.
+        let guidebotHandle = GameWorld(level: level).buddyHandle.rawValue
+        XCTAssertNotEqual(guidebotHandle, ObjectHandle.none.rawValue)
+        XCTAssertTrue(initial.preparedDraws.contains {
+            $0.objectHandle == guidebotHandle
+        })
+        XCTAssertFalse(initial.draws.contains {
+            $0.objectHandle == guidebotHandle
+        })
+
+        let simulation = GameSession(
+            level: level, presentationReadyTimestamp: 0
+        )
+        simulation.releaseOrRecallTestGuideBot()
+        let frame = simulation.update(at: 0.1, input: .zero)
+        let updated = try updateMetalWorldPlan(
+            initial, level: simulation.level, objects: simulation.world.objects,
+            roomStates: simulation.world.rooms, playerView: frame.playerView
+        )
+
+        XCTAssertTrue(updated.draws.contains {
+            $0.objectHandle == guidebotHandle
+        })
+        XCTAssertEqual(
+            updated.activeDrawIndices.map { updated.preparedDraws[$0] },
+            updated.draws
+        )
+    }
+
+    func testDynamicPlanMatchesFreshVisibilityAdmissionBackfaceAndLODSelection() throws {
+        var level = makeSliceSixObjectRenderLevel()
+        let initialView = defaultPlayerView(in: level)
+        let initial = try makeMetalWorldPlan(level: level, playerView: initialView)
+        let playerIndex = level.objects.firstIndex {
+            $0.handle == initialView.objectHandle
+        }!
+        level.objects[playerIndex].location = .room(3)
+        level.objects[playerIndex].position = RoomCamera.trainingRoom3.position
+        level.objects[playerIndex].orientation = .init(
+            right: .init(x: 1, y: 0, z: 0), up: .init(x: 0, y: 0, z: 1),
+            forward: .init(x: 0, y: 1, z: 0)
+        )
+        let movedView = defaultPlayerView(in: level)
+
+        let updated = try updateMetalWorldPlan(
+            initial, level: level, objects: ObjectTable(level: level),
+            roomStates: RoomState.canonical(level), playerView: movedView
+        )
+        let fresh = try makeMetalWorldPlan(level: level, playerView: movedView)
+
+        XCTAssertEqual(
+            updated.preparedDraws.map(\.indices),
+            initial.preparedDraws.map(\.indices)
+        )
+        XCTAssertNotEqual(updated.visibleRoomSourceIndices, initial.visibleRoomSourceIndices)
+        XCTAssertNotEqual(updated.activeDrawIndices, initial.activeDrawIndices)
+        XCTAssertEqual(updated.visibleRoomSourceIndices, fresh.visibleRoomSourceIndices)
+        XCTAssertEqual(updated.activeDrawIndices, fresh.activeDrawIndices)
+        XCTAssertEqual(updated.draws, fresh.draws)
+    }
+
+    func testResizeRecomputesRetainedPlanFromCurrentDrawableAspect() throws {
+        let level = makeSliceSixObjectRenderLevel()
+        let initialView = defaultPlayerView(in: level)
+        let initial = try makeMetalWorldPlan(level: level, playerView: initialView)
+        let resizedCamera = RoomCamera(
+            position: initial.camera.position, target: initial.camera.target,
+            up: initial.camera.up,
+            projection: initial.camera.projection.withAspectRatio(16.0 / 9.0)
+        )
+
+        let resized = try updateMetalWorldPlan(initial, camera: resizedCamera)
+
+        XCTAssertEqual(resized.camera, resizedCamera)
+        XCTAssertEqual(
+            resized.preparedDraws.map(\.indices),
+            initial.preparedDraws.map(\.indices)
+        )
+        XCTAssertEqual(
+            resized.activeDrawIndices.map { resized.preparedDraws[$0] },
+            resized.draws
+        )
+        XCTAssertFalse(resized.draws.contains {
+            $0.objectHandle == initialView.objectHandle
+        })
+    }
+
+    func testAddsObjectModelsToTheOneWorldPlanWithTypedMaterials() throws {
+        let plan = try makeMetalWorldPlan(
+            level: makeSliceSixObjectRenderLevel(), camera: .trainingRoom3,
+            startRoomSourceIndex: 3
+        )
+
+        let objectDraws = plan.draws.filter { $0.objectHandle != nil }
+        var seenObjectHandles: Set<UInt32> = []
+        XCTAssertEqual(
+            objectDraws.compactMap(\.objectHandle).filter {
+                seenObjectHandles.insert($0).inserted
+            },
+            [18_441, 2_048, 12_300, 6_147]
+        )
+        let player = try XCTUnwrap(objectDraws.first { $0.objectHandle == 2_048 })
+        XCTAssertEqual(player.model?.sourceName, "PyroGLMed.OOF")
+        XCTAssertEqual(player.texture?.sourceName, "model-surface")
+        XCTAssertEqual(player.blend, .sourceAlpha(opacity: 255))
+        XCTAssertTrue(player.writesDepth)
+        XCTAssertEqual(player.vertices[0].position.x, 2_058.6497, accuracy: 0.0002)
+
+        let startCourse = try XCTUnwrap(
+            objectDraws.first { $0.objectHandle == 6_147 }
+        )
+        XCTAssertNil(startCourse.texture)
+        XCTAssertEqual(
+            startCourse.sourceColor,
+            SIMD3<Float>(32.0 / 255, 64.0 / 255, 96.0 / 255)
+        )
+        XCTAssertEqual(startCourse.vertices[0].surfaceColor.w, 1)
+    }
+
+    func testBuildsTheSourceOrderedRoomThreeMetalPlanFromTypedPresentationValues() throws {
+        let plan = try makeMetalWorldPlan(
+            level: makeSelectedRoomRenderLevel(),
+            camera: .init(
+                position: .zero, target: .init(x: 0, y: 1, z: 0),
+                up: .init(x: 0, y: 0, z: 1)
+            ),
+            startRoomSourceIndex: 3
+        )
+
+        XCTAssertEqual(plan.visibleRoomSourceIndices, [3, 2, 1])
+        XCTAssertEqual(
+            plan.draws.map { "\($0.roomSourceIndex):\($0.faceIndex)" },
+            ["1:1", "2:0", "3:0"]
+        )
+        XCTAssertGreaterThan(plan.preparedDraws.count, plan.draws.count)
+        XCTAssertEqual(
+            plan.activeDrawIndices.map { plan.preparedDraws[$0] },
+            plan.draws
+        )
+        XCTAssertEqual(plan.draws.map(\.blend), [
+            .opaque, .additiveSourceAlpha(opacity: 178),
+            .additiveSourceAlpha(opacity: 178),
+        ])
+
+        let forceField = try XCTUnwrap(plan.draws.last)
+        XCTAssertEqual(forceField.vertices.count, 4)
+        XCTAssertEqual(forceField.indices, [0, 1, 2, 0, 2, 3])
+        XCTAssertEqual(
+            forceField.vertices[0].textureAndLightmapUV,
+            SIMD4<Float>(1, 1, 0, 0)
+        )
+        XCTAssertEqual(
+            forceField.vertices[0].presentation.x, Float(178) / 255,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(forceField.vertices[0].presentation.y, 1, accuracy: 0.000_001)
+        XCTAssertNil(forceField.lightmapPageIndex)
+    }
+}

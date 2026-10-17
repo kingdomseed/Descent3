@@ -52,8 +52,6 @@
 
 std::filesystem::path orig_pwd;
 
-static volatile char already_tried_signal_cleanup = 0;
-
 void just_exit() {
   ddio_InternalClose(); // try to reset serial port.
 
@@ -66,31 +64,9 @@ void just_exit() {
 
 #if defined(POSIX)
 void fatal_signal_handler(int signum) {
-  switch (signum) {
-  case SIGHUP:
-  case SIGTRAP:
-  case SIGABRT:
-  case SIGBUS:
-  case SIGFPE:
-  case SIGILL:
-  case SIGQUIT:
-  case SIGSEGV:
-  case SIGTERM:
-  case SIGVTALRM:
-  case SIGINT:
-    if (already_tried_signal_cleanup)
-      LOG_WARNING << "Recursive signal cleanup! Hard exit! AHHGGGG!";
-    else {
-      already_tried_signal_cleanup = 1;
-      LOG_WARNING.printf("SIGNAL %d caught, aborting", signum);
-      just_exit();
-    } // else
-    break;
-  default:
-    break;
-  }
-
-  _exit(-10);
+  // Logging, SDL cleanup, and sync are not async-signal-safe. Calling any of
+  // them here can deadlock when the signal interrupts the same subsystem.
+  _exit(128 + signum);
 }
 
 void install_signal_handlers() {

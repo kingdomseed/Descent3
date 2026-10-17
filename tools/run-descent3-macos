@@ -1,0 +1,91 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd -P)
+REPO_ROOT=$(CDPATH= cd "$SCRIPT_DIR/.." && pwd -P)
+
+D3_INSTALL_DIR=${D3_INSTALL_DIR:-"$REPO_ROOT/builds/mac/installed"}
+D3_RETAIL_DIR=${D3_RETAIL_DIR:-"$REPO_ROOT/retail-data/descent3"}
+
+usage() {
+  cat <<'EOF'
+Usage: tools/run-descent3-macos [--check] [--] [descent3 arguments...]
+
+Launch the local macOS Descent 3 build with owned retail data mounted from
+outside Git. Unrecognized arguments are passed directly to Descent 3.
+
+Options:
+  --check    Validate the engine and retail-data layout without launching.
+  -h, --help Show this help.
+
+Environment:
+  D3_INSTALL_DIR  Installed engine directory (default: builds/mac/installed)
+  D3_RETAIL_DIR   Retail data directory (default: retail-data/descent3)
+
+Examples:
+  tools/run-descent3-macos --check
+  tools/run-descent3-macos -windowed -width 1280 -height 720 -nointro
+  D3_RETAIL_DIR=/Volumes/Games/Descent3 tools/run-descent3-macos -windowed
+EOF
+}
+
+fail() {
+  printf 'error: %s\n' "$1" >&2
+  printf 'hint: run %s --help\n' "$0" >&2
+  exit 1
+}
+
+require_dir() {
+  [ -d "$1" ] || fail "required directory not found: $1"
+}
+
+require_file() {
+  [ -f "$1" ] || fail "required file not found: $1"
+}
+
+validate_runtime() {
+  require_dir "$D3_INSTALL_DIR"
+  require_dir "$D3_RETAIL_DIR"
+
+  D3_INSTALL_DIR=$(CDPATH= cd "$D3_INSTALL_DIR" && pwd -P)
+  D3_RETAIL_DIR=$(CDPATH= cd "$D3_RETAIL_DIR" && pwd -P)
+  D3_BINARY="$D3_INSTALL_DIR/Descent3.app/Contents/MacOS/Descent3"
+
+  [ -x "$D3_BINARY" ] || fail "Descent 3 executable not found or not executable: $D3_BINARY"
+  require_file "$D3_INSTALL_DIR/d3-osx.hog"
+  require_file "$D3_RETAIL_DIR/d3.hog"
+  require_file "$D3_RETAIL_DIR/ppics.hog"
+  require_file "$D3_RETAIL_DIR/missions/d3.mn3"
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  --check)
+    [ "$#" -eq 1 ] || fail "--check does not accept game arguments"
+    validate_runtime
+    printf 'Descent 3 runtime is ready.\n'
+    printf 'binary: %s\n' "$D3_BINARY"
+    printf 'engine data: %s\n' "$D3_INSTALL_DIR"
+    printf 'retail data: %s\n' "$D3_RETAIL_DIR"
+    if [ ! -f "$D3_RETAIL_DIR/extra13.hog" ]; then
+      printf 'warning: extra13.hog is missing; the imported CD data is not yet at the supported 1.4 level.\n' >&2
+    fi
+    exit 0
+    ;;
+  --)
+    shift
+    ;;
+esac
+
+validate_runtime
+cd "$D3_INSTALL_DIR"
+
+exec "$D3_BINARY" \
+  -additionaldir "$D3_RETAIL_DIR" \
+  -additionaldir "$D3_INSTALL_DIR" \
+  "$@"
